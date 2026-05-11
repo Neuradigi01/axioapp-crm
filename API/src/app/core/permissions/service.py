@@ -54,3 +54,35 @@ async def register_permission(
     )
     result = await session.execute(select(Permission).where(Permission.key == key))
     return result.scalar_one()
+
+
+async def register_permissions(
+    session: AsyncSession, keys: list[str]
+) -> list[Permission]:
+    """Bulk-upsert permission keys into the global registry.
+
+    Each `key` must be `"<module>.<action>"` — the prefix is used to
+    populate the `module` column. Called from the module-registry
+    startup hook for every `MODULE.permissions` list.
+    """
+    if not keys:
+        return []
+
+    rows = []
+    for key in keys:
+        module_prefix, _, _ = key.partition(".")
+        if not module_prefix:
+            raise ValueError(
+                f"permission key {key!r} must be '<module>.<action>'"
+            )
+        rows.append({"key": key, "module": module_prefix, "description": None})
+
+    await session.execute(
+        pg_insert(Permission).values(rows).on_conflict_do_nothing(index_elements=["key"])
+    )
+    await session.commit()
+
+    result = await session.execute(
+        select(Permission).where(Permission.key.in_(keys))
+    )
+    return list(result.scalars().all())

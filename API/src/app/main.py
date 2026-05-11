@@ -25,7 +25,11 @@ from config import APP_NAME, STATIC_DIR, UPLOAD_DIR
 from src.app.core.audit.router import router as audit_router
 from src.app.core.auth.router import router as auth_router
 from src.app.core.health.router import router as health_router
+from src.app.core.module_registry import discover_modules, registry
+from src.app.core.modules_router import router as modules_router
+from src.app.core.permissions.service import register_permissions
 from src.app.core.users.router import router as users_router
+from src.app.shared.db import async_session
 from src.app.shared.middleware import TenantContextMiddleware
 
 
@@ -34,6 +38,19 @@ async def lifespan(app: FastAPI):
     logger.info("FurnitureCRM API starting up...")
     await generate_routes_json()
     initialize_firebase()
+
+    registry.clear()
+    discover_modules()
+    discovered_ids = [m.id for m in registry.list()]
+    logger.info("discovered modules: %s", discovered_ids)
+
+    all_permission_keys: list[str] = []
+    for module in registry.list():
+        all_permission_keys.extend(module.permissions)
+    if all_permission_keys:
+        async with async_session() as session:
+            await register_permissions(session, all_permission_keys)
+
     yield
     logger.info("FurnitureCRM API shutting down...")
 
@@ -63,6 +80,7 @@ app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
+app.include_router(modules_router, prefix="/api/v1")
 
 
 @app.middleware("http")
