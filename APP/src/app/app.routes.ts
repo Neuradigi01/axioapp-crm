@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from '@core/guards/auth.guard';
 import { getRoute } from '@core/services/routes-helper.service';
+import { furnitureAuthGuard } from './features/user/core/auth/auth.guard';
 
 export const appRoutes: Routes = [
   {
@@ -19,8 +20,7 @@ export const appRoutes: Routes = [
     path: getRoute('user').path,
     loadChildren: () =>
       import('./features/user/user.routes').then((m) => m.userRoutes),
-    canActivate: [authGuard],
-    data: { role: 'User' },
+    canActivate: [furnitureAuthGuard],
   },
   {
     path: getRoute('admin').path,

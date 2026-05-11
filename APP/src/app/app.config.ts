@@ -1,5 +1,6 @@
 import {
   ApplicationConfig,
+  ErrorHandler,
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
   isDevMode,
@@ -16,13 +17,16 @@ import { RoutesHelperService } from '@core/services/routes-helper.service';
 import { ThemeService } from '@core/services/theme.service';
 import { SwUpdateService } from '@core/services/sw-update.service';
 import { AppConfigApiService } from '@app/services/app-config-api.service';
+import { jwtInterceptor } from './features/user/core/auth/jwt.interceptor';
+import { GlobalErrorHandler } from './features/user/core/error/global-error-handler';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideRouter([]),
-    provideHttpClient(withInterceptors([authInterceptor])),
+    provideHttpClient(withInterceptors([jwtInterceptor, authInterceptor])),
+    { provide: ErrorHandler, useClass: GlobalErrorHandler },
     provideAnimationsAsync(),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),

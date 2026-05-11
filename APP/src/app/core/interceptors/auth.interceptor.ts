@@ -8,6 +8,12 @@ import { SNACKBAR_DURATION, SNACKBAR_ACTION, ACTION_TOKEN_HEADER, ACTION_2FA_ERR
 import { MSG_ACTION_VERIFY_CANCELLED, MSG_ACCESS_DENIED } from '@core/constants/messages.constants';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  // FurnitureCRM (Step 1.9) handles `/api/v1/...` via its own jwtInterceptor;
+  // this legacy interceptor stays the source of truth for legacy `/api/...` routes.
+  if (req.url.includes('/api/v1/')) {
+    return next(req);
+  }
+
   const auth = inject(AuthService);
   const snackBar = inject(MatSnackBar);
   const actionVerify = inject(ActionVerifyService);

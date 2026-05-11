@@ -1,0 +1,19 @@
+<div class="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-6">
+  <div class="w-full max-w-md rounded-xl bg-white p-8 text-center shadow-sm ring-1 ring-zinc-200">
+    @if (loading()) {
+      <p class="text-sm text-zinc-500">Loading your profile…</p>
+    } @else if (error()) {
+      <h1 class="text-2xl font-semibold text-rose-700">Something went wrong</h1>
+      <p class="mt-2 text-sm text-zinc-500">{{ error() }}</p>
+    } @else if (user(); as u) {
+      <h1 class="text-2xl font-semibold text-zinc-900">
+        Welcome, {{ u.full_name }}
+      </h1>
+      <p class="mt-2 text-sm text-zinc-500">
+        Signed in as <span class="font-medium text-zinc-700">{{ u.role_name }}</span>
+      </p>
+      <p class="mt-1 text-xs text-zinc-400">{{ u.email }}</p>
+      <p class="mt-6 text-sm text-zinc-400">FurnitureCRM is being built one step at a time.</p>
+    }
+  </div>
+</div>
