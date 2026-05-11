@@ -17,22 +17,23 @@ The repo is in the middle of a structural migration. As of this writing:
 ```
 furniture-crm/
 ├── api/                                ← FastAPI backend (renamed from API/)
-│   ├── app/                            ← NEW layered package (alongside legacy src/)
-│   │   ├── core/                       ← Layer 1: universal CRM platform
-│   │   │   ├── auth/  tenants/  users/  permissions/  contacts/  activities/
-│   │   │   ├── tasks/  pipelines/  appointments/  custom_fields/  walk_ins/
-│   │   │   ├── catalog/  billing/  conversations/  calls/  reviews/  campaigns/
-│   │   │   ├── notifications/  files/  integrations/  reporting/  settings/
-│   │   │   └── module_registry.py
-│   │   ├── packs/
-│   │   │   └── furniture/              ← Layer 2: vertical pack
-│   │   │       ├── pack.yaml           ← source of truth for furniture defaults
-│   │   │       ├── installer.py
-│   │   │       └── modules/{inventory, custom_orders, field_ops, marketplace,
-│   │   │                    virtual_staging, qr_marketing, billing}/
-│   │   ├── shared/                     ← db, config, logging, exceptions, RLS, storage
-│   │   └── main.py
-│   ├── src/                            ← legacy (kept; hosts auth code until 1.5/1.6 ports it)
+│   ├── src/                            ← legacy package (hosts auth code) + NEW layered app/
+│   │   ├── app/                        ← NEW layered package
+│   │   │   ├── core/                   ← Layer 1: universal CRM platform
+│   │   │   │   ├── auth/  tenants/  users/  permissions/  contacts/  activities/
+│   │   │   │   ├── tasks/  pipelines/  appointments/  custom_fields/  walk_ins/
+│   │   │   │   ├── catalog/  billing/  conversations/  calls/  reviews/  campaigns/
+│   │   │   │   ├── notifications/  files/  integrations/  reporting/  settings/
+│   │   │   │   └── module_registry.py
+│   │   │   ├── packs/
+│   │   │   │   └── furniture/          ← Layer 2: vertical pack
+│   │   │   │       ├── pack.yaml       ← source of truth for furniture defaults
+│   │   │   │       ├── installer.py
+│   │   │   │       └── modules/{inventory, custom_orders, field_ops, marketplace,
+│   │   │   │                    virtual_staging, qr_marketing, billing}/
+│   │   │   ├── shared/                 ← db, config, logging, exceptions, RLS, storage
+│   │   │   └── main.py
+│   │   └── (legacy routers/services/models/... — auth code until 1.5/1.6 ports it)
 │   ├── alembic/
 │   ├── tests/
 │   └── pyproject.toml                  ← uv-managed
@@ -95,7 +96,7 @@ furniture-crm/
 
 These are project-specific deviations from a clean-slate build:
 
-- **Auth logic is preserved**, not rebuilt — JWT bearer with `token_id` session invalidation, password hashing, login history, refresh, forgot/reset password, all three 2FA methods (Google Authenticator + Email OTP + SMS OTP). It is **re-housed** under `api/app/core/auth/` (backend) in Steps 1.5/1.6, but the working logic comes from `api/src/...`.
+- **Auth logic is preserved**, not rebuilt — JWT bearer with `token_id` session invalidation, password hashing, login history, refresh, forgot/reset password, all three 2FA methods (Google Authenticator + Email OTP + SMS OTP). It is **re-housed** under `api/src/app/core/auth/` (backend) in Steps 1.5/1.6, but the working logic comes from `api/src/...` legacy modules.
 - **`org_id` is added** to existing user/role/session tables as part of the migration (existing tables are single-tenant today).
 - **`features/admin/` is left UNTOUCHED indefinitely.** It is the legacy template's admin panel and is not part of FurnitureCRM. Do not modify, delete, or repurpose any file inside it. The login form's "Admin login" button continues to work and redirects to `/admin/dashboard` (legacy). FurnitureCRM does not use this path.
 - **`features/user/` hosts the FurnitureCRM frontend.** All Layer 1 (`core/`) and Layer 2 (`packs/furniture/`) module code lives at `app/src/app/features/user/core/...` and `app/src/app/features/user/packs/furniture/...`. The seven FurnitureCRM roles all log in via the user-login button and land at `/user/...`.
@@ -131,7 +132,7 @@ If anything is ambiguous, **stop and ask one concrete question** with 2–3 opti
 ## Terminal (Windows)
 
 - The shell is **PowerShell**. Use PowerShell syntax (`$env:VAR`, `$null`, backtick continuation). Bash is also available via the Bash tool for POSIX scripts.
-- For Python work in `api/`, prefer `uv run <cmd>` (e.g., `uv run uvicorn app.main:app`, `uv run alembic upgrade head`, `uv run pytest`).
+- For Python work in `api/`, prefer `uv run <cmd>` (e.g., `uv run uvicorn src.app.main:app`, `uv run alembic upgrade head`, `uv run pytest`).
 - For Angular work in `app/`, use `npm` / `ng` as usual.
 - Database password and other secrets live in `.env` (never commit). `.env.example` is the canonical list.
 
@@ -144,7 +145,7 @@ If anything is ambiguous, **stop and ask one concrete question** with 2–3 opti
 | The 10 rules | this file (above) and `tasks/README.md` |
 | Existing auth code (reference) | [`API/src/routers/auth/`](API/src/routers/auth/), [`API/src/services/auth/`](API/src/services/auth/), [`APP/src/app/features/accounts/`](APP/src/app/features/accounts/) |
 | Existing template docs (reference only) | [`API/docs/`](API/docs/), [`APP/docs/`](APP/docs/) — describe the old template, not FurnitureCRM |
-| Pack manifest (after Phase 4.2) | `api/app/packs/furniture/pack.yaml` |
+| Pack manifest (after Phase 4.2) | `api/src/app/packs/furniture/pack.yaml` |
 
 ## What this file is NOT
 

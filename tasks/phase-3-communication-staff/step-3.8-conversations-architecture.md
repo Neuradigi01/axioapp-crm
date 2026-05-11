@@ -29,9 +29,9 @@
 - AI handling — 5.7.
 
 ## Files to touch
-- `api/app/core/conversations/{__init__,models,schemas,service,router,adapters,registry,module}.py` (created)
+- `api/src/app/core/conversations/{__init__,models,schemas,service,router,adapters,registry,module}.py` (created)
 - `api/alembic/versions/0018_conversations.py` (created)
-- `api/app/main.py` (modified)
+- `api/src/app/main.py` (modified)
 
 ## Plan
 1. Models + migration.

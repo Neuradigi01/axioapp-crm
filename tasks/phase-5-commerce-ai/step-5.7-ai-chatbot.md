@@ -22,8 +22,8 @@
 - Frontend updates: AI Handled badge already present; add "Suggested by AI — Approve / Edit / Reject" inline in compose bar when a held suggestion exists.
 
 ## Files to touch
-- `api/app/core/ai/{__init__,llm_client,policies}.py` (created)
-- `api/app/core/conversations/service.py` (modified — AI hook)
+- `api/src/app/core/ai/{__init__,llm_client,policies}.py` (created)
+- `api/src/app/core/conversations/service.py` (modified — AI hook)
 - `api/alembic/versions/0029_messages_ai_flags.py` (created)
 - `app/src/app/features/user/core/conversations/compose-bar.component.ts/.html` (modified — Approve/Edit/Reject)
 

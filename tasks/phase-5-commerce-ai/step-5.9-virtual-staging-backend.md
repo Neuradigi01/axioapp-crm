@@ -16,9 +16,9 @@
 - Permission: `staging.use`.
 
 ## Files to touch
-- `api/app/packs/furniture/modules/virtual_staging/{__init__,models,schemas,service,router,adapters,tasks,module}.py` (created)
+- `api/src/app/packs/furniture/modules/virtual_staging/{__init__,models,schemas,service,router,adapters,tasks,module}.py` (created)
 - `api/alembic/versions/0031_fp_virtual_staging.py` (created)
-- `api/app/shared/config.py` (modified)
+- `api/src/app/shared/config.py` (modified)
 
 ## Plan
 1. Models + migration.

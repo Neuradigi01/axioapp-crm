@@ -19,7 +19,7 @@
 - `GET /api/v1/users/me` now requires a valid token.
 - Login rate limiting: simple in-memory + Redis-backed limiter (e.g. `slowapi` or hand-rolled token bucket on Redis) — 10 attempts/min/IP.
 - Decision: 2FA flows (Google Auth, Email OTP, SMS OTP) re-housed too OR deferred to a later "Auth-2FA-port" sub-step. Default: defer to Phase 1.6b sub-step OR fold into 1.6 if it fits the size budget. (Adjust at execution time; if 2FA push exceeds the size budget, split into 1.6a/1.6b.)
-- Document token shape in `api/app/core/auth/README.md`.
+- Document token shape in `api/src/app/core/auth/README.md`.
 
 **Out of scope:**
 - Audit logs hookup — 1.7.
@@ -27,18 +27,18 @@
 - Frontend wire-up — 1.9.
 
 ## Files to touch
-- `api/app/core/auth/__init__.py` (created)
-- `api/app/core/auth/router.py` (created)
-- `api/app/core/auth/service.py` (created)
-- `api/app/core/auth/dependencies.py` (created)
-- `api/app/core/auth/tokens.py` (created)
-- `api/app/core/auth/schemas.py` (created)
-- `api/app/core/auth/models.py` (created — `AuthSession`)
-- `api/app/core/auth/README.md` (created — token shape doc)
-- `api/app/shared/middleware.py` (modified — JWT extraction)
-- `api/app/shared/rate_limit.py` (created — Redis token bucket)
+- `api/src/app/core/auth/__init__.py` (created)
+- `api/src/app/core/auth/router.py` (created)
+- `api/src/app/core/auth/service.py` (created)
+- `api/src/app/core/auth/dependencies.py` (created)
+- `api/src/app/core/auth/tokens.py` (created)
+- `api/src/app/core/auth/schemas.py` (created)
+- `api/src/app/core/auth/models.py` (created — `AuthSession`)
+- `api/src/app/core/auth/README.md` (created — token shape doc)
+- `api/src/app/shared/middleware.py` (modified — JWT extraction)
+- `api/src/app/shared/rate_limit.py` (created — Redis token bucket)
 - `api/alembic/versions/0004_auth_sessions.py` (created)
-- `api/app/main.py` (modified — register auth router)
+- `api/src/app/main.py` (modified — register auth router)
 - Updated `users/router.py` to use `Depends(get_current_user)`.
 
 ## Plan
@@ -70,8 +70,8 @@
 - run: `uv run pytest -q` → green.
 
 **Code review:**
-- open `api/app/core/auth/README.md` — token claims documented.
-- open `api/app/shared/middleware.py` — note JWT-only path; dev shortcut gated behind `APP_ENV=dev`.
+- open `api/src/app/core/auth/README.md` — token claims documented.
+- open `api/src/app/shared/middleware.py` — note JWT-only path; dev shortcut gated behind `APP_ENV=dev`.
 
 ## Self-check (10 rules)
 - [ ] `org_id` on `auth_sessions` + RLS.

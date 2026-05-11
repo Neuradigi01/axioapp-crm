@@ -18,9 +18,9 @@
 - Celery task `sync_marketplace(connection_id)` — fetches new orders since last_sync_at.
 
 ## Files to touch
-- `api/app/packs/furniture/modules/marketplace/adapters/amazon.py` (created)
-- `api/app/packs/furniture/modules/marketplace/tasks.py` (created — Celery)
-- `api/app/shared/config.py` (modified — Amazon settings)
+- `api/src/app/packs/furniture/modules/marketplace/adapters/amazon.py` (created)
+- `api/src/app/packs/furniture/modules/marketplace/tasks.py` (created — Celery)
+- `api/src/app/shared/config.py` (modified — Amazon settings)
 
 ## Plan
 1. Implement adapter using `python-amazon-sp-api` (well-maintained) OR raw httpx — DEFAULT decision: `python-amazon-sp-api` to save time; pin version.

@@ -28,10 +28,10 @@
     - Module descriptor (sidebar entry "Billing & POS", layer=`pack`).
 
 ## Files to touch
-- `api/app/core/billing/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/core/billing/{__init__,models,schemas,service,router,module}.py` (created)
 - `api/alembic/versions/0026_billing.py` (created)
-- `api/app/packs/furniture/modules/billing/{__init__,router,pdf,module}.py` (created)
-- `api/app/main.py` (modified)
+- `api/src/app/packs/furniture/modules/billing/{__init__,router,pdf,module}.py` (created)
+- `api/src/app/main.py` (modified)
 
 ## Plan
 1. Core billing models + migration. Invoice number generated via Postgres sequence per org (`bigserial` per-org-table or composite trick — use a `org_invoice_seq` table with `(org_id, last_number)` row + locked update for simplicity).

@@ -7,7 +7,7 @@
 
 ## Scope
 **In-scope:**
-- Pack module path: `api/app/packs/furniture/modules/inventory/`.
+- Pack module path: `api/src/app/packs/furniture/modules/inventory/`.
 - Models (TenantScoped, all `fp_*` tables):
   - `Warehouse` (`fp_warehouses`): id, org_id, name, address, contact_phone, is_default.
   - `InventoryItem` (`fp_inventory_items`): id, org_id, catalog_item_id (FK→`catalog_items`), warehouse_id, sku, material, color, finish, dimensions JSONB, qty_on_hand, qty_reserved, reorder_level, last_received_at, custom_data JSONB, is_best_seller (bool — manually toggled or computed), is_active.
@@ -29,7 +29,7 @@
 - Frontend — 4.5/4.6/4.7.
 
 ## Files to touch
-- `api/app/packs/furniture/modules/inventory/{__init__,models,schemas,service,router}.py` (created)
+- `api/src/app/packs/furniture/modules/inventory/{__init__,models,schemas,service,router}.py` (created)
 - `api/alembic/versions/0023_fp_inventory.py` (created)
 
 ## Plan
@@ -50,7 +50,7 @@
 
 ## Self-check (10 rules)
 - [ ] org_id + RLS on all four tables.
-- [ ] `app.packs.furniture` may import `app.core` (allowed); `app.core` does NOT import `app.packs.furniture`.
+- [ ] `src.app.packs.furniture` may import `src.app.core` (allowed); `src.app.core` does NOT import `src.app.packs.furniture`.
 
 ## Stop & report
 Await "proceed" before Step 4.4.

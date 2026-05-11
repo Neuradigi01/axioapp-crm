@@ -18,10 +18,10 @@
 - Permission: `campaigns.read`, `campaigns.write`, `campaigns.send`.
 
 ## Files to touch
-- `api/app/core/campaigns/{__init__,models,schemas,service,router,tasks,module}.py` (created)
+- `api/src/app/core/campaigns/{__init__,models,schemas,service,router,tasks,module}.py` (created)
 - `api/alembic/versions/0021_campaigns.py` (created)
-- `api/app/celery/__init__.py` (modified — register tasks module)
-- `api/app/main.py` (modified)
+- `api/src/app/celery/__init__.py` (modified — register tasks module)
+- `api/src/app/main.py` (modified)
 
 ## Plan
 1. Models + migration. `audience_filter` is the same JSONB filter shape as `/contacts` query (so re-uses same query builder).

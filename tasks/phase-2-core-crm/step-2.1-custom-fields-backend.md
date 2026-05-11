@@ -28,10 +28,10 @@
 - Seeding pack defaults — 4.2.
 
 ## Files to touch
-- `api/app/core/custom_fields/{__init__,models,schemas,service,router,module}.py` (created)
-- `api/app/core/permissions/service.py` (modified — register perms)
+- `api/src/app/core/custom_fields/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/core/permissions/service.py` (modified — register perms)
 - `api/alembic/versions/0006_custom_field_definitions.py` (created)
-- `api/app/main.py` (modified — register router)
+- `api/src/app/main.py` (modified — register router)
 
 ## Plan
 1. Define enums for `field_type` and `source` (Python enum + SQLAlchemy `ENUM` type).

@@ -33,11 +33,11 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 
 ## Reuse-vs-restructure (agreed exceptions)
 
-- **Auth logic preserved:** existing JWT, password hashing, login history, refresh, forgot/reset password, and all three 2FA methods (Google Authenticator + Email OTP + SMS OTP) are kept and re-housed under `api/app/core/auth/` (backend). The Step 1.5 / 1.6 files describe the migration.
+- **Auth logic preserved:** existing JWT, password hashing, login history, refresh, forgot/reset password, and all three 2FA methods (Google Authenticator + Email OTP + SMS OTP) are kept and re-housed under `api/src/app/core/auth/` (backend). The Step 1.5 / 1.6 files describe the migration.
 - **`features/admin/` is UNTOUCHED indefinitely.** Legacy template admin panel; not part of FurnitureCRM. No step modifies, deletes, or repurposes anything inside `app/src/app/features/admin/`.
 - **`features/user/` hosts the FurnitureCRM frontend.** All Layer 1 (`core/`) and Layer 2 (`packs/furniture/`) frontend module code lives under `app/src/app/features/user/core/...` and `app/src/app/features/user/packs/furniture/...`. All seven FurnitureCRM roles (Owner, Store Manager, Senior/Sales/Junior Sales Executive, Design Consultant, Warehouse Manager) log in via the user-login button and land at `/user/...`.
 - **Staff Portal at `/staff-portal`** is a separate top-level route tree, not under `features/user/`. Built in Phase 3, Step 3.7.
-- **Backend layout** stays as the master doc specifies: `api/app/core/...` and `api/app/packs/furniture/...`. No "user side" / "admin side" distinction on backend.
+- **Backend layout** stays as the master doc specifies: `api/src/app/core/...` and `api/src/app/packs/furniture/...`. No "user side" / "admin side" distinction on backend.
 - **Existing auth pages keep PrimeNG/Material visuals.** All new pages use Tailwind only.
 - **Folders renamed lowercase:** `API/` → `api/`, `APP/` → `app/`. `Flutter/` untouched.
 - **CLAUDE.md** already updated to FurnitureCRM-specific rules.

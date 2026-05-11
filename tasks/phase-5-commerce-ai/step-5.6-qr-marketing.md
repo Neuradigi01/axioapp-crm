@@ -19,7 +19,7 @@
   - Wire into Staff dashboard "Store Marketing" tab (3.5) — replace stub.
 
 ## Files to touch
-- `api/app/packs/furniture/modules/qr_marketing/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/packs/furniture/modules/qr_marketing/{__init__,models,schemas,service,router,module}.py` (created)
 - `api/alembic/versions/0028_fp_qr.py` (created)
 - `app/src/app/features/user/packs/furniture/qr-marketing/*` (created)
 - `app/src/app/features/user/core/staff/tabs/store-marketing.component.ts/.html` (modified — replaces stub)

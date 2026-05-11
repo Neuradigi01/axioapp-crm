@@ -7,11 +7,11 @@
 
 ## Scope
 **In-scope:**
-- `api/app/shared/context.py`: contextvar-based `RequestContext` (org_id, user_id, request_id).
-- `api/app/shared/middleware.py`: `TenantContextMiddleware` that reads `X-Org-Id` header in dev (placeholder) — replaced in 1.6 by JWT-claim extraction.
-- `api/app/shared/orm.py`: `TenantScoped` mixin (adds `org_id` Mapped column + index) and a session event listener that auto-injects `WHERE org_id = :ctx_org_id` on `Select` against TenantScoped models.
-- `api/app/shared/repository.py`: generic async repository helper (`get`, `list`, `create`, `update`, `delete`) that uses the current session + tenant filter.
-- `api/app/shared/rls.py`: helper `apply_rls(table_name, policy_name)` that emits `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` and `CREATE POLICY ... USING (org_id = current_setting('app.org_id')::uuid)`.
+- `api/src/app/shared/context.py`: contextvar-based `RequestContext` (org_id, user_id, request_id).
+- `api/src/app/shared/middleware.py`: `TenantContextMiddleware` that reads `X-Org-Id` header in dev (placeholder) — replaced in 1.6 by JWT-claim extraction.
+- `api/src/app/shared/orm.py`: `TenantScoped` mixin (adds `org_id` Mapped column + index) and a session event listener that auto-injects `WHERE org_id = :ctx_org_id` on `Select` against TenantScoped models.
+- `api/src/app/shared/repository.py`: generic async repository helper (`get`, `list`, `create`, `update`, `delete`) that uses the current session + tenant filter.
+- `api/src/app/shared/rls.py`: helper `apply_rls(table_name, policy_name)` that emits `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` and `CREATE POLICY ... USING (org_id = current_setting('app.org_id')::uuid)`.
 - Migration `0002_organizations_rls.py`: enables RLS on `organizations` itself (every query needs `SET LOCAL app.org_id`).
 - DB session lifecycle hook: on session begin, `SET LOCAL app.org_id = :ctx_org_id` if present.
 
@@ -20,13 +20,13 @@
 - Adding RLS to any other table (none exist yet).
 
 ## Files to touch
-- `api/app/shared/context.py` (created)
-- `api/app/shared/middleware.py` (created)
-- `api/app/shared/orm.py` (created)
-- `api/app/shared/repository.py` (created)
-- `api/app/shared/rls.py` (created)
-- `api/app/shared/db.py` (modified — register session hook)
-- `api/app/main.py` (modified — register middleware)
+- `api/src/app/shared/context.py` (created)
+- `api/src/app/shared/middleware.py` (created)
+- `api/src/app/shared/orm.py` (created)
+- `api/src/app/shared/repository.py` (created)
+- `api/src/app/shared/rls.py` (created)
+- `api/src/app/shared/db.py` (modified — register session hook)
+- `api/src/app/main.py` (modified — register middleware)
 - `api/alembic/versions/0002_organizations_rls.py` (created)
 
 ## Plan
@@ -56,8 +56,8 @@
 - hit: `curl http://localhost:8000/api/v1/health -H 'X-Org-Id: <demo-uuid>'` → still 200 (health is unscoped).
 
 **Code review:**
-- open `api/app/shared/orm.py` — note the `do_orm_execute` listener and how it appends the org_id filter only for `TenantScoped` models.
-- open `api/app/shared/rls.py` — note the helper signature; will be reused on every future table migration.
+- open `api/src/app/shared/orm.py` — note the `do_orm_execute` listener and how it appends the org_id filter only for `TenantScoped` models.
+- open `api/src/app/shared/rls.py` — note the helper signature; will be reused on every future table migration.
 
 ## Self-check (10 rules)
 - [ ] Rule 2 firmly in place: every future table will inherit `TenantScoped` and apply RLS.

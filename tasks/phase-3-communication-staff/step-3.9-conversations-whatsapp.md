@@ -20,9 +20,9 @@
 - Template messages — defer.
 
 ## Files to touch
-- `api/app/core/conversations/adapters/whatsapp.py` (created)
-- `api/app/core/conversations/router.py` (modified — webhook GET + POST)
-- `api/app/shared/config.py` (modified — new settings)
+- `api/src/app/core/conversations/adapters/whatsapp.py` (created)
+- `api/src/app/core/conversations/router.py` (modified — webhook GET + POST)
+- `api/src/app/shared/config.py` (modified — new settings)
 
 ## Plan
 1. Implement send via httpx async POST.

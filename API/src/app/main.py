@@ -22,8 +22,8 @@ from src.providers.firebase_provider import initialize_firebase
 from src.providers.error_log_provider import log_error_to_db
 from config import APP_NAME, STATIC_DIR, UPLOAD_DIR
 
-from app.core.health.router import router as health_router
-from app.shared.middleware import TenantContextMiddleware
+from src.app.core.health.router import router as health_router
+from src.app.shared.middleware import TenantContextMiddleware
 
 
 @asynccontextmanager

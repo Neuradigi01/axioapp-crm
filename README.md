@@ -51,7 +51,7 @@ furniture-crm/
 
 ## The 10 non-negotiable rules
 
-1. `app/core/` (frontend) and `api/app/core/` (backend) **never import** from `packs/`.
+1. `app/core/` (frontend) and `api/src/app/core/` (backend) **never import** from `packs/`.
 2. Every database table has `org_id`. Postgres Row-Level Security enabled from day one.
 3. Custom fields use a layered model: `custom_data` JSONB on every entity + `custom_field_definitions` with a `source` column (`system`/`pack`/`user`).
 4. Forms render dynamically from field definitions — never hardcoded.
@@ -91,10 +91,10 @@ docker compose -f api/docker-compose.yml up -d db redis
 # Migrations + seed (later steps will populate these)
 cd api
 uv run alembic upgrade head
-uv run python -m app.scripts.seed_demo_org
+uv run python -m src.app.scripts.seed_demo_org
 
 # Run
-cd api && uv run uvicorn app.main:app --reload      # backend on :8000
+cd api && uv run uvicorn src.app.main:app --reload  # backend on :8000
 cd app && npx ng serve                              # frontend on :4200
 ```
 

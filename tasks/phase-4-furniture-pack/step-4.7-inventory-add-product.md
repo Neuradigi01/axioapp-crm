@@ -13,8 +13,8 @@
 - File-upload endpoint `POST /inventory/items/{id}/cover` accepts multipart.
 
 ## Files to touch
-- `api/app/packs/furniture/modules/inventory/router.py` (modified — `/items/full`, `/items/{id}/cover`)
-- `api/app/shared/storage/{__init__,base,local}.py` (created — `StorageBackend` + `LocalStorage`)
+- `api/src/app/packs/furniture/modules/inventory/router.py` (modified — `/items/full`, `/items/{id}/cover`)
+- `api/src/app/shared/storage/{__init__,base,local}.py` (created — `StorageBackend` + `LocalStorage`)
 - `app/src/app/features/user/packs/furniture/inventory/add-product-modal.component.ts/.html` (created)
 
 ## Plan

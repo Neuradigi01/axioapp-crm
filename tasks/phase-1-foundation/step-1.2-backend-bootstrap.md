@@ -7,16 +7,16 @@
 
 ## Scope
 **In-scope:**
-- New `api/app/main.py` FastAPI app instance, mounted at `/api/v1`.
-- `api/app/shared/config.py` using `pydantic-settings` (env-based; reads `.env`).
-- `api/app/shared/logging.py` (structured JSON logs via stdlib `logging` + `json` formatter — keep it simple, no extra deps).
-- `api/app/shared/exceptions.py` (base `AppError` + handler).
-- `api/app/core/health/router.py` exposing `GET /api/v1/health` returning `{"status":"ok","version":"0.1.0"}`.
+- New `api/src/app/main.py` FastAPI app instance, mounted at `/api/v1`.
+- `api/src/app/shared/config.py` using `pydantic-settings` (env-based; reads `.env`).
+- `api/src/app/shared/logging.py` (structured JSON logs via stdlib `logging` + `json` formatter — keep it simple, no extra deps).
+- `api/src/app/shared/exceptions.py` (base `AppError` + handler).
+- `api/src/app/core/health/router.py` exposing `GET /api/v1/health` returning `{"status":"ok","version":"0.1.0"}`.
 - `api/pyproject.toml` written for **uv** with locked stack (FastAPI, uvicorn[standard], pydantic v2, pydantic-settings, sqlalchemy[asyncio], asyncpg, alembic, celery, redis, python-jose, passlib[bcrypt], pyotp, qrcode — all latest compatible).
 - `api/uv.lock` generated.
-- `api/docker-compose.yml` (dev) with services: `db` (postgres:17), `redis` (redis:7), `api` (build from local Dockerfile, mounts `api/`, runs `uvicorn app.main:app --reload`).
+- `api/docker-compose.yml` (dev) with services: `db` (postgres:17), `redis` (redis:7), `api` (build from local Dockerfile, mounts `api/`, runs `uvicorn src.app.main:app --reload`).
 - `api/Dockerfile` (slim Python 3.13-bookworm base, uv-installed deps).
-- Decision documented: existing `api/src/` retained for now; new code under `api/app/`. Auth migration into `app/core/auth/` happens in 1.5/1.6.
+- Decision documented: existing `api/src/` retained for now; new code under `api/src/app/`. Auth migration into `app/core/auth/` happens in 1.5/1.6.
 
 **Out of scope:**
 - DB connection / Alembic / models — those land in 1.3.
@@ -24,12 +24,12 @@
 - Frontend — 1.9.
 
 ## Files to touch
-- `api/app/main.py` (created)
-- `api/app/shared/config.py` (created)
-- `api/app/shared/logging.py` (created)
-- `api/app/shared/exceptions.py` (created)
-- `api/app/core/health/__init__.py` (created)
-- `api/app/core/health/router.py` (created)
+- `api/src/app/main.py` (created)
+- `api/src/app/shared/config.py` (created)
+- `api/src/app/shared/logging.py` (created)
+- `api/src/app/shared/exceptions.py` (created)
+- `api/src/app/core/health/__init__.py` (created)
+- `api/src/app/core/health/router.py` (created)
 - `api/pyproject.toml` (replaced)
 - `api/uv.lock` (created)
 - `api/Dockerfile` (replaced)
@@ -56,7 +56,7 @@ None this step.
 
 ## Verification checklist
 **Backend:**
-- run: `cd api && uv run uvicorn app.main:app --reload`
+- run: `cd api && uv run uvicorn src.app.main:app --reload`
 - visit: `http://localhost:8000/api/v1/health` → `{"status":"ok","version":"0.1.0"}`
 - visit: `http://localhost:8000/docs` → Swagger UI loads.
 - run: `docker compose -f api/docker-compose.yml up -d db redis` → both services Up, expose 5432/6379.
@@ -64,8 +64,8 @@ None this step.
 
 **Code review:**
 - open `api/pyproject.toml` — note Python 3.13, locked deps, no v1 Pydantic patterns.
-- open `api/app/shared/config.py` — uses `BaseSettings` from `pydantic-settings`, not `pydantic`.
-- open `api/app/main.py` — minimal, just app+router+exception handler+CORS.
+- open `api/src/app/shared/config.py` — uses `BaseSettings` from `pydantic-settings`, not `pydantic`.
+- open `api/src/app/main.py` — minimal, just app+router+exception handler+CORS.
 
 ## Self-check (10 rules)
 - [ ] `app/core/` does not import from `app/packs/`.

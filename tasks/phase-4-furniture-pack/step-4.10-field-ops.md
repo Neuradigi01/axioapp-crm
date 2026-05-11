@@ -18,7 +18,7 @@
   - Wire into Staff dashboard Field Operations tab (3.5) and Staff Portal Field Visits tab (3.7) — replace the placeholders.
 
 ## Files to touch
-- `api/app/packs/furniture/modules/field_ops/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/packs/furniture/modules/field_ops/{__init__,models,schemas,service,router,module}.py` (created)
 - `api/alembic/versions/0025_fp_field_visits.py` (created)
 - `app/src/app/features/user/packs/furniture/field-ops/*` (created)
 - `app/src/app/features/user/core/staff/tabs/field-ops.component.ts/.html` (modified — replaces stub)

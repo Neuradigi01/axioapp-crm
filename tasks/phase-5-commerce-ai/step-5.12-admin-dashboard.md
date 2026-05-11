@@ -18,8 +18,8 @@
 - Live AI Activity uses notifications WS.
 
 ## Files to touch
-- `api/app/core/dashboard/{__init__,router,service,module}.py` (created)
-- `api/app/main.py` (modified)
+- `api/src/app/core/dashboard/{__init__,router,service,module}.py` (created)
+- `api/src/app/main.py` (modified)
 - `app/src/app/features/user/core/layout/home.component.ts/.html` (modified — full dashboard)
 - `app/src/app/features/user/core/dashboard/*` (created — widget components)
 

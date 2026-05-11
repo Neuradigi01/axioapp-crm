@@ -17,9 +17,9 @@
   - Source map upload in production build.
 
 ## Files to touch
-- `api/app/shared/observability/{__init__,prometheus,sentry}.py` (created)
-- `api/app/shared/middleware.py` (modified — request id propagation)
-- `api/app/celery/__init__.py` (modified — request id propagation)
+- `api/src/app/shared/observability/{__init__,prometheus,sentry}.py` (created)
+- `api/src/app/shared/middleware.py` (modified — request id propagation)
+- `api/src/app/celery/__init__.py` (modified — request id propagation)
 - `app/src/app/features/user/core/observability/sentry.ts` (created)
 - `app/angular.json` (modified — source maps)
 

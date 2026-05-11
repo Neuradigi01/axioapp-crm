@@ -17,7 +17,7 @@
   - Dropdown rendering grouped results; click → routes to detail page.
 
 ## Files to touch
-- `api/app/core/search/{__init__,service,router,module}.py` (created)
+- `api/src/app/core/search/{__init__,service,router,module}.py` (created)
 - `api/alembic/versions/0033_search_tsvectors.py` (created)
 - `app/src/app/features/user/core/layout/header.component.ts/.html` (modified — wire search)
 - `app/src/app/features/user/core/search/search-results-popover.component.ts/.html` (created)

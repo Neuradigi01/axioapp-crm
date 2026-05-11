@@ -19,9 +19,9 @@
 - Auto-request after delivery — 5.11.
 
 ## Files to touch
-- `api/app/core/reviews/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/core/reviews/{__init__,models,schemas,service,router,module}.py` (created)
 - `api/alembic/versions/0020_reviews.py` (created)
-- `api/app/main.py` (modified)
+- `api/src/app/main.py` (modified)
 
 ## Plan
 1. Model + migration.

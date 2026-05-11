@@ -15,10 +15,10 @@
 - Settings: `AI_FOLLOWUP_ENABLED` toggle (org-level via OrgSettings).
 
 ## Files to touch
-- `api/app/core/ai/follow_ups.py` (created)
-- `api/app/core/ai/tasks.py` (created — Celery)
-- `api/app/celery/__init__.py` (modified — beat schedule)
-- `api/app/core/ai/router.py` (modified — skip endpoint)
+- `api/src/app/core/ai/follow_ups.py` (created)
+- `api/src/app/core/ai/tasks.py` (created — Celery)
+- `api/src/app/celery/__init__.py` (modified — beat schedule)
+- `api/src/app/core/ai/router.py` (modified — skip endpoint)
 
 ## Plan
 1. Resolve eligible leads: `created_at` was N days ago AND no follow-up of that step yet AND lead status is active.

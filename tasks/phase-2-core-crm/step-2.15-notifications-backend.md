@@ -25,9 +25,9 @@
 - Frontend — 2.16.
 
 ## Files to touch
-- `api/app/core/notifications/{__init__,models,schemas,service,router,ws,manager,module}.py` (created)
+- `api/src/app/core/notifications/{__init__,models,schemas,service,router,ws,manager,module}.py` (created)
 - `api/alembic/versions/0013_notifications.py` (created)
-- `api/app/main.py` (modified — register router + WS)
+- `api/src/app/main.py` (modified — register router + WS)
 
 ## Plan
 1. Models + migration.

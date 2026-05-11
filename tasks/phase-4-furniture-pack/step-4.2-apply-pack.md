@@ -7,7 +7,7 @@
 
 ## Scope
 **In-scope:**
-- `api/app/packs/furniture/pack.yaml` containing:
+- `api/src/app/packs/furniture/pack.yaml` containing:
   - `pipelines.leads`: New → Contacted → Showroom Visit → Quotation → Won (is_won) / Lost (is_lost).
   - `pipelines.custom_orders`: Measurement Scheduled → Design Phase → In Production → QC → Installation → Delivered.
   - `custom_fields.contact`: budget_range (select), preferred_material (select), room_type (select), requirement (text).
@@ -22,7 +22,7 @@
 - Verify: `GET /pipelines/leads` returns 5 stages, `GET /custom-fields?entity_type=lead` returns the seeded fields, etc.
 
 ## Files to touch
-- `api/app/packs/furniture/pack.yaml` (created)
+- `api/src/app/packs/furniture/pack.yaml` (created)
 - (no code changes if 4.1 is correct; only the manifest content + a run command)
 
 ## Plan
@@ -36,7 +36,7 @@
 
 ## Verification checklist
 **Backend:**
-- run: `python -m app.scripts.install_pack --org demo --pack furniture --version 1.0.0`
+- run: `python -m src.app.scripts.install_pack --org demo --pack furniture --version 1.0.0`
 - run: `psql -c "SELECT key, name FROM pipeline_stages WHERE pipeline_id IN (SELECT id FROM pipelines WHERE key='leads' AND org_id=...) ORDER BY display_order;"` → 5 rows in correct order.
 - frontend: visit `/leads` → stages match the screenshot.
 

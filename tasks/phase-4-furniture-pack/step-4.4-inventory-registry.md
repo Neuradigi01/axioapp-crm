@@ -7,13 +7,13 @@
 
 ## Scope
 **In-scope:**
-- `api/app/packs/furniture/modules/inventory/module.py` exporting `MODULE = ModuleDescriptor(id='inventory', layer='pack', name='Inventory & Warehouse', icon='warehouse', route='/api/v1/inventory', frontend_route='/inventory', menu_position=20, permissions=['inventory.read','inventory.write','inventory.dispatch','inventory.transfer'])`.
+- `api/src/app/packs/furniture/modules/inventory/module.py` exporting `MODULE = ModuleDescriptor(id='inventory', layer='pack', name='Inventory & Warehouse', icon='warehouse', route='/api/v1/inventory', frontend_route='/inventory', menu_position=20, permissions=['inventory.read','inventory.write','inventory.dispatch','inventory.transfer'])`.
 - Auto-discovery picks it up at startup (no core changes).
 - Update furniture pack manifest's `module_permissions.inventory` so default roles get the right perms (e.g., Warehouse Manager all, Sales Executive read-only).
 
 ## Files to touch
-- `api/app/packs/furniture/modules/inventory/module.py` (created)
-- `api/app/packs/furniture/pack.yaml` (modified — `module_permissions.inventory`)
+- `api/src/app/packs/furniture/modules/inventory/module.py` (created)
+- `api/src/app/packs/furniture/pack.yaml` (modified — `module_permissions.inventory`)
 
 ## Plan
 1. Define MODULE descriptor.

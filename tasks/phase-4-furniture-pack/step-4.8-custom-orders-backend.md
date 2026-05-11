@@ -22,7 +22,7 @@
 - Module descriptor (sidebar entry, layer=`pack`).
 
 ## Files to touch
-- `api/app/packs/furniture/modules/custom_orders/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/packs/furniture/modules/custom_orders/{__init__,models,schemas,service,router,module}.py` (created)
 - `api/alembic/versions/0024_fp_custom_orders.py` (created)
 
 ## Plan

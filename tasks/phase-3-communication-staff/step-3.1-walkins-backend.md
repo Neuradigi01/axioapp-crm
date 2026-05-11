@@ -17,9 +17,9 @@
 - Frontend — 3.2.
 
 ## Files to touch
-- `api/app/core/walk_ins/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/core/walk_ins/{__init__,models,schemas,service,router,module}.py` (created)
 - `api/alembic/versions/0014_walk_ins.py` (created)
-- `api/app/main.py` (modified)
+- `api/src/app/main.py` (modified)
 
 ## Plan
 1. Model + migration; `duration_min` as `GENERATED ALWAYS AS (EXTRACT(EPOCH FROM (time_out - time_in))/60) STORED` (NULL when time_out is null).

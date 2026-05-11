@@ -18,7 +18,7 @@
 - Multi-warehouse / stock movements / images / reorder logic — Phase 4 (`fp_inventory_items` extends this).
 
 ## Files to touch
-- `api/app/core/catalog/*` (created)
+- `api/src/app/core/catalog/*` (created)
 - `api/alembic/versions/0015_catalog_items.py` (created)
 - `app/src/app/features/user/core/catalog/*` (created)
 

@@ -20,7 +20,7 @@
 - Custom report builder UI — out of scope.
 
 ## Files to touch
-- `api/app/core/reporting/{__init__,service,router,module}.py` (created)
+- `api/src/app/core/reporting/{__init__,service,router,module}.py` (created)
 - `app/src/app/features/user/core/reporting/*` (created)
 
 ## Plan

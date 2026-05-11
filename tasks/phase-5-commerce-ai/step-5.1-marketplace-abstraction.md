@@ -21,7 +21,7 @@
 - Frontend shell: `app/src/app/features/user/packs/furniture/marketplace/marketplace.page.ts/.html` — tab host (Orders + Channels).
 
 ## Files to touch
-- `api/app/packs/furniture/modules/marketplace/{__init__,models,schemas,service,router,adapters,registry,module}.py` (created)
+- `api/src/app/packs/furniture/modules/marketplace/{__init__,models,schemas,service,router,adapters,registry,module}.py` (created)
 - `api/alembic/versions/0027_fp_marketplace.py` (created)
 - `app/src/app/features/user/packs/furniture/marketplace/*` (created — shell only)
 

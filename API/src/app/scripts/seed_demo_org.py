@@ -1,7 +1,7 @@
 """Seed one demo organization. Idempotent — safe to re-run.
 
 Usage (from inside the api/ directory or container):
-    python -m app.scripts.seed_demo_org
+    python -m src.app.scripts.seed_demo_org
 """
 import asyncio
 import uuid
@@ -10,8 +10,8 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
-from app.shared.db import async_session
-from app.core.tenants.models import Organization
+from src.app.shared.db import async_session
+from src.app.core.tenants.models import Organization
 
 DEMO_ORG_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 DEMO_ORG = {

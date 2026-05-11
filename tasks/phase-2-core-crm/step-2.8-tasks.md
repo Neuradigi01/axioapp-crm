@@ -21,7 +21,7 @@
 - Reminders / notifications wired up — 2.15+.
 
 ## Files to touch
-- `api/app/core/tasks/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/core/tasks/{__init__,models,schemas,service,router,module}.py` (created)
 - `api/alembic/versions/0009_tasks.py` (created)
 - `app/src/app/features/user/core/tasks/*` (created)
 - `app/src/app/features/user/core/contacts/contact-detail.page.html` (modified)

@@ -18,15 +18,15 @@
 - An admin UI for audit logs (later phase).
 
 ## Files to touch
-- `api/app/core/audit/__init__.py` (created)
-- `api/app/core/audit/models.py` (created)
-- `api/app/core/audit/schemas.py` (created)
-- `api/app/core/audit/service.py` (created)
-- `api/app/core/audit/router.py` (created)
-- `api/app/core/auth/service.py` (modified — `audit.log("auth.login.success"/"auth.login.failure")`)
-- `api/app/core/permissions/service.py` (modified — register `audit.read`)
+- `api/src/app/core/audit/__init__.py` (created)
+- `api/src/app/core/audit/models.py` (created)
+- `api/src/app/core/audit/schemas.py` (created)
+- `api/src/app/core/audit/service.py` (created)
+- `api/src/app/core/audit/router.py` (created)
+- `api/src/app/core/auth/service.py` (modified — `audit.log("auth.login.success"/"auth.login.failure")`)
+- `api/src/app/core/permissions/service.py` (modified — register `audit.read`)
 - `api/alembic/versions/0005_audit_logs.py` (created)
-- `api/app/main.py` (modified — register router)
+- `api/src/app/main.py` (modified — register router)
 
 ## Plan
 1. Define `AuditLog` model with `TenantScoped`. Use `JSONB` for before/after.
@@ -54,7 +54,7 @@
 - run: `uv run pytest -q` → green.
 
 **Code review:**
-- open `api/app/core/audit/service.py` — note try/except guard; never breaks parent flow.
+- open `api/src/app/core/audit/service.py` — note try/except guard; never breaks parent flow.
 
 ## Self-check (10 rules)
 - [ ] org_id + RLS on audit_logs.

@@ -13,7 +13,7 @@ if config.config_file_name is not None:
 # Import Base with all models registered
 from src.models import Base
 # Register new layered models with the shared metadata so autogenerate sees them.
-from app.core.tenants import models as _organizations_models  # noqa: F401
+from src.app.core.tenants import models as _organizations_models  # noqa: F401
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url from environment

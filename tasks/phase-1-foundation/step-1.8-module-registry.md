@@ -7,7 +7,7 @@
 
 ## Scope
 **In-scope:**
-- `api/app/core/module_registry.py`:
+- `api/src/app/core/module_registry.py`:
   - `ModuleDescriptor` dataclass (id, name, icon, layer='core'|'pack', route, menu_position, parent, permissions: list[str], frontend_route).
   - `ModuleRegistry` singleton with `register(descriptor)` and `list()`.
   - Auto-discovery: import every package under `app/core/` and `app/packs/{pack_id}/` looking for an optional `module.py` exporting `MODULE: ModuleDescriptor`.
@@ -21,17 +21,17 @@
 - Furniture pack modules registering — Phase 4.
 
 ## Files to touch
-- `api/app/core/module_registry.py` (created)
-- `api/app/core/modules_router.py` (created — `GET /api/v1/modules`)
-- `api/app/core/permissions/service.py` (modified — `register_permissions`)
-- `api/app/core/settings/__init__.py` (created)
-- `api/app/core/settings/module.py` (created — exports `MODULE`)
-- `api/app/main.py` (modified — startup hook to discover modules + register their permissions)
+- `api/src/app/core/module_registry.py` (created)
+- `api/src/app/core/modules_router.py` (created — `GET /api/v1/modules`)
+- `api/src/app/core/permissions/service.py` (modified — `register_permissions`)
+- `api/src/app/core/settings/__init__.py` (created)
+- `api/src/app/core/settings/module.py` (created — exports `MODULE`)
+- `api/src/app/main.py` (modified — startup hook to discover modules + register their permissions)
 
 ## Plan
 1. Define `ModuleDescriptor`. Validation: id matches `[a-z][a-z0-9_]*`, route starts with `/`, permissions all match `module.action` shape.
 2. Implement `ModuleRegistry`: dict by id, `register` raises on duplicate id, `list_for_user(perms)` filters.
-3. Implement discovery: walk `app.core.*` and `app.packs.*` packages with `pkgutil`, attempt to import `<pkg>.module`, collect `MODULE` if present.
+3. Implement discovery: walk `src.app.core.*` and `src.app.packs.*` packages with `pkgutil`, attempt to import `<pkg>.module`, collect `MODULE` if present.
 4. On startup, call `discover_modules()`, then for each module call `permissions.register_permissions(MODULE.permissions)` — bulk upsert.
 5. Build the Settings stub: `MODULE = ModuleDescriptor(id='settings', name='Settings', icon='cog', layer='core', route='/api/v1/settings', frontend_route='/settings', menu_position=999, permissions=['settings.read','settings.write'])`.
 6. Implement `GET /api/v1/modules`: returns `[ModuleDescriptorOut, ...]` filtered by current user permissions.
@@ -46,14 +46,14 @@
 
 ## Verification checklist
 **Backend:**
-- run: `uv run uvicorn app.main:app` → log shows `discovered modules: ['settings']` (later: more).
+- run: `uv run uvicorn src.app.main:app` → log shows `discovered modules: ['settings']` (later: more).
 - hit: `GET /api/v1/modules` with admin token → array containing Settings.
 - run: `psql -c "SELECT key FROM permissions WHERE key LIKE 'settings.%';"` → settings.read, settings.write rows.
 - run: `uv run pytest tests/test_module_registry.py -v` → green.
 
 **Code review:**
-- open `api/app/core/module_registry.py` — note the discovery walks both `app.core.*` and `app.packs.*` (rule 5).
-- open `api/app/core/settings/module.py` — note the standalone module export pattern.
+- open `api/src/app/core/module_registry.py` — note the discovery walks both `src.app.core.*` and `src.app.packs.*` (rule 5).
+- open `api/src/app/core/settings/module.py` — note the standalone module export pattern.
 
 ## Self-check (10 rules)
 - [ ] Rule 5 (sidebar registry) implemented.

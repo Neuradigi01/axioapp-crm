@@ -15,7 +15,7 @@ from sqlalchemy import DateTime, Numeric, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.shared.db import Base
+from src.app.shared.db import Base
 
 
 class Organization(Base):

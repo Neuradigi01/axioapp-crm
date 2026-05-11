@@ -21,7 +21,7 @@
 - Tailwind for the new tabs; existing Custom Fields tab stays as-is.
 
 ## Files to touch
-- `api/app/core/settings/{models,schemas,service,router}.py` (created)
+- `api/src/app/core/settings/{models,schemas,service,router}.py` (created)
 - `api/alembic/versions/0022_org_settings.py` (created)
 - `app/src/app/features/user/core/settings/settings-page.component.ts/.html` (modified — add 5 sub-tabs)
 - `app/src/app/features/user/core/settings/tabs/*` (created — 5 tab components)

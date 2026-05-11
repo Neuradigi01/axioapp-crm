@@ -23,9 +23,9 @@
 - Lead-specific endpoints — 2.11.
 
 ## Files to touch
-- `api/app/core/pipelines/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/core/pipelines/{__init__,models,schemas,service,router,module}.py` (created)
 - `api/alembic/versions/0010_pipelines.py` (created)
-- `api/app/main.py` (modified)
+- `api/src/app/main.py` (modified)
 
 ## Plan
 1. Models + migration. `pipeline_stages` has uniqueness on `(pipeline_id, key)` AND `(pipeline_id, display_order)`.

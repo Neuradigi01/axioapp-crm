@@ -7,7 +7,7 @@
 
 ## Scope
 **In-scope:**
-- `api/app/core/packs/manifest.py` — Pydantic v2 schema for `pack.yaml`:
+- `api/src/app/core/packs/manifest.py` — Pydantic v2 schema for `pack.yaml`:
   - `pack_id`, `version`, `display_name`
   - `pipelines: [{key, name, stages: [{key, name, color, display_order, is_won, is_lost}]}]`
   - `custom_fields: [{entity_type, field_key, field_label, field_type, options, is_required, display_order, validation}]`
@@ -17,9 +17,9 @@
   - `defaults: {currency, tax_rate, timezone, review_source, ai_personality, ai_welcome_message}`
   - `follow_up_schedule: [{day_offset, channel, template}]`
   - `module_permissions: {module_id: [perm_keys]}` — used to populate `role_permissions` per role.
-- `api/app/core/packs/loader.py` — loads YAML, validates, returns `PackManifest`.
-- `api/app/core/packs/installer.py` — `install(org_id, manifest)`: idempotent seed. Each section runs in its own try/except + audit log.
-- CLI: `python -m app.scripts.install_pack --org <slug> --pack <pack_id> --version <ver>`.
+- `api/src/app/core/packs/loader.py` — loads YAML, validates, returns `PackManifest`.
+- `api/src/app/core/packs/installer.py` — `install(org_id, manifest)`: idempotent seed. Each section runs in its own try/except + audit log.
+- CLI: `python -m src.app.scripts.install_pack --org <slug> --pack <pack_id> --version <ver>`.
 - `pack_id` and `pack_version` written to `organizations.pack_id` + `pack_version` after install.
 
 **Out of scope:**
@@ -27,8 +27,8 @@
 - Pack-installer UI — out of project scope.
 
 ## Files to touch
-- `api/app/core/packs/{__init__,manifest,loader,installer}.py` (created)
-- `api/app/scripts/install_pack.py` (created)
+- `api/src/app/core/packs/{__init__,manifest,loader,installer}.py` (created)
+- `api/src/app/scripts/install_pack.py` (created)
 
 ## Plan
 1. Define Pydantic schema. Reject duplicate keys within a section.

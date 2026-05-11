@@ -19,9 +19,9 @@
 - Auto-assign rules — later.
 
 ## Files to touch
-- `api/app/core/leads/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/core/leads/{__init__,models,schemas,service,router,module}.py` (created)
 - `api/alembic/versions/0011_leads.py` (created)
-- `api/app/main.py` (modified)
+- `api/src/app/main.py` (modified)
 
 ## Plan
 1. Model + migration; FK to contacts ON DELETE RESTRICT.

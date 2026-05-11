@@ -19,10 +19,10 @@
 - Frontend portal — 3.7.
 
 ## Files to touch
-- `api/app/core/staff_portal/{__init__,router,service,models,schemas}.py` (created)
-- `api/app/core/auth/dependencies.py` (modified — `get_current_staff`)
+- `api/src/app/core/staff_portal/{__init__,router,service,models,schemas}.py` (created)
+- `api/src/app/core/auth/dependencies.py` (modified — `get_current_staff`)
 - `api/alembic/versions/0017_staff_sessions.py` (created)
-- `api/app/main.py` (modified)
+- `api/src/app/main.py` (modified)
 
 ## Plan
 1. Migration: `staff_sessions(token_id PK, org_id, user_id, created_at, expires_at, revoked_at)` + RLS + indexes.

@@ -12,7 +12,7 @@ services:
       - REDIS_HOST=redis
       - IS_DEVELOPMENT=true
       - MASTER_KEY=${MASTER_KEY:-}
-    command: ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    command: ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client", "-m", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   celery:
     environment:

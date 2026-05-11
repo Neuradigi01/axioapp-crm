@@ -21,10 +21,10 @@
 - Activities/notes integration — 2.6/2.7.
 
 ## Files to touch
-- `api/app/core/contacts/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/core/contacts/{__init__,models,schemas,service,router,module}.py` (created)
 - `api/alembic/versions/0007_contacts.py` (created)
-- `api/app/main.py` (modified — register router)
-- `api/app/scripts/seed_contact_system_fields.py` (created)
+- `api/src/app/main.py` (modified — register router)
+- `api/src/app/scripts/seed_contact_system_fields.py` (created)
 
 ## Plan
 1. Model + migration. Use `pg_trgm` for fuzzy `full_name` search (`CREATE EXTENSION IF NOT EXISTS pg_trgm`).
@@ -44,7 +44,7 @@
 ## Verification checklist
 **Backend:**
 - run: `uv run alembic upgrade head` → 0007 applied.
-- run: `python -m app.scripts.seed_contact_system_fields` → 1 row inserted.
+- run: `python -m src.app.scripts.seed_contact_system_fields` → 1 row inserted.
 - hit: `POST /contacts` with `custom_data={"dob":"1990-05-01"}` → 201.
 - hit: `GET /contacts?q=John&custom.budget_range=premium` → filtered.
 

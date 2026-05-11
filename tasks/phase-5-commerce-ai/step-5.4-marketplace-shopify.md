@@ -13,8 +13,8 @@
 - Endpoints used: `orders` (fetch), `inventoryLevels` (push), `fulfillmentCreate` (tracking).
 
 ## Files to touch
-- `api/app/packs/furniture/modules/marketplace/adapters/shopify.py` (created)
-- `api/app/shared/config.py` (modified — Shopify settings)
+- `api/src/app/packs/furniture/modules/marketplace/adapters/shopify.py` (created)
+- `api/src/app/shared/config.py` (modified — Shopify settings)
 
 ## Plan
 1. Connection holds `shop_domain` + `admin_access_token`.

@@ -12,8 +12,8 @@
 - Endpoints used: `/sellers/v3/orders`, `/sellers/skus/listings/v3/update`, `/sellers/v3/shipments/{id}/manifest`.
 
 ## Files to touch
-- `api/app/packs/furniture/modules/marketplace/adapters/flipkart.py` (created)
-- `api/app/shared/config.py` (modified — Flipkart settings)
+- `api/src/app/packs/furniture/modules/marketplace/adapters/flipkart.py` (created)
+- `api/src/app/shared/config.py` (modified — Flipkart settings)
 
 ## Plan
 1. Implement OAuth + signed request helper.

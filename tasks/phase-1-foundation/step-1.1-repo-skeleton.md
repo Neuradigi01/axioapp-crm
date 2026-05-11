@@ -10,12 +10,12 @@
 - **`features/user/` is the host** for FurnitureCRM. Old user-side scaffolding (dashboard, profile, security, support, change-password) is removed. New layered structure (`core/`, `packs/furniture/`, `layout/`) lives under it.
 - **Frontend layered code lives under `app/src/app/features/user/core/...` and `app/src/app/features/user/packs/furniture/...`.** All seven FurnitureCRM roles (Owner, Store Manager, Senior/Sales/Junior Sales Executive, Design Consultant, Warehouse Manager) log in via the existing User-login button and land here.
 - **Staff Portal** (Phase 3, Step 3.7) lives at top-level `app/src/app/staff-portal/...` — separate route tree, PIN auth, NOT under `features/user/`.
-- **Backend** layered code stays per master doc: `api/app/core/...`, `api/app/packs/furniture/...`, `api/app/shared/...`. No "user side" / "admin side" distinction on backend.
+- **Backend** layered code stays per master doc: `api/src/app/core/...`, `api/src/app/packs/furniture/...`, `api/src/app/shared/...`. No "user side" / "admin side" distinction on backend.
 
 ## Scope
 **In-scope:**
 - Rename `API/` → `api/` and `APP/` → `app/` (Windows two-step rename via temp dirs).
-- Inside `api/app/` create empty `core/`, `packs/furniture/`, `shared/` trees with `__init__.py` placeholders (alongside existing `api/src/`).
+- Inside `api/src/app/` create empty `core/`, `packs/furniture/`, `shared/` trees with `__init__.py` placeholders (alongside existing `api/src/`).
 - Inside `app/src/app/features/user/` create empty `core/{layout, contacts, leads, ...}` and `packs/furniture/{...}` trees.
 - Inside `app/src/app/staff-portal/` create empty subfolders (login, dashboard, etc.) — placeholder only; built in Phase 3.
 - Delete non-auth backend scaffolding: `api/src/routers/{admin, user, common, dev, routes, misc, app_config}` and matching `services/`, `models/`, `schemas/`, `data_access/`, `seeds/`.
@@ -35,10 +35,10 @@
 ## Files to touch
 - `api/` (renamed from `API/`)
 - `app/` (renamed from `APP/`)
-- `api/app/__init__.py` (created)
-- `api/app/core/__init__.py` + 22 module subdirs each with `__init__.py` (created)
-- `api/app/packs/furniture/{pack.yaml.placeholder, __init__.py}` and module subdirs (created — empty)
-- `api/app/shared/__init__.py` (created)
+- `api/src/app/__init__.py` (created)
+- `api/src/app/core/__init__.py` + 22 module subdirs each with `__init__.py` (created)
+- `api/src/app/packs/furniture/{pack.yaml.placeholder, __init__.py}` and module subdirs (created — empty)
+- `api/src/app/shared/__init__.py` (created)
 - `app/src/app/features/user/core/{layout, contacts, activities, pipelines, appointments, custom-fields, walk-ins, catalog, billing, conversations, calls, reviews, campaigns, settings, shared, leads, tasks, notifications, dashboard, staff, ai, reporting}/.gitkeep` (created)
 - `app/src/app/features/user/packs/furniture/{inventory, custom-orders, field-ops, marketplace, virtual-staging, qr-marketing, billing}/.gitkeep` (created)
 - `app/src/app/features/user/layout/home-stub.component.ts` (created — placeholder)
@@ -61,7 +61,7 @@
 ## Plan
 1. Move `API/` → `_API_tmp/` → `api/` (Windows case-only rename workaround). Confirm `git status` shows the rename.
 2. Move `APP/` → `_APP_tmp/` → `app/`. Same.
-3. Inside `api/app/` (a brand-new package alongside the existing `src/`) create the empty layered tree. Existing `api/src/` stays for now; auth migration into `api/app/core/auth/` happens in 1.5/1.6.
+3. Inside `api/src/app/` (a brand-new package alongside the existing `src/`) create the empty layered tree. Existing `api/src/` stays for now; auth migration into `api/src/app/core/auth/` happens in 1.5/1.6.
 4. Delete the non-auth backend trees per the agreed list. Run `python -c "import src.routers.auth"` from `api/` (or equivalent) to confirm imports still resolve in auth code.
 5. Create the empty Angular layered folders under `app/src/app/features/user/core/` and `app/src/app/features/user/packs/furniture/`. Create the empty `app/src/app/staff-portal/` folder.
 6. Delete the old user-side frontend subfolders (dashboard, profile, security, support, change-password, layout).
@@ -105,7 +105,7 @@ None (no business logic). Manual smoke per Plan step 15.
 ## Verification checklist
 **Code review:**
 - run: `git status` → expect renames `API/` → `api/`, `APP/` → `app/`, deletions of non-auth files, `features/admin/` **unchanged**.
-- run: `Get-ChildItem api/app/core | Select Name` → expect 22 module directories.
+- run: `Get-ChildItem api/src/app/core | Select Name` → expect 22 module directories.
 - run: `Get-ChildItem app/src/app/features/user/core | Select Name` → expect new layered folders.
 - run: `Get-ChildItem app/src/app/features/admin | Select Name` → expect **identical to before** (dashboard, news, popups, ... all present).
 - run: `git diff app/src/app/features/admin/` → expect **empty**.
@@ -128,7 +128,7 @@ None (no business logic). Manual smoke per Plan step 15.
 - DevTools → Elements: confirm Tailwind classes (e.g. `flex`, `min-h-screen`) only appear on the stub page, NOT on the login or admin pages.
 
 ## Self-check (10 rules)
-- [ ] No `from app.packs` import in `app/core/` (no code yet, so trivially holds — CI guard added in Phase 6).
+- [ ] No `from src.app.packs` import in `app/core/` (no code yet, so trivially holds — CI guard added in Phase 6).
 - [ ] No tables created yet (rule 2 N/A).
 - [ ] No TODOs, no commented-out code in any new file.
 - [ ] Folder names lowercase; existing `Flutter/` and `features/admin/` untouched.

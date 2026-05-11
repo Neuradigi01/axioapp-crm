@@ -24,19 +24,19 @@
 - Deleting the old `api/src/...` paths (kept as reference until 1.6 finalizes auth migration).
 
 ## Files to touch
-- `api/app/core/users/__init__.py` (created)
-- `api/app/core/users/models.py` (created — `User`)
-- `api/app/core/users/schemas.py` (created — Pydantic v2)
-- `api/app/core/users/service.py` (created — read/list, password hashing wrapper)
-- `api/app/core/users/router.py` (created — `/users/me`, `/users` admin list)
-- `api/app/core/permissions/__init__.py` (created)
-- `api/app/core/permissions/models.py` (created — `Role`, `Permission`, `RolePermission`)
-- `api/app/core/permissions/schemas.py` (created)
-- `api/app/core/permissions/service.py` (created — registers permissions from modules)
-- `api/app/shared/security/password.py` (created — bcrypt wrapper, copied/refactored from existing `api/src/core/security/password.py`)
+- `api/src/app/core/users/__init__.py` (created)
+- `api/src/app/core/users/models.py` (created — `User`)
+- `api/src/app/core/users/schemas.py` (created — Pydantic v2)
+- `api/src/app/core/users/service.py` (created — read/list, password hashing wrapper)
+- `api/src/app/core/users/router.py` (created — `/users/me`, `/users` admin list)
+- `api/src/app/core/permissions/__init__.py` (created)
+- `api/src/app/core/permissions/models.py` (created — `Role`, `Permission`, `RolePermission`)
+- `api/src/app/core/permissions/schemas.py` (created)
+- `api/src/app/core/permissions/service.py` (created — registers permissions from modules)
+- `api/src/app/shared/security/password.py` (created — bcrypt wrapper, copied/refactored from existing `api/src/core/security/password.py`)
 - `api/alembic/versions/0003_users_roles_permissions.py` (created)
-- `api/app/scripts/seed_admin_user.py` (created)
-- `api/app/main.py` (modified — register `users` router)
+- `api/src/app/scripts/seed_admin_user.py` (created)
+- `api/src/app/main.py` (modified — register `users` router)
 
 ## Plan
 1. Define models in the new layered layout. `User` and `Role` inherit `TenantScoped`; `Permission` and `RolePermission` are global.
@@ -62,14 +62,14 @@
 ## Verification checklist
 **Backend:**
 - run: `uv run alembic upgrade head` → 0003 applied.
-- run: `uv run python -m app.scripts.seed_admin_user` → prints inserted user id.
+- run: `uv run python -m src.app.scripts.seed_admin_user` → prints inserted user id.
 - run: `psql $DATABASE_URL -c "\dt" | findstr users` → users, roles, permissions, role_permissions.
 - hit: `curl localhost:8000/api/v1/users/me -H 'X-Org-Id: <demo-uuid>' -H 'X-User-Id: <admin-uuid>'` → 200 with user JSON.
 - run: `uv run pytest -q` → green.
 
 **Code review:**
-- open `api/app/core/users/models.py` — note `TenantScoped` mixin used.
-- open `api/app/core/permissions/models.py` — note Permission is global, not TenantScoped.
+- open `api/src/app/core/users/models.py` — note `TenantScoped` mixin used.
+- open `api/src/app/core/permissions/models.py` — note Permission is global, not TenantScoped.
 
 ## Self-check (10 rules)
 - [ ] `org_id` on `users` and `roles`; RLS enabled.

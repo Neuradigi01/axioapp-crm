@@ -23,9 +23,9 @@
 - Staff portal auth — 3.6.
 
 ## Files to touch
-- `api/app/core/staff/{__init__,models,schemas,service,router,module}.py` (created)
+- `api/src/app/core/staff/{__init__,models,schemas,service,router,module}.py` (created)
 - `api/alembic/versions/0016_staff_profiles_attendance.py` (created)
-- `api/app/main.py` (modified)
+- `api/src/app/main.py` (modified)
 
 ## Plan
 1. Models + migration. `Attendance.hours` generated as `EXTRACT(EPOCH FROM (clock_out_at - clock_in_at))/3600`.

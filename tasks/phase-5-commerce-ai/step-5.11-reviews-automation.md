@@ -13,10 +13,10 @@
 - Idempotency: `review_request_history` table (TenantScoped) to prevent duplicate sends per (contact, order_id).
 
 ## Files to touch
-- `api/app/core/reviews/automation.py` (created)
-- `api/app/core/reviews/models.py` (modified — `ReviewRequestHistory`)
-- `api/app/packs/furniture/modules/custom_orders/service.py` (modified — emit event on delivered)
-- `api/app/core/billing/service.py` (modified — emit event on paid+delivered)
+- `api/src/app/core/reviews/automation.py` (created)
+- `api/src/app/core/reviews/models.py` (modified — `ReviewRequestHistory`)
+- `api/src/app/packs/furniture/modules/custom_orders/service.py` (modified — emit event on delivered)
+- `api/src/app/core/billing/service.py` (modified — emit event on paid+delivered)
 - `api/alembic/versions/0032_review_request_history.py` (created)
 
 ## Plan
