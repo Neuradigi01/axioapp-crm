@@ -24,6 +24,7 @@ from config import APP_NAME, STATIC_DIR, UPLOAD_DIR
 
 from src.app.core.audit.router import router as audit_router
 from src.app.core.auth.router import router as auth_router
+from src.app.core.custom_fields.router import router as custom_fields_router
 from src.app.core.health.router import router as health_router
 from src.app.core.module_registry import discover_modules, registry
 from src.app.core.modules_router import router as modules_router
@@ -80,6 +81,7 @@ app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
+app.include_router(custom_fields_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 

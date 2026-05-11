@@ -55,7 +55,7 @@ class ModuleDescriptor:
     route: str
     frontend_route: str
     permissions: list[str] = field(default_factory=list)
-    menu_position: int = 100
+    menu_position: int | None = 100
     parent: str | None = None
 
     def __post_init__(self) -> None:
@@ -99,22 +99,35 @@ class ModuleRegistry:
         return self._modules.get(module_id)
 
     def list(self) -> list[ModuleDescriptor]:
-        """All registered modules, sorted by `(menu_position, id)`."""
+        """All registered modules, sorted by `(menu_position, id)`.
+
+        `menu_position=None` denotes a hidden module (no sidebar entry);
+        it sorts to the end while still being discoverable so its
+        permissions register on startup.
+        """
         return sorted(
-            self._modules.values(), key=lambda m: (m.menu_position, m.id)
+            self._modules.values(),
+            key=lambda m: (
+                m.menu_position if m.menu_position is not None else float("inf"),
+                m.id,
+            ),
         )
 
     def list_for_user(self, granted: Iterable[str]) -> list[ModuleDescriptor]:
         """Return modules the user holds at least one declared permission for.
 
         Modules that declare an empty permission list are public and
-        always returned.
+        always returned. Modules with `menu_position=None` are excluded —
+        they exist in the registry for permission discovery only and do
+        not render in the sidebar (they surface from within other UIs,
+        e.g. Settings).
         """
         granted_set = set(granted)
         return [
             m
             for m in self.list()
-            if not m.permissions or any(p in granted_set for p in m.permissions)
+            if m.menu_position is not None
+            and (not m.permissions or any(p in granted_set for p in m.permissions))
         ]
 
     def clear(self) -> None:

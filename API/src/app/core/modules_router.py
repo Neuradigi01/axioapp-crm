@@ -44,7 +44,7 @@ class ModuleOut(BaseModel):
     route: str
     frontend_route: str
     permissions: list[str]
-    menu_position: int
+    menu_position: int | None
     parent: str | None
 
     @classmethod
