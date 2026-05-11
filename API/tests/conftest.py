@@ -39,10 +39,24 @@ async def _ensure_test_db_exists():
         await sys_conn.close()
 
 
+async def _ensure_test_db_extensions():
+    """Install Postgres extensions the layered models depend on (citext, pgcrypto).
+
+    Idempotent. Runs once per test session against the test DB so
+    `Base.metadata.create_all` can construct tables that reference
+    these types/functions (e.g. `users.email CITEXT`,
+    `id UUID DEFAULT gen_random_uuid()`).
+    """
+    async with test_engine.begin() as conn:
+        await conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS citext")
+        await conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+
+
 @pytest_asyncio.fixture(scope="session", autouse=True, loop_scope="session")
 async def ensure_test_db():
-    """Auto-create the test database before any tests run."""
+    """Auto-create the test database and install required extensions."""
     await _ensure_test_db_exists()
+    await _ensure_test_db_extensions()
 
 
 @pytest_asyncio.fixture(scope="function")

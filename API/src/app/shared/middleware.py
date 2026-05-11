@@ -2,14 +2,16 @@
 
 For each incoming HTTP request:
   1. Generate a request ID (or reuse `X-Request-Id` if the client sent one).
-  2. Read the dev-only `X-Org-Id` header to populate `org_id`.
-     (Step 1.6 will replace this with JWT-claim extraction.)
+  2. Read the dev-only `X-Org-Id` and `X-User-Id` headers to populate
+     `org_id` and `user_id`.
+     (Step 1.6 will replace these with JWT-claim extraction.)
   3. Set the contextvar so anything downstream can call `get_context()`.
   4. After the response, reset the contextvar.
 
-The middleware never raises — a malformed UUID header is treated as "no org",
-and the request continues normally. Endpoints that require a valid org context
-must enforce that themselves (auth dependency in Step 1.6).
+The middleware never raises — a malformed UUID header is treated as "no
+context value", and the request continues normally. Endpoints that
+require a valid org/user context must enforce that themselves (auth
+dependency in Step 1.6).
 """
 from __future__ import annotations
 
@@ -22,20 +24,24 @@ from starlette.responses import Response
 from src.app.shared.context import RequestContext, reset_context, set_context
 
 
+def _parse_uuid(raw: str | None) -> uuid.UUID | None:
+    if not raw:
+        return None
+    try:
+        return uuid.UUID(raw)
+    except ValueError:
+        return None
+
+
 class TenantContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
 
-        org_id: uuid.UUID | None = None
-        raw_org = request.headers.get("x-org-id")
-        if raw_org:
-            try:
-                org_id = uuid.UUID(raw_org)
-            except ValueError:
-                org_id = None
+        org_id = _parse_uuid(request.headers.get("x-org-id"))
+        user_id = _parse_uuid(request.headers.get("x-user-id"))
 
         token = set_context(
-            RequestContext(org_id=org_id, user_id=None, request_id=request_id)
+            RequestContext(org_id=org_id, user_id=user_id, request_id=request_id)
         )
         try:
             response = await call_next(request)
