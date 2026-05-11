@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, signal, inject, viewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -20,6 +21,11 @@ import { I2faRequiredData, IEmailVerificationRequiredData, ILoginPayload } from 
 import { ROLE_ADMIN, SNACKBAR_DURATION, SNACKBAR_ACTION } from '@core/constants/app.constants';
 import { MSG_ERROR_GENERIC, MSG_LOGIN_FAILED } from '@core/constants/messages.constants';
 import { DeviceInfoService } from '@core/services/device-info.service';
+import { FurnitureAuthService } from '@app/features/user/core/auth/auth.service';
+
+// All non-admin logins resolve to the demo org until a tenant selector
+// (or domain-based resolution) lands in Phase 2.
+const DEFAULT_FURNITURE_ORG_SLUG = 'demo';
 
 @Component({
   selector: 'app-login',
@@ -45,6 +51,7 @@ export class LoginComponent {
   private readonly fb = inject(FormBuilder);
   private readonly authApi = inject(AuthApiService);
   private readonly auth = inject(AuthService);
+  private readonly furnitureAuth = inject(FurnitureAuthService);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly deviceInfo = inject(DeviceInfoService);
@@ -84,6 +91,25 @@ export class LoginComponent {
 
     this.isLoading.set(true);
     const { identifier, password } = this.loginForm.value;
+
+    // FurnitureCRM (layered) user login. Admin login keeps the legacy path below.
+    if (!this.isAdmin) {
+      try {
+        await firstValueFrom(
+          this.furnitureAuth.login(identifier, password, DEFAULT_FURNITURE_ORG_SLUG),
+        );
+        await this.router.navigateByUrl('/user');
+      } catch (err: unknown) {
+        const msg =
+          (err as { error?: { detail?: string; message?: string } })?.error?.detail ??
+          (err as { error?: { detail?: string; message?: string } })?.error?.message ??
+          MSG_LOGIN_FAILED;
+        this.snackBar.open(msg, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+      } finally {
+        this.isLoading.set(false);
+      }
+      return;
+    }
 
     try {
       const device_info = this.deviceInfo.collect();
