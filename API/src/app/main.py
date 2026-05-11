@@ -22,6 +22,7 @@ from src.providers.firebase_provider import initialize_firebase
 from src.providers.error_log_provider import log_error_to_db
 from config import APP_NAME, STATIC_DIR, UPLOAD_DIR
 
+from src.app.core.audit.router import router as audit_router
 from src.app.core.auth.router import router as auth_router
 from src.app.core.health.router import router as health_router
 from src.app.core.users.router import router as users_router
@@ -61,6 +62,7 @@ app.include_router(legacy_router)
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
+app.include_router(audit_router, prefix="/api/v1")
 
 
 @app.middleware("http")

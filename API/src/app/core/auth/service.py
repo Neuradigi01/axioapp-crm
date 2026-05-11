@@ -17,6 +17,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core import audit
 from src.app.core.auth.models import AuthSession
 from src.app.core.auth.schemas import LoginResponse, RefreshResponse
 from src.app.core.auth.tokens import ACCESS_TOKEN_TTL, TokenClaims, encode_token
@@ -55,12 +56,29 @@ async def login(
 
     org = await _get_org_by_slug(db, org_slug)
     if org is None:
+        # No tenant known → can't attribute to a row, intentionally skip audit.
         raise invalid
 
     user = await _get_user_by_email_in_org(db, org.id, email)
     if user is None or not user.is_active:
+        await audit.log(
+            "auth.login.failure",
+            org_id=org.id,
+            user_id=None,
+            before={"email": email, "reason": "unknown_or_inactive_user"},
+            ip=ip,
+            ua=ua,
+        )
         raise invalid
     if not verify_password(password, user.password_hash):
+        await audit.log(
+            "auth.login.failure",
+            org_id=org.id,
+            user_id=None,
+            before={"email": email, "reason": "bad_password"},
+            ip=ip,
+            ua=ua,
+        )
         raise invalid
 
     token_id = uuid.uuid4()
@@ -78,6 +96,15 @@ async def login(
         )
     )
     await db.commit()
+
+    await audit.log(
+        "auth.login.success",
+        org_id=org.id,
+        user_id=user.id,
+        after={"token_id": str(token_id)},
+        ip=ip,
+        ua=ua,
+    )
 
     encoded, exp = encode_token(
         user_id=user.id, org_id=org.id, token_id=token_id, now=now

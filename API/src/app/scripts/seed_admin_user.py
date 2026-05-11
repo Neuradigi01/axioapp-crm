@@ -31,10 +31,11 @@ ADMIN_ROLE_ID = uuid.UUID("00000000-0000-0000-0000-000000000010")
 ADMIN_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000011")
 
 PERMISSIONS = [
-    (uuid.UUID("00000000-0000-0000-0000-000000000020"), "users.read",  "Read users",   "users"),
-    (uuid.UUID("00000000-0000-0000-0000-000000000021"), "users.write", "Manage users", "users"),
-    (uuid.UUID("00000000-0000-0000-0000-000000000022"), "roles.read",  "Read roles",   "roles"),
-    (uuid.UUID("00000000-0000-0000-0000-000000000023"), "roles.write", "Manage roles", "roles"),
+    (uuid.UUID("00000000-0000-0000-0000-000000000020"), "users.read",  "Read users",       "users"),
+    (uuid.UUID("00000000-0000-0000-0000-000000000021"), "users.write", "Manage users",     "users"),
+    (uuid.UUID("00000000-0000-0000-0000-000000000022"), "roles.read",  "Read roles",       "roles"),
+    (uuid.UUID("00000000-0000-0000-0000-000000000023"), "roles.write", "Manage roles",     "roles"),
+    (uuid.UUID("00000000-0000-0000-0000-000000000024"), "audit.read",  "Read audit logs",  "audit"),
 ]
 
 ADMIN_EMAIL = "admin@demo.local"
