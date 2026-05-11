@@ -1,0 +1,45 @@
+services:
+  api:
+    build:
+      args:
+        - is_development=true
+    ports:
+      - "5678:5678"
+    volumes:
+      - .:/app
+    environment:
+      - ENV=development
+      - REDIS_HOST=redis
+      - IS_DEVELOPMENT=true
+      - MASTER_KEY=${MASTER_KEY:-}
+    command: ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  celery:
+    environment:
+      - ENV=development
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+
+  celery-beat:
+    environment:
+      - ENV=development
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+
+  flower:
+    environment:
+      - ENV=development
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+
+  redis:
+    image: "redis:7-alpine"
+    restart: unless-stopped
+    volumes:
+      - redis_dev_data:/data
+
+volumes:
+  redis_dev_data:

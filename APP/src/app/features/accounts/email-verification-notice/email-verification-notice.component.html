@@ -1,0 +1,33 @@
+<div class="email-notice">
+  <mat-card class="email-notice__card">
+    <mat-card-header class="email-notice__header">
+      <mat-card-title class="email-notice__title">Verify Your Email</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="email-notice__status">
+        <mat-icon class="email-notice__icon">mark_email_unread</mat-icon>
+        <p class="email-notice__status-text">A verification email has been sent</p>
+        @if (email) {
+          <p class="email-notice__status-hint">
+            We've sent a verification link to <strong>{{ email }}</strong>.
+            Please check your inbox and click the link to verify your email address.
+          </p>
+        } @else {
+          <p class="email-notice__status-hint">
+            Please check your inbox and click the verification link to verify your email address.
+          </p>
+        }
+        <p class="email-notice__status-hint">
+          Didn't receive the email? Try logging in again to resend it.
+        </p>
+      </div>
+    </mat-card-content>
+
+    <mat-card-actions class="email-notice__actions">
+      <span class="email-notice__actions-text">
+        <a mat-button [routerLink]="loginUrl" class="email-notice__link">Back to Login</a>
+      </span>
+    </mat-card-actions>
+  </mat-card>
+</div>

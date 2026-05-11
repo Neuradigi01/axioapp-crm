@@ -1,0 +1,111 @@
+<app-form-card title="Add New Admin" subtitle="Create a new sub-admin account" icon="person_add" [showBackButton]="true" (backClicked)="goBack()">
+  @if (isLoading()) {
+    <div class="add-sub-admin__loading">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  } @else {
+    <form [formGroup]="adminForm" (ngSubmit)="onSubmit()" class="add-sub-admin__form">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Admin User ID</mat-label>
+        <input matInput formControlName="admin_user_id" />
+        <mat-icon matPrefix>badge</mat-icon>
+        <mat-error><app-validation-message [control]="adminForm.controls['admin_user_id']" label="Admin User ID" /></mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width" appPasswordToggle #pwToggle="passwordToggle">
+        <mat-label>Password</mat-label>
+        <input matInput [type]="pwToggle.type()" formControlName="password" autocomplete="new-password" />
+        <button mat-icon-button matSuffix type="button" (click)="pwToggle.toggle()" [attr.aria-label]="pwToggle.ariaLabel()">
+          <mat-icon>{{ pwToggle.icon() }}</mat-icon>
+        </button>
+        <mat-error><app-validation-message [control]="adminForm.controls['password']" label="Password" /></mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width" appPasswordToggle #cpwToggle="passwordToggle">
+        <mat-label>Confirm Password</mat-label>
+        <input matInput [type]="cpwToggle.type()" formControlName="confirm_password" autocomplete="new-password" />
+        <button mat-icon-button matSuffix type="button" (click)="cpwToggle.toggle()" [attr.aria-label]="cpwToggle.ariaLabel()">
+          <mat-icon>{{ cpwToggle.icon() }}</mat-icon>
+        </button>
+        <mat-error><app-validation-message [control]="adminForm.controls['confirm_password']" label="Confirm Password" /></mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Name</mat-label>
+        <input matInput formControlName="name" />
+        <mat-icon matPrefix>person</mat-icon>
+        <mat-error><app-validation-message [control]="adminForm.controls['name']" label="Name" /></mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Email</mat-label>
+        <input matInput formControlName="email" type="email" />
+        <mat-icon matPrefix>email</mat-icon>
+        <mat-error><app-validation-message [control]="adminForm.controls['email']" label="Email" /></mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Mobile No</mat-label>
+        <input matInput formControlName="mobile_no" type="tel" />
+        <mat-icon matPrefix>phone</mat-icon>
+      </mat-form-field>
+
+      <div class="add-sub-admin__routes-section">
+        <h3 class="add-sub-admin__routes-title">Route Assignment</h3>
+        <p class="add-sub-admin__routes-note">
+          Dashboard, Profile, Change Password, Security, and Inbox are always accessible.
+        </p>
+
+        <div class="add-sub-admin__routes-actions">
+          <button mat-stroked-button type="button" (click)="selectAll()">
+            <mat-icon>select_all</mat-icon>
+            Select All
+          </button>
+          <button mat-stroked-button type="button" (click)="deselectAll()">
+            <mat-icon>deselect</mat-icon>
+            Deselect All
+          </button>
+        </div>
+
+        <div class="add-sub-admin__route-tree">
+          @for (node of routeTree(); track node.route.id) {
+            <div class="add-sub-admin__route-parent">
+              <mat-checkbox
+                [checked]="node.checked"
+                [indeterminate]="node.indeterminate"
+                [disabled]="node.route.is_compulsory"
+                (change)="toggleParent(node)">
+                {{ node.route.name }}
+              </mat-checkbox>
+
+              @if (node.children.length > 0) {
+                <div class="add-sub-admin__route-children">
+                  @for (child of node.children; track child.route.id) {
+                    <mat-checkbox
+                      [checked]="child.checked"
+                      [disabled]="child.route.is_compulsory"
+                      (change)="toggleChild(node, child)">
+                      {{ child.route.name }}
+                    </mat-checkbox>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <button
+        mat-flat-button
+        type="submit"
+        class="add-sub-admin__submit"
+        [disabled]="isSaving()">
+        @if (isSaving()) {
+          <mat-spinner diameter="20"></mat-spinner>
+        } @else {
+          Create
+        }
+      </button>
+    </form>
+  }
+</app-form-card>

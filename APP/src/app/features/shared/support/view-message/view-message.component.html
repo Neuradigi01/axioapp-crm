@@ -1,0 +1,119 @@
+<div class="view-message">
+  @if (isLoading()) {
+    <div class="view-message__loading">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  } @else if (ticket(); as t) {
+    <!-- Header -->
+    <div class="view-message__header">
+      <div class="view-message__header-left">
+        <button mat-icon-button (click)="goBack()" aria-label="Go back" class="view-message__back-btn">
+          <mat-icon>arrow_back</mat-icon>
+        </button>
+        <div class="view-message__header-info">
+          <h2 class="view-message__title">{{ t.subject }}</h2>
+          <div class="view-message__meta">
+            <span class="view-message__ticket-no">{{ t.ticket_no }}</span>
+            <span class="view-message__meta-dot">·</span>
+            @let statusBadge = getStatusBadge(t.status);
+            <span class="view-message__badge" [style.color]="statusBadge.color" [style.background-color]="statusBadge.bgVar">
+              {{ statusBadge.label }}
+            </span>
+            <span class="view-message__meta-dot">·</span>
+            <span class="view-message__date">{{ t.created_at | date:'mediumDate' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin: Status Update -->
+      @if (isAdmin() && availableStatuses().length > 0) {
+        <div class="view-message__status-action">
+          <mat-form-field appearance="outline" class="view-message__status-select" subscriptSizing="dynamic">
+            <mat-label>Update Status</mat-label>
+            <mat-select (selectionChange)="onStatusChange($event.value)" [disabled]="isUpdatingStatus()">
+              @for (s of availableStatuses(); track s) {
+                <mat-option [value]="s">{{ s }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+      }
+    </div>
+
+    <!-- Conversation Thread -->
+    <div class="view-message__thread">
+      @for (msg of thread(); track $index) {
+        <div class="view-message__msg" [class.view-message__msg--own]="isOwnMessage(msg)">
+          <!-- Avatar -->
+          <div class="view-message__avatar" [class.view-message__avatar--own]="isOwnMessage(msg)">
+            {{ getAvatarInitial(msg) }}
+          </div>
+
+          <!-- Bubble -->
+          <div class="view-message__bubble" [class.view-message__bubble--own]="isOwnMessage(msg)">
+            <div class="view-message__bubble-header">
+              <span class="view-message__sender">{{ getSenderLabel(msg) }}</span>
+              <span class="view-message__timestamp">{{ msg.created_at | date:'short' }}</span>
+            </div>
+            <div class="view-message__bubble-body">{{ msg.message }}</div>
+            @if (msg.attachments && msg.attachments.length > 0) {
+              <div class="view-message__bubble-attachments">
+                <app-attachment-list [attachments]="msg.attachments"></app-attachment-list>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Reply Section -->
+    @if (isClosed()) {
+      <div class="view-message__closed">
+        <mat-icon>lock</mat-icon>
+        <span>This ticket is closed and no longer accepts replies</span>
+      </div>
+    } @else {
+      <div class="view-message__reply">
+        <div class="view-message__reply-composer">
+          <textarea
+            class="view-message__reply-input"
+            [(ngModel)]="replyMessage"
+            placeholder="Write a reply..."
+            rows="3"
+            (keydown.control.enter)="replyMessage.trim() && sendReply()"></textarea>
+          <div class="view-message__reply-toolbar">
+            <button
+              mat-icon-button
+              class="view-message__attach-btn"
+              (click)="toggleAttachments()"
+              [class.active]="showAttachments()"
+              aria-label="Attach files">
+              <mat-icon>attach_file</mat-icon>
+            </button>
+            <span class="view-message__reply-hint">Ctrl + Enter to send</span>
+            <button
+              mat-flat-button
+              class="view-message__send-btn"
+              [disabled]="isSending() || !replyMessage.trim()"
+              (click)="sendReply()">
+              @if (isSending()) {
+                <mat-spinner diameter="18"></mat-spinner>
+              } @else {
+                <ng-container>
+                  <mat-icon>send</mat-icon>
+                  Send
+                </ng-container>
+              }
+            </button>
+          </div>
+        </div>
+
+        @if (showAttachments()) {
+          <div class="view-message__reply-attachments">
+            <app-file-upload (filesChanged)="onReplyFilesChanged($event)"></app-file-upload>
+          </div>
+        }
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,55 @@
+services:
+  api:
+    build: .
+    ports:
+      - "${LISTEN_ADDR:-0.0.0.0}:${API_PORT:-8000}:8000"
+    volumes:
+      - ./static:/app/static
+      - ./logs:/app/logs
+    environment:
+      - ENV=production
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  celery:
+    build: .
+    command: celery -A src.celery.worker.celery worker --loglevel=info --hostname=celery_worker@%h
+    environment:
+      - ENV=production
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - api
+    restart: unless-stopped
+    profiles:
+      - celery
+
+  celery-beat:
+    build: .
+    command: celery -A src.celery.worker.celery beat --loglevel=info
+    env_file:
+      - .env
+    depends_on:
+      - celery
+    restart: unless-stopped
+    profiles:
+      - celery
+
+  flower:
+    build: .
+    ports:
+      - "${LISTEN_ADDR:-0.0.0.0}:${FLOWER_PORT:-5555}:5555"
+    command: >
+      sh -c "celery -A src.celery.worker.celery flower --port=5555 --basic_auth='${FLOWER_USER:-admin}:${FLOWER_PASS:-admin}' --persistent=True --db=./flower/flower.db"
+    env_file:
+      - .env
+    volumes:
+      - ./flower:/app/flower
+    depends_on:
+      - celery
+    restart: unless-stopped
+    profiles:
+      - celery

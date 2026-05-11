@@ -1,0 +1,46 @@
+<button
+  mat-icon-button
+  [matMenuTriggerFor]="notificationMenu"
+  (menuOpened)="onMenuOpened()"
+  aria-label="Notifications"
+  class="notification-bell__btn">
+  <mat-icon
+    [matBadge]="unreadCount()"
+    [matBadgeHidden]="unreadCount() === 0"
+    matBadgeColor="warn"
+    matBadgeSize="small">
+    notifications
+  </mat-icon>
+</button>
+
+<mat-menu #notificationMenu="matMenu" xPosition="before" class="notification-menu-panel">
+  <div class="notification-bell__header" (click)="$event.stopPropagation()">
+    <span class="notification-bell__title">Notifications</span>
+    @if (unreadCount() > 0) {
+      <button
+        class="notification-bell__mark-all"
+        (click)="markAllAsRead()">
+        Mark all as read
+      </button>
+    }
+  </div>
+  <mat-divider></mat-divider>
+  <div class="notification-bell__list" (click)="$event.stopPropagation()">
+    @if (isLoading()) {
+      <div class="notification-bell__empty">Loading...</div>
+    } @else if (notifications().length === 0) {
+      <div class="notification-bell__empty">No notifications</div>
+    } @else {
+      @for (notification of notifications(); track notification.id) {
+        <div
+          class="notification-bell__item"
+          [class.notification-bell__item--unread]="!notification.is_read"
+          (click)="markAsRead(notification, $event)">
+          <div class="notification-bell__item-title">{{ notification.title }}</div>
+          <div class="notification-bell__item-message">{{ notification.message }}</div>
+          <div class="notification-bell__item-time">{{ notification.created_at | date:'short' }}</div>
+        </div>
+      }
+    }
+  </div>
+</mat-menu>

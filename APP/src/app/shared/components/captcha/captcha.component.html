@@ -1,0 +1,28 @@
+@if (captchaType()) {
+  <div class="captcha">
+    @if (isLoading()) {
+      <div class="captcha__loading">
+        <mat-spinner diameter="24" />
+      </div>
+    } @else if (captchaType() === 'image') {
+      <div class="captcha__container">
+        <div class="captcha__image-wrap">
+          @if (captchaImage()) {
+            <img [src]="'data:image/png;base64,' + captchaImage()" alt="Captcha" class="captcha__image" />
+          }
+          <button mat-icon-button type="button" (click)="refresh()" class="captcha__refresh" aria-label="Refresh captcha">
+            <mat-icon>refresh</mat-icon>
+          </button>
+        </div>
+        <input
+          class="captcha__code-input"
+          [formControl]="captchaAnswer"
+          placeholder="Enter code"
+          autocomplete="off"
+          spellcheck="false" />
+      </div>
+    } @else if (captchaType() === 'recaptcha_v2') {
+      <div #recaptchaContainer class="captcha__recaptcha-v2"></div>
+    }
+  </div>
+}

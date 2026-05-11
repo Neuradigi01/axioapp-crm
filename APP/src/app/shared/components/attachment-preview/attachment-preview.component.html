@@ -1,0 +1,23 @@
+<div class="preview">
+  <!-- Toolbar -->
+  <div class="preview__toolbar">
+    <span class="preview__filename">{{ data.fileName }}</span>
+    <div class="preview__actions">
+      <button mat-icon-button (click)="download()" aria-label="Download file">
+        <mat-icon>download</mat-icon>
+      </button>
+      <button mat-icon-button (click)="close()" aria-label="Close preview">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="preview__content">
+    @if (data.type === 'image') {
+      <img class="preview__image" [src]="data.url" [alt]="data.fileName" />
+    } @else {
+      <iframe class="preview__pdf" [src]="safeUrl" [title]="data.fileName"></iframe>
+    }
+  </div>
+</div>

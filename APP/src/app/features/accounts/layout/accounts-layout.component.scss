@@ -1,0 +1,45 @@
+.accounts-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--page-bg);
+
+  &__header {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--spacing-md);
+  }
+
+  &__theme-toggle {
+    color: var(--page-text-secondary);
+    transition: color var(--transition-normal);
+
+    &:hover {
+      color: var(--page-text);
+    }
+  }
+
+  &__content {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-md);
+    padding-top: 0;
+  }
+
+  &__card-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: min(480px, 90vw);
+  }
+
+  &__logo {
+    height: 40px;
+    width: auto;
+    object-fit: contain;
+    margin-bottom: var(--spacing-xl);
+  }
+}

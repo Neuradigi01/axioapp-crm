@@ -1,0 +1,10 @@
+.edit-profile-dialog__form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.edit-profile-dialog__field {
+  width: 100%;
+  min-width: 300px;
+}

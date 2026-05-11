@@ -1,0 +1,78 @@
+<div class="login">
+  <mat-card class="login__card">
+    <mat-card-header class="login__header">
+      <mat-card-title class="login__title">
+        {{ isAdmin ? 'Admin Sign In' : 'Sign In' }}
+      </mat-card-title>
+      <mat-card-subtitle class="login__subtitle">
+        {{ isAdmin ? 'Admin Portal' : 'Welcome back' }}
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="login__form">
+        <!-- Identifier -->
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>{{ isAdmin ? 'Admin ID or Email' : 'User ID or Email' }}</mat-label>
+          <input matInput formControlName="identifier" autocomplete="username" />
+          <mat-error><app-validation-message [control]="loginForm.controls['identifier']" [label]="isAdmin ? 'Admin ID or Email' : 'User ID or Email'" /></mat-error>
+        </mat-form-field>
+
+        <!-- Password -->
+        <mat-form-field appearance="outline" class="full-width" appPasswordToggle #pwToggle="passwordToggle">
+          <mat-label>Password</mat-label>
+          <input
+            matInput
+            formControlName="password"
+            [type]="pwToggle.type()"
+            autocomplete="current-password" />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="pwToggle.toggle()"
+            [attr.aria-label]="pwToggle.ariaLabel()">
+            <mat-icon>{{ pwToggle.icon() }}</mat-icon>
+          </button>
+          <mat-error><app-validation-message [control]="loginForm.controls['password']" label="Password" /></mat-error>
+        </mat-form-field>
+
+        <!-- Remember Me -->
+        <mat-checkbox formControlName="rememberMe" class="login__remember">
+          Remember Me
+        </mat-checkbox>
+
+        <!-- Captcha -->
+        <app-captcha
+          #captchaRef
+          (typeChange)="onCaptchaTypeChange($event)"
+          (tokenChange)="onCaptchaTokenChange($event)" />
+
+        <!-- Submit -->
+        <button
+          mat-flat-button
+          type="submit"
+          class="login__submit full-width"
+          [disabled]="isLoading() || loginForm.invalid">
+          @if (isLoading()) {
+            <mat-spinner diameter="20"></mat-spinner>
+          } @else {
+            Sign In
+          }
+        </button>
+      </form>
+    </mat-card-content>
+
+    <mat-card-actions class="login__actions">
+      <a mat-button [routerLink]="forgotPasswordUrl" class="login__link">
+        Forgot password?
+      </a>
+      @if (!isAdmin) {
+        <span class="login__actions-text">
+          Don't have an account?
+          <a mat-button [routerLink]="registerUrl" class="login__link">Register</a>
+        </span>
+      }
+    </mat-card-actions>
+  </mat-card>
+</div>

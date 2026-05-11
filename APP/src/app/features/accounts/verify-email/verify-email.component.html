@@ -1,0 +1,34 @@
+<div class="verify-email">
+  <mat-card class="verify-email__card">
+    <mat-card-header class="verify-email__header">
+      <mat-card-title class="verify-email__title">Email Verification</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      @if (isLoading()) {
+        <div class="verify-email__status">
+          <mat-spinner diameter="40"></mat-spinner>
+          <p class="verify-email__status-text">Verifying your email address...</p>
+        </div>
+      } @else if (result() === 'success') {
+        <div class="verify-email__status">
+          <mat-icon class="verify-email__icon verify-email__icon--success">check_circle</mat-icon>
+          <p class="verify-email__status-text">Your email has been verified successfully!</p>
+          <p class="verify-email__status-hint">You can now login to your account.</p>
+        </div>
+      } @else {
+        <div class="verify-email__status">
+          <mat-icon class="verify-email__icon verify-email__icon--error">error_outline</mat-icon>
+          <p class="verify-email__status-text">{{ errorMessage() }}</p>
+          <p class="verify-email__status-hint">Please try logging in to receive a new verification email.</p>
+        </div>
+      }
+    </mat-card-content>
+
+    <mat-card-actions class="verify-email__actions">
+      <span class="verify-email__actions-text">
+        <a mat-button [routerLink]="loginUrl" class="verify-email__link">Back to Login</a>
+      </span>
+    </mat-card-actions>
+  </mat-card>
+</div>

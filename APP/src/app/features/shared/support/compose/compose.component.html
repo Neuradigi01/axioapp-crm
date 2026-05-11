@@ -1,0 +1,43 @@
+<app-form-card
+  title="New Ticket"
+  [subtitle]="isAdmin() ? 'Send a message to a user' : 'Submit a new support request'"
+  icon="confirmation_number">
+
+  <form [formGroup]="composeForm" (ngSubmit)="onSubmit()" class="compose__form">
+    @if (isAdmin()) {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>To (User ID)</mat-label>
+        <input matInput formControlName="to_user_id" placeholder="Enter user ID" />
+        <mat-error><app-validation-message [control]="composeForm.controls['to_user_id']" label="User ID" /></mat-error>
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Subject</mat-label>
+      <input matInput formControlName="subject" placeholder="Brief description of your issue" />
+      <mat-error><app-validation-message [control]="composeForm.controls['subject']" label="Subject" /></mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Message</mat-label>
+      <textarea matInput formControlName="message" rows="6" placeholder="Describe your issue in detail"></textarea>
+      <mat-error><app-validation-message [control]="composeForm.controls['message']" label="Message" /></mat-error>
+    </mat-form-field>
+
+    <div class="compose__attachments">
+      <app-file-upload #fileUpload (filesChanged)="onFilesChanged($event)"></app-file-upload>
+    </div>
+
+    <button
+      mat-flat-button
+      type="submit"
+      class="compose__submit"
+      [disabled]="isSaving()">
+      @if (isSaving()) {
+        <mat-spinner diameter="20"></mat-spinner>
+      } @else {
+        Submit Ticket
+      }
+    </button>
+  </form>
+</app-form-card>

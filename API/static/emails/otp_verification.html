@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Verification Code</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    body { margin: 0; padding: 0; width: 100% !important; height: 100% !important; background-color: #f0f4fa; }
+    @media only screen and (max-width: 620px) {
+      .email-container { width: 100% !important; padding: 0 12px !important; }
+      .content-cell { padding: 32px 24px !important; }
+      .hero-icon { width: 56px !important; height: 56px !important; line-height: 56px !important; }
+      .otp-code { font-size: 28px !important; letter-spacing: 8px !important; padding: 16px 24px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background-color:#f0f4fa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+
+  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">
+    Your {{app_name}} verification code: {{otp_code}}. Valid for {{otp_expiry_minutes}} minutes.
+  </div>
+
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f0f4fa;">
+    <tr>
+      <td align="center" style="padding: 40px 16px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="560" class="email-container" style="max-width:560px; width:100%;">
+
+          <!-- Logo -->
+          <tr>
+            <td align="center" style="padding: 0 0 28px 0;">
+              <img src="{{logo_url}}" alt="{{app_name}}" width="180" style="display:block; width:180px; max-width:180px; height:auto;">
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background-color:#ffffff; border-radius:12px; box-shadow: 0 2px 12px rgba(0,0,0,0.07);">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+
+                <!-- Accent Bar -->
+                <tr>
+                  <td style="background-color:#004BB2; height:4px; border-radius:12px 12px 0 0; font-size:0; line-height:0;">&nbsp;</td>
+                </tr>
+
+                <!-- Content -->
+                <tr>
+                  <td class="content-cell" style="padding: 44px 40px;">
+
+                    <!-- Icon -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td align="center" style="padding-bottom: 20px;">
+                          <div class="hero-icon" style="width:72px; height:72px; border-radius:50%; background-color:#004BB2; text-align:center; line-height:72px;">
+                            <span style="font-size:32px; color:#ffffff;">&#128272;</span>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <h1 style="margin:0 0 6px 0; font-size:22px; font-weight:700; color:#1a1a2e; text-align:center; line-height:1.3;">
+                      Verification Code
+                    </h1>
+                    <p style="margin:0 0 28px 0; font-size:14px; color:#6b7280; text-align:center; line-height:1.6;">
+                      Use the code below for <strong style="color:#374151;">{{purpose}}</strong>
+                    </p>
+
+                    <!-- OTP Code Box -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 0 0 24px 0;">
+                      <tr>
+                        <td align="center">
+                          <table role="presentation" cellpadding="0" cellspacing="0">
+                            <tr>
+                              <td class="otp-code" style="background-color:#f0f4fa; border: 2px dashed #004BB2; border-radius:12px; padding: 20px 40px; font-size:36px; font-weight:800; color:#004BB2; letter-spacing:12px; font-family: 'Courier New', Courier, monospace; text-align:center;">
+                                {{otp_code}}
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Expiry Badge -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td align="center" style="padding-bottom: 24px;">
+                          <table role="presentation" cellpadding="0" cellspacing="0">
+                            <tr>
+                              <td style="background-color:#FFF4E5; border: 1px solid #FFE0B2; border-radius:20px; padding: 7px 18px;">
+                                <span style="font-size:13px; font-weight:600; color:#E65100;">&#9202; Expires in {{otp_expiry_minutes}} minutes</span>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Security Notice -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                      <tr><td style="border-top: 1px solid #e8edf5; padding-top: 20px;">
+                        <p style="margin:0 0 10px 0; font-size:13px; color:#9ca3af; line-height:1.7;">
+                          <strong style="color:#6b7280;">Security tip:</strong> Never share this code with anyone. Our team will never ask you for this code.
+                        </p>
+                        <p style="margin:0; font-size:13px; color:#9ca3af; line-height:1.7;">
+                          If you did not request this code, please ignore this email or contact support if you have concerns.
+                        </p>
+                      </td></tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding: 28px 16px;">
+              <p style="margin:0 0 6px 0; font-size:12px; color:#9ca3af; line-height:1.6;">
+                &copy; {{year}} {{app_name}}. All rights reserved.
+              </p>
+              <p style="margin:0; font-size:11px; color:#d1d5db; line-height:1.6;">
+                This is an automated message. Please do not reply to this email.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

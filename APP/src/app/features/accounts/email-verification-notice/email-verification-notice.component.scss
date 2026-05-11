@@ -1,0 +1,35 @@
+@use 'styles/auth-card' as auth;
+
+@include auth.host();
+@include auth.card('email-notice') {
+  &__status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg) 0;
+    text-align: center;
+  }
+
+  &__icon {
+    font-size: 56px;
+    width: 56px;
+    height: 56px;
+    color: var(--feedback-info);
+  }
+
+  &__status-text {
+    color: var(--text-primary);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  &__status-hint {
+    color: var(--page-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+    margin: 0;
+  }
+}

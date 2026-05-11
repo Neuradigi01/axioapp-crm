@@ -1,0 +1,111 @@
+<div class="two-factor">
+  <mat-card class="two-factor__card">
+    <mat-card-header class="two-factor__header">
+      <mat-card-title class="two-factor__title">
+        Two-Factor Verification
+      </mat-card-title>
+      <mat-card-subtitle class="two-factor__subtitle">
+        Enter the verification code from your <strong>{{ methodLabel }}</strong>
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <!-- Expiry Timer -->
+      <div class="two-factor__timer" [class.two-factor__timer--expired]="isExpired">
+        @if (isExpired) {
+          <mat-icon>timer_off</mat-icon>
+          <span>Code expired. Please resend or try another method.</span>
+        } @else {
+          <mat-icon>timer</mat-icon>
+          <span>Code expires in {{ formattedExpiry }}</span>
+        }
+      </div>
+
+      <!-- Digit Inputs -->
+      <div class="two-factor__digits" (paste)="onDigitPaste($event)">
+        @for (digit of digits(); track $index) {
+          <input
+            #digitInput
+            type="text"
+            inputmode="numeric"
+            maxlength="1"
+            class="two-factor__digit-input"
+            [value]="digit"
+            [disabled]="isLoading() || isExpired"
+            (input)="onDigitInput($index, $event)"
+            (keydown)="onDigitKeydown($index, $event)"
+            autocomplete="one-time-code" />
+        }
+      </div>
+
+      <!-- Error Message -->
+      @if (errorMessage()) {
+        <p class="two-factor__error">{{ errorMessage() }}</p>
+      }
+
+      <!-- Loading Indicator -->
+      @if (isLoading()) {
+        <div class="two-factor__loading">
+          <mat-spinner diameter="24"></mat-spinner>
+          <span>Verifying...</span>
+        </div>
+      }
+
+      <!-- Resend Button (email/sms only) -->
+      @if (isOtpMethod) {
+        <div class="two-factor__resend">
+          <button
+            mat-button
+            type="button"
+            [disabled]="resendCooldown() > 0 || isLoading()"
+            (click)="resendCode()">
+            @if (resendCooldown() > 0) {
+              Resend code in {{ resendCooldown() }}s
+            } @else {
+              Resend code
+            }
+          </button>
+        </div>
+      }
+
+      <!-- Try Another Way -->
+      @if (alternativeMethods.length > 0) {
+      <div class="two-factor__try-another">
+        <button
+          mat-button
+          type="button"
+          class="two-factor__try-another-toggle"
+          (click)="toggleMethodOptions()"
+          [disabled]="isLoading()">
+          Try another way
+        </button>
+
+        @if (showMethodOptions()) {
+          <div class="two-factor__method-options">
+            @for (m of alternativeMethods; track m) {
+              <button
+                mat-stroked-button
+                type="button"
+                class="two-factor__method-btn"
+                [disabled]="isLoading()"
+                (click)="selectMethod(m)">
+                <mat-icon>
+                  {{ m === 'authenticator' ? 'phonelink_lock' : m === 'email' ? 'email' : 'sms' }}
+                </mat-icon>
+                {{ m === 'authenticator' ? 'Authenticator App' : m === 'email' ? 'Email OTP' : 'SMS OTP' }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+      }
+    </mat-card-content>
+
+    <mat-card-actions class="two-factor__actions">
+      <a mat-button [routerLink]="loginUrl()" class="two-factor__link">
+        <mat-icon>arrow_back</mat-icon>
+        Back to login
+      </a>
+    </mat-card-actions>
+  </mat-card>
+</div>

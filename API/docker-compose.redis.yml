@@ -1,0 +1,20 @@
+services:
+  redis:
+    image: "redis:7-alpine"
+    container_name: shared-redis
+    restart: unless-stopped
+    command: redis-server --bind 0.0.0.0 --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    env_file:
+      - .env
+    networks:
+      - shared-net
+
+volumes:
+  redis_data:
+
+networks:
+  shared-net:
+    name: shared-services-net
+    external: true

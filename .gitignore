@@ -1,0 +1,64 @@
+# Legacy
+Template/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Angular
+.angular/cache/
+.angular/
+
+# Build artifacts
+/dist
+/tmp
+/out-tsc
+/bazel-out
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.iml
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Storage (file uploads)
+storage/
+
+# Docker volumes
+postgres-data/
+redis-data/
+
+# Logs
+logs/
+*.log

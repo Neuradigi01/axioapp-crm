@@ -1,0 +1,210 @@
+<div class="register">
+  <mat-card class="register__card">
+    <mat-card-header class="register__header">
+      <mat-card-title class="register__title">Create Account</mat-card-title>
+      <mat-card-subtitle class="register__subtitle">Fill in your details to register</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="register__form">
+        <!-- Name Row -->
+        <div class="register__name-row">
+          <mat-form-field appearance="outline">
+            <mat-label>First Name</mat-label>
+            <input matInput formControlName="first_name" autocomplete="given-name" />
+            <mat-error><app-validation-message [control]="registerForm.controls['first_name']" label="First name" /></mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Last Name</mat-label>
+            <input matInput formControlName="last_name" autocomplete="family-name" />
+            <mat-error><app-validation-message [control]="registerForm.controls['last_name']" label="Last name" /></mat-error>
+          </mat-form-field>
+        </div>
+
+        <!-- Email + Inline OTP -->
+        <div class="register__otp-group">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Email</mat-label>
+            <input matInput formControlName="email" type="email" autocomplete="email" />
+            @if (needsEmailOtp()) {
+              <button mat-icon-button matSuffix type="button"
+                [disabled]="registerForm.get('email')!.invalid || isSendingEmailOtp() || emailTimer.remaining() > 0"
+                (click)="sendEmailOtp()"
+                class="register__otp-suffix-btn"
+                [attr.aria-label]="'Send email OTP'">
+                @if (isSendingEmailOtp()) {
+                  <mat-spinner diameter="18"></mat-spinner>
+                } @else {
+                  <mat-icon>{{ emailOtpSent() ? 'refresh' : 'send' }}</mat-icon>
+                }
+              </button>
+            }
+            <mat-error><app-validation-message [control]="registerForm.controls['email']" label="Email" /></mat-error>
+            @if (needsEmailOtp() && emailTimer.remaining() > 0) {
+              <mat-hint>Resend in {{ emailTimer.remaining() }}s</mat-hint>
+            }
+          </mat-form-field>
+
+          @if (needsEmailOtp() && emailOtpSent()) {
+            <mat-form-field appearance="outline" class="full-width register__otp-field">
+              <mat-label>Email OTP</mat-label>
+              <input matInput formControlName="email_otp_code" autocomplete="one-time-code" />
+              <mat-icon matPrefix>pin</mat-icon>
+            </mat-form-field>
+          }
+        </div>
+
+        <!-- Mobile + Inline OTP -->
+        <div class="register__otp-group">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Mobile Number</mat-label>
+            <input matInput formControlName="mobile_no" type="tel" autocomplete="tel" />
+            @if (needsSmsOtp()) {
+              <button mat-icon-button matSuffix type="button"
+                [disabled]="!registerForm.get('mobile_no')!.value || isSendingSmsOtp() || smsTimer.remaining() > 0"
+                (click)="sendSmsOtp()"
+                class="register__otp-suffix-btn"
+                [attr.aria-label]="'Send SMS OTP'">
+                @if (isSendingSmsOtp()) {
+                  <mat-spinner diameter="18"></mat-spinner>
+                } @else {
+                  <mat-icon>{{ smsOtpSent() ? 'refresh' : 'send' }}</mat-icon>
+                }
+              </button>
+            }
+            @if (needsSmsOtp() && smsTimer.remaining() > 0) {
+              <mat-hint>Resend in {{ smsTimer.remaining() }}s</mat-hint>
+            }
+          </mat-form-field>
+
+          @if (needsSmsOtp() && smsOtpSent()) {
+            <mat-form-field appearance="outline" class="full-width register__otp-field">
+              <mat-label>Mobile OTP</mat-label>
+              <input matInput formControlName="mobile_otp_code" autocomplete="one-time-code" />
+              <mat-icon matPrefix>pin</mat-icon>
+            </mat-form-field>
+          }
+        </div>
+
+        <!-- Country / State Row -->
+        <div class="register__location-row">
+          <mat-form-field appearance="outline">
+            <mat-label>Country</mat-label>
+            <mat-select formControlName="country_id"
+              panelClass="searchable-select-panel"
+              (selectionChange)="onCountryChange()"
+              (openedChange)="onCountrySelectToggle($event)">
+              <div class="select-search">
+                <mat-icon class="select-search__icon">search</mat-icon>
+                <input class="select-search__input"
+                  #countrySearchInput
+                  placeholder="Search country..."
+                  (input)="countrySearchTerm.set(countrySearchInput.value)"
+                  (keydown)="$event.stopPropagation()">
+              </div>
+              <div class="select-options">
+                <mat-option [value]="null">-- Select --</mat-option>
+                @for (country of filteredCountries(); track country.id) {
+                  <mat-option [value]="country.id">{{ country.name }}</mat-option>
+                }
+              </div>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>State</mat-label>
+            <mat-select formControlName="state_id"
+              panelClass="searchable-select-panel"
+              (openedChange)="onStateSelectToggle($event)">
+              <div class="select-search">
+                <mat-icon class="select-search__icon">search</mat-icon>
+                <input class="select-search__input"
+                  #stateSearchInput
+                  placeholder="Search state..."
+                  (input)="stateSearchTerm.set(stateSearchInput.value)"
+                  (keydown)="$event.stopPropagation()">
+              </div>
+              <div class="select-options">
+                <mat-option [value]="null">-- Select --</mat-option>
+                @for (state of filteredStates(); track state.id) {
+                  <mat-option [value]="state.id">{{ state.name }}</mat-option>
+                }
+              </div>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <!-- Password -->
+        <mat-form-field appearance="outline" class="full-width" appPasswordToggle #pwToggle="passwordToggle">
+          <mat-label>Password</mat-label>
+          <input
+            matInput
+            formControlName="password"
+            [type]="pwToggle.type()"
+            autocomplete="new-password" />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="pwToggle.toggle()"
+            [attr.aria-label]="pwToggle.ariaLabel()">
+            <mat-icon>{{ pwToggle.icon() }}</mat-icon>
+          </button>
+          <mat-error><app-validation-message [control]="registerForm.controls['password']" label="Password" /></mat-error>
+        </mat-form-field>
+
+        <!-- Confirm Password -->
+        <mat-form-field appearance="outline" class="full-width" appPasswordToggle #cpToggle="passwordToggle">
+          <mat-label>Confirm Password</mat-label>
+          <input
+            matInput
+            formControlName="confirm_password"
+            [type]="cpToggle.type()"
+            autocomplete="new-password" />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="cpToggle.toggle()"
+            [attr.aria-label]="cpToggle.ariaLabel()">
+            <mat-icon>{{ cpToggle.icon() }}</mat-icon>
+          </button>
+          <mat-error><app-validation-message [control]="registerForm.controls['confirm_password']" label="Confirm password" /></mat-error>
+        </mat-form-field>
+
+        <!-- Referral ID -->
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Referral ID (optional)</mat-label>
+          <input matInput formControlName="referral_id" />
+        </mat-form-field>
+
+        <!-- Captcha -->
+        <app-captcha
+          #captchaRef
+          (typeChange)="onCaptchaTypeChange($event)"
+          (tokenChange)="onCaptchaTokenChange($event)" />
+
+        <!-- Submit -->
+        <button
+          mat-flat-button
+          type="submit"
+          class="register__submit full-width"
+          [disabled]="isLoading()">
+          @if (isLoading()) {
+            <mat-spinner diameter="20"></mat-spinner>
+          } @else {
+            Create Account
+          }
+        </button>
+      </form>
+    </mat-card-content>
+
+    <mat-card-actions class="register__actions">
+      <span class="register__actions-text">
+        Already have an account?
+        <a mat-button [routerLink]="loginUrl" class="register__link">Login</a>
+      </span>
+    </mat-card-actions>
+  </mat-card>
+</div>

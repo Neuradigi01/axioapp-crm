@@ -1,0 +1,22 @@
+<div class="accounts-layout">
+  <div class="accounts-layout__header">
+    <button
+      mat-icon-button
+      (click)="theme.toggle()"
+      [matTooltip]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+      aria-label="Toggle theme"
+      class="accounts-layout__theme-toggle">
+      <mat-icon>{{ theme.isDark() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+    </button>
+  </div>
+
+  <div class="accounts-layout__content">
+    <div class="accounts-layout__card-wrapper">
+      <img
+        src="images/Logo.svg"
+        alt="Logo"
+        class="accounts-layout__logo">
+      <router-outlet />
+    </div>
+  </div>
+</div>

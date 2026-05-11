@@ -1,0 +1,10 @@
+@use 'styles/auth-card' as auth;
+
+@include auth.host();
+@include auth.card('login') {
+  .login__remember {
+    margin-top: calc(var(--spacing-xs) * -1);
+    font-size: var(--font-size-sm);
+    color: var(--page-text-secondary);
+  }
+}

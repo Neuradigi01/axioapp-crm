@@ -1,0 +1,47 @@
+<mat-card class="dashboard-news" appearance="outlined">
+  <mat-card-header class="dashboard-news__header">
+    <mat-icon class="dashboard-news__header-icon">newspaper</mat-icon>
+    <mat-card-title>Latest News</mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    @if (newsItems().length > 0) {
+      <div class="dashboard-news__list">
+        @for (item of newsItems(); track item.id) {
+          <div class="dashboard-news__item" [class.dashboard-news__item--expanded]="isExpanded(item.id)"
+               (click)="toggleExpand(item.id)">
+            <div class="dashboard-news__item-header">
+              <div class="dashboard-news__item-left">
+                @if (item.priority >= 5) {
+                  <span class="dashboard-news__priority-dot dashboard-news__priority-dot--high"></span>
+                }
+                <h4 class="dashboard-news__item-heading">{{ item.heading }}</h4>
+              </div>
+              <div class="dashboard-news__item-right">
+                <span class="dashboard-news__item-date">{{ item.created_at | date:'mediumDate' }}</span>
+                <mat-icon class="dashboard-news__expand-icon">
+                  {{ isExpanded(item.id) ? 'expand_less' : 'expand_more' }}
+                </mat-icon>
+              </div>
+            </div>
+
+            @if (!isExpanded(item.id)) {
+              <p class="dashboard-news__item-preview">{{ item.details | truncate:120 }}</p>
+            }
+
+            @if (isExpanded(item.id)) {
+              <div class="dashboard-news__item-details">
+                <p class="dashboard-news__item-content">{{ item.details }}</p>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="dashboard-news__empty">
+        <mat-icon class="dashboard-news__empty-icon">article</mat-icon>
+        <p>No news at the moment</p>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>
