@@ -1,14 +1,21 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+
+import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
+
+type SettingsTab = 'custom-fields';
+
+const TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
+  { id: 'custom-fields', label: 'Custom Fields' },
+];
 
 @Component({
   selector: 'app-settings-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="p-8">
-      <h1 class="text-2xl font-semibold text-zinc-900">Settings</h1>
-      <p class="mt-2 text-sm text-zinc-500">Settings (coming soon)</p>
-    </div>
-  `,
+  imports: [CustomFieldsPageComponent],
+  templateUrl: './settings-page.component.html',
 })
-export class SettingsPageComponent {}
+export class SettingsPageComponent {
+  readonly tabs = TABS;
+  readonly active = signal<SettingsTab>(TABS[0].id);
+}

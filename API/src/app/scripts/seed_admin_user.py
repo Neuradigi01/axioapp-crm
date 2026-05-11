@@ -1,7 +1,11 @@
-"""Seed one admin role, four permissions, and one admin user.
+"""Seed one admin role, the baseline permissions, and one admin user.
 
-Idempotent — safe to re-run. Uses fixed UUIDs so re-execution is a
-no-op (UPSERT with `ON CONFLICT DO NOTHING`).
+Idempotent. The role + user use fixed UUIDs so re-execution is a no-op
+on those rows. Permissions are resolved by `key` after upsert — that
+matters because the module-registry startup hook (in `main.py`'s
+lifespan) may have already inserted some of these keys with auto-
+generated UUIDs, so a hardcoded-ID insert would collide on the unique
+`key` constraint.
 
 Tenant context: the seed sets `RequestContext.org_id` to the demo org
 id before opening its session so the DB session lifecycle hook in
@@ -17,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.app.core.permissions.models import Permission, Role, RolePermission
@@ -31,11 +36,13 @@ ADMIN_ROLE_ID = uuid.UUID("00000000-0000-0000-0000-000000000010")
 ADMIN_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000011")
 
 PERMISSIONS = [
-    (uuid.UUID("00000000-0000-0000-0000-000000000020"), "users.read",  "Read users",       "users"),
-    (uuid.UUID("00000000-0000-0000-0000-000000000021"), "users.write", "Manage users",     "users"),
-    (uuid.UUID("00000000-0000-0000-0000-000000000022"), "roles.read",  "Read roles",       "roles"),
-    (uuid.UUID("00000000-0000-0000-0000-000000000023"), "roles.write", "Manage roles",     "roles"),
-    (uuid.UUID("00000000-0000-0000-0000-000000000024"), "audit.read",  "Read audit logs",  "audit"),
+    ("users.read",          "Read users",           "users"),
+    ("users.write",         "Manage users",         "users"),
+    ("roles.read",          "Read roles",           "roles"),
+    ("roles.write",         "Manage roles",         "roles"),
+    ("audit.read",          "Read audit logs",      "audit"),
+    ("custom_fields.read",  "Read custom fields",   "custom_fields"),
+    ("custom_fields.write", "Manage custom fields", "custom_fields"),
 ]
 
 ADMIN_EMAIL = "admin@demo.local"
@@ -59,22 +66,33 @@ async def seed_admin_user() -> None:
             .on_conflict_do_nothing(index_elements=["id"])
         )
 
-        # 2) four global permissions.
+        # 2) Baseline permissions. Resolve by `key` because some keys
+        # may already exist (registered by the module-registry startup
+        # hook) with a different id.
         await session.execute(
             pg_insert(Permission)
             .values([
-                {"id": pid, "key": key, "description": desc, "module": module}
-                for (pid, key, desc, module) in PERMISSIONS
+                {"key": key, "description": desc, "module": module}
+                for (key, desc, module) in PERMISSIONS
             ])
-            .on_conflict_do_nothing(index_elements=["id"])
+            .on_conflict_do_nothing(index_elements=["key"])
         )
 
-        # 3) admin role gets every permission (4 role_permission rows).
+        # Look up the actual ids that the DB ended up holding.
+        keys = [key for (key, _, _) in PERMISSIONS]
+        rows = (
+            await session.execute(
+                select(Permission.id, Permission.key).where(Permission.key.in_(keys))
+            )
+        ).all()
+        permission_ids = [r.id for r in rows]
+
+        # 3) admin role gets every baseline permission.
         await session.execute(
             pg_insert(RolePermission)
             .values([
                 {"role_id": ADMIN_ROLE_ID, "permission_id": pid}
-                for (pid, _, _, _) in PERMISSIONS
+                for pid in permission_ids
             ])
             .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
         )
@@ -100,7 +118,7 @@ async def seed_admin_user() -> None:
 
     print(f"Admin role:  {ADMIN_ROLE_ID}")
     print(f"Admin user:  {ADMIN_USER_ID} ({ADMIN_EMAIL})")
-    print(f"Permissions: {', '.join(key for _, key, _, _ in PERMISSIONS)}")
+    print(f"Permissions: {', '.join(key for (key, _, _) in PERMISSIONS)}")
 
 
 if __name__ == "__main__":
