@@ -1,0 +1,49 @@
+<aside
+  class="flex h-screen flex-col bg-zinc-900 text-zinc-100 transition-all"
+  [class.w-64]="open()"
+  [class.w-16]="!open()"
+>
+  <div class="flex items-center justify-between border-b border-zinc-800 px-4 py-4">
+    @if (open()) {
+      <span class="text-base font-semibold tracking-tight">FurnitureCRM</span>
+    } @else {
+      <span class="text-base font-semibold">F</span>
+    }
+    <button
+      type="button"
+      class="rounded p-1 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
+      (click)="toggle.emit()"
+      [attr.aria-label]="open() ? 'Collapse sidebar' : 'Expand sidebar'"
+    >
+      <lucide-icon
+        [name]="open() ? 'chevron-left' : 'chevron-right'"
+        class="h-4 w-4"
+      />
+    </button>
+  </div>
+
+  <nav class="flex-1 overflow-y-auto px-2 py-3">
+    @if (error()) {
+      <p class="px-2 text-xs text-rose-400">{{ error() }}</p>
+    } @else {
+      <ul class="space-y-1">
+        @for (m of modules(); track m.id) {
+          <li>
+            <a
+              [routerLink]="m.frontend_route"
+              routerLinkActive="bg-zinc-800 text-white"
+              class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+              [class.justify-center]="!open()"
+              [attr.title]="m.name"
+            >
+              <lucide-icon [name]="m.icon" class="h-5 w-5 shrink-0" />
+              @if (open()) {
+                <span class="truncate">{{ m.name }}</span>
+              }
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </nav>
+</aside>

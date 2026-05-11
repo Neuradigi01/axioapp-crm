@@ -1,0 +1,14 @@
+<div class="flex min-h-screen bg-zinc-50">
+  <app-sidebar
+    [open]="sidebarOpen()"
+    (toggle)="toggleSidebar()"
+    class="hidden md:block"
+  />
+
+  <div class="flex min-w-0 flex-1 flex-col">
+    <app-header (toggleSidebar)="toggleSidebar()" />
+    <main class="flex-1 overflow-x-hidden">
+      <router-outlet />
+    </main>
+  </div>
+</div>

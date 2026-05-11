@@ -1,0 +1,75 @@
+<header
+  class="sticky top-0 z-10 flex h-14 items-center gap-4 border-b border-zinc-200 bg-white px-4 shadow-sm"
+>
+  <button
+    type="button"
+    class="rounded p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 md:hidden"
+    (click)="toggleSidebar.emit()"
+    aria-label="Toggle sidebar"
+  >
+    <lucide-icon name="menu" class="h-5 w-5" />
+  </button>
+
+  <div class="relative flex max-w-md flex-1 items-center">
+    <lucide-icon
+      name="search"
+      class="pointer-events-none absolute left-3 h-4 w-4 text-zinc-400"
+    />
+    <input
+      type="search"
+      placeholder="Search…"
+      class="h-9 w-full rounded-md border border-zinc-200 bg-zinc-50 pl-9 pr-3 text-sm placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white focus:outline-none"
+    />
+  </div>
+
+  <div class="ml-auto flex items-center gap-2">
+    <button
+      type="button"
+      class="relative rounded p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
+      aria-label="Notifications"
+    >
+      <lucide-icon name="bell" class="h-5 w-5" />
+      <span
+        class="absolute right-1 top-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-zinc-300 px-1 text-[10px] font-medium text-zinc-700"
+      >
+        0
+      </span>
+    </button>
+
+    <div class="relative">
+      <button
+        type="button"
+        class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-100"
+        (click)="toggleUserMenu()"
+      >
+        <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-200">
+          <lucide-icon name="user" class="h-4 w-4 text-zinc-600" />
+        </span>
+        @if (user(); as u) {
+          <span class="hidden sm:inline">{{ u.full_name }}</span>
+        }
+      </button>
+
+      @if (userMenuOpen()) {
+        <div
+          class="absolute right-0 top-full mt-1 w-44 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+        >
+          @if (user(); as u) {
+            <div class="border-b border-zinc-100 px-3 py-2 text-xs text-zinc-500">
+              <p class="truncate font-medium text-zinc-700">{{ u.full_name }}</p>
+              <p class="truncate">{{ u.email }}</p>
+            </div>
+          }
+          <button
+            type="button"
+            class="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50"
+            (click)="logout()"
+          >
+            <lucide-icon name="log-out" class="h-4 w-4" />
+            Log out
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+</header>

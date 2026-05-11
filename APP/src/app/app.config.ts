@@ -1,6 +1,7 @@
 import {
   ApplicationConfig,
   ErrorHandler,
+  importProvidersFrom,
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
   isDevMode,
@@ -11,6 +12,17 @@ import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideServiceWorker } from '@angular/service-worker';
+import {
+  LucideAngularModule,
+  Bell,
+  ChevronLeft,
+  ChevronRight,
+  Cog,
+  LogOut,
+  Menu,
+  Search,
+  User,
+} from 'lucide-angular';
 
 import { authInterceptor } from '@core/interceptors/auth.interceptor';
 import { RoutesHelperService } from '@core/services/routes-helper.service';
@@ -27,6 +39,18 @@ export const appConfig: ApplicationConfig = {
     provideRouter([]),
     provideHttpClient(withInterceptors([jwtInterceptor, authInterceptor])),
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
+    importProvidersFrom(
+      LucideAngularModule.pick({
+        Bell,
+        ChevronLeft,
+        ChevronRight,
+        Cog,
+        LogOut,
+        Menu,
+        Search,
+        User,
+      }),
+    ),
     provideAnimationsAsync(),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),

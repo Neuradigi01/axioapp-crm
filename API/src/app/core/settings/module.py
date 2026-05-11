@@ -12,7 +12,7 @@ MODULE = ModuleDescriptor(
     icon="cog",
     layer="core",
     route="/api/v1/settings",
-    frontend_route="/settings",
+    frontend_route="/user/settings",
     menu_position=999,
     permissions=["settings.read", "settings.write"],
 )
