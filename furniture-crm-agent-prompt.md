@@ -122,85 +122,104 @@ These rules are non-negotiable. Violating any of them invalidates the architectu
 
 ```
 furniture-crm/
-├── backend/
-│   ├── app/
-│   │   ├── core/
-│   │   │   ├── auth/
-│   │   │   ├── tenants/
-│   │   │   ├── users/
-│   │   │   ├── permissions/
-│   │   │   ├── contacts/
-│   │   │   ├── activities/
-│   │   │   ├── tasks/
-│   │   │   ├── pipelines/
-│   │   │   ├── appointments/
-│   │   │   ├── custom_fields/
-│   │   │   ├── walk_ins/
-│   │   │   ├── catalog/
-│   │   │   ├── billing/
-│   │   │   ├── conversations/
-│   │   │   ├── calls/
-│   │   │   ├── reviews/
-│   │   │   ├── campaigns/
-│   │   │   ├── notifications/
-│   │   │   ├── files/
-│   │   │   ├── integrations/
-│   │   │   ├── reporting/
-│   │   │   ├── settings/
-│   │   │   └── module_registry.py
-│   │   ├── packs/
-│   │   │   └── furniture/
-│   │   │       ├── pack.yaml
-│   │   │       ├── installer.py
-│   │   │       ├── modules/
-│   │   │       │   ├── inventory/
-│   │   │       │   ├── custom_orders/
-│   │   │       │   ├── field_ops/
-│   │   │       │   ├── marketplace/
-│   │   │       │   ├── virtual_staging/
-│   │   │       │   └── qr_marketing/
-│   │   │       └── seeds/
-│   │   ├── shared/
-│   │   │   ├── db.py
-│   │   │   ├── config.py
-│   │   │   ├── logging.py
-│   │   │   ├── exceptions.py
-│   │   │   └── utils/
-│   │   └── main.py
+├── api/                                    ← FastAPI backend
+│   ├── src/                                ← package root (legacy modules + new layered app/)
+│   │   ├── app/                            ← NEW layered package — all FurnitureCRM backend code
+│   │   │   ├── core/                       ← Layer 1: universal CRM platform
+│   │   │   │   ├── auth/
+│   │   │   │   ├── tenants/
+│   │   │   │   ├── users/
+│   │   │   │   ├── permissions/
+│   │   │   │   ├── contacts/
+│   │   │   │   ├── activities/
+│   │   │   │   ├── tasks/
+│   │   │   │   ├── pipelines/
+│   │   │   │   ├── appointments/
+│   │   │   │   ├── custom_fields/
+│   │   │   │   ├── walk_ins/
+│   │   │   │   ├── catalog/
+│   │   │   │   ├── billing/
+│   │   │   │   ├── conversations/
+│   │   │   │   ├── calls/
+│   │   │   │   ├── reviews/
+│   │   │   │   ├── campaigns/
+│   │   │   │   ├── notifications/
+│   │   │   │   ├── files/
+│   │   │   │   ├── integrations/
+│   │   │   │   ├── reporting/
+│   │   │   │   ├── settings/
+│   │   │   │   └── module_registry.py
+│   │   │   ├── packs/                      ← Layer 2: vertical-specific packs
+│   │   │   │   └── furniture/
+│   │   │   │       ├── pack.yaml
+│   │   │   │       ├── installer.py
+│   │   │   │       ├── modules/
+│   │   │   │       │   ├── inventory/
+│   │   │   │       │   ├── custom_orders/
+│   │   │   │       │   ├── field_ops/
+│   │   │   │       │   ├── marketplace/
+│   │   │   │       │   ├── virtual_staging/
+│   │   │   │       │   └── qr_marketing/
+│   │   │   │       └── seeds/
+│   │   │   ├── shared/
+│   │   │   │   ├── db.py
+│   │   │   │   ├── config.py
+│   │   │   │   ├── logging.py
+│   │   │   │   ├── exceptions.py
+│   │   │   │   └── utils/
+│   │   │   └── main.py                     ← FurnitureCRM entrypoint (mounts legacy + new routers)
+│   │   └── (legacy routers/services/models/... — preserved auth code; ported under app/core/auth in Step 1.6)
 │   ├── alembic/
 │   ├── tests/
-│   ├── pyproject.toml
-│   └── docker-compose.yml
-└── frontend/
-    └── src/
-        └── app/
-            ├── core/
-            │   ├── auth/
-            │   ├── layout/
-            │   ├── contacts/
-            │   ├── activities/
-            │   ├── pipelines/
-            │   ├── appointments/
-            │   ├── custom-fields/
-            │   ├── walk-ins/
-            │   ├── catalog/
-            │   ├── billing/
-            │   ├── conversations/
-            │   ├── calls/
-            │   ├── reviews/
-            │   ├── campaigns/
-            │   ├── settings/
-            │   └── shared/
-            ├── packs/
-            │   └── furniture/
-            │       ├── inventory/
-            │       ├── custom-orders/
-            │       ├── field-ops/
-            │       ├── marketplace/
-            │       ├── virtual-staging/
-            │       └── qr-marketing/
-            └── app.config.ts
+│   ├── main.py                             ← legacy entrypoint (Docker `gunicorn main:app` still uses this)
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── pyproject.toml
+├── app/                                    ← Angular frontend
+│   └── src/
+│       └── app/
+│           ├── features/
+│           │   ├── accounts/               ← UNTOUCHED — legacy login/register/2FA (PrimeNG + Material)
+│           │   ├── admin/                  ← UNTOUCHED — legacy template admin panel (NOT part of FurnitureCRM)
+│           │   └── user/                   ← FurnitureCRM main app for all 7 roles (Tailwind only)
+│           │       ├── core/               ← Layer 1: universal CRM UI
+│           │       │   ├── auth/
+│           │       │   ├── layout/
+│           │       │   ├── contacts/
+│           │       │   ├── activities/
+│           │       │   ├── pipelines/
+│           │       │   ├── appointments/
+│           │       │   ├── custom-fields/
+│           │       │   ├── walk-ins/
+│           │       │   ├── catalog/
+│           │       │   ├── billing/
+│           │       │   ├── conversations/
+│           │       │   ├── calls/
+│           │       │   ├── reviews/
+│           │       │   ├── campaigns/
+│           │       │   ├── settings/
+│           │       │   └── shared/
+│           │       ├── packs/              ← Layer 2: vertical pack UI
+│           │       │   └── furniture/
+│           │       │       ├── inventory/
+│           │       │       ├── custom-orders/
+│           │       │       ├── field-ops/
+│           │       │       ├── marketplace/
+│           │       │       ├── virtual-staging/
+│           │       │       └── qr-marketing/
+│           │       ├── layout/             ← FurnitureCRM app shell (sidebar + header)
+│           │       └── user.routes.ts
+│           ├── staff-portal/               ← Separate route tree — PIN tablet login (Phase 3)
+│           └── app.config.ts
+├── Flutter/                                ← UNTOUCHED — not part of FurnitureCRM
+├── tasks/                                  ← 76-step build plan (per-step files)
+├── furniture-crm-agent-prompt.md           ← this file — master prompt
+└── CLAUDE.md                               ← AI agent operating instructions
 ```
+
+> **URL surfaces:** `/accounts/login` (legacy login, untouched) · `/admin/...` (legacy admin, idle) · `/user/...` (FurnitureCRM main app, all 7 roles) · `/staff-portal/...` (PIN tablet UI, Phase 3).
+>
+> **Backend import root is `src.app.X`** (e.g., `from src.app.core.tenants.models import Organization`). Working directory at runtime is `api/`, so `src/` is the package root.
 
 ---
 
