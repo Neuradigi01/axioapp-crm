@@ -193,3 +193,77 @@ async def test_client():
         await conn.run_sync(Base.metadata.drop_all)
 
     _restore_all_async_sessions(originals)
+
+
+# --- Layered FurnitureCRM app fixtures --------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _reset_login_limiter():
+    """Wipe the in-memory login rate-limit bucket between every test.
+
+    Without this, an earlier test that hammered `/auth/login` could push
+    a later test into 429s. The rate-limit test resets explicitly too.
+    """
+    from src.app.shared.rate_limit import login_limiter
+    login_limiter.reset()
+    yield
+    login_limiter.reset()
+
+
+@pytest_asyncio.fixture
+async def layered_client():
+    """AsyncClient wrapped around the layered FurnitureCRM ASGI app."""
+    from src.app.main import app
+
+    originals = _patch_all_async_sessions()
+
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        yield client
+
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+    _restore_all_async_sessions(originals)
+
+
+@pytest_asyncio.fixture
+async def seeded_admin():
+    """One org + admin role + admin user. The user's password is `Admin@123`.
+
+    Returns a dict with the inserted objects. Yields a TestSession-managed
+    snapshot — IDs are stable across the test.
+    """
+    import uuid as _uuid
+
+    from src.app.core.tenants.models import Organization
+    from src.app.core.users.models import User
+    from src.app.core.permissions.models import Role
+    from src.app.shared.security.password import hash_password as _hp
+
+    org = Organization(id=_uuid.uuid4(), name="Demo", slug=f"demo-{_uuid.uuid4().hex[:6]}")
+    role = Role(id=_uuid.uuid4(), org_id=org.id, name="admin", is_system=True)
+    user = User(
+        id=_uuid.uuid4(),
+        org_id=org.id,
+        email="admin@demo.local",
+        password_hash=_hp("Admin@123"),
+        full_name="Admin",
+        role_id=role.id,
+        is_active=True,
+    )
+    async with TestSession() as session:
+        session.add(org)
+        await session.flush()
+        session.add(role)
+        await session.flush()
+        session.add(user)
+        await session.commit()
+
+    return {"org": org, "role": role, "user": user, "password": "Admin@123"}

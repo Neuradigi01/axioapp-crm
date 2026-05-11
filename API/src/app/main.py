@@ -22,6 +22,7 @@ from src.providers.firebase_provider import initialize_firebase
 from src.providers.error_log_provider import log_error_to_db
 from config import APP_NAME, STATIC_DIR, UPLOAD_DIR
 
+from src.app.core.auth.router import router as auth_router
 from src.app.core.health.router import router as health_router
 from src.app.core.users.router import router as users_router
 from src.app.shared.middleware import TenantContextMiddleware
@@ -58,6 +59,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(legacy_router)
 app.include_router(health_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 
 
@@ -77,10 +79,13 @@ async def catch_exceptions_middleware(request: FastAPIRequest, call_next):
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: FastAPIRequest, exc: HTTPException):
     if isinstance(exc.detail, dict):
-        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+        return JSONResponse(
+            status_code=exc.status_code, content=exc.detail, headers=exc.headers
+        )
     return JSONResponse(
         status_code=exc.status_code,
         content={"success": False, "message": exc.detail},
+        headers=exc.headers,
     )
 
 

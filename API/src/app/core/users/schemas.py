@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict
 
 
 class UserOut(BaseModel):
@@ -17,7 +17,10 @@ class UserOut(BaseModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
-    email: EmailStr
+    # Plain str (not EmailStr): seed uses `admin@demo.local`, which RFC 6761
+    # reserves and EmailStr rejects on serialise. Strict email validation
+    # lives at create/update boundaries, not on read.
+    email: str
     full_name: str
     phone: str | None
     role_id: uuid.UUID

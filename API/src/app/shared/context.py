@@ -19,6 +19,7 @@ from dataclasses import dataclass
 class RequestContext:
     org_id: uuid.UUID | None = None
     user_id: uuid.UUID | None = None
+    token_id: uuid.UUID | None = None
     request_id: str | None = None
 
 
