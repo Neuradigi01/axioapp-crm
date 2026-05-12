@@ -3,7 +3,7 @@
 **Goal:** `pipelines` and `pipeline_stages` tables. Endpoints to read pipelines and to move a card between stages with audit logging. Pipeline creation is via pack installer (Phase 4); admin can edit stage labels/colors/order but not keys.
 **Phase:** 2
 **Depends on:** 1.7 (audit), 1.4 (RLS)
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
