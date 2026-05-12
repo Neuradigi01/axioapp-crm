@@ -3,7 +3,7 @@
 **Goal:** `contacts` table with `custom_data` JSONB + GIN index, CRUD endpoints, bulk search/filter that supports custom-field queries. Pre-seed system custom field defs for `contact`.
 **Phase:** 2
 **Depends on:** 2.1, 1.4
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
