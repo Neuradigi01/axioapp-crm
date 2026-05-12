@@ -16,6 +16,13 @@ const devRoutes: Routes = environment.production
             (m) => m.DevDynamicFormPageComponent,
           ),
       },
+      {
+        path: 'dev/pipeline-demo',
+        loadComponent: () =>
+          import('./core/pipelines/dev-pipeline.page').then(
+            (m) => m.DevPipelinePageComponent,
+          ),
+      },
     ];
 
 export const userRoutes: Routes = [

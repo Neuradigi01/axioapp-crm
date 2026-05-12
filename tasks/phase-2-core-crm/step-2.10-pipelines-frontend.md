@@ -3,7 +3,7 @@
 **Goal:** Reusable `<app-pipeline-board>` (kanban) and `<app-pipeline-list>` (table) components. Stage config from API. Drag-and-drop calls the move endpoint. Reused by Leads and Custom Orders.
 **Phase:** 2
 **Depends on:** 2.9
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
