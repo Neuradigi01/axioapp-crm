@@ -3,7 +3,7 @@
 **Goal:** Reusable `<app-activity-timeline>` component. Plug into Contact detail Activities tab. Manual "Add Note" action.
 **Phase:** 2
 **Depends on:** 2.6, 2.5
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
