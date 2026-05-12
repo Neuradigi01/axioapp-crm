@@ -35,6 +35,7 @@ import {
   User,
   UserPlus,
   Users,
+  X,
 } from 'lucide-angular';
 
 import { authInterceptor } from '@core/interceptors/auth.interceptor';
@@ -75,6 +76,7 @@ export const appConfig: ApplicationConfig = {
         User,
         UserPlus,
         Users,
+        X,
       }),
     ),
     provideAnimationsAsync(),

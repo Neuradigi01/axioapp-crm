@@ -3,7 +3,7 @@
 **Goal:** Bell icon in header showing unread count + dropdown. Real-time updates via WebSocket. Toast for new notifications.
 **Phase:** 2
 **Depends on:** 2.15, 1.10
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
