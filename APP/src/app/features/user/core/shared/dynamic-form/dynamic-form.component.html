@@ -1,0 +1,24 @@
+@if (loading()) {
+  <div class="space-y-4" aria-busy="true" aria-live="polite">
+    @for (i of skeletonRows; track i) {
+      <div class="animate-pulse">
+        <div class="h-3 w-24 rounded bg-zinc-200"></div>
+        <div class="mt-2 h-9 w-full rounded-md bg-zinc-200"></div>
+      </div>
+    }
+    <span class="sr-only">Loading form fields…</span>
+  </div>
+} @else if (fields().length === 0) {
+  <p class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
+    No fields defined.
+  </p>
+} @else {
+  <form [formGroup]="form()" class="space-y-4" novalidate>
+    @for (def of fields(); track def.field_key) {
+      <app-field-renderer
+        [def]="def"
+        [control]="control(def.field_key)"
+      />
+    }
+  </form>
+}

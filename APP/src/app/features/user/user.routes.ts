@@ -1,6 +1,22 @@
 import { Routes } from '@angular/router';
 
+import { environment } from '../../../environments/environment';
 import { furnitureAuthGuard } from './core/auth/auth.guard';
+
+// Dev-only routes are spread into the shell's children when not building
+// for production. The guard on the shell still applies, so the route is
+// auth-protected even though it has no real backing data.
+const devRoutes: Routes = environment.production
+  ? []
+  : [
+      {
+        path: 'dev/dynamic-form',
+        loadComponent: () =>
+          import('./core/shared/dynamic-form/dev-dynamic-form.page').then(
+            (m) => m.DevDynamicFormPageComponent,
+          ),
+      },
+    ];
 
 export const userRoutes: Routes = [
   {
@@ -21,6 +37,7 @@ export const userRoutes: Routes = [
             (m) => m.SettingsPageComponent,
           ),
       },
+      ...devRoutes,
     ],
   },
 ];
