@@ -3,7 +3,7 @@
 **Goal:** `tasks` table, CRUD, "my tasks" endpoint with due-date logic. UI: Tasks panel on contact detail + global "My Tasks" view in header dropdown.
 **Phase:** 2
 **Depends on:** 2.5
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

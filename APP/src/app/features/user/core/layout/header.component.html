@@ -23,6 +23,19 @@
   </div>
 
   <div class="ml-auto flex items-center gap-2">
+    <div class="relative">
+      <button
+        type="button"
+        class="relative rounded p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
+        aria-label="My tasks"
+        [attr.aria-expanded]="tasksOpen()"
+        (click)="toggleTasks()"
+      >
+        <lucide-icon name="check-square" class="h-5 w-5" />
+      </button>
+      <app-my-tasks-popover [open]="tasksOpen()" />
+    </div>
+
     <button
       type="button"
       class="relative rounded p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"

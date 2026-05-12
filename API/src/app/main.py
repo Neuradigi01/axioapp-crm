@@ -28,6 +28,7 @@ from src.app.core.auth.router import router as auth_router
 from src.app.core.contacts.router import router as contacts_router
 from src.app.core.custom_fields.router import router as custom_fields_router
 from src.app.core.health.router import router as health_router
+from src.app.core.tasks.router import router as tasks_router
 from src.app.core.module_registry import discover_modules, registry
 from src.app.core.modules_router import router as modules_router
 from src.app.core.permissions.service import register_permissions
@@ -86,6 +87,7 @@ app.include_router(audit_router, prefix="/api/v1")
 app.include_router(custom_fields_router, prefix="/api/v1")
 app.include_router(contacts_router, prefix="/api/v1")
 app.include_router(activities_router, prefix="/api/v1")
+app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 

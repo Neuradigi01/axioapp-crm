@@ -16,6 +16,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { ActivityTimelineComponent } from '../activities/activity-timeline.component';
 import { AddNoteComponent } from '../activities/add-note.component';
 import { Activity } from '../activities/activities-api.service';
+import { TasksPanelComponent } from '../tasks/tasks-panel.component';
 import { FieldDef } from '../shared/dynamic-form/types';
 import {
   Contact,
@@ -30,8 +31,8 @@ type DetailTab = 'overview' | 'activities' | 'notes' | 'tasks';
 const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: string | null }> = [
   { id: 'overview', label: 'Overview', placeholderStep: null },
   { id: 'activities', label: 'Activities', placeholderStep: null },
-  { id: 'notes', label: 'Notes', placeholderStep: '2.8' },
-  { id: 'tasks', label: 'Tasks', placeholderStep: '2.8' },
+  { id: 'notes', label: 'Notes', placeholderStep: 'later' },
+  { id: 'tasks', label: 'Tasks', placeholderStep: null },
 ];
 
 @Component({
@@ -44,6 +45,7 @@ const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: strin
     ContactFormModalComponent,
     ActivityTimelineComponent,
     AddNoteComponent,
+    TasksPanelComponent,
   ],
   templateUrl: './contact-detail.page.html',
 })

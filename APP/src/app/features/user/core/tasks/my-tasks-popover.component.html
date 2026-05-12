@@ -1,0 +1,65 @@
+@if (open()) {
+  <div
+    class="absolute right-0 top-full z-20 mt-1 w-80 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+    role="dialog"
+    aria-label="My tasks"
+  >
+    <header class="flex items-center justify-between border-b border-zinc-200 px-3 py-2">
+      <h3 class="text-sm font-semibold text-zinc-900">My tasks</h3>
+      <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+        {{ totalOpen() }} open
+      </span>
+    </header>
+
+    <div class="max-h-96 overflow-y-auto px-3 py-2">
+      @if (loadError(); as err) {
+        <p class="text-xs text-red-600">{{ err }}</p>
+      } @else if (loading() && items().length === 0) {
+        <div class="space-y-2 animate-pulse">
+          <div class="h-3 w-32 rounded bg-zinc-200"></div>
+          <div class="h-9 w-full rounded-md bg-zinc-100"></div>
+          <div class="h-9 w-full rounded-md bg-zinc-100"></div>
+        </div>
+      } @else if (totalOpen() === 0) {
+        <p class="py-6 text-center text-xs text-zinc-500">
+          You have no open tasks.
+        </p>
+      } @else {
+        <div class="space-y-3">
+          @for (group of groups(); track group.id) {
+            <section>
+              <h4
+                class="mb-1 text-[10px] font-semibold uppercase tracking-wider"
+                [class.text-red-600]="group.id === 'overdue'"
+                [class.text-zinc-500]="group.id !== 'overdue'"
+              >
+                {{ group.label }}
+              </h4>
+              <ul class="space-y-1">
+                @for (task of group.items; track task.id) {
+                  <li class="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-zinc-50">
+                    <input
+                      type="checkbox"
+                      [checked]="false"
+                      (change)="markDone(task)"
+                      [attr.aria-label]="'Mark ' + task.title + ' done'"
+                      class="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                    />
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-xs font-medium text-zinc-900">
+                        {{ task.title }}
+                      </p>
+                      <p class="text-[10px] text-zinc-500">
+                        {{ formatDue(task.due_at) }} · {{ task.priority }}
+                      </p>
+                    </div>
+                  </li>
+                }
+              </ul>
+            </section>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
