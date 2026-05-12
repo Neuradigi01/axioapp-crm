@@ -3,7 +3,7 @@
 **Goal:** `activities` table + service. Endpoints to log and list activities for any entity. Internal `activities.log(...)` helper for other modules.
 **Phase:** 2
 **Depends on:** 2.4
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
