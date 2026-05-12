@@ -23,6 +23,7 @@ from src.app.core.activities import models as _activities_models  # noqa: F401
 from src.app.core.tasks import models as _tasks_models  # noqa: F401
 from src.app.core.pipelines import models as _pipelines_models  # noqa: F401
 from src.app.core.leads import models as _leads_models  # noqa: F401
+from src.app.core.appointments import models as _appointments_models  # noqa: F401
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url from environment

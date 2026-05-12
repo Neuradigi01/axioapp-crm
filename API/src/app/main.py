@@ -23,6 +23,7 @@ from src.providers.error_log_provider import log_error_to_db
 from config import APP_NAME, STATIC_DIR, UPLOAD_DIR
 
 from src.app.core.activities.router import router as activities_router
+from src.app.core.appointments.router import router as appointments_router
 from src.app.core.audit.router import router as audit_router
 from src.app.core.auth.router import router as auth_router
 from src.app.core.contacts.router import router as contacts_router
@@ -92,6 +93,7 @@ app.include_router(activities_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(pipelines_router, prefix="/api/v1")
 app.include_router(leads_router, prefix="/api/v1")
+app.include_router(appointments_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 
