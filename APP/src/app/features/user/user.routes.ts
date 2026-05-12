@@ -70,6 +70,13 @@ export const userRoutes: Routes = [
             (m) => m.AppointmentsPageComponent,
           ),
       },
+      {
+        path: 'walk-ins',
+        loadComponent: () =>
+          import('./core/walk-ins/walk-ins.page').then(
+            (m) => m.WalkInsPageComponent,
+          ),
+      },
       ...devRoutes,
     ],
   },
