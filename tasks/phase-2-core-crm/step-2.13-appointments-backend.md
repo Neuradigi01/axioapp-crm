@@ -3,7 +3,7 @@
 **Goal:** `appointments` table, conflict detection, CRUD, calendar listing endpoint (range-based).
 **Phase:** 2
 **Depends on:** 2.4, 1.5
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
