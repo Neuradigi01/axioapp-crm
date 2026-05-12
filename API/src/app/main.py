@@ -34,6 +34,7 @@ from src.app.core.notifications.router import router as notifications_router
 from src.app.core.notifications.ws import ws_router as notifications_ws_router
 from src.app.core.pipelines.router import router as pipelines_router
 from src.app.core.tasks.router import router as tasks_router
+from src.app.core.walk_ins.router import router as walk_ins_router
 from src.app.core.module_registry import discover_modules, registry
 from src.app.core.modules_router import router as modules_router
 from src.app.core.permissions.service import register_permissions
@@ -98,6 +99,7 @@ app.include_router(leads_router, prefix="/api/v1")
 app.include_router(appointments_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(notifications_ws_router, prefix="/api/v1")
+app.include_router(walk_ins_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 

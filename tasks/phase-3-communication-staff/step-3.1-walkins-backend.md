@@ -3,7 +3,7 @@
 **Goal:** `walk_ins` table with universal status flow (browsing/interested/follow_up/converted/left). Quick-register endpoint optimized for reception desk.
 **Phase:** 3
 **Depends on:** 2.4
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
