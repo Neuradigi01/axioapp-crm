@@ -6,12 +6,16 @@ import {
   computed,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { ActivityTimelineComponent } from '../activities/activity-timeline.component';
+import { AddNoteComponent } from '../activities/add-note.component';
+import { Activity } from '../activities/activities-api.service';
 import { FieldDef } from '../shared/dynamic-form/types';
 import {
   Contact,
@@ -25,7 +29,7 @@ type DetailTab = 'overview' | 'activities' | 'notes' | 'tasks';
 
 const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: string | null }> = [
   { id: 'overview', label: 'Overview', placeholderStep: null },
-  { id: 'activities', label: 'Activities', placeholderStep: '2.7' },
+  { id: 'activities', label: 'Activities', placeholderStep: null },
   { id: 'notes', label: 'Notes', placeholderStep: '2.8' },
   { id: 'tasks', label: 'Tasks', placeholderStep: '2.8' },
 ];
@@ -34,7 +38,13 @@ const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: strin
   selector: 'app-contact-detail-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideAngularModule, ContactFormModalComponent],
+  imports: [
+    RouterLink,
+    LucideAngularModule,
+    ContactFormModalComponent,
+    ActivityTimelineComponent,
+    AddNoteComponent,
+  ],
   templateUrl: './contact-detail.page.html',
 })
 export class ContactDetailPageComponent implements OnInit {
@@ -51,11 +61,18 @@ export class ContactDetailPageComponent implements OnInit {
   readonly tabs = TABS;
   readonly activeTab = signal<DetailTab>('overview');
 
+  /** Live handle on the timeline so add-note can prepend without a refetch. */
+  protected readonly timeline = viewChild(ActivityTimelineComponent);
+
   /** Modal state: null = closed, Contact = edit. (No create from detail.) */
   readonly editingContact = signal<Contact | null>(null);
   readonly modalOpen = computed(() => this.editingContact() !== null);
   readonly submitting = signal(false);
   readonly formError = signal<string | null>(null);
+
+  protected onNoteCreated(activity: Activity): void {
+    this.timeline()?.prepend(activity);
+  }
 
   readonly customFields = computed(() => {
     const c = this.contact();

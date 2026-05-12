@@ -1,0 +1,33 @@
+<form (ngSubmit)="onSubmit()" class="space-y-2">
+  <label class="block">
+    <span class="sr-only">Add a note</span>
+    <textarea
+      [formControl]="text"
+      rows="3"
+      placeholder="Add a note (visible to everyone in your org)…"
+      class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+    ></textarea>
+  </label>
+
+  @if (text.touched && text.invalid) {
+    <p class="text-xs text-red-600">
+      @if (text.errors?.['required']) { Please enter some text. }
+      @else if (text.errors?.['maxlength']) { Notes are limited to 4,000 characters. }
+    </p>
+  }
+  @if (submitError(); as err) {
+    <p class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+      {{ err }}
+    </p>
+  }
+
+  <div class="flex justify-end">
+    <button
+      type="submit"
+      [disabled]="submitting()"
+      class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+    >
+      {{ submitting() ? 'Saving…' : 'Add note' }}
+    </button>
+  </div>
+</form>
