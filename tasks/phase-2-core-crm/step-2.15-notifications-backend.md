@@ -3,7 +3,7 @@
 **Goal:** `notifications` table + service. WebSocket endpoint for real-time delivery. Per-user notification preferences.
 **Phase:** 2
 **Depends on:** 1.6
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

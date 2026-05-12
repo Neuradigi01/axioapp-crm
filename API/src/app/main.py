@@ -30,6 +30,8 @@ from src.app.core.contacts.router import router as contacts_router
 from src.app.core.custom_fields.router import router as custom_fields_router
 from src.app.core.health.router import router as health_router
 from src.app.core.leads.router import router as leads_router
+from src.app.core.notifications.router import router as notifications_router
+from src.app.core.notifications.ws import ws_router as notifications_ws_router
 from src.app.core.pipelines.router import router as pipelines_router
 from src.app.core.tasks.router import router as tasks_router
 from src.app.core.module_registry import discover_modules, registry
@@ -94,6 +96,8 @@ app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(pipelines_router, prefix="/api/v1")
 app.include_router(leads_router, prefix="/api/v1")
 app.include_router(appointments_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
+app.include_router(notifications_ws_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 
