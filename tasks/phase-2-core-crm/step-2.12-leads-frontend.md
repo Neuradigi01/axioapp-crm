@@ -3,7 +3,7 @@
 **Goal:** Leads page with both Pipeline (kanban) and List views. New Lead modal uses `<app-dynamic-form>`. Status badges, source icons, INR budget formatting.
 **Phase:** 2
 **Depends on:** 2.11, 2.10, 2.3
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

@@ -58,6 +58,11 @@ export const userRoutes: Routes = [
             (m) => m.ContactDetailPageComponent,
           ),
       },
+      {
+        path: 'leads',
+        loadComponent: () =>
+          import('./core/leads/leads.page').then((m) => m.LeadsPageComponent),
+      },
       ...devRoutes,
     ],
   },
