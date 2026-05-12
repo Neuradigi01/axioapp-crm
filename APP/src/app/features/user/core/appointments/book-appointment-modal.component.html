@@ -1,0 +1,176 @@
+<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-2xl rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
+    <header class="border-b border-zinc-200 px-6 py-4">
+      <h2 class="text-base font-semibold text-zinc-900">Book appointment</h2>
+      <p class="mt-1 text-xs text-zinc-500">
+        Pick the contact this is for, then schedule a time and place. The
+        appointment is assigned to you by default.
+      </p>
+    </header>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="max-h-[70vh] overflow-y-auto px-6 py-5">
+      <!-- Contact picker -->
+      <section>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contact</h3>
+        @if (selectedContact(); as c) {
+          <div class="mt-2 flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-medium text-zinc-900">{{ c.full_name }}</p>
+              <p class="truncate text-xs text-zinc-500">
+                {{ c.phone ?? '—' }} · {{ c.email ?? '—' }}
+              </p>
+            </div>
+            <button
+              type="button"
+              (click)="clearContact()"
+              class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+            >
+              Change
+            </button>
+          </div>
+        } @else {
+          <div class="relative mt-2">
+            <input
+              type="search"
+              [value]="contactQuery()"
+              (input)="onContactQueryInput($event)"
+              placeholder="Search contacts by name, phone, or email…"
+              autocomplete="off"
+              class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+            @if (contactSearchOpen() && contactResults().length > 0) {
+              <ul class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-zinc-200">
+                @for (c of contactResults(); track c.id) {
+                  <li>
+                    <button
+                      type="button"
+                      (click)="selectContact(c)"
+                      class="block w-full px-3 py-1.5 text-left text-sm hover:bg-zinc-50"
+                    >
+                      <span class="font-medium text-zinc-900">{{ c.full_name }}</span>
+                      <span class="ml-2 text-xs text-zinc-500">{{ c.phone ?? c.email ?? '—' }}</span>
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- Standard fields -->
+      <section class="mt-6 border-t border-zinc-200 pt-5">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-medium text-zinc-700" for="ba_title">
+              Title *
+            </label>
+            <input
+              id="ba_title"
+              type="text"
+              formControlName="title"
+              placeholder="e.g. Showroom visit · sofa selection"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+            @if (form.controls.title.touched && form.controls.title.invalid) {
+              <p class="mt-1 text-xs text-red-600">A title is required.</p>
+            }
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-700" for="ba_purpose">Purpose</label>
+            <input
+              id="ba_purpose"
+              type="text"
+              formControlName="purpose"
+              placeholder="showroom_visit, measurement, delivery, …"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-700" for="ba_location">Location</label>
+            <input
+              id="ba_location"
+              type="text"
+              formControlName="location"
+              placeholder="Banjara Hills branch"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-700" for="ba_at">
+              Scheduled at *
+            </label>
+            <input
+              id="ba_at"
+              type="datetime-local"
+              formControlName="scheduled_at"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+            @if (form.controls.scheduled_at.touched && form.controls.scheduled_at.invalid) {
+              <p class="mt-1 text-xs text-red-600">Pick a date and time.</p>
+            }
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-700" for="ba_dur">
+              Duration (min) *
+            </label>
+            <input
+              id="ba_dur"
+              type="number"
+              min="1"
+              max="1440"
+              formControlName="duration_min"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+          </div>
+        </div>
+
+        <p class="mt-3 text-[11px] text-zinc-500">
+          Assigned to: <span class="font-medium text-zinc-700">{{ me()?.full_name ?? 'you' }}</span>
+        </p>
+      </section>
+
+      <!-- Errors / conflicts -->
+      @if (conflicts().length > 0) {
+        <div class="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+          <p class="font-semibold">Time conflict</p>
+          <p class="mt-1">{{ submitError() ?? 'Conflicts with the following appointments:' }}</p>
+          <ul class="mt-1.5 list-inside list-disc">
+            @for (cid of conflicts(); track cid) {
+              <li>{{ conflictLabel(cid) }}</li>
+            }
+          </ul>
+          <p class="mt-1.5 text-[11px] text-red-600">
+            Pick a different time or cancel the conflicting appointment first.
+          </p>
+        </div>
+      } @else if (submitError(); as err) {
+        <div class="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+          {{ err }}
+        </div>
+      }
+    </form>
+
+    <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg">
+      <button
+        type="button"
+        (click)="cancel.emit()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        [disabled]="!canSubmit()"
+        (click)="onSubmit()"
+        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+      >
+        Book
+      </button>
+    </footer>
+  </div>
+</div>

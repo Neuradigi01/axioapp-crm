@@ -16,6 +16,7 @@ import {
   LucideAngularModule,
   ArrowRight,
   Bell,
+  Calendar,
   Check,
   CheckSquare,
   ChevronLeft,
@@ -55,6 +56,7 @@ export const appConfig: ApplicationConfig = {
       LucideAngularModule.pick({
         ArrowRight,
         Bell,
+        Calendar,
         Check,
         CheckSquare,
         ChevronLeft,

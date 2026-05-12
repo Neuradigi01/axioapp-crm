@@ -63,6 +63,13 @@ export const userRoutes: Routes = [
         loadComponent: () =>
           import('./core/leads/leads.page').then((m) => m.LeadsPageComponent),
       },
+      {
+        path: 'appointments',
+        loadComponent: () =>
+          import('./core/appointments/appointments.page').then(
+            (m) => m.AppointmentsPageComponent,
+          ),
+      },
       ...devRoutes,
     ],
   },
