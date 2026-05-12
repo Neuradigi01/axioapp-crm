@@ -101,6 +101,24 @@ export class LeadsPageComponent {
     return [...set].sort();
   });
 
+  /** "X total · Y new today" — header subtitle. */
+  readonly totalCount = computed(() => this.leads().length);
+  readonly newTodayCount = computed(() => {
+    const todayKey = this.todayKey();
+    return this.leads().filter(
+      (l) => this.dateKey(l.created_at) === todayKey,
+    ).length;
+  });
+
+  private todayKey(): string {
+    return this.dateKey(new Date().toISOString());
+  }
+
+  private dateKey(iso: string): string {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
   /** Modal: null = closed, undefined = create, Lead = edit. */
   readonly modalState = signal<Lead | null | undefined>(null);
   readonly modalOpen = computed(() => this.modalState() !== null);

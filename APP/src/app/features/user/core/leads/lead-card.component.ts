@@ -4,38 +4,40 @@ import {
   computed,
   input,
 } from '@angular/core';
-import { LucideAngularModule } from 'lucide-angular';
 
 import { InrPipe } from '../shared/pipes/inr.pipe';
 import { Lead, LeadStatus } from './leads-api.service';
 
 /**
- * Small read-only card rendered inside each kanban column for a lead.
+ * Compact read-only card rendered inside each kanban column for a lead.
  *
- * Inputs:
- *   - `lead`: the lead row to display.
- *   - `contactName` / `contactPhone` / `contactSource`: looked up by
- *     the parent (the leads page caches contacts so we don't N+1).
+ * Matches the reference Vercel UI layout: a colored initials avatar
+ * (color derived deterministically from the lead's id so the same
+ * card always picks the same colour), the contact's name, the lead's
+ * creation date (YYYY-MM-DD), a furniture emoji + product label
+ * pulled from `lead.custom_data.product` (falls back to the source
+ * when no product is defined), and the budget formatted in
+ * Indian-rupee groupings.
  *
- * Source icon: a small set of common sources get a lucide icon
- * (walk-in → footprints, referral → user-plus); anything else falls
- * back to the source text. The card stays compact so multiple cards
- * fit comfortably per column on a kanban board.
+ * Inputs are minimal — the parent looks up the contact summary out of
+ * its cache and passes the visible fields in.
  */
-const SOURCE_ICONS: Record<string, string> = {
-  walk_in: 'footprints',
-  walkin: 'footprints',
-  referral: 'user-plus',
-  phone: 'phone',
-  whatsapp: 'message-circle',
-  email: 'mail',
-};
+const AVATAR_PALETTE: ReadonlyArray<string> = [
+  'bg-emerald-200 text-emerald-800',
+  'bg-sky-200 text-sky-800',
+  'bg-amber-200 text-amber-800',
+  'bg-rose-200 text-rose-800',
+  'bg-violet-200 text-violet-800',
+  'bg-cyan-200 text-cyan-800',
+  'bg-orange-200 text-orange-800',
+  'bg-indigo-200 text-indigo-800',
+];
 
 @Component({
   selector: 'app-lead-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, InrPipe],
+  imports: [InrPipe],
   templateUrl: './lead-card.component.html',
 })
 export class LeadCardComponent {
@@ -43,11 +45,6 @@ export class LeadCardComponent {
   readonly contactName = input<string | null>(null);
   readonly contactPhone = input<string | null>(null);
   readonly contactSource = input<string | null>(null);
-
-  readonly sourceIcon = computed<string | null>(() => {
-    const src = this.contactSource();
-    return src ? SOURCE_ICONS[src] ?? null : null;
-  });
 
   readonly initials = computed(() => {
     const name = this.contactName() ?? '?';
@@ -57,6 +54,34 @@ export class LeadCardComponent {
       .slice(0, 2)
       .map((p) => p[0]!.toUpperCase())
       .join('');
+  });
+
+  /** Deterministic colour pick from `AVATAR_PALETTE` based on lead id. */
+  readonly avatarClass = computed(() => {
+    const id = this.lead().id;
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = (hash * 31 + id.charCodeAt(i)) & 0x7fffffff;
+    }
+    return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
+  });
+
+  /** YYYY-MM-DD of the lead's created_at. */
+  readonly dateLabel = computed(() => {
+    const iso = this.lead().created_at;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+
+  /** Product label pulled from custom_data.product, falls back to source. */
+  readonly productLabel = computed<string | null>(() => {
+    const product = (this.lead().custom_data as { product?: unknown }).product;
+    if (typeof product === 'string' && product.trim().length > 0) return product;
+    return this.contactSource();
   });
 
   readonly statusPillClass = computed(() => this.classForStatus(this.lead().status));

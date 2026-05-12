@@ -1,27 +1,19 @@
 <div class="space-y-1.5">
   <div class="flex items-start gap-2">
-    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700">
+    <span
+      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+      [class]="avatarClass()"
+    >
       {{ initials() }}
     </span>
     <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-medium text-zinc-900">
         {{ contactName() ?? 'Unknown contact' }}
       </p>
-      @if (contactPhone()) {
-        <p class="truncate text-[11px] text-zinc-500">{{ contactPhone() }}</p>
-      }
+      <p class="truncate text-[11px] text-zinc-500">
+        {{ dateLabel() }}
+      </p>
     </div>
-  </div>
-
-  <div class="flex items-center justify-between gap-2">
-    @if (contactSource()) {
-      <span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200">
-        @if (sourceIcon(); as icn) {
-          <lucide-icon [name]="icn" class="h-3 w-3" />
-        }
-        {{ contactSource() }}
-      </span>
-    }
     <span
       class="ml-auto inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1"
       [class]="statusPillClass()"
@@ -30,8 +22,15 @@
     </span>
   </div>
 
+  @if (productLabel(); as product) {
+    <p class="flex items-center gap-1 text-xs text-zinc-700">
+      <span aria-hidden="true">🛋️</span>
+      <span class="truncate">{{ product }}</span>
+    </p>
+  }
+
   @if (lead().budget) {
-    <p class="text-xs font-semibold text-zinc-700">
+    <p class="text-sm font-semibold text-zinc-900">
       {{ lead().budget | formatINR : true }}
     </p>
   }
