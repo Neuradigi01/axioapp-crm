@@ -20,8 +20,10 @@ import {
   Cog,
   LogOut,
   Menu,
+  Plus,
   Search,
   User,
+  Users,
 } from 'lucide-angular';
 
 import { authInterceptor } from '@core/interceptors/auth.interceptor';
@@ -47,8 +49,10 @@ export const appConfig: ApplicationConfig = {
         Cog,
         LogOut,
         Menu,
+        Plus,
         Search,
         User,
+        Users,
       }),
     ),
     provideAnimationsAsync(),

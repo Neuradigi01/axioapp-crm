@@ -1,0 +1,179 @@
+<div class="mx-auto max-w-7xl p-6">
+  <header class="flex items-center justify-between">
+    <div>
+      <h1 class="text-lg font-semibold text-zinc-900">Contacts</h1>
+      <p class="mt-0.5 text-xs text-zinc-500">
+        Showroom walk-ins, leads, returning customers. {{ total() }} total.
+      </p>
+    </div>
+    <button
+      type="button"
+      (click)="openCreate()"
+      class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+    >
+      <lucide-icon name="plus" class="h-4 w-4" />
+      New Contact
+    </button>
+  </header>
+
+  <!-- Filters -->
+  <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-4">
+    <div class="sm:col-span-2">
+      <label for="contacts_q" class="sr-only">Search</label>
+      <div class="relative">
+        <lucide-icon
+          name="search"
+          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+        />
+        <input
+          id="contacts_q"
+          type="search"
+          [formControl]="searchControl"
+          placeholder="Search by name, phone, or email…"
+          class="block w-full rounded-md border border-zinc-300 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+      </div>
+    </div>
+
+    <div>
+      <label for="contacts_source" class="sr-only">Source</label>
+      <select
+        id="contacts_source"
+        [formControl]="sourceControl"
+        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        <option value="">All sources</option>
+        @for (s of sourceOptions(); track s) {
+          <option [value]="s">{{ s }}</option>
+        }
+      </select>
+    </div>
+
+    <div>
+      <label for="contacts_tag" class="sr-only">Tag</label>
+      <select
+        id="contacts_tag"
+        [formControl]="tagControl"
+        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        <option value="">All tags</option>
+        @for (t of tagOptions(); track t) {
+          <option [value]="t">{{ t }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="mt-6 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-zinc-200">
+    @if (loadError(); as err) {
+      <div class="px-6 py-4 text-sm text-red-700">{{ err }}</div>
+    } @else if (loading()) {
+      <div class="divide-y divide-zinc-200">
+        @for (i of [0, 1, 2, 3, 4]; track i) {
+          <div class="flex items-center gap-4 px-6 py-4">
+            <div class="h-9 w-9 animate-pulse rounded-full bg-zinc-200"></div>
+            <div class="flex-1">
+              <div class="h-3 w-40 animate-pulse rounded bg-zinc-200"></div>
+              <div class="mt-2 h-3 w-24 animate-pulse rounded bg-zinc-100"></div>
+            </div>
+            <div class="h-3 w-20 animate-pulse rounded bg-zinc-200"></div>
+          </div>
+        }
+      </div>
+    } @else if (items().length === 0) {
+      <div class="px-6 py-12 text-center text-sm text-zinc-500">
+        No contacts found.
+        <span class="block text-xs text-zinc-400">Try a different search or clear filters.</span>
+      </div>
+    } @else {
+      <table class="min-w-full divide-y divide-zinc-200">
+        <thead class="bg-zinc-50">
+          <tr>
+            <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Name</th>
+            <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Phone</th>
+            <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Email</th>
+            <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Source</th>
+            <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Tags</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-100 bg-white">
+          @for (item of items(); track item.id) {
+            <tr
+              tabindex="0"
+              (click)="onRowClick(item)"
+              (keydown.enter)="onRowClick(item)"
+              class="cursor-pointer transition hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-none"
+            >
+              <td class="whitespace-nowrap px-6 py-3 text-sm font-medium text-zinc-900">
+                <div class="flex items-center gap-3">
+                  <span class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700">
+                    {{ initials(item.full_name) }}
+                  </span>
+                  {{ item.full_name }}
+                </div>
+              </td>
+              <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600">
+                {{ item.phone ?? '—' }}
+              </td>
+              <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600">
+                {{ item.email ?? '—' }}
+              </td>
+              <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600">
+                {{ item.source ?? '—' }}
+              </td>
+              <td class="px-6 py-3 text-sm text-zinc-600">
+                <div class="flex flex-wrap gap-1">
+                  @for (tag of item.tags; track tag) {
+                    <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200">
+                      {{ tag }}
+                    </span>
+                  } @empty {
+                    <span class="text-zinc-400">—</span>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+
+  <!-- Pagination -->
+  @if (!loading() && total() > size) {
+    <div class="mt-4 flex items-center justify-between text-xs text-zinc-600">
+      <span>
+        Page {{ page() }} of {{ totalPages() }} · {{ total() }} contact(s)
+      </span>
+      <div class="flex items-center gap-1">
+        <button
+          type="button"
+          class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="page() <= 1"
+          (click)="goToPage(page() - 1)"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="page() >= totalPages()"
+          (click)="goToPage(page() + 1)"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-contact-form-modal
+    [contact]="editingContact()"
+    [submitting]="submitting()"
+    [submitError]="formError()"
+    (save)="onSave($event)"
+    (cancel)="closeModal()"
+  />
+}

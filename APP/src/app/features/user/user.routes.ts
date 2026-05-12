@@ -37,6 +37,20 @@ export const userRoutes: Routes = [
             (m) => m.SettingsPageComponent,
           ),
       },
+      {
+        path: 'contacts',
+        loadComponent: () =>
+          import('./core/contacts/contacts-list.page').then(
+            (m) => m.ContactsListPageComponent,
+          ),
+      },
+      {
+        path: 'contacts/:id',
+        loadComponent: () =>
+          import('./core/contacts/contact-detail.page').then(
+            (m) => m.ContactDetailPageComponent,
+          ),
+      },
       ...devRoutes,
     ],
   },

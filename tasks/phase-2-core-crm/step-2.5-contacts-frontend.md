@@ -3,7 +3,7 @@
 **Goal:** Contacts list page (table view) + contact detail page with tabs (Overview, Activities, Notes, Tasks — last three are placeholders until 2.6/2.7/2.8). New/edit forms use `<app-dynamic-form>` fed by `/custom-fields/contact/render`.
 **Phase:** 2
 **Depends on:** 2.4, 2.3, 1.10
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
