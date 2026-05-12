@@ -3,7 +3,7 @@
 **Goal:** Appointments page with monthly calendar matching the screenshot. Day-detail panel on the right. "Book Appointment" modal. Reusable `<app-calendar>` component.
 **Phase:** 2
 **Depends on:** 2.13, 2.4
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
