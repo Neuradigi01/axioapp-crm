@@ -18,6 +18,7 @@ from src.app.core.tenants import models as _organizations_models  # noqa: F401
 from src.app.core.permissions import models as _permissions_models  # noqa: F401
 from src.app.core.users import models as _users_models  # noqa: F401
 from src.app.core.auth import models as _auth_models  # noqa: F401
+from src.app.core.contacts import models as _contacts_models  # noqa: F401
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url from environment

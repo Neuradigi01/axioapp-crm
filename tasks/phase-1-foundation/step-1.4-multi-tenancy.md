@@ -7,6 +7,7 @@
 
 ## Scope
 **In-scope:**
+
 - `api/src/app/shared/context.py`: contextvar-based `RequestContext` (org_id, user_id, request_id).
 - `api/src/app/shared/middleware.py`: `TenantContextMiddleware` that reads `X-Org-Id` header in dev (placeholder) — replaced in 1.6 by JWT-claim extraction.
 - `api/src/app/shared/orm.py`: `TenantScoped` mixin (adds `org_id` Mapped column + index) and a session event listener that auto-injects `WHERE org_id = :ctx_org_id` on `Select` against TenantScoped models.

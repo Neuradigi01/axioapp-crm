@@ -14,12 +14,18 @@ from src.seeds.seed_routes import seed_routes
 from src.seeds.seed_countries import seed_countries, seed_states
 from src.app.scripts.seed_demo_org import seed_demo_org
 from src.app.scripts.seed_admin_user import seed_admin_user
+from src.app.scripts.seed_contact_system_fields import seed_contact_system_fields
 
 
 async def run_layered():
-    """FurnitureCRM layered seeds: demo org → admin role + permissions + admin user."""
+    """FurnitureCRM layered seeds: demo org → admin role + permissions + admin user → contact system fields."""
     await seed_demo_org()
     await seed_admin_user()
+    await seed_contact_system_fields()
+
+
+async def run_contact_fields():
+    await seed_contact_system_fields()
 
 
 async def run_all():
@@ -49,6 +55,7 @@ SEED_MAP = {
     "routes": run_routes,
     "countries": run_countries,
     "layered": run_layered,
+    "contact_fields": run_contact_fields,
 }
 
 
