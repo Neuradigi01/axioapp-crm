@@ -1,0 +1,170 @@
+"""Campaigns engine models.
+
+Two tables:
+
+- `Campaign` — one row per outbound marketing/transactional campaign.
+  `channel` reuses the same `ConversationChannel` enum from 3.8 so the
+  campaigns engine sends through the same adapter registry as
+  Conversations (no per-channel logic anywhere in this module).
+  `audience_filter` is JSONB shaped like a `/contacts` query so the
+  same query builder resolves it (`q`, `source`, `tag`).
+- `CampaignMessage` — one row per (campaign × contact). Records the
+  channel-side `channel_message_id` (for stats joins later) plus a
+  delivery-status enum the channel adapter / webhook updates.
+
+`CampaignStats` is computed on-the-fly from `CampaignMessage` (no
+denormalised view at this stage — we'll add a materialised view if /
+when the count GROUP BYs get expensive). The `stats` endpoint groups
+by `status` and returns counts that the UI charts.
+
+Tenant-scoped, RLS on. Migration 0021 adds hot-path indexes.
+"""
+from __future__ import annotations
+
+import enum
+import uuid
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+)
+from sqlalchemy import text as sql_text
+from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from src.app.core.conversations.models import (
+    ConversationChannel,
+    conversation_channel_enum,
+)
+from src.app.shared.db import Base
+from src.app.shared.orm import TenantScoped
+
+
+class CampaignStatus(str, enum.Enum):
+    draft = "draft"
+    scheduled = "scheduled"
+    running = "running"
+    done = "done"
+    failed = "failed"
+
+
+class CampaignMessageStatus(str, enum.Enum):
+    queued = "queued"
+    sent = "sent"
+    delivered = "delivered"
+    read = "read"
+    failed = "failed"
+
+
+campaign_status_enum = ENUM(
+    CampaignStatus,
+    name="campaign_status",
+    values_callable=lambda obj: [m.value for m in obj],
+)
+
+campaign_message_status_enum = ENUM(
+    CampaignMessageStatus,
+    name="campaign_message_status",
+    values_callable=lambda obj: [m.value for m in obj],
+)
+
+
+class Campaign(Base, TenantScoped):
+    __tablename__ = "campaigns"
+    __table_args__ = (
+        Index("ix_campaigns_org_status", "org_id", "status"),
+        Index("ix_campaigns_org_schedule_at", "org_id", "schedule_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    channel: Mapped[ConversationChannel] = mapped_column(
+        conversation_channel_enum, nullable=False
+    )
+    audience_filter: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sql_text("'{}'::jsonb")
+    )
+    template: Mapped[str] = mapped_column(
+        # Free-text body for now; in 5.x we'll add template_id +
+        # variable substitution. For now `{{full_name}}` is honoured by
+        # the send task as a tiny Mustache-style placeholder.
+        # (No template lookup table yet.)
+        String(4096),
+        nullable=False,
+    )
+    schedule_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    status: Mapped[CampaignStatus] = mapped_column(
+        campaign_status_enum,
+        nullable=False,
+        server_default=sql_text("'draft'"),
+    )
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+
+
+class CampaignMessage(Base, TenantScoped):
+    __tablename__ = "campaign_messages"
+    __table_args__ = (
+        Index(
+            "ix_campaign_messages_campaign_status",
+            "campaign_id",
+            "status",
+        ),
+        Index(
+            "ix_campaign_messages_campaign_contact",
+            "campaign_id",
+            "contact_id",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contacts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    channel_message_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
+    status: Mapped[CampaignMessageStatus] = mapped_column(
+        campaign_message_status_enum,
+        nullable=False,
+        server_default=sql_text("'queued'"),
+    )
+    error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )

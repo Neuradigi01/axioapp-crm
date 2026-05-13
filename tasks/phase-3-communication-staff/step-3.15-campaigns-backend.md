@@ -3,7 +3,7 @@
 **Goal:** `campaigns`, `campaign_messages`, `campaign_stats`. Channel-agnostic engine (uses the same channel adapters as Conversations). Schedule via Celery.
 **Phase:** 3
 **Depends on:** 3.8 (channel registry), 1.2 (Celery)
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

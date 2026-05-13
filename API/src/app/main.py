@@ -30,6 +30,7 @@ from src.app.core.calls.router import (
     outcomes_router as call_outcomes_router,
 )
 from src.app.core.auth.router import router as auth_router
+from src.app.core.campaigns.router import router as campaigns_router
 from src.app.core.catalog.router import router as catalog_router
 from src.app.core.contacts.router import router as contacts_router
 from src.app.core.conversations.router import router as conversations_router
@@ -125,6 +126,7 @@ app.include_router(conversations_router, prefix="/api/v1")
 app.include_router(calls_router, prefix="/api/v1")
 app.include_router(call_outcomes_router, prefix="/api/v1")
 app.include_router(reviews_router, prefix="/api/v1")
+app.include_router(campaigns_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 
