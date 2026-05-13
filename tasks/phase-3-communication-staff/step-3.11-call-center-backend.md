@@ -3,7 +3,7 @@
 **Goal:** `calls`, `call_transcripts`, `call_outcomes` (config table). CRUD + analytics endpoint (outcomes distribution, daily volume, direction split).
 **Phase:** 3
 **Depends on:** 2.4
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
