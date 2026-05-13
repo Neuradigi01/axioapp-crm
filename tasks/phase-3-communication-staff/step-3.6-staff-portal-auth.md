@@ -3,7 +3,7 @@
 **Goal:** PIN-based auth for staff at the shop tablet. Staff selects their name, enters last 4 digits of their phone. Issues a short-lived staff token (different scope from admin JWT).
 **Phase:** 3
 **Depends on:** 3.4, 1.6
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

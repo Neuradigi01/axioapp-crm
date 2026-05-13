@@ -36,8 +36,10 @@ def _parse_uuid(raw: str | None) -> uuid.UUID | None:
         return None
 
 
-def _context_from_jwt(authorization: str | None) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID] | None:
-    """Return (org_id, user_id, token_id) if the header carries a valid JWT, else None."""
+def _context_from_jwt(
+    authorization: str | None,
+) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, str] | None:
+    """Return (org_id, user_id, token_id, scope) if the header carries a valid JWT, else None."""
     if not authorization:
         return None
     scheme, _, raw = authorization.partition(" ")
@@ -47,7 +49,7 @@ def _context_from_jwt(authorization: str | None) -> tuple[uuid.UUID, uuid.UUID, 
         claims = decode_token(raw)
     except InvalidToken:
         return None
-    return claims.org_id, claims.user_id, claims.token_id
+    return claims.org_id, claims.user_id, claims.token_id, claims.scope
 
 
 def _context_from_dev_headers(request: Request) -> tuple[uuid.UUID | None, uuid.UUID | None]:
@@ -65,12 +67,16 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         org_id: uuid.UUID | None = None
         user_id: uuid.UUID | None = None
         token_id: uuid.UUID | None = None
+        scope: str | None = None
 
         jwt_claims = _context_from_jwt(request.headers.get("authorization"))
         if jwt_claims is not None:
-            org_id, user_id, token_id = jwt_claims
+            org_id, user_id, token_id, scope = jwt_claims
         elif IS_DEVELOPMENT:
             org_id, user_id = _context_from_dev_headers(request)
+            # Dev-header fallback is admin-only — staff tokens are
+            # always JWT-backed even in dev.
+            scope = "admin" if org_id is not None else None
 
         token = set_context(
             RequestContext(
@@ -78,6 +84,7 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
                 user_id=user_id,
                 token_id=token_id,
                 request_id=request_id,
+                scope=scope,
             )
         )
         try:

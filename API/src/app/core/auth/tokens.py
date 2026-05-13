@@ -27,6 +27,7 @@ from jose import JWTError, jwt
 from config import JWT_ALGORITHM, JWT_SECRET_KEY
 
 ACCESS_TOKEN_TTL = timedelta(hours=24)
+STAFF_TOKEN_TTL = timedelta(hours=4)
 
 
 class InvalidToken(Exception):
@@ -40,6 +41,10 @@ class TokenClaims:
     token_id: uuid.UUID
     issued_at: datetime
     expires_at: datetime
+    # "admin" for the standard email/password JWT; "staff" for the PIN
+    # token issued by the staff portal. Older tokens minted before this
+    # claim was introduced decode as "admin" (default).
+    scope: str = "admin"
 
 
 def encode_token(
@@ -49,6 +54,7 @@ def encode_token(
     token_id: uuid.UUID,
     now: datetime | None = None,
     ttl: timedelta = ACCESS_TOKEN_TTL,
+    scope: str = "admin",
 ) -> tuple[str, datetime]:
     """Return (jwt, expires_at)."""
     issued_at = now or datetime.now(timezone.utc)
@@ -57,6 +63,7 @@ def encode_token(
         "sub": str(user_id),
         "org_id": str(org_id),
         "token_id": str(token_id),
+        "scope": scope,
         "iat": int(issued_at.timestamp()),
         "exp": int(expires_at.timestamp()),
     }
@@ -78,6 +85,7 @@ def decode_token(raw: str) -> TokenClaims:
             token_id=uuid.UUID(payload["token_id"]),
             issued_at=datetime.fromtimestamp(payload["iat"], tz=timezone.utc),
             expires_at=datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
+            scope=payload.get("scope", "admin"),
         )
     except (KeyError, ValueError, TypeError) as exc:
         raise InvalidToken(f"missing or malformed claim: {exc}") from exc

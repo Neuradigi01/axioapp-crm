@@ -21,6 +21,11 @@ class RequestContext:
     user_id: uuid.UUID | None = None
     token_id: uuid.UUID | None = None
     request_id: str | None = None
+    # "admin" or "staff" — set from the JWT `scope` claim by
+    # `TenantContextMiddleware`. Auth dependencies use this to refuse
+    # cross-surface tokens (admin JWT against /staff-portal endpoints
+    # and vice versa).
+    scope: str | None = None
 
 
 _request_context: ContextVar[RequestContext] = ContextVar(
