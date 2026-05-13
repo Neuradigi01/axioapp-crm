@@ -3,7 +3,7 @@
 **Goal:** Write the actual `furniture/pack.yaml` reflecting the screenshots: pipeline stages, custom fields, roles, lead sources, call outcomes, currency INR, tax 18%, AI defaults. Run installer on the seeded demo org. Verify the existing UI now reflects furniture defaults.
 **Phase:** 4
 **Depends on:** 4.1
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

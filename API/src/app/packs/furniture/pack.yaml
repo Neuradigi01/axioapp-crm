@@ -1,0 +1,351 @@
+# FurnitureCRM — vertical pack manifest.
+#
+# This file is the source of truth (rule 7) for every furniture-specific
+# default the platform installs into a tenant org. Run via:
+#
+#   python -m src.app.scripts.install_pack --org <slug> --pack furniture
+#
+# Re-running is a no-op — the installer is idempotent. Editing this file
+# and re-running adds new rows but leaves admin-customised rows alone
+# (e.g. renamed pipeline stages, edited org_settings fields).
+
+pack_id: furniture
+version: 1.0.0
+display_name: Furniture Retail Pack
+
+# ---------------------------------------------------------------------------
+# Pipelines (kanban boards). The Leads board mirrors the screenshot
+# in the master prompt: New → Contacted → Showroom Visit → Quotation →
+# Won / Lost. The Custom Orders board is the post-sale flow:
+# Measurement → Design → Production → QC → Installation → Delivered.
+# ---------------------------------------------------------------------------
+pipelines:
+  - key: leads
+    name: Leads
+    stages:
+      - {key: new,           name: New,            color: '#3b82f6', display_order: 0}
+      - {key: contacted,     name: Contacted,      color: '#0ea5e9', display_order: 1}
+      - {key: showroom_visit, name: Showroom Visit, color: '#8b5cf6', display_order: 2}
+      - {key: quotation,     name: Quotation,      color: '#f59e0b', display_order: 3}
+      - {key: won,           name: Won,            color: '#10b981', display_order: 4, is_won: true}
+      - {key: lost,          name: Lost,           color: '#ef4444', display_order: 5, is_lost: true}
+
+  - key: custom_orders
+    name: Custom Orders
+    stages:
+      - {key: measurement_scheduled, name: Measurement Scheduled, color: '#3b82f6', display_order: 0}
+      - {key: design_phase,          name: Design Phase,          color: '#8b5cf6', display_order: 1}
+      - {key: in_production,         name: In Production,         color: '#f59e0b', display_order: 2}
+      - {key: qc,                    name: QC,                    color: '#ec4899', display_order: 3}
+      - {key: installation,          name: Installation,          color: '#0ea5e9', display_order: 4}
+      - {key: delivered,             name: Delivered,             color: '#10b981', display_order: 5, is_won: true}
+      - {key: cancelled,             name: Cancelled,             color: '#ef4444', display_order: 6, is_lost: true}
+
+# ---------------------------------------------------------------------------
+# Custom field definitions (source='pack' on insert). The dynamic-form
+# engine renders these from `/custom-fields/render?entity_type=...`.
+# ---------------------------------------------------------------------------
+custom_fields:
+  # Contact-level enrichment
+  - entity_type: contact
+    field_key: budget_range
+    field_label: Budget Range
+    field_type: select
+    options: ['Below ₹25k', '₹25k–₹50k', '₹50k–₹1L', '₹1L–₹3L', '₹3L–₹5L', '₹5L+']
+    display_order: 10
+
+  - entity_type: contact
+    field_key: preferred_material
+    field_label: Preferred Material
+    field_type: select
+    options: ['Solid Wood', 'Engineered Wood', 'Metal', 'Glass', 'Upholstered', 'Mixed']
+    display_order: 20
+
+  - entity_type: contact
+    field_key: room_type
+    field_label: Room Type
+    field_type: select
+    options: ['Living Room', 'Bedroom', 'Dining Room', 'Office', 'Kitchen', 'Outdoor', 'Kids Room']
+    display_order: 30
+
+  - entity_type: contact
+    field_key: requirement
+    field_label: Requirement Notes
+    field_type: text
+    display_order: 40
+
+  # Lead-level — drives the Leads kanban / detail page
+  - entity_type: lead
+    field_key: budget_range
+    field_label: Budget Range
+    field_type: select
+    options: ['Below ₹25k', '₹25k–₹50k', '₹50k–₹1L', '₹1L–₹3L', '₹3L–₹5L', '₹5L+']
+    is_required: true
+    display_order: 10
+
+  - entity_type: lead
+    field_key: preferred_material
+    field_label: Preferred Material
+    field_type: select
+    options: ['Solid Wood', 'Engineered Wood', 'Metal', 'Glass', 'Upholstered', 'Mixed']
+    display_order: 20
+
+  - entity_type: lead
+    field_key: room_type
+    field_label: Room Type
+    field_type: select
+    options: ['Living Room', 'Bedroom', 'Dining Room', 'Office', 'Kitchen', 'Outdoor', 'Kids Room']
+    display_order: 30
+
+  - entity_type: lead
+    field_key: expected_visit_date
+    field_label: Expected Showroom Visit
+    field_type: date
+    display_order: 40
+
+  # Walk-in (in-store) capture
+  - entity_type: walk_in
+    field_key: requirement
+    field_label: Requirement
+    field_type: text
+    is_required: true
+    display_order: 10
+
+  - entity_type: walk_in
+    field_key: product_interest_id
+    field_label: Product of Interest
+    # `text` today; the dynamic-form engine will render a catalog
+    # item picker for this key once entity-ref fields ship (Phase 5).
+    field_type: text
+    display_order: 20
+
+  - entity_type: walk_in
+    field_key: budget_range
+    field_label: Budget Range
+    field_type: select
+    options: ['Below ₹25k', '₹25k–₹50k', '₹50k–₹1L', '₹1L–₹3L', '₹3L–₹5L', '₹5L+']
+    display_order: 30
+
+# ---------------------------------------------------------------------------
+# Roles. Each role's `permissions` list expands via `module_permissions`
+# (`<module>.*` shorthand) — see the bottom of this file for the map.
+# Owner gets `<all>` (every module's keys). Other roles get a curated
+# subset matching real Indian furniture retail org charts.
+# ---------------------------------------------------------------------------
+roles:
+  - key: owner
+    name: Owner
+    permissions:
+      - users.read
+      - users.write
+      - roles.read
+      - roles.write
+      - audit.read
+      - custom_fields.read
+      - custom_fields.write
+      - contacts.*
+      - activities.*
+      - tasks.*
+      - pipelines.*
+      - leads.*
+      - appointments.*
+      - walk_ins.*
+      - catalog.*
+      - staff.*
+      - attendance.*
+      - conversations.*
+      - calls.*
+      - reviews.*
+      - campaigns.*
+      - settings.*
+
+  - key: store_manager
+    name: Store Manager
+    permissions:
+      - users.read
+      - audit.read
+      - custom_fields.read
+      - contacts.*
+      - activities.*
+      - tasks.*
+      - pipelines.*
+      - leads.*
+      - appointments.*
+      - walk_ins.*
+      - catalog.*
+      - staff.*
+      - attendance.*
+      - conversations.*
+      - calls.*
+      - reviews.*
+      - campaigns.read
+      - campaigns.write
+      - settings.read
+
+  - key: senior_sales_executive
+    name: Senior Sales Executive
+    permissions:
+      - contacts.*
+      - activities.*
+      - tasks.*
+      - pipelines.read
+      - leads.*
+      - appointments.*
+      - walk_ins.*
+      - catalog.read
+      - conversations.*
+      - calls.*
+      - reviews.read
+
+  - key: sales_executive
+    name: Sales Executive
+    permissions:
+      - contacts.read
+      - contacts.write
+      - activities.read
+      - activities.write
+      - tasks.*
+      - pipelines.read
+      - leads.*
+      - appointments.*
+      - walk_ins.*
+      - catalog.read
+      - conversations.read
+      - conversations.write
+      - calls.read
+      - calls.write
+
+  - key: junior_sales_executive
+    name: Junior Sales Executive
+    permissions:
+      - contacts.read
+      - activities.read
+      - activities.write
+      - tasks.read
+      - tasks.write
+      - pipelines.read
+      - leads.read
+      - leads.write
+      - appointments.read
+      - walk_ins.read
+      - walk_ins.write
+      - catalog.read
+      - conversations.read
+      - calls.read
+
+  - key: design_consultant
+    name: Design Consultant
+    permissions:
+      - contacts.read
+      - contacts.write
+      - activities.read
+      - activities.write
+      - tasks.read
+      - tasks.write
+      - pipelines.read
+      - leads.read
+      - leads.write
+      - appointments.*
+      - walk_ins.read
+      - walk_ins.write
+      - catalog.read
+      - conversations.read
+      - conversations.write
+
+  - key: warehouse_manager
+    name: Warehouse Manager
+    permissions:
+      - contacts.read
+      - tasks.read
+      - tasks.write
+      - catalog.*
+      - staff.read
+      - attendance.write
+
+# ---------------------------------------------------------------------------
+# Lead sources — top-of-funnel attribution. The Reviews tab and the
+# Campaigns tab both read this list.
+# ---------------------------------------------------------------------------
+lead_sources:
+  - {key: whatsapp,    label: WhatsApp,    display_order: 10}
+  - {key: instagram,   label: Instagram,   display_order: 20}
+  - {key: facebook,    label: Facebook,    display_order: 30}
+  - {key: website,     label: Website,     display_order: 40}
+  - {key: walk-in,     label: Walk-in,     display_order: 50}
+  - {key: reference,   label: Reference,   display_order: 60}
+  - {key: marketplace, label: Marketplace, display_order: 70}
+
+# ---------------------------------------------------------------------------
+# Call outcomes — what an agent picks at the end of a call.
+# ---------------------------------------------------------------------------
+call_outcomes:
+  - {key: appointment_booked,        label: Appointment Booked,        color: '#10b981', display_order: 10}
+  - {key: quote_sent,                label: Quote Sent,                color: '#0ea5e9', display_order: 20}
+  - {key: showroom_visit_scheduled,  label: Showroom Visit Scheduled,  color: '#8b5cf6', display_order: 30}
+  - {key: callback_requested,        label: Callback Requested,        color: '#f59e0b', display_order: 40}
+  - {key: not_interested,            label: Not Interested,            color: '#6b7280', display_order: 50}
+  - {key: wrong_number,              label: Wrong Number,              color: '#ef4444', display_order: 60}
+
+# ---------------------------------------------------------------------------
+# Org-wide defaults. Applied only when the field is still at its
+# migration default (or null) — the installer NEVER overwrites an
+# admin's manual edit on `org_settings`.
+# ---------------------------------------------------------------------------
+defaults:
+  currency: INR
+  tax_rate: 18.00
+  timezone: Asia/Kolkata
+  locale: en-IN
+  review_source: google
+  ai_personality: |
+    A helpful, warm Indian furniture sales assistant. Always
+    suggests an in-store visit for sofas/dining sets, mentions GST is
+    included in the displayed price, and offers WhatsApp follow-up.
+    Concise replies (3-4 sentences max), uses ₹ for prices.
+  ai_welcome_message: |
+    Hi! Welcome to our showroom 👋  Looking for living-room, bedroom
+    or dining-room furniture? Share a budget range and a photo of the
+    space if you can — we'll suggest options.
+
+# ---------------------------------------------------------------------------
+# Follow-up schedule — Phase 5 reads this to drip-feed a fresh lead
+# with templated WhatsApp messages on day 1, 3, 7 after creation.
+# ---------------------------------------------------------------------------
+follow_up_schedule:
+  - day_offset: 1
+    channel: whatsapp
+    template: |
+      Hi {{full_name}}, this is a follow-up on your enquiry yesterday.
+      Would tomorrow or Saturday work for a showroom visit?
+  - day_offset: 3
+    channel: whatsapp
+    template: |
+      Hi {{full_name}}, sharing 3 options that match your budget range.
+      Reply HOLD to reserve any one for 48 hours. — Team Furniture
+  - day_offset: 7
+    channel: whatsapp
+    template: |
+      Hi {{full_name}}, last gentle nudge — our Diwali offer ends Friday.
+      20% off + free delivery within city. Want me to lock something for you?
+
+# ---------------------------------------------------------------------------
+# module → permission key map. Lets roles use `<module>.*` shorthand
+# above to grant every key a module declares. New modules append here
+# in future pack versions.
+# ---------------------------------------------------------------------------
+module_permissions:
+  contacts:      [contacts.read, contacts.write]
+  activities:    [activities.read, activities.write]
+  tasks:         [tasks.read, tasks.write]
+  pipelines:     [pipelines.read, pipelines.write]
+  leads:         [leads.read, leads.write]
+  appointments:  [appointments.read, appointments.write]
+  walk_ins:      [walk_ins.read, walk_ins.write]
+  catalog:       [catalog.read, catalog.write]
+  staff:         [staff.read, staff.write, attendance.write]
+  attendance:    [attendance.write]
+  conversations: [conversations.read, conversations.write]
+  calls:         [calls.read, calls.write, calls.outcomes.manage]
+  reviews:       [reviews.read, reviews.write]
+  campaigns:     [campaigns.read, campaigns.write, campaigns.send]
+  settings:      [settings.read, settings.write]
