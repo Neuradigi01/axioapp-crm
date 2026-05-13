@@ -1,0 +1,74 @@
+<div class="flex min-h-0 flex-1 flex-col">
+  <!-- Header -->
+  <div class="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
+    <div class="min-w-0">
+      <p class="truncate text-sm font-semibold text-zinc-900">
+        {{ conversation.external_id }}
+      </p>
+      <p class="text-xs text-zinc-500 capitalize">
+        {{ conversation.channel }} · {{ conversation.status }}
+      </p>
+    </div>
+    <button
+      type="button"
+      (click)="toggle()"
+      [class]="
+        'rounded-full px-3 py-1 text-xs font-medium transition ' +
+        (conversation.ai_handling
+          ? 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+          : 'bg-amber-50 text-amber-700 hover:bg-amber-100')
+      "
+    >
+      {{ conversation.ai_handling ? 'AI Handled' : 'Needs Human' }}
+    </button>
+  </div>
+
+  <!-- Messages -->
+  <div
+    #scrollHost
+    class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-zinc-50 px-4 py-4"
+  >
+    @if (loading) {
+      <div class="py-6 text-center text-sm text-zinc-500">Loading thread…</div>
+    } @else if (!detail || detail.messages.length === 0) {
+      <div class="py-6 text-center text-sm text-zinc-500">
+        No messages yet — type something below to start the conversation.
+      </div>
+    } @else {
+      @for (m of detail.messages; track m.id) {
+        <div
+          [class]="
+            'flex ' + (m.direction === 'out' ? 'justify-end' : 'justify-start')
+          "
+        >
+          <div
+            [class]="
+              'max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ' +
+              (m.direction === 'out'
+                ? 'bg-zinc-900 text-white'
+                : 'bg-white text-zinc-900 ring-1 ring-zinc-200') +
+              (isPending(m) ? ' opacity-60' : '')
+            "
+          >
+            @if (m.text) {
+              <p class="whitespace-pre-wrap break-words">{{ m.text }}</p>
+            }
+            @if (m.attachments.length > 0) {
+              <p class="mt-1 text-[10px] uppercase tracking-wide opacity-70">
+                {{ m.attachments.length }} attachment(s)
+              </p>
+            }
+            <p
+              [class]="
+                'mt-1 text-right text-[10px] ' +
+                (m.direction === 'out' ? 'text-zinc-300' : 'text-zinc-500')
+              "
+            >
+              {{ formatTime(m.sent_at || m.created_at) }}
+            </p>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</div>

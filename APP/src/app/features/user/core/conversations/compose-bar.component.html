@@ -1,0 +1,37 @@
+<div class="border-t border-zinc-200 bg-white px-4 py-3">
+  <div class="flex items-end gap-2">
+    <textarea
+      [ngModel]="text()"
+      (ngModelChange)="onTextChange($event)"
+      (keydown)="onKey($event)"
+      rows="2"
+      placeholder="Type a reply or let AI handle it…"
+      class="block min-h-[2.5rem] flex-1 resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+    ></textarea>
+    <div class="flex flex-col items-stretch gap-2">
+      <button
+        type="button"
+        (click)="flipAi()"
+        [class]="
+          'rounded-md px-3 py-1.5 text-xs font-medium transition ' +
+          (aiHandling
+            ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+            : 'border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+        "
+      >
+        {{ aiHandling ? 'AI On' : 'Let AI handle' }}
+      </button>
+      <button
+        type="button"
+        (click)="submit()"
+        [disabled]="!text().trim()"
+        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+      >
+        Send
+      </button>
+    </div>
+  </div>
+  <p class="mt-2 text-[10px] text-zinc-400">
+    Enter to send · Shift+Enter for a new line
+  </p>
+</div>

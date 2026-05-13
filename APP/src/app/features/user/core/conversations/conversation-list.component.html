@@ -1,0 +1,99 @@
+<div class="flex flex-col h-full">
+  <!-- Filters -->
+  <div class="space-y-2 border-b border-zinc-200 px-3 py-3">
+    <div class="relative">
+      <lucide-icon
+        name="search"
+        class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+      ></lucide-icon>
+      <input
+        type="search"
+        placeholder="Search by phone or handle"
+        (input)="onSearchInput($event)"
+        class="block w-full rounded-md border border-zinc-300 bg-white py-1.5 pl-8 pr-3 text-sm placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      />
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <select
+        (change)="onChannelChange($event)"
+        class="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        @for (o of channelOptions; track o.value) {
+          <option [value]="o.value">{{ o.label }}</option>
+        }
+      </select>
+      <select
+        (change)="onStatusChange($event)"
+        class="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        @for (o of statusOptions; track o.value) {
+          <option [value]="o.value">{{ o.label }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <!-- List -->
+  <div class="min-h-0 flex-1 overflow-y-auto">
+    @if (loading) {
+      <div class="py-6 text-center text-sm text-zinc-500">Loading…</div>
+    } @else if (displayItems().length === 0) {
+      <div class="px-3 py-6 text-center text-sm text-zinc-500">
+        No conversations yet. Inbound messages will land here as customers reach out.
+      </div>
+    } @else {
+      <ul class="divide-y divide-zinc-100">
+        @for (c of displayItems(); track c.id) {
+          @let style = channelStyle(c.channel);
+          <li>
+            <button
+              type="button"
+              (click)="pick(c.id)"
+              [class]="
+                'flex w-full items-start gap-2 px-3 py-3 text-left transition hover:bg-zinc-50 ' +
+                (selectedId === c.id ? 'bg-zinc-100' : '')
+              "
+            >
+              <span
+                [class]="
+                  'mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ' +
+                  style.bg
+                "
+              >
+                <span [class]="'inline-block h-1.5 w-1.5 rounded-full ' + style.dot"></span>
+                {{ style.label }}
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-baseline justify-between gap-2">
+                  <p class="truncate text-sm font-medium text-zinc-900">
+                    {{ c.external_id }}
+                  </p>
+                  <span class="shrink-0 text-[10px] text-zinc-500">
+                    {{ formatTime(c.last_message_at) }}
+                  </span>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-zinc-500">
+                  <span class="capitalize">{{ c.status }}</span>
+                  @if (c.ai_handling) {
+                    <span class="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
+                      AI Handled
+                    </span>
+                  } @else {
+                    <span class="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                      Needs Human
+                    </span>
+                  }
+                </div>
+              </div>
+              @if (c.unread_count > 0) {
+                <span class="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+                  {{ c.unread_count }}
+                </span>
+              }
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+</div>

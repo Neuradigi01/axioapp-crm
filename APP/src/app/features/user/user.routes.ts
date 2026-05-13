@@ -91,6 +91,13 @@ export const userRoutes: Routes = [
             (m) => m.StaffPageComponent,
           ),
       },
+      {
+        path: 'conversations',
+        loadComponent: () =>
+          import('./core/conversations/conversations.page').then(
+            (m) => m.ConversationsPageComponent,
+          ),
+      },
       ...devRoutes,
     ],
   },

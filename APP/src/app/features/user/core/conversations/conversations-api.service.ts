@@ -1,0 +1,105 @@
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
+
+import { environment } from '../../../../../environments/environment';
+
+export type ConversationChannel =
+  | 'whatsapp'
+  | 'instagram'
+  | 'facebook'
+  | 'web'
+  | 'sms'
+  | 'email';
+
+export type ConversationStatus = 'open' | 'snoozed' | 'closed';
+
+export type MessageDirection = 'in' | 'out';
+
+export interface Conversation {
+  id: string;
+  org_id: string;
+  channel: ConversationChannel;
+  external_id: string;
+  contact_id: string | null;
+  assigned_to_id: string | null;
+  status: ConversationStatus;
+  ai_handling: boolean;
+  last_message_at: string | null;
+  unread_count: number;
+  created_at: string;
+}
+
+export interface ConversationListResponse {
+  items: Conversation[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface ConversationMessage {
+  id: string;
+  org_id: string;
+  conversation_id: string;
+  direction: MessageDirection;
+  sender_user_id: string | null;
+  text: string | null;
+  attachments: Array<Record<string, unknown>>;
+  channel_message_id: string | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface ConversationDetail {
+  conversation: Conversation;
+  messages: ConversationMessage[];
+}
+
+export interface ConversationListQuery {
+  channel?: ConversationChannel;
+  status?: ConversationStatus;
+  assigned_to?: string;
+  q?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface ConversationPatch {
+  assigned_to_id?: string | null;
+  status?: ConversationStatus;
+  ai_handling?: boolean;
+}
+
+@Injectable({ providedIn: 'root' })
+export class ConversationsApiService {
+  private readonly http = inject(HttpClient);
+  private readonly base = `${environment.apiBaseUrl}/conversations`;
+
+  list(query: ConversationListQuery = {}): Observable<ConversationListResponse> {
+    let params = new HttpParams();
+    if (query.channel) params = params.set('channel', query.channel);
+    if (query.status) params = params.set('status', query.status);
+    if (query.assigned_to) params = params.set('assigned_to', query.assigned_to);
+    if (query.q) params = params.set('q', query.q);
+    if (query.page) params = params.set('page', String(query.page));
+    if (query.size) params = params.set('size', String(query.size));
+    return this.http.get<ConversationListResponse>(this.base, { params });
+  }
+
+  detail(id: string): Observable<ConversationDetail> {
+    return this.http.get<ConversationDetail>(`${this.base}/${id}`);
+  }
+
+  send(id: string, text: string): Observable<ConversationMessage> {
+    return this.http.post<ConversationMessage>(`${this.base}/${id}/messages`, {
+      text,
+      attachments: [],
+    });
+  }
+
+  patch(id: string, payload: ConversationPatch): Observable<Conversation> {
+    return this.http.patch<Conversation>(`${this.base}/${id}`, payload);
+  }
+}

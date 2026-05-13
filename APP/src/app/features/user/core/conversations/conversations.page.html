@@ -1,0 +1,58 @@
+<div class="flex h-[calc(100vh-4rem)] flex-col">
+  <header class="border-b border-zinc-200 bg-white px-6 py-3">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-semibold text-zinc-900">Conversations</h1>
+        <p class="text-xs text-zinc-500">
+          Unified inbox across WhatsApp, Instagram, web chat &amp; SMS
+        </p>
+      </div>
+      <button
+        type="button"
+        (click)="reloadList()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+      >
+        Refresh
+      </button>
+    </div>
+    @if (loadError(); as err) {
+      <div class="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        {{ err }}
+      </div>
+    }
+  </header>
+
+  <div class="flex min-h-0 flex-1">
+    <!-- Left: list -->
+    <aside class="flex w-80 min-w-[18rem] flex-col border-r border-zinc-200 bg-white">
+      <app-conversation-list
+        [items]="items()"
+        [loading]="loading()"
+        [selectedId]="selectedId()"
+        (filtersChange)="onFiltersChange($event)"
+        (select)="onSelect($event)"
+      />
+    </aside>
+
+    <!-- Right: thread + compose -->
+    <section class="flex min-w-0 flex-1 flex-col bg-zinc-50">
+      @if (selectedConversation(); as conv) {
+        <app-chat-thread
+          [conversation]="conv"
+          [detail]="detail()"
+          [loading]="threadLoading()"
+          (toggleAi)="onToggleAi($event)"
+        />
+        <app-compose-bar
+          [aiHandling]="conv.ai_handling"
+          (send)="onSendText($event)"
+          (toggleAi)="onToggleAi($event)"
+        />
+      } @else {
+        <div class="flex flex-1 items-center justify-center px-4 text-center text-sm text-zinc-500">
+          Pick a conversation from the list to start replying.
+        </div>
+      }
+    </section>
+  </div>
+</div>
