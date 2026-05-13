@@ -16,13 +16,20 @@ from __future__ import annotations
 import uuid
 from typing import Any, Optional
 
-from fastapi import APIRouter, Body, Depends, Query, status
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.conversations.models import (
     ConversationChannel,
     ConversationStatus,
+)
+from src.app.core.conversations.registry import (
+    ChannelNotRegistered,
+    resolve,
 )
 from src.app.core.conversations.schemas import (
     ConversationDetail,
@@ -123,14 +130,80 @@ async def patch_endpoint(
     return ConversationOut.model_validate(conv)
 
 
+@router.get(
+    "/webhooks/{channel}",
+    response_class=PlainTextResponse,
+)
+async def webhook_verify_endpoint(
+    channel: ConversationChannel,
+    request: Request,
+) -> PlainTextResponse:
+    """Meta-style subscription handshake.
+
+    Returns the value of `hub.challenge` (plain text) only when the
+    adapter exposes a `verify_subscription(mode, token)` method and
+    that method approves the (mode, token) pair. Channels without
+    that hook return 404, since the handshake is meaningless to them.
+    """
+    try:
+        adapter = resolve(channel)
+    except ChannelNotRegistered as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        )
+    if not hasattr(adapter, "verify_subscription"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"channel '{channel.value}' has no subscription handshake",
+        )
+    qp = request.query_params
+    if not adapter.verify_subscription(
+        qp.get("hub.mode"), qp.get("hub.verify_token")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="verify failed"
+        )
+    return PlainTextResponse(content=qp.get("hub.challenge", ""))
+
+
 @router.post(
     "/webhooks/{channel}",
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def webhook_endpoint(
     channel: ConversationChannel,
-    payload: dict[str, Any] = Body(...),
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    msg = await receive_webhook(db, channel=channel, payload=payload)
+    raw = await request.body()
+    # Adapter-aware signature verification. Adapters that don't carry a
+    # secret (e.g. an internal `web` channel) can omit `verify_signature`;
+    # they're treated as permissive.
+    try:
+        adapter = resolve(channel)
+    except ChannelNotRegistered as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        )
+    if hasattr(adapter, "verify_signature"):
+        signature = request.headers.get("x-hub-signature-256")
+        if not adapter.verify_signature(raw, signature):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="invalid webhook signature",
+            )
+    try:
+        payload = json.loads(raw or b"{}")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"webhook body is not valid JSON: {exc}",
+        )
+    try:
+        msg = await receive_webhook(db, channel=channel, payload=payload)
+    except ValueError as exc:
+        # Adapter raised on a malformed envelope.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        )
     return {"message_id": str(msg.id)}

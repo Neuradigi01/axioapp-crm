@@ -37,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core import audit
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
+from src.app.core.contacts.models import Contact
 from src.app.core.conversations.adapters import InboundMessage
 from src.app.core.conversations.models import (
     Conversation,
@@ -48,6 +49,12 @@ from src.app.core.conversations.models import (
 from src.app.core.conversations.registry import resolve
 from src.app.core.conversations.schemas import ConversationPatch
 from src.app.core.notifications.service import notify
+
+
+# Channels whose `external_id` is a phone number; the webhook intake
+# tries to resolve / auto-create a contact for these so the inbox can
+# show a name instead of the raw phone string.
+_PHONE_CHANNELS = {ConversationChannel.whatsapp, ConversationChannel.sms}
 
 
 # --- reads -----------------------------------------------------------------
@@ -312,15 +319,52 @@ async def _find_or_create_conversation(
             detail="webhook has no tenant context",
         )
 
+    contact_id = None
+    if channel in _PHONE_CHANNELS:
+        contact_id = await _resolve_or_create_contact_by_phone(
+            session, org_id=ctx.org_id, phone=external_id
+        )
+
     conv = Conversation(
         org_id=ctx.org_id,
         channel=channel,
         external_id=external_id,
+        contact_id=contact_id,
         status=ConversationStatus.open,
     )
     session.add(conv)
     await session.flush()
     return conv
+
+
+async def _resolve_or_create_contact_by_phone(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    phone: str,
+) -> uuid.UUID | None:
+    """Look up a contact by phone in this org. If none exists, create
+    one with `full_name = phone` as a placeholder so the inbox has a
+    row to render. Returns the resolved/created contact id, or None if
+    the phone string is empty."""
+    if not phone:
+        return None
+    existing = (
+        await session.execute(
+            select(Contact).where(Contact.phone == phone)
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing.id
+    contact = Contact(
+        org_id=org_id,
+        full_name=phone,
+        phone=phone,
+        source="whatsapp",
+    )
+    session.add(contact)
+    await session.flush()
+    return contact.id
 
 
 def _snapshot(c: Conversation) -> dict[str, Any]:

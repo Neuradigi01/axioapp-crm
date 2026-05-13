@@ -101,6 +101,19 @@ FIREBASE_MESSAGING_SENDER_ID = os.getenv("FIREBASE_MESSAGING_SENDER_ID", "")
 FIREBASE_APP_ID = os.getenv("FIREBASE_APP_ID", "")
 FIREBASE_VAPID_KEY = _env("FIREBASE_VAPID_KEY", "")
 
+# WhatsApp Business Cloud API
+# Production: set real values via .env. In dev these stubs let the
+# adapter register + tests run; outbound `send()` will 401 against the
+# real Meta endpoint until a live token is provided, which is fine —
+# tests mock httpx and exercise the request *shape*, not the wire.
+WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID", "dev-phone-id")
+WHATSAPP_TOKEN = _env("WHATSAPP_TOKEN", "dev-token")
+WHATSAPP_VERIFY_TOKEN = _env(
+    "WHATSAPP_VERIFY_TOKEN", "dev-verify-token"
+)
+WHATSAPP_APP_SECRET = _env("WHATSAPP_APP_SECRET", "dev-app-secret")
+WHATSAPP_API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v18.0")
+
 # Celery / Redis
 CELERY_ENABLED = os.getenv("CELERY_ENABLED", "false").lower() == "true"
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")

@@ -10,6 +10,10 @@ import uuid
 
 import pytest
 
+# Side-effect imports — `Conversation.contact_id` FK references
+# `contacts.id`, so the `Contact` mapper must be on `Base.metadata`
+# before `create_all` runs for this test's tables.
+from src.app.core.contacts import models as _contacts  # noqa: F401
 from src.app.core.conversations.adapters import (
     ChannelMessageRef,
     InboundMessage,
