@@ -3,7 +3,7 @@
 **Goal:** Channel-agnostic Conversations engine. `conversations` and `messages` tables. `channels` registry — each channel adapter implements `send`, `receive_webhook`. WhatsApp adapter is built next; this step lays the abstraction.
 **Phase:** 3
 **Depends on:** 2.4, 1.8
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
