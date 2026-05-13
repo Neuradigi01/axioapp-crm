@@ -41,6 +41,7 @@ from src.app.core.notifications.router import router as notifications_router
 from src.app.core.notifications.ws import ws_router as notifications_ws_router
 from src.app.core.pipelines.router import router as pipelines_router
 from src.app.core.reviews.router import router as reviews_router
+from src.app.core.settings.router import router as settings_router
 from src.app.core.staff.router import router as staff_router
 from src.app.core.staff_portal.router import router as staff_portal_router
 from src.app.core.tasks.router import router as tasks_router
@@ -127,6 +128,7 @@ app.include_router(calls_router, prefix="/api/v1")
 app.include_router(call_outcomes_router, prefix="/api/v1")
 app.include_router(reviews_router, prefix="/api/v1")
 app.include_router(campaigns_router, prefix="/api/v1")
+app.include_router(settings_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 

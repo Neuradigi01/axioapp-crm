@@ -1,10 +1,26 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
+import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
+import { IntegrationsTabComponent } from './tabs/integrations-tab.component';
+import { NotificationsTabComponent } from './tabs/notifications-tab.component';
+import { StoreProfileTabComponent } from './tabs/store-profile-tab.component';
+import { TeamTabComponent } from './tabs/team-tab.component';
 
-type SettingsTab = 'custom-fields';
+type SettingsTab =
+  | 'store'
+  | 'team'
+  | 'integrations'
+  | 'notifications'
+  | 'ai'
+  | 'custom-fields';
 
 const TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
+  { id: 'store', label: 'Store Profile' },
+  { id: 'team', label: 'Team' },
+  { id: 'integrations', label: 'Integrations' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'ai', label: 'AI Settings' },
   { id: 'custom-fields', label: 'Custom Fields' },
 ];
 
@@ -12,7 +28,14 @@ const TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
   selector: 'app-settings-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CustomFieldsPageComponent],
+  imports: [
+    StoreProfileTabComponent,
+    TeamTabComponent,
+    IntegrationsTabComponent,
+    NotificationsTabComponent,
+    AiSettingsTabComponent,
+    CustomFieldsPageComponent,
+  ],
   templateUrl: './settings-page.component.html',
 })
 export class SettingsPageComponent {

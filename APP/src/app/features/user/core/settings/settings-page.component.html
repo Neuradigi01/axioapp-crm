@@ -4,7 +4,7 @@
     <p class="mt-1 text-sm text-zinc-500">Tenant configuration for this organisation.</p>
   </header>
 
-  <nav class="mb-6 flex gap-2 border-b border-zinc-200">
+  <nav class="mb-6 flex flex-wrap gap-2 border-b border-zinc-200">
     @for (tab of tabs; track tab.id) {
       <button
         type="button"
@@ -22,8 +22,23 @@
   </nav>
 
   @switch (active()) {
+    @case ('store') {
+      <app-settings-store-profile-tab />
+    }
+    @case ('team') {
+      <app-settings-team-tab />
+    }
+    @case ('integrations') {
+      <app-settings-integrations-tab />
+    }
+    @case ('notifications') {
+      <app-settings-notifications-tab />
+    }
+    @case ('ai') {
+      <app-settings-ai-tab />
+    }
     @case ('custom-fields') {
-      <app-custom-fields-page></app-custom-fields-page>
+      <app-custom-fields-page />
     }
   }
 </div>

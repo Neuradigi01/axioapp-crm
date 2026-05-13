@@ -1,0 +1,109 @@
+<div>
+  @if (loadError(); as err) {
+    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      {{ err }}
+    </div>
+  }
+  @if (loading()) {
+    <div class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+      Loading…
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="save()" class="space-y-5">
+      <section>
+        <h3 class="mb-2 text-sm font-semibold text-zinc-900">Store</h3>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">Store name</span>
+            <input formControlName="store_name" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">Logo URL</span>
+            <input formControlName="logo_url" placeholder="https://..." class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">GST number</span>
+            <input formControlName="gst_number" placeholder="29ABCDE1234F1Z5" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-mono shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">Phone</span>
+            <input formControlName="phone" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm sm:col-span-2">
+            <span class="block text-xs font-medium text-zinc-600">Email</span>
+            <input type="email" formControlName="email" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <h3 class="mb-2 text-sm font-semibold text-zinc-900">Address</h3>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label class="block text-sm sm:col-span-2">
+            <span class="block text-xs font-medium text-zinc-600">Address line 1</span>
+            <input formControlName="address_line1" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm sm:col-span-2">
+            <span class="block text-xs font-medium text-zinc-600">Address line 2</span>
+            <input formControlName="address_line2" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">City</span>
+            <input formControlName="city" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">State</span>
+            <input formControlName="state" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">Postal code</span>
+            <input formControlName="postal_code" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">Country</span>
+            <input formControlName="country" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <h3 class="mb-2 text-sm font-semibold text-zinc-900">Locale &amp; fiscal</h3>
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">Currency</span>
+            <input formControlName="currency" maxlength="3" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm uppercase shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">Tax rate (%)</span>
+            <input type="number" min="0" max="100" step="0.01" formControlName="tax_rate" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">Timezone</span>
+            <input formControlName="timezone" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-zinc-600">Locale</span>
+            <input formControlName="locale" class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500" />
+          </label>
+        </div>
+      </section>
+
+      @if (saveError(); as err) {
+        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {{ err }}
+        </div>
+      }
+      @if (saveOk()) {
+        <div class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          Saved.
+        </div>
+      }
+
+      <div class="flex justify-end">
+        <button type="submit" [disabled]="saving()" class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50">
+          {{ saving() ? 'Saving…' : 'Save changes' }}
+        </button>
+      </div>
+    </form>
+  }
+</div>

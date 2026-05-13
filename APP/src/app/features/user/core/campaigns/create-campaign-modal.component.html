@@ -69,13 +69,13 @@
         <span class="block text-xs font-medium text-zinc-600">
           Template
           <span class="ml-1 text-[10px] text-zinc-400">
-            Use <code>&#123;&#123;full_name&#125;&#125;</code> · <code>&#123;&#123;phone&#125;&#125;</code> for personalisation
+            Use <code>{{ varFullName }}</code> · <code>{{ varPhone }}</code> for personalisation
           </span>
         </span>
         <textarea
           rows="4"
           formControlName="template"
-          placeholder="Hi {{full_name}} — our Diwali sale is live! 20% off everything this week."
+          [placeholder]="templatePlaceholder"
           class="mt-1 block w-full resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         ></textarea>
       </label>

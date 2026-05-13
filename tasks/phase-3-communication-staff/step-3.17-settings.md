@@ -3,7 +3,7 @@
 **Goal:** Settings page with Store Profile, Team, Integrations, Notifications preferences, AI Settings tabs. Build them small, one at a time.
 **Phase:** 3
 **Depends on:** 2.2 (custom-fields tab already there), 1.6
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

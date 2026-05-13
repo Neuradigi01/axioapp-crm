@@ -1,0 +1,101 @@
+"""`OrgSettings` — one row per organisation, holding the editable
+preferences the Settings page exposes.
+
+Single-row-per-org enforced by `(org_id) PRIMARY KEY` (composed with
+the TenantScoped mixin, which already requires `org_id` on every
+table). The pack installer (4.2) writes the furniture-specific
+defaults; this core model holds only generic-CRM keys (rule 7 —
+no furniture-specific defaults in core).
+
+Tenant-scoped, RLS on.
+"""
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from decimal import Decimal
+
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy import text as sql_text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from src.app.shared.db import Base
+from src.app.shared.orm import TenantScoped
+
+
+class OrgSettings(Base, TenantScoped):
+    __tablename__ = "org_settings"
+    __table_args__ = (
+        UniqueConstraint("org_id", name="uq_org_settings_org_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+
+    # --- store profile ---
+    store_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    gst_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    address_line1: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address_line2: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    postal_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # --- locale / fiscal ---
+    currency: Mapped[str] = mapped_column(
+        String(3), nullable=False, server_default=sql_text("'INR'")
+    )
+    tax_rate: Mapped[Decimal] = mapped_column(
+        Numeric(5, 2), nullable=False, server_default=sql_text("18.00")
+    )
+    timezone: Mapped[str] = mapped_column(
+        String(64), nullable=False, server_default=sql_text("'Asia/Kolkata'")
+    )
+    locale: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=sql_text("'en-IN'")
+    )
+
+    # --- AI ---
+    ai_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("false")
+    )
+    ai_personality: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_welcome_message: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+
+    # --- reviews automation ---
+    reviews_auto_request_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("false")
+    )
+    reviews_auto_request_delay_hours: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=sql_text("24")
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+        onupdate=sql_text("now()"),
+    )

@@ -50,6 +50,13 @@ export class CreateCampaignModalComponent {
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
 
+  // String constants holding literal `{{...}}` so the template can
+  // render them as text without Angular trying to interpolate them.
+  protected readonly varFullName = '{{full_name}}';
+  protected readonly varPhone = '{{phone}}';
+  protected readonly templatePlaceholder =
+    'Hi {{full_name}} — our Diwali sale is live! 20% off everything this week.';
+
   protected readonly channels: ReadonlyArray<{
     value: ConversationChannel;
     label: string;

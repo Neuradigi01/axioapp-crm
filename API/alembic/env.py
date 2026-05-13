@@ -33,6 +33,7 @@ from src.app.core.conversations import models as _conversations_models  # noqa: 
 from src.app.core.calls import models as _calls_models  # noqa: F401
 from src.app.core.reviews import models as _reviews_models  # noqa: F401
 from src.app.core.campaigns import models as _campaigns_models  # noqa: F401
+from src.app.core.settings import models as _settings_models  # noqa: F401
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url from environment
