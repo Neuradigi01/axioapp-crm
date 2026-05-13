@@ -3,7 +3,7 @@
 **Goal:** WhatsApp Business Cloud API adapter (send + webhook). Stub credentials in config. Verify message round-trip.
 **Phase:** 3
 **Depends on:** 3.8
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
