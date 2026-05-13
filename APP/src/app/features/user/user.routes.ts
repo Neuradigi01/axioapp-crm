@@ -84,6 +84,13 @@ export const userRoutes: Routes = [
             (m) => m.CatalogPageComponent,
           ),
       },
+      {
+        path: 'staff',
+        loadComponent: () =>
+          import('./core/staff/staff.page').then(
+            (m) => m.StaffPageComponent,
+          ),
+      },
       ...devRoutes,
     ],
   },

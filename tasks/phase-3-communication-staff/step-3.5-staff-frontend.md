@@ -3,7 +3,7 @@
 **Goal:** Staff Dashboard with the 7 tabs from the screenshots: Overview, Leaderboard, Targets & Commission, Attendance, Activity Log, Field Operations (placeholder until 4.10), Stock Updates (placeholder until 4.4), Store Marketing (placeholder until 5.6).
 **Phase:** 3
 **Depends on:** 3.4
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

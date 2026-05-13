@@ -1,0 +1,92 @@
+@if (rows().length === 0) {
+  <div class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500">
+    No staff to inspect yet.
+  </div>
+} @else {
+  <div class="space-y-4">
+    <!-- Staff picker -->
+    <div class="flex items-center gap-3">
+      <label class="text-sm font-medium text-zinc-700">Staff member</label>
+      <select
+        (change)="pickStaff($event)"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        @for (row of rows(); track row.staff.id) {
+          <option
+            [value]="row.staff.id"
+            [selected]="row.staff.id === selectedUserId()"
+          >
+            {{ row.staff.full_name }}
+          </option>
+        }
+      </select>
+      @if (selectedStaff(); as sel) {
+        <span class="text-xs text-zinc-500">{{ sel.staff.email }}</span>
+      }
+    </div>
+
+    @if (loadError(); as err) {
+      <div class="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        {{ err }}
+      </div>
+    }
+
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <!-- Calendar -->
+      <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+        <app-calendar
+          [viewMonth]="viewMonth()"
+          [events]="events()"
+          (viewMonthChange)="onViewMonthChange($event)"
+          (daySelected)="onDaySelected($event)"
+        />
+      </div>
+
+      <!-- Session list -->
+      <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+        <div class="mb-3 flex items-baseline justify-between">
+          <h3 class="text-sm font-semibold text-zinc-900">Sessions this month</h3>
+          <span class="text-xs text-zinc-500">
+            {{ attendance().length }} sessions ·
+            {{ totalHours() }} hrs total
+          </span>
+        </div>
+        @if (loading()) {
+          <div class="py-6 text-center text-sm text-zinc-500">Loading…</div>
+        } @else if (attendance().length === 0) {
+          <div class="py-6 text-center text-sm text-zinc-500">
+            No sessions in this month.
+          </div>
+        } @else {
+          <ul class="divide-y divide-zinc-100">
+            @for (a of attendance(); track a.id) {
+              <li class="flex items-start justify-between py-2">
+                <div>
+                  <div class="text-sm font-medium text-zinc-900">
+                    {{ formatDate(a.date) }}
+                  </div>
+                  <div class="text-xs text-zinc-500">
+                    {{ formatTime(a.clock_in_at) }}
+                    →
+                    {{ a.clock_out_at ? formatTime(a.clock_out_at) : 'still open' }}
+                  </div>
+                  @if (a.notes) {
+                    <div class="mt-0.5 truncate text-xs text-zinc-400">
+                      {{ a.notes }}
+                    </div>
+                  }
+                </div>
+                <div class="text-right text-sm">
+                  <span class="font-medium text-zinc-900">
+                    {{ a.hours ?? '—' }}
+                  </span>
+                  <span class="ml-1 text-xs text-zinc-500">hrs</span>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    </div>
+  </div>
+}
