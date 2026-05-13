@@ -3,7 +3,7 @@
 **Goal:** Bare-minimum core catalog so Walk-ins/Leads can reference a "product interest." Furniture pack will extend with rich Inventory in Phase 4.
 **Phase:** 3
 **Depends on:** 1.5
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

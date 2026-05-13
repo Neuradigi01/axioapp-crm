@@ -1,0 +1,56 @@
+@if (selected(); as item) {
+  <div class="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+    <div class="min-w-0">
+      <p class="truncate text-sm font-medium text-zinc-900">{{ item.name }}</p>
+      <p class="truncate text-xs text-zinc-500">
+        <span class="font-mono">{{ item.sku }}</span>
+        @if (item.category) {
+          <span class="ml-1 text-zinc-400">· {{ item.category }}</span>
+        }
+        <span class="ml-1 text-zinc-700">{{ item.price | formatINR : true }}</span>
+      </p>
+    </div>
+    <button
+      type="button"
+      (click)="clear()"
+      [disabled]="disabledState()"
+      class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      Change
+    </button>
+  </div>
+} @else {
+  <div class="relative">
+    <input
+      type="search"
+      [value]="query()"
+      [placeholder]="placeholder"
+      [disabled]="disabledState()"
+      (input)="onInput($event)"
+      autocomplete="off"
+      class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100"
+    />
+    @if (open() && results().length > 0) {
+      <ul class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-zinc-200">
+        @for (item of results(); track item.id) {
+          <li>
+            <button
+              type="button"
+              (click)="pick(item)"
+              class="block w-full px-3 py-1.5 text-left text-sm hover:bg-zinc-50"
+            >
+              <span class="block truncate font-medium text-zinc-900">{{ item.name }}</span>
+              <span class="block truncate text-[11px] text-zinc-500">
+                <span class="font-mono">{{ item.sku }}</span>
+                @if (item.category) {
+                  <span class="ml-1 text-zinc-400">· {{ item.category }}</span>
+                }
+                <span class="ml-1 text-zinc-700">{{ item.price | formatINR : true }}</span>
+              </span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+}

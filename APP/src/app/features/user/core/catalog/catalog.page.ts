@@ -1,0 +1,191 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
+import { LucideAngularModule } from 'lucide-angular';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+
+import { InrPipe } from '../shared/pipes/inr.pipe';
+import {
+  CatalogApiService,
+  CatalogItem,
+} from './catalog-api.service';
+import { AddItemModalComponent } from './add-item-modal.component';
+
+/**
+ * Catalog page — bare-minimum product table matching the reference
+ * Vercel layout's structural shape (header + KPI strip + search +
+ * grid). The Phase 4 furniture pack will replace this with the
+ * richer inventory page (stock + locations + alerts).
+ */
+@Component({
+  selector: 'app-catalog-page',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    ReactiveFormsModule,
+    LucideAngularModule,
+    InrPipe,
+    AddItemModalComponent,
+  ],
+  templateUrl: './catalog.page.html',
+})
+export class CatalogPageComponent {
+  private readonly api = inject(CatalogApiService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly items = signal<CatalogItem[]>([]);
+  readonly total = signal<number>(0);
+  readonly loading = signal(false);
+  readonly loadError = signal<string | null>(null);
+
+  readonly searchControl = new FormControl('', { nonNullable: true });
+  readonly categoryControl = new FormControl('', { nonNullable: true });
+
+  private readonly q = toSignal(
+    this.searchControl.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
+    { initialValue: '' },
+  );
+  private readonly categoryFilter = toSignal(
+    this.categoryControl.valueChanges.pipe(distinctUntilChanged()),
+    { initialValue: '' },
+  );
+
+  /** Modal state: null = closed, undefined = create, CatalogItem = edit. */
+  readonly modalState = signal<CatalogItem | null | undefined>(null);
+  readonly modalOpen = computed(() => this.modalState() !== null);
+  readonly editingItem = computed<CatalogItem | null>(() => {
+    const v = this.modalState();
+    return v === undefined ? null : (v ?? null);
+  });
+
+  /** Category options derived from the loaded list. */
+  readonly categoryOptions = computed(() => {
+    const set = new Set<string>();
+    for (const i of this.items()) {
+      if (i.category) set.add(i.category);
+    }
+    return [...set].sort();
+  });
+
+  // --- KPI cards ---
+
+  readonly totalProducts = computed(() => this.total());
+  readonly activeProducts = computed(
+    () => this.items().filter((i) => i.is_active).length,
+  );
+  readonly inactiveProducts = computed(
+    () => this.items().filter((i) => !i.is_active).length,
+  );
+  readonly distinctCategories = computed(() => this.categoryOptions().length);
+
+  constructor() {
+    this.reload();
+
+    this.searchControl.valueChanges
+      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.reload());
+    this.categoryControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.reload());
+  }
+
+  protected reload(): void {
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.api
+      .list({
+        q: this.q() || undefined,
+        category: this.categoryFilter() || undefined,
+        size: 200,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resp) => {
+          this.items.set(resp.items);
+          this.total.set(resp.total);
+          this.loading.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.items.set([]);
+          this.total.set(0);
+          this.loading.set(false);
+          this.loadError.set(
+            this.extractError(err) ?? 'Could not load catalog.',
+          );
+        },
+      });
+  }
+
+  protected openCreate(): void {
+    this.modalState.set(undefined);
+  }
+
+  protected openEdit(item: CatalogItem): void {
+    this.modalState.set(item);
+  }
+
+  protected closeModal(): void {
+    this.modalState.set(null);
+  }
+
+  protected onSaved(_item: CatalogItem): void {
+    this.modalState.set(null);
+    this.reload();
+  }
+
+  protected onDelete(item: CatalogItem): void {
+    const ok = window.confirm(
+      `Delete "${item.name}" (${item.sku})? This cannot be undone.`,
+    );
+    if (!ok) return;
+    const before = this.items();
+    this.items.update((rows) => rows.filter((i) => i.id !== item.id));
+    this.total.update((n) => n - 1);
+    this.api
+      .delete(item.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        error: (err: HttpErrorResponse) => {
+          this.items.set(before);
+          this.total.set(before.length);
+          this.loadError.set(
+            this.extractError(err) ?? 'Could not delete item.',
+          );
+        },
+      });
+  }
+
+  /** Pick an emoji based on the category for the card icon. */
+  protected emojiFor(category: string | null): string {
+    if (!category) return '📦';
+    const c = category.toLowerCase();
+    if (c.includes('sofa') || c.includes('couch')) return '🛋️';
+    if (c.includes('bed')) return '🛏️';
+    if (c.includes('chair')) return '🪑';
+    if (c.includes('table')) return '🪟';
+    if (c.includes('dining')) return '🍽️';
+    if (c.includes('storage') || c.includes('shelf') || c.includes('cabinet')) return '🗄️';
+    if (c.includes('light') || c.includes('lamp')) return '💡';
+    return '📦';
+  }
+
+  private extractError(err: HttpErrorResponse): string | null {
+    const body = err?.error;
+    if (typeof body === 'string') return body;
+    if (body && typeof body === 'object') {
+      const candidate =
+        (body as { message?: string; detail?: unknown }).message
+        ?? (body as { detail?: unknown }).detail;
+      if (typeof candidate === 'string') return candidate;
+    }
+    return null;
+  }
+}

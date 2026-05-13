@@ -77,6 +77,13 @@ export const userRoutes: Routes = [
             (m) => m.WalkInsPageComponent,
           ),
       },
+      {
+        path: 'catalog',
+        loadComponent: () =>
+          import('./core/catalog/catalog.page').then(
+            (m) => m.CatalogPageComponent,
+          ),
+      },
       ...devRoutes,
     ],
   },

@@ -26,6 +26,7 @@ from src.app.core.activities.router import router as activities_router
 from src.app.core.appointments.router import router as appointments_router
 from src.app.core.audit.router import router as audit_router
 from src.app.core.auth.router import router as auth_router
+from src.app.core.catalog.router import router as catalog_router
 from src.app.core.contacts.router import router as contacts_router
 from src.app.core.custom_fields.router import router as custom_fields_router
 from src.app.core.health.router import router as health_router
@@ -100,6 +101,7 @@ app.include_router(appointments_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(notifications_ws_router, prefix="/api/v1")
 app.include_router(walk_ins_router, prefix="/api/v1")
+app.include_router(catalog_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 
