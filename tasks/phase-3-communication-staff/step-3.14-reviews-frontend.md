@@ -3,7 +3,7 @@
 **Goal:** Reviews & Reputation page matching the screenshot — rating distribution, negative-review alerts, reply functionality, auto-request toggle, star filters.
 **Phase:** 3
 **Depends on:** 3.13
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

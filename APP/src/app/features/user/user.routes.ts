@@ -105,6 +105,13 @@ export const userRoutes: Routes = [
             (m) => m.CallCenterPageComponent,
           ),
       },
+      {
+        path: 'reviews',
+        loadComponent: () =>
+          import('./core/reviews/reviews.page').then(
+            (m) => m.ReviewsPageComponent,
+          ),
+      },
       ...devRoutes,
     ],
   },
