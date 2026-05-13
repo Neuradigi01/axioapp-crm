@@ -98,6 +98,13 @@ export const userRoutes: Routes = [
             (m) => m.ConversationsPageComponent,
           ),
       },
+      {
+        path: 'calls',
+        loadComponent: () =>
+          import('./core/calls/call-center.page').then(
+            (m) => m.CallCenterPageComponent,
+          ),
+      },
       ...devRoutes,
     ],
   },
