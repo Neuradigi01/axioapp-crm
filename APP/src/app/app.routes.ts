@@ -30,6 +30,13 @@ export const appRoutes: Routes = [
     data: { role: 'Admin' },
   },
   {
+    path: 'staff-portal',
+    loadChildren: () =>
+      import('./staff-portal/staff-portal.routes').then(
+        (m) => m.staffPortalRoutes,
+      ),
+  },
+  {
     path: '**',
     redirectTo: getRoute('accounts').path,
   },

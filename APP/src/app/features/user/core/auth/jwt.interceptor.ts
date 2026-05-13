@@ -17,6 +17,14 @@ function ownsRequest(url: string): boolean {
   return url.startsWith(environment.apiBaseUrl) || url.startsWith('/api/v1');
 }
 
+function isStaffPortalRequest(url: string): boolean {
+  // The staff portal manages its own (scope="staff") token via
+  // StaffSessionService. Skipping these URLs here keeps the admin
+  // refresh-and-retry path out of the way of a staff 401, and prevents
+  // an admin token from being attached to a staff-portal endpoint.
+  return url.includes('/staff-portal/');
+}
+
 function withBearer(req: HttpRequest<unknown>, token: string): HttpRequest<unknown> {
   return req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
 }
@@ -39,7 +47,7 @@ function tryRefreshAndRetry(
 }
 
 export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
-  if (!ownsRequest(req.url)) {
+  if (!ownsRequest(req.url) || isStaffPortalRequest(req.url)) {
     return next(req);
   }
 

@@ -3,7 +3,7 @@
 **Goal:** Separate route tree `/staff-portal`. Login screen with name picker + 4-digit PIN. After login: My Dashboard, Activity Log, Stock Updates (stub), Field Visits (stub until 4.10), My Attendance, My Sales tabs. Clock In/Out widget.
 **Phase:** 3
 **Depends on:** 3.6
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

@@ -1,0 +1,64 @@
+<div class="flex min-h-screen flex-col bg-zinc-50">
+  <!-- Top bar -->
+  <header class="flex flex-col gap-3 border-b border-zinc-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+    <div class="flex items-center gap-3">
+      <div class="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-sm font-bold text-white">F</div>
+      <div class="min-w-0">
+        <p class="text-sm font-semibold text-zinc-900">Staff Portal</p>
+        @if (fullName(); as name) {
+          <p class="truncate text-xs text-zinc-500">Hi {{ name }}</p>
+        }
+      </div>
+    </div>
+
+    <nav class="-mb-2 flex gap-1 overflow-x-auto pb-1">
+      @for (t of tabs; track t.path) {
+        <a
+          [routerLink]="['/staff-portal', t.path]"
+          routerLinkActive="bg-zinc-900 text-white"
+          [routerLinkActiveOptions]="{ exact: false }"
+          class="whitespace-nowrap rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
+        >
+          {{ t.label }}
+        </a>
+      }
+    </nav>
+
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        (click)="toggleClock()"
+        [disabled]="clockingIn() || clockingOut()"
+        [class]="
+          'rounded-md px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50 ' +
+          (openSession()
+            ? 'bg-rose-600 text-white hover:bg-rose-700'
+            : 'bg-emerald-600 text-white hover:bg-emerald-700')
+        "
+      >
+        {{
+          clockingIn() ? 'Clocking In…'
+          : clockingOut() ? 'Clocking Out…'
+          : clockButtonLabel()
+        }}
+      </button>
+      <button
+        type="button"
+        (click)="logout()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+      >
+        Log Out
+      </button>
+    </div>
+  </header>
+
+  @if (clockError(); as err) {
+    <div class="border-b border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 sm:px-6">
+      {{ err }}
+    </div>
+  }
+
+  <main class="flex-1 px-4 py-4 sm:px-6">
+    <router-outlet />
+  </main>
+</div>

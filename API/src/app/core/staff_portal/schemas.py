@@ -36,3 +36,12 @@ class StaffLoginResponse(BaseModel):
     expires_at: datetime
     user_id: uuid.UUID
     org_id: uuid.UUID
+
+
+class StaffMeOut(BaseModel):
+    """Minimal `who am I` for the tablet header / dashboard greeting."""
+
+    id: uuid.UUID
+    org_id: uuid.UUID
+    full_name: str
+    email: str
