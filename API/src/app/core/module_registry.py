@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 _ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
-_PERM_RE = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
+_PERM_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
 
 Layer = Literal["core", "pack"]
 
