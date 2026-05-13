@@ -112,6 +112,20 @@ export const userRoutes: Routes = [
             (m) => m.ReviewsPageComponent,
           ),
       },
+      {
+        path: 'campaigns',
+        loadComponent: () =>
+          import('./core/campaigns/campaigns.page').then(
+            (m) => m.CampaignsPageComponent,
+          ),
+      },
+      {
+        path: 'campaigns/:id',
+        loadComponent: () =>
+          import('./core/campaigns/campaign-detail.page').then(
+            (m) => m.CampaignDetailPageComponent,
+          ),
+      },
       ...devRoutes,
     ],
   },

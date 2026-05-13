@@ -15,14 +15,17 @@ can grant edit rights without granting send-to-customers rights.
 from __future__ import annotations
 
 import uuid
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.campaigns.models import CampaignMessageStatus
 from src.app.core.campaigns.schemas import (
     CampaignCreate,
     CampaignListResponse,
+    CampaignMessageOut,
     CampaignOut,
     CampaignStartResponse,
     CampaignStatsOut,
@@ -34,6 +37,8 @@ from src.app.core.campaigns.service import (
     enqueue,
     get_campaign,
     list_campaigns,
+    list_messages,
+    retry_message,
     stats,
     update_campaign,
 )
@@ -129,3 +134,43 @@ async def stats_endpoint(
 ) -> CampaignStatsOut:
     data = await stats(db, campaign_id=campaign_id)
     return CampaignStatsOut(**data)
+
+
+@router.get(
+    "/{campaign_id}/messages",
+    response_model=list[CampaignMessageOut],
+)
+async def list_messages_endpoint(
+    campaign_id: uuid.UUID,
+    status_: Optional[CampaignMessageStatus] = Query(
+        default=None, alias="status"
+    ),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=100, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("campaigns.read")),
+) -> list[CampaignMessageOut]:
+    rows, _total = await list_messages(
+        db,
+        campaign_id=campaign_id,
+        status_filter=status_,
+        page=page,
+        size=size,
+    )
+    return [CampaignMessageOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/{campaign_id}/messages/{message_id}/retry",
+    response_model=CampaignMessageOut,
+)
+async def retry_message_endpoint(
+    campaign_id: uuid.UUID,
+    message_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("campaigns.send")),
+) -> CampaignMessageOut:
+    msg = await retry_message(
+        db, campaign_id=campaign_id, message_id=message_id
+    )
+    return CampaignMessageOut.model_validate(msg)

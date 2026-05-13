@@ -554,6 +554,83 @@ def _render_template(template: str, contact: Contact) -> str:
 # --- stats --------------------------------------------------------------
 
 
+async def list_messages(
+    session: AsyncSession,
+    *,
+    campaign_id: uuid.UUID,
+    status_filter: "CampaignMessageStatus | None" = None,
+    page: int = 1,
+    size: int = 100,
+) -> tuple[list[CampaignMessage], int]:
+    """Per-message rows for a campaign's detail view."""
+    await get_campaign(session, campaign_id)
+
+    filters: list[Any] = [CampaignMessage.campaign_id == campaign_id]
+    if status_filter is not None:
+        filters.append(CampaignMessage.status == status_filter)
+    where = and_(*filters)
+
+    total = (
+        await session.execute(
+            select(func.count()).select_from(CampaignMessage).where(where)
+        )
+    ).scalar_one()
+    offset = (page - 1) * size
+    rows = (
+        (
+            await session.execute(
+                select(CampaignMessage)
+                .where(where)
+                .order_by(CampaignMessage.created_at.asc())
+                .offset(offset)
+                .limit(size)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows), int(total)
+
+
+async def retry_message(
+    session: AsyncSession,
+    *,
+    campaign_id: uuid.UUID,
+    message_id: uuid.UUID,
+) -> CampaignMessage:
+    """Re-dispatch one failed `CampaignMessage`. Flips status back to
+    `queued` first so a concurrent reader sees the transition, then
+    runs the single-contact dispatch inline."""
+    await get_campaign(session, campaign_id)
+
+    msg = (
+        await session.execute(
+            select(CampaignMessage)
+            .where(CampaignMessage.id == message_id)
+            .where(CampaignMessage.campaign_id == campaign_id)
+        )
+    ).scalar_one_or_none()
+    if msg is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="campaign message not found",
+        )
+    if msg.status != CampaignMessageStatus.failed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"cannot retry a {msg.status.value} message",
+        )
+    msg.status = CampaignMessageStatus.queued
+    msg.error = None
+    await session.commit()
+
+    await dispatch_chunk(
+        session, campaign_id=campaign_id, contact_ids=[msg.contact_id]
+    )
+    await session.refresh(msg)
+    return msg
+
+
 async def stats(
     session: AsyncSession, *, campaign_id: uuid.UUID
 ) -> dict[str, Any]:
@@ -600,7 +677,9 @@ __all__ = [
     "enqueue",
     "get_campaign",
     "list_campaigns",
+    "list_messages",
     "resolve_audience",
+    "retry_message",
     "stats",
     "update_campaign",
 ]

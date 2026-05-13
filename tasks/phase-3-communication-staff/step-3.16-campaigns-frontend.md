@@ -3,7 +3,7 @@
 **Goal:** Marketing & Campaigns page matching the screenshot. Create Campaign modal. Per-campaign metrics cards.
 **Phase:** 3
 **Depends on:** 3.15
-**Status:** Pending
+**Status:** CPMPLETED
 
 ## Scope
 **In-scope:**
