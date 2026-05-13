@@ -15,13 +15,15 @@ from src.seeds.seed_countries import seed_countries, seed_states
 from src.app.scripts.seed_demo_org import seed_demo_org
 from src.app.scripts.seed_admin_user import seed_admin_user
 from src.app.scripts.seed_contact_system_fields import seed_contact_system_fields
+from src.app.scripts.seed_call_outcomes import seed_call_outcomes
 
 
 async def run_layered():
-    """FurnitureCRM layered seeds: demo org → admin role + permissions + admin user → contact system fields."""
+    """FurnitureCRM layered seeds: demo org → admin role + permissions + admin user → contact system fields → call outcomes."""
     await seed_demo_org()
     await seed_admin_user()
     await seed_contact_system_fields()
+    await seed_call_outcomes()
 
 
 async def run_contact_fields():

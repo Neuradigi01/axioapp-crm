@@ -25,6 +25,10 @@ from config import APP_NAME, STATIC_DIR, UPLOAD_DIR
 from src.app.core.activities.router import router as activities_router
 from src.app.core.appointments.router import router as appointments_router
 from src.app.core.audit.router import router as audit_router
+from src.app.core.calls.router import (
+    calls_router,
+    outcomes_router as call_outcomes_router,
+)
 from src.app.core.auth.router import router as auth_router
 from src.app.core.catalog.router import router as catalog_router
 from src.app.core.contacts.router import router as contacts_router
@@ -117,6 +121,8 @@ app.include_router(catalog_router, prefix="/api/v1")
 app.include_router(staff_router, prefix="/api/v1")
 app.include_router(staff_portal_router, prefix="/api/v1")
 app.include_router(conversations_router, prefix="/api/v1")
+app.include_router(calls_router, prefix="/api/v1")
+app.include_router(call_outcomes_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 

@@ -30,6 +30,7 @@ from src.app.core.catalog import models as _catalog_models  # noqa: F401
 from src.app.core.staff import models as _staff_models  # noqa: F401
 from src.app.core.staff_portal import models as _staff_portal_models  # noqa: F401
 from src.app.core.conversations import models as _conversations_models  # noqa: F401
+from src.app.core.calls import models as _calls_models  # noqa: F401
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url from environment
