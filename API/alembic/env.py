@@ -27,6 +27,7 @@ from src.app.core.appointments import models as _appointments_models  # noqa: F4
 from src.app.core.notifications import models as _notifications_models  # noqa: F401
 from src.app.core.walk_ins import models as _walk_ins_models  # noqa: F401
 from src.app.core.catalog import models as _catalog_models  # noqa: F401
+from src.app.core.staff import models as _staff_models  # noqa: F401
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url from environment

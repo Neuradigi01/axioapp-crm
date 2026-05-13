@@ -3,7 +3,7 @@
 **Goal:** Reuse `users` + `roles`. Add `staff_profiles` (commission_rate, monthly_target, rating, employment_status). Endpoints for staff list, performance, attendance, activity logs.
 **Phase:** 3
 **Depends on:** 1.5
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
