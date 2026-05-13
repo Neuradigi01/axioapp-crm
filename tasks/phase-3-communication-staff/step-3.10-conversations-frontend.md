@@ -3,7 +3,7 @@
 **Goal:** Unified inbox matching the screenshot. Left: conversation list with channel badges + filters. Right: chat thread. AI Handled / Needs Human badge. "Type a reply or let AI handle it" input. WS-driven real-time updates.
 **Phase:** 3
 **Depends on:** 3.8, 3.9, 2.16
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
