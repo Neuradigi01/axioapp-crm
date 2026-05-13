@@ -3,10 +3,11 @@
 **Goal:** `reviews` table with configurable `source` (furniture pack defaults to `google`). Review-request automation hook (will integrate with Campaigns later).
 **Phase:** 3
 **Depends on:** 2.4
-**Status:** Pending
+**Status:** COMPLETED
 
-## Scope
-**In-scope:**
+
+
+
 - Model `Review` (TenantScoped): id, org_id, source (text — `google`, `facebook`, `internal`, etc.), source_id (external review id, optional), contact_id, rating (1–5), text, reply_text, replied_at, replied_by_id, status (pending_reply/replied/escalated), tags text[], created_at.
 - Migration + RLS + indexes (`org_id, rating`, `org_id, source`).
 - Endpoints: `/reviews` CRUD, `POST /reviews/{id}/reply`, `POST /reviews/{id}/escalate`.
