@@ -3,7 +3,7 @@
 **Goal:** Stock Alerts tab with reorder priority and quick "Reorder" action.
 **Phase:** 4
 **Depends on:** 4.5
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
