@@ -37,6 +37,8 @@ After this you can demonstrate the two-layer architecture visually: same code, s
 - [DR.1 — Seed core-demo org + 3 roles + 3 users](step-dr.1-seed-core-demo-org.md) — Done
 - [DR.2 — Login dropdown for test logins](step-dr.2-login-dropdown.md) — Done
 - [DR.3 — Smoke test all 4 logins side-by-side](step-dr.3-smoke-test.md) — Done
+- [DR.4 — Move demo logins from hardcoded array to DB](step-dr.4-db-backed-logins.md) — Parked
+- [DR.5 — Per-org sidebar branding](step-dr.5-sidebar-branding.md) — Parked
 
 ## File budget
 
