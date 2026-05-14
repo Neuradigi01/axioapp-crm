@@ -3,7 +3,7 @@
 **Goal:** Inventory page with Products tab matching the screenshot — card grid + list toggle, category and warehouse filters, stock badges (In Stock / Low Stock / Out / Best Seller).
 **Phase:** 4
 **Depends on:** 4.4
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
