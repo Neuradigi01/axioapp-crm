@@ -3,7 +3,7 @@
 **Goal:** Billing & POS page with Invoices and POS tabs matching screenshots. POS screen with cart, customer details, discount (flat/percent), payment method picker, bill summary, Print Bill.
 **Phase:** 4
 **Depends on:** 4.11
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
