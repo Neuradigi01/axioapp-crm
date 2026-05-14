@@ -3,7 +3,7 @@
 **Goal:** `fp_warehouses`, `fp_inventory_items`, `fp_inventory_movements`, `fp_stock_alerts` tables. Models, schemas, repositories, CRUD, reorder logic. **First Layer 2 (pack) module touching the database.**
 **Phase:** 4
 **Depends on:** 4.2, 3.3 (catalog)
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

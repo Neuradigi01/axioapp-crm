@@ -46,6 +46,11 @@ from src.app.core.staff.router import router as staff_router
 from src.app.core.staff_portal.router import router as staff_portal_router
 from src.app.core.tasks.router import router as tasks_router
 from src.app.core.walk_ins.router import router as walk_ins_router
+# Layer-2 pack routers. `main.py` is the composition root and is
+# allowed to import from `packs/` — `core/` modules cannot.
+from src.app.packs.furniture.modules.inventory.router import (
+    router as fp_inventory_router,
+)
 from src.app.core.module_registry import discover_modules, registry
 from src.app.core.modules_router import router as modules_router
 from src.app.core.permissions.service import register_permissions
@@ -129,6 +134,7 @@ app.include_router(call_outcomes_router, prefix="/api/v1")
 app.include_router(reviews_router, prefix="/api/v1")
 app.include_router(campaigns_router, prefix="/api/v1")
 app.include_router(settings_router, prefix="/api/v1")
+app.include_router(fp_inventory_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 

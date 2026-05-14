@@ -35,6 +35,11 @@ from src.app.core.reviews import models as _reviews_models  # noqa: F401
 from src.app.core.campaigns import models as _campaigns_models  # noqa: F401
 from src.app.core.settings import models as _settings_models  # noqa: F401
 from src.app.core.packs import models as _packs_models  # noqa: F401
+# Layer-2 pack models. Core/Alembic loads them so autogenerate sees
+# the `fp_*` tables; the pack itself never imports core.
+from src.app.packs.furniture.modules.inventory import (
+    models as _fp_inventory_models,  # noqa: F401
+)
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url from environment
