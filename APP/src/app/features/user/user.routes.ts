@@ -161,6 +161,20 @@ export const userRoutes: Routes = [
             './packs/furniture/field-ops/field-visit-detail.page'
           ).then((m) => m.FieldVisitDetailPageComponent),
       },
+      {
+        path: 'billing',
+        loadComponent: () =>
+          import('./packs/furniture/billing/billing.page').then(
+            (m) => m.BillingPageComponent,
+          ),
+      },
+      {
+        path: 'billing/invoices/:id',
+        loadComponent: () =>
+          import(
+            './packs/furniture/billing/invoice-detail.page'
+          ).then((m) => m.InvoiceDetailPageComponent),
+      },
       ...devRoutes,
     ],
   },
