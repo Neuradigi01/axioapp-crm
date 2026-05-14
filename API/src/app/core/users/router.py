@@ -16,13 +16,16 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import select
+
 from src.app.core.auth.dependencies import get_current_user
 from src.app.core.permissions.service import (
     get_role_by_id,
     list_permissions_for_role,
 )
+from src.app.core.tenants.models import Organization
 from src.app.core.users.models import User
-from src.app.core.users.schemas import UserMe, UserOut
+from src.app.core.users.schemas import OrgSummary, UserMe, UserOut
 from src.app.core.users.service import list_users
 from src.app.shared.db import get_db
 
@@ -36,6 +39,11 @@ async def get_me(
 ) -> UserMe:
     role = await get_role_by_id(session, user.role_id)
     permissions = await list_permissions_for_role(session, user.role_id)
+    org = (
+        await session.execute(
+            select(Organization).where(Organization.id == user.org_id)
+        )
+    ).scalar_one()
     return UserMe(
         id=user.id,
         org_id=user.org_id,
@@ -48,6 +56,7 @@ async def get_me(
         updated_at=user.updated_at,
         role_name=role.name if role else "",
         permission_keys=[p.key for p in permissions],
+        org=OrgSummary.model_validate(org),
     )
 
 

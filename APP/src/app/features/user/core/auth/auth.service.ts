@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 
@@ -17,6 +17,13 @@ export interface LoginResponse {
   expires_at: string;
 }
 
+export interface OrgSummary {
+  id: string;
+  name: string;
+  slug: string;
+  pack_id: string;
+}
+
 export interface MeResponse {
   id: string;
   org_id: string;
@@ -29,12 +36,18 @@ export interface MeResponse {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  org: OrgSummary;
 }
 
 @Injectable({ providedIn: 'root' })
 export class FurnitureAuthService {
   private readonly http = inject(HttpClient);
   private readonly storage = inject(TokenStorageService);
+
+  /** The current tenant's identity, populated on every `/me` fetch.
+   * Components (sidebar header, breadcrumbs, etc.) bind to this to
+   * brand the shell. Null before the first /me lands (login splash). */
+  readonly currentOrg = signal<OrgSummary | null>(null);
 
   login(email: string, password: string, orgSlug: string): Observable<LoginResponse> {
     return this.http
@@ -59,11 +72,18 @@ export class FurnitureAuthService {
   logout(): Observable<void> {
     return this.http
       .post<void>(`${environment.apiBaseUrl}/auth/logout`, {})
-      .pipe(tap(() => this.storage.clear()));
+      .pipe(
+        tap(() => {
+          this.storage.clear();
+          this.currentOrg.set(null);
+        }),
+      );
   }
 
   me(): Observable<MeResponse> {
-    return this.http.get<MeResponse>(`${environment.apiBaseUrl}/users/me`);
+    return this.http
+      .get<MeResponse>(`${environment.apiBaseUrl}/users/me`)
+      .pipe(tap((res) => this.currentOrg.set(res.org)));
   }
 
   isAuthenticated(): boolean {
@@ -72,5 +92,6 @@ export class FurnitureAuthService {
 
   clearSession(): void {
     this.storage.clear();
+    this.currentOrg.set(null);
   }
 }

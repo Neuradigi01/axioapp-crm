@@ -29,6 +29,20 @@ class UserOut(BaseModel):
     updated_at: datetime
 
 
+class OrgSummary(BaseModel):
+    """Compact org identity included in `/users/me` so the SPA can
+    brand its shell (sidebar header, etc.) per current tenant without
+    a second round-trip."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    slug: str
+    pack_id: str
+
+
 class UserMe(UserOut):
     role_name: str
     permission_keys: list[str]
+    org: OrgSummary

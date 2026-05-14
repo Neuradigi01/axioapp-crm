@@ -10,6 +10,7 @@ import {
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { FurnitureAuthService } from '../auth/auth.service';
 import { ModuleApiService, ModuleDescriptorOut } from '../services/module-api.service';
 
 @Component({
@@ -21,9 +22,14 @@ import { ModuleApiService, ModuleDescriptorOut } from '../services/module-api.se
 })
 export class SidebarComponent implements OnInit {
   private readonly moduleApi = inject(ModuleApiService);
+  private readonly auth = inject(FurnitureAuthService);
 
   readonly open = input.required<boolean>();
   readonly toggle = output<void>();
+
+  /** Current tenant — drives the sidebar header brand. `null` until
+   * the first `/me` response lands. */
+  protected readonly org = this.auth.currentOrg;
 
   protected readonly modules = signal<ModuleDescriptorOut[]>([]);
   protected readonly error = signal<string | null>(null);
