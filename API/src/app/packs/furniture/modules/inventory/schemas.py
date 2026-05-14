@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -92,10 +93,42 @@ class InventoryItemOut(BaseModel):
     reorder_level: int
     last_received_at: Optional[datetime]
     custom_data: dict[str, Any]
+    cover_url: Optional[str]
     is_best_seller: bool
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class InventoryItemFullCreate(BaseModel):
+    """Atomic create: catalog row + inventory row in one transaction.
+
+    The catalog row is what walk-in/lead pickers reference; the
+    inventory row carries the physical stock numbers. The endpoint
+    enforces both inserts succeed-or-fail together so we never end up
+    with a half-created product.
+    """
+
+    # Catalog-side
+    name: str = Field(min_length=1, max_length=255)
+    category: Optional[str] = Field(default=None, max_length=64)
+    price: Decimal = Field(default=Decimal("0"), ge=0)
+    description: Optional[str] = None
+
+    # Inventory-side
+    warehouse_id: uuid.UUID
+    sku: str = Field(min_length=1, max_length=64)
+    material: Optional[str] = Field(default=None, max_length=64)
+    color: Optional[str] = Field(default=None, max_length=64)
+    finish: Optional[str] = Field(default=None, max_length=64)
+    dimensions: dict[str, Any] = Field(default_factory=dict)
+    reorder_level: int = Field(default=0, ge=0)
+    is_best_seller: bool = False
+    is_active: bool = True
+
+
+class CoverUploadResponse(BaseModel):
+    cover_url: str
 
 
 class InventoryItemListResponse(BaseModel):

@@ -191,6 +191,7 @@ class InventoryItem(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("'{}'::jsonb"),
     )
+    cover_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     is_best_seller: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sql_text("false")
     )

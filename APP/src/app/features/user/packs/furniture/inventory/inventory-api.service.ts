@@ -35,10 +35,31 @@ export interface InventoryItem {
   reorder_level: number;
   last_received_at: string | null;
   custom_data: Record<string, unknown>;
+  cover_url: string | null;
   is_best_seller: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface InventoryItemFullCreate {
+  name: string;
+  category?: string | null;
+  price?: number | string;
+  description?: string | null;
+  warehouse_id: string;
+  sku: string;
+  material?: string | null;
+  color?: string | null;
+  finish?: string | null;
+  dimensions?: Record<string, unknown>;
+  reorder_level?: number;
+  is_best_seller?: boolean;
+  is_active?: boolean;
+}
+
+export interface CoverUploadResponse {
+  cover_url: string;
 }
 
 export interface InventoryItemListResponse {
@@ -114,6 +135,21 @@ export class InventoryApiService {
 
   getItem(id: string): Observable<InventoryItem> {
     return this.http.get<InventoryItem>(`${this.base}/items/${id}`);
+  }
+
+  /** Atomic create: a catalog row + an inventory row in one transaction. */
+  createItemFull(payload: InventoryItemFullCreate): Observable<InventoryItem> {
+    return this.http.post<InventoryItem>(`${this.base}/items/full`, payload);
+  }
+
+  /** Upload the cover image. Backend stores via `LocalStorage`. */
+  uploadCover(itemId: string, file: File): Observable<CoverUploadResponse> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<CoverUploadResponse>(
+      `${this.base}/items/${itemId}/cover`,
+      form,
+    );
   }
 
   // --- Movements ---

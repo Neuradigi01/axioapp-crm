@@ -1,4 +1,15 @@
 <div>
+  <!-- Top action bar -->
+  <div class="mb-3 flex items-center justify-end">
+    <button
+      type="button"
+      (click)="openAddModal()"
+      class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+    >
+      + Add product
+    </button>
+  </div>
+
   <!-- Filter strip -->
   <div class="mb-4 flex flex-wrap items-center gap-3">
     <div class="relative max-w-md flex-1 min-w-[16rem]">
@@ -134,5 +145,13 @@
         </tbody>
       </table>
     </div>
+  }
+
+  @if (modalOpen()) {
+    <app-fp-add-product-modal
+      [warehouses]="warehouses()"
+      (created)="onProductCreated($event)"
+      (cancel)="onAddCancel()"
+    />
   }
 </div>

@@ -17,6 +17,7 @@ import {
   InventoryItem,
   Warehouse,
 } from '../inventory-api.service';
+import { AddProductModalComponent } from '../add-product-modal.component';
 import { ProductCardComponent } from '../product-card.component';
 
 type ViewMode = 'grid' | 'list';
@@ -40,7 +41,12 @@ type ViewMode = 'grid' | 'list';
   selector: 'app-fp-inventory-products',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, LucideAngularModule, ProductCardComponent],
+  imports: [
+    ReactiveFormsModule,
+    LucideAngularModule,
+    ProductCardComponent,
+    AddProductModalComponent,
+  ],
   templateUrl: './products.component.html',
 })
 export class ProductsTabComponent {
@@ -58,6 +64,7 @@ export class ProductsTabComponent {
   protected readonly searchControl = new FormControl('', { nonNullable: true });
   protected readonly warehouseFilter = signal<string>('');
   protected readonly activeOnly = signal<boolean>(false);
+  protected readonly modalOpen = signal(false);
 
   protected readonly warehouseById = computed(() => {
     const m = new Map<string, Warehouse>();
@@ -80,6 +87,19 @@ export class ProductsTabComponent {
 
   protected setViewMode(mode: ViewMode): void {
     this.viewMode.set(mode);
+  }
+
+  protected openAddModal(): void {
+    this.modalOpen.set(true);
+  }
+
+  protected onProductCreated(_item: InventoryItem): void {
+    this.modalOpen.set(false);
+    this.reloadItems();
+  }
+
+  protected onAddCancel(): void {
+    this.modalOpen.set(false);
   }
 
   protected onWarehouseChange(event: Event): void {

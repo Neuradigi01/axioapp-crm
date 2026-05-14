@@ -110,6 +110,12 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+# Local storage mount — backs `StorageBackend.url()`. Inventory covers
+# (and any future pack-uploaded blobs) live under `./storage/`.
+_STORAGE_DIR = "./storage"
+os.makedirs(_STORAGE_DIR, exist_ok=True)
+app.mount("/files", StaticFiles(directory=_STORAGE_DIR), name="files")
+
 app.include_router(legacy_router)
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")

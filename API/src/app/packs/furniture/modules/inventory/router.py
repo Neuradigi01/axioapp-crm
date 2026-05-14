@@ -16,18 +16,33 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import get_current_user, require_permissions
+from src.app.core.catalog.models import CatalogItem
 from src.app.core.users.models import User
 from src.app.packs.furniture.modules.inventory.models import (
     AlertSeverity,
     AlertStatus,
+    InventoryItem,
     MovementType,
 )
 from src.app.packs.furniture.modules.inventory.schemas import (
+    CoverUploadResponse,
     InventoryItemCreate,
+    InventoryItemFullCreate,
     InventoryItemListResponse,
     InventoryItemOut,
     InventoryItemUpdate,
@@ -39,6 +54,7 @@ from src.app.packs.furniture.modules.inventory.schemas import (
     WarehouseOut,
     WarehouseUpdate,
 )
+from src.app.shared.storage import get_storage
 from src.app.packs.furniture.modules.inventory.service import (
     create_item,
     create_warehouse,
@@ -163,6 +179,115 @@ async def create_item_endpoint(
 ) -> InventoryItemOut:
     item = await create_item(db, org_id=user.org_id, payload=payload)
     return InventoryItemOut.model_validate(item)
+
+
+@router.post(
+    "/items/full",
+    response_model=InventoryItemOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_item_full_endpoint(
+    payload: InventoryItemFullCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("inventory.write")),
+) -> InventoryItemOut:
+    """Atomic create: a catalog row + an inventory row in one
+    transaction. Used by the Add Product modal — either both rows
+    land, or neither does (no half-created products).
+
+    `description` is stored on `catalog_items.custom_data.description`.
+    """
+    # 1. Validate the warehouse exists in this org (404 friendlier than
+    # a generic FK violation).
+    wh = await get_warehouse(db, payload.warehouse_id)
+
+    # 2. Create the catalog row first.
+    catalog = CatalogItem(
+        org_id=user.org_id,
+        sku=payload.sku.strip().upper(),
+        name=payload.name,
+        category=payload.category,
+        price=payload.price,
+        custom_data=(
+            {"description": payload.description} if payload.description else {}
+        ),
+        is_active=payload.is_active,
+    )
+    db.add(catalog)
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"catalog SKU '{payload.sku}' already exists for this org",
+        )
+
+    # 3. Create the inventory row referencing the freshly-created
+    # catalog row. Same transaction → both succeed or both rollback.
+    inv = InventoryItem(
+        org_id=user.org_id,
+        catalog_item_id=catalog.id,
+        warehouse_id=wh.id,
+        sku=payload.sku.strip().upper(),
+        material=payload.material,
+        color=payload.color,
+        finish=payload.finish,
+        dimensions=payload.dimensions,
+        reorder_level=payload.reorder_level,
+        is_best_seller=payload.is_best_seller,
+        is_active=payload.is_active,
+    )
+    db.add(inv)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"inventory item with SKU '{payload.sku}' already exists "
+                f"in this warehouse"
+            ),
+        )
+    await db.refresh(inv)
+    return InventoryItemOut.model_validate(inv)
+
+
+@router.post(
+    "/items/{item_id}/cover", response_model=CoverUploadResponse
+)
+async def upload_cover_endpoint(
+    item_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("inventory.write")),
+) -> CoverUploadResponse:
+    """Multipart upload of a single cover image. Saved under
+    `./storage/{org}/inventory/{item}/cover.<ext>` via the storage
+    backend; the served URL is persisted on `inventory_items.cover_url`.
+    """
+    item = await get_item(db, item_id)
+
+    # Sniff extension from filename / content-type. Default to .jpg.
+    ext = "jpg"
+    if file.filename and "." in file.filename:
+        ext = file.filename.rsplit(".", 1)[-1].lower()[:8]
+    storage_path = f"{user.org_id}/inventory/{item.id}/cover.{ext}"
+    data = await file.read()
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="uploaded file is empty",
+        )
+    ref = get_storage().put(
+        storage_path, data, content_type=file.content_type or "application/octet-stream"
+    )
+
+    item.cover_url = ref.url
+    await db.commit()
+    await db.refresh(item)
+    return CoverUploadResponse(cover_url=ref.url)
 
 
 @router.get("/items/{item_id}", response_model=InventoryItemOut)
