@@ -3,7 +3,7 @@
 **Goal:** Use core billing engine (built here for the first time, kept core-generic). Furniture-specific invoice template. POS endpoint optimized for in-store quick checkout. GST calculation reads from org settings (not hardcoded).
 **Phase:** 4
 **Depends on:** 3.17 (settings), 3.3 (catalog), 4.3 (inventory)
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**

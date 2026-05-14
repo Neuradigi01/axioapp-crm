@@ -58,6 +58,13 @@ from src.app.packs.furniture.modules.field_ops.router import (
     router as fp_field_ops_router,
     staff_portal_router as fp_field_ops_staff_portal_router,
 )
+from src.app.core.billing.router import router as billing_router
+from src.app.packs.furniture.modules.billing.router import (
+    router as fp_pos_router,
+)
+# Import the pack's billing __init__ so its PDF renderer registers
+# itself with `core.billing.pdf_registry` at startup.
+import src.app.packs.furniture.modules.billing  # noqa: F401
 from src.app.core.module_registry import discover_modules, registry
 from src.app.core.modules_router import router as modules_router
 from src.app.core.permissions.service import register_permissions
@@ -151,6 +158,8 @@ app.include_router(fp_inventory_router, prefix="/api/v1")
 app.include_router(fp_custom_orders_router, prefix="/api/v1")
 app.include_router(fp_field_ops_router, prefix="/api/v1")
 app.include_router(fp_field_ops_staff_portal_router, prefix="/api/v1")
+app.include_router(billing_router, prefix="/api/v1")
+app.include_router(fp_pos_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 

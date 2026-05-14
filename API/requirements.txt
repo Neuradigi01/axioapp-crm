@@ -20,3 +20,4 @@ aiofiles
 qrcode[pil]
 captcha
 firebase-admin
+reportlab

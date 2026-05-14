@@ -160,6 +160,8 @@ roles:
       - settings.*
       - custom_orders.*
       - field_visits.*
+      - billing.*
+      - pos.*
 
   - key: store_manager
     name: Store Manager
@@ -186,6 +188,8 @@ roles:
       - inventory.*
       - custom_orders.*
       - field_visits.*
+      - billing.*
+      - pos.*
 
   - key: senior_sales_executive
     name: Senior Sales Executive
@@ -207,6 +211,9 @@ roles:
       - custom_orders.move
       - field_visits.read
       - field_visits.write
+      - billing.read
+      - billing.write
+      - pos.use
 
   - key: sales_executive
     name: Sales Executive
@@ -226,6 +233,8 @@ roles:
       - calls.read
       - calls.write
       - inventory.read
+      - billing.read
+      - pos.use
 
   - key: junior_sales_executive
     name: Junior Sales Executive
@@ -374,3 +383,5 @@ module_permissions:
   inventory:     [inventory.read, inventory.write, inventory.dispatch, inventory.transfer]
   custom_orders: [custom_orders.read, custom_orders.write, custom_orders.move]
   field_visits:  [field_visits.read, field_visits.write]
+  billing:       [billing.read, billing.write, billing.refund]
+  pos:           [pos.use, pos.refund]
