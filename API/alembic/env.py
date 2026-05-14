@@ -40,6 +40,9 @@ from src.app.core.packs import models as _packs_models  # noqa: F401
 from src.app.packs.furniture.modules.inventory import (
     models as _fp_inventory_models,  # noqa: F401
 )
+from src.app.packs.furniture.modules.custom_orders import (
+    models as _fp_custom_orders_models,  # noqa: F401
+)
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url from environment

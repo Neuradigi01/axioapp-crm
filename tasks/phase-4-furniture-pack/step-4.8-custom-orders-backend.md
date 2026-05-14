@@ -3,12 +3,12 @@
 **Goal:** `fp_custom_orders`, `fp_custom_order_measurements`, `fp_custom_order_photos`, `fp_custom_order_stages` tables. Reuse pipeline engine for production stages. File upload for site photos.
 **Phase:** 4
 **Depends on:** 2.9, 2.4, 4.3, 4.7 (storage)
-**Status:** Pending
-
+**Status:** COMPLETED
 ## Scope
 **In-scope:**
 - Models (TenantScoped):
-  - `CustomOrder` (`fp_custom_orders`): id, org_id, contact_id, lead_id (nullable), title, requirement, materials JSONB, color, finish, pipeline_stage (text — references `pipelines.custom_orders` stages), assigned_to_id, expected_delivery_date, total_amount, advance_paid, custom_data JSONB, created_at, updated_at.
+  - `CustomOrder` (`fp_custom_orders`): id, org_id, contact_id, lead_id (nullable), title, requirement, materials JSONB, color, finish, pipeline_stage (text — re
+  ferences `pipelines.custom_orders` stages), assigned_to_id, expected_delivery_date, total_amount, advance_paid, custom_data JSONB, created_at, updated_at.
   - `CustomOrderMeasurement` (`fp_custom_order_measurements`): id, org_id, order_id, item_label, length_cm, width_cm, height_cm, notes.
   - `CustomOrderPhoto` (`fp_custom_order_photos`): id, org_id, order_id, url, caption, taken_at.
   - `CustomOrderStageHistory` (`fp_custom_order_stages`): id, org_id, order_id, from_stage, to_stage, user_id, notes, changed_at. (Used for analytics; movement also writes to core `activities`.)

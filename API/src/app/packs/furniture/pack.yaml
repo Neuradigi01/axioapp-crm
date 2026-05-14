@@ -158,6 +158,7 @@ roles:
       - reviews.*
       - campaigns.*
       - settings.*
+      - custom_orders.*
 
   - key: store_manager
     name: Store Manager
@@ -182,6 +183,7 @@ roles:
       - campaigns.write
       - settings.read
       - inventory.*
+      - custom_orders.*
 
   - key: senior_sales_executive
     name: Senior Sales Executive
@@ -198,6 +200,9 @@ roles:
       - calls.*
       - reviews.read
       - inventory.read
+      - custom_orders.read
+      - custom_orders.write
+      - custom_orders.move
 
   - key: sales_executive
     name: Sales Executive
@@ -236,6 +241,8 @@ roles:
       - conversations.read
       - calls.read
       - inventory.read
+      - custom_orders.read
+      - custom_orders.write
 
   - key: design_consultant
     name: Design Consultant
@@ -256,6 +263,7 @@ roles:
       - conversations.read
       - conversations.write
       - inventory.read
+      - custom_orders.*
 
   - key: warehouse_manager
     name: Warehouse Manager
@@ -356,3 +364,4 @@ module_permissions:
   campaigns:     [campaigns.read, campaigns.write, campaigns.send]
   settings:      [settings.read, settings.write]
   inventory:     [inventory.read, inventory.write, inventory.dispatch, inventory.transfer]
+  custom_orders: [custom_orders.read, custom_orders.write, custom_orders.move]
