@@ -1,0 +1,55 @@
+<div class="flex h-full flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-3 text-left shadow-sm">
+  <div class="flex items-start justify-between gap-2">
+    <div class="min-w-0 flex-1">
+      <p class="truncate text-sm font-semibold text-zinc-900">{{ order().title }}</p>
+      <p class="mt-0.5 truncate text-[11px] text-zinc-500">
+        @if (contactName()) {
+          {{ contactName() }}
+        } @else {
+          No contact linked
+        }
+        @if (contactPhone()) {
+          <span class="ml-1 text-zinc-400">·</span>
+          <span class="ml-1">{{ contactPhone() }}</span>
+        }
+      </p>
+    </div>
+    <span
+      [class]="
+        'inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ' +
+        stageBadgeClass()
+      "
+    >
+      {{ stageLabel() }}
+    </span>
+  </div>
+
+  @if (materialsSummary()) {
+    <p class="truncate text-[11px] text-zinc-600">{{ materialsSummary() }}</p>
+  } @else if (order().color) {
+    <p class="text-[11px] text-zinc-600">Color: {{ order().color }}</p>
+  }
+
+  <dl class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+    <dt class="text-zinc-500">Total</dt>
+    <dd class="text-right font-medium text-zinc-900">{{ amountInr() }}</dd>
+    <dt class="text-zinc-500">Advance</dt>
+    <dd class="text-right text-emerald-700">{{ advanceInr() }}</dd>
+    <dt class="text-zinc-500">Due</dt>
+    <dd class="text-right text-amber-700">{{ outstanding() }}</dd>
+  </dl>
+
+  <div class="flex items-center justify-between border-t border-zinc-100 pt-2 text-[10px] text-zinc-500">
+    @if (deliveryLabel(); as d) {
+      <span class="inline-flex items-center gap-1">
+        <lucide-icon name="calendar" class="h-3 w-3" />
+        {{ d }}
+      </span>
+    } @else {
+      <span>No delivery date</span>
+    }
+    @if (progressPercent() !== null) {
+      <span class="font-medium text-zinc-700">{{ progressPercent() }}%</span>
+    }
+  </div>
+</div>

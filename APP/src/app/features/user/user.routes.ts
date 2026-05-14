@@ -133,6 +133,20 @@ export const userRoutes: Routes = [
             (m) => m.InventoryPageComponent,
           ),
       },
+      {
+        path: 'custom-orders',
+        loadComponent: () =>
+          import('./packs/furniture/custom-orders/custom-orders.page').then(
+            (m) => m.CustomOrdersPageComponent,
+          ),
+      },
+      {
+        path: 'custom-orders/:id',
+        loadComponent: () =>
+          import(
+            './packs/furniture/custom-orders/custom-order-detail.page'
+          ).then((m) => m.CustomOrderDetailPageComponent),
+      },
       ...devRoutes,
     ],
   },
