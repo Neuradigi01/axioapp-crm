@@ -20,6 +20,7 @@ import { StaffLeaderboardTabComponent } from './tabs/leaderboard.component';
 import { StaffTargetsTabComponent } from './tabs/targets.component';
 import { StaffAttendanceTabComponent } from './tabs/attendance.component';
 import { StaffActivityTabComponent } from './tabs/activity.component';
+import { StaffFieldOpsTabComponent } from './tabs/field-ops.component';
 import { StaffPlaceholderTabComponent } from './tabs/placeholder.component';
 
 export type StaffTabId =
@@ -55,6 +56,7 @@ export type StaffTabId =
     StaffTargetsTabComponent,
     StaffAttendanceTabComponent,
     StaffActivityTabComponent,
+    StaffFieldOpsTabComponent,
     StaffPlaceholderTabComponent,
   ],
   templateUrl: './staff.page.html',

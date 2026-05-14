@@ -116,10 +116,7 @@
         <app-staff-activity-tab [rows]="rows()" />
       }
       @case ('field-ops') {
-        <app-staff-placeholder-tab
-          title="Field Operations"
-          message="Site visits, deliveries and route assignments arrive in Phase 4.10 with the furniture pack's field-ops module."
-        />
+        <app-staff-field-ops-tab />
       }
       @case ('stock-updates') {
         <app-staff-placeholder-tab

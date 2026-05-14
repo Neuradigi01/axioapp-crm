@@ -54,6 +54,10 @@ from src.app.packs.furniture.modules.inventory.router import (
 from src.app.packs.furniture.modules.custom_orders.router import (
     router as fp_custom_orders_router,
 )
+from src.app.packs.furniture.modules.field_ops.router import (
+    router as fp_field_ops_router,
+    staff_portal_router as fp_field_ops_staff_portal_router,
+)
 from src.app.core.module_registry import discover_modules, registry
 from src.app.core.modules_router import router as modules_router
 from src.app.core.permissions.service import register_permissions
@@ -145,6 +149,8 @@ app.include_router(campaigns_router, prefix="/api/v1")
 app.include_router(settings_router, prefix="/api/v1")
 app.include_router(fp_inventory_router, prefix="/api/v1")
 app.include_router(fp_custom_orders_router, prefix="/api/v1")
+app.include_router(fp_field_ops_router, prefix="/api/v1")
+app.include_router(fp_field_ops_staff_portal_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 
 

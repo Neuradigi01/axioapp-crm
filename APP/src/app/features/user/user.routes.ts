@@ -147,6 +147,20 @@ export const userRoutes: Routes = [
             './packs/furniture/custom-orders/custom-order-detail.page'
           ).then((m) => m.CustomOrderDetailPageComponent),
       },
+      {
+        path: 'field-ops',
+        loadComponent: () =>
+          import('./packs/furniture/field-ops/field-ops.page').then(
+            (m) => m.FieldOpsPageComponent,
+          ),
+      },
+      {
+        path: 'field-ops/:id',
+        loadComponent: () =>
+          import(
+            './packs/furniture/field-ops/field-visit-detail.page'
+          ).then((m) => m.FieldVisitDetailPageComponent),
+      },
       ...devRoutes,
     ],
   },
