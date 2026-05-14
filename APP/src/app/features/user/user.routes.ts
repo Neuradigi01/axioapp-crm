@@ -126,6 +126,13 @@ export const userRoutes: Routes = [
             (m) => m.CampaignDetailPageComponent,
           ),
       },
+      {
+        path: 'inventory',
+        loadComponent: () =>
+          import('./packs/furniture/inventory/inventory.page').then(
+            (m) => m.InventoryPageComponent,
+          ),
+      },
       ...devRoutes,
     ],
   },

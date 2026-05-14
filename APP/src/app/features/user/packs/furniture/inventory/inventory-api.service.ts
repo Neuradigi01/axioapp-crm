@@ -1,0 +1,148 @@
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
+
+import { environment } from '../../../../../../environments/environment';
+
+export type MovementType = 'receipt' | 'dispatch' | 'adjust' | 'transfer';
+export type AlertSeverity = 'low' | 'out';
+export type AlertPriority = 'low' | 'med' | 'high';
+export type AlertStatus = 'open' | 'ordered' | 'closed';
+
+export interface Warehouse {
+  id: string;
+  org_id: string;
+  name: string;
+  address: string | null;
+  contact_phone: string | null;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventoryItem {
+  id: string;
+  org_id: string;
+  catalog_item_id: string | null;
+  warehouse_id: string;
+  sku: string;
+  material: string | null;
+  color: string | null;
+  finish: string | null;
+  dimensions: Record<string, unknown>;
+  qty_on_hand: number;
+  qty_reserved: number;
+  reorder_level: number;
+  last_received_at: string | null;
+  custom_data: Record<string, unknown>;
+  is_best_seller: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventoryItemListResponse {
+  items: InventoryItem[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface InventoryItemQuery {
+  warehouse_id?: string;
+  category?: string;
+  q?: string;
+  active_only?: boolean;
+  page?: number;
+  size?: number;
+}
+
+export interface MovementCreate {
+  type: MovementType;
+  qty: number;
+  reference_type?: string | null;
+  reference_id?: string | null;
+  notes?: string | null;
+}
+
+export interface Movement {
+  id: string;
+  org_id: string;
+  item_id: string;
+  type: MovementType;
+  qty: number;
+  reference_type: string | null;
+  reference_id: string | null;
+  notes: string | null;
+  user_id: string | null;
+  created_at: string;
+}
+
+export interface StockAlert {
+  id: string;
+  org_id: string;
+  item_id: string;
+  severity: AlertSeverity;
+  priority: AlertPriority;
+  suggested_reorder_qty: number;
+  status: AlertStatus;
+  created_at: string;
+  closed_at: string | null;
+}
+
+@Injectable({ providedIn: 'root' })
+export class InventoryApiService {
+  private readonly http = inject(HttpClient);
+  private readonly base = `${environment.apiBaseUrl}/inventory`;
+
+  // --- Warehouses ---
+  listWarehouses(): Observable<Warehouse[]> {
+    return this.http.get<Warehouse[]>(`${this.base}/warehouses`);
+  }
+
+  // --- Items ---
+  listItems(query: InventoryItemQuery = {}): Observable<InventoryItemListResponse> {
+    let params = new HttpParams();
+    if (query.warehouse_id) params = params.set('warehouse_id', query.warehouse_id);
+    if (query.category) params = params.set('category', query.category);
+    if (query.q) params = params.set('q', query.q);
+    if (query.active_only) params = params.set('active_only', 'true');
+    if (query.page) params = params.set('page', String(query.page));
+    if (query.size) params = params.set('size', String(query.size));
+    return this.http.get<InventoryItemListResponse>(`${this.base}/items`, { params });
+  }
+
+  getItem(id: string): Observable<InventoryItem> {
+    return this.http.get<InventoryItem>(`${this.base}/items/${id}`);
+  }
+
+  // --- Movements ---
+  listMovements(itemId: string, limit = 100): Observable<Movement[]> {
+    const params = new HttpParams().set('limit', String(limit));
+    return this.http.get<Movement[]>(
+      `${this.base}/items/${itemId}/movements`,
+      { params },
+    );
+  }
+
+  recordMovement(itemId: string, payload: MovementCreate): Observable<Movement> {
+    return this.http.post<Movement>(
+      `${this.base}/items/${itemId}/movements`,
+      payload,
+    );
+  }
+
+  // --- Alerts ---
+  listAlerts(opts: { severity?: AlertSeverity; status?: AlertStatus } = {}): Observable<StockAlert[]> {
+    let params = new HttpParams();
+    if (opts.severity) params = params.set('severity', opts.severity);
+    if (opts.status) params = params.set('status', opts.status);
+    return this.http.get<StockAlert[]>(`${this.base}/alerts`, { params });
+  }
+
+  updateAlertStatus(id: string, newStatus: AlertStatus): Observable<StockAlert> {
+    return this.http.patch<StockAlert>(`${this.base}/alerts/${id}`, {
+      status: newStatus,
+    });
+  }
+}
