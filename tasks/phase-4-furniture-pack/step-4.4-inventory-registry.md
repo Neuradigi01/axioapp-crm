@@ -3,7 +3,7 @@
 **Goal:** Register the inventory module in the module registry with permissions and menu metadata. Sidebar should automatically show "Inventory" via the registry endpoint.
 **Phase:** 4
 **Depends on:** 4.3, 1.8
-**Status:** COMPLETED
+**Status:** COMPLETED OK
 
 ## Scope
 **In-scope:**
