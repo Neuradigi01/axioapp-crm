@@ -1,5 +1,7 @@
 # Step DR.4 — Move demo logins from hardcoded array to DB
 
+STATUS: COMPLETED
+
 **Goal:** Eliminate the `DEMO_PRESETS` constant in `login.component.ts` by sourcing the test-login list from the database. Production builds end up with zero demo credentials baked in; dev/staging surfaces the list via a dev-only endpoint.
 **Phase:** 4.5 — Demo Roles Setup (side task)
 **Depends on:** DR.1, DR.2 (and ideally DR.3 verified)

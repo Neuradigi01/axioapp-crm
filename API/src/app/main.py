@@ -59,6 +59,7 @@ from src.app.packs.furniture.modules.field_ops.router import (
     staff_portal_router as fp_field_ops_staff_portal_router,
 )
 from src.app.core.billing.router import router as billing_router
+from src.app.core.dev.router import router as dev_router
 from src.app.packs.furniture.modules.billing.router import (
     router as fp_pos_router,
 )
@@ -160,6 +161,13 @@ app.include_router(fp_field_ops_router, prefix="/api/v1")
 app.include_router(fp_field_ops_staff_portal_router, prefix="/api/v1")
 app.include_router(billing_router, prefix="/api/v1")
 app.include_router(fp_pos_router, prefix="/api/v1")
+
+# Dev-only routes (test-login dropdown backing endpoint, etc). Mounted
+# only when IS_DEVELOPMENT=true on the API container — production never
+# resolves `/api/v1/_dev/*`.
+if os.getenv("IS_DEVELOPMENT", "").lower() == "true":
+    app.include_router(dev_router, prefix="/api/v1")
+    logger.info("dev routes mounted at /api/v1/_dev/* (IS_DEVELOPMENT=true)")
 app.include_router(modules_router, prefix="/api/v1")
 
 

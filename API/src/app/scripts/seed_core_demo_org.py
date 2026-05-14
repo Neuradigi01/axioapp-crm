@@ -31,6 +31,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from src.app.core.dev.models import DemoCredential
 from src.app.core.permissions.models import Permission, Role, RolePermission
 from src.app.core.settings.service import get_or_create as get_or_create_settings
 from src.app.core.tenants.models import Organization
@@ -136,10 +137,10 @@ _ROLES: list[tuple[uuid.UUID, str, list[str]]] = [
 ]
 
 
-_USERS: list[tuple[uuid.UUID, str, str, str, uuid.UUID]] = [
-    (ADMIN_USER_ID,    "admin@core-demo.local",    "Admin@123",    "Core Demo Admin",    ADMIN_ROLE_ID),
-    (OWNER_USER_ID,    "owner@core-demo.local",    "Owner@123",    "Core Demo Owner",    OWNER_ROLE_ID),
-    (EMPLOYEE_USER_ID, "employee@core-demo.local", "Employee@123", "Core Demo Employee", EMPLOYEE_ROLE_ID),
+_USERS: list[tuple[uuid.UUID, str, str, str, uuid.UUID, str]] = [
+    (ADMIN_USER_ID,    "admin@core-demo.local",    "Admin@123",    "Core Demo Admin",    ADMIN_ROLE_ID,    "Core CRM — Admin"),
+    (OWNER_USER_ID,    "owner@core-demo.local",    "Owner@123",    "Core Demo Owner",    OWNER_ROLE_ID,    "Core CRM — Owner"),
+    (EMPLOYEE_USER_ID, "employee@core-demo.local", "Employee@123", "Core Demo Employee", EMPLOYEE_ROLE_ID, "Core CRM — Employee"),
 ]
 
 
@@ -216,15 +217,36 @@ async def seed_core_demo_org() -> None:
                         "phone": None,
                         "role_id": role_id,
                         "is_active": True,
+                        "is_demo": True,
                     }
-                    for (user_id, email, password, full_name, role_id) in _USERS
+                    for (user_id, email, password, full_name, role_id, _label) in _USERS
                 ])
                 .on_conflict_do_nothing(index_elements=["id"])
+            )
+            # Flip is_demo on rows that pre-existed from a pre-DR.4 seed run.
+            await session.execute(
+                User.__table__.update()
+                .where(User.id.in_([u[0] for u in _USERS]))
+                .values(is_demo=True)
+            )
+
+            # 6) Demo credential rows backing /api/v1/_dev/demo-logins.
+            await session.execute(
+                pg_insert(DemoCredential)
+                .values([
+                    {
+                        "user_id": user_id,
+                        "plain_password": password,
+                        "label": label,
+                    }
+                    for (user_id, _, password, _, _, label) in _USERS
+                ])
+                .on_conflict_do_nothing(index_elements=["user_id"])
             )
 
             await session.commit()
 
-            # 6) Org settings row (idempotent helper — creates on first call).
+            # 7) Org settings row (idempotent helper — creates on first call).
             await get_or_create_settings(session, org_id=CORE_DEMO_ORG_ID)
     finally:
         reset_context(token)
@@ -235,7 +257,7 @@ async def seed_core_demo_org() -> None:
     for (role_id, name, keys) in _ROLES:
         print(f"  {name:10s} {role_id}  perms={len(keys)}")
     print("Users:")
-    for (user_id, email, password, _, _) in _USERS:
+    for (user_id, email, password, _, _, _) in _USERS:
         print(f"  {email:30s} {password}  id={user_id}")
     print()
     print("Done. Login via /accounts/login with org_slug='core-demo'.")

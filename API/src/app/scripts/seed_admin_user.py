@@ -24,6 +24,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from src.app.core.dev.models import DemoCredential
 from src.app.core.permissions.models import Permission, Role, RolePermission
 from src.app.core.users.models import User
 from src.app.scripts.seed_demo_org import DEMO_ORG_ID
@@ -110,8 +111,28 @@ async def seed_admin_user() -> None:
                 phone=None,
                 role_id=ADMIN_ROLE_ID,
                 is_active=True,
+                is_demo=True,
             )
             .on_conflict_do_nothing(index_elements=["id"])
+        )
+        # If the row already existed from a pre-`is_demo` seed, flip
+        # the flag on the existing row so the dev-only demo-logins
+        # endpoint surfaces it.
+        await session.execute(
+            User.__table__.update()
+            .where(User.id == ADMIN_USER_ID)
+            .values(is_demo=True)
+        )
+
+        # 5) Demo credential row backing /api/v1/_dev/demo-logins.
+        await session.execute(
+            pg_insert(DemoCredential)
+            .values(
+                user_id=ADMIN_USER_ID,
+                plain_password=ADMIN_PASSWORD,
+                label="Furniture CRM — Admin",
+            )
+            .on_conflict_do_nothing(index_elements=["user_id"])
         )
 
         await session.commit()

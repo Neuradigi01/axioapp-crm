@@ -1,7 +1,10 @@
-import { Component, ChangeDetectionStrategy, signal, inject, viewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnInit, signal, inject, viewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { environment } from '../../../../environments/environment';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -24,8 +27,11 @@ import { DeviceInfoService } from '@core/services/device-info.service';
 import { FurnitureAuthService } from '@app/features/user/core/auth/auth.service';
 
 // All non-admin logins resolve to the furniture demo org by default;
-// the "Test logins" dropdown lets a developer switch to the core-demo
-// org (or back to demo) without typing credentials each time.
+// the "Test logins" dropdown lets a developer switch between seeded
+// demo users without typing credentials each time. Presets come from
+// the dev-only `/api/v1/_dev/demo-logins` endpoint, which is mounted
+// only when the API container has `IS_DEVELOPMENT=true`. Production
+// builds get an empty list → dropdown auto-hides.
 const DEFAULT_FURNITURE_ORG_SLUG = 'demo';
 
 interface DemoPreset {
@@ -35,32 +41,14 @@ interface DemoPreset {
   readonly orgSlug: string;
 }
 
-const DEMO_PRESETS: readonly DemoPreset[] = [
-  {
-    label: 'Core CRM — Admin',
-    identifier: 'admin@core-demo.local',
-    password: 'Admin@123',
-    orgSlug: 'core-demo',
-  },
-  {
-    label: 'Core CRM — Owner',
-    identifier: 'owner@core-demo.local',
-    password: 'Owner@123',
-    orgSlug: 'core-demo',
-  },
-  {
-    label: 'Core CRM — Employee',
-    identifier: 'employee@core-demo.local',
-    password: 'Employee@123',
-    orgSlug: 'core-demo',
-  },
-  {
-    label: 'Furniture CRM — Admin',
-    identifier: 'admin@demo.local',
-    password: 'Admin@123',
-    orgSlug: 'demo',
-  },
-];
+/** Shape of `GET /api/v1/_dev/demo-logins` rows. */
+interface DemoLoginResponseRow {
+  label: string;
+  identifier: string;
+  password: string;
+  org_slug: string;
+  org_name: string;
+}
 
 @Component({
   selector: 'app-login',
@@ -82,7 +70,7 @@ const DEMO_PRESETS: readonly DemoPreset[] = [
     PasswordToggleDirective,
   ],
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly authApi = inject(AuthApiService);
   private readonly auth = inject(AuthService);
@@ -90,6 +78,7 @@ export class LoginComponent {
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly deviceInfo = inject(DeviceInfoService);
+  private readonly http = inject(HttpClient);
 
   private readonly route = inject(ActivatedRoute);
   readonly userType: UserType = (this.route.snapshot.data['userType'] as UserType) ?? 'User';
@@ -104,7 +93,10 @@ export class LoginComponent {
   readonly captchaType = signal('');
   readonly captchaToken = signal('');
 
-  readonly demoPresets = DEMO_PRESETS;
+  /** Populated on init from `/api/v1/_dev/demo-logins`. Empty when the
+   * backend doesn't expose the endpoint (production builds) — the
+   * template hides the dropdown in that case. */
+  readonly demoPresets = signal<readonly DemoPreset[]>([]);
   readonly selectedOrgSlug = signal<string>(DEFAULT_FURNITURE_ORG_SLUG);
 
   private readonly captchaRef = viewChild<CaptchaComponent>('captchaRef');
@@ -116,6 +108,26 @@ export class LoginComponent {
     return this.userType === ROLE_ADMIN;
   }
 
+  ngOnInit(): void {
+    // Skip the fetch entirely on the admin-login variant — the
+    // dropdown is hidden there anyway.
+    if (this.isAdmin) return;
+
+    const url = `${environment.apiBaseUrl}/_dev/demo-logins`;
+    this.http
+      .get<DemoLoginResponseRow[]>(url)
+      .pipe(catchError(() => of<DemoLoginResponseRow[]>([])))
+      .subscribe((rows) => {
+        const presets: DemoPreset[] = rows.map((r) => ({
+          label: r.label,
+          identifier: r.identifier,
+          password: r.password,
+          orgSlug: r.org_slug,
+        }));
+        this.demoPresets.set(presets);
+      });
+  }
+
   onPresetChange(event: Event): void {
     const idx = (event.target as HTMLSelectElement).value;
     if (idx === '') {
@@ -123,7 +135,7 @@ export class LoginComponent {
       this.selectedOrgSlug.set(DEFAULT_FURNITURE_ORG_SLUG);
       return;
     }
-    const preset = this.demoPresets[Number(idx)];
+    const preset = this.demoPresets()[Number(idx)];
     if (!preset) return;
     this.loginForm.patchValue({
       identifier: preset.identifier,
