@@ -1,4 +1,25 @@
 <div class="login">
+  @if (!isAdmin) {
+    <div class="mx-auto mb-3 w-full max-w-sm rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <label for="login_preset" class="block text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+        Test logins
+      </label>
+      <select
+        id="login_preset"
+        (change)="onPresetChange($event)"
+        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        <option value="">— Pick a test login —</option>
+        @for (p of demoPresets; track p.identifier; let i = $index) {
+          <option [value]="i">{{ p.label }}</option>
+        }
+      </select>
+      <p class="mt-1 text-[11px] text-zinc-500">
+        Active org: <span class="font-mono font-medium text-zinc-700">{{ selectedOrgSlug() }}</span>
+      </p>
+    </div>
+  }
+
   <mat-card class="login__card">
     <mat-card-header class="login__header">
       <mat-card-title class="login__title">

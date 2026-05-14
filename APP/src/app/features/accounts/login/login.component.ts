@@ -23,9 +23,44 @@ import { MSG_ERROR_GENERIC, MSG_LOGIN_FAILED } from '@core/constants/messages.co
 import { DeviceInfoService } from '@core/services/device-info.service';
 import { FurnitureAuthService } from '@app/features/user/core/auth/auth.service';
 
-// All non-admin logins resolve to the demo org until a tenant selector
-// (or domain-based resolution) lands in Phase 2.
+// All non-admin logins resolve to the furniture demo org by default;
+// the "Test logins" dropdown lets a developer switch to the core-demo
+// org (or back to demo) without typing credentials each time.
 const DEFAULT_FURNITURE_ORG_SLUG = 'demo';
+
+interface DemoPreset {
+  readonly label: string;
+  readonly identifier: string;
+  readonly password: string;
+  readonly orgSlug: string;
+}
+
+const DEMO_PRESETS: readonly DemoPreset[] = [
+  {
+    label: 'Core CRM — Admin',
+    identifier: 'admin@core-demo.local',
+    password: 'Admin@123',
+    orgSlug: 'core-demo',
+  },
+  {
+    label: 'Core CRM — Owner',
+    identifier: 'owner@core-demo.local',
+    password: 'Owner@123',
+    orgSlug: 'core-demo',
+  },
+  {
+    label: 'Core CRM — Employee',
+    identifier: 'employee@core-demo.local',
+    password: 'Employee@123',
+    orgSlug: 'core-demo',
+  },
+  {
+    label: 'Furniture CRM — Admin',
+    identifier: 'admin@demo.local',
+    password: 'Admin@123',
+    orgSlug: 'demo',
+  },
+];
 
 @Component({
   selector: 'app-login',
@@ -69,6 +104,9 @@ export class LoginComponent {
   readonly captchaType = signal('');
   readonly captchaToken = signal('');
 
+  readonly demoPresets = DEMO_PRESETS;
+  readonly selectedOrgSlug = signal<string>(DEFAULT_FURNITURE_ORG_SLUG);
+
   private readonly captchaRef = viewChild<CaptchaComponent>('captchaRef');
 
   readonly forgotPasswordUrl = getRoute('forgot_password').url;
@@ -76,6 +114,22 @@ export class LoginComponent {
 
   get isAdmin(): boolean {
     return this.userType === ROLE_ADMIN;
+  }
+
+  onPresetChange(event: Event): void {
+    const idx = (event.target as HTMLSelectElement).value;
+    if (idx === '') {
+      this.loginForm.patchValue({ identifier: '', password: '' });
+      this.selectedOrgSlug.set(DEFAULT_FURNITURE_ORG_SLUG);
+      return;
+    }
+    const preset = this.demoPresets[Number(idx)];
+    if (!preset) return;
+    this.loginForm.patchValue({
+      identifier: preset.identifier,
+      password: preset.password,
+    });
+    this.selectedOrgSlug.set(preset.orgSlug);
   }
 
   onCaptchaTypeChange(type: string): void {
@@ -96,7 +150,7 @@ export class LoginComponent {
     if (!this.isAdmin) {
       try {
         await firstValueFrom(
-          this.furnitureAuth.login(identifier, password, DEFAULT_FURNITURE_ORG_SLUG),
+          this.furnitureAuth.login(identifier, password, this.selectedOrgSlug()),
         );
         await this.router.navigateByUrl('/user');
       } catch (err: unknown) {

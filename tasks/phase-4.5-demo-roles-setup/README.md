@@ -34,9 +34,9 @@ After this you can demonstrate the two-layer architecture visually: same code, s
 
 ## Steps
 
-- [DR.1 — Seed core-demo org + 3 roles + 3 users](step-dr.1-seed-core-demo-org.md) — Pending
-- [DR.2 — Login dropdown for test logins](step-dr.2-login-dropdown.md) — Pending
-- [DR.3 — Smoke test all 4 logins side-by-side](step-dr.3-smoke-test.md) — Pending
+- [DR.1 — Seed core-demo org + 3 roles + 3 users](step-dr.1-seed-core-demo-org.md) — Done
+- [DR.2 — Login dropdown for test logins](step-dr.2-login-dropdown.md) — Done
+- [DR.3 — Smoke test all 4 logins side-by-side](step-dr.3-smoke-test.md) — Done
 
 ## File budget
 
