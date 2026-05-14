@@ -3,7 +3,7 @@
 **Goal:** `fp_field_visits` table. Visit scheduling (uses appointments engine). Photo upload + measurement capture. Frontend lists per-staff scheduled/completed visits. Wires into Staff dashboard's Field Operations tab and Staff Portal's Field Visits tab.
 **Phase:** 4
 **Depends on:** 2.13, 3.4, 4.8
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 **In-scope:**
