@@ -181,6 +181,7 @@ roles:
       - campaigns.read
       - campaigns.write
       - settings.read
+      - inventory.*
 
   - key: senior_sales_executive
     name: Senior Sales Executive
@@ -196,6 +197,7 @@ roles:
       - conversations.*
       - calls.*
       - reviews.read
+      - inventory.read
 
   - key: sales_executive
     name: Sales Executive
@@ -214,6 +216,7 @@ roles:
       - conversations.write
       - calls.read
       - calls.write
+      - inventory.read
 
   - key: junior_sales_executive
     name: Junior Sales Executive
@@ -232,6 +235,7 @@ roles:
       - catalog.read
       - conversations.read
       - calls.read
+      - inventory.read
 
   - key: design_consultant
     name: Design Consultant
@@ -251,6 +255,7 @@ roles:
       - catalog.read
       - conversations.read
       - conversations.write
+      - inventory.read
 
   - key: warehouse_manager
     name: Warehouse Manager
@@ -261,6 +266,7 @@ roles:
       - catalog.*
       - staff.read
       - attendance.write
+      - inventory.*
 
 # ---------------------------------------------------------------------------
 # Lead sources — top-of-funnel attribution. The Reviews tab and the
@@ -349,3 +355,4 @@ module_permissions:
   reviews:       [reviews.read, reviews.write]
   campaigns:     [campaigns.read, campaigns.write, campaigns.send]
   settings:      [settings.read, settings.write]
+  inventory:     [inventory.read, inventory.write, inventory.dispatch, inventory.transfer]

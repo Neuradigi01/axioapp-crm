@@ -36,6 +36,7 @@ import {
   User,
   UserPlus,
   Users,
+  Warehouse,
   X,
 } from 'lucide-angular';
 
@@ -78,6 +79,7 @@ export const appConfig: ApplicationConfig = {
         User,
         UserPlus,
         Users,
+        Warehouse,
         X,
       }),
     ),
