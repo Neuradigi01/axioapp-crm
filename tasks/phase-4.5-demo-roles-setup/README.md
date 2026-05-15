@@ -39,6 +39,7 @@ After this you can demonstrate the two-layer architecture visually: same code, s
 - [DR.3 — Smoke test all 4 logins side-by-side](step-dr.3-smoke-test.md) — Done
 - [DR.4 — Move demo logins from hardcoded array to DB](step-dr.4-db-backed-logins.md) — Done
 - [DR.5 — Per-org sidebar branding](step-dr.5-sidebar-branding.md) — Done
+- [DR.6 — Move auth onto `tbl_user_login`](step-dr.6-auth-on-tbl-user-login.md) — Pending
 
 ## File budget
 
