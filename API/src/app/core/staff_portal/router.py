@@ -93,7 +93,7 @@ async def me_endpoint(
     user: User = Depends(get_current_staff),
 ) -> StaffMeOut:
     return StaffMeOut(
-        id=user.id, org_id=user.org_id, full_name=user.full_name, email=user.email
+        id=user.legacy_uuid, org_id=user.org_id, full_name=user.full_name, email=user.email
     )
 
 
@@ -102,7 +102,7 @@ async def me_performance_endpoint(
     user: User = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ) -> PerformanceOut:
-    data = await compute_performance(db, user.id)
+    data = await compute_performance(db, user.legacy_uuid)
     return PerformanceOut(**data)
 
 
@@ -114,7 +114,7 @@ async def me_attendance_endpoint(
     db: AsyncSession = Depends(get_db),
 ) -> list[AttendanceOut]:
     rows = await list_attendance(
-        db, user_id=user.id, from_dt=from_, to_dt=to
+        db, user_id=user.legacy_uuid, from_dt=from_, to_dt=to
     )
     return [AttendanceOut.model_validate(r) for r in rows]
 
@@ -125,7 +125,7 @@ async def me_activity_endpoint(
     user: User = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ) -> list[ActivityOut]:
-    rows = await list_activities_for(db, user.id, limit=limit)
+    rows = await list_activities_for(db, user.legacy_uuid, limit=limit)
     return [ActivityOut.model_validate(r) for r in rows]
 
 
@@ -138,7 +138,7 @@ async def me_clock_in_endpoint(
     db: AsyncSession = Depends(get_db),
 ) -> AttendanceOut:
     row = await svc_clock_in(
-        db, org_id=user.org_id, user_id=user.id, payload=payload
+        db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload
     )
     return AttendanceOut.model_validate(row)
 
@@ -149,5 +149,5 @@ async def me_clock_out_endpoint(
     user: User = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ) -> AttendanceOut:
-    row = await svc_clock_out(db, user_id=user.id, payload=payload)
+    row = await svc_clock_out(db, user_id=user.legacy_uuid, payload=payload)
     return AttendanceOut.model_validate(row)

@@ -98,8 +98,8 @@ async def list_pickable_users(
     # without a staff_profile row are intentionally excluded — they
     # can't clock in until HR sets them up.
     stmt = (
-        select(User.id, User.full_name)
-        .join(StaffProfile, StaffProfile.user_id == User.id)
+        select(User.legacy_uuid, User.full_name)
+        .join(StaffProfile, StaffProfile.user_id == User.legacy_uuid)
         .where(User.org_id == org.id)
         .where(User.is_active.is_(True))
         .where(StaffProfile.employment_status == EmploymentStatus.active)
@@ -107,7 +107,7 @@ async def list_pickable_users(
     )
     rows = (await session.execute(stmt)).all()
     return [
-        StaffPickerUser(id=row.id, full_name=row.full_name, avatar=None)
+        StaffPickerUser(id=row.legacy_uuid, full_name=row.full_name, avatar=None)
         for row in rows
     ]
 
@@ -136,7 +136,7 @@ async def login(
 
     user = (
         await session.execute(
-            select(User).where(User.id == user_id).where(User.org_id == org.id)
+            select(User).where(User.legacy_uuid == user_id).where(User.org_id == org.id)
         )
     ).scalar_one_or_none()
     if user is None or not user.is_active:
@@ -156,16 +156,16 @@ async def login(
 
     profile = (
         await session.execute(
-            select(StaffProfile).where(StaffProfile.user_id == user.id)
+            select(StaffProfile).where(StaffProfile.user_id == user.legacy_uuid)
         )
     ).scalar_one_or_none()
     if profile is None or profile.employment_status != EmploymentStatus.active:
         await audit.log(
             "staff_portal.login_failed",
             entity_type="user",
-            entity_id=user.id,
+            entity_id=user.legacy_uuid,
             org_id=org.id,
-            user_id=user.id,
+            user_id=user.legacy_uuid,
             ip=ip,
             ua=ua,
             after={"reason": "profile_inactive"},
@@ -176,14 +176,14 @@ async def login(
         )
 
     now = datetime.now(timezone.utc)
-    rate_key = (org.id, user.id)
+    rate_key = (org.id, user.legacy_uuid)
     if _is_rate_limited(rate_key, now):
         await audit.log(
             "staff_portal.login_rate_limited",
             entity_type="user",
-            entity_id=user.id,
+            entity_id=user.legacy_uuid,
             org_id=org.id,
-            user_id=user.id,
+            user_id=user.legacy_uuid,
             ip=ip,
             ua=ua,
         )
@@ -198,9 +198,9 @@ async def login(
         await audit.log(
             "staff_portal.login_failed",
             entity_type="user",
-            entity_id=user.id,
+            entity_id=user.legacy_uuid,
             org_id=org.id,
-            user_id=user.id,
+            user_id=user.legacy_uuid,
             ip=ip,
             ua=ua,
             after={"reason": "bad_pin"},
@@ -213,7 +213,7 @@ async def login(
     # Success — mint token + persist session.
     token_id = uuid.uuid4()
     encoded, expires_at = encode_token(
-        user_id=user.id,
+        user_id=user.legacy_uuid,
         org_id=org.id,
         token_id=token_id,
         ttl=STAFF_TOKEN_TTL,
@@ -223,7 +223,7 @@ async def login(
         StaffSession(
             id=token_id,
             org_id=org.id,
-            user_id=user.id,
+            user_id=user.legacy_uuid,
             expires_at=expires_at,
             ip=ip,
             ua=ua,
@@ -238,9 +238,9 @@ async def login(
     await audit.log(
         "staff_portal.login_succeeded",
         entity_type="user",
-        entity_id=user.id,
+        entity_id=user.legacy_uuid,
         org_id=org.id,
-        user_id=user.id,
+        user_id=user.legacy_uuid,
         ip=ip,
         ua=ua,
     )
@@ -248,7 +248,7 @@ async def login(
     return {
         "staff_token": encoded,
         "expires_at": expires_at,
-        "user_id": user.id,
+        "user_id": user.legacy_uuid,
         "org_id": org.id,
     }
 

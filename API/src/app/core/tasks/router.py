@@ -51,7 +51,7 @@ async def my_tasks(
     user: User = Depends(require_permissions("tasks.read")),
 ) -> TaskListResponse:
     rows, total = await list_my_tasks(
-        db, user_id=user.id, status_filter=status_filter, page=page, size=size
+        db, user_id=user.legacy_uuid, status_filter=status_filter, page=page, size=size
     )
     return TaskListResponse(
         items=[TaskOut.model_validate(r) for r in rows],
@@ -94,7 +94,7 @@ async def create_task_endpoint(
     user: User = Depends(require_permissions("tasks.write")),
 ) -> TaskOut:
     task = await create_task(
-        db, org_id=user.org_id, current_user_id=user.id, payload=payload
+        db, org_id=user.org_id, current_user_id=user.legacy_uuid, payload=payload
     )
     return TaskOut.model_validate(task)
 

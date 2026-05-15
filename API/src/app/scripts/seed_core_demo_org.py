@@ -28,7 +28,7 @@ import asyncio
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.app.core.dev.models import DemoCredential
@@ -204,29 +204,41 @@ async def seed_core_demo_org() -> None:
                 )
             )
 
-            # 5) Users.
+            # 5) Users. After DR.6.3 the User model is backed by
+            # `tbl_user_login`. The UUID identity goes into `legacy_uuid`;
+            # `tbl_user_login.user_id` (TEXT, NOT NULL) is the legacy
+            # login handle which we synthesise deterministically from the
+            # UUID so re-runs hit the partial unique index
+            # `uq_tbl_user_login_legacy_uuid` and become no-ops. `password`
+            # is the actual DB column (Python `User.password_hash` is a
+            # read-only @property alias).
             await session.execute(
                 pg_insert(User)
                 .values([
                     {
-                        "id": user_id,
+                        "legacy_uuid": user_id,
+                        "user_id": "usr_" + user_id.hex,
                         "org_id": CORE_DEMO_ORG_ID,
                         "email": email,
-                        "password_hash": hash_password(password),
+                        "password": hash_password(password),
                         "full_name": full_name,
                         "phone": None,
                         "role_id": role_id,
                         "is_active": True,
                         "is_demo": True,
+                        "two_factor_enabled": False,
                     }
                     for (user_id, email, password, full_name, role_id, _label) in _USERS
                 ])
-                .on_conflict_do_nothing(index_elements=["id"])
+                .on_conflict_do_nothing(
+                    index_elements=["legacy_uuid"],
+                    index_where=text("legacy_uuid IS NOT NULL"),
+                )
             )
             # Flip is_demo on rows that pre-existed from a pre-DR.4 seed run.
             await session.execute(
                 User.__table__.update()
-                .where(User.id.in_([u[0] for u in _USERS]))
+                .where(User.legacy_uuid.in_([u[0] for u in _USERS]))
                 .values(is_demo=True)
             )
 

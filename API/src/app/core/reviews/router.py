@@ -93,7 +93,7 @@ async def create_endpoint(
     user: User = Depends(require_permissions("reviews.write")),
 ) -> ReviewOut:
     review = await create_review(
-        db, org_id=user.org_id, user_id=user.id, payload=payload
+        db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload
     )
     return ReviewOut.model_validate(review)
 
@@ -137,7 +137,7 @@ async def reply_endpoint(
     user: User = Depends(require_permissions("reviews.write")),
 ) -> ReviewOut:
     review = await reply_to_review(
-        db, review_id=review_id, user_id=user.id, payload=payload
+        db, review_id=review_id, user_id=user.legacy_uuid, payload=payload
     )
     return ReviewOut.model_validate(review)
 
@@ -150,6 +150,6 @@ async def escalate_endpoint(
     user: User = Depends(require_permissions("reviews.write")),
 ) -> ReviewOut:
     review = await escalate_review(
-        db, review_id=review_id, user_id=user.id, payload=payload
+        db, review_id=review_id, user_id=user.legacy_uuid, payload=payload
     )
     return ReviewOut.model_validate(review)

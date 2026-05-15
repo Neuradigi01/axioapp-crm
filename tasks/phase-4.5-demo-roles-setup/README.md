@@ -39,7 +39,34 @@ After this you can demonstrate the two-layer architecture visually: same code, s
 - [DR.3 — Smoke test all 4 logins side-by-side](step-dr.3-smoke-test.md) — Done
 - [DR.4 — Move demo logins from hardcoded array to DB](step-dr.4-db-backed-logins.md) — Done
 - [DR.5 — Per-org sidebar branding](step-dr.5-sidebar-branding.md) — Done
-- [DR.6 — Move auth onto `tbl_user_login`](step-dr.6-auth-on-tbl-user-login.md) — Pending
+- [DR.6 — Move auth onto `tbl_user_login`](step-dr.6-auth-on-tbl-user-login.md) — Done
+
+## DR.6 soak checklist — `users` table
+
+After DR.6, FurnitureCRM auth reads from `tbl_user_login` only. The
+old `users` table is kept physically intact (11 rows) as a 2-week
+safety net so we can roll back without data loss. Revisit on or after
+**2026-05-29** and run through this checklist:
+
+- [ ] Audit-log review: confirm no `auth.*` or write-path audit rows
+      have `user_id` values that aren't present as
+      `tbl_user_login.legacy_uuid`.
+- [ ] FK retarget plan: `auth_sessions.user_id`, `audit_logs.user_id`,
+      `staff_sessions.user_id`, `staff_profiles.user_id`, and any
+      `*.assigned_to_id` columns currently reference `users.id`. Plan
+      a migration to retarget them to
+      `tbl_user_login.legacy_uuid` (UNIQUE partial index already
+      exists from migration 0031), then drop the FK + the `users`
+      table + the placeholder `Table("users", …)` shim in
+      [`api/src/app/core/users/models.py`](../../api/src/app/core/users/models.py).
+- [ ] Verify the legacy `UserLogin` class in
+      [`api/src/models/user.py`](../../api/src/models/user.py) is
+      still the only declarative class that maps the bigint `id`
+      column, and that the layered `User`
+      class uses `__mapper_args__["exclude_properties"]` to keep
+      `id`/`user_id`/`two_factor_*` off its mapper.
+- [ ] Final cutover migration drops the placeholder `users` shim,
+      drops the physical `users` table, retargets FKs.
 
 ## File budget
 

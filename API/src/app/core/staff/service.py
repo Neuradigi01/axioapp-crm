@@ -75,7 +75,7 @@ async def _ensure_user_in_scope(
     session: AsyncSession, user_id: uuid.UUID
 ) -> User:
     user = (
-        await session.execute(select(User).where(User.id == user_id))
+        await session.execute(select(User).where(User.legacy_uuid == user_id))
     ).scalar_one_or_none()
     if user is None:
         raise HTTPException(
@@ -92,7 +92,7 @@ async def list_staff(session: AsyncSession) -> list[StaffListItem]:
     """Every user in the org + their profile (if any)."""
     stmt = (
         select(User, StaffProfile)
-        .outerjoin(StaffProfile, StaffProfile.user_id == User.id)
+        .outerjoin(StaffProfile, StaffProfile.user_id == User.legacy_uuid)
         .order_by(User.full_name.asc())
     )
     rows = (await session.execute(stmt)).all()
@@ -100,7 +100,7 @@ async def list_staff(session: AsyncSession) -> list[StaffListItem]:
     for user, profile in rows:
         out.append(
             StaffListItem(
-                id=user.id,
+                id=user.legacy_uuid,
                 org_id=user.org_id,
                 email=user.email,
                 full_name=user.full_name,

@@ -138,6 +138,6 @@ async def move_lead_stage_endpoint(
     user: User = Depends(require_permissions("leads.write")),
 ) -> LeadOut:
     lead = await move_stage_for_lead(
-        db, lead_id=lead_id, to_stage=payload.to_stage, user_id=user.id
+        db, lead_id=lead_id, to_stage=payload.to_stage, user_id=user.legacy_uuid
     )
     return LeadOut.model_validate(lead)

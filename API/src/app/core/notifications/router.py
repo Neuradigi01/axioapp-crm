@@ -46,7 +46,7 @@ async def list_notifications(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[NotificationOut]:
-    rows = await list_for_user(db, user_id=user.id, unread=unread, limit=limit)
+    rows = await list_for_user(db, user_id=user.legacy_uuid, unread=unread, limit=limit)
     return [NotificationOut.model_validate(r) for r in rows]
 
 
@@ -57,7 +57,7 @@ async def mark_notification_read(
     user: User = Depends(get_current_user),
 ) -> NotificationOut:
     notification = await mark_read(
-        db, user_id=user.id, notification_id=notification_id
+        db, user_id=user.legacy_uuid, notification_id=notification_id
     )
     if notification is None:
         raise HTTPException(
@@ -72,7 +72,7 @@ async def mark_all_notifications_read(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> ReadAllResponse:
-    n = await mark_all_read(db, user_id=user.id)
+    n = await mark_all_read(db, user_id=user.legacy_uuid)
     return ReadAllResponse(marked=n)
 
 
@@ -83,7 +83,7 @@ async def list_my_preferences(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[NotificationPreferenceOut]:
-    rows = await get_preferences(db, user_id=user.id)
+    rows = await get_preferences(db, user_id=user.legacy_uuid)
     return [NotificationPreferenceOut.model_validate(r) for r in rows]
 
 
@@ -98,6 +98,6 @@ async def update_my_preferences(
     user: User = Depends(get_current_user),
 ) -> list[NotificationPreferenceOut]:
     rows = await update_preferences(
-        db, org_id=user.org_id, user_id=user.id, type_=type, payload=payload
+        db, org_id=user.org_id, user_id=user.legacy_uuid, type_=type, payload=payload
     )
     return [NotificationPreferenceOut.model_validate(r) for r in rows]

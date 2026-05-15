@@ -34,8 +34,16 @@ async def _get_org_by_slug(db: AsyncSession, slug: str) -> Organization | None:
 async def _get_user_by_email_in_org(
     db: AsyncSession, org_id: uuid.UUID, email: str
 ) -> User | None:
+    # `email IS NOT NULL` is belt-and-suspenders against the legacy
+    # USR29684795 row co-resident in `tbl_user_login`. Its NULL email
+    # would never match a non-empty `email == ?` predicate either, but
+    # this makes the intent explicit and rules out future regressions.
     result = await db.execute(
-        select(User).where(User.org_id == org_id, User.email == email)
+        select(User).where(
+            User.org_id == org_id,
+            User.email == email,
+            User.email.is_not(None),
+        )
     )
     return result.scalar_one_or_none()
 
@@ -85,11 +93,17 @@ async def login(
     now = datetime.now(timezone.utc)
     expires_at = now + ACCESS_TOKEN_TTL
 
+    # `user.id` is the bigint storage PK of `tbl_user_login` (DR.6.3).
+    # Every UUID-typed `user_id` FK (AuthSession.user_id → users.id,
+    # audit_logs.user_id, JWT `sub`) references the user by the UUID
+    # identity preserved in `user.legacy_uuid`.
+    user_uuid = user.legacy_uuid
+
     db.add(
         AuthSession(
             id=token_id,
             org_id=org.id,
-            user_id=user.id,
+            user_id=user_uuid,
             expires_at=expires_at,
             ip=ip,
             ua=ua,
@@ -100,14 +114,14 @@ async def login(
     await audit.log(
         "auth.login.success",
         org_id=org.id,
-        user_id=user.id,
+        user_id=user_uuid,
         after={"token_id": str(token_id)},
         ip=ip,
         ua=ua,
     )
 
     encoded, exp = encode_token(
-        user_id=user.id, org_id=org.id, token_id=token_id, now=now
+        user_id=user_uuid, org_id=org.id, token_id=token_id, now=now
     )
     return LoginResponse(access_token=encoded, expires_at=exp)
 

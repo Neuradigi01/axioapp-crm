@@ -58,7 +58,11 @@ async def list_demo_logins(
             Organization.name.label("org_name"),
             Organization.pack_id.label("pack_id"),
         )
-        .join(DemoCredential, DemoCredential.user_id == User.id)
+        # After DR.6.3 `User.id` is the bigint storage PK of
+        # `tbl_user_login`. The UUID `DemoCredential.user_id` matches
+        # the value preserved in `User.legacy_uuid` by the 0032 data
+        # migration, so we join through that column instead.
+        .join(DemoCredential, DemoCredential.user_id == User.legacy_uuid)
         .join(Organization, Organization.id == User.org_id)
         .where(User.is_demo.is_(True))
         # 'core' pack first, then 'furniture', then anything else.

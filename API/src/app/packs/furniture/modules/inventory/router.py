@@ -372,7 +372,7 @@ async def create_movement_endpoint(
     movement = await record_movement(
         db,
         item_id=item_id,
-        user_id=user.id,
+        user_id=user.legacy_uuid,
         type_=payload.type,
         qty=payload.qty,
         reference_type=payload.reference_type,

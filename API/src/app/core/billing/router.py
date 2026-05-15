@@ -92,7 +92,7 @@ async def create_invoice_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("billing.write")),
 ) -> InvoiceOut:
-    inv = await create_draft(db, org_id=user.org_id, user_id=user.id, payload=payload)
+    inv = await create_draft(db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload)
     return InvoiceOut.model_validate(inv)
 
 
@@ -171,7 +171,7 @@ async def issue_invoice_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("billing.write")),
 ) -> InvoiceOut:
-    inv = await issue(db, invoice_id=invoice_id, user_id=user.id)
+    inv = await issue(db, invoice_id=invoice_id, user_id=user.legacy_uuid)
     return InvoiceOut.model_validate(inv)
 
 
@@ -181,7 +181,7 @@ async def void_invoice_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("billing.refund")),
 ) -> InvoiceOut:
-    inv = await void_invoice(db, invoice_id=invoice_id, user_id=user.id)
+    inv = await void_invoice(db, invoice_id=invoice_id, user_id=user.legacy_uuid)
     return InvoiceOut.model_validate(inv)
 
 
@@ -213,7 +213,7 @@ async def record_payment_endpoint(
     user: User = Depends(require_permissions("billing.write")),
 ) -> PaymentOut:
     pay = await record_payment(
-        db, invoice_id=invoice_id, user_id=user.id, payload=payload
+        db, invoice_id=invoice_id, user_id=user.legacy_uuid, payload=payload
     )
     return PaymentOut.model_validate(pay)
 

@@ -21,7 +21,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.app.core.dev.models import DemoCredential
@@ -98,29 +98,40 @@ async def seed_admin_user() -> None:
             .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
         )
 
-        # 4) admin user. Hash is computed at seed time so reruns produce
-        # different hashes but the row already exists → DO NOTHING.
+        # 4) admin user. After DR.6.3 the User model is backed by
+        # `tbl_user_login`. The UUID identity lives in `legacy_uuid`;
+        # `tbl_user_login.user_id` (TEXT, NOT NULL) is the legacy login
+        # handle — we synthesise one deterministically from the UUID so
+        # re-runs hit the partial unique index `uq_tbl_user_login_legacy_uuid`
+        # and become no-ops. `password` is the actual DB column (Python
+        # `User.password_hash` is a read-only @property alias).
+        legacy_user_handle = "usr_" + ADMIN_USER_ID.hex
         await session.execute(
             pg_insert(User)
             .values(
-                id=ADMIN_USER_ID,
+                legacy_uuid=ADMIN_USER_ID,
+                user_id=legacy_user_handle,
                 org_id=DEMO_ORG_ID,
                 email=ADMIN_EMAIL,
-                password_hash=hash_password(ADMIN_PASSWORD),
+                password=hash_password(ADMIN_PASSWORD),
                 full_name=ADMIN_FULL_NAME,
                 phone=None,
                 role_id=ADMIN_ROLE_ID,
                 is_active=True,
                 is_demo=True,
+                two_factor_enabled=False,
             )
-            .on_conflict_do_nothing(index_elements=["id"])
+            .on_conflict_do_nothing(
+                index_elements=["legacy_uuid"],
+                index_where=text("legacy_uuid IS NOT NULL"),
+            )
         )
         # If the row already existed from a pre-`is_demo` seed, flip
         # the flag on the existing row so the dev-only demo-logins
         # endpoint surfaces it.
         await session.execute(
             User.__table__.update()
-            .where(User.id == ADMIN_USER_ID)
+            .where(User.legacy_uuid == ADMIN_USER_ID)
             .values(is_demo=True)
         )
 

@@ -101,7 +101,7 @@ async def create_order_endpoint(
     user: User = Depends(require_permissions("custom_orders.write")),
 ) -> CustomOrderOut:
     order = await create_order(
-        db, org_id=user.org_id, user_id=user.id, payload=payload
+        db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload
     )
     return CustomOrderOut.model_validate(order)
 
@@ -150,7 +150,7 @@ async def move_stage_endpoint(
     order = await move_stage(
         db,
         order_id=order_id,
-        user_id=user.id,
+        user_id=user.legacy_uuid,
         to_stage=payload.to_stage,
         notes=payload.notes,
     )

@@ -45,7 +45,9 @@ async def get_me(
         )
     ).scalar_one()
     return UserMe(
-        id=user.id,
+        # `user.id` is the bigint storage PK of tbl_user_login (DR.6.3).
+        # The UUID identity exposed to consumers is `user.legacy_uuid`.
+        id=user.legacy_uuid,
         org_id=user.org_id,
         email=user.email,
         full_name=user.full_name,

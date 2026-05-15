@@ -3,7 +3,7 @@
 **Goal:** Make `tbl_user_login` the single source of truth for FurnitureCRM logins. Add the multi-tenant + RBAC columns it's missing, migrate the 4 demo users out of `users` and into `tbl_user_login`, and rewrite the auth chain to read from the new home. Keep all existing `tbl_user_login` columns intact so the legacy `/accounts/admin-login` flow keeps working. **Keep the `users` table physically intact as a 2-week safety net** — auth code stops reading it but the rows stay.
 **Phase:** 4.5 — Demo Roles Setup (side task)
 **Depends on:** DR.1, DR.2, DR.3, DR.4, DR.5
-**Status:** Pending
+**Status:** Done (smoked 2026-05-15; `users` table parked for soak — revisit on or after 2026-05-29)
 
 ---
 
@@ -26,7 +26,7 @@ This touches the central auth path. Mistakes lock everyone out. So we break DR.6
 | DR.6.1 | Migration: add columns to `tbl_user_login` (all nullable) | Yes — `alembic downgrade -1` |
 | DR.6.2 | Migration: copy `users` rows into `tbl_user_login`, populate `legacy_uuid` bridge | Yes — `alembic downgrade -1` |
 | DR.6.3 | Repoint `User` model's `__tablename__` to `tbl_user_login`; keep column aliases | Yes — flip one string back |
-| DR.6.4 | Update auth login lookup + JWT issuance to read from `tbl_user_login` | Yes — revert one file |
+| DR.6.4 | Update auth login lookup + JWT issuance to read from `tbl_user_login` | Yes — revert one file 
 | DR.6.5 | Update `/users/me`, `/_dev/demo-logins`, both seed scripts | Yes — revert each file |
 | DR.6.6 | End-to-end smoke: all 5 logins work; rebuild Angular; mark `users` table as "soak" (keep, don't drop) | n/a — verification only |
 

@@ -74,7 +74,7 @@ async def create_endpoint(
     user: User = Depends(require_permissions("campaigns.write")),
 ) -> CampaignOut:
     campaign = await create_campaign(
-        db, org_id=user.org_id, user_id=user.id, payload=payload
+        db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload
     )
     return CampaignOut.model_validate(campaign)
 

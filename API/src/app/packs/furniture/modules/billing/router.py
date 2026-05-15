@@ -113,7 +113,7 @@ async def checkout_endpoint(
     inv = await create_draft(
         db,
         org_id=user.org_id,
-        user_id=user.id,
+        user_id=user.legacy_uuid,
         payload=InvoiceCreate(
             contact_id=contact.id,
             notes=payload.notes,
@@ -136,13 +136,13 @@ async def checkout_endpoint(
         )
 
     # 4. Issue (snapshot tax + GST, assign number)
-    inv = await issue_invoice(db, invoice_id=inv.id, user_id=user.id)
+    inv = await issue_invoice(db, invoice_id=inv.id, user_id=user.legacy_uuid)
 
     # 5. Record a single full-amount payment → flip to `paid`
     await record_payment(
         db,
         invoice_id=inv.id,
-        user_id=user.id,
+        user_id=user.legacy_uuid,
         payload=PaymentCreate(
             amount=inv.total,
             method=payload.payment_method,
@@ -187,7 +187,7 @@ async def checkout_endpoint(
         await record_movement(
             db,
             item_id=inv_item.id,
-            user_id=user.id,
+            user_id=user.legacy_uuid,
             type_=MovementType.dispatch,
             qty=ln.qty,
             reference_type="invoice",

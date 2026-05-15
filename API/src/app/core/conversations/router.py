@@ -110,7 +110,7 @@ async def send_message_endpoint(
     msg = await send_outbound(
         db,
         conversation_id=conversation_id,
-        user_id=user.id,
+        user_id=user.legacy_uuid,
         text_body=payload.text,
         attachments=payload.attachments,
     )

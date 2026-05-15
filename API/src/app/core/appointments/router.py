@@ -69,7 +69,7 @@ async def create_appointment_endpoint(
     user: User = Depends(require_permissions("appointments.write")),
 ) -> AppointmentOut:
     appt = await create_appointment(
-        db, org_id=user.org_id, current_user_id=user.id, payload=payload
+        db, org_id=user.org_id, current_user_id=user.legacy_uuid, payload=payload
     )
     return AppointmentOut.model_validate(appt)
 
@@ -99,7 +99,7 @@ async def update_appointment_endpoint(
     appt = await update_appointment(
         db,
         appointment_id=appointment_id,
-        current_user_id=user.id,
+        current_user_id=user.legacy_uuid,
         payload=payload,
     )
     return AppointmentOut.model_validate(appt)

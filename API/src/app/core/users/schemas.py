@@ -9,13 +9,18 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    # `populate_by_name=True` so callers passing `id=...` explicitly
+    # still work alongside the `validation_alias` below that pulls from
+    # `User.legacy_uuid` when `model_validate(user)` reads off the ORM
+    # instance. (After DR.6.3 `User.id` is the bigint storage PK; the
+    # UUID identity exposed to API consumers is `User.legacy_uuid`.)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    id: uuid.UUID
+    id: uuid.UUID = Field(validation_alias="legacy_uuid")
     org_id: uuid.UUID
     # Plain str (not EmailStr): seed uses `admin@demo.local`, which RFC 6761
     # reserves and EmailStr rejects on serialise. Strict email validation

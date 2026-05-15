@@ -117,7 +117,7 @@ async def create_call_endpoint(
     user: User = Depends(require_permissions("calls.write")),
 ) -> CallOut:
     call = await create_call(
-        db, org_id=user.org_id, user_id=user.id, payload=payload
+        db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload
     )
     return CallOut.model_validate(call)
 

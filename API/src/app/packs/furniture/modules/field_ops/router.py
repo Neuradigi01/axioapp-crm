@@ -110,7 +110,7 @@ async def create_visit_endpoint(
     user: User = Depends(require_permissions("field_visits.write")),
 ) -> FieldVisitOut:
     visit = await create_visit(
-        db, org_id=user.org_id, user_id=user.id, payload=payload
+        db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload
     )
     return FieldVisitOut.model_validate(visit)
 
@@ -154,7 +154,7 @@ async def complete_visit_endpoint(
     user: User = Depends(require_permissions("field_visits.write")),
 ) -> FieldVisitOut:
     visit = await complete_visit(
-        db, visit_id=visit_id, user_id=user.id, payload=payload
+        db, visit_id=visit_id, user_id=user.legacy_uuid, payload=payload
     )
     return FieldVisitOut.model_validate(visit)
 
@@ -220,7 +220,7 @@ async def me_list_visits_endpoint(
 ) -> list[FieldVisitOut]:
     rows, _total = await list_visits(
         db,
-        assigned_to_id=user.id,
+        assigned_to_id=user.legacy_uuid,
         completed=completed,
         page=1,
         size=200,
@@ -250,7 +250,7 @@ async def me_complete_visit_endpoint(
     user: User = Depends(get_current_staff),
 ) -> FieldVisitOut:
     visit = await complete_visit(
-        db, visit_id=visit_id, user_id=user.id, payload=payload
+        db, visit_id=visit_id, user_id=user.legacy_uuid, payload=payload
     )
     return FieldVisitOut.model_validate(visit)
 

@@ -60,7 +60,7 @@ async def create_activity_note(
     note = await create_note(
         db,
         org_id=user.org_id,
-        user_id=user.id,
+        user_id=user.legacy_uuid,
         entity_type=payload.entity_type,
         entity_id=payload.entity_id,
         text=payload.payload["text"],

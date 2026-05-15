@@ -211,7 +211,7 @@ async def _ensure_user_in_scope(
     session: AsyncSession, user_id: uuid.UUID
 ) -> None:
     user = (
-        await session.execute(select(User.id).where(User.id == user_id))
+        await session.execute(select(User.legacy_uuid).where(User.legacy_uuid == user_id))
     ).scalar_one_or_none()
     if user is None:
         raise HTTPException(
