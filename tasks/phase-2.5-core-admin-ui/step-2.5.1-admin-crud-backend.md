@@ -2,7 +2,7 @@
 
 **Goal:** Add the missing CRUD endpoints the admin UI binds against. `GET /users` and `GET /audit` already exist; the rest are missing.
 **Phase:** 2.5 — Core CRM Admin UI
-**Status:** Pending
+**Status:** COMPLETED
 
 ---
 
