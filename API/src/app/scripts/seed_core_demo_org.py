@@ -35,7 +35,7 @@ from src.app.core.dev.models import DemoCredential
 from src.app.core.permissions.models import Permission, Role, RolePermission
 from src.app.core.settings.service import get_or_create as get_or_create_settings
 from src.app.core.tenants.models import Organization
-from src.app.core.users.models import User
+from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 from src.app.shared.security.password import hash_password
@@ -204,41 +204,94 @@ async def seed_core_demo_org() -> None:
                 )
             )
 
-            # 5) Users. After DR.6.3 the User model is backed by
-            # `tbl_user_login`. The UUID identity goes into `legacy_uuid`;
-            # `tbl_user_login.user_id` (TEXT, NOT NULL) is the legacy
-            # login handle which we synthesise deterministically from the
-            # UUID so re-runs hit the partial unique index
-            # `uq_tbl_user_login_legacy_uuid` and become no-ops. `password`
-            # is the actual DB column (Python `User.password_hash` is a
-            # read-only @property alias).
+            # 5) Users — three-table split (DR.7+). Each user is split
+            # across tbl_user_login (auth), tbl_user_info (profile),
+            # and tbl_organization_members (org + role + is_demo).
+            # All three inserts are idempotent.
+
+            # 5a) Auth rows.
             await session.execute(
                 pg_insert(User)
                 .values([
                     {
                         "legacy_uuid": user_id,
                         "user_id": "usr_" + user_id.hex,
-                        "org_id": CORE_DEMO_ORG_ID,
-                        "email": email,
                         "password": hash_password(password),
-                        "full_name": full_name,
-                        "phone": None,
-                        "role_id": role_id,
                         "is_active": True,
-                        "is_demo": True,
                         "two_factor_enabled": False,
                     }
-                    for (user_id, email, password, full_name, role_id, _label) in _USERS
+                    for (user_id, _email, password, _fn, _rid, _l) in _USERS
                 ])
                 .on_conflict_do_nothing(
                     index_elements=["legacy_uuid"],
                     index_where=text("legacy_uuid IS NOT NULL"),
                 )
             )
-            # Flip is_demo on rows that pre-existed from a pre-DR.4 seed run.
+
+            # 5b) Resolve bigint login.id for each UUID (the FK target
+            # for the profile + membership inserts below).
+            id_by_uuid: dict[uuid.UUID, int] = dict(
+                (
+                    await session.execute(
+                        select(User.legacy_uuid, User.id).where(
+                            User.legacy_uuid.in_([u[0] for u in _USERS])
+                        )
+                    )
+                ).all()
+            )
+
+            # 5c) Profile rows. Split full_name on first whitespace.
+            profile_rows: list[dict] = []
+            for (user_id, email, _pwd, full_name, _rid, _l) in _USERS:
+                first, _, last = (full_name or "").strip().partition(" ")
+                profile_rows.append(
+                    {
+                        "member_id": id_by_uuid[user_id],
+                        "first_name": first,
+                        "last_name": last,
+                        "email": email,
+                        "mobile_no": None,
+                        "is_email_verified": False,
+                        "is_mobile_verified": False,
+                    }
+                )
             await session.execute(
-                User.__table__.update()
-                .where(User.legacy_uuid.in_([u[0] for u in _USERS]))
+                pg_insert(UserInfo)
+                .values(profile_rows)
+                .on_conflict_do_nothing(index_elements=["member_id"])
+            )
+
+            # 5d) Org-membership rows: role + is_demo + active flag.
+            membership_rows: list[dict] = []
+            for (user_id, _e, _p, _fn, role_id, _l) in _USERS:
+                membership_rows.append(
+                    {
+                        "organization_id": CORE_DEMO_ORG_ID,
+                        "user_member_id": id_by_uuid[user_id],
+                        "role_id": role_id,
+                        "status": "active",
+                        "is_active": True,
+                        "is_demo": True,
+                    }
+                )
+            await session.execute(
+                pg_insert(OrganizationMember)
+                .values(membership_rows)
+                .on_conflict_do_nothing(
+                    index_elements=["organization_id", "user_member_id"]
+                )
+            )
+            # Flip is_demo on memberships pre-existing from an earlier seed.
+            await session.execute(
+                OrganizationMember.__table__.update()
+                .where(
+                    OrganizationMember.user_member_id.in_(
+                        list(id_by_uuid.values())
+                    )
+                )
+                .where(
+                    OrganizationMember.organization_id == CORE_DEMO_ORG_ID
+                )
                 .values(is_demo=True)
             )
 

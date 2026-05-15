@@ -35,7 +35,7 @@ from src.app.core.staff.models import EmploymentStatus, StaffProfile
 from src.app.core.staff_portal.models import StaffSession
 from src.app.core.staff_portal.schemas import StaffPickerUser
 from src.app.core.tenants.models import Organization
-from src.app.core.users.models import User
+from src.app.core.users.models import OrganizationMember, User, UserInfo
 
 
 # --- rate limiting ---------------------------------------------------------
@@ -98,16 +98,32 @@ async def list_pickable_users(
     # without a staff_profile row are intentionally excluded — they
     # can't clock in until HR sets them up.
     stmt = (
-        select(User.legacy_uuid, User.full_name)
+        select(
+            User.legacy_uuid.label("legacy_uuid"),
+            UserInfo.first_name,
+            UserInfo.last_name,
+        )
+        .join(UserInfo, UserInfo.member_id == User.id)
+        .join(
+            OrganizationMember,
+            OrganizationMember.user_member_id == User.id,
+        )
         .join(StaffProfile, StaffProfile.user_id == User.legacy_uuid)
-        .where(User.org_id == org.id)
+        .where(OrganizationMember.organization_id == org.id)
+        .where(OrganizationMember.is_active.is_(True))
         .where(User.is_active.is_(True))
         .where(StaffProfile.employment_status == EmploymentStatus.active)
-        .order_by(User.full_name.asc())
+        .order_by(UserInfo.first_name.asc())
     )
     rows = (await session.execute(stmt)).all()
     return [
-        StaffPickerUser(id=row.legacy_uuid, full_name=row.full_name, avatar=None)
+        StaffPickerUser(
+            id=row.legacy_uuid,
+            full_name=" ".join(
+                p for p in (row.first_name, row.last_name) if p
+            ).strip(),
+            avatar=None,
+        )
         for row in rows
     ]
 
@@ -136,7 +152,14 @@ async def login(
 
     user = (
         await session.execute(
-            select(User).where(User.legacy_uuid == user_id).where(User.org_id == org.id)
+            select(User)
+            .join(
+                OrganizationMember,
+                OrganizationMember.user_member_id == User.id,
+            )
+            .where(User.legacy_uuid == user_id)
+            .where(OrganizationMember.organization_id == org.id)
+            .where(OrganizationMember.is_active.is_(True))
         )
     ).scalar_one_or_none()
     if user is None or not user.is_active:

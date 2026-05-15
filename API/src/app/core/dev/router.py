@@ -23,7 +23,7 @@ from fastapi import Depends
 
 from src.app.core.dev.models import DemoCredential
 from src.app.core.tenants.models import Organization
-from src.app.core.users.models import User
+from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.shared.db import get_db
 
 
@@ -49,24 +49,37 @@ async def list_demo_logins(
     Ordered so Core CRM entries come first, then Furniture — matches
     what most reviewers expect to click through.
     """
+    # After DR.7 the email / org / is_demo flag live on three
+    # different tables. We JOIN through tbl_user_info (email),
+    # tbl_organization_members (org membership + is_demo), and
+    # organizations (slug + name + pack_id).
     stmt = (
         select(
-            User.email.label("identifier"),
+            UserInfo.email.label("identifier"),
             DemoCredential.plain_password.label("password"),
             DemoCredential.label.label("label_db"),
             Organization.slug.label("org_slug"),
             Organization.name.label("org_name"),
             Organization.pack_id.label("pack_id"),
         )
-        # After DR.6.3 `User.id` is the bigint storage PK of
-        # `tbl_user_login`. The UUID `DemoCredential.user_id` matches
-        # the value preserved in `User.legacy_uuid` by the 0032 data
-        # migration, so we join through that column instead.
+        .select_from(User)
+        .join(UserInfo, UserInfo.member_id == User.id)
+        .join(
+            OrganizationMember,
+            OrganizationMember.user_member_id == User.id,
+        )
+        .join(
+            Organization,
+            Organization.id == OrganizationMember.organization_id,
+        )
+        # DemoCredential.user_id is a UUID FK kept against the original
+        # users.id values; tbl_user_login.legacy_uuid preserves them
+        # 1:1 from the 0032 migration.
         .join(DemoCredential, DemoCredential.user_id == User.legacy_uuid)
-        .join(Organization, Organization.id == User.org_id)
-        .where(User.is_demo.is_(True))
+        .where(OrganizationMember.is_demo.is_(True))
+        .where(OrganizationMember.is_active.is_(True))
         # 'core' pack first, then 'furniture', then anything else.
-        .order_by(Organization.pack_id.asc(), User.full_name.asc())
+        .order_by(Organization.pack_id.asc(), UserInfo.first_name.asc())
     )
     rows = (await db.execute(stmt)).all()
 

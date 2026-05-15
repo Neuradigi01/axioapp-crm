@@ -69,5 +69,7 @@ async def list_users_endpoint(
     _user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> list[UserOut]:
-    users = await list_users(session, limit=limit, offset=offset)
+    users = await list_users(
+        session, org_id=_user.org_id, limit=limit, offset=offset
+    )
     return [UserOut.model_validate(u) for u in users]

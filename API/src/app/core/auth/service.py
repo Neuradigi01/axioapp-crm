@@ -22,7 +22,7 @@ from src.app.core.auth.models import AuthSession
 from src.app.core.auth.schemas import LoginResponse, RefreshResponse
 from src.app.core.auth.tokens import ACCESS_TOKEN_TTL, TokenClaims, encode_token
 from src.app.core.tenants.models import Organization
-from src.app.core.users.models import User
+from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.shared.security.password import verify_password
 
 
@@ -34,15 +34,23 @@ async def _get_org_by_slug(db: AsyncSession, slug: str) -> Organization | None:
 async def _get_user_by_email_in_org(
     db: AsyncSession, org_id: uuid.UUID, email: str
 ) -> User | None:
-    # `email IS NOT NULL` is belt-and-suspenders against the legacy
-    # USR29684795 row co-resident in `tbl_user_login`. Its NULL email
-    # would never match a non-empty `email == ?` predicate either, but
-    # this makes the intent explicit and rules out future regressions.
+    # Three-table lookup after DR.7: `tbl_user_info` carries the email,
+    # `tbl_organization_members` carries the org membership + active
+    # flag, `tbl_user_login` carries auth state. We require the
+    # membership to be `is_active=true` so a deactivated user is
+    # filtered out even if their auth row is still active.
     result = await db.execute(
-        select(User).where(
-            User.org_id == org_id,
-            User.email == email,
-            User.email.is_not(None),
+        select(User)
+        .join(UserInfo, UserInfo.member_id == User.id)
+        .join(
+            OrganizationMember,
+            OrganizationMember.user_member_id == User.id,
+        )
+        .where(
+            UserInfo.email == email,
+            OrganizationMember.organization_id == org_id,
+            OrganizationMember.is_active.is_(True),
+            User.is_active.is_(True),
         )
     )
     return result.scalar_one_or_none()

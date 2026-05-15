@@ -1,13 +1,23 @@
-"""User model — backed by `tbl_user_login` (DR.6.3+).
+"""User model — three-table split (DR.7+).
 
-`tbl_user_login` is the single source of truth for FurnitureCRM logins
-after DR.6. It existed pre-DR.6 with a bigint PK and held one legacy
-admin row (USR29684795) that drives `/accounts/admin-login` via the
-separate `src.models.user.UserLogin` mapping. DR.6.1 added the
-FurnitureCRM columns (email / org_id / role_id / full_name / phone /
-is_demo / legacy_uuid / created_at / updated_at) and DR.6.2 migrated
-the `users`-table rows in, preserving each user's original UUID
-identity in the `legacy_uuid` bridge column.
+After DR.7 the FurnitureCRM user is **three rows joined**:
+
+  - `tbl_user_login` — auth (id, user_id text login-handle, password,
+                       2FA, is_active). Mapped here as `User`.
+  - `tbl_user_info`  — profile (first_name, last_name, email,
+                       mobile_no, country/state, verification flags).
+                       Mapped on the legacy `src.models.user.UserInfo`
+                       class, re-exported here as `UserInfo`.
+  - `tbl_organization_members` — N:M between login and organisations,
+                       holds role_id, status, is_demo, is_active per
+                       (user, org) pair. Mapped here as `OrganizationMember`.
+
+`User.id` is the bigint storage PK of `tbl_user_login`. The UUID
+identity that audit FKs, AuthSession.user_id, staff_sessions.user_id,
+and the JWT `sub` reference lives in `User.legacy_uuid`. The
+DR.6.2 data migration populated `legacy_uuid` from the original
+`users.id` values; the soak-and-drop of the `users` table is tracked
+in [tasks/phase-4.5-demo-roles-setup/README.md].
 
 Coexistence with the legacy `UserLogin` mapping
 -----------------------------------------------
@@ -21,31 +31,44 @@ to keep this mapper's namespace from being polluted by the legacy
 2FA / `user_id` / `password_change_*` columns the FurnitureCRM auth
 path doesn't read.
 
-Identity
---------
-`User.id` is the **bigint** storage PK — the same Python type and
-column as `UserLogin.id`. The UUID identity that other tables'
-`user_id` FKs and the JWT `sub` reference lives in `User.legacy_uuid`.
-Callers writing UUID-typed FKs (audit_logs.user_id, AuthSession.user_id,
-JWT sub) MUST use `user.legacy_uuid`, not `user.id`. This is exactly
-the Risk #1 / Risk #2 the DR.6 plan tracks; DR.6.4 / DR.6.5 update
-the audit / JWT / token call sites accordingly.
+User.email / .full_name / .phone / .org_id / .role_id / .is_demo
+----------------------------------------------------------------
+Kept as Python `@property` aliases so callers using attribute access
+(`user.email`, `user.org_id`, etc.) keep working without a sweep. They
+delegate to the joined `info` / `active_membership` rows. For
+SQLAlchemy SQL expressions, callers must JOIN through `UserInfo` and
+`OrganizationMember` directly — properties are not query-expressible.
 
-The legacy USR29684795 row has NULL email / org_id / role_id /
-legacy_uuid, so it never matches any FurnitureCRM auth query (which
-always filters by `email IS NOT NULL` and a specific `org_id`).
+`User` is NOT `TenantScoped` — the org column lives on
+`OrganizationMember`, not on `tbl_user_login`. Queries that need
+tenant scoping must JOIN through `OrganizationMember` and filter on
+`OrganizationMember.organization_id`.
 """
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table, text
-from sqlalchemy.dialects.postgresql import CITEXT, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Table,
+    Text,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.app.shared.db import Base
-from src.app.shared.orm import TenantScoped
+
+# Re-export the legacy `tbl_user_info` mapping. We use the legacy
+# class as-is (1:1 with tbl_user_login, FK on member_id) so the
+# layered code can `from src.app.core.users.models import UserInfo`
+# without setting up a duplicate mapper.
+from src.models.user import UserInfo  # noqa: F401
 
 
 # Placeholder `users` Table in MetaData. The `User` model below maps
@@ -65,19 +88,34 @@ Table(
 )
 
 
-class User(Base, TenantScoped):
+class User(Base):
     __tablename__ = "tbl_user_login"
     __table_args__ = {"extend_existing": True}
-    # Existing Table columns are auto-mapped onto this class unless
-    # excluded. The legacy 2FA + login-handle columns belong to the
-    # legacy `UserLogin` mapping only; hide them from the layered
-    # mapper so `user.user_id`, `user.two_factor_*` don't appear here.
     __mapper_args__ = {
+        # Hide legacy `UserLogin`-only columns from this mapper:
+        # the 2FA tuple plus the TEXT login-handle. The DR.6.1
+        # FurnitureCRM columns are also excluded here — `email`,
+        # `full_name`, `phone`, `role_id`, `is_demo`, `created_at`,
+        # `updated_at`, `org_id` — because after DR.7 they live on
+        # `tbl_user_info` and `tbl_organization_members`. They are
+        # exposed back via @property aliases below for read-only
+        # attribute access. The `org_id` exclusion also keeps the
+        # `do_orm_execute` tenant-filter listener from injecting a
+        # stale `WHERE org_id = ?` clause once the column is dropped
+        # by migration 0035.
         "exclude_properties": [
             "user_id",
             "two_factor_enabled",
             "two_factor_method",
             "two_factor_secret",
+            "email",
+            "full_name",
+            "phone",
+            "role_id",
+            "is_demo",
+            "created_at",
+            "updated_at",
+            "org_id",
         ],
     }
 
@@ -86,34 +124,157 @@ class User(Base, TenantScoped):
     # redeclare them here — `extend_existing` doesn't permit replacing
     # already-mapped columns.
 
-    # FurnitureCRM columns (added in 0031). Nullable so the legacy
-    # USR29684795 row coexists without a backfill.
+    # The one DR.6.1 column we keep on `tbl_user_login`: the UUID
+    # identity bridge. Every cross-table `user_id` FK in the codebase
+    # (audit_logs, auth_sessions, staff_sessions, staff_profiles,
+    # demo_credentials, JWT sub) is a UUID, and `legacy_uuid` is what
+    # those FKs ultimately resolve against until a future migration
+    # retargets them to `tbl_user_login.id` (bigint).
     legacy_uuid: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
     )
-    email: Mapped[str | None] = mapped_column(CITEXT(), nullable=True)
-    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    role_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("roles.id", ondelete="RESTRICT"),
-        nullable=True,
-        index=True,
+
+    # Relationships introduced in DR.7.3 — the three-table split.
+    # `info` is the profile row on `tbl_user_info` (one per user).
+    # `memberships` is the list of (org, role) rows on
+    # `tbl_organization_members`. Use `selectin` loading so a single
+    # `select(User)` always pulls the joined profile + memberships in
+    # one extra query — avoids N+1 on /me and similar.
+    info: Mapped["UserInfo | None"] = relationship(
+        "UserInfo",
+        primaryjoin="User.id == UserInfo.member_id",
+        foreign_keys="UserInfo.member_id",
+        uselist=False,
+        viewonly=True,
+        lazy="selectin",
     )
-    is_demo: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
+    memberships: Mapped[list["OrganizationMember"]] = relationship(
+        "OrganizationMember",
+        primaryjoin="User.id == OrganizationMember.user_member_id",
+        foreign_keys="OrganizationMember.user_member_id",
+        viewonly=True,
+        lazy="selectin",
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=text("now()"),
-        onupdate=text("now()"),
-    )
+
+    @property
+    def active_membership(self) -> "OrganizationMember | None":
+        """The user's currently-active org membership.
+
+        Enforced at the DB level by the partial unique index
+        `uq_org_members_one_active_per_user` (one active row per
+        `user_member_id`). For a request to see this user via the
+        auth path, exactly one row of `memberships` should have
+        `is_active=true`.
+        """
+        for m in self.memberships:
+            if m.is_active:
+                return m
+        return None
 
     @property
     def password_hash(self) -> str:
         """Read-only alias for the legacy `password` column."""
         return self.password  # type: ignore[attr-defined]
+
+    # --- DR.6.1 column shims --------------------------------------------
+    # These attributes used to live on `tbl_user_login` (added DR.6.1,
+    # dropped DR.7.5). They're now read off the joined `info` and
+    # `active_membership` rows. Property-only — not query-expressible.
+
+    @property
+    def email(self) -> str | None:
+        return self.info.email if self.info else None
+
+    @property
+    def full_name(self) -> str:
+        if self.info is None:
+            return ""
+        parts = [self.info.first_name, self.info.last_name]
+        return " ".join(p for p in parts if p).strip()
+
+    @property
+    def phone(self) -> str | None:
+        return self.info.mobile_no if self.info else None
+
+    @property
+    def org_id(self) -> uuid.UUID | None:
+        m = self.active_membership
+        return m.organization_id if m else None
+
+    @property
+    def role_id(self) -> uuid.UUID | None:
+        m = self.active_membership
+        return m.role_id if m else None
+
+    @property
+    def is_demo(self) -> bool:
+        m = self.active_membership
+        return m.is_demo if m else False
+
+    @property
+    def created_at(self) -> datetime | None:
+        m = self.active_membership
+        return m.joined_at if m else None
+
+    @property
+    def updated_at(self) -> datetime | None:
+        # No per-user updated_at after DR.7 — we don't track when an
+        # org membership was last touched. Surface `joined_at` so
+        # serializers that include `updated_at` don't break.
+        m = self.active_membership
+        return m.joined_at if m else None
+
+
+class OrganizationMember(Base):
+    """Per-(org, user) membership row, with role + per-membership state.
+
+    Introduced in DR.7.1 to lift org + role + is_demo + status off
+    `tbl_user_login`. One row per active (org, user) pair; the partial
+    unique index `uq_org_members_one_active_per_user` constrains a
+    user to a single *active* membership across all orgs at a time,
+    while leaving historical/paused memberships in place.
+
+    Not `TenantScoped` — the tenant column is `organization_id`
+    (matching the reference architecture), not `org_id`, so the
+    `do_orm_execute` auto-filter listener doesn't apply. Callers that
+    query `OrganizationMember` directly must filter by
+    `organization_id` explicitly.
+    """
+
+    __tablename__ = "tbl_organization_members"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    user_member_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("tbl_user_login.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    role_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("roles.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'active'")
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    is_demo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    ui_preferences: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )

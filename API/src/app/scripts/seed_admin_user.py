@@ -26,7 +26,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.app.core.dev.models import DemoCredential
 from src.app.core.permissions.models import Permission, Role, RolePermission
-from src.app.core.users.models import User
+from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.scripts.seed_demo_org import DEMO_ORG_ID
 from src.app.shared.context import RequestContext, set_context
 from src.app.shared.db import async_session
@@ -98,27 +98,24 @@ async def seed_admin_user() -> None:
             .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
         )
 
-        # 4) admin user. After DR.6.3 the User model is backed by
-        # `tbl_user_login`. The UUID identity lives in `legacy_uuid`;
-        # `tbl_user_login.user_id` (TEXT, NOT NULL) is the legacy login
-        # handle — we synthesise one deterministically from the UUID so
-        # re-runs hit the partial unique index `uq_tbl_user_login_legacy_uuid`
-        # and become no-ops. `password` is the actual DB column (Python
-        # `User.password_hash` is a read-only @property alias).
+        # 4) admin user — three-table split (DR.7+). Each table owns
+        # one slice of the user's identity:
+        #   tbl_user_login          → auth (login handle, password, 2FA)
+        #   tbl_user_info           → profile (name, email)
+        #   tbl_organization_members → membership + role + is_demo
+        #
+        # We insert in dependency order, looking up the bigint login
+        # PK after the auth row exists so it can be the FK target for
+        # the other two. All three inserts are idempotent via
+        # `ON CONFLICT DO NOTHING` on their respective unique keys.
         legacy_user_handle = "usr_" + ADMIN_USER_ID.hex
         await session.execute(
             pg_insert(User)
             .values(
                 legacy_uuid=ADMIN_USER_ID,
                 user_id=legacy_user_handle,
-                org_id=DEMO_ORG_ID,
-                email=ADMIN_EMAIL,
                 password=hash_password(ADMIN_PASSWORD),
-                full_name=ADMIN_FULL_NAME,
-                phone=None,
-                role_id=ADMIN_ROLE_ID,
                 is_active=True,
-                is_demo=True,
                 two_factor_enabled=False,
             )
             .on_conflict_do_nothing(
@@ -126,12 +123,54 @@ async def seed_admin_user() -> None:
                 index_where=text("legacy_uuid IS NOT NULL"),
             )
         )
-        # If the row already existed from a pre-`is_demo` seed, flip
-        # the flag on the existing row so the dev-only demo-logins
-        # endpoint surfaces it.
+
+        # 4b) Resolve the bigint login.id for this UUID identity so we
+        # can FK into the profile + membership rows below.
+        login_id = (
+            await session.execute(
+                select(User.id).where(User.legacy_uuid == ADMIN_USER_ID)
+            )
+        ).scalar_one()
+
+        # 4c) Profile row. Split the fixed display name into first/last.
+        first_name, _, last_name = ADMIN_FULL_NAME.partition(" ")
         await session.execute(
-            User.__table__.update()
-            .where(User.legacy_uuid == ADMIN_USER_ID)
+            pg_insert(UserInfo)
+            .values(
+                member_id=login_id,
+                first_name=first_name,
+                last_name=last_name,
+                email=ADMIN_EMAIL,
+                mobile_no=None,
+                is_email_verified=False,
+                is_mobile_verified=False,
+            )
+            .on_conflict_do_nothing(index_elements=["member_id"])
+        )
+
+        # 4d) Org membership + role + is_demo. The partial unique
+        # `uq_org_members_one_active_per_user` constrains one active
+        # row per user across all orgs.
+        await session.execute(
+            pg_insert(OrganizationMember)
+            .values(
+                organization_id=DEMO_ORG_ID,
+                user_member_id=login_id,
+                role_id=ADMIN_ROLE_ID,
+                status="active",
+                is_active=True,
+                is_demo=True,
+            )
+            .on_conflict_do_nothing(
+                index_elements=["organization_id", "user_member_id"]
+            )
+        )
+        # Flip is_demo on the existing membership in case a pre-DR.7
+        # seed run left it false.
+        await session.execute(
+            OrganizationMember.__table__.update()
+            .where(OrganizationMember.user_member_id == login_id)
+            .where(OrganizationMember.organization_id == DEMO_ORG_ID)
             .values(is_demo=True)
         )
 

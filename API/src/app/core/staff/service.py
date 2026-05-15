@@ -44,7 +44,7 @@ from src.app.core.staff.schemas import (
     StaffListItem,
     StaffProfileUpsert,
 )
-from src.app.core.users.models import User
+from src.app.core.users.models import User, UserInfo
 
 
 def _profile_snapshot(p: StaffProfile) -> dict[str, Any]:
@@ -90,10 +90,14 @@ async def _ensure_user_in_scope(
 
 async def list_staff(session: AsyncSession) -> list[StaffListItem]:
     """Every user in the org + their profile (if any)."""
+    # After DR.7 the user's display name lives on `tbl_user_info`, so
+    # we JOIN through it for the ordering. The JOIN is inner because
+    # every FurnitureCRM user has a profile row (post-DR.7.2 backfill).
     stmt = (
         select(User, StaffProfile)
+        .join(UserInfo, UserInfo.member_id == User.id)
         .outerjoin(StaffProfile, StaffProfile.user_id == User.legacy_uuid)
-        .order_by(User.full_name.asc())
+        .order_by(UserInfo.first_name.asc())
     )
     rows = (await session.execute(stmt)).all()
     out: list[StaffListItem] = []
