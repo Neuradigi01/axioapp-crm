@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PermissionOut(BaseModel):
@@ -24,3 +24,28 @@ class RoleOut(BaseModel):
     name: str
     is_system: bool
     created_at: datetime
+
+
+class RoleWithCounts(RoleOut):
+    """Role row + computed counts.
+
+    `permission_count` lets the roles-management UI show "Admin · 44
+    permissions · 1 member" without N+1 lookups. `member_count` is the
+    number of active memberships referencing this role — drives the
+    DELETE guard (can't delete a role currently assigned to anyone).
+    """
+
+    permission_count: int
+    member_count: int
+
+
+class RoleCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    permission_keys: list[str] = Field(default_factory=list)
+
+
+class RoleUpdate(BaseModel):
+    """At least one of `name` or `permission_keys` should be set."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    permission_keys: list[str] | None = None

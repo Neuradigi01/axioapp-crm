@@ -13,20 +13,34 @@ Both routes return 401 if the request has no resolved user/org context.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+import uuid
+
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sqlalchemy import select
 
-from src.app.core.auth.dependencies import get_current_user
+from src.app.core.auth.dependencies import get_current_user, require_permissions
 from src.app.core.permissions.service import (
     get_role_by_id,
     list_permissions_for_role,
 )
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import User
-from src.app.core.users.schemas import OrgSummary, UserMe, UserOut
-from src.app.core.users.service import list_users
+from src.app.core.users.schemas import (
+    OrgSummary,
+    UserCreate,
+    UserMe,
+    UserOut,
+    UserStatusUpdate,
+    UserUpdate,
+)
+from src.app.core.users.service import (
+    create_user,
+    list_users,
+    set_user_status,
+    update_user,
+)
 from src.app.shared.db import get_db
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -73,3 +87,46 @@ async def list_users_endpoint(
         session, org_id=_user.org_id, limit=limit, offset=offset
     )
     return [UserOut.model_validate(u) for u in users]
+
+
+@router.post(
+    "",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_user_endpoint(
+    payload: UserCreate,
+    user: User = Depends(require_permissions("users.write")),
+    session: AsyncSession = Depends(get_db),
+) -> UserOut:
+    new_user = await create_user(session, org_id=user.org_id, payload=payload)
+    return UserOut.model_validate(new_user)
+
+
+@router.patch("/{user_id}", response_model=UserOut)
+async def update_user_endpoint(
+    user_id: uuid.UUID,
+    payload: UserUpdate,
+    user: User = Depends(require_permissions("users.write")),
+    session: AsyncSession = Depends(get_db),
+) -> UserOut:
+    updated = await update_user(
+        session, user_id=user_id, org_id=user.org_id, payload=payload
+    )
+    return UserOut.model_validate(updated)
+
+
+@router.patch("/{user_id}/status", response_model=UserOut)
+async def set_user_status_endpoint(
+    user_id: uuid.UUID,
+    payload: UserStatusUpdate,
+    user: User = Depends(require_permissions("users.write")),
+    session: AsyncSession = Depends(get_db),
+) -> UserOut:
+    updated = await set_user_status(
+        session,
+        user_id=user_id,
+        org_id=user.org_id,
+        is_active=payload.is_active,
+    )
+    return UserOut.model_validate(updated)

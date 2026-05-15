@@ -51,3 +51,34 @@ class UserMe(UserOut):
     role_name: str
     permission_keys: list[str]
     org: OrgSummary
+
+
+class UserCreate(BaseModel):
+    """Admin creates a new user in the caller's org.
+
+    Password is not set here — the user is unable to log in until they
+    accept an invitation (step 2.5.6). A random placeholder password
+    is written so the bcrypt verify never short-circuits NULL.
+    """
+
+    email: str = Field(min_length=3, max_length=255)
+    full_name: str = Field(min_length=1, max_length=255)
+    phone: str | None = Field(default=None, max_length=32)
+    role_id: uuid.UUID
+
+
+class UserUpdate(BaseModel):
+    """Admin updates a user's display name, phone, or role.
+
+    Email is immutable — changing email means inviting a new account.
+    Status (is_active) goes through a separate endpoint so the audit
+    trail is unambiguous.
+    """
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    phone: str | None = Field(default=None, max_length=32)
+    role_id: uuid.UUID | None = None
+
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool
