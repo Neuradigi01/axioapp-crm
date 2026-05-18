@@ -56,8 +56,9 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | 4.5 | [Demo Roles Setup + DR.6/7](phase-4.5-demo-roles-setup/README.md) | 7 | Core (Done) |
 | 5 | [Core CRM v1 Launch](phase-5-core-crm-launch/README.md) | 13 | **Core — current focus** |
 | 6 | [Furniture Pack Features (Layer 2)](phase-6-furniture-pack-features/README.md) | 8 | Furniture pack (post-launch) |
+| — | [Lead Infrastructure](lead-infrastructure/README.md) | 4 | Core (side track) |
 
-**Total: 89 step files** (76 original plan + DR.1–7 + Phase 2.5).
+**Total: 93 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure side track).
 
 Phase 5 was restructured to gather **all core CRM v1 work** (features + polish + hardening) so the path to a shipped template is one phase. Phase 6 was reshaped to hold **all furniture-pack-specific work** that's irrelevant to a generic CRM template adopter.
 
@@ -150,6 +151,12 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [6.6 In-Store QR Marketing](phase-6-furniture-pack-features/step-6.6-qr-marketing.md) — Pending
 - [6.7 AI Virtual Staging: backend](phase-6-furniture-pack-features/step-6.7-virtual-staging-backend.md) — Pending
 - [6.8 AI Virtual Staging: frontend](phase-6-furniture-pack-features/step-6.8-virtual-staging-frontend.md) — Pending
+
+### Lead Infrastructure (side track — pipeline-stage CRUD on the Leads kanban)
+- [Step 1: Backend stage CRUD endpoints](lead-infrastructure/step-1-backend-stage-crud.md) — Pending
+- [Step 2: Frontend stage editor popover](lead-infrastructure/step-2-frontend-stage-editor.md) — Pending
+- [Step 3: Frontend add-stage popover](lead-infrastructure/step-3-frontend-add-stage.md) — Pending
+- [Step 4: Frontend board wiring](lead-infrastructure/step-4-frontend-board-wiring.md) — Pending
 
 ---
 
