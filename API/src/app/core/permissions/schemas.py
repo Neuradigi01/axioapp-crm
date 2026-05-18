@@ -27,16 +27,19 @@ class RoleOut(BaseModel):
 
 
 class RoleWithCounts(RoleOut):
-    """Role row + computed counts.
+    """Role row + computed counts + the grant set.
 
-    `permission_count` lets the roles-management UI show "Admin · 44
-    permissions · 1 member" without N+1 lookups. `member_count` is the
-    number of active memberships referencing this role — drives the
-    DELETE guard (can't delete a role currently assigned to anyone).
+    `permission_count` and `member_count` drive the roles-management
+    list view (e.g. "Admin · 44 permissions · 1 member"). The
+    `permission_keys` list is the actual grant set — the editor reads
+    it to pre-check the boxes when the user opens an existing role
+    for edit. Computed via `array_agg` in `list_roles_in_org` so no
+    N+1 lookups when listing a dozen roles per org.
     """
 
     permission_count: int
     member_count: int
+    permission_keys: list[str]
 
 
 class RoleCreate(BaseModel):

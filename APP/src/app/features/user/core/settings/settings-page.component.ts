@@ -4,12 +4,14 @@ import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { IntegrationsTabComponent } from './tabs/integrations-tab.component';
 import { NotificationsTabComponent } from './tabs/notifications-tab.component';
+import { RolesTabComponent } from './tabs/roles-tab.component';
 import { StoreProfileTabComponent } from './tabs/store-profile-tab.component';
 import { TeamTabComponent } from './tabs/team-tab.component';
 
 type SettingsTab =
   | 'store'
   | 'team'
+  | 'roles'
   | 'integrations'
   | 'notifications'
   | 'ai'
@@ -18,6 +20,7 @@ type SettingsTab =
 const TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
   { id: 'store', label: 'Store Profile' },
   { id: 'team', label: 'Team' },
+  { id: 'roles', label: 'Roles' },
   { id: 'integrations', label: 'Integrations' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'ai', label: 'AI Settings' },
@@ -31,6 +34,7 @@ const TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
   imports: [
     StoreProfileTabComponent,
     TeamTabComponent,
+    RolesTabComponent,
     IntegrationsTabComponent,
     NotificationsTabComponent,
     AiSettingsTabComponent,

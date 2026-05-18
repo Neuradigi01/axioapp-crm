@@ -1,0 +1,175 @@
+<div>
+  @if (loadError(); as err) {
+    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      {{ err }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+      Loading…
+    </div>
+  } @else if (mode() === 'list') {
+    <!-- List view -->
+    <div class="mb-3 flex items-center justify-between">
+      <p class="text-sm text-zinc-500">
+        {{ roles().length }} {{ roles().length === 1 ? 'role' : 'roles' }} defined for this organisation
+      </p>
+      @if (canWrite()) {
+        <button
+          type="button"
+          (click)="startCreate()"
+          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+        >
+          Create role
+        </button>
+      }
+    </div>
+
+    @if (roles().length === 0) {
+      <div class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500">
+        No roles defined yet.
+      </div>
+    } @else {
+      <ul class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+        @for (r of roles(); track r.id) {
+          <li class="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3 last:border-b-0">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <p class="truncate text-sm font-medium text-zinc-900">{{ r.name }}</p>
+                @if (r.is_system) {
+                  <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">
+                    System
+                  </span>
+                }
+              </div>
+              <p class="mt-0.5 text-xs text-zinc-500">
+                {{ r.permission_count }} {{ r.permission_count === 1 ? 'permission' : 'permissions' }}
+                · {{ r.member_count }} {{ r.member_count === 1 ? 'member' : 'members' }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                (click)="startEdit(r)"
+                class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                {{ r.is_system ? 'View' : 'Edit' }}
+              </button>
+              @if (canWrite() && !r.is_system) {
+                <button
+                  type="button"
+                  (click)="deleteRole(r)"
+                  [disabled]="saving() || r.member_count > 0"
+                  [title]="r.member_count > 0 ? 'Cannot delete: ' + r.member_count + ' member(s) still use this role. Reassign them first.' : 'Delete role'"
+                  class="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <!-- Editor view -->
+    <form [formGroup]="nameForm" (ngSubmit)="saveEditor()" class="space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-semibold text-zinc-900">
+          @if (editingRole(); as r) {
+            {{ isReadOnly() ? 'View role' : 'Edit role' }}: {{ r.name }}
+            @if (r.is_system) {
+              <span class="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">
+                System (read-only)
+              </span>
+            }
+          } @else {
+            Create role
+          }
+        </h3>
+        <button
+          type="button"
+          (click)="cancelEditor()"
+          class="text-sm text-zinc-500 hover:text-zinc-900"
+        >
+          ← Back to roles
+        </button>
+      </div>
+
+      <label class="block">
+        <span class="mb-1 block text-xs font-medium text-zinc-600">Role name</span>
+        <input
+          type="text"
+          formControlName="name"
+          autocomplete="off"
+          [attr.readonly]="isReadOnly() ? '' : null"
+          [class.bg-zinc-50]="isReadOnly()"
+          class="w-full max-w-md rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+        />
+      </label>
+
+      <div>
+        <p class="mb-2 text-xs font-medium text-zinc-600">
+          Permissions ({{ selectedKeys().size }} selected)
+        </p>
+        <div class="space-y-3 rounded-lg border border-zinc-200 bg-white p-3">
+          @for (group of permissionsByModule(); track group.module) {
+            <details class="rounded-md border border-zinc-100 bg-zinc-50/50" open>
+              <summary class="cursor-pointer select-none px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-600 hover:text-zinc-900">
+                {{ group.module }}
+                <span class="ml-2 text-zinc-400 normal-case">
+                  ({{ group.perms.length }})
+                </span>
+              </summary>
+              <div class="grid grid-cols-1 gap-1 px-3 pb-3 pt-1 md:grid-cols-2">
+                @for (p of group.perms; track p.id) {
+                  <label class="flex items-start gap-2 rounded px-1.5 py-1 text-sm hover:bg-zinc-100">
+                    <input
+                      type="checkbox"
+                      [checked]="isChecked(p.key)"
+                      [disabled]="isReadOnly()"
+                      (change)="toggleKey(p.key, $any($event.target).checked)"
+                      class="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    <span class="min-w-0">
+                      <span class="block font-mono text-xs text-zinc-700">{{ p.key }}</span>
+                      @if (p.description) {
+                        <span class="block text-[11px] text-zinc-500">{{ p.description }}</span>
+                      }
+                    </span>
+                  </label>
+                }
+              </div>
+            </details>
+          }
+        </div>
+      </div>
+
+      @if (editorError(); as err) {
+        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {{ err }}
+        </div>
+      }
+
+      <div class="flex justify-end gap-2">
+        <button
+          type="button"
+          (click)="cancelEditor()"
+          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          {{ isReadOnly() ? 'Close' : 'Cancel' }}
+        </button>
+        @if (!isReadOnly() && canWrite()) {
+          <button
+            type="submit"
+            [disabled]="nameForm.invalid || saving()"
+            class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {{ saving() ? 'Saving…' : (editingRole() ? 'Save changes' : 'Create role') }}
+          </button>
+        }
+      </div>
+    </form>
+  }
+</div>

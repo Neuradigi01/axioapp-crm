@@ -119,6 +119,20 @@ async def list_roles_in_org(
         .correlate(Role)
         .scalar_subquery()
     )
+    # array_agg gives us the grant set in a single round-trip; the
+    # role-editor pre-checks its boxes off this list. NULL when the
+    # role has no grants — we coalesce to an empty array client-side.
+    perm_keys = (
+        select(func.array_agg(Permission.key))
+        .select_from(Permission)
+        .join(
+            RolePermission,
+            RolePermission.permission_id == Permission.id,
+        )
+        .where(RolePermission.role_id == Role.id)
+        .correlate(Role)
+        .scalar_subquery()
+    )
     stmt = (
         select(
             Role.id,
@@ -128,6 +142,7 @@ async def list_roles_in_org(
             Role.created_at,
             perm_count.label("permission_count"),
             member_count.label("member_count"),
+            perm_keys.label("permission_keys"),
         )
         .where(Role.org_id == org_id)
         .order_by(Role.is_system.desc(), Role.name.asc())
@@ -142,6 +157,7 @@ async def list_roles_in_org(
             "created_at": r.created_at,
             "permission_count": r.permission_count,
             "member_count": r.member_count,
+            "permission_keys": list(r.permission_keys or []),
         }
         for r in rows
     ]
