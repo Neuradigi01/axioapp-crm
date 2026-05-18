@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -7,9 +7,10 @@ import {
 import { LucideAngularModule } from 'lucide-angular';
 
 import { CustomOrder } from './custom-orders-api.service';
+import { fmtInr } from '@core/services/currency.util';
 
 /**
- * Single kanban card for a Custom Order. Dumb component — gets the
+ * Single kanban card for a Custom Order. Dumb component â€” gets the
  * row + an optional resolved contact-name pre-loaded by the parent.
  *
  * Layout matches the Vercel reference: title + status badge on top,
@@ -30,14 +31,14 @@ export class CustomOrderCardComponent {
   readonly stageIndex = input<number | null>(null);
   readonly stageTotal = input<number | null>(null);
 
-  protected readonly amountInr = computed(() => this.fmtInr(this.order().total_amount));
-  protected readonly advanceInr = computed(() => this.fmtInr(this.order().advance_paid));
+  protected readonly amountInr = computed(() => fmtInr(this.order().total_amount));
+  protected readonly advanceInr = computed(() => fmtInr(this.order().advance_paid));
 
   protected readonly outstanding = computed(() => {
     const total = Number(this.order().total_amount ?? 0);
     const paid = Number(this.order().advance_paid ?? 0);
     const due = Math.max(total - paid, 0);
-    return this.fmtInr(String(due));
+    return fmtInr(String(due));
   });
 
   protected readonly materialsSummary = computed(() => {
@@ -47,7 +48,7 @@ export class CustomOrderCardComponent {
       if (v === null || v === undefined || v === '') continue;
       parts.push(`${k}: ${String(v)}`);
     }
-    return parts.join(' · ');
+    return parts.join(' Â· ');
   });
 
   protected readonly deliveryLabel = computed(() => {
@@ -98,9 +99,4 @@ export class CustomOrderCardComponent {
     return s.replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
-  private fmtInr(value: string | number | null | undefined): string {
-    const n = Number(value ?? 0);
-    if (!Number.isFinite(n)) return '—';
-    return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-  }
 }

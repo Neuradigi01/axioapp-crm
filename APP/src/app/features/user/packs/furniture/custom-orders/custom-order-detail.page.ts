@@ -16,6 +16,7 @@ import { ActivityTimelineComponent } from '../../../core/activities/activity-tim
 import { ContactsApiService } from '../../../core/contacts/contacts-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 import { deriveApiOrigin } from '@core/services/url.util';
+import { fmtInr } from '@core/services/currency.util';
 import {
   CustomOrder,
   CustomOrdersApiService,
@@ -63,10 +64,10 @@ export class CustomOrderDetailPageComponent {
   protected readonly apiOrigin = deriveApiOrigin();
 
   protected readonly totalInr = computed(() =>
-    this.fmtInr(this.order()?.total_amount),
+    fmtInr(this.order()?.total_amount),
   );
   protected readonly advanceInr = computed(() =>
-    this.fmtInr(this.order()?.advance_paid),
+    fmtInr(this.order()?.advance_paid),
   );
   protected readonly dueInr = computed(() => {
     const o = this.order();
@@ -75,7 +76,7 @@ export class CustomOrderDetailPageComponent {
       Number(o.total_amount ?? 0) - Number(o.advance_paid ?? 0),
       0,
     );
-    return this.fmtInr(String(due));
+    return fmtInr(String(due));
   });
 
   protected readonly stageLabel = computed(() => {
@@ -207,10 +208,5 @@ export class CustomOrderDetailPageComponent {
   }
 
 
-  private fmtInr(value: string | number | null | undefined): string {
-    const n = Number(value ?? 0);
-    if (!Number.isFinite(n)) return 'â€”';
-    return `â‚¹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-  }
 
 }
