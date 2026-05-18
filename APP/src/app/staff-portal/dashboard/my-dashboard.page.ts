@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -14,9 +14,10 @@ import {
   StaffPortalApiService,
 } from '../staff-portal-api.service';
 import { StaffSessionService } from '../staff-session.service';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * My Dashboard — landing tab after PIN login. Six KPI cards from
+ * My Dashboard â€” landing tab after PIN login. Six KPI cards from
  * `GET /staff-portal/me/performance` (leads converted, leads active,
  * sales-MTD, monthly target, target progress, rating, commission).
  */
@@ -55,7 +56,7 @@ export class MyDashboardPageComponent {
           this.perf.set(null);
           this.loading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load your dashboard.',
+            extractApiError(err) ?? 'Could not load your dashboard.',
           );
         },
       });
@@ -67,15 +68,4 @@ export class MyDashboardPageComponent {
     return v > 100 ? 100 : v;
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -13,6 +13,7 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { Review, ReviewsApiService } from './reviews-api.service';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
  * Modal for replying to a review. Shows the original review for
@@ -60,7 +61,7 @@ export class ReviewReplyModalComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.submitError.set(this._extract(err) ?? 'Could not send reply.');
+          this.submitError.set(extractApiError(err) ?? 'Could not send reply.');
         },
       });
   }
@@ -70,18 +71,7 @@ export class ReviewReplyModalComponent {
   }
 
   protected stars(n: number): string {
-    return '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
+    return 'â˜…â˜…â˜…â˜…â˜…'.slice(0, n) + 'â˜†â˜†â˜†â˜†â˜†'.slice(0, 5 - n);
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

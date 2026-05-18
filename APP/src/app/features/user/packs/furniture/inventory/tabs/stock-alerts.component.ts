@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -10,6 +10,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { forkJoin } from 'rxjs';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   InventoryApiService,
@@ -23,14 +24,14 @@ import {
  * Lists open alerts (high priority + most depleted first), shows the
  * matching item context, and exposes two actions per row:
  *
- *   - "Reorder"    → opens a modal to confirm qty + supplier.
+ *   - "Reorder"    â†’ opens a modal to confirm qty + supplier.
  *                    On confirm: PATCH alert.status='ordered'.
  *                    Supplier/qty entered in the modal are UX-only
- *                    inputs today (no `receipt_planned` ledger row —
+ *                    inputs today (no `receipt_planned` ledger row â€”
  *                    the alert status alone communicates "order in
  *                    flight"). When the real receipt is recorded, the
  *                    standard movement path auto-closes the alert.
- *   - "Mark Closed" → PATCH alert.status='closed' for the operator
+ *   - "Mark Closed" â†’ PATCH alert.status='closed' for the operator
  *                     who already restocked outside the system.
  */
 interface AlertRow {
@@ -54,7 +55,7 @@ export class StockAlertsTabComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
 
-  /** null = closed · AlertRow = reorder modal target. */
+  /** null = closed Â· AlertRow = reorder modal target. */
   protected readonly modalTarget = signal<AlertRow | null>(null);
   protected readonly busyAlertId = signal<string | null>(null);
 
@@ -160,7 +161,7 @@ export class StockAlertsTabComponent {
         error: (err: HttpErrorResponse) => {
           this.busyAlertId.set(null);
           this.loadError.set(
-            this._extract(err) ?? 'Could not mark alert as ordered.',
+            extractApiError(err) ?? 'Could not mark alert as ordered.',
           );
         },
       });
@@ -185,7 +186,7 @@ export class StockAlertsTabComponent {
         error: (err: HttpErrorResponse) => {
           this.busyAlertId.set(null);
           this.loadError.set(
-            this._extract(err) ?? 'Could not close alert.',
+            extractApiError(err) ?? 'Could not close alert.',
           );
         },
       });
@@ -227,20 +228,9 @@ export class StockAlertsTabComponent {
         error: (err: HttpErrorResponse) => {
           this.rows.set([]);
           this.loading.set(false);
-          this.loadError.set(this._extract(err) ?? 'Could not load alerts.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load alerts.');
         },
       });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -15,9 +15,10 @@ import {
   CallsApiService,
 } from '../calls-api.service';
 import { LogCallModalComponent } from '../log-call-modal.component';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * Call Logs tab — table of every call (newest first) + "Log call" button
+ * Call Logs tab â€” table of every call (newest first) + "Log call" button
  * that opens the shared `LogCallModalComponent`. Outcomes are loaded
  * once and shared with the modal as an input.
  */
@@ -52,7 +53,7 @@ export class CallLogsTabComponent {
       .subscribe({
         next: (rows) => this.outcomes.set(rows),
         error: () => {
-          /* outcomes aren't fatal — leave list empty */
+          /* outcomes aren't fatal â€” leave list empty */
         },
       });
   }
@@ -72,7 +73,7 @@ export class CallLogsTabComponent {
           this.items.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load calls.',
+            extractApiError(err) ?? 'Could not load calls.',
           );
         },
       });
@@ -106,15 +107,4 @@ export class CallLogsTabComponent {
     return call.outcome_id ? this.outcomeById().get(call.outcome_id) ?? null : null;
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

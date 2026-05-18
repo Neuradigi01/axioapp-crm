@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -16,6 +16,7 @@ import {
   CampaignsApiService,
 } from './campaigns-api.service';
 import { CreateCampaignModalComponent } from './create-campaign-modal.component';
+import { extractApiError } from '@core/services/api-error.util';
 
 interface ChannelStyle {
   label: string;
@@ -67,10 +68,10 @@ const STATUS_STYLES: Record<CampaignStatus, { label: string; cls: string }> = {
 };
 
 /**
- * Campaigns page — cards grid + "New campaign" button + delete + start.
+ * Campaigns page â€” cards grid + "New campaign" button + delete + start.
  *
- * Each card carries: name · status pill · channel pill · audience
- * fingerprint · schedule time (if any) · "Start" button for drafts ·
+ * Each card carries: name Â· status pill Â· channel pill Â· audience
+ * fingerprint Â· schedule time (if any) Â· "Start" button for drafts Â·
  * "View" link to the detail page.
  */
 @Component({
@@ -109,7 +110,7 @@ export class CampaignsPageComponent {
           this.items.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load campaigns.',
+            extractApiError(err) ?? 'Could not load campaigns.',
           );
         },
       });
@@ -141,7 +142,7 @@ export class CampaignsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.busyId.set(null);
           this.loadError.set(
-            this._extract(err) ?? 'Could not start campaign.',
+            extractApiError(err) ?? 'Could not start campaign.',
           );
         },
       });
@@ -162,7 +163,7 @@ export class CampaignsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.busyId.set(null);
           this.loadError.set(
-            this._extract(err) ?? 'Could not delete campaign.',
+            extractApiError(err) ?? 'Could not delete campaign.',
           );
         },
       });
@@ -182,23 +183,12 @@ export class CampaignsPageComponent {
     if (c.audience_filter?.source)
       parts.push(`source=${c.audience_filter.source}`);
     if (c.audience_filter?.tag) parts.push(`tag=${c.audience_filter.tag}`);
-    return parts.length ? parts.join(' · ') : 'Everyone';
+    return parts.length ? parts.join(' Â· ') : 'Everyone';
   }
 
   protected formatDate(iso: string | null): string {
-    if (!iso) return '—';
+    if (!iso) return 'â€”';
     return new Date(iso).toLocaleString();
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

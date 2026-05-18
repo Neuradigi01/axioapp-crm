@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -16,6 +16,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { environment } from '../../../../environments/environment';
 import { TokenStorageService } from '../../user/core/auth/token-storage.service';
+import { extractApiError } from '@core/services/api-error.util';
 
 interface InvitationPreview {
   email: string;
@@ -31,14 +32,14 @@ interface LoginResponse {
 }
 
 /**
- * `/accounts/accept-invite?token=…` — recipient-side flow.
+ * `/accounts/accept-invite?token=â€¦` â€” recipient-side flow.
  *
  * Three states inside one component:
- *   `loading`  — looking up the token via GET /api/v1/invitations/lookup
- *   `invalid`  — token missing / expired / already-accepted
- *   `ready`    — preview rendered + form open
+ *   `loading`  â€” looking up the token via GET /api/v1/invitations/lookup
+ *   `invalid`  â€” token missing / expired / already-accepted
+ *   `ready`    â€” preview rendered + form open
  *
- * On valid submit the API returns a JWT — we persist it via
+ * On valid submit the API returns a JWT â€” we persist it via
  * `TokenStorageService` (same path the login flow uses) and redirect
  * to `/user/dashboard`. The recipient never has to log in manually.
  */
@@ -103,7 +104,7 @@ export class AcceptInviteComponent {
             },
             error: (err: HttpErrorResponse) => {
               this.invalidReason.set(
-                this._extract(err)
+                extractApiError(err)
                   ?? 'This invitation link is invalid or has expired.',
               );
               this.state.set('invalid');
@@ -116,7 +117,7 @@ export class AcceptInviteComponent {
     if (this.submitting() || this.rawToken === null) return;
     const raw = this.form.getRawValue();
     if (this.form.invalid) {
-      this.submitError.set('All required fields must be filled, password ≥ 8 chars.');
+      this.submitError.set('All required fields must be filled, password â‰¥ 8 chars.');
       return;
     }
     if (raw.password !== raw.confirm_password) {
@@ -144,21 +145,10 @@ export class AcceptInviteComponent {
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.submitError.set(
-            this._extract(err) ?? 'Could not accept invitation.',
+            extractApiError(err) ?? 'Could not accept invitation.',
           );
         },
       });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

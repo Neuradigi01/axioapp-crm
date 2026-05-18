@@ -21,6 +21,7 @@ import {
 } from '../calls-api.service';
 import { LogCallModalComponent } from '../log-call-modal.component';
 import { initials } from '@core/services/text.util';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
  * Phone Book tab â€” searchable contacts list with click-to-call. The
@@ -118,21 +119,10 @@ export class CallPhoneBookTabComponent {
           this.items.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load phone book.',
+            extractApiError(err) ?? 'Could not load phone book.',
           );
         },
       });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

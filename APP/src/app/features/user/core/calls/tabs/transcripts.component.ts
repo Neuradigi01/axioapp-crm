@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -9,6 +9,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   Call,
@@ -17,7 +18,7 @@ import {
 } from '../calls-api.service';
 
 /**
- * Transcripts tab — left rail of calls (newest first), right pane shows
+ * Transcripts tab â€” left rail of calls (newest first), right pane shows
  * the transcript for the selected call. Admin can edit + save the
  * transcript (PUT replaces the single row per call).
  *
@@ -85,7 +86,7 @@ export class CallTranscriptsTabComponent {
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           this.saveError.set(
-            this._extract(err) ?? 'Could not save transcript.',
+            extractApiError(err) ?? 'Could not save transcript.',
           );
         },
       });
@@ -110,7 +111,7 @@ export class CallTranscriptsTabComponent {
           this.calls.set([]);
           this.callsLoading.set(false);
           this.listError.set(
-            this._extract(err) ?? 'Could not load calls.',
+            extractApiError(err) ?? 'Could not load calls.',
           );
         },
       });
@@ -139,22 +140,11 @@ export class CallTranscriptsTabComponent {
             this.transcriptHas404.set(true);
           } else {
             this.saveError.set(
-              this._extract(err) ?? 'Could not load transcript.',
+              extractApiError(err) ?? 'Could not load transcript.',
             );
           }
         },
       });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

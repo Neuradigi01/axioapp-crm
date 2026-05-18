@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -9,6 +9,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   Campaign,
@@ -21,7 +22,7 @@ import {
 const POLL_INTERVAL_MS = 5_000;
 
 /**
- * Campaign detail — stats KPIs + per-message table with retry.
+ * Campaign detail â€” stats KPIs + per-message table with retry.
  *
  * Polls stats + messages every 5s while the campaign is `scheduled`
  * or `running` so the operator sees the dispatch progress without
@@ -70,7 +71,7 @@ export class CampaignDetailPageComponent {
       return;
     }
     this.loadAll();
-    // Tear the poll down on destroy — DestroyRef → cleanup callback.
+    // Tear the poll down on destroy â€” DestroyRef â†’ cleanup callback.
     this.destroyRef.onDestroy(() => this.stopPolling());
   }
 
@@ -86,7 +87,7 @@ export class CampaignDetailPageComponent {
           this.maybeStartPolling();
         },
         error: (err: HttpErrorResponse) =>
-          this.loadError.set(this._extract(err) ?? 'Could not load campaign.'),
+          this.loadError.set(extractApiError(err) ?? 'Could not load campaign.'),
       });
     this.refreshStatsAndMessages();
   }
@@ -118,7 +119,7 @@ export class CampaignDetailPageComponent {
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load messages.',
+            extractApiError(err) ?? 'Could not load messages.',
           );
         },
       });
@@ -137,7 +138,7 @@ export class CampaignDetailPageComponent {
         error: (err: HttpErrorResponse) => {
           this.retryingId.set(null);
           this.loadError.set(
-            this._extract(err) ?? 'Could not retry message.',
+            extractApiError(err) ?? 'Could not retry message.',
           );
         },
       });
@@ -157,7 +158,7 @@ export class CampaignDetailPageComponent {
   }
 
   protected formatDate(iso: string | null): string {
-    if (!iso) return '—';
+    if (!iso) return 'â€”';
     return new Date(iso).toLocaleString();
   }
 
@@ -186,15 +187,4 @@ export class CampaignDetailPageComponent {
     }
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

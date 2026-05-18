@@ -16,6 +16,7 @@ import {
 } from '../staff-portal-api.service';
 import { StaffSessionService } from '../staff-session.service';
 import { initials } from '@core/services/text.util';
+import { extractApiError } from '@core/services/api-error.util';
 
 const DEFAULT_ORG_SLUG = 'demo';
 
@@ -128,7 +129,7 @@ export class StaffPortalLoginPageComponent {
           this.users.set([]);
           this.loadingUsers.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load staff list.',
+            extractApiError(err) ?? 'Could not load staff list.',
           );
         },
       });
@@ -159,21 +160,10 @@ export class StaffPortalLoginPageComponent {
           } else if (err.status === 401) {
             this.submitError.set('Wrong PIN. Try again.');
           } else {
-            this.submitError.set(this._extract(err) ?? 'Login failed.');
+            this.submitError.set(extractApiError(err) ?? 'Login failed.');
           }
         },
       });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

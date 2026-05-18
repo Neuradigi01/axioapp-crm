@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -15,12 +15,13 @@ import {
   StaffPortalApiService,
 } from './staff-portal-api.service';
 import { StaffSessionService } from './staff-session.service';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * Tablet shell — minimal, no admin sidebar. Top bar carries:
+ * Tablet shell â€” minimal, no admin sidebar. Top bar carries:
  *
  *   left   : "FurnitureCRM" wordmark + greeting (full_name)
- *   centre : tab nav (Dashboard · Attendance · Activity · Sales · Stock · Field)
+ *   centre : tab nav (Dashboard Â· Attendance Â· Activity Â· Sales Â· Stock Â· Field)
  *   right  : clock-in/out widget + logout
  *
  * Clock-in/out lives on the shell (not on My Attendance) per the
@@ -80,7 +81,7 @@ export class StaffPortalShellComponent {
           error: (err: HttpErrorResponse) => {
             this.clockingOut.set(false);
             this.clockError.set(
-              this._extract(err) ?? 'Could not clock out.',
+              extractApiError(err) ?? 'Could not clock out.',
             );
           },
         });
@@ -97,7 +98,7 @@ export class StaffPortalShellComponent {
           error: (err: HttpErrorResponse) => {
             this.clockingIn.set(false);
             this.clockError.set(
-              this._extract(err) ?? 'Could not clock in.',
+              extractApiError(err) ?? 'Could not clock in.',
             );
           },
         });
@@ -119,20 +120,9 @@ export class StaffPortalShellComponent {
           this.openSession.set(open);
         },
         error: () => {
-          // Non-fatal — shell still usable without the badge.
+          // Non-fatal â€” shell still usable without the badge.
         },
       });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

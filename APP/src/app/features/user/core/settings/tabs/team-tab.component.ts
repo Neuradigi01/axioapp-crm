@@ -19,6 +19,7 @@ import { forkJoin } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { FurnitureAuthService } from '../../auth/auth.service';
 import { initials } from '@core/services/text.util';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   InvitationRow,
   InvitationsApiService,
@@ -139,7 +140,7 @@ export class TeamTabComponent {
           this.items.set([]);
           this.roles.set([]);
           this.loading.set(false);
-          this.loadError.set(this._extract(err) ?? 'Could not load users.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load users.');
         },
       });
   }
@@ -163,7 +164,7 @@ export class TeamTabComponent {
           // false. Anything else is a real load failure.
           if (err.status !== 403) {
             this.invitationsError.set(
-              this._extract(err) ?? 'Could not load pending invitations.',
+              extractApiError(err) ?? 'Could not load pending invitations.',
             );
           }
         },
@@ -202,7 +203,7 @@ export class TeamTabComponent {
         error: (err: HttpErrorResponse) => {
           this.inviteSending.set(false);
           this.inviteError.set(
-            this._extract(err) ?? 'Could not send invitation.',
+            extractApiError(err) ?? 'Could not send invitation.',
           );
         },
       });
@@ -227,7 +228,7 @@ export class TeamTabComponent {
         error: (err: HttpErrorResponse) => {
           this.revokingInviteId.set(null);
           this.invitationsError.set(
-            this._extract(err) ?? 'Could not revoke invitation.',
+            extractApiError(err) ?? 'Could not revoke invitation.',
           );
         },
       });
@@ -286,7 +287,7 @@ export class TeamTabComponent {
           this.savingId.set(null);
           this.rowError.set({
             id: user.id,
-            message: this._extract(err) ?? 'Could not save user.',
+            message: extractApiError(err) ?? 'Could not save user.',
           });
         },
       });
@@ -312,21 +313,10 @@ export class TeamTabComponent {
           this.savingId.set(null);
           this.rowError.set({
             id: user.id,
-            message: this._extract(err) ?? 'Could not change status.',
+            message: extractApiError(err) ?? 'Could not change status.',
           });
         },
       });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

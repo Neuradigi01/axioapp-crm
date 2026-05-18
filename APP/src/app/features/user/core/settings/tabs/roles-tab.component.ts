@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -17,6 +17,7 @@ import { forkJoin } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
 import { FurnitureAuthService } from '../../auth/auth.service';
+import { extractApiError } from '@core/services/api-error.util';
 
 interface RoleRow {
   id: string;
@@ -39,18 +40,18 @@ interface PermissionRow {
 type Mode = 'list' | 'editor';
 
 /**
- * Roles tab — list, create, edit, and delete roles in the active org.
+ * Roles tab â€” list, create, edit, and delete roles in the active org.
  *
  * Two visual states inside the tab:
- *   - `list`   — table of roles (name, members, permission count, actions)
- *   - `editor` — role name input + permission-grants matrix grouped by module
+ *   - `list`   â€” table of roles (name, members, permission count, actions)
+ *   - `editor` â€” role name input + permission-grants matrix grouped by module
  *
  * System roles (`is_system=true`) get a "View" button instead of "Edit";
  * the editor renders the matrix read-only for them. CLAUDE.md rule: core
  * + pack-installed roles stay stable; admins create custom roles instead.
  *
  * The grants matrix is rendered from `GET /permissions` (the global
- * registry — ~55 keys today, ~80 with the furniture pack) grouped by the
+ * registry â€” ~55 keys today, ~80 with the furniture pack) grouped by the
  * `module` column. Adding a new module just makes its keys show up in
  * the matrix; no UI change required.
  */
@@ -135,7 +136,7 @@ export class RolesTabComponent {
           this.roles.set([]);
           this.permissions.set([]);
           this.loading.set(false);
-          this.loadError.set(this._extract(err) ?? 'Could not load roles.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load roles.');
         },
       });
   }
@@ -207,7 +208,7 @@ export class RolesTabComponent {
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           this.editorError.set(
-            this._extract(err) ?? 'Could not save role.',
+            extractApiError(err) ?? 'Could not save role.',
           );
         },
       });
@@ -232,20 +233,9 @@ export class RolesTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.loadError.set(this._extract(err) ?? 'Could not delete role.');
+          this.loadError.set(extractApiError(err) ?? 'Could not delete role.');
         },
       });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -15,20 +15,21 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
 import { ProfileApiService } from './profile.service';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * `/user/profile` — self-service profile page.
+ * `/user/profile` â€” self-service profile page.
  *
  * Two independent sub-forms:
- *   - Profile  (full_name, phone)            → PATCH /api/v1/users/me
- *   - Password (current, new, sign-out-others) → POST  /api/v1/users/me/password
+ *   - Profile  (full_name, phone)            â†’ PATCH /api/v1/users/me
+ *   - Password (current, new, sign-out-others) â†’ POST  /api/v1/users/me/password
  *
  * Each sub-form has its own submit button + success/error state. The
  * password sub-form is the only place a user can revoke other sessions
- * — if `sign_out_others` is ticked the backend revokes every open
+ * â€” if `sign_out_others` is ticked the backend revokes every open
  * `auth_sessions` row except the caller's own JWT.
  *
- * Email is intentionally shown read-only — changing email = inviting
+ * Email is intentionally shown read-only â€” changing email = inviting
  * a new account (step 2.5.6 wires that flow). Role / org membership
  * are admin-only and never exposed here.
  */
@@ -91,7 +92,7 @@ export class ProfilePageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(this._extract(err) ?? 'Could not load profile.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load profile.');
         },
       });
   }
@@ -119,7 +120,7 @@ export class ProfilePageComponent {
         error: (err: HttpErrorResponse) => {
           this.profileSaving.set(false);
           this.profileError.set(
-            this._extract(err) ?? 'Could not save profile.',
+            extractApiError(err) ?? 'Could not save profile.',
           );
         },
       });
@@ -162,21 +163,10 @@ export class ProfilePageComponent {
         error: (err: HttpErrorResponse) => {
           this.passwordSaving.set(false);
           this.passwordError.set(
-            this._extract(err) ?? 'Could not change password.',
+            extractApiError(err) ?? 'Could not change password.',
           );
         },
       });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

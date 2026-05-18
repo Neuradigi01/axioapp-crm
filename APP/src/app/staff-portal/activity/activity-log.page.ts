@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -10,6 +10,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { RelativeTimePipe } from '../../features/user/core/activities/relative-time.pipe';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   StaffActivity,
   StaffPortalApiService,
@@ -31,7 +32,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 /**
- * My Activity Log — the same stream the admin sees on the staff-tab
+ * My Activity Log â€” the same stream the admin sees on the staff-tab
  * activity view, but scoped to "me" via `GET /staff-portal/me/activity`.
  */
 @Component({
@@ -95,7 +96,7 @@ export class StaffPortalActivityLogPageComponent {
           this.items.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load activity.',
+            extractApiError(err) ?? 'Could not load activity.',
           );
         },
       });
@@ -116,15 +117,4 @@ export class StaffPortalActivityLogPageComponent {
     });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

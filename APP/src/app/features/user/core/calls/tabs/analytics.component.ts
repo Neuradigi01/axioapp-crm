@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -22,6 +22,7 @@ import {
   ChartConfiguration,
 } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   CallAnalytics,
@@ -41,7 +42,7 @@ Chart.register(
 );
 
 /**
- * Analytics tab — three chart-ready arrays from `GET /calls/analytics`:
+ * Analytics tab â€” three chart-ready arrays from `GET /calls/analytics`:
  *   - donut: outcomes distribution (colour = outcome's stored colour)
  *   - bar:   daily volume over the window
  *   - donut: direction split (incoming vs outgoing)
@@ -158,7 +159,7 @@ export class CallAnalyticsTabComponent {
           this.data.set(null);
           this.loading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load analytics.',
+            extractApiError(err) ?? 'Could not load analytics.',
           );
         },
       });
@@ -181,15 +182,4 @@ export class CallAnalyticsTabComponent {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

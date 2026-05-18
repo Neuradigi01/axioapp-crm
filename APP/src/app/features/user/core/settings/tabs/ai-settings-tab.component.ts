@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -8,6 +8,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   OrgSettings,
@@ -15,7 +16,7 @@ import {
 } from '../settings-api.service';
 
 /**
- * AI Settings tab — `ai_enabled` master switch + personality +
+ * AI Settings tab â€” `ai_enabled` master switch + personality +
  * welcome message + reviews-auto-request toggle + delay hours.
  * Phase 5 reads these to wire the actual AI replies.
  */
@@ -66,7 +67,7 @@ export class AiSettingsTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(this._extract(err) ?? 'Could not load.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load.');
         },
       });
   }
@@ -97,7 +98,7 @@ export class AiSettingsTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.saveError.set(this._extract(err) ?? 'Could not save.');
+          this.saveError.set(extractApiError(err) ?? 'Could not save.');
         },
       });
   }
@@ -112,15 +113,4 @@ export class AiSettingsTabComponent {
     });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

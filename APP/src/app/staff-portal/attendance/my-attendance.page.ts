@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   StaffAttendance,
@@ -15,7 +16,7 @@ import {
 } from '../staff-portal-api.service';
 
 /**
- * My Attendance — month list of the signed-in staff's own clock-in/out
+ * My Attendance â€” month list of the signed-in staff's own clock-in/out
  * rows. The shell handles the actual clock-in/out button; here we just
  * read the history. Total hours shown at top so the user can see their
  * MTD time at a glance.
@@ -63,7 +64,7 @@ export class MyAttendancePageComponent {
           this.rows.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load attendance.',
+            extractApiError(err) ?? 'Could not load attendance.',
           );
         },
       });
@@ -84,15 +85,4 @@ export class MyAttendancePageComponent {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -19,11 +19,12 @@ import {
 } from '../inventory-api.service';
 import { AddProductModalComponent } from '../add-product-modal.component';
 import { ProductCardComponent } from '../product-card.component';
+import { extractApiError } from '@core/services/api-error.util';
 
 type ViewMode = 'grid' | 'list';
 
 /**
- * Products tab — main inventory grid.
+ * Products tab â€” main inventory grid.
  *
  *   - Filters: warehouse (dropdown), search (debounced), active-only
  *     toggle, view-mode grid/list.
@@ -34,7 +35,7 @@ type ViewMode = 'grid' | 'list';
  *     page/size today, so we mirror that here.
  *
  * Category filter is wired but inert until catalog items have
- * categories populated — the dropdown stays empty by default and the
+ * categories populated â€” the dropdown stays empty by default and the
  * field just passes through to `category=` query.
  */
 @Component({
@@ -167,21 +168,10 @@ export class ProductsTabComponent {
           this.total.set(0);
           this.loading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load inventory items.',
+            extractApiError(err) ?? 'Could not load inventory items.',
           );
         },
       });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

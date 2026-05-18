@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -10,6 +10,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 
 import { environment } from '../../../../../../environments/environment';
+import { extractApiError } from '@core/services/api-error.util';
 
 type Channel = 'in_app' | 'email' | 'push';
 
@@ -27,7 +28,7 @@ interface PrefMatrixRow {
 }
 
 /**
- * Notifications tab — per-type toggles for in-app / email / push.
+ * Notifications tab â€” per-type toggles for in-app / email / push.
  * Reads + writes the existing `/api/v1/notification-preferences`
  * endpoints from Step 2.15. Types are free-form; the table grows as
  * other modules emit new notification types.
@@ -80,7 +81,7 @@ export class NotificationsTabComponent {
         error: (err: HttpErrorResponse) => {
           this.rows.set([]);
           this.loading.set(false);
-          this.loadError.set(this._extract(err) ?? 'Could not load.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load.');
         },
       });
   }
@@ -96,19 +97,8 @@ export class NotificationsTabComponent {
       .subscribe({
         next: (rows) => this.rows.set(rows),
         error: (err: HttpErrorResponse) =>
-          this.saveError.set(this._extract(err) ?? 'Could not save.'),
+          this.saveError.set(extractApiError(err) ?? 'Could not save.'),
       });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

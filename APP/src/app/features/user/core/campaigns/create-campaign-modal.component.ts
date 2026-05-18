@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -12,6 +12,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { ConversationChannel } from '../conversations/conversations-api.service';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   Campaign,
   CampaignsApiService,
@@ -26,7 +27,7 @@ import {
  *   - Audience filter: q / source / tag (same shape as /contacts list).
  *     Empty filter = everyone in the org.
  *   - Template with `{{full_name}}` placeholder support
- *   - Schedule_at (optional, datetime-local) — if blank, send now-ish
+ *   - Schedule_at (optional, datetime-local) â€” if blank, send now-ish
  *     when the operator clicks Start.
  *
  * The campaign is created in `status='draft'`. The operator clicks
@@ -55,7 +56,7 @@ export class CreateCampaignModalComponent {
   protected readonly varFullName = '{{full_name}}';
   protected readonly varPhone = '{{phone}}';
   protected readonly templatePlaceholder =
-    'Hi {{full_name}} — our Diwali sale is live! 20% off everything this week.';
+    'Hi {{full_name}} â€” our Diwali sale is live! 20% off everything this week.';
 
   protected readonly channels: ReadonlyArray<{
     value: ConversationChannel;
@@ -120,7 +121,7 @@ export class CreateCampaignModalComponent {
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.submitError.set(
-            this._extract(err) ?? 'Could not create campaign.',
+            extractApiError(err) ?? 'Could not create campaign.',
           );
         },
       });
@@ -130,15 +131,4 @@ export class CreateCampaignModalComponent {
     this.cancel.emit();
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

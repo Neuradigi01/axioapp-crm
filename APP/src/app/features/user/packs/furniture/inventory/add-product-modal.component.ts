@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -11,6 +11,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   InventoryApiService,
@@ -23,7 +24,7 @@ import {
  *
  * Form maps 1-to-1 onto `POST /inventory/items/full` (atomic catalog
  * + inventory). The optional cover image is uploaded via a second
- * `POST .../{id}/cover` call only after the create succeeds — if the
+ * `POST .../{id}/cover` call only after the create succeeds â€” if the
  * image upload fails, the product still exists with no cover.
  *
  * `warehouses` is passed in by the parent (already loaded once for the
@@ -153,7 +154,7 @@ export class AddProductModalComponent {
             this.created.emit(item);
             return;
           }
-          // Best-effort cover upload — if it fails, the product
+          // Best-effort cover upload â€” if it fails, the product
           // still exists; surface the error inline so the user can
           // retry from the items list.
           this.api
@@ -173,7 +174,7 @@ export class AddProductModalComponent {
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.submitError.set(
-            this._extract(err) ?? 'Could not create product.',
+            extractApiError(err) ?? 'Could not create product.',
           );
         },
       });
@@ -184,15 +185,4 @@ export class AddProductModalComponent {
     this.cancel.emit();
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

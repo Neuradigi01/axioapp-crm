@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -21,9 +21,10 @@ import { ChatThreadComponent } from './chat-thread.component';
 import { ComposeBarComponent } from './compose-bar.component';
 import { ConversationListComponent } from './conversation-list.component';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * Conversations page — split inbox layout. Owns:
+ * Conversations page â€” split inbox layout. Owns:
  *
  *   - the list of conversations + the filter signals
  *   - the currently-selected conversation id + its loaded detail
@@ -63,7 +64,7 @@ export class ConversationsPageComponent {
     return this.items().find((c) => c.id === id) ?? null;
   });
 
-  /** Last notification fingerprint we've already reacted to — guards
+  /** Last notification fingerprint we've already reacted to â€” guards
    * against re-running the refresh loop when the signal re-emits with
    * the same head element. */
   private lastSeenNotificationId: string | null = null;
@@ -145,7 +146,7 @@ export class ConversationsPageComponent {
               : d,
           );
           this.loadError.set(
-            this._extract(err) ?? 'Could not send message.',
+            extractApiError(err) ?? 'Could not send message.',
           );
         },
       });
@@ -168,7 +169,7 @@ export class ConversationsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loadError.set(
-            this._extract(err) ?? 'Could not update AI handling.',
+            extractApiError(err) ?? 'Could not update AI handling.',
           );
         },
       });
@@ -189,7 +190,7 @@ export class ConversationsPageComponent {
           this.items.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load conversations.',
+            extractApiError(err) ?? 'Could not load conversations.',
           );
         },
       });
@@ -209,7 +210,7 @@ export class ConversationsPageComponent {
           this.detail.set(null);
           this.threadLoading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load thread.',
+            extractApiError(err) ?? 'Could not load thread.',
           );
         },
       });
@@ -242,15 +243,4 @@ export class ConversationsPageComponent {
     );
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

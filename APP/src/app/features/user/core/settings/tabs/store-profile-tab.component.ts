@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -10,13 +10,14 @@ import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { FurnitureAuthService, OrgSummary } from '../../auth/auth.service';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   OrgSettings,
   SettingsApiService,
 } from '../settings-api.service';
 
 /**
- * Store Profile tab — the meat of OrgSettings. Logo, store name,
+ * Store Profile tab â€” the meat of OrgSettings. Logo, store name,
  * GST, full address, phone, email, currency, tax_rate, timezone,
  * locale. Submits only the dirty keys via PATCH (strict-key on the
  * backend side too).
@@ -42,7 +43,7 @@ export class StoreProfileTabComponent {
   /** Read-only org identity surfaced above the editable form (DR.5 + 2.5.4). */
   protected readonly org = signal<OrgSummary | null>(null);
   /** Gate the Save button on `settings.write`. Read access alone keeps the
-   * form viewable but unsubmittable — same UX shape as the Roles tab. */
+   * form viewable but unsubmittable â€” same UX shape as the Roles tab. */
   protected readonly canWrite = signal(false);
 
   protected readonly form = this.fb.group({
@@ -94,7 +95,7 @@ export class StoreProfileTabComponent {
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.loadError.set(
-            this._extract(err) ?? 'Could not load settings.',
+            extractApiError(err) ?? 'Could not load settings.',
           );
         },
       });
@@ -130,7 +131,7 @@ export class StoreProfileTabComponent {
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           this.saveError.set(
-            this._extract(err) ?? 'Could not save settings.',
+            extractApiError(err) ?? 'Could not save settings.',
           );
         },
       });
@@ -156,15 +157,4 @@ export class StoreProfileTabComponent {
     });
   }
 
-  private _extract(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }
