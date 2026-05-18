@@ -10,6 +10,30 @@
     </div>
   } @else {
     <form [formGroup]="form" (ngSubmit)="save()" class="space-y-5">
+      @if (org(); as o) {
+        <section class="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+          <h3 class="mb-2 text-sm font-semibold text-zinc-900">Organization</h3>
+          <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+            <div>
+              <dt class="text-xs font-medium text-zinc-500">Name</dt>
+              <dd class="mt-0.5 text-zinc-900">{{ o.name }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs font-medium text-zinc-500">Slug</dt>
+              <dd class="mt-0.5 font-mono text-zinc-900">{{ o.slug }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs font-medium text-zinc-500">Pack</dt>
+              <dd class="mt-0.5 font-mono text-zinc-900">{{ o.pack_id }}</dd>
+            </div>
+          </dl>
+          <p class="mt-2 text-[11px] text-zinc-500">
+            Slug and pack are immutable — they drive URLs and module
+            installation. Display name and locale are editable below.
+          </p>
+        </section>
+      }
+
       <section>
         <h3 class="mb-2 text-sm font-semibold text-zinc-900">Store</h3>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -99,11 +123,17 @@
         </div>
       }
 
-      <div class="flex justify-end">
-        <button type="submit" [disabled]="saving()" class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50">
-          {{ saving() ? 'Saving…' : 'Save changes' }}
-        </button>
-      </div>
+      @if (canWrite()) {
+        <div class="flex justify-end">
+          <button type="submit" [disabled]="saving()" class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50">
+            {{ saving() ? 'Saving…' : 'Save changes' }}
+          </button>
+        </div>
+      } @else {
+        <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+          You have read-only access to these settings. Ask an admin for the <span class="font-mono">settings.write</span> permission to make changes.
+        </div>
+      }
     </form>
   }
 </div>

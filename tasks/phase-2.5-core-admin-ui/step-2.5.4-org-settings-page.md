@@ -2,7 +2,7 @@
 
 **Goal:** Build `/user/settings/org` — let an admin edit their org's name, currency, tax rate, timezone, and (DR.5-aligned) branding fields.
 **Phase:** 2.5 — Core CRM Admin UI
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** DR.5 (per-org sidebar branding already exposes the `org_settings` shape).
 
 ---

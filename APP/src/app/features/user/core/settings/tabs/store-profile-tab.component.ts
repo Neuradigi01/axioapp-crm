@@ -9,6 +9,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
+import { FurnitureAuthService, OrgSummary } from '../../auth/auth.service';
 import {
   OrgSettings,
   SettingsApiService,
@@ -30,6 +31,7 @@ import {
 export class StoreProfileTabComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(SettingsApiService);
+  private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly loading = signal(false);
@@ -37,6 +39,11 @@ export class StoreProfileTabComponent {
   protected readonly loadError = signal<string | null>(null);
   protected readonly saveError = signal<string | null>(null);
   protected readonly saveOk = signal(false);
+  /** Read-only org identity surfaced above the editable form (DR.5 + 2.5.4). */
+  protected readonly org = signal<OrgSummary | null>(null);
+  /** Gate the Save button on `settings.write`. Read access alone keeps the
+   * form viewable but unsubmittable — same UX shape as the Roles tab. */
+  protected readonly canWrite = signal(false);
 
   protected readonly form = this.fb.group({
     store_name: this.fb.control<string | null>(null),
@@ -58,6 +65,19 @@ export class StoreProfileTabComponent {
 
   constructor() {
     this.reload();
+    this.auth
+      .me()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (me) => {
+          this.org.set(me.org);
+          this.canWrite.set(me.permission_keys.includes('settings.write'));
+        },
+        error: () => {
+          this.org.set(null);
+          this.canWrite.set(false);
+        },
+      });
   }
 
   protected reload(): void {
@@ -81,6 +101,7 @@ export class StoreProfileTabComponent {
   }
 
   protected save(): void {
+    if (!this.canWrite()) return;
     this.saving.set(true);
     this.saveError.set(null);
     this.saveOk.set(false);
