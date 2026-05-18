@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -26,6 +26,7 @@ import {
   AppointmentsApiService,
 } from '../../../core/appointments/appointments-api.service';
 import { ContactsApiService } from '../../../core/contacts/contacts-api.service';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   FieldOpsApiService,
   FieldVisit,
@@ -95,7 +96,7 @@ export class FieldVisitDetailPageComponent {
           return this.api.get(id).pipe(
             catchError((err: HttpErrorResponse) => {
               this.loadError.set(
-                this.extractError(err) ?? 'Could not load visit.',
+                extractApiError(err) ?? 'Could not load visit.',
               );
               this.loading.set(false);
               return of(null);
@@ -175,13 +176,13 @@ export class FieldVisitDetailPageComponent {
           this.completing.set(false);
           this.visit.set(updated);
           this.completeOpen.set(false);
-          // Appointment status flipped server-side — re-fetch to reflect.
+          // Appointment status flipped server-side â€” re-fetch to reflect.
           this.loadAppointment(updated.appointment_id);
         },
         error: (err: HttpErrorResponse) => {
           this.completing.set(false);
           this.completeError.set(
-            this.extractError(err) ?? 'Could not complete the visit.',
+            extractApiError(err) ?? 'Could not complete the visit.',
           );
         },
       });
@@ -207,7 +208,7 @@ export class FieldVisitDetailPageComponent {
         error: (err: HttpErrorResponse) => {
           this.uploading.set(false);
           this.uploadError.set(
-            this.extractError(err) ?? 'Could not upload photo.',
+            extractApiError(err) ?? 'Could not upload photo.',
           );
         },
       });
@@ -219,7 +220,7 @@ export class FieldVisitDetailPageComponent {
   }
 
   protected formatDateTime(iso: string | null | undefined): string {
-    if (!iso) return '—';
+    if (!iso) return 'â€”';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleString('en-IN', {
@@ -293,15 +294,4 @@ export class FieldVisitDetailPageComponent {
     return t.length === 0 ? null : t;
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

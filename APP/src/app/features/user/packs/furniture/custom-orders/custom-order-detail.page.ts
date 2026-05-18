@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -15,6 +15,7 @@ import { catchError, of, switchMap } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { ActivityTimelineComponent } from '../../../core/activities/activity-timeline.component';
 import { ContactsApiService } from '../../../core/contacts/contacts-api.service';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   CustomOrder,
   CustomOrdersApiService,
@@ -69,7 +70,7 @@ export class CustomOrderDetailPageComponent {
   );
   protected readonly dueInr = computed(() => {
     const o = this.order();
-    if (!o) return '—';
+    if (!o) return 'â€”';
     const due = Math.max(
       Number(o.total_amount ?? 0) - Number(o.advance_paid ?? 0),
       0,
@@ -114,7 +115,7 @@ export class CustomOrderDetailPageComponent {
           return this.api.get(id).pipe(
             catchError((err: HttpErrorResponse) => {
               this.loadError.set(
-                this.extractError(err) ?? 'Could not load order.',
+                extractApiError(err) ?? 'Could not load order.',
               );
               this.loading.set(false);
               return of(null);
@@ -137,7 +138,7 @@ export class CustomOrderDetailPageComponent {
   }
 
   protected formatDate(iso: string | null | undefined): string {
-    if (!iso) return '—';
+    if (!iso) return 'â€”';
     const dt = new Date(iso);
     if (Number.isNaN(dt.getTime())) return iso;
     return dt.toLocaleDateString('en-IN', {
@@ -160,7 +161,7 @@ export class CustomOrderDetailPageComponent {
   }
 
   protected stageLabelFor(key: string | null): string {
-    if (!key) return '—';
+    if (!key) return 'â€”';
     return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
@@ -215,19 +216,8 @@ export class CustomOrderDetailPageComponent {
 
   private fmtInr(value: string | number | null | undefined): string {
     const n = Number(value ?? 0);
-    if (!Number.isFinite(n)) return '—';
-    return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+    if (!Number.isFinite(n)) return 'â€”';
+    return `â‚¹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

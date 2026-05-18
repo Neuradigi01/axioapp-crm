@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -21,6 +21,7 @@ import {
 } from '../contacts/contacts-api.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   QuickRegisterResponse,
   WalkInsApiService,
@@ -31,11 +32,11 @@ import {
  * a phone number, we debounce + lookup an existing contact; if one
  * exists with that exact phone we show a banner ("Existing customer:
  * Asha Reddy"). The backend dedups regardless, so this is a UX hint
- * only — the operator can still type any name and submit.
+ * only â€” the operator can still type any name and submit.
  *
  * The Custom section renders `<app-dynamic-form>` against
  * `entity_type='walk_in'`. Contact custom fields are NOT enforced at
- * this surface — the backend's `quick-register` bypasses them on
+ * this surface â€” the backend's `quick-register` bypasses them on
  * contact creation (operator fills the rest later via Contacts page).
  */
 @Component({
@@ -95,7 +96,7 @@ export class RegisterWalkinModalComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.fieldsError.set(
-            this.extractError(err) ?? 'Could not load custom field definitions.',
+            extractApiError(err) ?? 'Could not load custom field definitions.',
           );
           this.fieldsLoading.set(false);
         },
@@ -182,7 +183,7 @@ export class RegisterWalkinModalComponent implements OnInit {
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.submitError.set(
-            this.extractError(err) ?? 'Could not register walk-in.',
+            extractApiError(err) ?? 'Could not register walk-in.',
           );
         },
       });
@@ -194,15 +195,4 @@ export class RegisterWalkinModalComponent implements OnInit {
     return trimmed.length === 0 ? null : trimmed;
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

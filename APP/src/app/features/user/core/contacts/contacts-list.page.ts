@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -21,6 +21,7 @@ import {
   ContactsApiService,
 } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
+import { extractApiError } from '@core/services/api-error.util';
 
 @Component({
   selector: 'app-contacts-list-page',
@@ -59,7 +60,7 @@ export class ContactsListPageComponent {
     { initialValue: '' },
   );
 
-  /** Distinct source/tag chips for filter dropdowns — derived from the loaded page. */
+  /** Distinct source/tag chips for filter dropdowns â€” derived from the loaded page. */
   readonly sourceOptions = computed(() => {
     const set = new Set<string>();
     for (const item of this.items()) {
@@ -93,7 +94,7 @@ export class ContactsListPageComponent {
   readonly formError = signal<string | null>(null);
 
   constructor() {
-    // Initial load — runs after the effect below subscribes to the filter signals.
+    // Initial load â€” runs after the effect below subscribes to the filter signals.
     this.reload();
 
     // Reactive: any filter change resets to page 1 and re-fetches.
@@ -138,7 +139,7 @@ export class ContactsListPageComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.total.set(0);
-          this.loadError.set(this.extractError(err) ?? 'Could not load contacts.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load contacts.');
           this.loading.set(false);
         },
       });
@@ -197,7 +198,7 @@ export class ContactsListPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.formError.set(this.extractError(err) ?? 'Could not create contact.');
+          this.formError.set(extractApiError(err) ?? 'Could not create contact.');
         },
       });
   }
@@ -216,20 +217,9 @@ export class ContactsListPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.formError.set(this.extractError(err) ?? 'Could not save contact.');
+          this.formError.set(extractApiError(err) ?? 'Could not save contact.');
         },
       });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -12,6 +12,7 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { Activity, ActivitiesApiService } from './activities-api.service';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
  * Lightweight composer for a manual note on any tenant-scoped entity.
@@ -22,7 +23,7 @@ import { Activity, ActivitiesApiService } from './activities-api.service';
  * on success.
  *
  * Reusable: same component will back the note composer for Leads and
- * Walk-ins later — no entity-type knowledge lives here.
+ * Walk-ins later â€” no entity-type knowledge lives here.
  */
 @Component({
   selector: 'app-add-note',
@@ -68,21 +69,10 @@ export class AddNoteComponent {
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.submitError.set(
-            this.extractError(err) ?? 'Could not save the note.',
+            extractApiError(err) ?? 'Could not save the note.',
           );
         },
       });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

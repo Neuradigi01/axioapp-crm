@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -13,6 +13,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { CalendarComponent } from '../../shared/calendar/calendar.component';
 import { CalendarEvent } from '../../shared/calendar/calendar.component';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   StaffApiService,
   AttendanceOut,
@@ -20,7 +21,7 @@ import {
 } from '../staff-api.service';
 
 /**
- * Attendance tab — picks one staff member (the first row by default),
+ * Attendance tab â€” picks one staff member (the first row by default),
  * lets the admin browse their month-grid via the shared calendar, and
  * lists the raw clock-in/out rows for that month below.
  *
@@ -94,7 +95,7 @@ export class StaffAttendanceTabComponent {
   }
 
   protected onDaySelected(_d: Date): void {
-    // Reserved for future drilldown — silenced for now.
+    // Reserved for future drilldown â€” silenced for now.
   }
 
   protected formatTime(iso: string): string {
@@ -126,21 +127,10 @@ export class StaffAttendanceTabComponent {
           this.attendance.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load attendance.',
+            extractApiError(err) ?? 'Could not load attendance.',
           );
         },
       });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

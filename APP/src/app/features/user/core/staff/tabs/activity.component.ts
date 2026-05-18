@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -13,6 +13,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { RelativeTimePipe } from '../../activities/relative-time.pipe';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   StaffActivity,
   StaffApiService,
@@ -71,7 +72,7 @@ interface DayGroup {
 }
 
 /**
- * Activity Log tab — per-staff stream pulled from
+ * Activity Log tab â€” per-staff stream pulled from
  * `/api/v1/staff/{user_id}/activity`. Items group by local calendar
  * day, newest first; "Today" / "Yesterday" relabel matches the
  * timeline in Step 2.6 so admins read the same shape across views.
@@ -140,7 +141,7 @@ export class StaffActivityTabComponent {
   }
 
   protected entityLabel(a: StaffActivity): string {
-    return `${a.entity_type} · ${a.entity_id.slice(0, 8)}`;
+    return `${a.entity_type} Â· ${a.entity_id.slice(0, 8)}`;
   }
 
   private dayLabel(d: Date): string {
@@ -173,21 +174,10 @@ export class StaffActivityTabComponent {
           this.activities.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load activity.',
+            extractApiError(err) ?? 'Could not load activity.',
           );
         },
       });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

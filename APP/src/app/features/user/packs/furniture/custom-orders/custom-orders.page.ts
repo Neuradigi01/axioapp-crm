@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -25,12 +25,13 @@ import { PipelineBoardComponent } from '../../../core/pipelines/pipeline-board.c
 import { PipelineListComponent } from '../../../core/pipelines/pipeline-list.component';
 import { CustomOrderCardComponent } from './custom-order-card.component';
 import { CustomOrderFormModalComponent } from './custom-order-form-modal.component';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   CustomOrder,
   CustomOrdersApiService,
 } from './custom-orders-api.service';
 
-/** Stage keys in display order — used for the % progress hint on cards. */
+/** Stage keys in display order â€” used for the % progress hint on cards. */
 const STAGE_ORDER = [
   'measurement_scheduled',
   'design_phase',
@@ -161,7 +162,7 @@ export class CustomOrdersPageComponent {
           this.orders.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load custom orders.',
+            extractApiError(err) ?? 'Could not load custom orders.',
           );
         },
       });
@@ -188,7 +189,7 @@ export class CustomOrdersPageComponent {
         error: (err: HttpErrorResponse) => {
           this.orders.set(before);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not move order.',
+            extractApiError(err) ?? 'Could not move order.',
           );
         },
       });
@@ -208,12 +209,12 @@ export class CustomOrdersPageComponent {
 
   protected fmtInr(value: number): string {
     if (value >= 100000) {
-      return `₹${(value / 100000).toFixed(1)}L`;
+      return `â‚¹${(value / 100000).toFixed(1)}L`;
     }
     if (value >= 1000) {
-      return `₹${(value / 1000).toFixed(1)}K`;
+      return `â‚¹${(value / 1000).toFixed(1)}K`;
     }
-    return `₹${Math.round(value)}`;
+    return `â‚¹${Math.round(value)}`;
   }
 
   private fetchContacts(ids: string[]): void {
@@ -240,15 +241,4 @@ export class CustomOrdersPageComponent {
       });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

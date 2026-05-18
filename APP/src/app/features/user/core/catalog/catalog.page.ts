@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -18,9 +18,10 @@ import {
   CatalogItem,
 } from './catalog-api.service';
 import { AddItemModalComponent } from './add-item-modal.component';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * Catalog page — bare-minimum product table matching the reference
+ * Catalog page â€” bare-minimum product table matching the reference
  * Vercel layout's structural shape (header + KPI strip + search +
  * grid). The Phase 4 furniture pack will replace this with the
  * richer inventory page (stock + locations + alerts).
@@ -118,7 +119,7 @@ export class CatalogPageComponent {
           this.total.set(0);
           this.loading.set(false);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load catalog.',
+            extractApiError(err) ?? 'Could not load catalog.',
           );
         },
       });
@@ -157,7 +158,7 @@ export class CatalogPageComponent {
           this.items.set(before);
           this.total.set(before.length);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not delete item.',
+            extractApiError(err) ?? 'Could not delete item.',
           );
         },
       });
@@ -165,27 +166,16 @@ export class CatalogPageComponent {
 
   /** Pick an emoji based on the category for the card icon. */
   protected emojiFor(category: string | null): string {
-    if (!category) return '📦';
+    if (!category) return 'ðŸ“¦';
     const c = category.toLowerCase();
-    if (c.includes('sofa') || c.includes('couch')) return '🛋️';
-    if (c.includes('bed')) return '🛏️';
-    if (c.includes('chair')) return '🪑';
-    if (c.includes('table')) return '🪟';
-    if (c.includes('dining')) return '🍽️';
-    if (c.includes('storage') || c.includes('shelf') || c.includes('cabinet')) return '🗄️';
-    if (c.includes('light') || c.includes('lamp')) return '💡';
-    return '📦';
+    if (c.includes('sofa') || c.includes('couch')) return 'ðŸ›‹ï¸';
+    if (c.includes('bed')) return 'ðŸ›ï¸';
+    if (c.includes('chair')) return 'ðŸª‘';
+    if (c.includes('table')) return 'ðŸªŸ';
+    if (c.includes('dining')) return 'ðŸ½ï¸';
+    if (c.includes('storage') || c.includes('shelf') || c.includes('cabinet')) return 'ðŸ—„ï¸';
+    if (c.includes('light') || c.includes('lamp')) return 'ðŸ’¡';
+    return 'ðŸ“¦';
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

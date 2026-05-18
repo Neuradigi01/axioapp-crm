@@ -1,4 +1,4 @@
-import { NgTemplateOutlet } from '@angular/common';
+﻿import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   ItemMovedEvent,
@@ -25,7 +26,7 @@ import {
 
 /**
  * Table counterpart to `PipelineBoardComponent`. Same inputs and same
- * `itemMoved` output — the only difference is the visual: rows in a
+ * `itemMoved` output â€” the only difference is the visual: rows in a
  * table, with a per-row dropdown that changes the stage.
  *
  * Reusable: takes `pipelineKey` + caller-owned `items` + an optional
@@ -105,22 +106,11 @@ export class PipelineListComponent {
         error: (err: HttpErrorResponse) => {
           this.pipeline.set(null);
           this.loadError.set(
-            this.extractError(err) ?? `Could not load pipeline '${key}'.`,
+            extractApiError(err) ?? `Could not load pipeline '${key}'.`,
           );
           this.loading.set(false);
         },
       });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

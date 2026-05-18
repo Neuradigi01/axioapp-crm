@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -22,6 +22,7 @@ import {
   WalkInsApiService,
 } from './walk-ins-api.service';
 import { RegisterWalkinModalComponent } from './register-walkin-modal.component';
+import { extractApiError } from '@core/services/api-error.util';
 
 interface ContactSummary {
   id: string;
@@ -83,7 +84,7 @@ export class WalkInsPageComponent {
       (w) => w.status === 'converted' && this.isToday(w.updated_at),
     ).length,
   );
-  /** Combined "warm leads" count — interested + follow_up across all loaded rows. */
+  /** Combined "warm leads" count â€” interested + follow_up across all loaded rows. */
   readonly interestedOrFollowUpCount = computed(
     () =>
       this.all().filter(
@@ -157,7 +158,7 @@ export class WalkInsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.all.set(before);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not check out walk-in.',
+            extractApiError(err) ?? 'Could not check out walk-in.',
           );
         },
       });
@@ -193,9 +194,9 @@ export class WalkInsPageComponent {
   }
 
   protected formatTime(iso: string | null): string {
-    if (iso === null) return '—';
+    if (iso === null) return 'â€”';
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
+    if (Number.isNaN(d.getTime())) return 'â€”';
     return d.toLocaleTimeString(undefined, {
       hour: '2-digit',
       minute: '2-digit',
@@ -203,25 +204,25 @@ export class WalkInsPageComponent {
   }
 
   protected formatDate(iso: string | null): string {
-    if (iso === null) return '—';
+    if (iso === null) return 'â€”';
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
+    if (Number.isNaN(d.getTime())) return 'â€”';
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
   }
 
-  /** No users-list API yet — show a short id snippet, or "—" if unassigned. */
+  /** No users-list API yet â€” show a short id snippet, or "â€”" if unassigned. */
   protected assignedToLabel(id: string | null): string {
-    if (id === null) return '—';
+    if (id === null) return 'â€”';
     return id.slice(0, 8);
   }
 
   protected formatDuration(min: string | null): string {
-    if (min === null) return '—';
+    if (min === null) return 'â€”';
     const n = Number(min);
-    if (!Number.isFinite(n)) return '—';
+    if (!Number.isFinite(n)) return 'â€”';
     if (n < 1) return `${Math.round(n * 60)}s`;
     if (n < 60) return `${Math.round(n)} min`;
     const hours = Math.floor(n / 60);
@@ -244,7 +245,7 @@ export class WalkInsPageComponent {
           this.all.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load walk-ins.',
+            extractApiError(err) ?? 'Could not load walk-ins.',
           );
         },
       });
@@ -278,15 +279,4 @@ export class WalkInsPageComponent {
     );
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

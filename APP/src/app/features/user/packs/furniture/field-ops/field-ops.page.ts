@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -24,6 +24,7 @@ import {
   FieldVisit,
 } from './field-ops-api.service';
 import { ScheduleVisitModalComponent } from './schedule-visit-modal.component';
+import { extractApiError } from '@core/services/api-error.util';
 
 type Filter = 'today' | 'upcoming' | 'completed';
 
@@ -172,7 +173,7 @@ export class FieldOpsPageComponent {
           this.visits.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load field visits.',
+            extractApiError(err) ?? 'Could not load field visits.',
           );
         },
       });
@@ -259,15 +260,4 @@ export class FieldOpsPageComponent {
       });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

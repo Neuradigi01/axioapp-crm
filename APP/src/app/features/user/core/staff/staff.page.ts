@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -22,6 +22,7 @@ import { StaffAttendanceTabComponent } from './tabs/attendance.component';
 import { StaffActivityTabComponent } from './tabs/activity.component';
 import { StaffFieldOpsTabComponent } from './tabs/field-ops.component';
 import { StaffPlaceholderTabComponent } from './tabs/placeholder.component';
+import { extractApiError } from '@core/services/api-error.util';
 
 export type StaffTabId =
   | 'overview'
@@ -34,13 +35,13 @@ export type StaffTabId =
   | 'store-marketing';
 
 /**
- * Staff Dashboard — admin-facing tab host. The 5 real tabs read from
+ * Staff Dashboard â€” admin-facing tab host. The 5 real tabs read from
  * `loadWithPerformance()` (one /staff + N /staff/{id}/performance calls
  * in parallel) and share the result via input bindings to keep child
  * tabs cheap to switch between. The 3 placeholder tabs are stubs until
  * Phase 4.4 / 4.10 / 5.6 ship.
  *
- * KPI header mirrors the Vercel reference layout — Present-today,
+ * KPI header mirrors the Vercel reference layout â€” Present-today,
  * total staff, total revenue (placeholder zero until invoices land),
  * avg conversion %, today's revenue (also zero today).
  */
@@ -94,7 +95,7 @@ export class StaffPageComponent {
   });
 
   protected readonly totalRevenue = computed(() => {
-    // Sum of leaderboard.sales — sales placeholder is 0 today.
+    // Sum of leaderboard.sales â€” sales placeholder is 0 today.
     return this.rows().reduce(
       (acc, r) => acc + Number(r.performance.sales || 0),
       0,
@@ -135,7 +136,7 @@ export class StaffPageComponent {
         error: (err: HttpErrorResponse) => {
           this.rows.set([]);
           this.loading.set(false);
-          this.loadError.set(this.extractError(err) ?? 'Could not load staff.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load staff.');
         },
       });
   }
@@ -144,15 +145,4 @@ export class StaffPageComponent {
     this.activeTab.set(tab);
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

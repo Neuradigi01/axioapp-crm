@@ -1,4 +1,4 @@
-import {
+﻿import {
   CdkDragDrop,
   DragDropModule,
   moveItemInArray,
@@ -21,6 +21,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   ItemMovedEvent,
@@ -45,13 +46,13 @@ import {
  *     different column. The parent is expected to PATCH the moved
  *     item's stage on the server and (optimistically or otherwise)
  *     refresh the `items` input. The board does NOT call the move
- *     endpoint itself — that lives on the entity router (leads,
+ *     endpoint itself â€” that lives on the entity router (leads,
  *     custom_orders) which knows about `move_card`.
  *
  * Item rendering: caller supplies a `<ng-template>` child with an
  * `let-item` binding. The board passes each item through via
  * `*ngTemplateOutlet` so the caller can render any card layout they
- * want without the board knowing anything about contacts, leads, …
+ * want without the board knowing anything about contacts, leads, â€¦
  *
  * Note on cdk-drag-drop + signals: cdk mutates the drop-list's `data`
  * array in place to reflect the visual drop. We mirror items into a
@@ -83,7 +84,7 @@ export class PipelineBoardComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
 
-  /** `{stageKey: PipelineItem[]}` — mutable so cdk-drag-drop works in place. */
+  /** `{stageKey: PipelineItem[]}` â€” mutable so cdk-drag-drop works in place. */
   protected readonly buckets = signal<Record<string, PipelineItem[]>>({});
 
   readonly stages = computed<PipelineStage[]>(() => this.pipeline()?.stages ?? []);
@@ -111,7 +112,7 @@ export class PipelineBoardComponent {
 
   protected onDrop(event: CdkDragDrop<PipelineItem[]>, toStage: string): void {
     if (event.previousContainer === event.container) {
-      // Reorder within the same column — purely visual, no server call.
+      // Reorder within the same column â€” purely visual, no server call.
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
     } else {
       transferArrayItem(
@@ -163,7 +164,7 @@ export class PipelineBoardComponent {
       const key = item.pipeline_stage;
       if (next[key]) next[key].push(item);
       else {
-        // Item references an unknown stage — surface in a sentinel
+        // Item references an unknown stage â€” surface in a sentinel
         // bucket so the user still sees the item rather than losing it.
         // Won't render unless a column with this key exists, but the
         // emit-side won't see a phantom bucket either.
@@ -186,22 +187,11 @@ export class PipelineBoardComponent {
         error: (err: HttpErrorResponse) => {
           this.pipeline.set(null);
           this.loadError.set(
-            this.extractError(err) ?? `Could not load pipeline '${key}'.`,
+            extractApiError(err) ?? `Could not load pipeline '${key}'.`,
           );
           this.loading.set(false);
         },
       });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

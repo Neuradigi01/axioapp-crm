@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -18,6 +18,7 @@ import {
   ContactsApiService,
 } from '../../../../core/contacts/contacts-api.service';
 import { InrPipe } from '../../../../core/shared/pipes/inr.pipe';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   BillingApiService,
   Invoice,
@@ -59,7 +60,7 @@ export class InvoicesTabComponent {
     { id: 'void', label: 'Void' },
   ];
 
-  /** Summary tiles — match the Vercel reference: Total / Billed / Collected / Pending. */
+  /** Summary tiles â€” match the Vercel reference: Total / Billed / Collected / Pending. */
   protected readonly tiles = computed(() => {
     const rows = this.invoices();
     let billed = 0;
@@ -120,7 +121,7 @@ export class InvoicesTabComponent {
           this.invoices.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load invoices.',
+            extractApiError(err) ?? 'Could not load invoices.',
           );
         },
       });
@@ -142,12 +143,12 @@ export class InvoicesTabComponent {
   }
 
   protected paymentLabel(method: string | null): string {
-    if (!method) return '—';
+    if (!method) return 'â€”';
     return method.toUpperCase();
   }
 
   protected formatDate(iso: string | null | undefined): string {
-    if (!iso) return '—';
+    if (!iso) return 'â€”';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleDateString('en-IN', {
@@ -158,13 +159,13 @@ export class InvoicesTabComponent {
   }
 
   protected invoiceNumber(inv: Invoice): string {
-    if (inv.number === null) return '— draft —';
+    if (inv.number === null) return 'â€” draft â€”';
     return `INV-${String(inv.number).padStart(4, '0')}`;
   }
 
   protected contactName(id: string | null): string {
     if (!id) return 'Walk-in';
-    return this.contactsById()[id]?.full_name ?? '…';
+    return this.contactsById()[id]?.full_name ?? 'â€¦';
   }
 
   protected contactPhone(id: string | null): string | null {
@@ -196,15 +197,4 @@ export class InvoicesTabComponent {
       });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

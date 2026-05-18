@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -13,20 +13,21 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { InrPipe } from '../../shared/pipes/inr.pipe';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   StaffApiService,
   StaffWithPerformance,
 } from '../staff-api.service';
 
 /**
- * Targets & Commission tab — table of staff with an inline editor.
+ * Targets & Commission tab â€” table of staff with an inline editor.
  *
- * Click "Edit" on a row → that row expands with three numeric inputs
- * (commission %, monthly target ₹, rating). Hitting Save fires PUT
+ * Click "Edit" on a row â†’ that row expands with three numeric inputs
+ * (commission %, monthly target â‚¹, rating). Hitting Save fires PUT
  * /staff/{user_id} and emits `saved` so the parent reloads the joined
  * list.
  *
- * Only one row is editable at a time — picking another row collapses
+ * Only one row is editable at a time â€” picking another row collapses
  * the previous one.
  */
 @Component({
@@ -108,21 +109,10 @@ export class StaffTargetsTabComponent {
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.submitError.set(
-            this.extractError(err) ?? 'Could not save profile.',
+            extractApiError(err) ?? 'Could not save profile.',
           );
         },
       });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

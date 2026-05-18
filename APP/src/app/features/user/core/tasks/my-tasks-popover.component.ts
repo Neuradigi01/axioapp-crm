@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -13,10 +13,11 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { Task, TasksApiService } from './tasks-api.service';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
  * Header popover that lists the caller's open tasks, grouped by due
- * window: Overdue → Today → Later → No due date. Opens only when the
+ * window: Overdue â†’ Today â†’ Later â†’ No due date. Opens only when the
  * `open` signal-input is true; the parent (header) owns the toggle.
  *
  * Marking a task done removes it from the list (we're filtering by
@@ -102,7 +103,7 @@ export class MyTasksPopoverComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load your tasks.',
+            extractApiError(err) ?? 'Could not load your tasks.',
           );
           this.loading.set(false);
         },
@@ -119,16 +120,16 @@ export class MyTasksPopoverComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set(before);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not update task.',
+            extractApiError(err) ?? 'Could not update task.',
           );
         },
       });
   }
 
   protected formatDue(iso: string | null): string {
-    if (iso === null) return '—';
+    if (iso === null) return 'â€”';
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
+    if (Number.isNaN(d.getTime())) return 'â€”';
     return d.toLocaleString(undefined, {
       day: 'numeric',
       month: 'short',
@@ -137,15 +138,4 @@ export class MyTasksPopoverComponent {
     });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

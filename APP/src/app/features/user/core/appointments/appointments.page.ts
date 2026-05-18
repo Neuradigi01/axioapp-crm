@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -31,6 +31,7 @@ import {
   AppointmentsApiService,
 } from './appointments-api.service';
 import { BookAppointmentModalComponent } from './book-appointment-modal.component';
+import { extractApiError } from '@core/services/api-error.util';
 
 interface ContactSummary {
   id: string;
@@ -148,7 +149,7 @@ export class AppointmentsPageComponent {
   }
 
   protected contactName(id: string): string {
-    return this.contactsById()[id]?.full_name ?? '—';
+    return this.contactsById()[id]?.full_name ?? 'â€”';
   }
 
   protected statusClass(status: Appointment['status']): string {
@@ -185,7 +186,7 @@ export class AppointmentsPageComponent {
           this.appointments.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load appointments.',
+            extractApiError(err) ?? 'Could not load appointments.',
           );
         },
       });
@@ -223,15 +224,4 @@ export class AppointmentsPageComponent {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

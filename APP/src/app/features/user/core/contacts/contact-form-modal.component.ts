@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -16,6 +16,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   Contact,
   ContactCreate,
@@ -26,9 +27,9 @@ import {
 /**
  * Modal that creates or edits a `Contact`. Splits the form into two
  * sections per the master plan:
- *   - "Standard" — the canonical columns on the contacts row
+ *   - "Standard" â€” the canonical columns on the contacts row
  *     (full_name, phone, email, source, tags).
- *   - "Custom"   — the dynamic block driven by
+ *   - "Custom"   â€” the dynamic block driven by
  *     `GET /custom-fields/contact/render`, rendered through
  *     `<app-dynamic-form>`. Nothing about custom fields is hardcoded
  *     here (rule 4).
@@ -45,7 +46,7 @@ export class ContactFormModalComponent implements OnInit {
   private readonly api = inject(ContactsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
-  /** When set, the modal opens in edit mode. Null → create mode. */
+  /** When set, the modal opens in edit mode. Null â†’ create mode. */
   @Input() set contact(value: Contact | null) {
     this._contact.set(value);
     if (value !== null) this.resetForm(value);
@@ -99,7 +100,7 @@ export class ContactFormModalComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.fieldsError.set(
-            this.extractError(err) ?? 'Could not load custom field definitions.',
+            extractApiError(err) ?? 'Could not load custom field definitions.',
           );
           this.fieldsLoading.set(false);
         },
@@ -174,15 +175,4 @@ export class ContactFormModalComponent implements OnInit {
     return [...seen];
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -10,6 +10,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   FieldOpsApiService,
@@ -17,7 +18,7 @@ import {
 } from '../../../packs/furniture/field-ops/field-ops-api.service';
 
 /**
- * Staff Dashboard → Field Operations tab. Replaces the Step-3.5
+ * Staff Dashboard â†’ Field Operations tab. Replaces the Step-3.5
  * placeholder with a compact org-wide visit roll-up.
  */
 @Component({
@@ -60,14 +61,14 @@ export class StaffFieldOpsTabComponent {
           this.visits.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load field visits.',
+            extractApiError(err) ?? 'Could not load field visits.',
           );
         },
       });
   }
 
   protected formatRelative(iso: string | null): string {
-    if (!iso) return '—';
+    if (!iso) return 'â€”';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleDateString('en-IN', {
@@ -89,15 +90,4 @@ export class StaffFieldOpsTabComponent {
     }
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

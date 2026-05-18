@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -25,6 +25,7 @@ import {
   ContactsApiService,
 } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
+import { extractApiError } from '@core/services/api-error.util';
 
 type DetailTab = 'overview' | 'activities' | 'notes' | 'tasks';
 
@@ -142,7 +143,7 @@ export class ContactDetailPageComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.formError.set(this.extractError(err) ?? 'Could not save contact.');
+          this.formError.set(extractApiError(err) ?? 'Could not save contact.');
         },
       });
   }
@@ -160,7 +161,7 @@ export class ContactDetailPageComponent implements OnInit {
       .subscribe({
         next: () => this.router.navigate(['/user/contacts']),
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(this.extractError(err) ?? 'Could not delete contact.');
+          this.loadError.set(extractApiError(err) ?? 'Could not delete contact.');
         },
       });
   }
@@ -177,7 +178,7 @@ export class ContactDetailPageComponent implements OnInit {
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(this.extractError(err) ?? 'Could not load contact.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load contact.');
           this.loading.set(false);
         },
       });
@@ -197,8 +198,8 @@ export class ContactDetailPageComponent implements OnInit {
   }
 
   private formatValue(def: FieldDef, value: unknown): string {
-    if (value === null || value === undefined || value === '') return '—';
-    if (Array.isArray(value)) return value.length === 0 ? '—' : value.join(', ');
+    if (value === null || value === undefined || value === '') return 'â€”';
+    if (Array.isArray(value)) return value.length === 0 ? 'â€”' : value.join(', ');
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (def.field_type === 'currency' && typeof value === 'number') {
       return new Intl.NumberFormat('en-IN', {
@@ -210,15 +211,4 @@ export class ContactDetailPageComponent implements OnInit {
     return String(value);
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

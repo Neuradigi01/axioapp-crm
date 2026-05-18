@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -15,6 +15,7 @@ import { catchError, of, switchMap } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { ContactsApiService } from '../../../core/contacts/contacts-api.service';
 import { InrPipe } from '../../../core/shared/pipes/inr.pipe';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   BillingApiService,
   InvoiceStatus,
@@ -23,7 +24,7 @@ import {
 } from './billing-api.service';
 
 /**
- * `/billing/invoices/:id` — full invoice view with line items, payment
+ * `/billing/invoices/:id` â€” full invoice view with line items, payment
  * history, and a Print/PDF button. The PDF link is the absolute API URL
  * so `window.open` hits the API origin directly (no Angular proxy).
  */
@@ -56,7 +57,7 @@ export class InvoiceDetailPageComponent {
 
   protected readonly invoiceNumber = computed(() => {
     const inv = this.invoice();
-    if (!inv || inv.number === null) return '— draft —';
+    if (!inv || inv.number === null) return 'â€” draft â€”';
     return `INV-${String(inv.number).padStart(4, '0')}`;
   });
 
@@ -71,7 +72,7 @@ export class InvoiceDetailPageComponent {
           return this.api.get(id).pipe(
             catchError((err: HttpErrorResponse) => {
               this.loadError.set(
-                this.extractError(err) ?? 'Could not load invoice.',
+                extractApiError(err) ?? 'Could not load invoice.',
               );
               this.loading.set(false);
               return of(null);
@@ -105,7 +106,7 @@ export class InvoiceDetailPageComponent {
   }
 
   protected formatDateTime(iso: string | null | undefined): string {
-    if (!iso) return '—';
+    if (!iso) return 'â€”';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleString('en-IN', {
@@ -118,7 +119,7 @@ export class InvoiceDetailPageComponent {
   }
 
   protected paymentLabel(method: string | null): string {
-    if (!method) return '—';
+    if (!method) return 'â€”';
     return method.toUpperCase();
   }
 
@@ -155,15 +156,4 @@ export class InvoiceDetailPageComponent {
     }
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

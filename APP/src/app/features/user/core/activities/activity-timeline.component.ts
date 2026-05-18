@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -18,11 +18,12 @@ import {
   ActivitiesApiService,
 } from './activities-api.service';
 import { RelativeTimePipe } from './relative-time.pipe';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
  * Reusable vertical timeline of activities for any tenant-scoped entity.
  *
- * Inputs are intentionally minimal — `(entityType, entityId)` only —
+ * Inputs are intentionally minimal â€” `(entityType, entityId)` only â€”
  * so this same component will back the Activities tab for Leads
  * (Step 2.12), Walk-ins, and any future entity. No knowledge of
  * "contact" lives here.
@@ -133,7 +134,7 @@ export class ActivityTimelineComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load activities.',
+            extractApiError(err) ?? 'Could not load activities.',
           );
           this.loading.set(false);
         },
@@ -157,7 +158,7 @@ export class ActivityTimelineComponent {
       const from = (payload as { from?: unknown }).from;
       const to = (payload as { to?: unknown }).to;
       if (typeof from === 'string' && typeof to === 'string') {
-        return `${from} → ${to}`;
+        return `${from} â†’ ${to}`;
       }
     }
     // Fallback: stringify so unknown future shapes are still legible.
@@ -191,15 +192,4 @@ export class ActivityTimelineComponent {
     });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

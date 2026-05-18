@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -14,16 +14,17 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { Task, TaskPriority, TasksApiService } from './tasks-api.service';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
  * Tasks panel rendered inside any entity detail page. Inputs are
- * `(entityType, entityId)` only — no contact-specific code lives here,
+ * `(entityType, entityId)` only â€” no contact-specific code lives here,
  * so the same component plugs into Leads (2.12) and Walk-ins later.
  *
  * Behaviour:
  *   - Lists tasks for the given entity, earliest-due first.
  *   - Inline "Add task" form (title, due, priority).
- *   - Click the checkbox to flip status open ↔ done. Strikethrough on done.
+ *   - Click the checkbox to flip status open â†” done. Strikethrough on done.
  *   - Optimistic UI: server-confirmed updates replace the in-memory row.
  */
 @Component({
@@ -85,7 +86,7 @@ export class TasksPanelComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load tasks.',
+            extractApiError(err) ?? 'Could not load tasks.',
           );
           this.loading.set(false);
         },
@@ -124,7 +125,7 @@ export class TasksPanelComponent {
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.addError.set(
-            this.extractError(err) ?? 'Could not create task.',
+            extractApiError(err) ?? 'Could not create task.',
           );
         },
       });
@@ -132,7 +133,7 @@ export class TasksPanelComponent {
 
   protected toggleDone(task: Task): void {
     const nextStatus = task.status === 'done' ? 'open' : 'done';
-    // Optimistic local flip — reverts on error.
+    // Optimistic local flip â€” reverts on error.
     const before = this.items();
     this.items.update((rows) =>
       rows.map((r) => (r.id === task.id ? { ...r, status: nextStatus } : r)),
@@ -149,7 +150,7 @@ export class TasksPanelComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set(before);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not update task.',
+            extractApiError(err) ?? 'Could not update task.',
           );
         },
       });
@@ -185,7 +186,7 @@ export class TasksPanelComponent {
 
   private normalizeDue(value: string | null | undefined): string | null {
     if (!value) return null;
-    // <input type="datetime-local"> emits "YYYY-MM-DDTHH:mm" — convert to ISO.
+    // <input type="datetime-local"> emits "YYYY-MM-DDTHH:mm" â€” convert to ISO.
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return null;
     return d.toISOString();
@@ -201,15 +202,4 @@ export class TasksPanelComponent {
     return a.created_at < b.created_at ? 1 : -1;
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

@@ -1,4 +1,4 @@
-import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+﻿import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -19,6 +19,7 @@ import {
   FieldSource,
 } from './custom-fields-api.service';
 import { FieldFormComponent } from './field-form.component';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
  * Curated entity list for the picker. Once the module registry exposes
@@ -84,7 +85,7 @@ export class CustomFieldsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.fields.set([]);
-          this.loadError.set(this.extractError(err) ?? 'Failed to load fields.');
+          this.loadError.set(extractApiError(err) ?? 'Failed to load fields.');
           this.loading.set(false);
         },
       });
@@ -131,7 +132,7 @@ export class CustomFieldsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.formError.set(this.extractError(err) ?? 'Could not create field.');
+          this.formError.set(extractApiError(err) ?? 'Could not create field.');
         },
       });
   }
@@ -150,7 +151,7 @@ export class CustomFieldsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.formError.set(this.extractError(err) ?? 'Could not save field.');
+          this.formError.set(extractApiError(err) ?? 'Could not save field.');
         },
       });
   }
@@ -170,7 +171,7 @@ export class CustomFieldsPageComponent {
         error: (err: HttpErrorResponse) => {
           // Revert + surface.
           this.fields.set(snapshot);
-          this.loadError.set(this.extractError(err) ?? 'Could not delete field.');
+          this.loadError.set(extractApiError(err) ?? 'Could not delete field.');
         },
       });
   }
@@ -196,7 +197,7 @@ export class CustomFieldsPageComponent {
         error: (err: HttpErrorResponse) => {
           // Revert the optimistic reorder.
           this.fields.set(before);
-          this.loadError.set(this.extractError(err) ?? 'Could not reorder fields.');
+          this.loadError.set(extractApiError(err) ?? 'Could not reorder fields.');
         },
       });
   }
@@ -223,14 +224,4 @@ export class CustomFieldsPageComponent {
     }
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate = (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

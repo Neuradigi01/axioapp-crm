@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -23,6 +23,7 @@ import { PipelineBoardComponent } from '../pipelines/pipeline-board.component';
 import { PipelineListComponent } from '../pipelines/pipeline-list.component';
 import { LeadCardComponent } from './lead-card.component';
 import { LeadFormModalComponent } from './lead-form-modal.component';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   Lead,
   LeadCreate,
@@ -35,15 +36,15 @@ import {
  * Top-level Leads page.
  *
  * Tabs:
- *   - **Pipeline** — wraps `<app-pipeline-board pipelineKey="leads">`
+ *   - **Pipeline** â€” wraps `<app-pipeline-board pipelineKey="leads">`
  *     and feeds it the loaded leads. The lead-card template projects
  *     into each kanban card. `(itemMoved)` calls the move-stage
  *     endpoint; on error we revert the optimistic local mutation.
- *   - **List** — wraps `<app-pipeline-list>` for the same data with
+ *   - **List** â€” wraps `<app-pipeline-list>` for the same data with
  *     the same `itemMoved` semantics.
  *
  * Contact info on each card comes from a one-shot
- * `forkJoin(contactsApi.get(id))` after the leads load — keeps the
+ * `forkJoin(contactsApi.get(id))` after the leads load â€” keeps the
  * card component dumb and avoids it issuing its own HTTP per render.
  */
 type View = 'pipeline' | 'list';
@@ -101,7 +102,7 @@ export class LeadsPageComponent {
     return [...set].sort();
   });
 
-  /** "X total · Y new today" — header subtitle. */
+  /** "X total Â· Y new today" â€” header subtitle. */
   readonly totalCount = computed(() => this.leads().length);
   readonly newTodayCount = computed(() => {
     const todayKey = this.todayKey();
@@ -177,7 +178,7 @@ export class LeadsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.leads.set([]);
           this.loading.set(false);
-          this.loadError.set(this.extractError(err) ?? 'Could not load leads.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load leads.');
         },
       });
   }
@@ -201,7 +202,7 @@ export class LeadsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.leads.set(before);
-          this.loadError.set(this.extractError(err) ?? 'Could not move lead.');
+          this.loadError.set(extractApiError(err) ?? 'Could not move lead.');
         },
       });
   }
@@ -253,7 +254,7 @@ export class LeadsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.formError.set(this.extractError(err) ?? 'Could not create lead.');
+          this.formError.set(extractApiError(err) ?? 'Could not create lead.');
         },
       });
   }
@@ -272,7 +273,7 @@ export class LeadsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.formError.set(this.extractError(err) ?? 'Could not save lead.');
+          this.formError.set(extractApiError(err) ?? 'Could not save lead.');
         },
       });
   }
@@ -302,15 +303,4 @@ export class LeadsPageComponent {
       });
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

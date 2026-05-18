@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -20,6 +20,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   ContactListItem,
@@ -73,7 +74,7 @@ export class ScheduleVisitModalComponent implements OnInit {
   protected readonly staff = signal<StaffListItem[]>([]);
   protected readonly recentOrders = signal<CustomOrder[]>([]);
 
-  // Contact picker state — same pattern as the custom-order modal.
+  // Contact picker state â€” same pattern as the custom-order modal.
   protected readonly selectedContact = signal<ContactListItem | null>(null);
   protected readonly contactQuery = signal('');
   protected readonly contactResults = signal<ContactListItem[]>([]);
@@ -218,7 +219,7 @@ export class ScheduleVisitModalComponent implements OnInit {
         error: (err: HttpErrorResponse) => {
           this._submitting.set(false);
           this.submitError.set(
-            this.extractError(err) ?? 'Could not schedule the visit.',
+            extractApiError(err) ?? 'Could not schedule the visit.',
           );
         },
       });
@@ -247,15 +248,4 @@ export class ScheduleVisitModalComponent implements OnInit {
     return t.length === 0 ? null : t;
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

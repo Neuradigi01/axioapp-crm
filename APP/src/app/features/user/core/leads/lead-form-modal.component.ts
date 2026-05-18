@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -28,18 +28,19 @@ import {
   PipelinesApiService,
 } from '../pipelines/pipelines-api.service';
 import { Lead, LeadCreate, LeadUpdate, LeadsApiService } from './leads-api.service';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
  * Modal that creates or edits a `Lead`. Splits the form into:
  *
- *   - Contact picker — debounced search through the contacts API.
+ *   - Contact picker â€” debounced search through the contacts API.
  *     Selected contact becomes the lead's `contact_id`. "Create new
  *     contact" intentionally redirects users to the Contacts page
  *     instead of inlining a second dynamic form (which would have to
  *     re-implement the entire required-custom-fields flow).
- *   - Standard fields — pipeline_stage (from the pipeline engine),
+ *   - Standard fields â€” pipeline_stage (from the pipeline engine),
  *     budget, expected_close_date.
- *   - Custom fields — `<app-dynamic-form>` fed by the lead-scoped
+ *   - Custom fields â€” `<app-dynamic-form>` fed by the lead-scoped
  *     `/custom-fields/lead/render` endpoint.
  */
 @Component({
@@ -117,7 +118,7 @@ export class LeadFormModalComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.fieldsError.set(
-            this.extractError(err) ?? 'Could not load custom field definitions.',
+            extractApiError(err) ?? 'Could not load custom field definitions.',
           );
           this.fieldsLoading.set(false);
         },
@@ -254,7 +255,7 @@ export class LeadFormModalComponent implements OnInit {
             created_at: c.created_at,
           }),
         error: () => {
-          /* leave selectedContact null — the user can re-pick */
+          /* leave selectedContact null â€” the user can re-pick */
         },
       });
   }
@@ -265,15 +266,4 @@ export class LeadFormModalComponent implements OnInit {
     return trimmed.length === 0 ? null : trimmed;
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

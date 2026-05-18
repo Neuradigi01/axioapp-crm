@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -17,6 +17,7 @@ import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   ContactListItem,
   ContactsApiService,
@@ -36,7 +37,7 @@ import {
  *   - Standard fields (title, purpose, scheduled_at, duration_min,
  *     location). `assigned_to_id` defaults to the current user; there's
  *     no users-list API yet so we keep it implicit.
- *   - Conflict banner — when the create call returns 409 with a
+ *   - Conflict banner â€” when the create call returns 409 with a
  *     `conflicts: [...]` array we surface the conflicting appointment
  *     ids and let the parent map them to titles via `conflictTitleFor`.
  *
@@ -64,7 +65,7 @@ export class BookAppointmentModalComponent implements OnInit {
     }
   }
 
-  /** Map a conflicting appointment id → human-readable label (set by parent). */
+  /** Map a conflicting appointment id â†’ human-readable label (set by parent). */
   @Input() conflictTitleFor: (id: string) => string | null = () => null;
 
   @Output() readonly created = new EventEmitter<Appointment>();
@@ -200,7 +201,7 @@ export class BookAppointmentModalComponent implements OnInit {
             );
           } else {
             this.submitError.set(
-              this.extractError(err) ?? 'Could not create appointment.',
+              extractApiError(err) ?? 'Could not create appointment.',
             );
           }
         },
@@ -208,16 +209,16 @@ export class BookAppointmentModalComponent implements OnInit {
   }
 
   protected conflictLabel(id: string): string {
-    return this.conflictTitleFor(id) ?? id.slice(0, 8) + '…';
+    return this.conflictTitleFor(id) ?? id.slice(0, 8) + 'â€¦';
   }
 
-  /** Convert `<input type="datetime-local">` value → backend ISO. */
+  /** Convert `<input type="datetime-local">` value â†’ backend ISO. */
   private toIsoFromLocal(value: string): string {
     const d = new Date(value);
     return d.toISOString();
   }
 
-  /** Convert a Date → "YYYY-MM-DDTHH:mm" for <input type="datetime-local">. */
+  /** Convert a Date â†’ "YYYY-MM-DDTHH:mm" for <input type="datetime-local">. */
   private toDatetimeLocalString(d: Date, hour: number): string {
     const local = new Date(
       d.getFullYear(),
@@ -235,15 +236,4 @@ export class BookAppointmentModalComponent implements OnInit {
     );
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }

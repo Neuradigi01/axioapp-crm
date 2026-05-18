@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -24,6 +24,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { Observable, Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import { extractApiError } from '@core/services/api-error.util';
 
 import {
   ContactListItem,
@@ -37,11 +38,11 @@ import {
 /**
  * Multi-step "New Custom Order" wizard.
  *
- *   1. Basics       — contact picker + title + materials/color/finish +
+ *   1. Basics       â€” contact picker + title + materials/color/finish +
  *                     total / advance / expected delivery date.
- *   2. Measurements — repeatable rows (label + L/W/H + notes).
- *   3. Photos       — multi-file picker with thumbnail previews.
- *   4. Review       — summary + Submit.
+ *   2. Measurements â€” repeatable rows (label + L/W/H + notes).
+ *   3. Photos       â€” multi-file picker with thumbnail previews.
+ *   4. Review       â€” summary + Submit.
  *
  * Submission order: create the order first; then in parallel POST each
  * measurement and upload each photo. We capture per-row errors and
@@ -80,7 +81,7 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
   protected readonly _submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
 
-  // Step 1 — basics
+  // Step 1 â€” basics
   readonly basics = this.fb.group({
     title: this.fb.control<string>('', {
       nonNullable: true,
@@ -96,11 +97,11 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
     expected_delivery_date: this.fb.control<string>('', { nonNullable: true }),
   });
 
-  // Step 2 — measurements (FormArray of FormGroups)
+  // Step 2 â€” measurements (FormArray of FormGroups)
   readonly measurements: FormArray<FormGroup<MeasurementRowGroup>> =
     this.fb.array<FormGroup<MeasurementRowGroup>>([]);
 
-  // Step 3 — photos (signal, not a form control — File objects are out-of-band)
+  // Step 3 â€” photos (signal, not a form control â€” File objects are out-of-band)
   protected readonly photos = signal<PhotoStaged[]>([]);
 
   // Contact picker state
@@ -276,7 +277,7 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
         error: (err: HttpErrorResponse) => {
           this._submitting.set(false);
           this.submitError.set(
-            this.extractError(err) ?? 'Could not create custom order.',
+            extractApiError(err) ?? 'Could not create custom order.',
           );
         },
       });
@@ -329,7 +330,7 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
           error: (err: HttpErrorResponse) => {
             if (!firstError) {
               firstError =
-                this.extractError(err)
+                extractApiError(err)
                 ?? 'Order created, but some attachments failed to upload.';
             }
             done();
@@ -344,17 +345,6 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
     return trimmed.length === 0 ? null : trimmed;
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }
 
 interface MeasurementRowGroup {

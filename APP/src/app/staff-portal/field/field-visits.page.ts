@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+﻿import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -14,17 +14,18 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { StaffSessionService } from '../staff-session.service';
+import { extractApiError } from '@core/services/api-error.util';
 import {
   FieldVisit,
   FieldVisitCompletePayload,
 } from '../../features/user/packs/furniture/field-ops/field-ops-api.service';
 
 /**
- * Staff Portal → Field Visits tab.
+ * Staff Portal â†’ Field Visits tab.
  *
  * Lists visits assigned to the logged-in staff user (via the
  * `/staff-portal/me/field-visits` family, which gates on the staff
- * bearer token). Tap a visit to complete it on the spot — the
+ * bearer token). Tap a visit to complete it on the spot â€” the
  * complete handler shares the same backend service as the admin
  * surface, including measurement copyback to any linked custom order.
  */
@@ -72,7 +73,7 @@ export class FieldVisitsPageComponent {
           this.visits.set([]);
           this.loading.set(false);
           this.loadError.set(
-            this.extractError(err) ?? 'Could not load your visits.',
+            extractApiError(err) ?? 'Could not load your visits.',
           );
         },
       });
@@ -94,7 +95,7 @@ export class FieldVisitsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.completing.set(null);
           this.completeError.set(
-            this.extractError(err) ?? 'Could not mark visit complete.',
+            extractApiError(err) ?? 'Could not mark visit complete.',
           );
         },
       });
@@ -114,7 +115,7 @@ export class FieldVisitsPageComponent {
   }
 
   protected formatDateTime(iso: string | null): string {
-    if (!iso) return '—';
+    if (!iso) return 'â€”';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleString('en-IN', {
@@ -147,15 +148,4 @@ export class FieldVisitsPageComponent {
     return new HttpHeaders(t ? { Authorization: `Bearer ${t}` } : {});
   }
 
-  private extractError(err: HttpErrorResponse): string | null {
-    const body = err?.error;
-    if (typeof body === 'string') return body;
-    if (body && typeof body === 'object') {
-      const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
-      if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-  }
 }
