@@ -65,6 +65,17 @@ export const accountsRoutes: Routes = [
             (m) => m.EmailVerificationNoticeComponent
           ),
       },
+      {
+        // Recipient flow for /accounts/accept-invite?token=…
+        // — wired in step 2.5.6 (the invite-user flow). Not driven
+        // through `getRoute()` because this is a FurnitureCRM-only
+        // route that doesn't live in the legacy `tbl_routes` registry.
+        path: 'accept-invite',
+        loadComponent: () =>
+          import('./accept-invite/accept-invite.component').then(
+            (m) => m.AcceptInviteComponent
+          ),
+      },
     ],
   },
 ];

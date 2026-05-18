@@ -68,6 +68,7 @@ from src.app.packs.furniture.modules.billing.router import (
 import src.app.packs.furniture.modules.billing  # noqa: F401
 from src.app.core.module_registry import discover_modules, registry
 from src.app.core.modules_router import router as modules_router
+from src.app.core.invitations.router import router as invitations_router
 from src.app.core.permissions.router import (
     permissions_router,
     roles_router,
@@ -141,6 +142,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(roles_router, prefix="/api/v1")
 app.include_router(permissions_router, prefix="/api/v1")
+app.include_router(invitations_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
 app.include_router(custom_fields_router, prefix="/api/v1")
 app.include_router(contacts_router, prefix="/api/v1")

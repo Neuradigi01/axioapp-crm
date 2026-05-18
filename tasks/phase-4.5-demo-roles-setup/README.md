@@ -52,14 +52,20 @@ safety net so we can roll back without data loss. Revisit on or after
 - [ ] Audit-log review: confirm no `auth.*` or write-path audit rows
       have `user_id` values that aren't present as
       `tbl_user_login.legacy_uuid`.
-- [ ] FK retarget plan: `auth_sessions.user_id`, `audit_logs.user_id`,
-      `staff_sessions.user_id`, `staff_profiles.user_id`, and any
-      `*.assigned_to_id` columns currently reference `users.id`. Plan
-      a migration to retarget them to
-      `tbl_user_login.legacy_uuid` (UNIQUE partial index already
-      exists from migration 0031), then drop the FK + the `users`
-      table + the placeholder `Table("users", …)` shim in
-      [`api/src/app/core/users/models.py`](../../api/src/app/core/users/models.py).
+- [x] **Partial cut taken 2026-05-18 (step 2.5.6, migration 0037):**
+      dropped the FK constraints on `auth_sessions.user_id` and
+      `audit_logs.user_id`. The columns + indexes stay UUID; only the
+      referential integrity to `users.id` is gone, because the invite
+      flow needs to create users whose UUID isn't in the soak table.
+      Three FKs still pointing at `users.id`:
+      `staff_sessions.user_id`, `staff_profiles.user_id`,
+      `demo_credentials.user_id` — exercise those before the final
+      cutover.
+- [ ] FK retarget plan: the five `user_id` UUID columns above should
+      ultimately reference `tbl_user_login.legacy_uuid` (UNIQUE
+      partial index already exists from migration 0031). Either point
+      new FKs there OR drop the FKs entirely and rely on application-
+      level integrity (cheaper, simpler).
 - [ ] Verify the legacy `UserLogin` class in
       [`api/src/models/user.py`](../../api/src/models/user.py) is
       still the only declarative class that maps the bigint `id`

@@ -6,7 +6,7 @@
     @if (canWrite()) {
       <button
         type="button"
-        (click)="showInviteStub()"
+        (click)="openInviteModal()"
         class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
       >
         Invite member
@@ -33,7 +33,6 @@
       @for (u of items(); track u.id) {
         <li class="border-b border-zinc-100 last:border-b-0">
           @if (editingId() === u.id) {
-            <!-- Inline edit form -->
             <form [formGroup]="editForm" (ngSubmit)="saveEdit(u)" class="space-y-3 bg-zinc-50 px-4 py-4">
               <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <label class="block text-sm">
@@ -152,5 +151,128 @@
         </li>
       }
     </ul>
+  }
+
+  <!-- Pending invitations (step 2.5.6) ------------------------------------- -->
+  @if (canWrite() && (invitations().length > 0 || invitationsError())) {
+    <section class="mt-6">
+      <h3 class="mb-2 text-sm font-medium text-zinc-900">
+        Pending invitations
+        <span class="ml-1 text-xs font-normal text-zinc-500">({{ invitations().length }})</span>
+      </h3>
+      @if (invitationsError(); as err) {
+        <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {{ err }}
+        </div>
+      }
+      @if (invitations().length > 0) {
+        <ul class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+          @for (inv of invitations(); track inv.id) {
+            <li class="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3 last:border-b-0">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-zinc-900">{{ inv.email }}</p>
+                <p class="text-xs text-zinc-500">
+                  Invited as <span class="font-medium">{{ roleNameOfId(inv.role_id) }}</span>
+                  · expires {{ inv.expires_at | date:'medium' }}
+                </p>
+              </div>
+              <button
+                type="button"
+                (click)="revokeInvite(inv)"
+                [disabled]="revokingInviteId() === inv.id"
+                class="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {{ revokingInviteId() === inv.id ? 'Revoking…' : 'Revoke' }}
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+
+  <!-- Invite modal -------------------------------------------------------- -->
+  @if (inviteModalOpen()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+      <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+        <h3 class="mb-3 text-base font-semibold text-zinc-900">Invite a member</h3>
+        @if (lastInviteLink()) {
+          <div class="space-y-3">
+            <div class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              Invitation sent. The recipient will receive an email with the accept link. (Dev: copy it below.)
+            </div>
+            <label class="block text-xs font-medium text-zinc-600">Accept link</label>
+            <textarea
+              readonly
+              rows="3"
+              class="w-full break-all rounded-md border border-zinc-300 bg-zinc-50 p-2 font-mono text-[11px] text-zinc-700"
+            >{{ lastInviteLink() }}</textarea>
+            <div class="flex justify-end gap-2">
+              <button
+                type="button"
+                (click)="copyInviteLink(lastInviteLink()!)"
+                class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                Copy link
+              </button>
+              <button
+                type="button"
+                (click)="closeInviteModal()"
+                class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        } @else {
+          <form [formGroup]="inviteForm" (ngSubmit)="sendInvite()" class="space-y-3">
+            <label class="block text-sm">
+              <span class="mb-1 block text-xs font-medium text-zinc-600">Email</span>
+              <input
+                type="email"
+                formControlName="email"
+                autocomplete="email"
+                class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+              />
+            </label>
+            <label class="block text-sm">
+              <span class="mb-1 block text-xs font-medium text-zinc-600">Role</span>
+              <select
+                formControlName="role_id"
+                class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+              >
+                <option value="" disabled>Choose a role…</option>
+                @for (r of roles(); track r.id) {
+                  <option [value]="r.id">{{ r.name }}</option>
+                }
+              </select>
+            </label>
+
+            @if (inviteError(); as e) {
+              <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700">
+                {{ e }}
+              </div>
+            }
+
+            <div class="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                (click)="closeInviteModal()"
+                class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                [disabled]="inviteForm.invalid || inviteSending()"
+                class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {{ inviteSending() ? 'Sending…' : 'Send invitation' }}
+              </button>
+            </div>
+          </form>
+        }
+      </div>
+    </div>
   }
 </div>

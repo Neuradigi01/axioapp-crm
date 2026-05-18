@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import {
   FormBuilder,
@@ -17,6 +18,10 @@ import { forkJoin } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
 import { FurnitureAuthService } from '../../auth/auth.service';
+import {
+  InvitationRow,
+  InvitationsApiService,
+} from './invitations.service';
 
 interface UserRow {
   id: string;
@@ -55,7 +60,7 @@ interface RoleRow {
   selector: 'app-settings-team-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [DatePipe, ReactiveFormsModule],
   templateUrl: './team-tab.component.html',
 })
 export class TeamTabComponent {
@@ -63,6 +68,7 @@ export class TeamTabComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
   private readonly fb = inject(FormBuilder);
+  private readonly invitationsApi = inject(InvitationsApiService);
   private readonly base = environment.apiBaseUrl;
 
   protected readonly items = signal<UserRow[]>([]);
@@ -73,6 +79,20 @@ export class TeamTabComponent {
   protected readonly editingId = signal<string | null>(null);
   protected readonly savingId = signal<string | null>(null);
   protected readonly rowError = signal<{ id: string; message: string } | null>(null);
+
+  // Invite modal + pending list state (step 2.5.6)
+  protected readonly invitations = signal<InvitationRow[]>([]);
+  protected readonly invitationsError = signal<string | null>(null);
+  protected readonly inviteModalOpen = signal(false);
+  protected readonly inviteSending = signal(false);
+  protected readonly inviteError = signal<string | null>(null);
+  protected readonly lastInviteLink = signal<string | null>(null);
+  protected readonly revokingInviteId = signal<string | null>(null);
+
+  protected readonly inviteForm = this.fb.nonNullable.group({
+    email: ['', [Validators.required, Validators.email]],
+    role_id: ['', Validators.required],
+  });
 
   protected readonly roleNameById = computed(() => {
     const map = new Map<string, string>();
@@ -88,6 +108,7 @@ export class TeamTabComponent {
 
   constructor() {
     this.reload();
+    this.reloadInvitations();
     this.auth
       .me()
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -134,10 +155,100 @@ export class TeamTabComponent {
       .join('');
   }
 
-  protected showInviteStub(): void {
-    window.alert(
-      'Invite flow ships in step 2.5.6. For now ask the org admin to add users directly via the API.',
-    );
+  protected reloadInvitations(): void {
+    this.invitationsError.set(null);
+    this.invitationsApi
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => this.invitations.set(rows),
+        error: (err: HttpErrorResponse) => {
+          this.invitations.set([]);
+          // 403 (no users.read) is silent — non-admins shouldn't see
+          // this section at all and the UI hides it when canWrite is
+          // false. Anything else is a real load failure.
+          if (err.status !== 403) {
+            this.invitationsError.set(
+              this._extract(err) ?? 'Could not load pending invitations.',
+            );
+          }
+        },
+      });
+  }
+
+  protected openInviteModal(): void {
+    if (!this.canWrite()) return;
+    this.inviteForm.reset({ email: '', role_id: '' });
+    this.inviteError.set(null);
+    this.lastInviteLink.set(null);
+    this.inviteModalOpen.set(true);
+  }
+
+  protected closeInviteModal(): void {
+    this.inviteModalOpen.set(false);
+    this.inviteError.set(null);
+    this.lastInviteLink.set(null);
+  }
+
+  protected sendInvite(): void {
+    if (!this.canWrite() || this.inviteForm.invalid || this.inviteSending()) return;
+    const { email, role_id } = this.inviteForm.getRawValue();
+    this.inviteSending.set(true);
+    this.inviteError.set(null);
+    this.invitationsApi
+      .create(email.trim(), role_id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (inv) => {
+          this.inviteSending.set(false);
+          this.lastInviteLink.set(inv.accept_link);
+          this.inviteForm.reset({ email: '', role_id: '' });
+          this.reloadInvitations();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.inviteSending.set(false);
+          this.inviteError.set(
+            this._extract(err) ?? 'Could not send invitation.',
+          );
+        },
+      });
+  }
+
+  protected revokeInvite(invitation: InvitationRow): void {
+    if (!this.canWrite() || this.revokingInviteId() !== null) return;
+    if (!window.confirm(
+      `Revoke invitation for ${invitation.email}?`,
+    )) {
+      return;
+    }
+    this.revokingInviteId.set(invitation.id);
+    this.invitationsApi
+      .revoke(invitation.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.revokingInviteId.set(null);
+          this.reloadInvitations();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.revokingInviteId.set(null);
+          this.invitationsError.set(
+            this._extract(err) ?? 'Could not revoke invitation.',
+          );
+        },
+      });
+  }
+
+  protected roleNameOfId(roleId: string): string {
+    return this.roleNameById().get(roleId) ?? 'Unknown';
+  }
+
+  protected copyInviteLink(link: string): void {
+    if (!navigator.clipboard) {
+      window.prompt('Copy the invite link:', link);
+      return;
+    }
+    void navigator.clipboard.writeText(link);
   }
 
   protected startEdit(user: UserRow): void {
