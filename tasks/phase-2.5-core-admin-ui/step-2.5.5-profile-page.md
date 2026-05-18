@@ -13,7 +13,9 @@ One Angular page + one form. Two backend endpoints to add — both keyed off the
 
 | Endpoint | Behaviour |
 |---|---|
-| `PATCH /api/v1/users/me` | Update `tbl_user_info.first_name`, `last_name`, `mobile_no` for the calling user. Email is immutable (changing email = invite a new account; see 2.5.6). |
+| `PATCH /api/v1/users/me` | Update `tbl_user_info.first_name
+
+`, `last_name`, `mobile_no` for the calling user. Email is immutable (changing email = invite a new account; see 2.5.6). |
 | `POST /api/v1/users/me/password` | Body: `{current_password, new_password}`. Verifies current, hashes new, writes to `tbl_user_login.password`. Revokes other open `auth_sessions` for this user (keep the current session). |
 
 ## UI
