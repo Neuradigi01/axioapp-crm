@@ -21,6 +21,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { extractApiError } from '@core/services/api-error.util';
+import { nullableTrim } from '@core/services/form.util';
 
 import {
   ContactListItem,
@@ -202,13 +203,13 @@ export class ScheduleVisitModalComponent implements OnInit {
           purpose: v.purpose,
           scheduled_at: scheduledAt,
           duration_min: v.duration_min,
-          location: this.nullableTrim(v.location),
+          location: nullableTrim(v.location),
           assigned_to_id: v.assigned_to_id,
           custom_data: {},
         },
         purpose: v.purpose,
         custom_order_id: v.custom_order_id.trim() || null,
-        notes: this.nullableTrim(v.notes),
+        notes: nullableTrim(v.notes),
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -242,10 +243,5 @@ export class ScheduleVisitModalComponent implements OnInit {
     return dt.toISOString();
   }
 
-  private nullableTrim(v: string | null | undefined): string | null {
-    if (v === null || v === undefined) return null;
-    const t = v.trim();
-    return t.length === 0 ? null : t;
-  }
 
 }

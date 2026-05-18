@@ -25,6 +25,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { Observable, Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { extractApiError } from '@core/services/api-error.util';
+import { nullableTrim } from '@core/services/form.util';
 
 import {
   ContactListItem,
@@ -258,13 +259,13 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
     const payload: CustomOrderCreate = {
       contact_id: this.selectedContact()?.id ?? null,
       title: v.title.trim(),
-      requirement: this.nullableTrim(v.requirement),
+      requirement: nullableTrim(v.requirement),
       materials,
-      color: this.nullableTrim(v.color),
-      finish: this.nullableTrim(v.finish),
+      color: nullableTrim(v.color),
+      finish: nullableTrim(v.finish),
       total_amount: v.total_amount.trim() || '0',
       advance_paid: v.advance_paid.trim() || '0',
-      expected_delivery_date: this.nullableTrim(v.expected_delivery_date),
+      expected_delivery_date: nullableTrim(v.expected_delivery_date),
     };
 
     this.api
@@ -290,10 +291,10 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
       .map((row) =>
         this.api.addMeasurement(orderId, {
           item_label: row.item_label.trim(),
-          length_cm: this.nullableTrim(row.length_cm),
-          width_cm: this.nullableTrim(row.width_cm),
-          height_cm: this.nullableTrim(row.height_cm),
-          notes: this.nullableTrim(row.notes),
+          length_cm: nullableTrim(row.length_cm),
+          width_cm: nullableTrim(row.width_cm),
+          height_cm: nullableTrim(row.height_cm),
+          notes: nullableTrim(row.notes),
         }),
       );
 
@@ -339,11 +340,6 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
     }
   }
 
-  private nullableTrim(v: string | null | undefined): string | null {
-    if (v === null || v === undefined) return null;
-    const trimmed = v.trim();
-    return trimmed.length === 0 ? null : trimmed;
-  }
 
 }
 

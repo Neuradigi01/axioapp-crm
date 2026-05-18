@@ -29,6 +29,7 @@ import {
 } from '../pipelines/pipelines-api.service';
 import { Lead, LeadCreate, LeadUpdate, LeadsApiService } from './leads-api.service';
 import { extractApiError } from '@core/services/api-error.util';
+import { nullableTrim } from '@core/services/form.util';
 
 /**
  * Modal that creates or edits a `Lead`. Splits the form into:
@@ -209,8 +210,8 @@ export class LeadFormModalComponent implements OnInit {
     const payload: LeadCreate = {
       contact_id: contact ? contact.id : this._lead()!.contact_id,
       pipeline_stage: raw.pipeline_stage || null,
-      budget: this.nullableTrim(raw.budget),
-      expected_close_date: this.nullableTrim(raw.expected_close_date),
+      budget: nullableTrim(raw.budget),
+      expected_close_date: nullableTrim(raw.expected_close_date),
       custom_data: this.customValue() as Record<string, unknown>,
     };
 
@@ -260,10 +261,5 @@ export class LeadFormModalComponent implements OnInit {
       });
   }
 
-  private nullableTrim(v: string | null | undefined): string | null {
-    if (v === null || v === undefined) return null;
-    const trimmed = v.trim();
-    return trimmed.length === 0 ? null : trimmed;
-  }
 
 }

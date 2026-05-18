@@ -27,6 +27,7 @@ import {
 } from '../../../core/appointments/appointments-api.service';
 import { ContactsApiService } from '../../../core/contacts/contacts-api.service';
 import { extractApiError } from '@core/services/api-error.util';
+import { nullableTrim } from '@core/services/form.util';
 import {
   FieldOpsApiService,
   FieldVisit,
@@ -158,16 +159,16 @@ export class FieldVisitDetailPageComponent {
           .filter((r) => r.item_label.trim().length > 0)
           .map((r) => ({
             item_label: r.item_label.trim(),
-            length_cm: this.nullableTrim(r.length_cm),
-            width_cm: this.nullableTrim(r.width_cm),
-            height_cm: this.nullableTrim(r.height_cm),
-            notes: this.nullableTrim(r.notes),
+            length_cm: nullableTrim(r.length_cm),
+            width_cm: nullableTrim(r.width_cm),
+            height_cm: nullableTrim(r.height_cm),
+            notes: nullableTrim(r.notes),
           }))
       : [];
 
     this.api
       .complete(v.id, {
-        notes: this.nullableTrim(this.completeForm.controls.notes.value),
+        notes: nullableTrim(this.completeForm.controls.notes.value),
         measurements,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -288,10 +289,5 @@ export class FieldVisitDetailPageComponent {
     }
   }
 
-  private nullableTrim(v: string | null | undefined): string | null {
-    if (v === null || v === undefined) return null;
-    const t = v.trim();
-    return t.length === 0 ? null : t;
-  }
 
 }

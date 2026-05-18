@@ -22,6 +22,7 @@ import {
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { extractApiError } from '@core/services/api-error.util';
+import { nullableTrim } from '@core/services/form.util';
 import {
   QuickRegisterResponse,
   WalkInsApiService,
@@ -168,10 +169,10 @@ export class RegisterWalkinModalComponent implements OnInit {
       .quickRegister({
         phone: raw.phone.trim(),
         full_name: raw.full_name.trim(),
-        email: this.nullableTrim(raw.email),
-        source: this.nullableTrim(raw.source),
-        requirement: this.nullableTrim(raw.requirement),
-        budget: this.nullableTrim(raw.budget),
+        email: nullableTrim(raw.email),
+        source: nullableTrim(raw.source),
+        requirement: nullableTrim(raw.requirement),
+        budget: nullableTrim(raw.budget),
         custom_data: this.customValue() as Record<string, unknown>,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -189,10 +190,5 @@ export class RegisterWalkinModalComponent implements OnInit {
       });
   }
 
-  private nullableTrim(v: string | null | undefined): string | null {
-    if (v === null || v === undefined) return null;
-    const trimmed = v.trim();
-    return trimmed.length === 0 ? null : trimmed;
-  }
 
 }

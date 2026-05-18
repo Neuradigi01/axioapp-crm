@@ -17,6 +17,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { extractApiError } from '@core/services/api-error.util';
+import { nullableTrim } from '@core/services/form.util';
 import {
   Contact,
   ContactCreate,
@@ -134,9 +135,9 @@ export class ContactFormModalComponent implements OnInit {
     const raw = this.standard.getRawValue();
     const payload: ContactCreate = {
       full_name: raw.full_name!.trim(),
-      phone: this.nullableTrim(raw.phone),
-      email: this.nullableTrim(raw.email),
-      source: this.nullableTrim(raw.source),
+      phone: nullableTrim(raw.phone),
+      email: nullableTrim(raw.email),
+      source: nullableTrim(raw.source),
       tags: this.parseTags(raw.tags_csv),
       custom_data: this.customValue() as Record<string, unknown>,
     };
@@ -159,11 +160,6 @@ export class ContactFormModalComponent implements OnInit {
     this.customValue.set(contact.custom_data as FormValue);
   }
 
-  private nullableTrim(v: string | null | undefined): string | null {
-    if (v === null || v === undefined) return null;
-    const trimmed = v.trim();
-    return trimmed.length === 0 ? null : trimmed;
-  }
 
   private parseTags(csv: string | null | undefined): string[] {
     if (!csv) return [];

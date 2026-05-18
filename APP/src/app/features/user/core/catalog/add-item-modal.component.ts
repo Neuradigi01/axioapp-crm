@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -12,6 +12,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { nullableTrim } from '@core/services/form.util';
 
 import {
   CatalogApiService,
@@ -91,7 +92,7 @@ export class AddItemModalComponent {
       this.api
         .update(existing.id, {
           name: raw.name,
-          category: this.nullableTrim(raw.category),
+          category: nullableTrim(raw.category),
           price: raw.price,
           is_active: raw.is_active,
         })
@@ -111,7 +112,7 @@ export class AddItemModalComponent {
         .create({
           sku: raw.sku.trim(),
           name: raw.name,
-          category: this.nullableTrim(raw.category),
+          category: nullableTrim(raw.category),
           price: raw.price,
           is_active: raw.is_active,
         })
@@ -146,11 +147,6 @@ export class AddItemModalComponent {
     this.form.controls.sku.disable();
   }
 
-  private nullableTrim(v: string | null | undefined): string | null {
-    if (v === null || v === undefined) return null;
-    const t = v.trim();
-    return t.length === 0 ? null : t;
-  }
 
   private errorFor(err: HttpErrorResponse): string | null {
     const body = err?.error;
