@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -20,9 +20,10 @@ import {
   CallsApiService,
 } from '../calls-api.service';
 import { LogCallModalComponent } from '../log-call-modal.component';
+import { initials } from '@core/services/text.util';
 
 /**
- * Phone Book tab — searchable contacts list with click-to-call. The
+ * Phone Book tab â€” searchable contacts list with click-to-call. The
  * "Call" button does two things in sequence:
  *   1. opens `tel:<phone>` in a hidden anchor (the device handles dial)
  *   2. opens the LogCallModal pre-filled with the contact id
@@ -35,6 +36,7 @@ import { LogCallModalComponent } from '../log-call-modal.component';
   templateUrl: './phone-book.component.html',
 })
 export class CallPhoneBookTabComponent {
+  protected readonly initials = initials;
   private readonly contactsApi = inject(ContactsApiService);
   private readonly callsApi = inject(CallsApiService);
   private readonly destroyRef = inject(DestroyRef);
@@ -68,14 +70,6 @@ export class CallPhoneBookTabComponent {
       .subscribe(() => this.reload());
   }
 
-  protected initials(name: string): string {
-    return name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((s) => s[0]?.toUpperCase() ?? '')
-      .join('');
-  }
 
   protected avatarBg(id: string): string {
     const palette = [
@@ -115,7 +109,7 @@ export class CallPhoneBookTabComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
-          // Only show contacts that actually have a phone — clicking
+          // Only show contacts that actually have a phone â€” clicking
           // "Call" on a row without one is a footgun.
           this.items.set(resp.items.filter((c) => !!c.phone));
           this.loading.set(false);

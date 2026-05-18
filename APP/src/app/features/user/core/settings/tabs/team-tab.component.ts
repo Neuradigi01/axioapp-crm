@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -18,6 +18,7 @@ import { forkJoin } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
 import { FurnitureAuthService } from '../../auth/auth.service';
+import { initials } from '@core/services/text.util';
 import {
   InvitationRow,
   InvitationsApiService,
@@ -44,13 +45,13 @@ interface RoleRow {
 }
 
 /**
- * Team tab — manage users in the active org.
+ * Team tab â€” manage users in the active org.
  *
  * Reads /api/v1/users + /api/v1/roles and joins them client-side so the
  * row shows the role NAME (the users payload only carries `role_id`).
  *
  * Admins (`users.write`) can edit a user inline (full_name, phone,
- * role) and toggle their is_active flag. Email is immutable —
+ * role) and toggle their is_active flag. Email is immutable â€”
  * changing email is handled by the invite flow (step 2.5.6, where the
  * Invite-member button gets wired up to it).
  *
@@ -64,6 +65,7 @@ interface RoleRow {
   templateUrl: './team-tab.component.html',
 })
 export class TeamTabComponent {
+  protected readonly initials = initials;
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
@@ -146,14 +148,6 @@ export class TeamTabComponent {
     return this.roleNameById().get(user.role_id) ?? 'No role';
   }
 
-  protected initials(name: string): string {
-    return name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((s) => s[0]?.toUpperCase() ?? '')
-      .join('');
-  }
 
   protected reloadInvitations(): void {
     this.invitationsError.set(null);
@@ -164,7 +158,7 @@ export class TeamTabComponent {
         next: (rows) => this.invitations.set(rows),
         error: (err: HttpErrorResponse) => {
           this.invitations.set([]);
-          // 403 (no users.read) is silent — non-admins shouldn't see
+          // 403 (no users.read) is silent â€” non-admins shouldn't see
           // this section at all and the UI hides it when canWrite is
           // false. Anything else is a real load failure.
           if (err.status !== 403) {

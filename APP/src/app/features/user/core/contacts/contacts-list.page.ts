@@ -22,6 +22,7 @@ import {
 } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { initials } from '@core/services/text.util';
 
 @Component({
   selector: 'app-contacts-list-page',
@@ -31,6 +32,7 @@ import { extractApiError } from '@core/services/api-error.util';
   templateUrl: './contacts-list.page.html',
 })
 export class ContactsListPageComponent {
+  protected readonly initials = initials;
   private readonly api = inject(ContactsApiService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -175,14 +177,6 @@ export class ContactsListPageComponent {
     this.reload();
   }
 
-  protected initials(name: string): string {
-    return name
-      .split(/\s+/)
-      .filter((p) => p.length > 0)
-      .slice(0, 2)
-      .map((p) => p[0]!.toUpperCase())
-      .join('');
-  }
 
   private submitCreate(payload: ContactCreate): void {
     this.submitting.set(true);

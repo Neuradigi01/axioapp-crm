@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -8,9 +8,10 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { InrPipe } from '../../shared/pipes/inr.pipe';
 import { StaffWithPerformance } from '../staff-api.service';
+import { initials } from '@core/services/text.util';
 
 /**
- * Overview tab — grid of staff "summary cards". One card per user
+ * Overview tab â€” grid of staff "summary cards". One card per user
  * showing the joined profile + performance numbers we have today.
  * Avatar background is a deterministic hash on user.id so the same
  * person keeps the same colour across reloads.
@@ -23,6 +24,7 @@ import { StaffWithPerformance } from '../staff-api.service';
   templateUrl: './overview.component.html',
 })
 export class StaffOverviewTabComponent {
+  protected readonly initials = initials;
   readonly rows = input.required<StaffWithPerformance[]>();
 
   protected readonly sortedRows = computed(() =>
@@ -31,14 +33,6 @@ export class StaffOverviewTabComponent {
     ),
   );
 
-  protected initials(name: string): string {
-    return name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((s) => s[0]?.toUpperCase() ?? '')
-      .join('');
-  }
 
   protected avatarBg(id: string): string {
     const palette = [

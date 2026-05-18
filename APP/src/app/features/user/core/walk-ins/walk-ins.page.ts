@@ -23,6 +23,7 @@ import {
 } from './walk-ins-api.service';
 import { RegisterWalkinModalComponent } from './register-walkin-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { initials } from '@core/services/text.util';
 
 interface ContactSummary {
   id: string;
@@ -49,6 +50,7 @@ const FILTER_CHIPS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
   templateUrl: './walk-ins.page.html',
 })
 export class WalkInsPageComponent {
+  protected readonly initials = initials;
   private readonly api = inject(WalkInsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly destroyRef = inject(DestroyRef);
@@ -179,15 +181,6 @@ export class WalkInsPageComponent {
     }
   }
 
-  protected initials(name: string | null | undefined): string {
-    if (!name) return '?';
-    return name
-      .split(/\s+/)
-      .filter((p) => p.length > 0)
-      .slice(0, 2)
-      .map((p) => p[0]!.toUpperCase())
-      .join('');
-  }
 
   protected contactFor(id: string): ContactSummary | null {
     return this.contactsById()[id] ?? null;

@@ -26,6 +26,7 @@ import {
 } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { initials } from '@core/services/text.util';
 
 type DetailTab = 'overview' | 'activities' | 'notes' | 'tasks';
 
@@ -51,6 +52,7 @@ const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: strin
   templateUrl: './contact-detail.page.html',
 })
 export class ContactDetailPageComponent implements OnInit {
+  protected readonly initials = initials;
   private readonly api = inject(ContactsApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -107,14 +109,6 @@ export class ContactDetailPageComponent implements OnInit {
     this.activeTab.set(tab);
   }
 
-  protected initials(name: string): string {
-    return name
-      .split(/\s+/)
-      .filter((p) => p.length > 0)
-      .slice(0, 2)
-      .map((p) => p[0]!.toUpperCase())
-      .join('');
-  }
 
   protected openEdit(): void {
     const c = this.contact();
