@@ -1,7 +1,7 @@
-# Step 5.9 — AI Virtual Staging — backend
+# Step 6.7 — AI Virtual Staging — backend
 
 **Goal:** `fp_virtual_staging_jobs` table. Integrate a generative-AI image API. Job queue, status updates, output URL.
-**Phase:** 5
+**Phase:** 6 — Furniture Pack Features
 **Depends on:** 4.7 (storage), 3.4
 **Status:** Pending
 

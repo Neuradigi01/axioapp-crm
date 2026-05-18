@@ -1,7 +1,7 @@
-# Step 5.2 — Marketplace — Amazon adapter
+# Step 6.2 — Marketplace — Amazon adapter
 
 **Goal:** Amazon SP-API integration. Connect/disconnect, fetch orders, basic inventory push. Test with sandbox credentials.
-**Phase:** 5
+**Phase:** 6 — Furniture Pack Features
 **Depends on:** 5.1
 **Status:** Pending
 

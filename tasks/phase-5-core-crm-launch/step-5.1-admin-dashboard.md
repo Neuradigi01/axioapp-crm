@@ -1,7 +1,7 @@
-﻿# Step 5.12 — Dashboard — admin overview
+# Step 5.1 — Dashboard — admin overview
 
 **Goal:** Build the main dashboard page matching the screenshot — KPI cards, Best Selling chart, Stock Alerts, Recent Leads, Upcoming Appointments, AI Activity Feed (live).
-**Phase:** 5
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** most prior modules
 **Status:** Pending
 

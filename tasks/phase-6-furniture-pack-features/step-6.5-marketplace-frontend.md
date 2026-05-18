@@ -1,7 +1,7 @@
-﻿# Step 5.5 — Marketplace — frontend (Orders + Channels tabs)
+# Step 6.5 — Marketplace — frontend (Orders + Channels tabs)
 
 **Goal:** Orders page with multi-channel orders (Store/Amazon/Flipkart/Shopify). Channels tab showing connection status, sync settings (auto-sync, sync inventory, auto-update tracking).
-**Phase:** 5
+**Phase:** 6 — Furniture Pack Features
 **Depends on:** 5.1, 5.2, 5.3, 5.4
 **Status:** Pending
 

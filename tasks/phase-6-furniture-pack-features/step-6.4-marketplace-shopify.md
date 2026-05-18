@@ -1,7 +1,7 @@
-# Step 5.4 — Marketplace — Shopify adapter
+# Step 6.4 — Marketplace — Shopify adapter
 
 **Goal:** Shopify Admin API adapter. Same operations.
-**Phase:** 5
+**Phase:** 6 — Furniture Pack Features
 **Depends on:** 5.1
 **Status:** Pending
 

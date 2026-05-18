@@ -1,7 +1,7 @@
-# Step 6.7 — Deployment
+# Step 5.11 — Deployment
 
 **Goal:** Production Dockerfiles for backend and frontend. `docker-compose.prod.yml`. Environment-based configs. Deployment runbook.
-**Phase:** 6
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** all prior
 **Status:** Pending
 

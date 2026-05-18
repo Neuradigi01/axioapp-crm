@@ -1,7 +1,7 @@
-# Step 6.9 — Beta cutover
+# Step 5.13 — Beta cutover
 
 **Goal:** Final QA. Demo data scrub. First customer onboarding script.
-**Phase:** 6
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** 6.1–6.8
 **Status:** Pending
 

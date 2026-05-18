@@ -1,7 +1,7 @@
-﻿# Step 5.7 — AI Chatbot — Conversations integration
+# Step 5.2 — AI Chatbot — Conversations integration
 
 **Goal:** Plug an LLM into Conversations. AI Handled / Needs Human flag drives whether the bot replies. Bot personality + welcome message from Settings → AI. Message review/override flow.
-**Phase:** 5
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** 3.10, 3.17
 **Status:** Pending
 

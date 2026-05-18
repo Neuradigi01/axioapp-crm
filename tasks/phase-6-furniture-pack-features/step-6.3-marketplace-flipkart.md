@@ -1,7 +1,7 @@
-# Step 5.3 — Marketplace — Flipkart adapter
+# Step 6.3 — Marketplace — Flipkart adapter
 
 **Goal:** Flipkart Seller API adapter. Same operations as Amazon (connect/fetch_orders/push_inventory/push_tracking).
-**Phase:** 5
+**Phase:** 6 — Furniture Pack Features
 **Depends on:** 5.1
 **Status:** Pending
 

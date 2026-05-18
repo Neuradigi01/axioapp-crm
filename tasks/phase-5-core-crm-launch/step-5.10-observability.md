@@ -1,7 +1,7 @@
-﻿# Step 6.6 — Observability
+# Step 5.10 — Observability
 
 **Goal:** Structured logs with request IDs, basic metrics (Prometheus), error tracking (Sentry). Health & readiness endpoints.
-**Phase:** 6
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** prior phases
 **Status:** Pending
 

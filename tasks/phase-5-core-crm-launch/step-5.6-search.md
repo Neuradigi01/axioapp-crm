@@ -1,7 +1,7 @@
-﻿# Step 6.2 — Global search
+# Step 5.6 — Global search
 
 **Goal:** Global search across contacts, leads, products, orders, invoices, custom orders. Postgres full-text search initially. Header search bar wired up.
-**Phase:** 6
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** most prior modules
 **Status:** Pending
 

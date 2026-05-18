@@ -1,7 +1,7 @@
-﻿# Step 6.1 — Reporting/Analytics depth
+# Step 5.5 — Reporting/Analytics depth
 
 **Goal:** Reusable analytics widgets for sales, inventory turnover, staff performance, conversion funnels. Date-range filters everywhere.
-**Phase:** 6
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** most prior modules
 **Status:** Pending
 

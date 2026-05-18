@@ -1,7 +1,7 @@
-# Step 6.8 — Documentation
+# Step 5.12 — Documentation
 
 **Goal:** README, architecture docs (with the Layer 1 / Layer 2 diagram), API reference (OpenAPI auto-generated), contributor guide for adding a new pack module.
-**Phase:** 6
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** all prior
 **Status:** Pending
 

@@ -1,7 +1,7 @@
-# Step 6.3 — Performance pass
+# Step 5.7 — Performance pass
 
 **Goal:** Add indexes on hot paths, JSONB GIN indexes on `custom_data` for entities filtered by custom fields, pagination/cursor patterns, N+1 audit.
-**Phase:** 6
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** prior phases
 **Status:** Pending
 

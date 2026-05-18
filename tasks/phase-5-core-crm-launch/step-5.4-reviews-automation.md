@@ -1,7 +1,7 @@
-# Step 5.11 — Reviews automation
+# Step 5.4 — Reviews automation
 
 **Goal:** Automatic review request after delivery completion. Configurable in Settings → Reviews. Hooked into the order-delivered event.
-**Phase:** 5
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** 3.13, 3.15, 4.8 (custom orders), 4.11 (billing)
 **Status:** Pending
 

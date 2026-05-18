@@ -46,16 +46,20 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 
 ## Phase index
 
-| Phase | Title | Steps | Status |
+| Phase | Title | Steps | Track |
 |-------|-------|-------|--------|
-| 1 | [Foundation & Scaffolding](phase-1-foundation/README.md) | 10 | Pending |
-| 2 | [Core CRM Engine](phase-2-core-crm/README.md) | 16 | Pending |
-| 3 | [Communication & Staff](phase-3-communication-staff/README.md) | 17 | Pending |
-| 4 | [Furniture Pack & First Modules](phase-4-furniture-pack/README.md) | 12 | Pending |
-| 5 | [Commerce Integrations & AI](phase-5-commerce-ai/README.md) | 12 | Pending |
-| 6 | [Polish, Performance, Beta-Ready](phase-6-polish-launch/README.md) | 9 | Pending |
+| 1 | [Foundation & Scaffolding](phase-1-foundation/README.md) | 10 | Core |
+| 2 | [Core CRM Engine](phase-2-core-crm/README.md) | 16 | Core |
+| 2.5 | [Core CRM Admin UI](phase-2.5-core-admin-ui/README.md) | 6 | Core (Done) |
+| 3 | [Communication & Staff](phase-3-communication-staff/README.md) | 17 | Core |
+| 4 | [Furniture Pack & First Modules](phase-4-furniture-pack/README.md) | 12 | Furniture pack |
+| 4.5 | [Demo Roles Setup + DR.6/7](phase-4.5-demo-roles-setup/README.md) | 7 | Core (Done) |
+| 5 | [Core CRM v1 Launch](phase-5-core-crm-launch/README.md) | 13 | **Core — current focus** |
+| 6 | [Furniture Pack Features (Layer 2)](phase-6-furniture-pack-features/README.md) | 8 | Furniture pack (post-launch) |
 
-**Total: 76 steps.**
+**Total: 89 step files** (76 original plan + DR.1–7 + Phase 2.5).
+
+Phase 5 was restructured to gather **all core CRM v1 work** (features + polish + hardening) so the path to a shipped template is one phase. Phase 6 was reshaped to hold **all furniture-pack-specific work** that's irrelevant to a generic CRM template adopter.
 
 ## All-steps quick index
 
@@ -122,30 +126,30 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 - [4.11 Billing/POS: backend](phase-4-furniture-pack/step-4.11-billing-backend.md) — Pending
 - [4.12 Billing/POS: frontend](phase-4-furniture-pack/step-4.12-billing-frontend.md) — Pending
 
-### Phase 5 — Commerce & AI
-- [5.1 Marketplace abstraction](phase-5-commerce-ai/step-5.1-marketplace-abstraction.md) — Pending
-- [5.2 Amazon adapter](phase-5-commerce-ai/step-5.2-marketplace-amazon.md) — Pending
-- [5.3 Flipkart adapter](phase-5-commerce-ai/step-5.3-marketplace-flipkart.md) — Pending
-- [5.4 Shopify adapter](phase-5-commerce-ai/step-5.4-marketplace-shopify.md) — Pending
-- [5.5 Marketplace frontend](phase-5-commerce-ai/step-5.5-marketplace-frontend.md) — Pending
-- [5.6 In-Store QR Marketing](phase-5-commerce-ai/step-5.6-qr-marketing.md) — Pending
-- [5.7 AI Chatbot in Conversations](phase-5-commerce-ai/step-5.7-ai-chatbot.md) — Pending
-- [5.8 AI Auto Follow-up Schedule](phase-5-commerce-ai/step-5.8-ai-followups.md) — Pending
-- [5.9 AI Virtual Staging: backend](phase-5-commerce-ai/step-5.9-virtual-staging-backend.md) — Pending
-- [5.10 AI Virtual Staging: frontend](phase-5-commerce-ai/step-5.10-virtual-staging-frontend.md) — Pending
-- [5.11 Reviews automation](phase-5-commerce-ai/step-5.11-reviews-automation.md) — Pending
-- [5.12 Admin Dashboard overview](phase-5-commerce-ai/step-5.12-admin-dashboard.md) — Pending
+### Phase 5 — Core CRM v1 Launch (all core CRM: features + polish + ship-blockers)
+- [5.1 Admin Dashboard overview](phase-5-core-crm-launch/step-5.1-admin-dashboard.md) — Pending — SHOULD
+- [5.2 AI Chatbot in Conversations](phase-5-core-crm-launch/step-5.2-ai-chatbot.md) — Pending — NICE
+- [5.3 AI Auto Follow-up Schedule](phase-5-core-crm-launch/step-5.3-ai-followups.md) — Pending — NICE
+- [5.4 Reviews automation](phase-5-core-crm-launch/step-5.4-reviews-automation.md) — Pending — NICE
+- [5.5 Reporting/Analytics depth](phase-5-core-crm-launch/step-5.5-reporting.md) — Pending — NICE
+- [5.6 Global search](phase-5-core-crm-launch/step-5.6-search.md) — Pending — NICE
+- [5.7 Performance pass](phase-5-core-crm-launch/step-5.7-performance.md) — Pending — NICE
+- [5.8 RLS hardening](phase-5-core-crm-launch/step-5.8-rls-hardening.md) — Pending — **MUST**
+- [5.9 Tests](phase-5-core-crm-launch/step-5.9-tests.md) — Pending — **MUST**
+- [5.10 Observability](phase-5-core-crm-launch/step-5.10-observability.md) — Pending — **MUST**
+- [5.11 Deployment](phase-5-core-crm-launch/step-5.11-deployment.md) — Pending — **MUST**
+- [5.12 Documentation](phase-5-core-crm-launch/step-5.12-documentation.md) — Pending — **MUST**
+- [5.13 Beta cutover](phase-5-core-crm-launch/step-5.13-beta-cutover.md) — Pending — **MUST**
 
-### Phase 6 — Polish & Launch
-- [6.1 Reporting/Analytics depth](phase-6-polish-launch/step-6.1-reporting.md) — Pending
-- [6.2 Global search](phase-6-polish-launch/step-6.2-search.md) — Pending
-- [6.3 Performance pass](phase-6-polish-launch/step-6.3-performance.md) — Pending
-- [6.4 RLS hardening](phase-6-polish-launch/step-6.4-rls-hardening.md) — Pending
-- [6.5 Tests](phase-6-polish-launch/step-6.5-tests.md) — Pending
-- [6.6 Observability](phase-6-polish-launch/step-6.6-observability.md) — Pending
-- [6.7 Deployment](phase-6-polish-launch/step-6.7-deployment.md) — Pending
-- [6.8 Documentation](phase-6-polish-launch/step-6.8-documentation.md) — Pending
-- [6.9 Beta cutover](phase-6-polish-launch/step-6.9-beta-cutover.md) — Pending
+### Phase 6 — Furniture Pack Features (Layer 2 — post-launch)
+- [6.1 Marketplace abstraction](phase-6-furniture-pack-features/step-6.1-marketplace-abstraction.md) — Pending
+- [6.2 Amazon adapter](phase-6-furniture-pack-features/step-6.2-marketplace-amazon.md) — Pending
+- [6.3 Flipkart adapter](phase-6-furniture-pack-features/step-6.3-marketplace-flipkart.md) — Pending
+- [6.4 Shopify adapter](phase-6-furniture-pack-features/step-6.4-marketplace-shopify.md) — Pending
+- [6.5 Marketplace frontend](phase-6-furniture-pack-features/step-6.5-marketplace-frontend.md) — Pending
+- [6.6 In-Store QR Marketing](phase-6-furniture-pack-features/step-6.6-qr-marketing.md) — Pending
+- [6.7 AI Virtual Staging: backend](phase-6-furniture-pack-features/step-6.7-virtual-staging-backend.md) — Pending
+- [6.8 AI Virtual Staging: frontend](phase-6-furniture-pack-features/step-6.8-virtual-staging-frontend.md) — Pending
 
 ---
 

@@ -1,7 +1,7 @@
-﻿# Step 5.1 — Marketplace Sync — abstraction
+# Step 6.1 — Marketplace Sync — abstraction
 
 **Goal:** `fp_marketplace_connections` and `fp_marketplace_orders` tables. Marketplace adapter interface (connect, fetch_orders, push_inventory, push_tracking). Channels page UI shell.
-**Phase:** 5
+**Phase:** 6 — Furniture Pack Features
 **Depends on:** 4.3 (inventory)
 **Status:** Pending
 

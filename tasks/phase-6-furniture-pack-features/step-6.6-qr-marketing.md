@@ -1,7 +1,7 @@
-﻿# Step 5.6 — In-Store QR Marketing — backend + frontend
+# Step 6.6 — In-Store QR Marketing — backend + frontend
 
 **Goal:** `fp_qr_campaigns`, `fp_qr_scans` tables. QR code generation. Stats per campaign. UI matching the Store Marketing tab in staff dashboard.
-**Phase:** 5
+**Phase:** 6 — Furniture Pack Features
 **Depends on:** 1.6, 3.4
 **Status:** Pending
 

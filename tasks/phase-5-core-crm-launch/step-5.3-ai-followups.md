@@ -1,7 +1,7 @@
-# Step 5.8 — AI Auto Follow-up Schedule
+# Step 5.3 — AI Auto Follow-up Schedule
 
 **Goal:** Day 1 / Day 3 / Day 7 follow-up scheduler reading from AI Settings + pack manifest templates. Celery beat tasks.
-**Phase:** 5
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** 5.7, 4.2 (manifest follow_up_schedule), 3.15 (campaigns)
 **Status:** Pending
 

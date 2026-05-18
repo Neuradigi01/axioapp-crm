@@ -1,7 +1,7 @@
-# Step 6.4 — RLS hardening
+# Step 5.8 — RLS hardening
 
 **Goal:** Audit every table for RLS policies. Add tests that switch tenants and assert isolation.
-**Phase:** 6
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** all prior tables
 **Status:** Pending
 

@@ -1,7 +1,7 @@
-# Step 6.5 — Tests
+# Step 5.9 — Tests
 
 **Goal:** Coverage pass — unit tests for services, integration tests for APIs (auth, custom fields, pipelines, walk-ins, leads, custom orders), Cypress E2E for the critical flows (login → create lead → book appointment → convert).
-**Phase:** 6
+**Phase:** 5 — Core CRM v1 Launch
 **Depends on:** prior phases
 **Status:** Pending
 

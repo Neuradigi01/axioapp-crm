@@ -1,7 +1,7 @@
-﻿# Step 5.10 — AI Virtual Staging — frontend
+# Step 6.8 — AI Virtual Staging — frontend
 
 **Goal:** AI Recommend page matching the screenshot. Upload base room, upload furniture items, prompt, generate, preview.
-**Phase:** 5
+**Phase:** 6 — Furniture Pack Features
 **Depends on:** 5.9
 **Status:** Pending
 
