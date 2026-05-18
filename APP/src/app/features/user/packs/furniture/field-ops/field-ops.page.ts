@@ -25,6 +25,7 @@ import {
 } from './field-ops-api.service';
 import { ScheduleVisitModalComponent } from './schedule-visit-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { purposeBadgeClass } from '@core/services/badge.util';
 
 type Filter = 'today' | 'upcoming' | 'completed';
 
@@ -42,6 +43,7 @@ interface ContactSummary {
   templateUrl: './field-ops.page.html',
 })
 export class FieldOpsPageComponent {
+  protected readonly purposeBadgeClass = purposeBadgeClass;
   private readonly api = inject(FieldOpsApiService);
   private readonly appointmentsApi = inject(AppointmentsApiService);
   private readonly contactsApi = inject(ContactsApiService);
@@ -195,18 +197,6 @@ export class FieldOpsPageComponent {
     });
   }
 
-  protected purposeBadgeClass(purpose: string): string {
-    switch (purpose) {
-      case 'measurement':
-        return 'bg-sky-100 text-sky-700 ring-sky-200';
-      case 'installation':
-        return 'bg-amber-100 text-amber-700 ring-amber-200';
-      case 'inspection':
-        return 'bg-violet-100 text-violet-700 ring-violet-200';
-      default:
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
-    }
-  }
 
   protected contactName(id: string): string {
     return this.contactsById()[id]?.full_name ?? 'Unknown';
