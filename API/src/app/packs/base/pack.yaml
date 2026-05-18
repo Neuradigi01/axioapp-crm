@@ -1,0 +1,34 @@
+# Core CRM — global (vendor-neutral) pack manifest.
+#
+# This is the universal default every org should start with. Unlike
+# vertical packs (e.g. `furniture`), nothing in here assumes an
+# industry — the Leads funnel is the textbook SaaS shape that admins
+# can rename / reorder per-org without losing the contract.
+#
+# Run via:
+#
+#   python -m src.app.scripts.install_pack --org <slug> --pack base
+#
+# Re-running is a no-op. A later vertical pack install (e.g. furniture)
+# replaces the `leads` pipeline shape with its own funnel; everything
+# else here remains.
+
+pack_id: base
+version: 1.0.0
+display_name: Core CRM
+
+# ---------------------------------------------------------------------------
+# Pipelines — only the universal Leads board lives here. Vertical
+# packs are the right home for any other board (custom_orders, jobs,
+# tickets, …).
+# ---------------------------------------------------------------------------
+pipelines:
+  - key: leads
+    name: Leads
+    stages:
+      - {key: new,        name: New,        color: '#3b82f6', display_order: 0}
+      - {key: contacted,  name: Contacted,  color: '#0ea5e9', display_order: 1}
+      - {key: qualified,  name: Qualified,  color: '#8b5cf6', display_order: 2}
+      - {key: proposal,   name: Proposal,   color: '#f59e0b', display_order: 3}
+      - {key: won,        name: Won,        color: '#10b981', display_order: 4, is_won: true}
+      - {key: lost,       name: Lost,       color: '#ef4444', display_order: 5, is_lost: true}
