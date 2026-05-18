@@ -5,7 +5,7 @@
 
 function nullableTrim(v) {
   if (v === null || v === undefined) return null;
-  const trimmed = v.trim();
+  const trimmed = String(v).trim();
   return trimmed.length === 0 ? null : trimmed;
 }
 
@@ -20,6 +20,9 @@ const cases = [
   ['single char',                 'A',              'A',     'edge: very short input still works'],
   ['internal whitespace kept',    'Walnut  Veneer', 'Walnut  Veneer', 'only outer trimmed, not collapsed'],
   ['tab + newline',               '\t\nfoo\n',      'foo',   'works on any whitespace, not just spaces'],
+  ['number from type="number"',   15000,            '15000', 'budget input — was the runtime crash before this fix'],
+  ['zero',                        0,                '0',     'numeric zero is a valid input, not null'],
+  ['boolean',                     false,            'false', 'mistyped form control — coerce instead of crashing'],
 ];
 
 let pass = 0, fail = 0;
