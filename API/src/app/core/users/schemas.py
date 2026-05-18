@@ -82,3 +82,20 @@ class UserUpdate(BaseModel):
 
 class UserStatusUpdate(BaseModel):
     is_active: bool
+
+
+class MeUpdate(BaseModel):
+    """Self-service profile update — name + phone only.
+
+    Email is immutable; changing it = inviting a new account. Role and
+    org-membership state are admin-only and stay out of this shape.
+    """
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    phone: str | None = Field(default=None, max_length=32)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=255)
+    sign_out_others: bool = False

@@ -2,7 +2,7 @@
 
 **Goal:** Build `/user/profile` — every logged-in user can edit their own name, phone, and password (regardless of role).
 **Phase:** 2.5 — Core CRM Admin UI
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Phase 2 `users` module + the existing layered auth.
 
 ---

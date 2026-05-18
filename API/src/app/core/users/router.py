@@ -28,7 +28,9 @@ from src.app.core.permissions.service import (
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import User
 from src.app.core.users.schemas import (
+    MeUpdate,
     OrgSummary,
+    PasswordChange,
     UserCreate,
     UserMe,
     UserOut,
@@ -36,14 +38,46 @@ from src.app.core.users.schemas import (
     UserUpdate,
 )
 from src.app.core.users.service import (
+    change_password,
     create_user,
     list_users,
     set_user_status,
+    update_self,
     update_user,
 )
+from src.app.shared.context import get_context
 from src.app.shared.db import get_db
 
 router = APIRouter(prefix="/users", tags=["Users"])
+
+
+@router.patch("/me", response_model=UserOut)
+async def patch_me_endpoint(
+    payload: MeUpdate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> UserOut:
+    """Self-service profile edit — name + phone only."""
+    updated = await update_self(session, user=user, payload=payload)
+    return UserOut.model_validate(updated)
+
+
+@router.post("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password_endpoint(
+    payload: PasswordChange,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> None:
+    """Change the current user's password. Optionally revoke other sessions."""
+    ctx = get_context()
+    await change_password(
+        session,
+        user=user,
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+        sign_out_others=payload.sign_out_others,
+        current_token_id=ctx.token_id,
+    )
 
 
 @router.get("/me", response_model=UserMe)

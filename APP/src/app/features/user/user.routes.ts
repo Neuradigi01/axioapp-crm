@@ -45,6 +45,13 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        path: 'profile',
+        loadComponent: () =>
+          import('./core/profile/profile-page.component').then(
+            (m) => m.ProfilePageComponent,
+          ),
+      },
+      {
         path: 'contacts',
         loadComponent: () =>
           import('./core/contacts/contacts-list.page').then(

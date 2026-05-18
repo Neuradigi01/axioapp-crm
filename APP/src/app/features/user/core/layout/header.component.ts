@@ -6,7 +6,7 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
@@ -21,6 +21,7 @@ import { MyTasksPopoverComponent } from '../tasks/my-tasks-popover.component';
     LucideAngularModule,
     MyTasksPopoverComponent,
     NotificationsPopoverComponent,
+    RouterLink,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './header.component.html',

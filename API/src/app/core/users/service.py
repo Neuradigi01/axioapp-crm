@@ -24,8 +24,8 @@ from src.app.core import audit
 from src.app.core.auth.models import AuthSession
 from src.app.core.permissions.models import Role
 from src.app.core.users.models import OrganizationMember, User, UserInfo
-from src.app.core.users.schemas import UserCreate, UserUpdate
-from src.app.shared.security.password import hash_password
+from src.app.core.users.schemas import MeUpdate, UserCreate, UserUpdate
+from src.app.shared.security.password import hash_password, verify_password
 
 
 async def get_user_by_id(session: AsyncSession, user_id: uuid.UUID) -> User | None:
@@ -349,3 +349,120 @@ async def set_user_status(
         entity_id=user_id,
     )
     return user
+
+
+# --- self-service (2.5.5) ----------------------------------------------
+
+
+async def update_self(
+    session: AsyncSession,
+    *,
+    user: User,
+    payload: MeUpdate,
+) -> User:
+    """Apply a self-edit to the calling user's `tbl_user_info` row.
+
+    Email is intentionally NOT in `MeUpdate` — changing email means
+    inviting a new account. Only the profile fields the user can
+    self-manage are honoured here.
+    """
+    profile = (
+        await session.execute(
+            select(UserInfo).where(UserInfo.member_id == user.id)
+        )
+    ).scalar_one_or_none()
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="profile row missing — data inconsistency",
+        )
+
+    changes = payload.model_dump(exclude_unset=True)
+    before = {
+        "full_name": f"{profile.first_name or ''} {profile.last_name or ''}".strip(),
+        "phone": profile.mobile_no,
+    }
+
+    if "full_name" in changes and changes["full_name"] is not None:
+        first, last = _split_full_name(changes["full_name"])
+        profile.first_name = first
+        profile.last_name = last
+    if "phone" in changes:
+        profile.mobile_no = changes["phone"]
+
+    await session.commit()
+    await session.refresh(user)
+
+    after = {
+        "full_name": f"{profile.first_name or ''} {profile.last_name or ''}".strip(),
+        "phone": profile.mobile_no,
+    }
+    await audit.log(
+        "users.self_updated",
+        entity_type="user",
+        entity_id=user.legacy_uuid,
+        before=before,
+        after=after,
+    )
+    return user
+
+
+async def change_password(
+    session: AsyncSession,
+    *,
+    user: User,
+    current_password: str,
+    new_password: str,
+    sign_out_others: bool,
+    current_token_id: uuid.UUID | None,
+) -> None:
+    """Verify current → hash + persist new. Optionally revoke other sessions.
+
+    `current_token_id` is the JWT's `token_id` claim of the request
+    invoking this — used to spare the caller's own session when
+    `sign_out_others=true` (otherwise the user would be logged out of
+    the tab they just used to change their password).
+    """
+    if not verify_password(current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="current password is incorrect",
+        )
+    if current_password == new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="new password must differ from the current one",
+        )
+
+    # tbl_user_login.password is mapped as `password` on the layered
+    # User model (the `password_hash` attribute is a read-only @property
+    # alias). Write through the bigint table-level update.
+    new_hash = hash_password(new_password)
+    await session.execute(
+        update(User.__table__)
+        .where(User.__table__.c.id == user.id)
+        .values(password=new_hash)
+    )
+
+    if sign_out_others:
+        now = datetime.now(timezone.utc)
+        stmt = (
+            update(AuthSession)
+            .where(
+                AuthSession.user_id == user.legacy_uuid,
+                AuthSession.revoked_at.is_(None),
+            )
+            .values(revoked_at=now)
+        )
+        if current_token_id is not None:
+            stmt = stmt.where(AuthSession.id != current_token_id)
+        await session.execute(stmt)
+
+    await session.commit()
+
+    await audit.log(
+        "auth.password.changed",
+        entity_type="user",
+        entity_id=user.legacy_uuid,
+        after={"signed_out_others": sign_out_others},
+    )
