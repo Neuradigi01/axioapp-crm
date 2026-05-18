@@ -22,6 +22,7 @@ import {
 } from '../../../../core/contacts/contacts-api.service';
 import { InrPipe } from '../../../../core/shared/pipes/inr.pipe';
 import { extractApiError } from '@core/services/api-error.util';
+import { deriveApiOrigin } from '@core/services/url.util';
 import {
   InventoryApiService,
   InventoryItem,
@@ -323,7 +324,7 @@ export class PosTabComponent {
     this.lastInvoiceNumber.set(resp.invoice.number);
     // Open the PDF in a new tab. Use the absolute URL so the browser
     // hits the API directly, not the Angular dev origin.
-    const origin = this.deriveApiOrigin();
+    const origin = deriveApiOrigin();
     window.open(`${origin}${resp.pdf_url}`, '_blank', 'noopener');
     // Reset cart + customer + discount but keep payment-method selection
     // so back-to-back cash sales stay fast.
@@ -371,12 +372,5 @@ export class PosTabComponent {
       });
   }
 
-  private deriveApiOrigin(): string {
-    try {
-      return new URL(environment.apiBaseUrl, window.location.origin).origin;
-    } catch {
-      return '';
-    }
-  }
 
 }

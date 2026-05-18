@@ -12,10 +12,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { catchError, of, switchMap } from 'rxjs';
 
-import { environment } from '../../../../../../environments/environment';
 import { ActivityTimelineComponent } from '../../../core/activities/activity-timeline.component';
 import { ContactsApiService } from '../../../core/contacts/contacts-api.service';
 import { extractApiError } from '@core/services/api-error.util';
+import { deriveApiOrigin } from '@core/services/url.util';
 import {
   CustomOrder,
   CustomOrdersApiService,
@@ -60,7 +60,7 @@ export class CustomOrderDetailPageComponent {
   protected readonly entityType = 'fp_custom_orders';
 
   /** Absolute base for `/files/...` URLs the backend persists. */
-  protected readonly apiOrigin = this.deriveApiOrigin();
+  protected readonly apiOrigin = deriveApiOrigin();
 
   protected readonly totalInr = computed(() =>
     this.fmtInr(this.order()?.total_amount),
@@ -206,13 +206,6 @@ export class CustomOrderDetailPageComponent {
     }
   }
 
-  private deriveApiOrigin(): string {
-    try {
-      return new URL(environment.apiBaseUrl, window.location.origin).origin;
-    } catch {
-      return '';
-    }
-  }
 
   private fmtInr(value: string | number | null | undefined): string {
     const n = Number(value ?? 0);

@@ -12,10 +12,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { catchError, of, switchMap } from 'rxjs';
 
-import { environment } from '../../../../../../environments/environment';
 import { ContactsApiService } from '../../../core/contacts/contacts-api.service';
 import { InrPipe } from '../../../core/shared/pipes/inr.pipe';
 import { extractApiError } from '@core/services/api-error.util';
+import { deriveApiOrigin } from '@core/services/url.util';
 import {
   BillingApiService,
   InvoiceStatus,
@@ -48,7 +48,7 @@ export class InvoiceDetailPageComponent {
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
 
-  protected readonly apiOrigin = this.deriveApiOrigin();
+  protected readonly apiOrigin = deriveApiOrigin();
 
   protected readonly pdfHref = computed(() => {
     const inv = this.invoice();
@@ -148,12 +148,5 @@ export class InvoiceDetailPageComponent {
       });
   }
 
-  private deriveApiOrigin(): string {
-    try {
-      return new URL(environment.apiBaseUrl, window.location.origin).origin;
-    } catch {
-      return '';
-    }
-  }
 
 }

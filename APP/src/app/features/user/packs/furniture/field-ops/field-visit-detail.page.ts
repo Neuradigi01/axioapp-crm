@@ -20,7 +20,6 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { catchError, of, switchMap } from 'rxjs';
 
-import { environment } from '../../../../../../environments/environment';
 import {
   Appointment,
   AppointmentsApiService,
@@ -29,6 +28,7 @@ import { ContactsApiService } from '../../../core/contacts/contacts-api.service'
 import { extractApiError } from '@core/services/api-error.util';
 import { nullableTrim } from '@core/services/form.util';
 import { purposeBadgeClass } from '@core/services/badge.util';
+import { deriveApiOrigin } from '@core/services/url.util';
 import {
   FieldOpsApiService,
   FieldVisit,
@@ -75,7 +75,7 @@ export class FieldVisitDetailPageComponent {
   protected readonly uploading = signal(false);
   protected readonly uploadError = signal<string | null>(null);
 
-  protected readonly apiOrigin = this.deriveApiOrigin();
+  protected readonly apiOrigin = deriveApiOrigin();
 
   readonly completeForm = this.fb.group({
     notes: this.fb.control<string>('', { nonNullable: true }),
@@ -271,13 +271,6 @@ export class FieldVisitDetailPageComponent {
       .subscribe((rows) => this.photos.set(rows));
   }
 
-  private deriveApiOrigin(): string {
-    try {
-      return new URL(environment.apiBaseUrl, window.location.origin).origin;
-    } catch {
-      return '';
-    }
-  }
 
 
 }
