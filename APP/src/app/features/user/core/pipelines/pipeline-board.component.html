@@ -56,7 +56,7 @@
         </header>
 
         @if (editingStage()?.id === stage.id) {
-          <div class="absolute right-0 top-full z-30 mt-1">
+          <div class="absolute right-0 top-11 z-30">
             <app-stage-editor-popover
               [stage]="stage"
               [pipelineKey]="pipelineKey()"
@@ -75,7 +75,7 @@
           [cdkDropListConnectedTo]="dropListIds()"
           (cdkDropListDropped)="onDrop($event, stage.key)"
           cdkDropList
-          class="flex-1 min-h-[6rem] space-y-2 p-2"
+          class="flex-1 min-h-[24rem] space-y-2 p-2"
         >
           @for (item of bucket(stage.key); track item.id) {
             <div
