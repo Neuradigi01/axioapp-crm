@@ -49,6 +49,15 @@ export class FurnitureAuthService {
    * brand the shell. Null before the first /me lands (login splash). */
   readonly currentOrg = signal<OrgSummary | null>(null);
 
+  /** Permission keys for the signed-in user. Empty until the first
+   * `/me` lands. Consumers (kanban admin affordances, etc.) read this
+   * to decide whether to render management UI. */
+  readonly currentPermissions = signal<string[]>([]);
+
+  hasPermission(key: string): boolean {
+    return this.currentPermissions().includes(key);
+  }
+
   login(email: string, password: string, orgSlug: string): Observable<LoginResponse> {
     return this.http
       .post<LoginResponse>(`${environment.apiBaseUrl}/auth/login`, {
@@ -76,6 +85,7 @@ export class FurnitureAuthService {
         tap(() => {
           this.storage.clear();
           this.currentOrg.set(null);
+          this.currentPermissions.set([]);
         }),
       );
   }
@@ -83,7 +93,12 @@ export class FurnitureAuthService {
   me(): Observable<MeResponse> {
     return this.http
       .get<MeResponse>(`${environment.apiBaseUrl}/users/me`)
-      .pipe(tap((res) => this.currentOrg.set(res.org)));
+      .pipe(
+        tap((res) => {
+          this.currentOrg.set(res.org);
+          this.currentPermissions.set(res.permission_keys);
+        }),
+      );
   }
 
   isAuthenticated(): boolean {
@@ -93,5 +108,6 @@ export class FurnitureAuthService {
   clearSession(): void {
     this.storage.clear();
     this.currentOrg.set(null);
+    this.currentPermissions.set([]);
   }
 }

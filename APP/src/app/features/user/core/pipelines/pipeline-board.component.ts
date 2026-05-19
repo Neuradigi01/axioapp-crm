@@ -23,6 +23,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { extractApiError } from '@core/services/api-error.util';
 
+import { FurnitureAuthService } from '../auth/auth.service';
+import { AddStagePopoverComponent } from './add-stage-popover.component';
+import { DeleteStageConfirmComponent } from './delete-stage-confirm.component';
 import {
   ItemMovedEvent,
   Pipeline,
@@ -30,6 +33,7 @@ import {
   PipelineStage,
   PipelinesApiService,
 } from './pipelines-api.service';
+import { StageEditorPopoverComponent } from './stage-editor-popover.component';
 
 /**
  * Reusable kanban board for any pipeline + item collection.
@@ -64,12 +68,19 @@ import {
   selector: 'app-pipeline-board',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DragDropModule, NgTemplateOutlet],
+  imports: [
+    DragDropModule,
+    NgTemplateOutlet,
+    StageEditorPopoverComponent,
+    AddStagePopoverComponent,
+    DeleteStageConfirmComponent,
+  ],
   templateUrl: './pipeline-board.component.html',
 })
 export class PipelineBoardComponent {
   private readonly api = inject(PipelinesApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(FurnitureAuthService);
 
   readonly pipelineKey = input.required<string>();
   readonly items = input<PipelineItem[]>([]);
@@ -88,6 +99,25 @@ export class PipelineBoardComponent {
   protected readonly buckets = signal<Record<string, PipelineItem[]>>({});
 
   readonly stages = computed<PipelineStage[]>(() => this.pipeline()?.stages ?? []);
+
+  /** Admin-only management affordances live behind this gate. */
+  protected readonly canManage = computed(() =>
+    this.auth.currentPermissions().includes('pipelines.manage'),
+  );
+
+  protected readonly editingStage = signal<PipelineStage | null>(null);
+  protected readonly addingPopoverOpen = signal(false);
+  protected readonly deleteConfirm = signal<{
+    stage: PipelineStage;
+    cardsInStage: number;
+  } | null>(null);
+  protected readonly deleteError = signal<string | null>(null);
+
+  protected readonly deleteCandidates = computed<PipelineStage[]>(() => {
+    const confirmCtx = this.deleteConfirm();
+    if (!confirmCtx) return [];
+    return this.stages().filter((s) => s.id !== confirmCtx.stage.id);
+  });
 
   /** Pre-built list of `cdkDropList` ids for `cdkDropListConnectedTo`. */
   readonly dropListIds = computed(() =>
@@ -173,6 +203,71 @@ export class PipelineBoardComponent {
     this.buckets.set(next);
   }
 
+  protected openEditor(stage: PipelineStage): void {
+    if (!this.canManage()) return;
+    this.editingStage.set(stage);
+  }
+
+  protected openAdd(): void {
+    if (!this.canManage()) return;
+    this.addingPopoverOpen.set(true);
+  }
+
+  protected onStageSaved(): void {
+    this.fetchPipeline(this.pipelineKey());
+    this.editingStage.set(null);
+  }
+
+  protected onStageDeleted(): void {
+    this.fetchPipeline(this.pipelineKey());
+    this.editingStage.set(null);
+  }
+
+  protected onDeleteBlocked(evt: { stageId: string; cardsInStage: number }): void {
+    const stage = this.stages().find((s) => s.id === evt.stageId);
+    if (!stage) return;
+    this.deleteConfirm.set({ stage, cardsInStage: evt.cardsInStage });
+    this.editingStage.set(null);
+  }
+
+  protected onEditorClosed(): void {
+    this.editingStage.set(null);
+  }
+
+  protected onStageCreated(): void {
+    this.fetchPipeline(this.pipelineKey());
+    this.addingPopoverOpen.set(false);
+  }
+
+  protected onAddClosed(): void {
+    this.addingPopoverOpen.set(false);
+  }
+
+  protected onDeleteConfirmed(evt: { moveLeadsTo: string }): void {
+    const ctx = this.deleteConfirm();
+    if (!ctx) return;
+    this.deleteError.set(null);
+    this.api
+      .deleteStage(this.pipelineKey(), ctx.stage.id, evt.moveLeadsTo)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.deleteConfirm.set(null);
+          this.fetchPipeline(this.pipelineKey());
+        },
+        error: (err: HttpErrorResponse) => {
+          this.deleteError.set(
+            extractApiError(err) ?? 'Could not delete stage.',
+          );
+        },
+      });
+  }
+
+  protected onDeleteCancelled(): void {
+    this.deleteConfirm.set(null);
+    this.deleteError.set(null);
+  }
+
   private fetchPipeline(key: string): void {
     this.loading.set(true);
     this.loadError.set(null);
@@ -193,5 +288,4 @@ export class PipelineBoardComponent {
         },
       });
   }
-
 }

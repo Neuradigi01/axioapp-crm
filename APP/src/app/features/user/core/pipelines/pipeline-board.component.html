@@ -13,10 +13,10 @@
     This pipeline has no stages defined.
   </p>
 } @else {
-  <div cdkDropListGroup class="flex gap-3 overflow-x-auto pb-2">
+  <div cdkDropListGroup class="flex items-start gap-3 overflow-x-auto pb-2">
     @for (stage of stages(); track stage.key) {
       <section
-        class="flex w-72 shrink-0 flex-col overflow-hidden rounded-lg bg-zinc-50 ring-1 ring-zinc-200"
+        class="relative flex w-72 shrink-0 flex-col overflow-visible rounded-lg bg-zinc-50 ring-1 ring-zinc-200"
       >
         <header class="flex items-center justify-between border-b border-zinc-200 bg-white px-3 py-2">
           <div class="flex min-w-0 items-center gap-2">
@@ -38,10 +38,36 @@
               </span>
             }
           </div>
-          <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
-            {{ bucket(stage.key).length }}
-          </span>
+          <div class="flex items-center gap-1.5">
+            <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+              {{ bucket(stage.key).length }}
+            </span>
+            @if (canManage()) {
+              <button
+                type="button"
+                (click)="openEditor(stage)"
+                [attr.aria-label]="'Edit stage ' + stage.name"
+                class="rounded p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+              >
+                ✎
+              </button>
+            }
+          </div>
         </header>
+
+        @if (editingStage()?.id === stage.id) {
+          <div class="absolute right-0 top-full z-30 mt-1">
+            <app-stage-editor-popover
+              [stage]="stage"
+              [pipelineKey]="pipelineKey()"
+              [siblingCount]="stages().length"
+              (saved)="onStageSaved()"
+              (deleted)="onStageDeleted()"
+              (deleteBlocked)="onDeleteBlocked($event)"
+              (closed)="onEditorClosed()"
+            />
+          </div>
+        }
 
         <div
           [id]="dropListIdFor(stage.key)"
@@ -75,5 +101,42 @@
         </div>
       </section>
     }
+
+    @if (canManage()) {
+      <div class="relative shrink-0">
+        <button
+          type="button"
+          (click)="openAdd()"
+          class="flex h-10 w-40 items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-white text-xs font-medium text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-800"
+        >
+          + Add stage
+        </button>
+        @if (addingPopoverOpen()) {
+          <div class="absolute right-0 top-full z-30 mt-1">
+            <app-add-stage-popover
+              [pipelineKey]="pipelineKey()"
+              [stages]="stages()"
+              (created)="onStageCreated()"
+              (closed)="onAddClosed()"
+            />
+          </div>
+        }
+      </div>
+    }
   </div>
+
+  @if (deleteConfirm(); as ctx) {
+    <app-delete-stage-confirm
+      [stage]="ctx.stage"
+      [cardsInStage]="ctx.cardsInStage"
+      [candidateStages]="deleteCandidates()"
+      (confirmed)="onDeleteConfirmed($event)"
+      (cancelled)="onDeleteCancelled()"
+    />
+    @if (deleteError(); as err) {
+      <p class="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-md bg-red-600 px-3 py-2 text-xs text-white shadow-lg">
+        {{ err }}
+      </p>
+    }
+  }
 }
