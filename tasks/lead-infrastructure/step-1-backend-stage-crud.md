@@ -2,7 +2,7 @@
 
 **Goal:** Add the two missing pipeline-stage endpoints (POST to add, DELETE to remove with lead relocation) so the kanban editor on the Leads page has a full backend to call. PATCH already exists; this step makes it a real CRUD surface.
 **Track:** Lead Infrastructure
-**Status:** Pending
+**Status:** COMPLETED
 
 ---
 
