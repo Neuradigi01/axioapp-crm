@@ -12,7 +12,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { forkJoin, of } from 'rxjs';
-import { catchError, debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { ContactsApiService } from '../contacts/contacts-api.service';
 import {
@@ -223,12 +223,16 @@ export class LeadsPageComponent {
     this.submitting.set(false);
   }
 
-  protected onSave(event: { create?: LeadCreate; update?: LeadUpdate }): void {
+  protected onSave(event: {
+    create?: LeadCreate;
+    update?: LeadUpdate;
+    moveStageTo?: string;
+  }): void {
     if (event.create) {
       this.submitCreate(event.create);
     } else if (event.update) {
       const existing = this.editingLead();
-      if (existing) this.submitUpdate(existing.id, event.update);
+      if (existing) this.submitUpdate(existing.id, event.update, event.moveStageTo);
     }
   }
 
@@ -259,11 +263,14 @@ export class LeadsPageComponent {
       });
   }
 
-  private submitUpdate(id: string, payload: LeadUpdate): void {
+  private submitUpdate(id: string, payload: LeadUpdate, moveStageTo?: string): void {
     this.submitting.set(true);
     this.formError.set(null);
-    this.api
-      .update(id, payload)
+    const update$ = this.api.update(id, payload);
+    const final$ = moveStageTo
+      ? update$.pipe(switchMap(() => this.api.moveStage(id, moveStageTo)))
+      : update$;
+    final$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {

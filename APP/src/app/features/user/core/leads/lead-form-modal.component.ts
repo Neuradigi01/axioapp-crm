@@ -74,6 +74,7 @@ export class LeadFormModalComponent implements OnInit {
   @Output() readonly save = new EventEmitter<{
     create?: LeadCreate;
     update?: LeadUpdate;
+    moveStageTo?: string;
   }>();
   @Output() readonly cancel = new EventEmitter<void>();
 
@@ -216,16 +217,20 @@ export class LeadFormModalComponent implements OnInit {
     };
 
     if (this.isEdit()) {
-      // PATCH cannot change `pipeline_stage` (use move-stage endpoint).
+      const existing = this._lead()!;
       const update: LeadUpdate = {
         budget: payload.budget,
         expected_close_date: payload.expected_close_date,
         custom_data: payload.custom_data,
       };
-      if (contact && contact.id !== this._lead()!.contact_id) {
+      if (contact && contact.id !== existing.contact_id) {
         update.contact_id = contact.id;
       }
-      this.save.emit({ update });
+      const moveStageTo =
+        raw.pipeline_stage && raw.pipeline_stage !== existing.pipeline_stage
+          ? raw.pipeline_stage
+          : undefined;
+      this.save.emit({ update, moveStageTo });
     } else {
       this.save.emit({ create: payload });
     }

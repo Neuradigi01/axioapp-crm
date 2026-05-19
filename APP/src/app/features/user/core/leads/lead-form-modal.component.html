@@ -86,8 +86,7 @@
               <select
                 id="lf_stage"
                 formControlName="pipeline_stage"
-                [disabled]="isEdit()"
-                class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100"
+                class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               >
                 @for (s of p.stages; track s.key) {
                   <option [value]="s.key">{{ s.name }}</option>
@@ -95,12 +94,6 @@
               </select>
             } @else {
               <p class="mt-1 text-xs text-zinc-400">Loading stages…</p>
-            }
-            @if (isEdit()) {
-              <p class="mt-1 text-[11px] text-zinc-500">
-                To change the stage, drag the card on the kanban or use the stage
-                dropdown in List view.
-              </p>
             }
           </div>
 
