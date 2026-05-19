@@ -35,6 +35,12 @@ export interface StageUpdate {
   display_order?: number;
 }
 
+export interface StageCreate {
+  name: string;
+  color?: string;
+  after_stage_key?: string;
+}
+
 /**
  * Minimal "card" shape the kanban + list components require. The
  * caller's actual lead / order / contact item type extends this — the
@@ -65,6 +71,16 @@ export class PipelinesApiService {
 
   getByKey(key: string): Observable<Pipeline> {
     return this.http.get<Pipeline>(`${this.base}/${key}`);
+  }
+
+  createStage(
+    pipelineKey: string,
+    payload: StageCreate,
+  ): Observable<PipelineStage> {
+    return this.http.post<PipelineStage>(
+      `${this.base}/${pipelineKey}/stages`,
+      payload,
+    );
   }
 
   updateStage(

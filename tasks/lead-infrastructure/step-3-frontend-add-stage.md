@@ -2,7 +2,7 @@
 
 **Goal:** Build the reusable popover admins click to create a new pipeline stage at a chosen insertion point. Self-contained, mirrors the shape of the editor popover from Step 2.
 **Track:** Lead Infrastructure
-**Status:** Pending
+**Status:** COMPLETED
 
 ---
 
