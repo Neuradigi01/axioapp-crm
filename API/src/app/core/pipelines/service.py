@@ -36,7 +36,7 @@ from sqlalchemy.orm import selectinload
 
 from src.app.core import activities, audit
 from src.app.core.pipelines.models import Pipeline, PipelineStage
-from src.app.core.pipelines.schemas import StageUpdate
+from src.app.core.pipelines.schemas import StageCreate, StageUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,16 @@ _PIPELINE_TRACKED_TABLES: set[str] = set()
 # names. The names land inside a raw SQL UPDATE, so this is the second
 # line of defence after the registry check.
 _TABLE_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
+
+# Slug derivation for new stage keys: lowercase, collapse runs of
+# non-alphanumerics into a single underscore, trim leading/trailing
+# underscores. Length-capped to fit the `key VARCHAR(64)` column.
+_SLUG_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify_stage_key(name: str) -> str:
+    s = _SLUG_NON_ALNUM_RE.sub("_", name.lower()).strip("_")
+    return s[:64]
 
 
 def register_pipeline_table(name: str) -> None:
@@ -179,6 +189,202 @@ async def update_stage(
     return stage
 
 
+async def create_stage(
+    session: AsyncSession,
+    *,
+    pipeline_key: str,
+    payload: StageCreate,
+) -> PipelineStage:
+    """Insert a new stage into `pipeline_key`.
+
+    - Slugifies `payload.name` to derive `key`; rejects 422 if empty or
+      collides with an existing stage in this pipeline.
+    - If `after_stage_key` is given, places the new stage at
+      `that_stage.display_order + 1` and shifts every later stage's
+      order up by 1 (deferred-unique constraint absorbs the mid-txn
+      collision); otherwise appends at the end.
+    - `is_won`/`is_lost` are hardcoded `False`: creating terminal
+      stages from the API is a pack-level concern.
+    """
+    pipeline = await get_pipeline_by_key(session, key=pipeline_key)
+    if pipeline is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found"
+        )
+
+    new_key = _slugify_stage_key(payload.name)
+    if not new_key:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="name does not yield a valid stage key after slugification",
+        )
+
+    existing_keys = {s.key for s in pipeline.stages}
+    if new_key in existing_keys:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"stage key {new_key!r} already exists in this pipeline",
+        )
+
+    if payload.after_stage_key is not None:
+        anchor = next(
+            (s for s in pipeline.stages if s.key == payload.after_stage_key),
+            None,
+        )
+        if anchor is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"after_stage_key {payload.after_stage_key!r} is not a "
+                    f"stage in pipeline {pipeline_key!r}"
+                ),
+            )
+        insert_at = anchor.display_order + 1
+        # Shift every stage at or beyond the new slot up by 1. The
+        # `(pipeline_id, display_order)` unique constraint is INITIALLY
+        # DEFERRED so the mid-statement collision is acceptable.
+        for s in pipeline.stages:
+            if s.display_order >= insert_at:
+                s.display_order = s.display_order + 1
+                session.add(s)
+    else:
+        max_order = max((s.display_order for s in pipeline.stages), default=-1)
+        insert_at = max_order + 1
+
+    stage = PipelineStage(
+        org_id=pipeline.org_id,
+        pipeline_id=pipeline.id,
+        key=new_key,
+        name=payload.name,
+        color=payload.color,
+        display_order=insert_at,
+        is_won=False,
+        is_lost=False,
+    )
+    session.add(stage)
+    await session.commit()
+    await session.refresh(stage)
+
+    await audit.log(
+        "pipelines.stage_created",
+        entity_type="pipeline_stage",
+        entity_id=stage.id,
+        after=_stage_snapshot(stage),
+    )
+    return stage
+
+
+async def delete_stage(
+    session: AsyncSession,
+    *,
+    pipeline_key: str,
+    stage_id: uuid.UUID,
+    move_leads_to: Optional[str] = None,
+) -> None:
+    """Delete a stage, relocating any cards that reference its key.
+
+    Rules:
+      - Terminal stages (`is_won` / `is_lost`) cannot be deleted (409).
+      - Counts rows in every registered pipeline-tracked table where
+        `pipeline_stage = stage.key`. If the count is non-zero and
+        `move_leads_to` is not supplied, 409 with
+        `{cards_in_stage, must_provide}`.
+      - When relocation is supplied, UPDATEs all those rows to the
+        target stage's key, then DELETEs the stage — both in the
+        caller's transaction.
+      - `display_order` gaps on remaining stages are accepted.
+    """
+    pipeline = await get_pipeline_by_key(session, key=pipeline_key)
+    if pipeline is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found"
+        )
+
+    stage = await get_stage(session, stage_id)
+    if stage is None or stage.pipeline_id != pipeline.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="stage not found in this pipeline",
+        )
+
+    if stage.is_won or stage.is_lost:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="cannot delete a won/lost stage",
+        )
+
+    if move_leads_to is not None:
+        if move_leads_to == stage.key:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="move_leads_to cannot be the stage being deleted",
+            )
+        target_exists = any(
+            s.key == move_leads_to for s in pipeline.stages
+        )
+        if not target_exists:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"move_leads_to {move_leads_to!r} is not a stage in "
+                    f"pipeline {pipeline_key!r}"
+                ),
+            )
+
+    # Tally cards across every registered pipeline-tracked table.
+    # `_PIPELINE_TRACKED_TABLES` only ever holds names that passed the
+    # `_TABLE_NAME_RE` allowlist, so f-string interpolation is safe here.
+    cards_in_stage = 0
+    for table in _PIPELINE_TRACKED_TABLES:
+        row = (
+            await session.execute(
+                text(
+                    f"SELECT count(*) FROM {table} "  # noqa: S608
+                    "WHERE pipeline_stage = :key"
+                ),
+                {"key": stage.key},
+            )
+        ).first()
+        if row is not None:
+            cards_in_stage += int(row[0])
+
+    if cards_in_stage > 0 and move_leads_to is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "cards_in_stage": cards_in_stage,
+                "must_provide": "move_leads_to",
+            },
+        )
+
+    before = _stage_snapshot(stage)
+    cards_moved_count = 0
+    if cards_in_stage > 0 and move_leads_to is not None:
+        for table in _PIPELINE_TRACKED_TABLES:
+            result = await session.execute(
+                text(
+                    f"UPDATE {table} SET pipeline_stage = :to_key, "  # noqa: S608
+                    "updated_at = now() WHERE pipeline_stage = :from_key"
+                ),
+                {"to_key": move_leads_to, "from_key": stage.key},
+            )
+            cards_moved_count += result.rowcount or 0
+
+    await session.delete(stage)
+    await session.commit()
+
+    await audit.log(
+        "pipelines.stage_deleted",
+        entity_type="pipeline_stage",
+        entity_id=stage_id,
+        before=before,
+        after={
+            "cards_moved_count": cards_moved_count,
+            "cards_moved_to": move_leads_to,
+        },
+    )
+
+
 async def move_card(
     session: AsyncSession,
     *,
@@ -282,6 +488,8 @@ async def move_card(
 
 
 __all__ = [
+    "create_stage",
+    "delete_stage",
     "get_pipeline_by_id",
     "get_pipeline_by_key",
     "get_stage",
