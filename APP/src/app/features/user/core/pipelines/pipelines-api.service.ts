@@ -77,4 +77,23 @@ export class PipelinesApiService {
       payload,
     );
   }
+
+  /**
+   * Delete a stage. `moveLeadsTo`, when supplied, names the relocation
+   * target stage's key — the backend returns 409 with
+   * `{cards_in_stage, must_provide}` if the stage holds cards and no
+   * target was given. Callers should catch that 409 to surface the
+   * relocation modal, then retry with `moveLeadsTo` filled in.
+   */
+  deleteStage(
+    pipelineKey: string,
+    stageId: string,
+    moveLeadsTo?: string,
+  ): Observable<void> {
+    let url = `${this.base}/${pipelineKey}/stages/${stageId}`;
+    if (moveLeadsTo) {
+      url += `?move_leads_to=${encodeURIComponent(moveLeadsTo)}`;
+    }
+    return this.http.delete<void>(url);
+  }
 }

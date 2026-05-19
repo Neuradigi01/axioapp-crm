@@ -2,7 +2,7 @@
 
 **Goal:** Build the reusable popover component admins click to rename, recolor, reorder, or delete a single pipeline stage. Self-contained — knows nothing about the kanban that hosts it; emits typed events the parent acts on.
 **Track:** Lead Infrastructure
-**Status:** Pending
+**Status:** COMPLETED
 
 ---
 
