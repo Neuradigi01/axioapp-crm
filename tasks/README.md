@@ -57,8 +57,9 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | 5 | [Core CRM v1 Launch](phase-5-core-crm-launch/README.md) | 13 | **Core — current focus** |
 | 6 | [Furniture Pack Features (Layer 2)](phase-6-furniture-pack-features/README.md) | 8 | Furniture pack (post-launch) |
 | — | [Lead Infrastructure](lead-infrastructure/README.md) | 4 | Core (side track) |
+| — | [RBAC, Ownership & Self-Signup](rbac-ownership/README.md) | 5 | Core (side track) |
 
-**Total: 93 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure side track).
+**Total: 98 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership side tracks).
 
 Phase 5 was restructured to gather **all core CRM v1 work** (features + polish + hardening) so the path to a shipped template is one phase. Phase 6 was reshaped to hold **all furniture-pack-specific work** that's irrelevant to a generic CRM template adopter.
 
@@ -157,6 +158,13 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 2: Frontend stage editor popover](lead-infrastructure/step-2-frontend-stage-editor.md) — Pending
 - [Step 3: Frontend add-stage popover](lead-infrastructure/step-3-frontend-add-stage.md) — Pending
 - [Step 4: Frontend board wiring](lead-infrastructure/step-4-frontend-board-wiring.md) — Pending
+
+### RBAC, Ownership & Self-Signup (side track — Owner-driven role management + signup branching)
+- [Step 1: Normal signup creates org + assigns Owner](rbac-ownership/step-1-normal-signup-creates-org.md) — Pending
+- [Step 2: Role-template registry + auto-seed on org creation](rbac-ownership/step-2-role-templates-auto-seed.md) — Pending
+- [Step 3: Ownership transfer (backend + UI)](rbac-ownership/step-3-ownership-transfer.md) — Pending
+- [Step 4: Frontend route guards + Access Denied page](rbac-ownership/step-4-route-guards-access-denied.md) — Pending
+- [Step 5: Security audit events wiring](rbac-ownership/step-5-security-audit-events.md) — Pending
 
 ---
 

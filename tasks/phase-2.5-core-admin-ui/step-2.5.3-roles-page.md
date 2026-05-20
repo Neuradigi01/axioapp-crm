@@ -36,7 +36,7 @@ Top right: **[+ Create role]** opens an editor.
   ```
 - Save / Cancel buttons.
 
-For **system roles** the editor is read-only (CLAUDE.md: pack-installed and core-seeded roles shouldn't drift; admins create their own custom roles instead).
+For **system roles** the editor is read-only. In FurnitureCRM only the **Owner** role is `is_system=true`; `Admin` and `Employee` are seeded as ordinary editable roles via the role-template installer ([rbac-ownership/step-2](../rbac-ownership/step-2-role-templates-auto-seed.md)). The `+ Add from template` button referenced in that step is rendered on this page — see the RBAC track for its implementation.
 
 ## Files to touch
 
