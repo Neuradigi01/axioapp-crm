@@ -89,6 +89,43 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
 ]
 
 
+# Optional templates — surfaced on the Roles page as "Add from template"
+# presets. Not auto-installed; an Owner clicks to instantiate. Permission
+# sets are curated to the role's job: a Sales Manager runs the funnel and
+# the team; a Support Agent talks to customers but doesn't touch the
+# pipeline shape or billing.
+_CORE_SALES_MANAGER_KEYS: list[str] = [
+    "contacts.read", "contacts.write",
+    "leads.read", "leads.write",
+    "appointments.read", "appointments.write",
+    "walkins.read", "walkins.write",
+    "walk_ins.read", "walk_ins.write",
+    "tasks.read", "tasks.write",
+    "activities.read", "activities.write",
+    "pipelines.read", "pipelines.manage",
+    "calls.read", "calls.write", "calls.outcomes.manage",
+    "campaigns.read", "campaigns.write", "campaigns.send",
+    "reviews.read",
+    "catalog.read",
+    "staff.read",
+    "users.read",
+]
+
+
+_CORE_SUPPORT_AGENT_KEYS: list[str] = [
+    "contacts.read", "contacts.write",
+    "conversations.read", "conversations.write",
+    "calls.read", "calls.write",
+    "reviews.read", "reviews.write",
+    "tasks.read", "tasks.write",
+    "activities.read", "activities.write",
+    "catalog.read",
+    "walkins.read",
+    "walk_ins.read",
+    "leads.read",
+]
+
+
 @dataclass(frozen=True)
 class RoleTemplate:
     key: str
@@ -131,6 +168,30 @@ ROLE_TEMPLATES: dict[str, RoleTemplate] = {
             "View assigned leads; manage own tasks/contacts/deals; "
             "limited reports. No user management."
         ),
+    ),
+    "sales_manager": RoleTemplate(
+        key="sales_manager",
+        name="Sales Manager",
+        is_system=False,
+        is_owner=False,
+        permission_keys=_CORE_SALES_MANAGER_KEYS,
+        description=(
+            "Run the sales funnel: leads, pipelines, calls, campaigns, "
+            "appointments. View staff + users. No user management or billing."
+        ),
+        auto_install_on_org_create=False,
+    ),
+    "support_agent": RoleTemplate(
+        key="support_agent",
+        name="Support Agent",
+        is_system=False,
+        is_owner=False,
+        permission_keys=_CORE_SUPPORT_AGENT_KEYS,
+        description=(
+            "Talk to customers: conversations, calls, reviews. "
+            "Read-only on leads and catalog. No pipeline or billing access."
+        ),
+        auto_install_on_org_create=False,
     ),
 }
 
@@ -198,6 +259,27 @@ async def _install_one(
         )
 
     return role
+
+
+async def installed_template_names(
+    session: AsyncSession, org_id: uuid.UUID
+) -> set[str]:
+    """Names of `roles` rows in this org that match any template name.
+
+    Used by the Roles page to mark templates as `installed=true` when
+    the org already has a same-named role. Match is by `name` because
+    that's what we wrote when the template was instantiated; the
+    `template_key` isn't stored on the role row.
+    """
+    template_names = {t.name for t in ROLE_TEMPLATES.values()}
+    rows = (
+        await session.execute(
+            select(Role.name).where(
+                Role.org_id == org_id, Role.name.in_(template_names)
+            )
+        )
+    ).all()
+    return {r.name for r in rows}
 
 
 async def install(

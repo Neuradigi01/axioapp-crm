@@ -20,11 +20,15 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi import HTTPException
+
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.permissions import role_templates
 from src.app.core.permissions.schemas import (
     PermissionOut,
     RoleCreate,
     RoleOut,
+    RoleTemplateOut,
     RoleUpdate,
     RoleWithCounts,
 )
@@ -41,6 +45,7 @@ from src.app.shared.db import get_db
 
 roles_router = APIRouter(prefix="/roles", tags=["Roles"])
 permissions_router = APIRouter(prefix="/permissions", tags=["Permissions"])
+role_templates_router = APIRouter(prefix="/role-templates", tags=["Role Templates"])
 
 
 # --- /roles --------------------------------------------------------------
@@ -105,3 +110,74 @@ async def list_permissions_endpoint(
 ) -> list[PermissionOut]:
     rows = await list_all_permissions(session)
     return [PermissionOut.model_validate(p) for p in rows]
+
+
+# --- /role-templates -----------------------------------------------------
+
+
+@role_templates_router.get("", response_model=list[RoleTemplateOut])
+async def list_role_templates_endpoint(
+    user: User = Depends(require_permissions("roles.read")),
+    session: AsyncSession = Depends(get_db),
+) -> list[RoleTemplateOut]:
+    installed = await role_templates.installed_template_names(session, user.org_id)
+    out: list[RoleTemplateOut] = []
+    for t in role_templates.ROLE_TEMPLATES.values():
+        keys = (
+            list(t.permission_keys) if isinstance(t.permission_keys, list) else []
+        )
+        out.append(
+            RoleTemplateOut(
+                key=t.key,
+                name=t.name,
+                description=t.description,
+                is_system=t.is_system,
+                is_owner=t.is_owner,
+                auto_install_on_org_create=t.auto_install_on_org_create,
+                permission_keys=keys,
+                installed=t.name in installed,
+            )
+        )
+    return out
+
+
+@role_templates_router.post(
+    "/{template_key}/install",
+    response_model=RoleOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def install_role_template_endpoint(
+    template_key: str,
+    user: User = Depends(require_permissions("roles.write")),
+    session: AsyncSession = Depends(get_db),
+) -> RoleOut:
+    template = role_templates.ROLE_TEMPLATES.get(template_key)
+    if template is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"unknown role template: {template_key!r}",
+        )
+    if template.is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "the Owner template cannot be installed via this endpoint — "
+                "Owner is assigned by the signup flow and there is exactly one "
+                "Owner per org"
+            ),
+        )
+
+    installed = await role_templates.installed_template_names(session, user.org_id)
+    if template.name in installed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"role {template.name!r} already exists in this org",
+        )
+
+    result = await role_templates.install(
+        session, org_id=user.org_id, template_keys=[template_key]
+    )
+    await session.commit()
+    role = result[template_key]
+    await session.refresh(role)
+    return RoleOut.model_validate(role)

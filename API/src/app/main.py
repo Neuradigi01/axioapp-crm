@@ -71,6 +71,7 @@ from src.app.core.modules_router import router as modules_router
 from src.app.core.invitations.router import router as invitations_router
 from src.app.core.permissions.router import (
     permissions_router,
+    role_templates_router,
     roles_router,
 )
 from src.app.core.permissions.service import register_permissions
@@ -142,6 +143,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(roles_router, prefix="/api/v1")
 app.include_router(permissions_router, prefix="/api/v1")
+app.include_router(role_templates_router, prefix="/api/v1")
 app.include_router(invitations_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
 app.include_router(custom_fields_router, prefix="/api/v1")

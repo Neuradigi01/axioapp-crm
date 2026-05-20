@@ -2,7 +2,7 @@
 
 **Goal:** Define `Owner`, `Admin`, `Employee` as vertical-neutral *role templates* in code (not as fixed system rows), and expose an installer that stamps them into a new org's `roles` + `role_permissions` tables. On normal signup (Step 1) all three auto-instantiate; an Owner can later pull in additional templates ("Sales Manager", "Support Agent") via "+ Add from template" on the Roles page.
 **Track:** RBAC, Ownership & Self-Signup
-**Status:** Pending
+**Status:** COMPLETED — registry + installer + auto-seed shipped inline with Step 1; this step added the GET/POST `/role-templates` endpoints, the `Sales Manager` + `Support Agent` non-auto-install templates, and the "+ Add from template" picker on the Roles tab. Owner uses a curated grant set (not `ALL_KEYS`) to avoid pack permission leakage. `seed_admin_user.py` refactor deferred to a separate cleanup pass — risk of churn against the existing demo admin user wasn't worth it for the dedup gain.
 **Depends on:** 1.5 (roles + permissions schema), 2.5.3 (Roles page UI we'll extend).
 
 ---

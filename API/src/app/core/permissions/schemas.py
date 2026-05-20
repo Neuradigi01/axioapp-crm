@@ -52,3 +52,16 @@ class RoleUpdate(BaseModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=64)
     permission_keys: list[str] | None = None
+
+
+class RoleTemplateOut(BaseModel):
+    """A template descriptor + whether the caller's org has instantiated it."""
+
+    key: str
+    name: str
+    description: str
+    is_system: bool
+    is_owner: bool
+    auto_install_on_org_create: bool
+    permission_keys: list[str]
+    installed: bool

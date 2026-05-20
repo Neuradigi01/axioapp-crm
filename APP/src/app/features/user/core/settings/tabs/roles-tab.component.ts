@@ -37,6 +37,17 @@ interface PermissionRow {
   module: string;
 }
 
+interface RoleTemplate {
+  key: string;
+  name: string;
+  description: string;
+  is_system: boolean;
+  is_owner: boolean;
+  auto_install_on_org_create: boolean;
+  permission_keys: string[];
+  installed: boolean;
+}
+
 type Mode = 'list' | 'editor';
 
 /**
@@ -71,6 +82,7 @@ export class RolesTabComponent {
 
   protected readonly roles = signal<RoleRow[]>([]);
   protected readonly permissions = signal<PermissionRow[]>([]);
+  protected readonly templates = signal<RoleTemplate[]>([]);
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
   protected readonly canWrite = signal(false);
@@ -80,6 +92,15 @@ export class RolesTabComponent {
   protected readonly selectedKeys = signal<Set<string>>(new Set());
   protected readonly saving = signal(false);
   protected readonly editorError = signal<string | null>(null);
+
+  protected readonly showTemplatePicker = signal(false);
+  protected readonly installingKey = signal<string | null>(null);
+  protected readonly templateError = signal<string | null>(null);
+
+  /** Templates this org hasn't instantiated yet — shown in the picker. */
+  protected readonly availableTemplates = computed(() =>
+    this.templates().filter((t) => !t.installed && !t.is_owner),
+  );
 
   protected readonly nameForm = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(64)]],
@@ -124,19 +145,51 @@ export class RolesTabComponent {
     forkJoin({
       roles: this.http.get<RoleRow[]>(`${this.base}/roles`),
       permissions: this.http.get<PermissionRow[]>(`${this.base}/permissions`),
+      templates: this.http.get<RoleTemplate[]>(`${this.base}/role-templates`),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: ({ roles, permissions }) => {
+        next: ({ roles, permissions, templates }) => {
           this.roles.set(roles);
           this.permissions.set(permissions);
+          this.templates.set(templates);
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
           this.roles.set([]);
           this.permissions.set([]);
+          this.templates.set([]);
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load roles.');
+        },
+      });
+  }
+
+  protected toggleTemplatePicker(): void {
+    this.templateError.set(null);
+    this.showTemplatePicker.update((v) => !v);
+  }
+
+  protected installTemplate(t: RoleTemplate): void {
+    if (!this.canWrite() || this.installingKey()) return;
+    this.installingKey.set(t.key);
+    this.templateError.set(null);
+    this.http
+      .post<{ id: string }>(
+        `${this.base}/role-templates/${t.key}/install`,
+        {},
+      )
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.installingKey.set(null);
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.installingKey.set(null);
+          this.templateError.set(
+            extractApiError(err) ?? 'Could not install template.',
+          );
         },
       });
   }
