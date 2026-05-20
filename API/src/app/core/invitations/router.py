@@ -47,15 +47,20 @@ router = APIRouter(prefix="/invitations", tags=["Invitations"])
 )
 async def create_endpoint(
     payload: InvitationCreate,
+    request: Request,
     user: User = Depends(require_permissions("users.write")),
     session: AsyncSession = Depends(get_db),
 ) -> InvitationCreated:
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent")
     inv, accept_link = await create_invitation(
         session,
         org_id=user.org_id,
         invited_by=user.legacy_uuid,
         payload=payload,
         frontend_url=FRONTEND_URL,
+        ip=ip,
+        ua=ua,
     )
     base = InvitationOut.model_validate(inv).model_dump()
     base["accept_link"] = accept_link
@@ -76,11 +81,19 @@ async def list_endpoint(
 )
 async def delete_endpoint(
     invitation_id: uuid.UUID,
+    request: Request,
     user: User = Depends(require_permissions("users.write")),
     session: AsyncSession = Depends(get_db),
 ) -> Response:
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent")
     await revoke_invitation(
-        session, invitation_id=invitation_id, org_id=user.org_id
+        session,
+        invitation_id=invitation_id,
+        org_id=user.org_id,
+        revoked_by=user.legacy_uuid,
+        ip=ip,
+        ua=ua,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

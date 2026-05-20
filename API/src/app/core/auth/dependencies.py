@@ -22,10 +22,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core import audit
 from src.app.core.auth.models import AuthSession
 from src.app.core.permissions.service import list_permissions_for_role
 from src.app.core.users.models import User
@@ -95,15 +96,36 @@ async def get_current_staff(db: AsyncSession = Depends(get_db)) -> User:
 
 
 def require_permissions(*required: str):
-    """Returns a dependency that 403s if the user lacks any of the required keys."""
+    """Returns a dependency that 403s if the user lacks any of the required keys.
+
+    Emits an `auth.access_denied` audit row before raising 403 so an
+    auditor can see who tried what. The row writes to the caller's org
+    (the resource lives there — that's the RLS scope that matters).
+    `audit.log` is best-effort and never raises, so the 403 always fires
+    whether or not the audit row landed.
+    """
 
     async def _check(
+        request: Request,
         user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> User:
         granted = {p.key for p in await list_permissions_for_role(db, user.role_id)}
         missing = [k for k in required if k not in granted]
         if missing:
+            await audit.log(
+                "auth.access_denied",
+                entity_type="access_attempt",
+                after={
+                    "path": request.url.path,
+                    "method": request.method,
+                    "required_permission_keys": list(required),
+                    "missing_permission_keys": missing,
+                    "status_code": 403,
+                },
+                ip=request.client.host if request.client else None,
+                ua=request.headers.get("user-agent"),
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Missing permission(s): {', '.join(missing)}",

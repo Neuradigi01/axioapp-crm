@@ -2,7 +2,7 @@
 
 **Goal:** Every security-relevant action emits an `audit_logs` row carrying enough context to reconstruct who did what to whom. Closes the spec's audit-log requirement by wiring the five events into the modules that own them.
 **Track:** RBAC, Ownership & Self-Signup
-**Status:** Pending
+**Status:** COMPLETED — enriched `invitations.sent` (+ role_name, expires_at, invited_by_user_id), `invitations.accepted` (+ role_id, role_name, accepted_by_user_id), `invitations.revoked` (+ revoked_by_user_id); added new `roles.assigned_to_user` event in `update_user` (fires only when role_id actually changes); added `auth.access_denied` in `require_permissions` (carries path, method, required + missing keys, status_code). Existing `users.created/updated/activated/deactivated`, `roles.created/updated/deleted`, `ownership.transferred`, `auth.signup/login.success/login.failure`, `auth.password.changed` already in place. Action-key naming kept as `<module>.*` (plural) for backward compatibility — step doc used `<entity>.*` (singular) but renaming would churn the audit table; payload shape matches the spec.
 **Depends on:** 1.7 (audit_logs table + `audit.log()` service), all prior steps in this track (the events they emit).
 
 ---

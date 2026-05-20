@@ -254,6 +254,7 @@ async def update_user(
             detail="profile row missing — data inconsistency",
         )
 
+    before_role_id = membership.role_id
     before = {
         "full_name": f"{profile.first_name or ''} {profile.last_name or ''}".strip(),
         "phone": profile.mobile_no,
@@ -261,6 +262,8 @@ async def update_user(
     }
 
     changes = payload.model_dump(exclude_unset=True)
+    role_changed = False
+    new_role: Role | None = None
 
     if "full_name" in changes and changes["full_name"] is not None:
         first, last = _split_full_name(changes["full_name"])
@@ -269,9 +272,11 @@ async def update_user(
     if "phone" in changes:
         profile.mobile_no = changes["phone"]
     if "role_id" in changes and changes["role_id"] is not None:
-        await _ensure_role_in_org(
+        new_role = await _ensure_role_in_org(
             session, role_id=changes["role_id"], org_id=org_id
         )
+        if membership.role_id != changes["role_id"]:
+            role_changed = True
         membership.role_id = changes["role_id"]
 
     await session.commit()
@@ -289,6 +294,29 @@ async def update_user(
         before=before,
         after=after,
     )
+
+    # Emit a separate event when role assignment changed so an
+    # auditor can query role-assignment history without parsing every
+    # `users.updated` diff.
+    if role_changed and new_role is not None:
+        before_role_name = (
+            await session.execute(
+                select(Role.name).where(Role.id == before_role_id)
+            )
+        ).scalar_one_or_none()
+        await audit.log(
+            "roles.assigned_to_user",
+            entity_type="user",
+            entity_id=user_id,
+            before={
+                "role_id": str(before_role_id),
+                "role_name": before_role_name,
+            },
+            after={
+                "role_id": str(new_role.id),
+                "role_name": new_role.name,
+            },
+        )
     return user
 
 

@@ -62,6 +62,8 @@ async def create_invitation(
     invited_by: uuid.UUID,
     payload: InvitationCreate,
     frontend_url: str,
+    ip: str | None = None,
+    ua: str | None = None,
 ) -> tuple[Invitation, str]:
     """Issue an invitation. Returns (row, raw_accept_link)."""
     role = (
@@ -153,7 +155,12 @@ async def create_invitation(
         after={
             "email": payload.email,
             "role_id": str(payload.role_id),
+            "role_name": role.name,
+            "invited_by_user_id": str(invited_by),
+            "expires_at": invitation.expires_at.isoformat(),
         },
+        ip=ip,
+        ua=ua,
     )
     return invitation, accept_link
 
@@ -179,6 +186,9 @@ async def revoke_invitation(
     *,
     invitation_id: uuid.UUID,
     org_id: uuid.UUID,
+    revoked_by: uuid.UUID | None = None,
+    ip: str | None = None,
+    ua: str | None = None,
 ) -> None:
     """Revoke = set expires_at to now. The row stays for audit."""
     inv = (
@@ -208,6 +218,11 @@ async def revoke_invitation(
         entity_type="invitation",
         entity_id=inv.id,
         before={"email": inv.email},
+        after={
+            "revoked_by_user_id": str(revoked_by) if revoked_by else None,
+        },
+        ip=ip,
+        ua=ua,
     )
 
 
@@ -362,13 +377,30 @@ async def accept_invitation(
         now=now,
     )
 
+    # Best-effort role-name lookup so the audit row is readable without
+    # a second query. Falls back to None if the role row vanished
+    # between accept and audit (vanishingly unlikely; the invite row
+    # carries `role_id` as a FK with ondelete RESTRICT).
+    role_name = (
+        await session.execute(
+            select(Role.name).where(Role.id == inv.role_id)
+        )
+    ).scalar_one_or_none()
+
     await audit.log(
         "invitations.accepted",
         entity_type="invitation",
         entity_id=inv.id,
         org_id=inv.org_id,
         user_id=new_uuid,
-        after={"email": inv.email},
+        after={
+            "email": inv.email,
+            "role_id": str(inv.role_id),
+            "role_name": role_name,
+            "accepted_by_user_id": str(new_uuid),
+        },
+        ip=ip,
+        ua=ua,
     )
 
     return {
