@@ -2,7 +2,7 @@
 
 **Goal:** Move the DR.2 "Test logins" dropdown out of the login card and into a small floating pill anchored to the bottom-right of every screen in dev mode. Production builds do not render or bundle the component.
 **Track:** Dev Tools UI
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** DR.2 (the inline dropdown this step relocates). If DR.2 hasn't shipped yet, this step subsumes DR.2's work — mark DR.2 Superseded in that case.
 
 ---
