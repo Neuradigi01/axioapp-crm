@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 
 import { environment } from '../../../environments/environment';
 import { furnitureAuthGuard } from './core/auth/auth.guard';
+import { permissionGuard } from './core/auth/permission.guard';
 
 // Dev-only routes are spread into the shell's children when not building
 // for production. The guard on the shell still applies, so the route is
@@ -93,6 +94,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'staff',
+        canActivate: [permissionGuard('staff.read')],
         loadComponent: () =>
           import('./core/staff/staff.page').then(
             (m) => m.StaffPageComponent,
@@ -114,6 +116,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'reviews',
+        canActivate: [permissionGuard('reviews.read')],
         loadComponent: () =>
           import('./core/reviews/reviews.page').then(
             (m) => m.ReviewsPageComponent,
@@ -121,6 +124,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'campaigns',
+        canActivate: [permissionGuard('campaigns.read')],
         loadComponent: () =>
           import('./core/campaigns/campaigns.page').then(
             (m) => m.CampaignsPageComponent,
@@ -128,6 +132,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'campaigns/:id',
+        canActivate: [permissionGuard('campaigns.read')],
         loadComponent: () =>
           import('./core/campaigns/campaign-detail.page').then(
             (m) => m.CampaignDetailPageComponent,
@@ -135,6 +140,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'inventory',
+        canActivate: [permissionGuard('inventory.read')],
         loadComponent: () =>
           import('./packs/furniture/inventory/inventory.page').then(
             (m) => m.InventoryPageComponent,
@@ -142,6 +148,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'custom-orders',
+        canActivate: [permissionGuard('custom_orders.read')],
         loadComponent: () =>
           import('./packs/furniture/custom-orders/custom-orders.page').then(
             (m) => m.CustomOrdersPageComponent,
@@ -149,6 +156,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'custom-orders/:id',
+        canActivate: [permissionGuard('custom_orders.read')],
         loadComponent: () =>
           import(
             './packs/furniture/custom-orders/custom-order-detail.page'
@@ -156,6 +164,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'field-ops',
+        canActivate: [permissionGuard('field_visits.read')],
         loadComponent: () =>
           import('./packs/furniture/field-ops/field-ops.page').then(
             (m) => m.FieldOpsPageComponent,
@@ -163,6 +172,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'field-ops/:id',
+        canActivate: [permissionGuard('field_visits.read')],
         loadComponent: () =>
           import(
             './packs/furniture/field-ops/field-visit-detail.page'
@@ -170,6 +180,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'billing',
+        canActivate: [permissionGuard('billing.read')],
         loadComponent: () =>
           import('./packs/furniture/billing/billing.page').then(
             (m) => m.BillingPageComponent,
@@ -177,10 +188,18 @@ export const userRoutes: Routes = [
       },
       {
         path: 'billing/invoices/:id',
+        canActivate: [permissionGuard('billing.read')],
         loadComponent: () =>
           import(
             './packs/furniture/billing/invoice-detail.page'
           ).then((m) => m.InvoiceDetailPageComponent),
+      },
+      {
+        path: 'access-denied',
+        loadComponent: () =>
+          import('./core/access-denied/access-denied.page').then(
+            (m) => m.AccessDeniedPageComponent,
+          ),
       },
       ...devRoutes,
     ],

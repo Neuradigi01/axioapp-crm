@@ -115,7 +115,11 @@ export class LoginComponent {
         await firstValueFrom(
           this.furnitureAuth.login(identifier, password, this.selectedOrgSlug()),
         );
-        await this.router.navigateByUrl('/user');
+        // Honour ?return_url= if it came from a guard bounce, but only
+        // if it's a same-origin path — never a full URL.
+        const target = this.route.snapshot.queryParamMap.get('return_url') ?? '';
+        const safeTarget = /^\/[^/\\]/.test(target) ? target : '/user';
+        await this.router.navigateByUrl(safeTarget);
       } catch (err: unknown) {
         const msg =
           (err as { error?: { detail?: string; message?: string } })?.error?.detail ??

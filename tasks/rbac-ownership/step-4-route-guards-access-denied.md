@@ -2,7 +2,7 @@
 
 **Goal:** Add a uniform permission-key-driven route-guard layer to the FurnitureCRM frontend, plus a styled `/user/access-denied` page. Direct URL access to forbidden routes is blocked at the router level, not just hidden in the sidebar.
 **Track:** RBAC, Ownership & Self-Signup
-**Status:** Pending
+**Status:** COMPLETED — `permissionGuard()` + Access Denied page wired. Guards applied to `/user/{staff, reviews, campaigns, campaigns/:id, inventory, custom-orders, custom-orders/:id, field-ops, field-ops/:id, billing, billing/invoices/:id}`. Auth guard upgraded to capture `return_url`; login form honours it on success (with a same-origin safety check that rejects full URLs). `/user/reports` and `/user/audit-logs` routes don't exist yet — guards will be added when the pages ship.
 **Depends on:** 1.6 (JWT + `/users/me` returns the permission key list), Phase 2.5 (admin routes exist as gating targets).
 
 ---

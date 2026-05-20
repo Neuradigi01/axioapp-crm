@@ -72,6 +72,10 @@ export class FurnitureAuthService {
    * to decide whether to render management UI. */
   readonly currentPermissions = signal<string[]>([]);
 
+  /** Display name of the signed-in user's active role ("Owner",
+   * "Admin", "Employee", "Sales Manager", …). Empty before first /me. */
+  readonly currentRoleName = signal<string>('');
+
   hasPermission(key: string): boolean {
     return this.currentPermissions().includes(key);
   }
@@ -121,6 +125,7 @@ export class FurnitureAuthService {
         tap((res) => {
           this.currentOrg.set(res.org);
           this.currentPermissions.set(res.permission_keys);
+          this.currentRoleName.set(res.role_name);
         }),
       );
   }
@@ -133,5 +138,6 @@ export class FurnitureAuthService {
     this.storage.clear();
     this.currentOrg.set(null);
     this.currentPermissions.set([]);
+    this.currentRoleName.set('');
   }
 }
