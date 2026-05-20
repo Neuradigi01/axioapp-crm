@@ -24,12 +24,10 @@ import { DeviceInfoService } from '@core/services/device-info.service';
 import { FurnitureAuthService } from '@app/features/user/core/auth/auth.service';
 import { DemoPresetBusService } from '@app/features/dev-tools/demo-preset-bus.service';
 
-// All non-admin logins resolve to the furniture demo org by default.
-// In dev, the floating demo-logins pill (rendered by app.html) writes
-// to DemoPresetBusService when a developer picks a preset; the effect
-// below patches this form and updates selectedOrgSlug. Production
-// never renders the pill — the bus stays empty.
-const DEFAULT_FURNITURE_ORG_SLUG = 'demo';
+// When the demo-logins pill picks a preset, its slug lands here via
+// the bus effect below — sent on submit so the demo org is targeted
+// explicitly. For real signups the slug stays null and the backend
+// resolves the user's org from email + active membership.
 
 @Component({
   selector: 'app-login',
@@ -74,7 +72,7 @@ export class LoginComponent {
   readonly captchaType = signal('');
   readonly captchaToken = signal('');
 
-  readonly selectedOrgSlug = signal<string>(DEFAULT_FURNITURE_ORG_SLUG);
+  readonly selectedOrgSlug = signal<string | null>(null);
 
   private readonly captchaRef = viewChild<CaptchaComponent>('captchaRef');
 

@@ -7,6 +7,14 @@ Owner / Admin / Employee are all auto-instantiated on org creation
 rows in `roles` — the Owner row carries `is_system=true` so it's
 locked, Admin and Employee are `is_system=false` and Owner-editable.
 
+The permission lists below are **core-only** — they intentionally
+exclude pack-specific keys (`inventory.*`, `custom_orders.*`,
+`field_visits.*`, `pos.*`). Self-signup orgs are created with
+`pack_id='core'`, so granting pack permissions would surface pack
+modules in the sidebar even though the pack isn't installed. Pack
+permissions get added back if/when the pack is installed on the org
+(future Phase 4 work).
+
 `permission_keys` lists are resolved against the live `permissions`
 registry at install time. Unknown keys raise — better to break the
 install than silently miss a grant.
@@ -35,14 +43,7 @@ class OwnerAlreadyExists(RuntimeError):
     """Attempted to install a second Owner role into an org."""
 
 
-# Sentinel meaning "every permission key currently registered." The
-# installer resolves it by reading the full `permissions` table at
-# install time — newly-registered modules' keys are automatically
-# granted to Owner on the next org signup without code changes here.
-ALL_KEYS = "__all__"
-
-
-_ADMIN_KEYS: list[str] = [
+_CORE_ADMIN_KEYS: list[str] = [
     "users.read", "users.write",
     "roles.read", "roles.write",
     "audit.read",
@@ -63,10 +64,17 @@ _ADMIN_KEYS: list[str] = [
     "activities.read", "activities.write",
     "staff.read", "staff.write",
     "attendance.write",
+    "billing.read", "billing.write",
 ]
 
 
-_EMPLOYEE_KEYS: list[str] = [
+# Owner = Admin + the few keys only the workspace owner should hold.
+# Curated (not ALL_KEYS) so pack-specific permissions don't leak into
+# the sidebar of a `pack_id='core'` org.
+_CORE_OWNER_KEYS: list[str] = _CORE_ADMIN_KEYS + ["billing.refund"]
+
+
+_CORE_EMPLOYEE_KEYS: list[str] = [
     "contacts.read", "contacts.write",
     "leads.read", "leads.write",
     "activities.read", "activities.write",
@@ -99,18 +107,18 @@ ROLE_TEMPLATES: dict[str, RoleTemplate] = {
         name="Owner",
         is_system=True,
         is_owner=True,
-        permission_keys=ALL_KEYS,
-        description="Full system access. Cannot be edited or deleted.",
+        permission_keys=_CORE_OWNER_KEYS,
+        description="Full workspace control. Cannot be edited or deleted.",
     ),
     "admin": RoleTemplate(
         key="admin",
         name="Admin",
         is_system=False,
         is_owner=False,
-        permission_keys=_ADMIN_KEYS,
+        permission_keys=_CORE_ADMIN_KEYS,
         description=(
             "Manage users, leads, contacts, deals; view reports; "
-            "configure settings. No billing or ownership transfer."
+            "configure settings. No billing refund or ownership transfer."
         ),
     ),
     "employee": RoleTemplate(
@@ -118,7 +126,7 @@ ROLE_TEMPLATES: dict[str, RoleTemplate] = {
         name="Employee",
         is_system=False,
         is_owner=False,
-        permission_keys=_EMPLOYEE_KEYS,
+        permission_keys=_CORE_EMPLOYEE_KEYS,
         description=(
             "View assigned leads; manage own tasks/contacts/deals; "
             "limited reports. No user management."
@@ -130,11 +138,12 @@ ROLE_TEMPLATES: dict[str, RoleTemplate] = {
 async def _resolve_keys(
     session: AsyncSession, template: RoleTemplate
 ) -> list[uuid.UUID]:
-    """Map a template's permission_keys list (or ALL_KEYS sentinel) to ids."""
-    if template.permission_keys == ALL_KEYS:
-        rows = (await session.execute(select(Permission.id))).all()
-        return [r.id for r in rows]
+    """Map a template's permission_keys list to ids.
 
+    Skips keys that aren't in the live registry (rather than raising)
+    so a pack that isn't loaded today doesn't break a self-signup.
+    Unknown keys are silently ignored — the role just doesn't get them.
+    """
     keys = list(template.permission_keys)
     if not keys:
         return []
@@ -144,13 +153,7 @@ async def _resolve_keys(
         )
     ).all()
     found = {r.key: r.id for r in rows}
-    missing = sorted(set(keys) - set(found))
-    if missing:
-        raise UnknownPermissionKey(
-            f"template {template.key!r} references unregistered keys: "
-            f"{', '.join(missing)}"
-        )
-    return [found[k] for k in keys]
+    return [found[k] for k in keys if k in found]
 
 
 async def _install_one(

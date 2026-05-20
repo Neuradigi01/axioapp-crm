@@ -40,6 +40,28 @@ async def _get_org_by_slug(db: AsyncSession, slug: str) -> Organization | None:
     return result.scalar_one_or_none()
 
 
+async def _resolve_org_for_email(
+    db: AsyncSession, email: str
+) -> Organization | None:
+    """Find the org by walking email → active membership → org.
+
+    Used when login is called without `org_slug` (the email-only flow).
+    Returns None when the email isn't known OR has no active membership —
+    the caller treats both as "invalid credentials" to avoid leaking
+    which case it was.
+    """
+    result = await db.execute(
+        select(Organization)
+        .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
+        .join(UserInfo, UserInfo.member_id == OrganizationMember.user_member_id)
+        .where(
+            UserInfo.email == email,
+            OrganizationMember.is_active.is_(True),
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 async def _get_user_by_email_in_org(
     db: AsyncSession, org_id: uuid.UUID, email: str
 ) -> User | None:
@@ -70,7 +92,7 @@ async def login(
     *,
     email: str,
     password: str,
-    org_slug: str,
+    org_slug: str | None,
     ip: str | None = None,
     ua: str | None = None,
 ) -> LoginResponse:
@@ -79,7 +101,10 @@ async def login(
         detail="Invalid credentials",
     )
 
-    org = await _get_org_by_slug(db, org_slug)
+    if org_slug:
+        org = await _get_org_by_slug(db, org_slug)
+    else:
+        org = await _resolve_org_for_email(db, email)
     if org is None:
         # No tenant known → can't attribute to a row, intentionally skip audit.
         raise invalid

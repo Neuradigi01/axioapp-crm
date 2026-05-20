@@ -13,7 +13,10 @@ class LoginRequest(BaseModel):
     # email validation — the actual check is DB row match.
     email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=1, max_length=255)
-    org_slug: str = Field(min_length=1, max_length=64)
+    # Optional — when omitted, the server resolves the user's org from the
+    # email via the active `tbl_organization_members` row. Used by the demo
+    # pill (which sends an explicit slug) and by manual login (which doesn't).
+    org_slug: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class LoginResponse(BaseModel):

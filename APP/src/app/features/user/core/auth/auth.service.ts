@@ -8,7 +8,7 @@ import { TokenStorageService } from './token-storage.service';
 export interface LoginRequest {
   email: string;
   password: string;
-  org_slug: string;
+  org_slug?: string | null;
 }
 
 export interface LoginResponse {
@@ -76,13 +76,11 @@ export class FurnitureAuthService {
     return this.currentPermissions().includes(key);
   }
 
-  login(email: string, password: string, orgSlug: string): Observable<LoginResponse> {
+  login(email: string, password: string, orgSlug?: string | null): Observable<LoginResponse> {
+    const body: LoginRequest = { email, password };
+    if (orgSlug) body.org_slug = orgSlug;
     return this.http
-      .post<LoginResponse>(`${environment.apiBaseUrl}/auth/login`, {
-        email,
-        password,
-        org_slug: orgSlug,
-      } satisfies LoginRequest)
+      .post<LoginResponse>(`${environment.apiBaseUrl}/auth/login`, body)
       .pipe(
         tap((res) => this.storage.setTokens(res.access_token, res.access_token)),
       );
