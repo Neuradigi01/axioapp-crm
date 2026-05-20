@@ -1,10 +1,7 @@
-import { Component, ChangeDetectionStrategy, OnInit, signal, inject, viewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, effect, signal, inject, viewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
-import { environment } from '../../../../environments/environment';
+import { firstValueFrom } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -25,30 +22,14 @@ import { ROLE_ADMIN, SNACKBAR_DURATION, SNACKBAR_ACTION } from '@core/constants/
 import { MSG_ERROR_GENERIC, MSG_LOGIN_FAILED } from '@core/constants/messages.constants';
 import { DeviceInfoService } from '@core/services/device-info.service';
 import { FurnitureAuthService } from '@app/features/user/core/auth/auth.service';
+import { DemoPresetBusService } from '@app/features/dev-tools/demo-preset-bus.service';
 
-// All non-admin logins resolve to the furniture demo org by default;
-// the "Test logins" dropdown lets a developer switch between seeded
-// demo users without typing credentials each time. Presets come from
-// the dev-only `/api/v1/_dev/demo-logins` endpoint, which is mounted
-// only when the API container has `IS_DEVELOPMENT=true`. Production
-// builds get an empty list → dropdown auto-hides.
+// All non-admin logins resolve to the furniture demo org by default.
+// In dev, the floating demo-logins pill (rendered by app.html) writes
+// to DemoPresetBusService when a developer picks a preset; the effect
+// below patches this form and updates selectedOrgSlug. Production
+// never renders the pill — the bus stays empty.
 const DEFAULT_FURNITURE_ORG_SLUG = 'demo';
-
-interface DemoPreset {
-  readonly label: string;
-  readonly identifier: string;
-  readonly password: string;
-  readonly orgSlug: string;
-}
-
-/** Shape of `GET /api/v1/_dev/demo-logins` rows. */
-interface DemoLoginResponseRow {
-  label: string;
-  identifier: string;
-  password: string;
-  org_slug: string;
-  org_name: string;
-}
 
 @Component({
   selector: 'app-login',
@@ -70,7 +51,7 @@ interface DemoLoginResponseRow {
     PasswordToggleDirective,
   ],
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent {
   private readonly fb = inject(FormBuilder);
   private readonly authApi = inject(AuthApiService);
   private readonly auth = inject(AuthService);
@@ -78,7 +59,7 @@ export class LoginComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly deviceInfo = inject(DeviceInfoService);
-  private readonly http = inject(HttpClient);
+  private readonly demoBus = inject(DemoPresetBusService);
 
   private readonly route = inject(ActivatedRoute);
   readonly userType: UserType = (this.route.snapshot.data['userType'] as UserType) ?? 'User';
@@ -93,10 +74,6 @@ export class LoginComponent implements OnInit {
   readonly captchaType = signal('');
   readonly captchaToken = signal('');
 
-  /** Populated on init from `/api/v1/_dev/demo-logins`. Empty when the
-   * backend doesn't expose the endpoint (production builds) — the
-   * template hides the dropdown in that case. */
-  readonly demoPresets = signal<readonly DemoPreset[]>([]);
   readonly selectedOrgSlug = signal<string>(DEFAULT_FURNITURE_ORG_SLUG);
 
   private readonly captchaRef = viewChild<CaptchaComponent>('captchaRef');
@@ -104,44 +81,20 @@ export class LoginComponent implements OnInit {
   readonly forgotPasswordUrl = getRoute('forgot_password').url;
   readonly registerUrl = getRoute('register').url;
 
+  constructor() {
+    effect(() => {
+      const preset = this.demoBus.selected();
+      if (!preset || this.isAdmin) return;
+      this.loginForm.patchValue({
+        identifier: preset.identifier,
+        password: preset.password,
+      });
+      this.selectedOrgSlug.set(preset.orgSlug);
+    });
+  }
+
   get isAdmin(): boolean {
     return this.userType === ROLE_ADMIN;
-  }
-
-  ngOnInit(): void {
-    // Skip the fetch entirely on the admin-login variant — the
-    // dropdown is hidden there anyway.
-    if (this.isAdmin) return;
-
-    const url = `${environment.apiBaseUrl}/_dev/demo-logins`;
-    this.http
-      .get<DemoLoginResponseRow[]>(url)
-      .pipe(catchError(() => of<DemoLoginResponseRow[]>([])))
-      .subscribe((rows) => {
-        const presets: DemoPreset[] = rows.map((r) => ({
-          label: r.label,
-          identifier: r.identifier,
-          password: r.password,
-          orgSlug: r.org_slug,
-        }));
-        this.demoPresets.set(presets);
-      });
-  }
-
-  onPresetChange(event: Event): void {
-    const idx = (event.target as HTMLSelectElement).value;
-    if (idx === '') {
-      this.loginForm.patchValue({ identifier: '', password: '' });
-      this.selectedOrgSlug.set(DEFAULT_FURNITURE_ORG_SLUG);
-      return;
-    }
-    const preset = this.demoPresets()[Number(idx)];
-    if (!preset) return;
-    this.loginForm.patchValue({
-      identifier: preset.identifier,
-      password: preset.password,
-    });
-    this.selectedOrgSlug.set(preset.orgSlug);
   }
 
   onCaptchaTypeChange(type: string): void {

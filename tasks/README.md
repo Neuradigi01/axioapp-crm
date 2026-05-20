@@ -58,8 +58,9 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | 6 | [Furniture Pack Features (Layer 2)](phase-6-furniture-pack-features/README.md) | 8 | Furniture pack (post-launch) |
 | — | [Lead Infrastructure](lead-infrastructure/README.md) | 4 | Core (side track) |
 | — | [RBAC, Ownership & Self-Signup](rbac-ownership/README.md) | 5 | Core (side track) |
+| — | [Dev Tools UI](dev-tools-ui/README.md) | 1 | Dev-only (side track) |
 
-**Total: 98 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership side tracks).
+**Total: 99 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI side tracks).
 
 Phase 5 was restructured to gather **all core CRM v1 work** (features + polish + hardening) so the path to a shipped template is one phase. Phase 6 was reshaped to hold **all furniture-pack-specific work** that's irrelevant to a generic CRM template adopter.
 
@@ -165,6 +166,9 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 3: Ownership transfer (backend + UI)](rbac-ownership/step-3-ownership-transfer.md) — Pending
 - [Step 4: Frontend route guards + Access Denied page](rbac-ownership/step-4-route-guards-access-denied.md) — Pending
 - [Step 5: Security audit events wiring](rbac-ownership/step-5-security-audit-events.md) — Pending
+
+### Dev Tools UI (side track — dev-only UI affordances, env-gated)
+- [Step 1: Demo logins floating pill (replaces DR.2 dropdown)](dev-tools-ui/step-1-demo-logins-floating-pill.md) — Pending
 
 ---
 
