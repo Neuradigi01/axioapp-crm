@@ -3,16 +3,33 @@
     <p class="text-sm text-zinc-500">
       {{ items().length }} {{ items().length === 1 ? 'member' : 'members' }} in this organisation
     </p>
-    @if (canWrite()) {
-      <button
-        type="button"
-        (click)="openInviteModal()"
-        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
-      >
-        Invite member
-      </button>
-    }
+    <div class="flex items-center gap-2">
+      @if (isOwner()) {
+        <button
+          type="button"
+          (click)="openTransferModal()"
+          class="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
+        >
+          Transfer ownership
+        </button>
+      }
+      @if (canWrite()) {
+        <button
+          type="button"
+          (click)="openInviteModal()"
+          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+        >
+          Invite member
+        </button>
+      }
+    </div>
   </div>
+
+  @if (transferSuccess(); as msg) {
+    <div class="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+      {{ msg }}
+    </div>
+  }
 
   @if (loadError(); as err) {
     <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -273,6 +290,103 @@
           </form>
         }
       </div>
+    </div>
+  }
+
+  @if (transferModalOpen()) {
+    <div
+      class="fixed inset-0 z-40 bg-black/40"
+      (click)="closeTransferModal()"
+      role="presentation"
+    ></div>
+    <div
+      class="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-white shadow-2xl"
+      role="dialog"
+      aria-label="Transfer ownership"
+    >
+      <div class="border-b border-zinc-200 px-5 py-3">
+        <h3 class="text-sm font-semibold text-zinc-900">
+          Transfer ownership of {{ currentOrgName() }}
+        </h3>
+      </div>
+
+      <form [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="space-y-4 px-5 py-4">
+        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          <strong class="font-semibold">Warning:</strong> after transfer, you immediately
+          lose Owner permissions and the recipient gains them.
+          <span class="block mt-1">This cannot be undone without their cooperation.</span>
+        </div>
+
+        <label class="block text-sm">
+          <span class="mb-1 block text-xs font-medium text-zinc-600">New Owner</span>
+          <select
+            formControlName="target_user_id"
+            class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          >
+            <option value="">— Select an active member —</option>
+            @for (m of transferTargets(); track m.id) {
+              <option [value]="m.id">{{ m.email }} ({{ roleNameOf(m) }})</option>
+            }
+          </select>
+          @if (transferTargets().length === 0) {
+            <span class="mt-1 block text-[11px] text-zinc-500">
+              No other active members in this org. Invite someone first.
+            </span>
+          }
+        </label>
+
+        <label class="block text-sm">
+          <span class="mb-1 block text-xs font-medium text-zinc-600">Your new role</span>
+          <select
+            formControlName="demote_to_role_id"
+            class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          >
+            <option value="">Admin (default)</option>
+            @for (r of demoteRoleOptions(); track r.id) {
+              <option [value]="r.id">{{ r.name }}</option>
+            }
+          </select>
+          <span class="mt-1 block text-[11px] text-zinc-500">
+            Leave on default to take the Admin role after transfer.
+          </span>
+        </label>
+
+        <label class="block text-sm">
+          <span class="mb-1 block text-xs font-medium text-zinc-600">
+            Type <span class="font-mono text-zinc-900">{{ currentOrgName() }}</span> to confirm
+          </span>
+          <input
+            type="text"
+            [value]="transferOrgConfirm()"
+            (input)="onTransferOrgConfirmInput($any($event.target).value)"
+            autocomplete="off"
+            class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          />
+        </label>
+
+        @if (transferError(); as err) {
+          <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            {{ err }}
+          </div>
+        }
+
+        <div class="flex items-center justify-end gap-2 pt-1">
+          <button
+            type="button"
+            (click)="closeTransferModal()"
+            class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            [disabled]="!canSubmitTransfer()"
+            class="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {{ transferSubmitting() ? 'Transferring…' : 'Transfer ownership' }}
+          </button>
+        </div>
+      </form>
     </div>
   }
 </div>

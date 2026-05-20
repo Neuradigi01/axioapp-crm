@@ -2,7 +2,7 @@
 
 **Goal:** An `Owner` hands their org over to another active member. The target member becomes Owner; the original Owner is demoted to `Admin` (default — confirmable in the UI). Single-Owner-per-org invariant maintained atomically.
 **Track:** RBAC, Ownership & Self-Signup
-**Status:** Pending
+**Status:** COMPLETED — backend `POST /api/v1/ownership/transfer` + frontend Transfer modal on team tab. Atomic swap verified via curl (happy path, self-transfer 422, unknown target 422, non-owner 403, transfer-back round-trip). Migration-free per the step's "default: skip" option. Tests live as curl smoke for now; pytest unit tests deferred.
 **Depends on:** Step 1 (Owner role exists per org), Step 2 (Admin role exists per org as default demote target), 2.5.1 (admin user CRUD).
 
 ---

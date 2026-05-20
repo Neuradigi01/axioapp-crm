@@ -75,6 +75,7 @@ from src.app.core.permissions.router import (
     roles_router,
 )
 from src.app.core.permissions.service import register_permissions
+from src.app.core.tenants.router import router as ownership_router
 from src.app.core.users.router import router as users_router
 from src.app.shared.db import async_session
 from src.app.shared.middleware import TenantContextMiddleware
@@ -144,6 +145,7 @@ app.include_router(users_router, prefix="/api/v1")
 app.include_router(roles_router, prefix="/api/v1")
 app.include_router(permissions_router, prefix="/api/v1")
 app.include_router(role_templates_router, prefix="/api/v1")
+app.include_router(ownership_router, prefix="/api/v1")
 app.include_router(invitations_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
 app.include_router(custom_fields_router, prefix="/api/v1")

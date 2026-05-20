@@ -79,9 +79,18 @@ export class TeamTabComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
   protected readonly canWrite = signal(false);
+  protected readonly isOwner = signal(false);
+  protected readonly currentUserId = signal<string | null>(null);
   protected readonly editingId = signal<string | null>(null);
   protected readonly savingId = signal<string | null>(null);
   protected readonly rowError = signal<{ id: string; message: string } | null>(null);
+
+  // Transfer-ownership modal state
+  protected readonly transferModalOpen = signal(false);
+  protected readonly transferSubmitting = signal(false);
+  protected readonly transferError = signal<string | null>(null);
+  protected readonly transferOrgConfirm = signal('');
+  protected readonly transferSuccess = signal<string | null>(null);
 
   // Invite modal + pending list state (step 2.5.6)
   protected readonly invitations = signal<InvitationRow[]>([]);
@@ -109,6 +118,33 @@ export class TeamTabComponent {
     role_id: ['', Validators.required],
   });
 
+  protected readonly transferForm = this.fb.nonNullable.group({
+    target_user_id: ['', Validators.required],
+    demote_to_role_id: [''],
+  });
+
+  /** Candidate members for transfer — active, not the caller. */
+  protected readonly transferTargets = computed(() => {
+    const myId = this.currentUserId();
+    return this.items().filter((u) => u.id !== myId && u.is_active);
+  });
+
+  /** Roles the caller can demote into — anything except Owner. */
+  protected readonly demoteRoleOptions = computed(() =>
+    this.roles().filter((r) => r.name !== 'Owner'),
+  );
+
+  /** Org name typed-confirmation gate. */
+  protected readonly currentOrgName = computed(
+    () => this.auth.currentOrg()?.name ?? '',
+  );
+
+  protected readonly canSubmitTransfer = computed(() => {
+    if (this.transferSubmitting()) return false;
+    if (this.transferForm.controls.target_user_id.value === '') return false;
+    return this.transferOrgConfirm() === this.currentOrgName();
+  });
+
   constructor() {
     this.reload();
     this.reloadInvitations();
@@ -116,8 +152,84 @@ export class TeamTabComponent {
       .me()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (me) => this.canWrite.set(me.permission_keys.includes('users.write')),
-        error: () => this.canWrite.set(false),
+        next: (me) => {
+          this.canWrite.set(me.permission_keys.includes('users.write'));
+          this.isOwner.set(me.role_name === 'Owner');
+          this.currentUserId.set(me.id);
+        },
+        error: () => {
+          this.canWrite.set(false);
+          this.isOwner.set(false);
+          this.currentUserId.set(null);
+        },
+      });
+  }
+
+  protected openTransferModal(): void {
+    if (!this.isOwner()) return;
+    this.transferForm.reset({ target_user_id: '', demote_to_role_id: '' });
+    this.transferOrgConfirm.set('');
+    this.transferError.set(null);
+    this.transferSuccess.set(null);
+    this.transferModalOpen.set(true);
+  }
+
+  protected closeTransferModal(): void {
+    this.transferModalOpen.set(false);
+    this.transferError.set(null);
+  }
+
+  protected onTransferOrgConfirmInput(value: string): void {
+    this.transferOrgConfirm.set(value);
+  }
+
+  protected submitTransfer(): void {
+    if (!this.canSubmitTransfer()) return;
+    const raw = this.transferForm.getRawValue();
+    const body: { target_user_id: string; demote_to_role_id?: string } = {
+      target_user_id: raw.target_user_id,
+    };
+    if (raw.demote_to_role_id) {
+      body.demote_to_role_id = raw.demote_to_role_id;
+    }
+    this.transferSubmitting.set(true);
+    this.transferError.set(null);
+    this.http
+      .post<{ new_owner: { role_id: string }; demoted: { role_id: string } }>(
+        `${this.base}/ownership/transfer`,
+        body,
+      )
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.transferSubmitting.set(false);
+          const targetEmail =
+            this.items().find((u) => u.id === raw.target_user_id)?.email ??
+            'the selected member';
+          this.transferSuccess.set(
+            `Ownership transferred to ${targetEmail}. Your role has changed.`,
+          );
+          this.transferModalOpen.set(false);
+          // Re-read /me so the sidebar + canWrite/isOwner flags reflect
+          // the new (demoted) role, then reload the user list.
+          this.auth
+            .me()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+              next: (me) => {
+                this.canWrite.set(me.permission_keys.includes('users.write'));
+                this.isOwner.set(me.role_name === 'Owner');
+                this.currentUserId.set(me.id);
+              },
+            });
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.transferSubmitting.set(false);
+          this.transferError.set(
+            extractApiError(err) ?? 'Could not transfer ownership.',
+          );
+        },
       });
   }
 
