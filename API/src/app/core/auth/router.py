@@ -20,6 +20,8 @@ from src.app.core.auth.schemas import (
     LoginResponse,
     LogoutResponse,
     RefreshResponse,
+    RegisterRequest,
+    RegisterResponse,
 )
 from src.app.core.auth.tokens import InvalidToken, TokenClaims, decode_token
 from src.app.shared.db import get_db
@@ -69,6 +71,25 @@ async def login(
         email=req.email,
         password=req.password,
         org_slug=req.org_slug,
+        ip=_client_ip(request),
+        ua=request.headers.get("user-agent"),
+    )
+
+
+@router.post(
+    "/register",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def register(
+    req: RegisterRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RegisterResponse:
+    """Self-signup: creates a new org, makes the visitor its Owner, returns a JWT."""
+    return await auth_service.register_with_new_org(
+        db,
+        req=req,
         ip=_client_ip(request),
         ua=request.headers.get("user-agent"),
     )

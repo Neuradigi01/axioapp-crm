@@ -15,15 +15,24 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.auth.models import AuthSession
-from src.app.core.auth.schemas import LoginResponse, RefreshResponse
+from src.app.core.auth.schemas import (
+    LoginResponse,
+    RefreshResponse,
+    RegisterRequest,
+    RegisterResponse,
+)
 from src.app.core.auth.tokens import ACCESS_TOKEN_TTL, TokenClaims, encode_token
+from src.app.core.permissions import role_templates
 from src.app.core.tenants.models import Organization
+from src.app.core.tenants.service import create_organization
 from src.app.core.users.models import OrganizationMember, User, UserInfo
-from src.app.shared.security.password import verify_password
+from src.app.shared.context import RequestContext, reset_context, set_context
+from src.app.shared.security.password import hash_password, verify_password
 
 
 async def _get_org_by_slug(db: AsyncSession, slug: str) -> Organization | None:
@@ -185,3 +194,143 @@ async def logout(db: AsyncSession, token_id: uuid.UUID) -> None:
         .values(revoked_at=now)
     )
     await db.commit()
+
+
+async def _email_taken(db: AsyncSession, email: str) -> bool:
+    result = await db.execute(select(UserInfo.id).where(UserInfo.email == email))
+    return result.scalar_one_or_none() is not None
+
+
+async def register_with_new_org(
+    db: AsyncSession,
+    *,
+    req: RegisterRequest,
+    ip: str | None = None,
+    ua: str | None = None,
+) -> RegisterResponse:
+    """Atomic signup: org + Owner role-template seed + user + membership.
+
+    Either every insert lands or none do. On success returns a JWT for
+    the newly-created Owner, ready to be carried by the frontend into
+    `/user/dashboard`.
+    """
+    if await _email_taken(db, req.email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists.",
+        )
+
+    workspace_name = (req.organization_name or "").strip() or (
+        f"{req.first_name.strip()}'s Workspace"
+    )
+
+    org = await create_organization(
+        db, name=workspace_name, created_via="normal_signup"
+    )
+
+    # Role-template install is tenant-scoped via the auto-filter; set
+    # the request context to the new org so the installer's reads of
+    # `roles` see (and only see) this org's rows.
+    token = set_context(RequestContext(org_id=org.id))
+    try:
+        installed = await role_templates.install(db, org_id=org.id)
+    except role_templates.UnknownPermissionKey as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"role template install failed: {exc}",
+        )
+    finally:
+        reset_context(token)
+
+    owner_role = installed.get("owner")
+    if owner_role is None:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="role template install did not produce an Owner role",
+        )
+
+    # `User` (layered mapper) hides legacy `user_id` / 2FA columns. Bypass
+    # the exclusion by inserting via `pg_insert(User)` — same trick the
+    # seed scripts use — then fetch the bigint id by `legacy_uuid`.
+    user_uuid = uuid.uuid4()
+    await db.execute(
+        pg_insert(User).values(
+            {
+                "legacy_uuid": user_uuid,
+                "user_id": f"usr_{user_uuid.hex}",
+                "password": hash_password(req.password),
+                "is_active": True,
+                "two_factor_enabled": False,
+            }
+        )
+    )
+    bigint_id = (
+        await db.execute(
+            select(User.id).where(User.legacy_uuid == user_uuid)
+        )
+    ).scalar_one()
+
+    db.add(
+        UserInfo(
+            member_id=bigint_id,
+            first_name=req.first_name.strip(),
+            last_name=req.last_name.strip(),
+            email=req.email,
+            mobile_no=req.phone,
+            is_email_verified=False,
+            is_mobile_verified=False,
+        )
+    )
+    db.add(
+        OrganizationMember(
+            organization_id=org.id,
+            user_member_id=bigint_id,
+            role_id=owner_role.id,
+            status="active",
+            is_active=True,
+            is_demo=False,
+        )
+    )
+
+    token_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+    expires_at = now + ACCESS_TOKEN_TTL
+    db.add(
+        AuthSession(
+            id=token_id,
+            org_id=org.id,
+            user_id=user_uuid,
+            expires_at=expires_at,
+            ip=ip,
+            ua=ua,
+        )
+    )
+
+    await db.commit()
+
+    await audit.log(
+        "auth.signup",
+        org_id=org.id,
+        user_id=user_uuid,
+        after={
+            "email": req.email,
+            "organization_name": org.name,
+            "organization_slug": org.slug,
+            "role": owner_role.name,
+        },
+        ip=ip,
+        ua=ua,
+    )
+
+    encoded, exp = encode_token(
+        user_id=user_uuid, org_id=org.id, token_id=token_id, now=now
+    )
+    return RegisterResponse(
+        access_token=encoded,
+        expires_at=exp,
+        organization_id=org.id,
+        organization_slug=org.slug,
+        role_name=owner_role.name,
+    )

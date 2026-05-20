@@ -17,6 +17,24 @@ export interface LoginResponse {
   expires_at: string;
 }
 
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  phone?: string | null;
+  organization_name?: string | null;
+}
+
+export interface RegisterResponse {
+  access_token: string;
+  token_type: string;
+  expires_at: string;
+  organization_id: string;
+  organization_slug: string;
+  role_name: string;
+}
+
 export interface OrgSummary {
   id: string;
   name: string;
@@ -65,6 +83,14 @@ export class FurnitureAuthService {
         password,
         org_slug: orgSlug,
       } satisfies LoginRequest)
+      .pipe(
+        tap((res) => this.storage.setTokens(res.access_token, res.access_token)),
+      );
+  }
+
+  register(req: RegisterRequest): Observable<RegisterResponse> {
+    return this.http
+      .post<RegisterResponse>(`${environment.apiBaseUrl}/auth/register`, req)
       .pipe(
         tap((res) => this.storage.setTokens(res.access_token, res.access_token)),
       );

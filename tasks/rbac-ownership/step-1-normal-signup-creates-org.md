@@ -2,7 +2,7 @@
 
 **Goal:** When a visitor completes `/accounts/register` *without* an invite token, the system creates a brand-new organization, makes them its `Owner`, and lands them at `/user/dashboard` — all in one atomic transaction.
 **Track:** RBAC, Ownership & Self-Signup
-**Status:** Pending
+**Status:** COMPLETED — backend + frontend wired; end-to-end smoke green (register → /users/me → login → /users/me). Browser UI smoke pending human eyeball. Step 2 (role-template registry) was delivered inline as a prerequisite — its remaining UI surfaces (Roles page "+ Add from template" button) are deferred to a follow-up.
 **Depends on:** 1.5, 1.6, DR.7. Step 2 of this track (role templates) lands the seeding side; this step lands the *signup-routes-to-create-org* side. Ship Step 2 first so the new org has Admin/Employee on day one.
 
 ---

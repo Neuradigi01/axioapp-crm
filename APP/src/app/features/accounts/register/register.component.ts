@@ -14,6 +14,8 @@ import { CaptchaComponent } from '@shared/components/captcha/captcha.component';
 import { PasswordToggleDirective } from '@shared/directives/password-toggle.directive';
 import { matchFieldValidator } from '@shared/validators/custom-validators';
 import { AuthApiService } from '@app/services/auth-api.service';
+import { FurnitureAuthService } from '@app/features/user/core/auth/auth.service';
+import { firstValueFrom } from 'rxjs';
 import { AppConfigApiService } from '@app/services/app-config-api.service';
 import { LocationApiService } from '@app/services/location-api.service';
 import { createCountdownTimer } from '@core/services/countdown.service';
@@ -48,6 +50,7 @@ import { ICountry, IState } from '@app/schemas/common';
 export class RegisterComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly authApi = inject(AuthApiService);
+  private readonly furnitureAuth = inject(FurnitureAuthService);
   private readonly appConfigService = inject(AppConfigApiService);
   private readonly locationApi = inject(LocationApiService);
   private readonly router = inject(Router);
@@ -84,6 +87,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     last_name: ['', Validators.required],
     email: ['', [Validators.required, Validators.email]],
     mobile_no: [''],
+    organization_name: [''],
     country_id: [null as number | null],
     state_id: [{ value: null as number | null, disabled: true }],
     referral_id: [''],
@@ -271,21 +275,28 @@ export class RegisterComponent implements OnInit, OnDestroy {
     }
 
     try {
-      const response = await this.authApi.register(payload);
-
-      if (response.success) {
-        const userId = (response.data as { user_id?: string })?.user_id;
-        const msg = userId
-          ? `${MSG_REGISTRATION_SUCCESS} Your User ID is: ${userId}`
-          : (response.message || MSG_REGISTRATION_SUCCESS);
-        this.snackBar.open(msg, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION_LONG });
-        this.router.navigate([this.loginUrl]);
-      } else {
-        this.snackBar.open(response.message || MSG_REGISTRATION_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
-        this.captchaRef()?.refresh();
-      }
-    } catch {
-      this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+      const res = await firstValueFrom(
+        this.furnitureAuth.register({
+          email: payload.email,
+          password: payload.password,
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+          phone: payload.mobile_no || null,
+          organization_name: payload.organization_name || null,
+        }),
+      );
+      this.snackBar.open(
+        `Welcome to ${res.organization_slug}! You're signed in as ${res.role_name}.`,
+        SNACKBAR_ACTION,
+        { duration: SNACKBAR_DURATION_LONG },
+      );
+      await this.router.navigateByUrl('/user');
+    } catch (err: unknown) {
+      const msg =
+        (err as { error?: { detail?: string; message?: string } })?.error?.detail ??
+        (err as { error?: { detail?: string; message?: string } })?.error?.message ??
+        MSG_REGISTRATION_FAILED;
+      this.snackBar.open(msg, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
       this.captchaRef()?.refresh();
     } finally {
       this.isLoading.set(false);

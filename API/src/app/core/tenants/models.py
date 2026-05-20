@@ -37,6 +37,11 @@ class Organization(Base):
         server_default=text("18.00"),
     )
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, server_default=text("'Asia/Kolkata'"))
+    created_via: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text("'normal_signup'"),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
