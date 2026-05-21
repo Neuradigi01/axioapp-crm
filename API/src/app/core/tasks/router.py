@@ -1,15 +1,17 @@
 """HTTP routes for the tasks module.
 
   GET    /api/v1/tasks?related_entity_type=&related_entity_id=&status=
-  GET    /api/v1/tasks/me?status=open
+  GET    /api/v1/tasks/me?status=open&priority=&q=&due_filter=&sort_by=&sort_dir=
+  GET    /api/v1/tasks/all?…  — same filters + assigned_to_id; gated on users.read
   POST   /api/v1/tasks
   GET    /api/v1/tasks/{id}
   PATCH  /api/v1/tasks/{id}
   DELETE /api/v1/tasks/{id}
 
-`/tasks/me` is declared before `/tasks/{id}` so FastAPI's path-router
-treats "me" as a literal segment, not a UUID. Reads need `tasks.read`,
-writes need `tasks.write`. Tenant scoping is automatic.
+`/tasks/me` and `/tasks/all` are declared before `/tasks/{id}` so
+FastAPI's path-router treats "me" / "all" as literal segments, not as
+UUIDs. Reads need `tasks.read`; the org-wide `/all` additionally needs
+`users.read`. Writes need `tasks.write`. Tenant scoping is automatic.
 """
 from __future__ import annotations
 
@@ -20,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
-from src.app.core.tasks.models import TaskStatus
+from src.app.core.tasks.models import TaskPriority, TaskStatus
 from src.app.core.tasks.schemas import (
     TaskCreate,
     TaskListResponse,
@@ -28,9 +30,13 @@ from src.app.core.tasks.schemas import (
     TaskUpdate,
 )
 from src.app.core.tasks.service import (
+    DueFilter,
+    SortBy,
+    SortDir,
     create_task,
     delete_task,
     get_task,
+    list_all_in_org,
     list_my_tasks,
     list_tasks_for_entity,
     update_task,
@@ -45,13 +51,62 @@ router = APIRouter(prefix="/tasks", tags=["Tasks"])
 @router.get("/me", response_model=TaskListResponse)
 async def my_tasks(
     status_filter: Optional[TaskStatus] = Query(default=None, alias="status"),
+    priority: Optional[TaskPriority] = Query(default=None),
+    q: Optional[str] = Query(default=None, min_length=1, max_length=255),
+    due_filter: Optional[DueFilter] = Query(default=None),
+    sort_by: SortBy = Query(default="due_at"),
+    sort_dir: SortDir = Query(default="asc"),
     page: int = Query(1, ge=1),
     size: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("tasks.read")),
 ) -> TaskListResponse:
     rows, total = await list_my_tasks(
-        db, user_id=user.legacy_uuid, status_filter=status_filter, page=page, size=size
+        db,
+        user_id=user.legacy_uuid,
+        status_filter=status_filter,
+        priority=priority,
+        q=q,
+        due_filter=due_filter,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        page=page,
+        size=size,
+    )
+    return TaskListResponse(
+        items=[TaskOut.model_validate(r) for r in rows],
+        total=total,
+        page=page,
+        size=size,
+    )
+
+
+@router.get("/all", response_model=TaskListResponse)
+async def all_tasks(
+    status_filter: Optional[TaskStatus] = Query(default=None, alias="status"),
+    priority: Optional[TaskPriority] = Query(default=None),
+    assigned_to_id: Optional[uuid.UUID] = Query(default=None),
+    q: Optional[str] = Query(default=None, min_length=1, max_length=255),
+    due_filter: Optional[DueFilter] = Query(default=None),
+    sort_by: SortBy = Query(default="due_at"),
+    sort_dir: SortDir = Query(default="asc"),
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("users.read")),
+) -> TaskListResponse:
+    rows, total = await list_all_in_org(
+        db,
+        org_id=user.org_id,
+        status_filter=status_filter,
+        priority=priority,
+        assigned_to_id=assigned_to_id,
+        q=q,
+        due_filter=due_filter,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        page=page,
+        size=size,
     )
     return TaskListResponse(
         items=[TaskOut.model_validate(r) for r in rows],

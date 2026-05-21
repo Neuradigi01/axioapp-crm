@@ -16,15 +16,87 @@ status changes for free.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, nulls_last, select
+from sqlalchemy import case, func, nulls_first, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.tasks.models import Task, TaskPriority, TaskStatus
 from src.app.core.tasks.schemas import TaskCreate, TaskUpdate
+
+
+DueFilter = Literal["today", "overdue", "upcoming"]
+SortBy = Literal["due_at", "priority", "title", "created_at"]
+SortDir = Literal["asc", "desc"]
+
+
+# Priority ordering when sorting by priority — Postgres compares the
+# enum's storage values alphabetically ("high" < "low" < "med"), which
+# isn't the human ordering. CASE-coerce to a numeric rank so high tasks
+# surface first.
+_PRIORITY_RANK = case(
+    {
+        TaskPriority.high: 1,
+        TaskPriority.med: 2,
+        TaskPriority.low: 3,
+    },
+    value=Task.priority,
+)
+
+
+def _apply_task_filters(
+    stmt,
+    *,
+    status_filter: Optional[TaskStatus],
+    priority: Optional[TaskPriority],
+    q: Optional[str],
+    due_filter: Optional[DueFilter],
+    sort_by: SortBy,
+    sort_dir: SortDir,
+):
+    """Compose the shared WHERE + ORDER clauses for `/tasks/me` and `/tasks/all`.
+
+    Returns the stmt with filters + sort applied. The base `select(Task)`
+    plus any caller-specific constraints (org_id, assigned_to) must be
+    on the stmt already.
+    """
+    if status_filter is not None:
+        stmt = stmt.where(Task.status == status_filter)
+    if priority is not None:
+        stmt = stmt.where(Task.priority == priority)
+    if q:
+        stmt = stmt.where(Task.title.ilike(f"%{q}%"))
+    if due_filter == "today":
+        stmt = stmt.where(
+            Task.due_at.is_not(None),
+            func.date(Task.due_at) == func.current_date(),
+        )
+    elif due_filter == "overdue":
+        stmt = stmt.where(Task.due_at.is_not(None), Task.due_at < func.now())
+    elif due_filter == "upcoming":
+        stmt = stmt.where(Task.due_at.is_not(None), Task.due_at > func.now())
+
+    if sort_by == "priority":
+        col = _PRIORITY_RANK
+    elif sort_by == "title":
+        col = Task.title
+    elif sort_by == "created_at":
+        col = Task.created_at
+    else:
+        col = Task.due_at
+
+    ordered = col.asc() if sort_dir == "asc" else col.desc()
+    # Tasks with NULL `due_at` shouldn't pre-empt overdue work when
+    # sorting by due date — push nulls to the tail in both directions.
+    if sort_by == "due_at":
+        ordered = (
+            nulls_last(col.asc()) if sort_dir == "asc"
+            else nulls_first(col.desc())
+        )
+
+    return stmt.order_by(ordered, Task.created_at.desc())
 
 
 def _snapshot(t: Task) -> dict[str, Any]:
@@ -170,21 +242,68 @@ async def list_my_tasks(
     *,
     user_id: uuid.UUID,
     status_filter: Optional[TaskStatus] = None,
+    priority: Optional[TaskPriority] = None,
+    q: Optional[str] = None,
+    due_filter: Optional[DueFilter] = None,
+    sort_by: SortBy = "due_at",
+    sort_dir: SortDir = "asc",
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Task], int]:
-    """Caller's tasks, earliest-due first. Backs the header popover."""
-    filters: list[Any] = [Task.assigned_to_id == user_id]
-    if status_filter is not None:
-        filters.append(Task.status == status_filter)
-
-    base = (
-        select(Task)
-        .where(*filters)
-        .order_by(nulls_last(Task.due_at.asc()), Task.created_at.desc())
+    """Caller's tasks. Filters mirror `/tasks/all` so the personal Tasks
+    page shares the same chip/search wiring as the org-wide view."""
+    base = select(Task).where(Task.assigned_to_id == user_id)
+    base = _apply_task_filters(
+        base,
+        status_filter=status_filter,
+        priority=priority,
+        q=q,
+        due_filter=due_filter,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
     )
-    count_stmt = select(func.count()).select_from(Task).where(*filters)
 
+    count_stmt = select(func.count()).select_from(base.subquery())
+    total = (await session.execute(count_stmt)).scalar_one()
+    rows = (
+        await session.execute(base.offset((page - 1) * size).limit(size))
+    ).scalars().all()
+    return list(rows), int(total)
+
+
+async def list_all_in_org(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    status_filter: Optional[TaskStatus] = None,
+    priority: Optional[TaskPriority] = None,
+    assigned_to_id: Optional[uuid.UUID] = None,
+    q: Optional[str] = None,
+    due_filter: Optional[DueFilter] = None,
+    sort_by: SortBy = "due_at",
+    sort_dir: SortDir = "asc",
+    page: int = 1,
+    size: int = 50,
+) -> tuple[list[Task], int]:
+    """Every task in the org — gated by `users.read` at the router layer.
+
+    Always carries the explicit `Task.org_id == org_id` filter so a
+    misconfigured tenant context can't leak cross-org rows.
+    """
+    base = select(Task).where(Task.org_id == org_id)
+    if assigned_to_id is not None:
+        base = base.where(Task.assigned_to_id == assigned_to_id)
+    base = _apply_task_filters(
+        base,
+        status_filter=status_filter,
+        priority=priority,
+        q=q,
+        due_filter=due_filter,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+    )
+
+    count_stmt = select(func.count()).select_from(base.subquery())
     total = (await session.execute(count_stmt)).scalar_one()
     rows = (
         await session.execute(base.offset((page - 1) * size).limit(size))
@@ -194,11 +313,15 @@ async def list_my_tasks(
 
 # Re-export enums so callers get a stable import path through this module.
 __all__ = [
+    "DueFilter",
+    "SortBy",
+    "SortDir",
     "TaskPriority",
     "TaskStatus",
     "create_task",
     "delete_task",
     "get_task",
+    "list_all_in_org",
     "list_my_tasks",
     "list_tasks_for_entity",
     "update_task",

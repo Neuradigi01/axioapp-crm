@@ -2,7 +2,7 @@
 
 **Goal:** Enable an Owner / Admin / anyone with `users.read` to fetch all tasks in their org, with status + priority + assignee + search filters. Keeps the existing entity-scoped `GET /tasks` and personal `GET /tasks/me` paths unchanged.
 **Track:** Tasks page
-**Status:** Pending
+**Status:** COMPLETED — `GET /api/v1/tasks/all` shipped (gated on `users.read`), `/me` extended with the same filter params, single `_apply_task_filters()` helper shared by both. Priority sort uses a CASE-ranked column so `high` ranks above `med/low` (Postgres's default enum ordering is alphabetical). Schema unchanged — no `TaskListFilter` Pydantic model needed; query params stayed clean inline.
 **Depends on:** Phase 2 tasks module (CRUD + schemas already in place).
 
 ---
