@@ -30,17 +30,26 @@ class EmailBackend(Protocol):
         ...
 
 
-from src.app.shared.email.log_backend import LogEmailBackend  # noqa: E402
+from config import EMAIL_ENABLED  # noqa: E402
 
-# Module-level default. Production swaps via env-driven wiring.
-_backend: EmailBackend = LogEmailBackend()
+from src.app.shared.email.log_backend import LogEmailBackend  # noqa: E402
+from src.app.shared.email.smtp_backend import SmtpEmailBackend  # noqa: E402
+
+
+def _select_backend() -> EmailBackend:
+    return SmtpEmailBackend() if EMAIL_ENABLED else LogEmailBackend()
+
+
+# Module-level default, chosen at import time from env.
+_backend: EmailBackend = _select_backend()
 
 
 def get_email_backend() -> EmailBackend:
     """Return the active email backend.
 
-    A future composition root may replace this with an env-driven
-    factory; for now the dev `LogEmailBackend` is the only impl.
+    `SmtpEmailBackend` when `EMAIL_ENABLED=true` (delegates to the
+    legacy aiosmtplib helper), otherwise `LogEmailBackend` which just
+    logs the body so dev can copy the invite link out of the API log.
     """
     return _backend
 
