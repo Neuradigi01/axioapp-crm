@@ -2,7 +2,7 @@
 
 **Goal:** Register the Dashboard as a real core module so it shows up in the sidebar at the very top (above Contacts), reachable from any page. No special-case sidebar hardcoding — Dashboard registers itself like every other module, per Rule 5.
 **Track:** Dashboard
-**Status:** Pending
+**Status:** COMPLETED — single-file module descriptor shipped. Final `menu_position=10` (not 100 as originally drafted): furniture-pack modules occupy 20–50, so 100 would have sunk Dashboard below them on furniture-pack orgs. 10 keeps Dashboard first universally.
 **Depends on:** Step 1 (backend endpoint) and Step 2 (frontend page).
 
 ---
