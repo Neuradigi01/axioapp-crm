@@ -2,11 +2,11 @@
 
 **Goal:** Stand up `GET /api/v1/dashboard/summary` — a single aggregation endpoint that returns the cards + recent activity + upcoming appointments the dashboard page needs. The shape of the response adapts to the caller's permissions: Owner/Admin/anyone with `users.read` gets org-wide aggregates; Employee/anyone without gets personal-scope.
 **Track:** Dashboard
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Phase 1.5/1.6 (auth + perms), Phase 2 (contacts/leads/tasks/appointments/calls/activities exist).
 
 ---
-
+ 
 ## Scope
 
 One new core module — `api/src/app/core/dashboard/` — with three small files (service, router, schemas) plus a one-line registration in `main.py`. No database changes. No new permission keys. Pure aggregation over existing tenant-scoped tables.
