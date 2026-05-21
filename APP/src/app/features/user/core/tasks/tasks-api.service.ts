@@ -11,6 +11,21 @@ import { environment } from '../../../../../environments/environment';
  */
 export type TaskStatus = 'open' | 'done' | 'cancelled';
 export type TaskPriority = 'low' | 'med' | 'high';
+export type TaskDueFilter = 'today' | 'overdue' | 'upcoming';
+export type TaskSortBy = 'due_at' | 'priority' | 'title' | 'created_at';
+export type TaskSortDir = 'asc' | 'desc';
+
+export interface TaskListFilters {
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  q?: string;
+  due_filter?: TaskDueFilter;
+  sort_by?: TaskSortBy;
+  sort_dir?: TaskSortDir;
+  assigned_to_id?: string;
+  page?: number;
+  size?: number;
+}
 
 export interface Task {
   id: string;
@@ -53,6 +68,21 @@ export type TaskUpdate = Partial<{
   priority: TaskPriority;
 }>;
 
+function toParams(filters: TaskListFilters): HttpParams {
+  let params = new HttpParams();
+  if (filters.status) params = params.set('status', filters.status);
+  if (filters.priority) params = params.set('priority', filters.priority);
+  if (filters.q) params = params.set('q', filters.q);
+  if (filters.due_filter) params = params.set('due_filter', filters.due_filter);
+  if (filters.sort_by) params = params.set('sort_by', filters.sort_by);
+  if (filters.sort_dir) params = params.set('sort_dir', filters.sort_dir);
+  if (filters.assigned_to_id)
+    params = params.set('assigned_to_id', filters.assigned_to_id);
+  if (filters.page) params = params.set('page', String(filters.page));
+  if (filters.size) params = params.set('size', String(filters.size));
+  return params;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TasksApiService {
   private readonly http = inject(HttpClient);
@@ -71,11 +101,20 @@ export class TasksApiService {
     return this.http.get<TaskListResponse>(this.base, { params });
   }
 
-  /** Caller's own tasks (header popover). */
-  listMine(status?: TaskStatus): Observable<TaskListResponse> {
-    let params = new HttpParams();
-    if (status) params = params.set('status', status);
-    return this.http.get<TaskListResponse>(`${this.base}/me`, { params });
+  /** Caller's own tasks. Used by the header popover (no filters) and the
+   *  Tasks page (all filter params). */
+  listMine(filters: TaskListFilters = {}): Observable<TaskListResponse> {
+    return this.http.get<TaskListResponse>(`${this.base}/me`, {
+      params: toParams(filters),
+    });
+  }
+
+  /** Every task in the org. Requires `users.read` server-side; callers
+   *  without it get 403. Used by the Tasks page's "All" chip. */
+  listAll(filters: TaskListFilters = {}): Observable<TaskListResponse> {
+    return this.http.get<TaskListResponse>(`${this.base}/all`, {
+      params: toParams(filters),
+    });
   }
 
   create(payload: TaskCreate): Observable<Task> {

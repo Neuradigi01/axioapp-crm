@@ -2,7 +2,7 @@
 
 **Goal:** Build `/user/tasks` — the standalone CRM tasks page. Permission-scoped (Owner/Admin see all; Employee sees own), with filter chips, sortable columns, quick-complete checkbox, search, and a create/edit modal. Reuses the existing `TasksApiService`.
 **Track:** Tasks page
-**Status:** Pending
+**Status:** COMPLETED — page + modal + route shipped; sidebar Tasks click now lands on a real page. Permission scope branches off `/me`'s `users.read` perm. The "Related entity" picker dropped to a read-only column for v1 (typeahead deferred). The existing `my-tasks-popover` got its `listMine('open')` call migrated to the new `listMine({ status: 'open' })` shape. TypeScript compile + dev build clean. Visual smoke pending human eyeball.
 **Depends on:** Step 1 (backend `/tasks/all` endpoint + extended `/tasks/me` filters).
 
 ---

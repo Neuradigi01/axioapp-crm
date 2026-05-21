@@ -91,6 +91,11 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        path: 'tasks',
+        loadComponent: () =>
+          import('./core/tasks/tasks.page').then((m) => m.TasksPageComponent),
+      },
+      {
         path: 'walk-ins',
         loadComponent: () =>
           import('./core/walk-ins/walk-ins.page').then(

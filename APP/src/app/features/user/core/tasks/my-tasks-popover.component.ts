@@ -93,7 +93,7 @@ export class MyTasksPopoverComponent {
     this.loading.set(true);
     this.loadError.set(null);
     this.api
-      .listMine('open')
+      .listMine({ status: 'open' })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
