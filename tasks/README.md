@@ -59,8 +59,9 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [Lead Infrastructure](lead-infrastructure/README.md) | 4 | Core (side track) |
 | — | [RBAC, Ownership & Self-Signup](rbac-ownership/README.md) | 5 | Core (side track) |
 | — | [Dev Tools UI](dev-tools-ui/README.md) | 1 | Dev-only (side track) |
+| — | [Dashboard](dashboard/README.md) | 2 | Core (side track) |
 
-**Total: 99 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI side tracks).
+**Total: 101 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard side tracks).
 
 Phase 5 was restructured to gather **all core CRM v1 work** (features + polish + hardening) so the path to a shipped template is one phase. Phase 6 was reshaped to hold **all furniture-pack-specific work** that's irrelevant to a generic CRM template adopter.
 
@@ -169,6 +170,10 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 
 ### Dev Tools UI (side track — dev-only UI affordances, env-gated)
 - [Step 1: Demo logins floating pill (replaces DR.2 dropdown)](dev-tools-ui/step-1-demo-logins-floating-pill.md) — Pending
+
+### Dashboard (side track — `/user/dashboard` landing page, role-adaptive via permissions)
+- [Step 1: Backend dashboard summary endpoint](dashboard/step-1-backend-summary-endpoint.md) — Pending
+- [Step 2: Frontend dashboard page](dashboard/step-2-frontend-dashboard-page.md) — Pending
 
 ---
 
