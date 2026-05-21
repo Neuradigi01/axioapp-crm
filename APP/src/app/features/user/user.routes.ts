@@ -35,6 +35,18 @@ export const userRoutes: Routes = [
     children: [
       {
         path: '',
+        pathMatch: 'full',
+        redirectTo: 'dashboard',
+      },
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./core/dashboard/dashboard.page').then(
+            (m) => m.DashboardPageComponent,
+          ),
+      },
+      {
+        path: 'welcome',
         loadComponent: () =>
           import('./layout/welcome.component').then((m) => m.WelcomeComponent),
       },

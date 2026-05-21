@@ -2,7 +2,7 @@
 
 **Goal:** Build `/user/dashboard` — the page that renders the cards + recent activity + upcoming appointments returned by Step 1's `GET /api/v1/dashboard/summary`. Generic renderer keyed on `card.format` so adding a card later is one backend change, no template edits.
 **Track:** Dashboard
-**Status:** Pending
+**Status:** COMPLETED — page + route shipped; `/user` empty path now redirects to `/user/dashboard` (welcome page moved to `/user/welcome` as a fallback). TypeScript compile + dev build clean. Visual smoke pending human eyeball. Currency format hardcoded to INR for now — extending `OrgSummary` to carry the per-org currency code is a follow-up.
 **Depends on:** Step 1 (backend endpoint).
 
 ---
