@@ -60,8 +60,9 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [RBAC, Ownership & Self-Signup](rbac-ownership/README.md) | 5 | Core (side track) |
 | — | [Dev Tools UI](dev-tools-ui/README.md) | 1 | Dev-only (side track) |
 | — | [Dashboard](dashboard/README.md) | 3 | Core (side track) |
+| — | [Tasks page](tasks-page/README.md) | 2 | Core (side track) |
 
-**Total: 102 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard side tracks).
+**Total: 104 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page side tracks).
 
 Phase 5 was restructured to gather **all core CRM v1 work** (features + polish + hardening) so the path to a shipped template is one phase. Phase 6 was reshaped to hold **all furniture-pack-specific work** that's irrelevant to a generic CRM template adopter.
 
@@ -175,6 +176,10 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 1: Backend dashboard summary endpoint](dashboard/step-1-backend-summary-endpoint.md) — Pending
 - [Step 2: Frontend dashboard page](dashboard/step-2-frontend-dashboard-page.md) — Pending
 - [Step 3: Sidebar entry for Dashboard](dashboard/step-3-sidebar-entry.md) — Pending
+
+### Tasks page (side track — `/user/tasks` standalone list, permission-scoped)
+- [Step 1: Backend org-wide list endpoint + filter params](tasks-page/step-1-backend-org-list-endpoint.md) — Pending
+- [Step 2: Frontend tasks list page + create/edit modal](tasks-page/step-2-frontend-tasks-list-page.md) — Pending
 
 ---
 
