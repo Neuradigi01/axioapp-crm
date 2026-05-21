@@ -18,6 +18,9 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import logging
+from pathlib import Path
+
 from src.app.core import audit
 from src.app.core.auth.models import AuthSession
 from src.app.core.auth.schemas import (
@@ -27,12 +30,22 @@ from src.app.core.auth.schemas import (
     RegisterResponse,
 )
 from src.app.core.auth.tokens import ACCESS_TOKEN_TTL, TokenClaims, encode_token
+from src.app.core.packs.installer import install as install_pack
+from src.app.core.packs.loader import PackLoadError, load_pack
 from src.app.core.permissions import role_templates
 from src.app.core.tenants.models import Organization
 from src.app.core.tenants.service import create_organization
 from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.security.password import hash_password, verify_password
+
+
+logger = logging.getLogger(__name__)
+
+# Path is relative to the container's WORKDIR (/app). The base pack
+# ships with the core CRM and supplies the default Leads pipeline,
+# lead sources, and call outcomes any new tenant needs out of the box.
+_BASE_PACK_FILE = Path("src/app/packs/base/pack.yaml")
 
 
 async def _get_org_by_slug(db: AsyncSession, slug: str) -> Organization | None:
@@ -253,20 +266,41 @@ async def register_with_new_org(
         db, name=workspace_name, created_via="normal_signup"
     )
 
-    # Role-template install is tenant-scoped via the auto-filter; set
-    # the request context to the new org so the installer's reads of
-    # `roles` see (and only see) this org's rows.
+    # Role-template install + base-pack install are both tenant-scoped
+    # via the auto-filter; set the request context to the new org so
+    # all reads/writes resolve against this org's rows.
     token = set_context(RequestContext(org_id=org.id))
     try:
         installed = await role_templates.install(db, org_id=org.id)
     except role_templates.UnknownPermissionKey as exc:
         await db.rollback()
+        reset_context(token)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"role template install failed: {exc}",
         )
-    finally:
-        reset_context(token)
+
+    # Base pack — installs the default Leads pipeline + 6 stages, lead
+    # sources, call outcomes. Best-effort: if the manifest can't be
+    # loaded or the install reports errors, log and continue rather
+    # than fail signup. The Owner can re-run `install_pack --pack base`
+    # later to recover. (No equivalent admin endpoint exists yet; a
+    # follow-up could surface this through the Settings UI.)
+    try:
+        manifest = load_pack(_BASE_PACK_FILE)
+        report = await install_pack(db, org_id=org.id, manifest=manifest)
+        if report.errors:
+            logger.warning(
+                "base pack install reported errors for org %s: %s",
+                org.id,
+                report.errors,
+            )
+    except PackLoadError as exc:
+        logger.warning("base pack manifest unreadable: %s", exc)
+    except Exception:
+        logger.exception("base pack install failed for org %s", org.id)
+
+    reset_context(token)
 
     owner_role = installed.get("owner")
     if owner_role is None:
