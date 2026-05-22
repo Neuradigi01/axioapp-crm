@@ -61,8 +61,9 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [Dev Tools UI](dev-tools-ui/README.md) | 1 | Dev-only (side track) |
 | — | [Dashboard](dashboard/README.md) | 3 | Core (side track) |
 | — | [Tasks page](tasks-page/README.md) | 2 | Core (side track) |
+| — | [Standard Field Overrides](standard-field-overrides/README.md) | 6 | Core (side track) |
 
-**Total: 104 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page side tracks).
+**Total: 110 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides side tracks).
 
 Phase 5 was restructured to gather **all core CRM v1 work** (features + polish + hardening) so the path to a shipped template is one phase. Phase 6 was reshaped to hold **all furniture-pack-specific work** that's irrelevant to a generic CRM template adopter.
 
@@ -180,6 +181,14 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 ### Tasks page (side track — `/user/tasks` standalone list, permission-scoped)
 - [Step 1: Backend org-wide list endpoint + filter params](tasks-page/step-1-backend-org-list-endpoint.md) — Pending
 - [Step 2: Frontend tasks list page + create/edit modal](tasks-page/step-2-frontend-tasks-list-page.md) — Pending
+
+### Standard Field Overrides (side track — Owner/Admin can customise label/required/hidden/min/max of every standard form field per org)
+- [Step 1: Backend registry of overridable standard fields + permission key](standard-field-overrides/step-1-backend-registry.md) — Pending
+- [Step 2: Backend `standard_field_overrides` table + CRUD endpoints](standard-field-overrides/step-2-backend-overrides-table-endpoints.md) — Pending
+- [Step 3: Backend `/standard-fields/{entity}/render` merge endpoint](standard-field-overrides/step-3-backend-render-endpoint.md) — Pending
+- [Step 4: Frontend Settings → Standard Fields tab](standard-field-overrides/step-4-frontend-settings-tab.md) — Pending
+- [Step 5: Frontend wire overrides into Leads + Contacts modals](standard-field-overrides/step-5-frontend-wire-leads-contacts.md) — Pending
+- [Step 6: Frontend wire overrides into remaining form modals](standard-field-overrides/step-6-frontend-wire-remaining-entities.md) — Pending
 
 ---
 
