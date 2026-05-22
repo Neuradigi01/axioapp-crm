@@ -96,3 +96,14 @@ class StandardFieldRendered(BaseModel):
 class StandardFieldRenderedListResponse(BaseModel):
     entity: str
     items: list[StandardFieldRendered]
+
+
+class StandardFieldEntity(BaseModel):
+    """One registered entity, for the Settings page entity-selector dropdown."""
+
+    entity: str
+    field_count: int
+
+
+class StandardFieldEntitiesResponse(BaseModel):
+    items: list[StandardFieldEntity]

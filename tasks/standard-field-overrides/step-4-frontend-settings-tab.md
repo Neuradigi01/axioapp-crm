@@ -2,7 +2,7 @@
 
 **Goal:** Add a new tab to `/user/settings` named "Standard fields" where Owners and Admins (anyone with `settings.standard_fields.manage`) pick an entity, see its standard fields rendered with current overrides, edit the overridable knobs per field, and reset to defaults. Surface clear warnings when hiding NOT-NULL fields or hitting locked knobs.
 **Track:** Standard Field Overrides
-**Status:** Pending
+**Status:** COMPLETED — shipped the `Standard Fields` tab + edit modal in the Settings page, plus the `StandardFieldsApiService` and root-provided `StandardFieldsSignalsService` event bus. Also added a small backend `GET /standard-fields/entities` listing endpoint (called out in Risks) — drives the dropdown off the server registry rather than a hardcoded TS list. Tab visibility now permission-filters via a generalised `tabs()` computed in `settings-page.component.ts` — non-Owner/Admin users don't see the tab at all (existing tabs unaffected since none declare a permission). Edit modal builds its reactive form dynamically from `overridable_props`: locked knobs render disabled with 🔒 tooltips and the registry-default value visible; min/max/step inputs are conditional on numeric field types. Submission strategy is a diff payload — only changed props sent, mapped through `PAYLOAD_BY_PROP` to backend column names. `tsc --noEmit` clean; `ng build --configuration development` clean (settings-page chunk grew from ~265 KB to 290 KB to absorb the new tab + modal). Live browser smoke deferred — CLI environment can't drive a real browser; backend endpoint smoke already pinned in Step 3.
 **Depends on:** Step 3 (render endpoint), Phase 2.5.4 (org settings page tab pattern).
 
 ---

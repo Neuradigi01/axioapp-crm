@@ -1,0 +1,152 @@
+<section>
+  @if (!canManage()) {
+    <div class="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
+      You don't have permission to manage standard-field overrides
+      (<code class="font-mono">settings.standard_fields.manage</code>).
+      Ask an Owner or Admin to grant access.
+    </div>
+  } @else {
+    <header class="mb-4">
+      <h2 class="text-base font-semibold text-zinc-900">Standard fields</h2>
+      <p class="mt-1 text-sm text-zinc-500">
+        Customise the label, required state, visibility, and numeric bounds
+        of the canonical fields on each form. Changes apply to every form
+        modal in your org. The
+        <code class="font-mono">field_key</code> and underlying data type
+        stay fixed.
+      </p>
+    </header>
+
+    <div class="mb-4 flex items-end gap-3">
+      <div>
+        <label class="block text-xs font-medium text-zinc-700" for="sft_entity">Entity</label>
+        <select
+          id="sft_entity"
+          class="mt-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          [value]="entity()"
+          (change)="onEntityChange($event)"
+        >
+          @for (e of entities(); track e.entity) {
+            <option [value]="e.entity">
+              {{ e.entity }} ({{ e.field_count }} field{{ e.field_count === 1 ? '' : 's' }})
+            </option>
+          }
+        </select>
+      </div>
+      <p class="pb-2 text-xs text-zinc-500">
+        <span class="font-medium text-zinc-700">●</span> overridden
+        &middot; <span class="text-zinc-700">🔒</span> locked by registry
+      </p>
+    </div>
+
+    @if (error(); as e) {
+      <div class="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+        {{ e }}
+      </div>
+    }
+
+    @if (loading()) {
+      <p class="text-sm text-zinc-500">Loading…</p>
+    } @else if (fields().length === 0) {
+      <p class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm text-zinc-500">
+        No standard fields registered for this entity.
+      </p>
+    } @else {
+      <div class="overflow-x-auto rounded-md border border-zinc-200">
+        <table class="min-w-full divide-y divide-zinc-200 text-sm">
+          <thead class="bg-zinc-50">
+            <tr class="text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              <th class="px-3 py-2">Field</th>
+              <th class="px-3 py-2">Type</th>
+              <th class="px-3 py-2">Required</th>
+              <th class="px-3 py-2">Hidden</th>
+              <th class="px-3 py-2">Min / Max / Step</th>
+              <th class="px-3 py-2">Order</th>
+              <th class="px-3 py-2">Status</th>
+              <th class="px-3 py-2 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100 bg-white">
+            @for (f of fields(); track f.field_key) {
+              <tr>
+                <td class="px-3 py-2">
+                  <div class="font-medium text-zinc-900">
+                    {{ f.label }}
+                    @if (f.is_overridden) { <span class="ml-1 text-zinc-700">●</span> }
+                  </div>
+                  <div class="text-xs text-zinc-500 font-mono">{{ f.field_key }}</div>
+                </td>
+                <td class="px-3 py-2 text-zinc-700">{{ f.field_type }}</td>
+                <td class="px-3 py-2 text-zinc-700">
+                  {{ f.is_required ? 'Yes' : 'No' }}
+                  @if (f.backend_required) {
+                    <span class="ml-1" title="Backend enforces NOT NULL — locked">🔒</span>
+                  }
+                </td>
+                <td class="px-3 py-2 text-zinc-700">
+                  {{ f.is_hidden ? 'Yes' : 'No' }}
+                  @if (f.backend_required) {
+                    <span class="ml-1" title="Hidden locked — backend NOT NULL">🔒</span>
+                  }
+                </td>
+                <td class="px-3 py-2 text-xs text-zinc-600 font-mono">
+                  @if (f.field_type === 'number' || f.field_type === 'currency') {
+                    {{ f.min_value ?? '—' }}
+                    /
+                    {{ f.max_value ?? '—' }}
+                    /
+                    {{ f.step_value ?? '—' }}
+                  } @else {
+                    <span class="text-zinc-400">—</span>
+                  }
+                </td>
+                <td class="px-3 py-2 text-zinc-700">{{ f.display_order }}</td>
+                <td class="px-3 py-2">
+                  @if (f.is_overridden) {
+                    <span class="inline-flex items-center rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-medium text-white">
+                      Overridden
+                    </span>
+                  } @else {
+                    <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                      Default
+                    </span>
+                  }
+                </td>
+                <td class="px-3 py-2 text-right">
+                  <div class="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                      (click)="openEdit(f)"
+                    >
+                      Edit
+                    </button>
+                    @if (f.is_overridden) {
+                      <button
+                        type="button"
+                        [disabled]="resettingKey() === f.field_key"
+                        (click)="resetRow(f)"
+                        class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                      >
+                        {{ resettingKey() === f.field_key ? 'Resetting…' : 'Reset' }}
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</section>
+
+@if (editing(); as f) {
+  <app-standard-field-edit-modal
+    [field]="f"
+    (saved)="onModalSaved()"
+    (didReset)="onModalReset()"
+    (cancel)="closeModal()"
+  />
+}

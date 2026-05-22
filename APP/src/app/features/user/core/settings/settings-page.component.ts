@@ -1,10 +1,12 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
+import { FurnitureAuthService } from '../auth/auth.service';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { IntegrationsTabComponent } from './tabs/integrations-tab.component';
 import { NotificationsTabComponent } from './tabs/notifications-tab.component';
 import { RolesTabComponent } from './tabs/roles-tab.component';
+import { StandardFieldsTabComponent } from './tabs/standard-fields-tab.component';
 import { StoreProfileTabComponent } from './tabs/store-profile-tab.component';
 import { TeamTabComponent } from './tabs/team-tab.component';
 
@@ -15,9 +17,17 @@ type SettingsTab =
   | 'integrations'
   | 'notifications'
   | 'ai'
-  | 'custom-fields';
+  | 'custom-fields'
+  | 'standard-fields';
 
-const TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
+interface TabDef {
+  id: SettingsTab;
+  label: string;
+  /** If set, the tab is hidden unless the current user holds this permission. */
+  permission?: string;
+}
+
+const TABS: ReadonlyArray<TabDef> = [
   { id: 'store', label: 'Store Profile' },
   { id: 'team', label: 'Team' },
   { id: 'roles', label: 'Roles' },
@@ -25,6 +35,11 @@ const TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
   { id: 'notifications', label: 'Notifications' },
   { id: 'ai', label: 'AI Settings' },
   { id: 'custom-fields', label: 'Custom Fields' },
+  {
+    id: 'standard-fields',
+    label: 'Standard Fields',
+    permission: 'settings.standard_fields.manage',
+  },
 ];
 
 @Component({
@@ -39,10 +54,15 @@ const TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
     NotificationsTabComponent,
     AiSettingsTabComponent,
     CustomFieldsPageComponent,
+    StandardFieldsTabComponent,
   ],
   templateUrl: './settings-page.component.html',
 })
 export class SettingsPageComponent {
-  readonly tabs = TABS;
+  private readonly auth = inject(FurnitureAuthService);
+
+  readonly tabs = computed(() =>
+    TABS.filter((t) => !t.permission || this.auth.hasPermission(t.permission)),
+  );
   readonly active = signal<SettingsTab>(TABS[0].id);
 }

@@ -17,7 +17,10 @@ from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import get_current_user, require_permissions
+from src.app.core.standard_fields import registry as field_registry
 from src.app.core.standard_fields.schemas import (
+    StandardFieldEntitiesResponse,
+    StandardFieldEntity,
     StandardFieldOverrideIn,
     StandardFieldOverrideListResponse,
     StandardFieldOverrideOut,
@@ -99,6 +102,26 @@ async def reset_override(
 ) -> Response:
     await reset(db, org_id=user.org_id, entity=entity, field_key=field_key)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/entities", response_model=StandardFieldEntitiesResponse)
+async def list_entities(
+    _user: User = Depends(get_current_user),
+) -> StandardFieldEntitiesResponse:
+    """Registered entities + their overridable-field counts.
+
+    Read off the in-process registry — no DB round trip. Drives the
+    Settings page's entity-selector dropdown. Open to any authenticated
+    user since the data is just labels.
+    """
+    items = [
+        StandardFieldEntity(
+            entity=name,
+            field_count=len(field_registry.list_for_entity(name)),
+        )
+        for name in field_registry.list_entities()
+    ]
+    return StandardFieldEntitiesResponse(items=items)
 
 
 @router.get(

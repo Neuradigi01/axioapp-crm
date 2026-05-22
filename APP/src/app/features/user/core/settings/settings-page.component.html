@@ -5,7 +5,7 @@
   </header>
 
   <nav class="mb-6 flex flex-wrap gap-2 border-b border-zinc-200">
-    @for (tab of tabs; track tab.id) {
+    @for (tab of tabs(); track tab.id) {
       <button
         type="button"
         class="-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors"
@@ -42,6 +42,9 @@
     }
     @case ('custom-fields') {
       <app-custom-fields-page />
+    }
+    @case ('standard-fields') {
+      <app-settings-standard-fields-tab />
     }
   }
 </div>
