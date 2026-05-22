@@ -10,8 +10,10 @@
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
+
+import { FurnitureAuthService } from '../auth/auth.service';
 import { forkJoin, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
@@ -63,6 +65,7 @@ interface ContactSummary {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule,
+    RouterLink,
     LucideAngularModule,
     PipelineBoardComponent,
     PipelineListComponent,
@@ -77,6 +80,12 @@ export class LeadsPageComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly auth = inject(FurnitureAuthService);
+
+  /** Gates the "Import" header button; backend enforces too. */
+  protected readonly canImport = computed(() =>
+    this.auth.currentPermissions().includes('leads.import'),
+  );
 
   readonly leads = signal<Lead[]>([]);
   readonly loading = signal(false);

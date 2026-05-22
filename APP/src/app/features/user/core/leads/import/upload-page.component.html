@@ -1,0 +1,129 @@
+<div class="mx-auto max-w-3xl p-6 space-y-6">
+  <header class="space-y-1">
+    <nav class="flex items-center gap-1 text-xs text-zinc-500">
+      <a routerLink="/user/leads" class="hover:text-zinc-700">Leads</a>
+      <lucide-icon name="chevron-right" class="h-3 w-3" />
+      <span class="text-zinc-700">Import</span>
+    </nav>
+    <h1 class="text-lg font-semibold text-zinc-900">Import leads</h1>
+    <p class="text-sm text-zinc-500">
+      Upload a CSV or Excel export from another CRM. After upload you'll
+      map the columns to fields in this CRM.
+    </p>
+  </header>
+
+  <!-- File drop / picker -->
+  <div>
+    <label class="mb-1 block text-xs font-medium text-zinc-700">File</label>
+    @if (selectedFile(); as file) {
+      <div class="flex items-center justify-between rounded-md border border-zinc-300 bg-white px-4 py-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <lucide-icon name="file-spreadsheet" class="h-5 w-5 shrink-0 text-emerald-600" />
+          <div class="min-w-0">
+            <p class="truncate text-sm font-medium text-zinc-900">{{ file.name }}</p>
+            <p class="text-xs text-zinc-500">{{ fileSizeLabel() }}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          (click)="clearFile()"
+          class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+          aria-label="Remove file"
+        >
+          <lucide-icon name="x" class="h-4 w-4" />
+        </button>
+      </div>
+    } @else {
+      <label
+        for="import-file"
+        class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed bg-white px-4 py-10 text-center transition"
+        [class.border-zinc-300]="!dragOver()"
+        [class.border-indigo-400]="dragOver()"
+        [class.bg-indigo-50]="dragOver()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+      >
+        <lucide-icon name="upload-cloud" class="h-8 w-8 text-zinc-400" />
+        <div class="text-sm text-zinc-700">
+          <span class="font-medium text-indigo-600">Click to browse</span>
+          or drag a file here
+        </div>
+        <p class="text-xs text-zinc-500">CSV or Excel · 10 MB max · 50,000 rows max</p>
+        <input
+          id="import-file"
+          type="file"
+          class="sr-only"
+          accept=".csv,.xlsx"
+          (change)="onFileSelected($event)"
+        />
+      </label>
+    }
+  </div>
+
+  <!-- Source platform -->
+  <div>
+    <label for="import-platform" class="mb-1 block text-xs font-medium text-zinc-700">
+      Source platform
+    </label>
+    <select
+      id="import-platform"
+      [value]="sourcePlatform()"
+      (change)="onPlatformChange($event)"
+      class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+    >
+      @for (p of platforms; track p.value) {
+        <option [value]="p.value">{{ p.label }}</option>
+      }
+    </select>
+    <p class="mt-1 text-xs text-zinc-500">
+      Picks the default column mapping for the next step. You can override every column.
+    </p>
+  </div>
+
+  <!-- Name -->
+  <div>
+    <label for="import-name" class="mb-1 block text-xs font-medium text-zinc-700">
+      Name <span class="font-normal text-zinc-400">(optional)</span>
+    </label>
+    <input
+      id="import-name"
+      type="text"
+      [value]="name()"
+      (input)="onNameInput($event)"
+      placeholder="Auto-named from the filename if left blank"
+      class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+    />
+  </div>
+
+  <!-- Error -->
+  @if (error(); as msg) {
+    <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ msg }}
+    </div>
+  }
+
+  <!-- Actions -->
+  <div class="flex items-center justify-end gap-2 border-t border-zinc-200 pt-4">
+    <a
+      routerLink="/user/leads"
+      class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+    >
+      Cancel
+    </a>
+    <button
+      type="button"
+      [disabled]="!canSubmit()"
+      (click)="submit()"
+      class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      @if (uploading()) {
+        <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
+        Uploading…
+      } @else {
+        <lucide-icon name="upload" class="h-4 w-4" />
+        Upload
+      }
+    </button>
+  </div>
+</div>

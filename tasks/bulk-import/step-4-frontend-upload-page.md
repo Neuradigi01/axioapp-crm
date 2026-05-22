@@ -2,7 +2,7 @@
 
 **Goal:** Build `/user/leads/import` — a page with a file picker, a source-platform dropdown, an optional name field, and an Upload button. On successful upload, route to the mapping page (Step 5) carrying the new import id.
 **Track:** Bulk Import
-**Status:** Pending
+**Status:** Done — `ImportsApiService` wraps all 10 backend endpoints (upload + list + get + commit + cancel + errors.csv + targets + list-presets + create-preset + delete-preset). `UploadPageComponent` ships at `/user/leads/import` with drag-drop file zone (CSV/XLSX only, client-side extension gate), source-platform dropdown (Zoho/HubSpot/Salesforce/Freshsales/Generic/Custom), optional name input, upload button gated by `canSubmit = selectedFile && platform && !uploading`, inline error banner sourcing server detail via `extractApiError`, spinner during upload, and navigation to `/user/leads/import/:id/mapping` on 201. Routes registered with `permissionGuard('leads.import')` — direct visits without the permission redirect to `/user/access-denied`. Sidebar untouched (registry-driven per Rule 5); instead an "Import" button lives next to "Add Lead" in the leads page header, gated by `canImport()` computed signal reading `FurnitureAuthService.currentPermissions()`. Step-5 mapping page stubbed via `MappingPagePlaceholderComponent` (deleted in Step 5) — shows the uploaded import's name/source/row-count/status so this step's smoke is self-contained. Angular dev build clean (11.8s, zero warnings).
 **Depends on:** Steps 1–3 (backend complete), Phase 1.5 (permissions on the frontend), the manual-lead-entry track's badge styling (for visual consistency on the leads page link).
 
 ---

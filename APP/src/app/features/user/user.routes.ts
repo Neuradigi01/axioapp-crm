@@ -84,6 +84,22 @@ export const userRoutes: Routes = [
           import('./core/leads/leads.page').then((m) => m.LeadsPageComponent),
       },
       {
+        path: 'leads/import',
+        canActivate: [permissionGuard('leads.import')],
+        loadComponent: () =>
+          import('./core/leads/import/upload-page.component').then(
+            (m) => m.UploadPageComponent,
+          ),
+      },
+      {
+        path: 'leads/import/:id/mapping',
+        canActivate: [permissionGuard('leads.import')],
+        loadComponent: () =>
+          import(
+            './core/leads/import/mapping-page.placeholder.component'
+          ).then((m) => m.MappingPagePlaceholderComponent),
+      },
+      {
         path: 'appointments',
         loadComponent: () =>
           import('./core/appointments/appointments.page').then(
