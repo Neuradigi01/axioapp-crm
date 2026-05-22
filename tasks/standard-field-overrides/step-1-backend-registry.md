@@ -2,7 +2,7 @@
 
 **Goal:** Declare in code, per entity, which standard (DB-column) fields are exposed to org-level overrides and which presentational knobs (label, placeholder, help, required, hidden, min/max/step, display order) each one accepts. Register a new permission key `settings.standard_fields.manage`. No DB tables yet — registry is code-only, like the role-template and module registries.
 **Track:** Standard Field Overrides
-**Status:** Pending
+**Status:** COMPLETED — `core/standard_fields/{__init__,registry,module}.py` shipped with 29 seeds across 6 entities (contact, lead, walk_in, task, appointment, catalog_item). `StandardFieldDef` enforces all four contract invariants in `__post_init__` (unknown overridable_prop names, numeric-only props on non-numeric fields, exposing required/hidden when backend_required, snake_case entity/field_key). `settings.standard_fields.manage` is registered automatically via the lifespan's `discover_modules()` sweep — no `main.py` edit needed. Admin role template grants the key (Owner inherits via `_CORE_OWNER_KEYS = _CORE_ADMIN_KEYS + ["billing.refund"]`); Employee does not. 21 pytest contract tests, all green.
 **Depends on:** Phase 1.5 (permissions registry), Phase 1.8 (module registry pattern).
 
 ---

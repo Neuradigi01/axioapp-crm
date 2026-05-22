@@ -183,7 +183,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 2: Frontend tasks list page + create/edit modal](tasks-page/step-2-frontend-tasks-list-page.md) — Pending
 
 ### Standard Field Overrides (side track — Owner/Admin can customise label/required/hidden/min/max of every standard form field per org)
-- [Step 1: Backend registry of overridable standard fields + permission key](standard-field-overrides/step-1-backend-registry.md) — Pending
+- [Step 1: Backend registry of overridable standard fields + permission key](standard-field-overrides/step-1-backend-registry.md) — Done
 - [Step 2: Backend `standard_field_overrides` table + CRUD endpoints](standard-field-overrides/step-2-backend-overrides-table-endpoints.md) — Pending
 - [Step 3: Backend `/standard-fields/{entity}/render` merge endpoint](standard-field-overrides/step-3-backend-render-endpoint.md) — Pending
 - [Step 4: Frontend Settings → Standard Fields tab](standard-field-overrides/step-4-frontend-settings-tab.md) — Pending
