@@ -59,7 +59,7 @@ A new Owner, on a fresh org, can:
 
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
-| 1 | [Backend registry of overridable standard fields + permission key](step-1-backend-registry.md) | Pending | ~½ day |
+| 1 | [Backend registry of overridable standard fields + permission key](step-1-backend-registry.md) | Done | ~½ day |
 | 2 | [Backend `standard_field_overrides` table + CRUD endpoints](step-2-backend-overrides-table-endpoints.md) | Pending | ~1 day |
 | 3 | [Backend `/standard-fields/{entity}/render` merge endpoint](step-3-backend-render-endpoint.md) | Pending | ~½ day |
 | 4 | [Frontend Settings → Standard Fields tab](step-4-frontend-settings-tab.md) | Pending | ~1 day |
