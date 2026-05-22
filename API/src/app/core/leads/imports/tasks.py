@@ -70,6 +70,7 @@ from sqlalchemy import select
 from src.app.core import audit
 from src.app.core.contacts.schemas import ContactCreate
 from src.app.core.contacts.service import create_contact
+from src.app.core.custom_fields.models import CustomFieldDefinition
 from src.app.core.leads.imports.dedup import find_existing_contact
 from src.app.core.leads.imports.models import LeadImport, LeadImportStatus
 from src.app.core.leads.imports.parser import HeaderInfo, ParsedRow, parse_rows
@@ -197,6 +198,62 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
         reset_context(token)
 
 
+async def _load_custom_field_routing(
+    org_id: uuid.UUID,
+) -> tuple[set[str], set[str]]:
+    """Return (contact_cf_keys, lead_cf_keys) — the field_keys defined
+    for each entity in this org's `custom_field_definitions`.
+
+    Used to route mapped `custom_data.<key>` values into the right
+    entity's `custom_data` dict at row-commit time. Same field_key on
+    both entities is allowed — the value lands in both.
+    """
+    contact_keys: set[str] = set()
+    lead_keys: set[str] = set()
+    async with async_session() as session:
+        rows = (
+            await session.execute(
+                select(
+                    CustomFieldDefinition.field_key,
+                    CustomFieldDefinition.entity_type,
+                ).where(
+                    CustomFieldDefinition.entity_type.in_(("contact", "lead"))
+                )
+            )
+        ).all()
+    for field_key, entity in rows:
+        if entity == "contact":
+            contact_keys.add(field_key)
+        elif entity == "lead":
+            lead_keys.add(field_key)
+    return contact_keys, lead_keys
+
+
+def _split_custom_data(
+    mapped: dict[str, Optional[str]],
+    contact_keys: set[str],
+    lead_keys: set[str],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Pull `custom_data.<key>` entries out of the per-row mapped dict
+    and bucket them into contact_custom / lead_custom based on which
+    entity each field is defined for. Empty / null values are skipped
+    so we don't fight `_validate_custom_data` over None for
+    optional fields."""
+    contact_custom: dict[str, Any] = {}
+    lead_custom: dict[str, Any] = {}
+    for crm_key, value in mapped.items():
+        if not crm_key.startswith("custom_data."):
+            continue
+        if value is None or value == "":
+            continue
+        cf_key = crm_key[len("custom_data.") :]
+        if cf_key in contact_keys:
+            contact_custom[cf_key] = value
+        if cf_key in lead_keys:
+            lead_custom[cf_key] = value
+    return contact_custom, lead_custom
+
+
 async def _commit_rows(
     *,
     org_id: uuid.UUID,
@@ -211,6 +268,9 @@ async def _commit_rows(
     """
     imported = duplicates = errors = 0
     error_rows: list[dict[str, Any]] = []
+
+    # Load custom-field routing once per import — every row reuses it.
+    contact_cf_keys, lead_cf_keys = await _load_custom_field_routing(org_id)
 
     for parsed in rows_iter:
         mapped = parsed.mapped
@@ -227,6 +287,10 @@ async def _commit_rows(
             )
             continue
 
+        contact_custom, lead_custom = _split_custom_data(
+            mapped, contact_cf_keys, lead_cf_keys
+        )
+
         try:
             async with async_session() as session:
                 existing = await find_existing_contact(
@@ -242,6 +306,7 @@ async def _commit_rows(
                     email=email,
                     source=mapped.get("contact.source"),
                     notes=mapped.get("contact.notes"),
+                    custom_data=contact_custom,
                 )
                 contact = await create_contact(
                     session, org_id=org_id, payload=contact_payload
@@ -254,6 +319,7 @@ async def _commit_rows(
                     expected_close_date=_coerce_date(
                         mapped.get("lead.expected_close_date")
                     ),
+                    custom_data=lead_custom,
                     source=LeadSource.bulk_import,
                 )
                 await create_lead(session, org_id=org_id, payload=lead_payload)

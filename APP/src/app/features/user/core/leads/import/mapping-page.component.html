@@ -55,13 +55,11 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-100">
-          @for (col of preview()?.columns ?? []; track col) {
+          @for (col of preview()?.columns ?? []; track $index) {
             <tr>
-              <td class="px-4 py-3 font-medium text-zinc-900">{{ col }}</td>
-              <td class="px-4 py-3 text-zinc-600 truncate max-w-xs">
-                <span class="text-xs">{{ sampleValue(col) ?? '—' }}</span>
-              </td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 font-medium text-zinc-900 align-top">{{ col }}</td>
+              <td class="px-4 py-3 text-xs text-zinc-600 align-top">{{ sampleValue(col) ?? '—' }}</td>
+              <td class="px-4 py-3 align-top">
                 <select
                   [value]="mapping()[col] ?? ''"
                   (change)="onMappingChange(col, $event)"
