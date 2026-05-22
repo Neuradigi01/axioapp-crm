@@ -2,7 +2,7 @@
 
 **Goal:** Make `lead-form-modal` and `contact-form-modal` consume the `/standard-fields/{entity}/render` endpoint on open. Apply label, placeholder, help text, required validator, hidden flag, and min/max/step bindings dynamically. Prove the end-to-end loop: an Owner edits Budget's label in Settings → re-opens the New Lead modal → sees the new label.
 **Track:** Standard Field Overrides
-**Status:** Pending
+**Status:** COMPLETED — both modals now consume `/standard-fields/{entity}/render` on open and re-fetch when the `StandardFieldsSignalsService.changedAt` signal bumps (Settings page save/reset). Each binds `label`, `placeholder`, `help_text`, `min/max/step`, and a required asterisk from the rendered defs; HTML5 numeric attrs `[attr.min/max/step]` reflect overrides on Budget. Validators are layered: static shape validators (`Validators.email`, `Validators.maxLength`) stay always-on; `Validators.required` + `Validators.min` + `Validators.max` are reconstructed per fetch off `is_required` / `min_value` / `max_value`. Hidden fields are wrapped in `@if (!isHidden(key))` — the FormControl stays put (cleanest interaction with existing `getRawValue()` paths and `nullableTrim` already handles empty/undefined). Inline error messages added for `required` / `min` / `max` errors on Budget. Implementation deviation from spec: kept FormControls always present rather than removing them when hidden — both behave identically on the wire (empty payload key) and keeping the control simplifies hidden→visible toggling. `tsc --noEmit` clean; `ng build --configuration development` clean.
 **Depends on:** Step 3 (render endpoint), Step 4 (Settings tab + signals service).
 
 ---

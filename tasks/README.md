@@ -187,7 +187,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 2: Backend `standard_field_overrides` table + CRUD endpoints](standard-field-overrides/step-2-backend-overrides-table-endpoints.md) — Done
 - [Step 3: Backend `/standard-fields/{entity}/render` merge endpoint](standard-field-overrides/step-3-backend-render-endpoint.md) — Done
 - [Step 4: Frontend Settings → Standard Fields tab](standard-field-overrides/step-4-frontend-settings-tab.md) — Done
-- [Step 5: Frontend wire overrides into Leads + Contacts modals](standard-field-overrides/step-5-frontend-wire-leads-contacts.md) — Pending
+- [Step 5: Frontend wire overrides into Leads + Contacts modals](standard-field-overrides/step-5-frontend-wire-leads-contacts.md) — Done
 - [Step 6: Frontend wire overrides into remaining form modals](standard-field-overrides/step-6-frontend-wire-remaining-entities.md) — Pending
 
 ---

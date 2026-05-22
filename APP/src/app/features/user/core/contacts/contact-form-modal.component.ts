@@ -7,15 +7,19 @@
   OnInit,
   Output,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
+import { StandardFieldsSignalsService } from '../standard-fields/standard-fields-signals.service';
+import type { StandardFieldRendered } from '../standard-fields/types';
 import { extractApiError } from '@core/services/api-error.util';
 import { nullableTrim } from '@core/services/form.util';
 import {
@@ -45,7 +49,24 @@ import {
 export class ContactFormModalComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(ContactsApiService);
+  private readonly stdApi = inject(StandardFieldsApiService);
+  private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
+
+  // Standard fields registered for the `contact` entity. The registry
+  // key `tags` maps to the FormControl `tags_csv` (we store the CSV
+  // string and split on submit).
+  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
+    {},
+  );
+
+  protected stdField(key: string): StandardFieldRendered | undefined {
+    return this.stdFields()[key];
+  }
+
+  protected isHidden(key: string): boolean {
+    return this.stdField(key)?.is_hidden === true;
+  }
 
   /** When set, the modal opens in edit mode. Null â†’ create mode. */
   @Input() set contact(value: Contact | null) {
@@ -89,6 +110,78 @@ export class ContactFormModalComponent implements OnInit {
     source: ['', [Validators.maxLength(64)]],
     tags_csv: [''],
   });
+
+  constructor() {
+    // Refetch override-merged defs on Settings save/reset.
+    effect(() => {
+      this.stdSignals.changedAt();
+      this.refreshStdFields();
+    });
+  }
+
+  private refreshStdFields(): void {
+    this.stdApi.render('contact').subscribe({
+      next: (resp) => {
+        const map: Record<string, StandardFieldRendered> = {};
+        for (const f of resp.items) map[f.field_key] = f;
+        this.stdFields.set(map);
+        this.applyStandardValidators(map);
+      },
+      error: () => {
+        // Modal still works with hardcoded fallbacks.
+      },
+    });
+  }
+
+  /** Override-driven validators on the standard FormGroup.
+   *
+   * The static "shape" validators (`Validators.email`, `Validators.maxLength`)
+   * are always present — they're not overridable. We layer `Validators.required`
+   * on top per the org's override choice. `full_name` stays required always
+   * (registry locks it).
+   */
+  private applyStandardValidators(
+    map: Record<string, StandardFieldRendered>,
+  ): void {
+    // full_name — always required + max 255 (backend enforces NOT NULL).
+    this.standard.controls.full_name.setValidators([
+      Validators.required,
+      Validators.maxLength(255),
+    ]);
+    this.standard.controls.full_name.updateValueAndValidity({
+      emitEvent: false,
+    });
+
+    const phoneRow = map['phone'];
+    const phoneV: ValidatorFn[] = [Validators.maxLength(32)];
+    if (phoneRow?.is_required) phoneV.push(Validators.required);
+    this.standard.controls.phone.setValidators(phoneV);
+    this.standard.controls.phone.updateValueAndValidity({ emitEvent: false });
+
+    const emailRow = map['email'];
+    const emailV: ValidatorFn[] = [
+      Validators.email,
+      Validators.maxLength(255),
+    ];
+    if (emailRow?.is_required) emailV.push(Validators.required);
+    this.standard.controls.email.setValidators(emailV);
+    this.standard.controls.email.updateValueAndValidity({ emitEvent: false });
+
+    const sourceRow = map['source'];
+    const sourceV: ValidatorFn[] = [Validators.maxLength(64)];
+    if (sourceRow?.is_required) sourceV.push(Validators.required);
+    this.standard.controls.source.setValidators(sourceV);
+    this.standard.controls.source.updateValueAndValidity({ emitEvent: false });
+
+    // tags has no static validators; only required if the override sets it.
+    const tagsRow = map['tags'];
+    const tagsV: ValidatorFn[] = [];
+    if (tagsRow?.is_required) tagsV.push(Validators.required);
+    this.standard.controls.tags_csv.setValidators(tagsV);
+    this.standard.controls.tags_csv.updateValueAndValidity({
+      emitEvent: false,
+    });
+  }
 
   ngOnInit(): void {
     this.api

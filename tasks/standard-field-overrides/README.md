@@ -63,7 +63,7 @@ A new Owner, on a fresh org, can:
 | 2 | [Backend `standard_field_overrides` table + CRUD endpoints](step-2-backend-overrides-table-endpoints.md) | Done | ~1 day |
 | 3 | [Backend `/standard-fields/{entity}/render` merge endpoint](step-3-backend-render-endpoint.md) | Done | ~½ day |
 | 4 | [Frontend Settings → Standard Fields tab](step-4-frontend-settings-tab.md) | Done | ~1 day |
-| 5 | [Frontend: wire overrides into Leads + Contacts modals](step-5-frontend-wire-leads-contacts.md) | Pending | ~1 day |
+| 5 | [Frontend: wire overrides into Leads + Contacts modals](step-5-frontend-wire-leads-contacts.md) | Done | ~1 day |
 | 6 | [Frontend: wire overrides into remaining form modals](step-6-frontend-wire-remaining-entities.md) | Pending | ~1 day |
 
 **Total: ~4–5 working days.** Each step verifiable in under 30 min per Rule 8; pause-and-report per Rule 9.

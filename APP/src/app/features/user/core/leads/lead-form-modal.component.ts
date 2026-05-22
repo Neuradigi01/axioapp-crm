@@ -7,11 +7,12 @@
   OnInit,
   Output,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Subject } from 'rxjs';
@@ -27,6 +28,9 @@ import {
   Pipeline,
   PipelinesApiService,
 } from '../pipelines/pipelines-api.service';
+import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
+import { StandardFieldsSignalsService } from '../standard-fields/standard-fields-signals.service';
+import type { StandardFieldRendered } from '../standard-fields/types';
 import { Lead, LeadCreate, LeadUpdate, LeadsApiService } from './leads-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 import { nullableTrim } from '@core/services/form.util';
@@ -56,7 +60,24 @@ export class LeadFormModalComponent implements OnInit {
   private readonly api = inject(LeadsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly pipelinesApi = inject(PipelinesApiService);
+  private readonly stdApi = inject(StandardFieldsApiService);
+  private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
+
+  // Standard fields registered for the `lead` entity. Render once on
+  // open and again whenever the signal bus fires (Settings save / reset).
+  // Keys are field_key — e.g. `stdFields()['budget']`.
+  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
+    {},
+  );
+
+  protected stdField(key: string): StandardFieldRendered | undefined {
+    return this.stdFields()[key];
+  }
+
+  protected isHidden(key: string): boolean {
+    return this.stdField(key)?.is_hidden === true;
+  }
 
   @Input() set lead(value: Lead | null) {
     this._lead.set(value);
@@ -107,6 +128,74 @@ export class LeadFormModalComponent implements OnInit {
     budget: this.fb.control<string>('', { nonNullable: true }),
     expected_close_date: this.fb.control<string>('', { nonNullable: true }),
   });
+
+  constructor() {
+    // Refetch the override-merged defs whenever the Settings page bumps
+    // the signal bus (a save or reset). On first mount the effect runs
+    // once and kicks off the initial fetch, so `ngOnInit` doesn't need
+    // to call render() again.
+    effect(() => {
+      this.stdSignals.changedAt();
+      this.refreshStdFields();
+    });
+  }
+
+  private refreshStdFields(): void {
+    this.stdApi.render('lead').subscribe({
+      next: (resp) => {
+        const map: Record<string, StandardFieldRendered> = {};
+        for (const f of resp.items) map[f.field_key] = f;
+        this.stdFields.set(map);
+        this.applyStandardValidators(map);
+      },
+      error: () => {
+        // Render is best-effort — the modal still works with the
+        // hardcoded fallbacks below. Logging would be noisy; the auth
+        // case (401) is already redirected by the interceptor.
+      },
+    });
+  }
+
+  /** Apply the override-driven validators to the standard FormGroup.
+   *
+   * Pipeline-stage stays required at all times (registry locks `required`).
+   * Budget + expected_close_date pick up `Validators.required` if the
+   * org marked them required. Budget additionally picks up min/max from
+   * the override row when present.
+   */
+  private applyStandardValidators(
+    map: Record<string, StandardFieldRendered>,
+  ): void {
+    const pipelineRow = map['pipeline_stage'];
+    const budgetRow = map['budget'];
+    const closeRow = map['expected_close_date'];
+
+    // pipeline_stage — always required.
+    this.standard.controls.pipeline_stage.setValidators([Validators.required]);
+    this.standard.controls.pipeline_stage.updateValueAndValidity({
+      emitEvent: false,
+    });
+
+    // budget — required if override says so; min/max if numeric bounds set.
+    const budgetValidators: ValidatorFn[] = [];
+    if (budgetRow?.is_required) budgetValidators.push(Validators.required);
+    if (budgetRow?.min_value !== null && budgetRow?.min_value !== undefined) {
+      budgetValidators.push(Validators.min(budgetRow.min_value));
+    }
+    if (budgetRow?.max_value !== null && budgetRow?.max_value !== undefined) {
+      budgetValidators.push(Validators.max(budgetRow.max_value));
+    }
+    this.standard.controls.budget.setValidators(budgetValidators);
+    this.standard.controls.budget.updateValueAndValidity({ emitEvent: false });
+
+    // expected_close_date — required if override says so.
+    const closeValidators: ValidatorFn[] = [];
+    if (closeRow?.is_required) closeValidators.push(Validators.required);
+    this.standard.controls.expected_close_date.setValidators(closeValidators);
+    this.standard.controls.expected_close_date.updateValueAndValidity({
+      emitEvent: false,
+    });
+  }
 
   ngOnInit(): void {
     // 1) lead custom field defs
