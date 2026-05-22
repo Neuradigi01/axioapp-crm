@@ -30,10 +30,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.leads.imports.models import LeadImportStatus
+from src.app.core.leads.imports.presets import (
+    create_preset,
+    delete_preset,
+    list_presets,
+)
 from src.app.core.leads.imports.schemas import (
     LeadImportCommit,
     LeadImportListResponse,
     LeadImportRead,
+    MappingTarget,
+    PresetCreate,
+    PresetRead,
     SourcePlatform,
 )
 from src.app.core.leads.imports.service import (
@@ -44,6 +52,7 @@ from src.app.core.leads.imports.service import (
     read_error_csv,
     upload,
 )
+from src.app.core.leads.imports.targets import list_targets
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -101,6 +110,80 @@ async def list_lead_imports_endpoint(
         page=page,
         size=size,
     )
+
+
+@router.get("/targets", response_model=list[MappingTarget])
+async def list_mapping_targets_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("leads.import")),
+) -> list[MappingTarget]:
+    """Return every CRM field a bulk-import row can map to.
+
+    Combines the standard-fields registry (canonical contact + lead
+    columns) with this org's `custom_field_definitions`. The mapping
+    UI uses this to populate the per-CSV-column dropdown.
+    """
+    return await list_targets(db)
+
+
+@router.get("/presets", response_model=list[PresetRead])
+async def list_import_presets_endpoint(
+    source_platform: SourcePlatform,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("leads.import")),
+) -> list[PresetRead]:
+    """List system + org-owned mapping presets for one platform.
+
+    System presets surface first; org-owned presets follow in
+    most-recent-first order. The mapping UI picks the org's newest
+    preset as the auto-default, falling back to the system row.
+    """
+    rows = await list_presets(
+        db, org_id=user.org_id, source_platform=source_platform
+    )
+    return [PresetRead.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/presets",
+    response_model=PresetRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_import_preset_endpoint(
+    payload: PresetCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("leads.import")),
+) -> PresetRead:
+    """Save the current mapping as a reusable org-owned preset.
+
+    Validates `mapping` against `/leads/import/targets`. Auto-names
+    "<platform> vN" when `name` is omitted.
+    """
+    row = await create_preset(
+        db,
+        org_id=user.org_id,
+        actor_id=user.legacy_uuid,
+        name=payload.name,
+        source_platform=payload.source_platform,
+        mapping=payload.mapping,
+    )
+    return PresetRead.model_validate(row)
+
+
+@router.delete("/presets/{preset_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_import_preset_endpoint(
+    preset_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("leads.import")),
+) -> Response:
+    """Remove an org-owned preset. System presets reject with 403."""
+    await delete_preset(
+        db,
+        org_id=user.org_id,
+        actor_id=user.legacy_uuid,
+        preset_id=preset_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{import_id}", response_model=LeadImportRead)

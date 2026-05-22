@@ -21,7 +21,16 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, Integer, String, Text, text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -86,4 +95,51 @@ class LeadImport(Base, TenantScoped):
     )
 
 
-__all__ = ["LeadImport", "LeadImportStatus"]
+class ImportPreset(Base):
+    """Saved column-mapping preset for bulk imports.
+
+    Cannot use `TenantScoped` mixin: system presets carry
+    `org_id IS NULL` and the mixin enforces NOT NULL + auto-applies a
+    `WHERE org_id = ctx_org_id` filter that would hide system rows.
+    The service layer (`presets.py`) filters explicitly with the
+    `(is_system OR org_id = ctx)` predicate. PG-level RLS (set in the
+    migration) backs that up.
+    """
+
+    __tablename__ = "import_presets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    # NULL = system preset (visible to every org).
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    source_platform: Mapped[str] = mapped_column(String(32), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    mapping: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    is_system: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    # No FK — post-0037 convention.
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=text("now()"),
+    )
+
+
+__all__ = ["ImportPreset", "LeadImport", "LeadImportStatus"]

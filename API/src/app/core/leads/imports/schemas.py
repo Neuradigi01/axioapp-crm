@@ -76,9 +76,56 @@ class LeadImportCommit(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
+class PresetCreate(BaseModel):
+    """Request body for `POST /leads/import/presets`.
+
+    `name` is optional — service auto-fills "<source_platform> v<N>"
+    if omitted. `mapping` is the same shape as `LeadImportCommit.mapping`
+    and is validated against the same target whitelist.
+    """
+
+    name: Optional[str] = Field(default=None, max_length=128)
+    source_platform: SourcePlatform
+    mapping: dict[str, Optional[str]] = Field(default_factory=dict)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class PresetRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    org_id: Optional[uuid.UUID]            # None for system presets
+    source_platform: str
+    name: str
+    mapping: dict[str, Optional[str]]
+    is_system: bool
+    created_by: Optional[uuid.UUID]
+    created_at: datetime
+    updated_at: datetime
+
+
+class MappingTarget(BaseModel):
+    """One row in the `/leads/import/targets` response.
+
+    Frontend renders these as the options inside each per-column
+    mapping dropdown. `custom` lets the UI group standard vs. custom
+    targets visually.
+    """
+
+    key: str                   # e.g. "contact.full_name" or "custom_data.industry"
+    label: str                 # human label, e.g. "Full name"
+    field_type: str            # "text" / "tel" / "email" / "number" / ...
+    required: bool             # backend-required (cannot be omitted)
+    custom: bool               # True for `custom_data.<key>`, False for canonical
+
+
 __all__ = [
     "LeadImportCommit",
     "LeadImportListResponse",
     "LeadImportRead",
+    "MappingTarget",
+    "PresetCreate",
+    "PresetRead",
     "SourcePlatform",
 ]
