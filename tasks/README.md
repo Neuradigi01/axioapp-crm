@@ -62,8 +62,12 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [Dashboard](dashboard/README.md) | 3 | Core (side track) |
 | — | [Tasks page](tasks-page/README.md) | 2 | Core (side track) |
 | — | [Standard Field Overrides](standard-field-overrides/README.md) | 6 | Core (side track) |
+| — | [Manual Lead Entry](manual-lead-entry/README.md) | 2 | Core (Lead Capture, 1/4) |
+| — | [Bulk Import](bulk-import/README.md) | 6 | Core (Lead Capture, 2/4) |
+| — | [Embeddable Widget](embeddable-widget/README.md) | 9 | Core (Lead Capture, 3/4) |
+| — | [Ad Integrations](ad-integrations/README.md) | 8 | Core (Lead Capture, 4/4) |
 
-**Total: 110 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides side tracks).
+**Total: 135 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides + Lead-Capture (4 tracks) side tracks).
 
 Phase 5 was restructured to gather **all core CRM v1 work** (features + polish + hardening) so the path to a shipped template is one phase. Phase 6 was reshaped to hold **all furniture-pack-specific work** that's irrelevant to a generic CRM template adopter.
 
@@ -189,6 +193,41 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 4: Frontend Settings → Standard Fields tab](standard-field-overrides/step-4-frontend-settings-tab.md) — Done
 - [Step 5: Frontend wire overrides into Leads + Contacts modals](standard-field-overrides/step-5-frontend-wire-leads-contacts.md) — Done
 - [Step 6: Frontend wire overrides into remaining form modals](standard-field-overrides/step-6-frontend-wire-remaining-entities.md) — Done
+
+### Lead Capture & Ingestion (4 independent tracks — manager-specced 2026-05-22; build order: manual → bulk → widget → ads)
+
+#### Manual Lead Entry (Track 1/4 — half-day, unblocks demos)
+- [Step 1: Backend `lead.source` enum column + audit event](manual-lead-entry/step-1-backend-source-and-audit.md) — Done
+- [Step 2: Frontend quick-add floating button + source badge on list](manual-lead-entry/step-2-frontend-quick-add-and-badge.md) — Pending
+
+#### Bulk Import (Track 2/4 — ~4½ days, unlocks competitor-CRM migrations)
+- [Step 1: Backend `lead_imports` table + upload endpoint](bulk-import/step-1-backend-imports-table-and-upload.md) — Pending
+- [Step 2: Backend Celery import job (parse + validate + dedup + commit)](bulk-import/step-2-backend-celery-import-job.md) — Pending
+- [Step 3: Backend `import_presets` per source platform](bulk-import/step-3-backend-source-platform-presets.md) — Pending
+- [Step 4: Frontend upload page + source-platform selector](bulk-import/step-4-frontend-upload-page.md) — Pending
+- [Step 5: Frontend column-mapping UI + preview](bulk-import/step-5-frontend-mapping-ui.md) — Pending
+- [Step 6: Frontend import history + error-report download](bulk-import/step-6-frontend-import-history.md) — Pending
+
+#### Embeddable Widget (Track 3/4 — ~6 days, customer-site lead capture)
+- [Step 1: Backend `embed_keys` table + key issuance/revocation](embeddable-widget/step-1-backend-embed-keys.md) — Pending
+- [Step 2: Backend public `POST /embed/leads` + rate limit](embeddable-widget/step-2-backend-public-submission-endpoint.md) — Pending
+- [Step 3: Backend per-org widget config](embeddable-widget/step-3-backend-widget-config.md) — Pending
+- [Step 4: Frontend Settings Embed tab (keys + config + snippet)](embeddable-widget/step-4-frontend-settings-embed-tab.md) — Pending
+- [Step 5: Widget build pipeline (Vite, vanilla TS)](embeddable-widget/step-5-widget-build-pipeline.md) — Pending
+- [Step 6: Widget loader + form renderer](embeddable-widget/step-6-widget-loader-and-renderer.md) — Pending
+- [Step 7: Widget CSS-variable theming + class-name override](embeddable-widget/step-7-widget-theming.md) — Pending
+- [Step 8: Widget spam protection (honeypot + min-time + reCAPTCHA hook)](embeddable-widget/step-8-widget-spam-protection.md) — Pending
+- [Step 9: Frontend submission log + abuse signals](embeddable-widget/step-9-frontend-submission-log.md) — Pending
+
+#### Ad Integrations (Track 4/4 — ~8 days code + 1–2 weeks of OAuth app review in parallel)
+- [Step 1: Backend `integrations` table + encrypted token storage](ad-integrations/step-1-backend-integrations-table.md) — Pending
+- [Step 2: Backend Google Ads OAuth flow](ad-integrations/step-2-backend-google-oauth.md) — Pending
+- [Step 3: Backend Google Ads webhook + signature + retry/DLQ](ad-integrations/step-3-backend-google-webhook.md) — Pending
+- [Step 4: Backend Meta OAuth + auto-subscription](ad-integrations/step-4-backend-meta-oauth-and-subscription.md) — Pending
+- [Step 5: Backend Meta Lead Ads webhook + signature verification](ad-integrations/step-5-backend-meta-webhook.md) — Pending
+- [Step 6: Backend cross-source dedup + lead routing (round-robin)](ad-integrations/step-6-backend-dedup-and-routing.md) — Pending
+- [Step 7: Frontend Settings Integrations page (connect/disconnect + form picker)](ad-integrations/step-7-frontend-settings-integrations-page.md) — Pending
+- [Step 8: Frontend field mapping editor + integration status + DLQ](ad-integrations/step-8-frontend-mapping-editor-and-status.md) — Pending
 
 ---
 

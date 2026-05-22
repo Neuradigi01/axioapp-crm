@@ -15,7 +15,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.app.core.leads.models import LeadStatus
+from src.app.core.leads.models import LeadSource, LeadStatus
 
 
 class LeadCreate(BaseModel):
@@ -25,6 +25,7 @@ class LeadCreate(BaseModel):
     budget: Optional[Decimal] = Field(default=None, ge=0)
     expected_close_date: Optional[date] = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
+    source: LeadSource = LeadSource.manual
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -58,6 +59,7 @@ class LeadOut(BaseModel):
     contact_id: uuid.UUID
     pipeline_stage: str
     status: LeadStatus
+    source: LeadSource
     assigned_to_id: Optional[uuid.UUID]
     budget: Optional[Decimal]
     expected_close_date: Optional[date]

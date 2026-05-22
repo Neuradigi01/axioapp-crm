@@ -51,6 +51,28 @@ lead_status_enum = ENUM(
 )
 
 
+class LeadSource(str, enum.Enum):
+    """Provenance of a lead row. One of five fixed ingestion channels.
+
+    Stamped at create time and immutable afterwards (no update endpoint
+    exposes it). New channels require both an enum value here AND a
+    matching value in the PG `lead_source_enum` type via a migration.
+    """
+
+    manual = "manual"
+    bulk_import = "bulk_import"
+    widget = "widget"
+    google_ads = "google_ads"
+    meta_ads = "meta_ads"
+
+
+lead_source_enum = ENUM(
+    LeadSource,
+    name="lead_source",
+    values_callable=lambda obj: [m.value for m in obj],
+)
+
+
 class Lead(Base, TenantScoped):
     __tablename__ = "leads"
 
@@ -69,6 +91,11 @@ class Lead(Base, TenantScoped):
         lead_status_enum,
         nullable=False,
         server_default=text("'active'"),
+    )
+    source: Mapped[LeadSource] = mapped_column(
+        lead_source_enum,
+        nullable=False,
+        server_default=text("'manual'"),
     )
     assigned_to_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

@@ -39,7 +39,7 @@ from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldType,
 )
-from src.app.core.leads.models import Lead, LeadStatus
+from src.app.core.leads.models import Lead, LeadSource, LeadStatus
 from src.app.core.leads.schemas import LeadCreate, LeadUpdate
 from src.app.core.pipelines import move_card
 from src.app.core.pipelines.service import get_pipeline_by_key
@@ -56,6 +56,7 @@ def _snapshot(lead: Lead) -> dict[str, Any]:
         "contact_id": str(lead.contact_id),
         "pipeline_stage": lead.pipeline_stage,
         "status": lead.status.value,
+        "source": lead.source.value,
         "assigned_to_id": (
             str(lead.assigned_to_id)
             if lead.assigned_to_id is not None
@@ -268,6 +269,7 @@ async def create_lead(
         contact_id=payload.contact_id,
         pipeline_stage=stage_key,
         status=LeadStatus.active,
+        source=payload.source,
         assigned_to_id=payload.assigned_to_id,
         budget=payload.budget,
         expected_close_date=payload.expected_close_date,

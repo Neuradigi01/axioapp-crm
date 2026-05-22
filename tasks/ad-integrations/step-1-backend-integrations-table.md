@@ -1,0 +1,142 @@
+# Step 1 — Backend: `integrations` table + token storage (encrypted at rest)
+
+**Goal:** Land the per-org integration record model used by both Google Ads and Meta Ads (and future providers). Stores OAuth tokens encrypted via Fernet, scopes, provider account metadata, and a status flag. One row per (org, provider) for v1; multiple per-provider connections is a future surface.
+**Track:** Ad Integrations
+**Status:** Pending
+**Depends on:** Phase 1.5 (permissions, audit), nothing else.
+
+---
+
+## Scope
+
+In-scope:
+
+- Alembic migration adding `integrations` table.
+- SQLAlchemy `Integration` model + Pydantic schemas.
+- `core/integrations/crypto.py` — Fernet wrapper. Reads `INTEGRATIONS_ENCRYPTION_KEY` from `pydantic-settings`. Functions `encrypt(plain: str) -> str` (returns base64 ciphertext) and `decrypt(cipher: str) -> str`.
+- `core/integrations/service.py`:
+  - `upsert(org_id, provider, account_id, account_label, access_token, refresh_token, token_expires_at, scopes) -> Integration`.
+  - `disconnect(org_id, provider, actor)` — clears tokens, sets status `disconnected`.
+  - `get(org_id, provider) -> Integration | None`.
+  - `decrypt_tokens(integration) -> tuple[access, refresh]`.
+- `core/integrations/router.py`:
+  - `GET /api/v1/integrations` — list all integrations for the org (no tokens; status + account label).
+  - `DELETE /api/v1/integrations/{provider}` — disconnect.
+- New permission key `settings.integrations.manage` (covers Google + Meta + future).
+- New env var `INTEGRATIONS_ENCRYPTION_KEY` in `.env.example` (Fernet key — 32 url-safe-base64 bytes).
+- Tests: encryption round-trip, RLS, permission gate, disconnect semantics.
+
+Out of scope:
+
+- No OAuth flows — Steps 2 + 4.
+- No webhooks — Steps 3 + 5.
+- No frontend — Steps 7 + 8.
+- Token refresh logic — lives in the provider-specific code (Step 2's Google client + Step 4's Meta client). The service here just stores what's given.
+
+## The `integrations` table
+
+```sql
+CREATE TYPE integration_provider_enum AS ENUM ('google_ads', 'meta_ads');
+CREATE TYPE integration_status_enum   AS ENUM ('connected', 'disconnected', 'expired', 'error');
+
+CREATE TABLE integrations (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id              UUID NOT NULL REFERENCES organizations(id),
+    provider            integration_provider_enum NOT NULL,
+    account_id          TEXT,                      -- the external account id (e.g. Google customer_id)
+    account_label       TEXT,                      -- human-friendly label, e.g. "asha@example.com"
+    access_token_enc    TEXT,                      -- Fernet ciphertext; null when disconnected
+    refresh_token_enc   TEXT,
+    token_expires_at    TIMESTAMPTZ,
+    scopes              TEXT[],                    -- granted scopes
+    status              integration_status_enum NOT NULL DEFAULT 'disconnected',
+    last_error          TEXT,                      -- last error message, for the status UI
+    connected_at        TIMESTAMPTZ,
+    connected_by        UUID REFERENCES users(id),
+    disconnected_at     TIMESTAMPTZ,
+    disconnected_by     UUID REFERENCES users(id),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    UNIQUE (org_id, provider)
+);
+
+ALTER TABLE integrations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY integrations_tenant_isolation ON integrations
+    USING (org_id = current_setting('app.org_id', true)::uuid);
+```
+
+## Files to touch
+
+| File | Action |
+|---|---|
+| `api/alembic/versions/0XXX_add_integrations.py` | created |
+| `api/src/app/core/integrations/__init__.py` | created |
+| `api/src/app/core/integrations/models.py` | created |
+| `api/src/app/core/integrations/schemas.py` | created |
+| `api/src/app/core/integrations/service.py` | created |
+| `api/src/app/core/integrations/crypto.py` | created |
+| `api/src/app/core/integrations/router.py` | created |
+| `api/src/app/core/permissions/registry.py` | modified — add `settings.integrations.manage` |
+| `api/src/app/shared/config.py` | modified — add `INTEGRATIONS_ENCRYPTION_KEY: SecretStr` field |
+| `.env.example` | modified — add `INTEGRATIONS_ENCRYPTION_KEY=` line with generation instructions |
+| `api/src/app/main.py` | modified (small) — include router |
+| `api/tests/test_integrations_table.py` | created |
+
+**12 files, 1 migration.** Just over the rule-8 ceiling. Could split into 1a (table + crypto) and 1b (service + router) but they're tightly coupled — recommend keeping together; if the diff feels heavy at implementation time, split.
+
+## Plan
+
+1. Migration: create enum types, table, RLS.
+2. `crypto.py`: thin Fernet wrapper. Document key-generation in the module docstring (`Fernet.generate_key().decode()` for a fresh key).
+3. Settings field in `shared/config.py`. App fails to start if missing.
+4. `.env.example` line with a generated dev key + instructions.
+5. Build `Integration` model and `IntegrationRead` schema (omits the `*_enc` fields — tokens never leave the backend in this form).
+6. `service.upsert()` — encrypts tokens before write; sets `connected_at` + `connected_by`. Status `connected`.
+7. `service.disconnect()` — clears `*_enc` (sets to NULL), sets status `disconnected`, records actor.
+8. `service.decrypt_tokens()` — internal use only; never exposed to API.
+9. Router: `GET /integrations`, `DELETE /integrations/{provider}`. Permission gate.
+10. Tests.
+
+## Tests
+
+`api/tests/test_integrations_table.py`:
+
+- **Encryption round-trip:** `decrypt(encrypt("hello")) == "hello"`. Ciphertexts differ across calls (Fernet IV).
+- **Upsert stores ciphertext:** after `upsert(..., access_token="t1", refresh_token="t2", ...)`, the row's `access_token_enc` and `refresh_token_enc` do not contain "t1" or "t2" as substrings.
+- **Decrypt round-trip on row:** `decrypt_tokens(integration) == ("t1", "t2")`.
+- **Unique per (org, provider):** second upsert for same `(org_id, 'google_ads')` updates the row, doesn't create a new one.
+- **Disconnect clears tokens:** after disconnect, `access_token_enc IS NULL` and `refresh_token_enc IS NULL`, status `disconnected`.
+- **GET returns no tokens:** `IntegrationRead` response shape does not include `*_enc` fields.
+- **RLS:** Org A's integration is invisible to Org B.
+- **Permission gate:** Employee → 403.
+- **App startup without key:** `INTEGRATIONS_ENCRYPTION_KEY` missing → app fails to start with a clear error (validation via pydantic-settings).
+
+## Smoke
+
+```powershell
+# Generate a Fernet key for local dev
+docker exec template_api-api-1 uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Paste into .env as INTEGRATIONS_ENCRYPTION_KEY=...
+
+# Migrations
+docker exec template_api-api-1 uv run alembic upgrade head
+
+# Tests
+docker exec template_api-api-1 uv run pytest tests/test_integrations_table.py -v
+
+# Manual: as Owner, list integrations (should be empty initially)
+$token = "<owner JWT>"
+curl http://localhost:8000/api/v1/integrations -H "Authorization: Bearer $token"
+# Expect: []
+```
+
+## Risks
+
+- **Encryption key rotation:** Fernet supports rotation via `MultiFernet([new_key, old_key])`. We ship with one key for v1; rotation is a future task. Document.
+- **Lost encryption key = lost tokens:** if the key is rotated/lost, all existing tokens decrypt to nothing → forces every org to reconnect. Acceptable for v1; back up the key in your secrets manager.
+- **PG enum types add migration friction:** PG enums require special handling on rename. Acceptable — we already use them elsewhere in the project.
+- **Settings start-up failure:** missing env var = container won't start. That's the right default for security.
+
+## Rollback
+
+`alembic downgrade -1` removes the table + enum types. Delete the new files. Revert settings + .env.example + permission registry. No other modules consume the integrations module yet at this point.
