@@ -95,9 +95,17 @@ export const userRoutes: Routes = [
         path: 'leads/import/:id/mapping',
         canActivate: [permissionGuard('leads.import')],
         loadComponent: () =>
-          import(
-            './core/leads/import/mapping-page.placeholder.component'
-          ).then((m) => m.MappingPagePlaceholderComponent),
+          import('./core/leads/import/mapping-page.component').then(
+            (m) => m.MappingPageComponent,
+          ),
+      },
+      {
+        path: 'leads/import/:id/result',
+        canActivate: [permissionGuard('leads.import')],
+        loadComponent: () =>
+          import('./core/leads/import/result-page.component').then(
+            (m) => m.ResultPageComponent,
+          ),
       },
       {
         path: 'appointments',

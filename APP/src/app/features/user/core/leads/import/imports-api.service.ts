@@ -100,6 +100,11 @@ export interface PresetCreatePayload {
   mapping: Record<string, string | null>;
 }
 
+export interface PreviewResponse {
+  columns: string[];
+  rows: Array<Array<string | null>>;
+}
+
 
 @Injectable({ providedIn: 'root' })
 export class ImportsApiService {
@@ -129,6 +134,14 @@ export class ImportsApiService {
 
   get(importId: string): Observable<LeadImport> {
     return this.http.get<LeadImport>(`${this.base}/${importId}`);
+  }
+
+  preview(importId: string, limit = 5): Observable<PreviewResponse> {
+    const params = new HttpParams().set('limit', String(limit));
+    return this.http.get<PreviewResponse>(
+      `${this.base}/${importId}/preview`,
+      { params },
+    );
   }
 
   commit(

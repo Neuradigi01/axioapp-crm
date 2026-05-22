@@ -42,6 +42,7 @@ from src.app.core.leads.imports.schemas import (
     MappingTarget,
     PresetCreate,
     PresetRead,
+    PreviewResponse,
     SourcePlatform,
 )
 from src.app.core.leads.imports.service import (
@@ -50,6 +51,7 @@ from src.app.core.leads.imports.service import (
     get_import,
     list_imports,
     read_error_csv,
+    read_preview,
     upload,
 )
 from src.app.core.leads.imports.targets import list_targets
@@ -232,6 +234,28 @@ async def cancel_lead_import_endpoint(
         db, import_id=import_id, actor_id=user.legacy_uuid
     )
     return LeadImportRead.model_validate(row)
+
+
+@router.get("/{import_id}/preview", response_model=PreviewResponse)
+async def preview_lead_import_endpoint(
+    import_id: uuid.UUID,
+    limit: int = 5,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("leads.import")),
+) -> PreviewResponse:
+    """Return the first N data rows of an uploaded import file.
+
+    Used by the mapping UI's preview pane. Header order is preserved
+    so dropdowns line up with source columns one-to-one. `limit` is
+    capped at 50 server-side.
+    """
+    row = await get_import(db, import_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
+        )
+    payload = read_preview(row, limit)
+    return PreviewResponse(columns=payload.columns, rows=payload.rows)
 
 
 @router.get("/{import_id}/errors.csv")

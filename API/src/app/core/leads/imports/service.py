@@ -20,6 +20,7 @@ from __future__ import annotations
 import csv
 import io
 import uuid
+from dataclasses import dataclass
 from typing import Optional
 
 from fastapi import HTTPException, status
@@ -400,6 +401,42 @@ async def cancel_import(
     return row
 
 
+def read_preview(import_row: LeadImport, limit: int) -> "PreviewPayload":
+    """Read the first `limit` data rows from the import's source file.
+
+    Returns the original column header + a list-of-lists of stringified
+    cell values. The mapping UI uses this to populate the preview pane
+    so the user can see how their mapping projects onto real data
+    before committing.
+
+    Reuses `parser.parse_rows()` with an empty mapping — only the
+    `raw` dict is needed (one entry per source column). Rows are
+    returned in source column order; missing cells surface as None.
+    """
+    from src.app.core.leads.imports.parser import parse_rows
+
+    capped_limit = max(1, min(int(limit), 50))
+    header, rows_iter = parse_rows(import_row.storage_path, mapping={})
+
+    rows: list[list[Optional[str]]] = []
+    for parsed in rows_iter:
+        if len(rows) >= capped_limit:
+            break
+        rows.append([parsed.raw.get(col) for col in header.columns])
+
+    return PreviewPayload(columns=header.columns, rows=rows)
+
+
+@dataclass(frozen=True, slots=True)
+class PreviewPayload:
+    """Plain-Python projection of `read_preview` so the router can
+    convert to the Pydantic `PreviewResponse` without leaking the
+    parser internals."""
+
+    columns: list[str]
+    rows: list[list[Optional[str]]]
+
+
 def read_error_csv(import_row: LeadImport) -> bytes:
     """Read the errors CSV bytes for a completed import.
 
@@ -425,10 +462,12 @@ def read_error_csv(import_row: LeadImport) -> bytes:
 
 
 __all__ = [
+    "PreviewPayload",
     "cancel_import",
     "commit_mapping",
     "get_import",
     "list_imports",
     "read_error_csv",
+    "read_preview",
     "upload",
 ]

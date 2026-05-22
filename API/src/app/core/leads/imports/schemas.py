@@ -120,6 +120,19 @@ class MappingTarget(BaseModel):
     custom: bool               # True for `custom_data.<key>`, False for canonical
 
 
+class PreviewResponse(BaseModel):
+    """Response for `GET /leads/import/{id}/preview?limit=N`.
+
+    `columns` is the file's header row (original column order, preserved
+    so the mapping UI can align dropdowns to the source columns one-to-
+    one). `rows` is the first N data rows as `string | null` cell
+    values — Pydantic / lead-create downstream does the type coercion.
+    """
+
+    columns: list[str]
+    rows: list[list[Optional[str]]]
+
+
 __all__ = [
     "LeadImportCommit",
     "LeadImportListResponse",
@@ -127,5 +140,6 @@ __all__ = [
     "MappingTarget",
     "PresetCreate",
     "PresetRead",
+    "PreviewResponse",
     "SourcePlatform",
 ]

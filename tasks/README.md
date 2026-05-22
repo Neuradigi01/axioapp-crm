@@ -205,7 +205,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 2: Backend Celery import job (parse + validate + dedup + commit)](bulk-import/step-2-backend-celery-import-job.md) — Done
 - [Step 3: Backend `import_presets` per source platform](bulk-import/step-3-backend-source-platform-presets.md) — Done
 - [Step 4: Frontend upload page + source-platform selector](bulk-import/step-4-frontend-upload-page.md) — Done
-- [Step 5: Frontend column-mapping UI + preview](bulk-import/step-5-frontend-mapping-ui.md) — Pending
+- [Step 5: Frontend column-mapping UI + preview](bulk-import/step-5-frontend-mapping-ui.md) — Done
 - [Step 6: Frontend import history + error-report download](bulk-import/step-6-frontend-import-history.md) — Pending
 
 #### Embeddable Widget (Track 3/4 — ~6 days, customer-site lead capture)
