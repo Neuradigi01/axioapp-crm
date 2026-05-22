@@ -30,7 +30,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core import audit
 from src.app.core.standard_fields import registry as field_registry
 from src.app.core.standard_fields.models import StandardFieldOverride
-from src.app.core.standard_fields.schemas import StandardFieldOverrideIn
+from src.app.core.standard_fields.schemas import (
+    StandardFieldOverrideIn,
+    StandardFieldRendered,
+)
 
 
 # Payload field name → registry `overridable_props` token. The two
@@ -272,3 +275,142 @@ async def reset(
         entity_id=snapshot_id,
         before=snapshot,
     )
+
+
+# ---------------------------------------------------------------------------
+# Merge: registry defaults + override row → `StandardFieldRendered`
+#
+# Every form modal calls `render_for_entity` on open. The merge is the
+# only logic outside the test path that matters here.
+# ---------------------------------------------------------------------------
+
+
+# Override columns to consider when determining `is_overridden`. Order is
+# stable for diffing/logging; values are not significant.
+_OVERRIDE_COLUMNS: tuple[str, ...] = (
+    "label",
+    "placeholder",
+    "help_text",
+    "is_required",
+    "is_hidden",
+    "min_value",
+    "max_value",
+    "step_value",
+    "display_order",
+)
+
+
+def _coalesce_numeric(
+    override_value: Any, registry_value: float | None
+) -> float | None:
+    """Pick the override (cast Decimal → float) if set, else the registry default."""
+    if override_value is None:
+        return registry_value
+    return float(override_value)
+
+
+def _merge(
+    definition: field_registry.StandardFieldDef,
+    override: StandardFieldOverride | None,
+) -> StandardFieldRendered:
+    """Coalesce one field. Pure function — no DB or context dependency."""
+    o = override  # alias for readability below
+
+    return StandardFieldRendered(
+        entity=definition.entity,
+        field_key=definition.field_key,
+        field_type=definition.field_type,
+        label=(o.label if o and o.label is not None else definition.default_label),
+        placeholder=(
+            o.placeholder if o and o.placeholder is not None
+            else definition.default_placeholder
+        ),
+        help_text=(
+            o.help_text if o and o.help_text is not None
+            else definition.default_help
+        ),
+        is_required=(
+            o.is_required if o and o.is_required is not None
+            else definition.default_required
+        ),
+        is_hidden=(o.is_hidden if o and o.is_hidden is not None else False),
+        min_value=_coalesce_numeric(
+            o.min_value if o else None, definition.default_min
+        ),
+        max_value=_coalesce_numeric(
+            o.max_value if o else None, definition.default_max
+        ),
+        step_value=_coalesce_numeric(
+            o.step_value if o else None, definition.default_step
+        ),
+        display_order=(
+            o.display_order if o and o.display_order is not None
+            else definition.default_display_order
+        ),
+        backend_required=definition.backend_required,
+        backend_validators=list(definition.backend_validators),
+        is_overridden=_is_overridden(o),
+        overridable_props=sorted(definition.overridable_props),
+    )
+
+
+def _is_overridden(override: StandardFieldOverride | None) -> bool:
+    """True iff an override row exists with at least one non-NULL column.
+
+    An empty override row (all columns NULL) is treated as not overridden
+    so the Settings UI doesn't show a Reset button for a row that does
+    nothing. The DELETE endpoint can still clean it up if needed.
+    """
+    if override is None:
+        return False
+    return any(getattr(override, col) is not None for col in _OVERRIDE_COLUMNS)
+
+
+class EntityNotInRegistry(HTTPException):
+    """Raised when `render_for_entity` is called with an unknown entity."""
+
+    def __init__(self, entity: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"entity {entity!r} not in standard-fields registry",
+        )
+
+
+async def _fetch_overrides_map(
+    session: AsyncSession, *, org_id: uuid.UUID, entity: str
+) -> dict[str, StandardFieldOverride]:
+    """One SELECT, one dict keyed by `field_key`. Avoids N+1 in `render_for_entity`."""
+    rows = (
+        await session.execute(
+            select(StandardFieldOverride).where(
+                StandardFieldOverride.org_id == org_id,
+                StandardFieldOverride.entity == entity,
+            )
+        )
+    ).scalars().all()
+    return {row.field_key: row for row in rows}
+
+
+async def render_for_entity(
+    session: AsyncSession, *, org_id: uuid.UUID, entity: str
+) -> list[StandardFieldRendered]:
+    """Return registry defaults merged with the org's overrides for `entity`.
+
+    Sorted by effective `display_order` (override → registry default),
+    with registry insertion order as a deterministic tiebreak so the UI
+    doesn't reorder fields between requests when display_orders collide.
+    """
+    registry_defs = field_registry.list_for_entity(entity)
+    if not registry_defs:
+        raise EntityNotInRegistry(entity)
+
+    overrides = await _fetch_overrides_map(session, org_id=org_id, entity=entity)
+
+    # Carry the registry index alongside each merged row for tiebreaking.
+    indexed: list[tuple[int, int, StandardFieldRendered]] = []
+    for idx, definition in enumerate(registry_defs):
+        rendered = _merge(definition, overrides.get(definition.field_key))
+        indexed.append((rendered.display_order, idx, rendered))
+
+    indexed.sort(key=lambda triple: (triple[0], triple[1]))
+    return [rendered for _, _, rendered in indexed]

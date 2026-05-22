@@ -1,30 +1,32 @@
 """HTTP routes for `standard_field_overrides`.
 
-Mounted under `/api/v1/standard-fields`. Every endpoint here requires
-`settings.standard_fields.manage` — Owner + Admin by default. Read
-access for the rendered (defaults + overrides merged) view lands in
-Step 3 on a separate, openly-authenticated endpoint so every form modal
-can fetch it.
+Mounted under `/api/v1/standard-fields`. Management endpoints (list,
+upsert, reset) require `settings.standard_fields.manage` — Owner +
+Admin by default. The `{entity}/render` endpoint is open to any
+authenticated user since every form modal calls it on open.
 
-  GET    /standard-fields/                      → all overrides for the org
-  GET    /standard-fields/{entity}/             → overrides for one entity
-  PUT    /standard-fields/{entity}/{field_key}  → upsert one override
-  DELETE /standard-fields/{entity}/{field_key}  → reset to registry defaults
+  GET    /standard-fields/                      → all overrides for the org      [manage]
+  GET    /standard-fields/{entity}/             → overrides for one entity        [manage]
+  PUT    /standard-fields/{entity}/{field_key}  → upsert one override             [manage]
+  DELETE /standard-fields/{entity}/{field_key}  → reset to registry defaults      [manage]
+  GET    /standard-fields/{entity}/render       → merged defaults + overrides     [any user]
 """
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.auth.dependencies import require_permissions
+from src.app.core.auth.dependencies import get_current_user, require_permissions
 from src.app.core.standard_fields.schemas import (
     StandardFieldOverrideIn,
     StandardFieldOverrideListResponse,
     StandardFieldOverrideOut,
+    StandardFieldRenderedListResponse,
 )
 from src.app.core.standard_fields.service import (
     list_for_entity,
     list_for_org,
+    render_for_entity,
     reset,
     upsert,
 )
@@ -97,3 +99,23 @@ async def reset_override(
 ) -> Response:
     await reset(db, org_id=user.org_id, entity=entity, field_key=field_key)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/{entity}/render",
+    response_model=StandardFieldRenderedListResponse,
+)
+async def render_entity(
+    entity: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> StandardFieldRenderedListResponse:
+    """Merged registry-defaults + caller-org overrides for `entity`.
+
+    Open to any authenticated user — every form modal in the app calls
+    this on open. Hidden fields are included with `is_hidden=true`; the
+    client decides whether to render. 404 if `entity` is not in the
+    registry.
+    """
+    items = await render_for_entity(db, org_id=user.org_id, entity=entity)
+    return StandardFieldRenderedListResponse(entity=entity, items=items)

@@ -2,7 +2,7 @@
 
 **Goal:** Expose a single read endpoint that returns the **merged** view of standard fields for an entity: registry defaults coalesced with the caller-org's override rows. This is what every form modal calls on open. Mirrors the existing `/custom-fields/{entity}/render` shape so a future iteration can unify both into the dynamic-form renderer.
 **Track:** Standard Field Overrides
-**Status:** Pending
+**Status:** COMPLETED — `StandardFieldRendered` + `…ListResponse` schemas, `_merge()` + `_is_overridden()` + `_coalesce_numeric()` helpers, `render_for_entity()`, and `GET /{entity}/render` shipped. Render is gated by `get_current_user` only (no manage permission) — confirmed live: Employee can call render, only management endpoints require `settings.standard_fields.manage`. Sort is `(effective display_order, registry insertion index)` — stable across requests. `is_overridden` is `override_row is not None AND any non-NULL override column` (handles empty-row edge case so the UI doesn't surface a no-op Reset button). 20 new unit tests (40 total) cover all coalescing paths, Decimal→float casting, sort tiebreak, and the unknown-entity early-fail. End-to-end live curl verified: PUT override → render shows merged values → DELETE → render back to defaults. Also surfaced + applied the existing-orgs backfill SQL for `settings.standard_fields.manage` (13 Owner/Admin roles granted) — flagged in Step 1 as deferrable to Step 4 but unblocked smoke-testing here.
 **Depends on:** Step 1 (registry), Step 2 (override table + endpoints).
 
 ---

@@ -60,3 +60,39 @@ class StandardFieldOverrideOut(BaseModel):
 class StandardFieldOverrideListResponse(BaseModel):
     items: list[StandardFieldOverrideOut]
     total: int
+
+
+class StandardFieldRendered(BaseModel):
+    """One field, with registry defaults coalesced with the caller-org's
+    override row. This is what every form modal renders against.
+
+    `is_overridden` is true if an override row exists with at least one
+    non-NULL column — drives the "Reset" affordance in the Settings UI.
+    `overridable_props` is copied straight from the registry so the UI
+    can grey out locked knobs.
+    """
+
+    entity: str
+    field_key: str
+    field_type: str
+
+    label: str
+    placeholder: str | None = None
+    help_text: str | None = None
+    is_required: bool
+    is_hidden: bool
+    min_value: float | None = None
+    max_value: float | None = None
+    step_value: float | None = None
+    display_order: int
+
+    backend_required: bool
+    backend_validators: list[str]
+
+    is_overridden: bool
+    overridable_props: list[str]
+
+
+class StandardFieldRenderedListResponse(BaseModel):
+    entity: str
+    items: list[StandardFieldRendered]
