@@ -52,6 +52,7 @@ from src.app.core.leads.imports.service import (
     list_imports,
     read_error_csv,
     read_preview,
+    read_source_file,
     upload,
 )
 from src.app.core.leads.imports.targets import list_targets
@@ -98,13 +99,18 @@ async def upload_lead_import_endpoint(
 @router.get("", response_model=LeadImportListResponse)
 async def list_lead_imports_endpoint(
     status_filter: Optional[LeadImportStatus] = None,
+    source_platform: Optional[SourcePlatform] = None,
     page: int = 1,
     size: int = 50,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("leads.import")),
 ) -> LeadImportListResponse:
     rows, total = await list_imports(
-        db, status_filter=status_filter, page=page, size=size
+        db,
+        status_filter=status_filter,
+        source_platform=source_platform,
+        page=page,
+        size=size,
     )
     return LeadImportListResponse(
         items=[LeadImportRead.model_validate(r) for r in rows],
@@ -256,6 +262,35 @@ async def preview_lead_import_endpoint(
         )
     payload = read_preview(row, limit)
     return PreviewResponse(columns=payload.columns, rows=payload.rows)
+
+
+@router.get("/{import_id}/source")
+async def download_import_source_endpoint(
+    import_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("leads.import")),
+) -> Response:
+    """Stream the original uploaded source file.
+
+    Used by the history page's "Download source" action so an op can
+    re-inspect what was actually uploaded weeks ago. The browser is
+    handed the file with the original filename via Content-Disposition.
+    Permission + RLS scope to the caller's org; foreign-org id → 404.
+    """
+    row = await get_import(db, import_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
+        )
+    data = read_source_file(row)
+    safe_filename = (row.original_filename or "import.csv").replace('"', "")
+    return Response(
+        content=data,
+        media_type=row.mime_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_filename}"',
+        },
+    )
 
 
 @router.get("/{import_id}/errors.csv")

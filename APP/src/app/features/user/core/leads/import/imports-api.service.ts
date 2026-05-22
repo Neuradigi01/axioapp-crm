@@ -124,9 +124,18 @@ export class ImportsApiService {
     return this.http.post<LeadImport>(`${this.base}/upload`, fd);
   }
 
-  list(opts: { status?: LeadImportStatus; page?: number; size?: number } = {}): Observable<LeadImportListResponse> {
+  list(
+    opts: {
+      status?: LeadImportStatus;
+      sourcePlatform?: SourcePlatform;
+      page?: number;
+      size?: number;
+    } = {},
+  ): Observable<LeadImportListResponse> {
     let params = new HttpParams();
     if (opts.status) params = params.set('status_filter', opts.status);
+    if (opts.sourcePlatform)
+      params = params.set('source_platform', opts.sourcePlatform);
     if (opts.page) params = params.set('page', String(opts.page));
     if (opts.size) params = params.set('size', String(opts.size));
     return this.http.get<LeadImportListResponse>(this.base, { params });
@@ -160,6 +169,13 @@ export class ImportsApiService {
   /** Returns a Blob so the caller can trigger a browser download. */
   downloadErrors(importId: string): Observable<Blob> {
     return this.http.get(`${this.base}/${importId}/errors.csv`, {
+      responseType: 'blob',
+    });
+  }
+
+  /** Streams the original uploaded source file as a Blob. */
+  downloadSource(importId: string): Observable<Blob> {
+    return this.http.get(`${this.base}/${importId}/source`, {
       responseType: 'blob',
     });
   }

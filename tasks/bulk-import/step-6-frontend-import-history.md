@@ -2,7 +2,7 @@
 
 **Goal:** Build `/user/leads/import-history` — a paginated list of every import this org has ever run, with status, counts, uploader, timestamp, source platform, and download links for both the original source file and the error report. Gives ops a forensic trail for "where did this lead come from" investigations.
 **Track:** Bulk Import
-**Status:** Pending
+**Status:** Done — backend `GET /leads/import` extended with `source_platform` filter; `GET /{id}/source` endpoint added to stream the original uploaded file with the original filename in `Content-Disposition`. Frontend `ImportsApiService.list()` widened with `sourcePlatform` param; new `downloadSource(id)` blob helper. `HistoryPageComponent` ships paginated table (20/page) at `/user/leads/import-history` with status + source-platform filters (reactive via `effect()`), relative-time column with absolute on hover, source-platform badge, status badge using the gray/blue/green/red colour matrix from the spec, compact counts (`957 ✓ · 32 dup · 11 err`), per-row kebab menu with Download source / Download errors (if any) / Cancel (if pre-terminal) actions, mobile-friendly card fallback under 768px, empty state with CTA. Sidebar untouched (registry-driven per Rule 5); navigation flows via Upload-page header → "View history" link and History-page header → "New import" CTA. Routes registered with `permissionGuard('leads.import')`. Backend addendum verified end-to-end: filter by `source_platform=hubspot` narrows correctly; `read_source_file` returns original CSV bytes. Angular dev build clean (11.4s, zero warnings). **Bulk-import track complete** — all 6 steps Done.
 **Depends on:** Step 1 (`GET /leads/import` list endpoint), Step 2 (error CSV download).
 
 ---

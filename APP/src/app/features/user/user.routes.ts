@@ -92,6 +92,14 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        path: 'leads/import-history',
+        canActivate: [permissionGuard('leads.import')],
+        loadComponent: () =>
+          import('./core/leads/import/history-page.component').then(
+            (m) => m.HistoryPageComponent,
+          ),
+      },
+      {
         path: 'leads/import/:id/mapping',
         canActivate: [permissionGuard('leads.import')],
         loadComponent: () =>

@@ -240,20 +240,26 @@ async def list_imports(
     session: AsyncSession,
     *,
     status_filter: Optional[LeadImportStatus] = None,
+    source_platform: Optional[str] = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[LeadImport], int]:
     """Paginated list of imports for the caller's org.
 
-    Future status / source-platform filters land in Step 6 when the
-    history page wants them. For now the optional `status_filter` is
-    the only narrowing — keeps the surface tiny.
+    `status_filter` narrows to one lifecycle state; `source_platform`
+    narrows to one source CRM. Both feed the Step 6 history page's
+    filter controls. Tenant filter is automatic via `TenantScoped`.
     """
     base = select(LeadImport)
     count_stmt = select(func.count()).select_from(LeadImport)
     if status_filter is not None:
         base = base.where(LeadImport.status == status_filter)
         count_stmt = count_stmt.where(LeadImport.status == status_filter)
+    if source_platform:
+        base = base.where(LeadImport.source_platform == source_platform)
+        count_stmt = count_stmt.where(
+            LeadImport.source_platform == source_platform
+        )
     base = base.order_by(LeadImport.created_at.desc(), LeadImport.id.desc())
 
     total = (await session.execute(count_stmt)).scalar_one()
@@ -261,6 +267,24 @@ async def list_imports(
         await session.execute(base.offset((page - 1) * size).limit(size))
     ).scalars().all()
     return list(rows), int(total)
+
+
+def read_source_file(import_row: LeadImport) -> bytes:
+    """Read the bytes of the original uploaded source file.
+
+    Used by the Step 6 history page's "Download source" action so an
+    op can re-inspect what was actually uploaded weeks ago. Raises 404
+    if the file is missing from disk (e.g. retention cleanup).
+    """
+    from pathlib import Path
+
+    full = Path("./storage").resolve() / import_row.storage_path.lstrip("/")
+    if not full.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="source file missing on disk",
+        )
+    return full.read_bytes()
 
 
 async def _allowed_custom_targets(session: AsyncSession) -> set[str]:
@@ -469,5 +493,6 @@ __all__ = [
     "list_imports",
     "read_error_csv",
     "read_preview",
+    "read_source_file",
     "upload",
 ]
