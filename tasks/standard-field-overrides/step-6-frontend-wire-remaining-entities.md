@@ -2,7 +2,7 @@
 
 **Goal:** Apply the same render-and-bind pattern proven in Step 5 to the remaining form modals — Walk-ins, Tasks, Appointments, Catalog, plus the furniture pack modals (Custom Orders, Field Ops). After this step, every form in the app respects the org's standard-field overrides.
 **Track:** Standard Field Overrides
-**Status:** Pending
+**Status:** COMPLETED — all 6 modals wired (8 core files + 4 pack files = 12 modal files), plus pack-installer registrations for `custom_order` (9 fields) and `field_visit` (8 fields) added via `__init__.py` on the pack modules' Python packages (loaded by the existing module-registry discovery sweep, no `main.py` edit needed). Every modal: injects `StandardFieldsApiService` + `StandardFieldsSignalsService`, holds a `stdFields` signal keyed by `field_key`, refreshes via an `effect()` on the signal bus, layers `Validators.required` / `Validators.min` / `Validators.max` on top of static shape validators, and wraps each std-field block with `@if (!isHidden(key))`. Custom-order modal's wizard structure honoured — all 9 std fields live in step-1 ("basics"), step navigation logic untouched. Numeric inline error messages added to Budget (walk-in), Duration (appointment), Price (catalog). `tsc --noEmit` clean; `ng build --configuration development` clean (11s, all chunks generated). Total entity registry now: 8 entities, 50 overridable fields. One deviation from spec: kept the FormControls always present (didn't remove on hide) — same rationale as Step 5; the `@if` wrappers handle UI hiding, `nullableTrim()` normalizes empty values to null on the wire.
 **Depends on:** Step 5 (Leads + Contacts wiring as the proven pattern), Step 1's registry covers every modal touched here.
 
 ---

@@ -61,96 +61,124 @@
         }
       </div>
 
-      <!-- Title -->
-      <div>
-        <label for="fv_title" class="block text-xs font-medium text-zinc-700">
-          Title <span class="text-red-500">*</span>
-        </label>
-        <input
-          id="fv_title"
-          type="text"
-          formControlName="title"
-          placeholder="e.g. Measurement at customer site"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-        />
-      </div>
-
-      <!-- Purpose -->
-      <div>
-        <label class="block text-xs font-medium text-zinc-700">Purpose</label>
-        <div class="mt-1 inline-flex overflow-hidden rounded-md ring-1 ring-zinc-300">
-          @for (p of ['measurement', 'installation', 'inspection']; track p) {
-            <button
-              type="button"
-              (click)="form.controls.purpose.setValue($any(p))"
-              class="px-3 py-1.5 text-xs font-medium capitalize transition"
-              [class.bg-zinc-900]="form.controls.purpose.value === p"
-              [class.text-white]="form.controls.purpose.value === p"
-              [class.text-zinc-700]="form.controls.purpose.value !== p"
-              [class.bg-white]="form.controls.purpose.value !== p"
-            >
-              {{ p }}
-            </button>
+      @if (!isHidden('title')) {
+        <div>
+          <label for="fv_title" class="block text-xs font-medium text-zinc-700">
+            {{ stdField('title')?.label ?? 'Title' }} <span class="text-red-500">*</span>
+          </label>
+          <input
+            id="fv_title"
+            type="text"
+            formControlName="title"
+            [attr.placeholder]="stdField('title')?.placeholder ?? 'e.g. Measurement at customer site'"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+          @if (stdField('title')?.help_text; as help) {
+            <p class="mt-1 text-xs text-zinc-500">{{ help }}</p>
           }
         </div>
-      </div>
+      }
 
-      <!-- Schedule -->
+      @if (!isHidden('purpose')) {
+        <div>
+          <label class="block text-xs font-medium text-zinc-700">
+            {{ stdField('purpose')?.label ?? 'Purpose' }}
+            @if (stdField('purpose')?.is_required) { <span class="text-red-500">*</span> }
+          </label>
+          <div class="mt-1 inline-flex overflow-hidden rounded-md ring-1 ring-zinc-300">
+            @for (p of ['measurement', 'installation', 'inspection']; track p) {
+              <button
+                type="button"
+                (click)="form.controls.purpose.setValue($any(p))"
+                class="px-3 py-1.5 text-xs font-medium capitalize transition"
+                [class.bg-zinc-900]="form.controls.purpose.value === p"
+                [class.text-white]="form.controls.purpose.value === p"
+                [class.text-zinc-700]="form.controls.purpose.value !== p"
+                [class.bg-white]="form.controls.purpose.value !== p"
+              >
+                {{ p }}
+              </button>
+            }
+          </div>
+          @if (stdField('purpose')?.help_text; as help) {
+            <p class="mt-1 text-xs text-zinc-500">{{ help }}</p>
+          }
+        </div>
+      }
+
       <div class="grid grid-cols-3 gap-3">
-        <div>
-          <label class="block text-xs font-medium text-zinc-700">Date</label>
-          <input
-            type="date"
-            formControlName="scheduled_date"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-          />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-zinc-700">Time</label>
-          <input
-            type="time"
-            formControlName="scheduled_time"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-          />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-zinc-700">Duration (min)</label>
-          <input
-            type="number"
-            min="15"
-            step="15"
-            formControlName="duration_min"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-          />
-        </div>
+        @if (!isHidden('scheduled_date')) {
+          <div>
+            <label class="block text-xs font-medium text-zinc-700">
+              {{ stdField('scheduled_date')?.label ?? 'Date' }} <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              formControlName="scheduled_date"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+          </div>
+        }
+        @if (!isHidden('scheduled_time')) {
+          <div>
+            <label class="block text-xs font-medium text-zinc-700">
+              {{ stdField('scheduled_time')?.label ?? 'Time' }} <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="time"
+              formControlName="scheduled_time"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+          </div>
+        }
+        @if (!isHidden('duration_min')) {
+          <div>
+            <label class="block text-xs font-medium text-zinc-700">
+              {{ stdField('duration_min')?.label ?? 'Duration (min)' }} <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              [attr.min]="stdField('duration_min')?.min_value ?? 15"
+              [attr.max]="stdField('duration_min')?.max_value ?? 1440"
+              [attr.step]="stdField('duration_min')?.step_value ?? 15"
+              formControlName="duration_min"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+          </div>
+        }
       </div>
 
-      <!-- Assignee -->
-      <div>
-        <label class="block text-xs font-medium text-zinc-700">
-          Assigned to <span class="text-red-500">*</span>
-        </label>
-        <select
-          formControlName="assigned_to_id"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-        >
-          <option value="" disabled>Select a staff member</option>
-          @for (s of staff(); track s.id) {
-            <option [value]="s.id">{{ s.full_name }}</option>
-          }
-        </select>
-      </div>
+      @if (!isHidden('assigned_to_id')) {
+        <div>
+          <label class="block text-xs font-medium text-zinc-700">
+            {{ stdField('assigned_to_id')?.label ?? 'Assigned to' }} <span class="text-red-500">*</span>
+          </label>
+          <select
+            formControlName="assigned_to_id"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          >
+            <option value="" disabled>Select a staff member</option>
+            @for (s of staff(); track s.id) {
+              <option [value]="s.id">{{ s.full_name }}</option>
+            }
+          </select>
+        </div>
+      }
 
-      <!-- Location -->
-      <div>
-        <label class="block text-xs font-medium text-zinc-700">Location</label>
-        <input
-          type="text"
-          formControlName="location"
-          placeholder="Customer home / site address"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-        />
-      </div>
+      @if (!isHidden('location')) {
+        <div>
+          <label class="block text-xs font-medium text-zinc-700">
+            {{ stdField('location')?.label ?? 'Location' }}
+            @if (stdField('location')?.is_required) { <span class="text-red-500">*</span> }
+          </label>
+          <input
+            type="text"
+            formControlName="location"
+            [attr.placeholder]="stdField('location')?.placeholder ?? 'Customer home / site address'"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+        </div>
+      }
 
       <!-- Link to custom order -->
       <div>
@@ -171,16 +199,20 @@
         </p>
       </div>
 
-      <!-- Notes -->
-      <div>
-        <label class="block text-xs font-medium text-zinc-700">Notes</label>
-        <textarea
-          rows="2"
-          formControlName="notes"
-          placeholder="bring laser measure, special access instructions, …"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-        ></textarea>
-      </div>
+      @if (!isHidden('notes')) {
+        <div>
+          <label class="block text-xs font-medium text-zinc-700">
+            {{ stdField('notes')?.label ?? 'Notes' }}
+            @if (stdField('notes')?.is_required) { <span class="text-red-500">*</span> }
+          </label>
+          <textarea
+            rows="2"
+            formControlName="notes"
+            [attr.placeholder]="stdField('notes')?.placeholder ?? 'bring laser measure, special access instructions, …'"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          ></textarea>
+        </div>
+      }
 
       @if (submitError(); as err) {
         <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">

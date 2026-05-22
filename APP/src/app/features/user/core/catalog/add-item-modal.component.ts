@@ -6,14 +6,18 @@
   Input,
   Output,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { nullableTrim } from '@core/services/form.util';
 
+import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
+import { StandardFieldsSignalsService } from '../standard-fields/standard-fields-signals.service';
+import type { StandardFieldRendered } from '../standard-fields/types';
 import {
   CatalogApiService,
   CatalogItem,
@@ -39,7 +43,76 @@ import {
 export class AddItemModalComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(CatalogApiService);
+  private readonly stdApi = inject(StandardFieldsApiService);
+  private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
+
+  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
+    {},
+  );
+
+  protected stdField(key: string): StandardFieldRendered | undefined {
+    return this.stdFields()[key];
+  }
+
+  protected isHidden(key: string): boolean {
+    return this.stdField(key)?.is_hidden === true;
+  }
+
+  constructor() {
+    effect(() => {
+      this.stdSignals.changedAt();
+      this.refreshStdFields();
+    });
+  }
+
+  private refreshStdFields(): void {
+    this.stdApi.render('catalog_item').subscribe({
+      next: (resp) => {
+        const map: Record<string, StandardFieldRendered> = {};
+        for (const f of resp.items) map[f.field_key] = f;
+        this.stdFields.set(map);
+        this.applyStandardValidators(map);
+      },
+      error: () => {
+        /* fallbacks keep the form usable */
+      },
+    });
+  }
+
+  /** `sku` + `name` + `price` are backend-required (locked).
+   *  `category` accepts `required`. `price` additionally accepts `min`/`max`. */
+  private applyStandardValidators(
+    map: Record<string, StandardFieldRendered>,
+  ): void {
+    this.form.controls.sku.setValidators([
+      Validators.required,
+      Validators.maxLength(64),
+    ]);
+    this.form.controls.sku.updateValueAndValidity({ emitEvent: false });
+
+    this.form.controls.name.setValidators([
+      Validators.required,
+      Validators.maxLength(255),
+    ]);
+    this.form.controls.name.updateValueAndValidity({ emitEvent: false });
+
+    const categoryV: ValidatorFn[] = [Validators.maxLength(64)];
+    if (map['category']?.is_required) categoryV.push(Validators.required);
+    this.form.controls.category.setValidators(categoryV);
+    this.form.controls.category.updateValueAndValidity({ emitEvent: false });
+
+    const priceRow = map['price'];
+    const priceV: ValidatorFn[] = [Validators.required];
+    if (priceRow?.min_value != null) {
+      priceV.push(Validators.min(priceRow.min_value));
+    } else {
+      priceV.push(Validators.min(0));
+    }
+    if (priceRow?.max_value != null) priceV.push(Validators.max(priceRow.max_value));
+    this.form.controls.price.setValidators(priceV);
+    this.form.controls.price.updateValueAndValidity({ emitEvent: false });
+  }
 
   @Input() set item(value: CatalogItem | null) {
     this._item.set(value);

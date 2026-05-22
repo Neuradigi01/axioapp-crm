@@ -8,6 +8,7 @@
   OnInit,
   Output,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -18,6 +19,7 @@ import {
   FormControl,
   FormGroup,
   ReactiveFormsModule,
+  ValidatorFn,
   Validators,
 } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -31,6 +33,9 @@ import {
   ContactListItem,
   ContactsApiService,
 } from '../../../core/contacts/contacts-api.service';
+import { StandardFieldsApiService } from '../../../core/standard-fields/standard-fields-api.service';
+import { StandardFieldsSignalsService } from '../../../core/standard-fields/standard-fields-signals.service';
+import type { StandardFieldRendered } from '../../../core/standard-fields/types';
 import {
   CustomOrderCreate,
   CustomOrdersApiService,
@@ -69,7 +74,99 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(CustomOrdersApiService);
   private readonly contactsApi = inject(ContactsApiService);
+  private readonly stdApi = inject(StandardFieldsApiService);
+  private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
+
+  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
+    {},
+  );
+
+  protected stdField(key: string): StandardFieldRendered | undefined {
+    return this.stdFields()[key];
+  }
+
+  protected isHidden(key: string): boolean {
+    return this.stdField(key)?.is_hidden === true;
+  }
+
+  constructor() {
+    effect(() => {
+      this.stdSignals.changedAt();
+      this.refreshStdFields();
+    });
+  }
+
+  private refreshStdFields(): void {
+    this.stdApi.render('custom_order').subscribe({
+      next: (resp) => {
+        const map: Record<string, StandardFieldRendered> = {};
+        for (const f of resp.items) map[f.field_key] = f;
+        this.stdFields.set(map);
+        this.applyStandardValidators(map);
+      },
+      error: () => {
+        /* fallbacks keep the form usable */
+      },
+    });
+  }
+
+  /** Layer override-driven validators on top of the static shape validators.
+   *  `title` is backend-locked-required. The rest accept `required`; currency
+   *  fields additionally accept `min`/`max`. */
+  private applyStandardValidators(
+    map: Record<string, StandardFieldRendered>,
+  ): void {
+    this.basics.controls.title.setValidators([
+      Validators.required,
+      Validators.maxLength(255),
+    ]);
+    this.basics.controls.title.updateValueAndValidity({ emitEvent: false });
+
+    const setReq = (
+      ctrl:
+        | 'requirement'
+        | 'material_primary'
+        | 'material_secondary'
+        | 'color'
+        | 'finish'
+        | 'expected_delivery_date',
+      row: StandardFieldRendered | undefined,
+    ): void => {
+      const v: ValidatorFn[] = [];
+      if (row?.is_required) v.push(Validators.required);
+      this.basics.controls[ctrl].setValidators(v);
+      this.basics.controls[ctrl].updateValueAndValidity({ emitEvent: false });
+    };
+    setReq('requirement', map['requirement']);
+    setReq('material_primary', map['material_primary']);
+    setReq('material_secondary', map['material_secondary']);
+    setReq('color', map['color']);
+    setReq('finish', map['finish']);
+    setReq('expected_delivery_date', map['expected_delivery_date']);
+
+    const currencyValidators = (
+      row: StandardFieldRendered | undefined,
+    ): ValidatorFn[] => {
+      const v: ValidatorFn[] = [];
+      if (row?.is_required) v.push(Validators.required);
+      if (row?.min_value != null) v.push(Validators.min(row.min_value));
+      if (row?.max_value != null) v.push(Validators.max(row.max_value));
+      return v;
+    };
+    this.basics.controls.total_amount.setValidators(
+      currencyValidators(map['total_amount']),
+    );
+    this.basics.controls.total_amount.updateValueAndValidity({
+      emitEvent: false,
+    });
+    this.basics.controls.advance_paid.setValidators(
+      currencyValidators(map['advance_paid']),
+    );
+    this.basics.controls.advance_paid.updateValueAndValidity({
+      emitEvent: false,
+    });
+  }
 
   @Input() set submitting(value: boolean) {
     this._submitting.set(value);

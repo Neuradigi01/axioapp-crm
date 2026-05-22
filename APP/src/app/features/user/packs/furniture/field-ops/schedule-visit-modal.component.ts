@@ -7,6 +7,7 @@
   OnInit,
   Output,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -14,6 +15,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   FormBuilder,
   ReactiveFormsModule,
+  ValidatorFn,
   Validators,
 } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -31,6 +33,9 @@ import {
   StaffApiService,
   StaffListItem,
 } from '../../../core/staff/staff-api.service';
+import { StandardFieldsApiService } from '../../../core/standard-fields/standard-fields-api.service';
+import { StandardFieldsSignalsService } from '../../../core/standard-fields/standard-fields-signals.service';
+import type { StandardFieldRendered } from '../../../core/standard-fields/types';
 import {
   CustomOrder,
   CustomOrdersApiService,
@@ -60,7 +65,93 @@ export class ScheduleVisitModalComponent implements OnInit {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly staffApi = inject(StaffApiService);
   private readonly customOrdersApi = inject(CustomOrdersApiService);
+  private readonly stdApi = inject(StandardFieldsApiService);
+  private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
+
+  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
+    {},
+  );
+
+  protected stdField(key: string): StandardFieldRendered | undefined {
+    return this.stdFields()[key];
+  }
+
+  protected isHidden(key: string): boolean {
+    return this.stdField(key)?.is_hidden === true;
+  }
+
+  constructor() {
+    effect(() => {
+      this.stdSignals.changedAt();
+      this.refreshStdFields();
+    });
+  }
+
+  private refreshStdFields(): void {
+    this.stdApi.render('field_visit').subscribe({
+      next: (resp) => {
+        const map: Record<string, StandardFieldRendered> = {};
+        for (const f of resp.items) map[f.field_key] = f;
+        this.stdFields.set(map);
+        this.applyStandardValidators(map);
+      },
+      error: () => {
+        /* fallbacks keep the form usable */
+      },
+    });
+  }
+
+  /** title/scheduled_date/scheduled_time/duration_min/assigned_to_id are
+   *  backend-locked-required. duration_min accepts min/max overrides. */
+  private applyStandardValidators(
+    map: Record<string, StandardFieldRendered>,
+  ): void {
+    this.form.controls.title.setValidators([
+      Validators.required,
+      Validators.maxLength(255),
+    ]);
+    this.form.controls.title.updateValueAndValidity({ emitEvent: false });
+
+    this.form.controls.scheduled_date.setValidators([Validators.required]);
+    this.form.controls.scheduled_date.updateValueAndValidity({
+      emitEvent: false,
+    });
+
+    this.form.controls.scheduled_time.setValidators([Validators.required]);
+    this.form.controls.scheduled_time.updateValueAndValidity({
+      emitEvent: false,
+    });
+
+    const durRow = map['duration_min'];
+    const durV: ValidatorFn[] = [
+      Validators.required,
+      Validators.min(durRow?.min_value ?? 15),
+      Validators.max(durRow?.max_value ?? 1440),
+    ];
+    this.form.controls.duration_min.setValidators(durV);
+    this.form.controls.duration_min.updateValueAndValidity({
+      emitEvent: false,
+    });
+
+    this.form.controls.assigned_to_id.setValidators([Validators.required]);
+    this.form.controls.assigned_to_id.updateValueAndValidity({
+      emitEvent: false,
+    });
+
+    const setReq = (
+      ctrl: 'purpose' | 'location' | 'notes',
+      row: StandardFieldRendered | undefined,
+    ): void => {
+      const v: ValidatorFn[] = [];
+      if (row?.is_required) v.push(Validators.required);
+      this.form.controls[ctrl].setValidators(v);
+      this.form.controls[ctrl].updateValueAndValidity({ emitEvent: false });
+    };
+    setReq('purpose', map['purpose']);
+    setReq('location', map['location']);
+    setReq('notes', map['notes']);
+  }
 
   @Input() set submitting(value: boolean) {
     this._submitting.set(value);
