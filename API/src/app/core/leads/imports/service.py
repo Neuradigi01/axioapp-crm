@@ -27,9 +27,32 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.custom_fields.models import CustomFieldDefinition
 from src.app.core.leads.imports.models import LeadImport, LeadImportStatus
 from src.app.core.leads.imports.schemas import SourcePlatform
 from src.app.shared.storage import get_storage
+
+
+# Whitelist of CRM field keys a mapping may target. System-managed
+# columns (`id`, `org_id`, `source`, `status`, `created_at`,
+# `updated_at`) are deliberately excluded — they're either auto-set
+# (source='bulk_import', server timestamps) or org-scoped invariants
+# (org_id, id). `custom_data.<key>` targets are allowed dynamically
+# against the org's `custom_field_definitions`.
+_ALLOWED_STANDARD_TARGETS: frozenset[str] = frozenset(
+    {
+        "contact.full_name",
+        "contact.phone",
+        "contact.email",
+        "contact.source",
+        "contact.notes",
+        "lead.pipeline_stage",
+        "lead.budget",
+        "lead.expected_close_date",
+    }
+)
+
+_REQUIRED_TARGETS: frozenset[str] = frozenset({"contact.full_name"})
 
 
 # 10 MB cap on uploaded file size; 50,000 rows on parsed row count.
@@ -239,4 +262,173 @@ async def list_imports(
     return list(rows), int(total)
 
 
-__all__ = ["get_import", "list_imports", "upload"]
+async def _allowed_custom_targets(session: AsyncSession) -> set[str]:
+    """Return `custom_data.<key>` targets allowed for this org.
+
+    Pulls every `custom_field_definitions` row for entity_type='lead'
+    or 'contact' and emits `custom_data.<field_key>` for each. The
+    ORM filter scopes to the active org automatically.
+    """
+    rows = (
+        await session.execute(
+            select(CustomFieldDefinition.field_key).where(
+                CustomFieldDefinition.entity_type.in_(("contact", "lead"))
+            )
+        )
+    ).all()
+    return {f"custom_data.{r.field_key}" for r in rows}
+
+
+async def commit_mapping(
+    session: AsyncSession,
+    *,
+    import_id: uuid.UUID,
+    mapping: dict[str, Optional[str]],
+    actor_id: uuid.UUID,
+) -> LeadImport:
+    """Validate + persist a mapping, transition to `mapping_committed`,
+    queue the Celery processor. Raises:
+
+    - 404 if the import doesn't exist (or is foreign-org, RLS-hidden).
+    - 409 if the import isn't in `awaiting_mapping`.
+    - 422 if the mapping targets are invalid (system-managed targets,
+      unknown custom fields, missing the required full_name target).
+    """
+    row = (
+        await session.execute(
+            select(LeadImport).where(LeadImport.id == import_id)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
+        )
+    if row.status != LeadImportStatus.awaiting_mapping:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Cannot commit mapping: import is in '{row.status.value}'. "
+                "Only 'awaiting_mapping' imports can be committed."
+            ),
+        )
+
+    allowed = set(_ALLOWED_STANDARD_TARGETS)
+    allowed |= await _allowed_custom_targets(session)
+
+    targets = [v for v in mapping.values() if v]
+    unknown = [t for t in targets if t not in allowed]
+    if unknown:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Mapping references unknown or forbidden targets: "
+                f"{sorted(set(unknown))}. Allowed standard targets: "
+                f"{sorted(_ALLOWED_STANDARD_TARGETS)}. Custom-field "
+                "targets must be of the form custom_data.<key> and the "
+                "field definition must exist for entity 'contact' or 'lead'."
+            ),
+        )
+
+    missing_required = [t for t in _REQUIRED_TARGETS if t not in targets]
+    if missing_required:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Mapping is missing required target(s): "
+                f"{sorted(missing_required)}. Map at least one CSV column "
+                "to 'contact.full_name' before committing."
+            ),
+        )
+
+    row.mapping = mapping
+    row.status = LeadImportStatus.mapping_committed
+    await session.commit()
+    await session.refresh(row)
+
+    # Dispatch the processor. With Celery installed we enqueue and
+    # return — the worker picks it up and the row transitions to
+    # `processing` then `completed` asynchronously. Without Celery
+    # (dev), we await the async body inline on the current event loop
+    # so the response reflects the final status. Either way the row's
+    # mapping is already persisted before this returns.
+    from src.app.core.leads.imports.tasks import (
+        HAS_CELERY,
+        process_lead_import,
+        process_lead_import_async,
+    )
+
+    if HAS_CELERY:
+        process_lead_import.delay(str(row.id))
+    else:
+        await process_lead_import_async(row.id)
+        await session.refresh(row)
+    return row
+
+
+async def cancel_import(
+    session: AsyncSession,
+    *,
+    import_id: uuid.UUID,
+    actor_id: uuid.UUID,
+) -> LeadImport:
+    """User-driven cancel. Allowed only from `awaiting_mapping` or
+    `mapping_committed` — once `processing` we don't kill the worker;
+    once terminal there's nothing to do."""
+    row = (
+        await session.execute(
+            select(LeadImport).where(LeadImport.id == import_id)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
+        )
+    if row.status not in (
+        LeadImportStatus.awaiting_mapping,
+        LeadImportStatus.mapping_committed,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Cannot cancel: import is in '{row.status.value}'. "
+                "Cancel only works while awaiting mapping or pre-processing."
+            ),
+        )
+    row.status = LeadImportStatus.cancelled
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+def read_error_csv(import_row: LeadImport) -> bytes:
+    """Read the errors CSV bytes for a completed import.
+
+    Raises 404 if the row has no `error_report_path` (no errors, or
+    not yet processed). Storage is local-disk for v1; we read directly
+    rather than streaming since the file is bounded by the per-import
+    row cap (50k rows ⇒ a few MB worst case).
+    """
+    if not import_row.error_report_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="this import has no error report",
+        )
+    from pathlib import Path
+
+    full = Path("./storage").resolve() / import_row.error_report_path.lstrip("/")
+    if not full.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="error report file missing on disk",
+        )
+    return full.read_bytes()
+
+
+__all__ = [
+    "cancel_import",
+    "commit_mapping",
+    "get_import",
+    "list_imports",
+    "read_error_csv",
+    "upload",
+]

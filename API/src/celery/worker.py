@@ -4,7 +4,10 @@ from . import celery_config as config
 
 celery = Celery(COMPOSE_PROJECT_NAME)
 celery.config_from_object(config)
-celery.autodiscover_tasks(["src.celery.tasks"])
+celery.autodiscover_tasks([
+    "src.celery.tasks",
+    "src.app.core.leads.imports.tasks",
+])
 
 if not CELERY_ENABLED:
     celery.conf.task_always_eager = True

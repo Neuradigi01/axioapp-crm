@@ -17,7 +17,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.leads.imports.models import LeadImportStatus
 
@@ -60,4 +60,25 @@ class LeadImportListResponse(BaseModel):
     size: int
 
 
-__all__ = ["LeadImportRead", "LeadImportListResponse", "SourcePlatform"]
+class LeadImportCommit(BaseModel):
+    """Request body for `POST /leads/import/{id}/commit`.
+
+    `mapping` is `{csv_column_name: crm_field_key | None}`. Mapping a
+    column to None (or omitting it) means "ignore this column". Every
+    non-null value is validated against the whitelist of allowed
+    targets — see `service._ALLOWED_TARGETS`. Mapping must cover
+    `contact.full_name` (the only required field) — the row otherwise
+    cannot create a contact.
+    """
+
+    mapping: dict[str, Optional[str]] = Field(default_factory=dict)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+__all__ = [
+    "LeadImportCommit",
+    "LeadImportListResponse",
+    "LeadImportRead",
+    "SourcePlatform",
+]

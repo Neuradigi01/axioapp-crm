@@ -22,6 +22,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Response,
     UploadFile,
     status,
 )
@@ -30,13 +31,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.leads.imports.models import LeadImportStatus
 from src.app.core.leads.imports.schemas import (
+    LeadImportCommit,
     LeadImportListResponse,
     LeadImportRead,
     SourcePlatform,
 )
 from src.app.core.leads.imports.service import (
+    cancel_import,
+    commit_mapping,
     get_import,
     list_imports,
+    read_error_csv,
     upload,
 )
 from src.app.core.users.models import User
@@ -112,3 +117,60 @@ async def get_lead_import_endpoint(
             status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
         )
     return LeadImportRead.model_validate(row)
+
+
+@router.post("/{import_id}/commit", response_model=LeadImportRead)
+async def commit_lead_import_endpoint(
+    import_id: uuid.UUID,
+    payload: LeadImportCommit,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("leads.import")),
+) -> LeadImportRead:
+    """Validate + persist the mapping, transition to
+    `mapping_committed`, queue the Celery processor. When
+    `CELERY_ENABLED=false` (dev), the task runs synchronously inline,
+    so the response may already reflect `completed` status."""
+    row = await commit_mapping(
+        db,
+        import_id=import_id,
+        mapping=payload.mapping,
+        actor_id=user.legacy_uuid,
+    )
+    return LeadImportRead.model_validate(row)
+
+
+@router.post("/{import_id}/cancel", response_model=LeadImportRead)
+async def cancel_lead_import_endpoint(
+    import_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("leads.import")),
+) -> LeadImportRead:
+    row = await cancel_import(
+        db, import_id=import_id, actor_id=user.legacy_uuid
+    )
+    return LeadImportRead.model_validate(row)
+
+
+@router.get("/{import_id}/errors.csv")
+async def download_import_errors_endpoint(
+    import_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("leads.import")),
+) -> Response:
+    """Download the per-import error CSV produced by the processor.
+
+    404 if the import has no errors (no file written) or if the import
+    row is foreign-org / nonexistent (RLS-hidden).
+    """
+    row = await get_import(db, import_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
+        )
+    data = read_error_csv(row)
+    filename = f"import-{import_id}-errors.csv"
+    return Response(
+        content=data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

@@ -202,7 +202,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 
 #### Bulk Import (Track 2/4 — ~4½ days, unlocks competitor-CRM migrations)
 - [Step 1: Backend `lead_imports` table + upload endpoint](bulk-import/step-1-backend-imports-table-and-upload.md) — Done
-- [Step 2: Backend Celery import job (parse + validate + dedup + commit)](bulk-import/step-2-backend-celery-import-job.md) — Pending
+- [Step 2: Backend Celery import job (parse + validate + dedup + commit)](bulk-import/step-2-backend-celery-import-job.md) — Done
 - [Step 3: Backend `import_presets` per source platform](bulk-import/step-3-backend-source-platform-presets.md) — Pending
 - [Step 4: Frontend upload page + source-platform selector](bulk-import/step-4-frontend-upload-page.md) — Pending
 - [Step 5: Frontend column-mapping UI + preview](bulk-import/step-5-frontend-mapping-ui.md) — Pending
