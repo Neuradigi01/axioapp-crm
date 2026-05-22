@@ -10,6 +10,7 @@
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { ActivatedRoute, Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { forkJoin, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
@@ -74,6 +75,8 @@ export class LeadsPageComponent {
   private readonly api = inject(LeadsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   readonly leads = signal<Lead[]>([]);
   readonly loading = signal(false);
@@ -154,6 +157,24 @@ export class LeadsPageComponent {
       if (missing.length === 0) return;
       this.fetchContacts(missing);
     });
+
+    // Honour `/user/leads?new=1` (used by the global quick-add FAB) so
+    // landing on the page from anywhere in the app drops the user
+    // straight into the create-lead modal. Strip the param after
+    // consuming it so a refresh doesn't re-open.
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        if (params.get('new') !== null && this.modalState() === null) {
+          this.openCreate();
+          this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { new: null },
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+          });
+        }
+      });
   }
 
   protected setView(v: View): void {

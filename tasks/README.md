@@ -198,7 +198,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 
 #### Manual Lead Entry (Track 1/4 — half-day, unblocks demos)
 - [Step 1: Backend `lead.source` enum column + audit event](manual-lead-entry/step-1-backend-source-and-audit.md) — Done
-- [Step 2: Frontend quick-add floating button + source badge on list](manual-lead-entry/step-2-frontend-quick-add-and-badge.md) — Pending
+- [Step 2: Frontend quick-add floating button + source badge on list](manual-lead-entry/step-2-frontend-quick-add-and-badge.md) — Done
 
 #### Bulk Import (Track 2/4 — ~4½ days, unlocks competitor-CRM migrations)
 - [Step 1: Backend `lead_imports` table + upload endpoint](bulk-import/step-1-backend-imports-table-and-upload.md) — Pending

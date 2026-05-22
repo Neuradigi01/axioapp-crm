@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { ToastHostComponent } from '../notifications/toast-host.component';
+import { QuickAddFabComponent } from '../shared/quick-add-fab/quick-add-fab.component';
 import { SidebarComponent } from './sidebar.component';
 import { HeaderComponent } from './header.component';
 
@@ -10,7 +11,13 @@ const SIDEBAR_STORAGE_KEY = 'furniturecrm:sidebar-open';
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, SidebarComponent, HeaderComponent, ToastHostComponent],
+  imports: [
+    RouterOutlet,
+    SidebarComponent,
+    HeaderComponent,
+    ToastHostComponent,
+    QuickAddFabComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './shell.component.html',
 })

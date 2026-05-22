@@ -6,7 +6,7 @@ import {
 } from '@angular/core';
 
 import { InrPipe } from '../shared/pipes/inr.pipe';
-import { Lead, LeadStatus } from './leads-api.service';
+import { Lead, LeadSource, LeadStatus } from './leads-api.service';
 
 /**
  * Compact read-only card rendered inside each kanban column for a lead.
@@ -86,6 +86,12 @@ export class LeadCardComponent {
 
   readonly statusPillClass = computed(() => this.classForStatus(this.lead().status));
 
+  /** Tailwind classes for the per-source badge. */
+  readonly sourceBadgeClass = computed(() => this.classForSource(this.lead().source));
+
+  /** Human label for the per-source badge. */
+  readonly sourceBadgeLabel = computed(() => this.labelForSource(this.lead().source));
+
   private classForStatus(status: LeadStatus): string {
     switch (status) {
       case 'won':
@@ -94,6 +100,36 @@ export class LeadCardComponent {
         return 'bg-red-100 text-red-700 ring-red-200';
       default:
         return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+    }
+  }
+
+  private classForSource(source: LeadSource | undefined): string {
+    switch (source) {
+      case 'bulk_import':
+        return 'bg-indigo-100 text-indigo-700 ring-indigo-200';
+      case 'widget':
+        return 'bg-emerald-100 text-emerald-700 ring-emerald-200';
+      case 'google_ads':
+        return 'bg-amber-100 text-amber-700 ring-amber-200';
+      case 'meta_ads':
+        return 'bg-blue-100 text-blue-700 ring-blue-200';
+      default:
+        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+    }
+  }
+
+  private labelForSource(source: LeadSource | undefined): string {
+    switch (source) {
+      case 'bulk_import':
+        return 'Bulk import';
+      case 'widget':
+        return 'Widget';
+      case 'google_ads':
+        return 'Google Ads';
+      case 'meta_ads':
+        return 'Meta Ads';
+      default:
+        return 'Manual';
     }
   }
 }

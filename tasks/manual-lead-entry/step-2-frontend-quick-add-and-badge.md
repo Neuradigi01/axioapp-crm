@@ -2,7 +2,7 @@
 
 **Goal:** Surface the new `source` column on the leads list as a small badge per row, and add a global floating "+" button to the app shell that opens the existing lead-form modal from any `/user/...` page. Permission-gated to `leads.create`.
 **Track:** Manual Lead Entry
-**Status:** Pending
+**Status:** Done — `LeadSource` TS type alias declared in `leads-api.service.ts`; `Lead` now requires `source`, `LeadCreate` accepts optional `source`. `LeadCardComponent` renders a per-source colour-coded badge (Manual/gray, Bulk import/indigo, Widget/emerald, Google Ads/amber, Meta Ads/blue) under the existing budget line, so both kanban + list views inherit it. New standalone `QuickAddFabComponent` lives at `core/shared/quick-add-fab/`; permission-gated by `leads.write` via `FurnitureAuthService.currentPermissions()`; positioned `fixed bottom-6 right-6 z-30` (sits below the toast host's z-50 so transient toasts overlay it cleanly). FAB navigates to `/user/leads?new=1`; `LeadsPageComponent` reads the query param on init, calls `openCreate()`, then strips the param via `replaceUrl` so refresh doesn't re-open. Angular dev build passes with zero warnings (10.7s). Permission key used is `leads.write` (matches the backend), not the spec's hypothetical `leads.create`.
 **Depends on:** Step 1 (backend `source` field + audit event), Phase 1.10 (app shell), Phase 2.12 (Leads frontend), Phase 1.5 (permissions on the frontend).
 
 ---

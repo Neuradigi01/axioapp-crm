@@ -7,12 +7,22 @@ import { FieldDef } from '../shared/dynamic-form/types';
 
 export type LeadStatus = 'active' | 'won' | 'lost';
 
+/** Provenance of a lead row. Matches the backend `lead_source` PG enum
+ * exactly — keep in sync. */
+export type LeadSource =
+  | 'manual'
+  | 'bulk_import'
+  | 'widget'
+  | 'google_ads'
+  | 'meta_ads';
+
 export interface Lead {
   id: string;
   org_id: string;
   contact_id: string;
   pipeline_stage: string;
   status: LeadStatus;
+  source: LeadSource;
   assigned_to_id: string | null;
   budget: string | null;
   expected_close_date: string | null;
@@ -37,6 +47,8 @@ export interface LeadCreate {
   budget?: string | null;
   expected_close_date?: string | null;
   custom_data?: Record<string, unknown>;
+  /** Defaults to 'manual' server-side when omitted. */
+  source?: LeadSource;
 }
 
 export type LeadUpdate = Partial<{
