@@ -2,7 +2,7 @@
 
 **Goal:** Persist per-org overrides for standard fields and expose CRUD endpoints gated on the new `settings.standard_fields.manage` permission. Enforce the registry's `overridable_props` contract at write time so the DB never holds an override for a knob the field doesn't allow.
 **Track:** Standard Field Overrides
-**Status:** Pending
+**Status:** COMPLETED — migration `0039_standard_field_overrides`, model, schemas, service, router, and unit tests shipped. The `_validate_payload_against_registry` helper enforces the registry contract: 404 for unknown entity/field, 422 for any prop not in `overridable_props` (errors collected, all reported at once). Audit emission via `settings.standard_field_override.updated` / `…reset`. `actor_id` plumbed through from `user.legacy_uuid` to `created_by` / `updated_by`. Router mounted under `/api/v1/standard-fields` with `settings.standard_fields.manage` gating all four endpoints. Audit `events.py` skipped — codebase convention is string literals at call sites (confirmed in `core/audit/service.py`). 20 pure-unit tests cover all 404/422 paths, schema constraints, the payload↔registry name bridge, migration shape, and router wiring. DB/HTTP integration suite documented in the test file but deferred — existing `conftest.py` fixtures pre-date the DR.7 user-table split (a separate pre-existing bug) and the Postgres host isn't reachable from this workstation. Migration is unrun in this environment for the same reason; the file imports cleanly and follows the same shape as 0006 (RLS via `apply_rls`).
 **Depends on:** Step 1 (registry + permission key), Phase 1.4 (multi-tenancy + RLS), Phase 1.7 (audit logs).
 
 ---

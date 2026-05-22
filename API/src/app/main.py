@@ -43,6 +43,7 @@ from src.app.core.pipelines.router import router as pipelines_router
 from src.app.core.reviews.router import router as reviews_router
 from src.app.core.settings.router import router as settings_router
 from src.app.core.staff.router import router as staff_router
+from src.app.core.standard_fields.router import router as standard_fields_router
 from src.app.core.staff_portal.router import router as staff_portal_router
 from src.app.core.tasks.router import router as tasks_router
 from src.app.core.walk_ins.router import router as walk_ins_router
@@ -169,6 +170,7 @@ app.include_router(call_outcomes_router, prefix="/api/v1")
 app.include_router(reviews_router, prefix="/api/v1")
 app.include_router(campaigns_router, prefix="/api/v1")
 app.include_router(settings_router, prefix="/api/v1")
+app.include_router(standard_fields_router, prefix="/api/v1")
 app.include_router(fp_inventory_router, prefix="/api/v1")
 app.include_router(fp_custom_orders_router, prefix="/api/v1")
 app.include_router(fp_field_ops_router, prefix="/api/v1")
