@@ -14,5 +14,5 @@ MODULE = ModuleDescriptor(
     route="/api/v1/leads",
     frontend_route="/user/leads",
     menu_position=250,
-    permissions=["leads.read", "leads.write"],
+    permissions=["leads.read", "leads.write", "leads.import"],
 )

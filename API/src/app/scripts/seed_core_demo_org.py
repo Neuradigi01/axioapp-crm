@@ -84,7 +84,7 @@ _ADMIN_KEYS: list[str] = [
     "custom_fields.read", "custom_fields.write",
     "settings.read", "settings.write",
     "contacts.read", "contacts.write",
-    "leads.read", "leads.write",
+    "leads.read", "leads.write", "leads.import",
     "appointments.read", "appointments.write",
     # Walk-ins: sidebar gates on `walkins.*` (module descriptor), but the
     # furniture pack.yaml emits `walk_ins.*` keys too. Grant both so this
