@@ -25,11 +25,11 @@ const ATTRIBUTION: Attribution = {
 function makeConfig(overrides: Partial<WidgetConfig> = {}): WidgetConfig {
   return {
     fields: [
-      { key: "full_name", label: "Name", required: true, order: 0, field_type: "text", field_source: "standard" },
-      { key: "phone", label: "Phone", required: true, order: 1, field_type: "tel", field_source: "standard" },
-      { key: "email", label: "Email", required: false, order: 2, field_type: "email", field_source: "standard" },
-      { key: "interest", label: "Interest", required: false, order: 3, field_type: "select", options: ["Sofas", "Beds"], field_source: "standard" },
-      { key: "notes", label: "Notes", required: false, order: 4, field_type: "textarea", field_source: "standard" },
+      { key: "full_name", label: "Name", required: true, order: 0, field_type: "text", field_source: "standard", entity: "contact" },
+      { key: "phone", label: "Phone", required: true, order: 1, field_type: "tel", field_source: "standard", entity: "contact" },
+      { key: "email", label: "Email", required: false, order: 2, field_type: "email", field_source: "standard", entity: "contact" },
+      { key: "interest", label: "Interest", required: false, order: 3, field_type: "select", options: ["Sofas", "Beds"], field_source: "standard", entity: "contact" },
+      { key: "notes", label: "Notes", required: false, order: 4, field_type: "textarea", field_source: "standard", entity: "contact" },
     ],
     submit_button_label: "Submit",
     thank_you_message: "Thanks!",

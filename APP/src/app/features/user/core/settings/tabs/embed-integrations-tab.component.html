@@ -133,7 +133,7 @@
                     <div class="flex items-center gap-1.5">
                       <code class="text-xs text-zinc-600">{{ f.key }}</code>
                       @if (f.field_source === 'custom') {
-                        <span class="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-medium text-indigo-700">CUSTOM</span>
+                        <span class="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-medium text-indigo-700">CUSTOM · {{ f.entity }}</span>
                       }
                     </div>
                     <p class="text-[10px] text-zinc-400">{{ f.field_type }}</p>
@@ -220,10 +220,15 @@
                 </p>
               } @else {
                 <ul class="divide-y divide-zinc-200 rounded-md border border-zinc-200 bg-white">
-                  @for (opt of pickerOptions(); track opt.field_key) {
+                  @for (opt of pickerOptions(); track opt.entity + '.' + opt.field_key) {
                     <li class="flex items-center justify-between gap-2 px-3 py-2">
                       <div>
-                        <div class="text-sm font-medium text-zinc-900">{{ opt.field_label }}</div>
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-sm font-medium text-zinc-900">{{ opt.field_label }}</span>
+                          <span class="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium uppercase text-zinc-600">
+                            {{ opt.entity }}
+                          </span>
+                        </div>
                         <div class="text-[10px] text-zinc-500">
                           <code>{{ opt.field_key }}</code> · {{ opt.field_type }}
                           @if (opt.is_required) { · required }

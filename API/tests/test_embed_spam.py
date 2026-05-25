@@ -537,25 +537,34 @@ class TestSubmitSpamGates:
 # --- Step 10: custom-field routing ----------------------------------------
 
 
-def _config_row_with_custom_field():
-    """A config that exposes one standard field plus a custom `address`
-    text field — mirrors the Owner adding `address` via the picker."""
-    doc = WidgetConfigDocument(
-        fields=[
+def _config_row_with_custom_field(*, with_lead_custom: bool = False):
+    """A config that exposes one standard field plus a contact-entity
+    custom `address` text field. When `with_lead_custom=True`, also
+    includes a lead-entity custom `companyname` text field — mirrors
+    the Owner adding both via the picker."""
+    fields = [
+        WidgetConfigField(
+            key="full_name", label="Name", required=True, order=0,
+            field_type="text", field_source="standard", entity="contact",
+        ),
+        WidgetConfigField(
+            key="phone", label="Phone", required=True, order=1,
+            field_type="tel", field_source="standard", entity="contact",
+        ),
+        WidgetConfigField(
+            key="address", label="Address", required=False, order=2,
+            field_type="text", field_source="custom", entity="contact",
+        ),
+    ]
+    if with_lead_custom:
+        fields.append(
             WidgetConfigField(
-                key="full_name", label="Name", required=True, order=0,
-                field_type="text", field_source="standard",
-            ),
-            WidgetConfigField(
-                key="phone", label="Phone", required=True, order=1,
-                field_type="tel", field_source="standard",
-            ),
-            WidgetConfigField(
-                key="address", label="Address", required=False, order=2,
-                field_type="text", field_source="custom",
-            ),
-        ],
-    )
+                key="companyname", label="Company", required=False,
+                order=3, field_type="text", field_source="custom",
+                entity="lead",
+            )
+        )
+    doc = WidgetConfigDocument(fields=fields)
     return SimpleNamespace(config=doc.model_dump(mode="json"))
 
 
@@ -639,6 +648,98 @@ class TestCustomFieldRouting:
         assert len(created_payloads) == 1
         assert created_payloads[0].custom_data == {
             "address": "42 MG Road, Pune"
+        }
+
+    @pytest.mark.asyncio
+    async def test_lead_entity_custom_field_routes_into_lead_custom_data(
+        self, monkeypatch
+    ):
+        # Owner exposes a lead-entity `companyname` custom field on the
+        # widget. Submitted value must land in the LEAD's custom_data
+        # (not the contact's).
+        contact_payloads: list = []
+        lead_payloads: list = []
+
+        async def _find_key(plain, ip=None):
+            return SimpleNamespace(
+                id=_KEY_ID, org_id=_ORG_ID, prefix="pk_live_xx"
+            )
+
+        async def _public_get(_):
+            return _config_row_with_custom_field(with_lead_custom=True)
+
+        async def _audit_log(*_a, **_k):
+            return None
+
+        async def _record_log(*_a, **_k):
+            return None
+
+        async def _find_existing(*_a, **_k):
+            return None
+
+        async def _create_contact(session, *, org_id, payload, **_kwargs):
+            contact_payloads.append(payload)
+            return SimpleNamespace(id=_CONTACT_ID)
+
+        async def _create_lead(session, *, org_id, payload, **_kwargs):
+            lead_payloads.append(payload)
+            return SimpleNamespace(id=_LEAD_ID)
+
+        class _NullCM:
+            async def __aenter__(self_inner):
+                return MagicMock()
+
+            async def __aexit__(self_inner, *a):
+                return False
+
+        monkeypatch.setattr(submissions, "find_by_plain_key", _find_key)
+        monkeypatch.setattr(submissions, "public_get_config", _public_get)
+        monkeypatch.setattr(
+            submissions,
+            "check_per_key",
+            lambda _p: RateLimitResult(
+                allowed=True, remaining=100, retry_after=0.0
+            ),
+        )
+        monkeypatch.setattr(
+            submissions,
+            "check_per_ip",
+            lambda _ip: RateLimitResult(
+                allowed=True, remaining=10, retry_after=0.0
+            ),
+        )
+        monkeypatch.setattr(
+            submissions, "find_existing_contact", _find_existing
+        )
+        monkeypatch.setattr(submissions, "create_contact", _create_contact)
+        monkeypatch.setattr(submissions, "create_lead", _create_lead)
+        monkeypatch.setattr(submissions, "async_session", lambda: _NullCM())
+        monkeypatch.setattr(submissions.audit, "log", _audit_log)
+        monkeypatch.setattr(
+            submissions.log_service, "record", _record_log
+        )
+
+        payload = _payload_defaults(
+            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            custom_data={
+                "address": "42 MG Road, Pune",
+                "companyname": "Acme Furniture Pvt Ltd",
+            },
+        )
+
+        result = await submissions.submit(
+            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
+        )
+
+        assert result.accepted is True
+        # Address lives on contact, companyname lives on lead.
+        assert len(contact_payloads) == 1
+        assert contact_payloads[0].custom_data == {
+            "address": "42 MG Road, Pune"
+        }
+        assert len(lead_payloads) == 1
+        assert lead_payloads[0].custom_data == {
+            "companyname": "Acme Furniture Pvt Ltd"
         }
 
     @pytest.mark.asyncio

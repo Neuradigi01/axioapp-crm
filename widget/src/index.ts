@@ -53,10 +53,10 @@ export { ApiError } from "./api";
  */
 const FALLBACK_CONFIG: WidgetConfig = {
   fields: [
-    { key: "full_name", label: "Your name", placeholder: "Asha Reddy", required: true, order: 0, field_type: "text", field_source: "standard" },
-    { key: "phone", label: "Phone", placeholder: "+91 …", required: true, order: 1, field_type: "tel", field_source: "standard" },
-    { key: "email", label: "Email", placeholder: "you@…", required: false, order: 2, field_type: "email", field_source: "standard" },
-    { key: "notes", label: "Tell us more", placeholder: "Anything we should know?", required: false, order: 3, field_type: "textarea", field_source: "standard" },
+    { key: "full_name", label: "Your name", placeholder: "Asha Reddy", required: true, order: 0, field_type: "text", field_source: "standard", entity: "contact" },
+    { key: "phone", label: "Phone", placeholder: "+91 …", required: true, order: 1, field_type: "tel", field_source: "standard", entity: "contact" },
+    { key: "email", label: "Email", placeholder: "you@…", required: false, order: 2, field_type: "email", field_source: "standard", entity: "contact" },
+    { key: "notes", label: "Tell us more", placeholder: "Anything we should know?", required: false, order: 3, field_type: "textarea", field_source: "standard", entity: "contact" },
   ],
   submit_button_label: "Get a quote",
   thank_you_message: "Thanks — we'll reach out shortly.",

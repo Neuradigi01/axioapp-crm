@@ -110,15 +110,19 @@ export class EmbedIntegrationsTabComponent {
   protected readonly pickerError = signal<string | null>(null);
 
   /** Subset of `availableCustomFields` not already in the config. The
-   *  picker filters these out so the same field can't be added twice. */
+   *  picker filters these out so the same field can't be added twice.
+   *  Filter key is `${entity}.${field_key}` so a contact `address`
+   *  and a lead `address` (if both exist) don't shadow each other. */
   protected readonly pickerOptions = computed<AvailableCustomField[]>(() => {
     const all = this.availableCustomFields() ?? [];
     const cfg = this.config();
     if (!cfg) return all;
-    const exposedKeys = new Set(
-      cfg.fields.filter((f) => f.field_source === 'custom').map((f) => f.key),
+    const exposed = new Set(
+      cfg.fields
+        .filter((f) => f.field_source === 'custom')
+        .map((f) => `${f.entity}.${f.key}`),
     );
-    return all.filter((f) => !exposedKeys.has(f.field_key));
+    return all.filter((f) => !exposed.has(`${f.entity}.${f.field_key}`));
   });
 
   // --- Panel 3: install snippet ----------------------------------------
@@ -323,6 +327,7 @@ export class EmbedIntegrationsTabComponent {
       field_type: customTypeToWidgetType(field.field_type),
       options: field.options ?? null,
       field_source: 'custom',
+      entity: field.entity,
     };
     this.config.set({
       ...cur,

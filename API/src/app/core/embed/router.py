@@ -29,7 +29,7 @@ from src.app.core.auth.dependencies import require_permissions
 from src.app.core.embed import log_service
 from src.app.core.embed.config_service import (
     get_or_create as get_or_create_config,
-    list_available_contact_custom_fields,
+    list_available_widget_custom_fields,
     public_get as public_get_config,
     update as update_config,
 )
@@ -160,11 +160,13 @@ async def list_available_custom_fields_endpoint(
         require_permissions("settings.integrations.embed.manage")
     ),
 ) -> list[AvailableCustomField]:
-    """Return the contact custom fields the Owner can opt IN to the
-    widget. Drives the Settings → Embed → "Add custom field" picker.
-    Unsupported types (multiselect/datetime/etc.) appear in the list
-    with `widget_supported=false` so the UI can grey them out."""
-    return await list_available_contact_custom_fields(db)
+    """Return the custom fields (contact AND lead) the Owner can opt IN
+    to the widget. Drives the Settings → Embed → "Add custom field"
+    picker. Unsupported types (multiselect/datetime/etc.) appear in the
+    list with `widget_supported=false` so the UI can grey them out;
+    each row carries `entity` so the picker can show which entity the
+    field belongs to."""
+    return await list_available_widget_custom_fields(db)
 
 
 @router.put("/config", response_model=WidgetConfigRead)

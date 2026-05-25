@@ -31,10 +31,11 @@ export type WidgetFieldType =
   | 'date';
 
 export type WidgetFieldSource = 'standard' | 'custom';
+export type WidgetFieldEntity = 'contact' | 'lead';
 
 export interface WidgetConfigField {
   /** Standard-source keys are one of `WidgetStandardFieldKey`; custom-
-   *  source keys are the org's contact custom-field `field_key`. */
+   *  source keys are the org's contact or lead custom-field `field_key`. */
   key: string;
   label: string;
   placeholder?: string | null;
@@ -43,13 +44,20 @@ export interface WidgetConfigField {
   field_type: WidgetFieldType;
   options?: string[] | null;
   field_source: WidgetFieldSource;
+  /** Where the custom-source value gets routed at submission time —
+   *  `contact.custom_data` or `lead.custom_data`. Ignored for
+   *  standard-source fields (which always land on the contact). */
+  entity: WidgetFieldEntity;
 }
 
 
 /** One row in `GET /embed/available-custom-fields` — drives the
  *  Settings "Add custom field" picker. Unsupported types stay in the
- *  list but get `widget_supported=false` so the UI greys them out. */
+ *  list but get `widget_supported=false` so the UI greys them out.
+ *  `entity` tells the picker whether the field lives on the contact
+ *  or lead entity so the Owner knows where it'll route. */
 export interface AvailableCustomField {
+  entity: WidgetFieldEntity;
   field_key: string;
   field_label: string;
   field_type: string;

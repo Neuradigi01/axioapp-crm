@@ -246,14 +246,12 @@ async def submit(
                 combined_notes = _combine_notes(
                     payload.interest, payload.notes
                 )
-                # Drop empty-string custom values so they don't land as
-                # "" in JSONB (cleaner than storing literal empties; the
-                # field is just absent for visitors who left it blank).
-                widget_custom_data = {
-                    k: v
-                    for k, v in (payload.custom_data or {}).items()
-                    if v not in (None, "")
-                }
+                # Split custom_data into contact vs lead buckets based
+                # on each field's `entity` in the org's widget config.
+                # Empties dropped so they don't land as "" in JSONB.
+                contact_custom_data, lead_custom_data = (
+                    _split_custom_data(payload.custom_data or {}, document)
+                )
                 contact = await create_contact(
                     session,
                     org_id=org_id,
@@ -263,7 +261,7 @@ async def submit(
                         email=payload.email,
                         source="widget",
                         notes=combined_notes,
-                        custom_data=widget_custom_data,
+                        custom_data=contact_custom_data,
                     ),
                     # Visitors filling out a public widget form can't
                     # possibly know the org's required custom fields
@@ -277,7 +275,8 @@ async def submit(
 
             # 10. Create the lead. Same reasoning as create_contact —
             # widget visitors don't know the org's required custom
-            # fields on the lead either.
+            # fields on the lead either. Lead-entity custom-data values
+            # (e.g. `companyname`) flow in via `lead_custom_data`.
             lead = await create_lead(
                 session,
                 org_id=org_id,
@@ -287,6 +286,7 @@ async def submit(
                     attribution=payload.attribution.model_dump(
                         exclude_none=False
                     ),
+                    custom_data=lead_custom_data,
                 ),
                 require_all_required=False,
             )
@@ -452,6 +452,37 @@ def _truncate_reason(value: object, length: int = 500) -> str:
     short string for the submission log's `reason` column."""
     text = value if isinstance(value, str) else str(value)
     return text[:length]
+
+
+def _split_custom_data(
+    submitted: dict[str, object],
+    document: WidgetConfigDocument,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Split the visitor's flat `custom_data` payload into (contact,
+    lead) buckets based on each field's `entity` in the widget config.
+
+    Empty / None values are dropped from both buckets so widget
+    submissions don't pollute existing JSONB with literal empties.
+    Keys not in the config (already 422'd upstream by the validator)
+    fall through to the contact bucket as a defensive default — they
+    shouldn't reach here.
+    """
+    entity_by_key: dict[str, str] = {
+        f.key: f.entity
+        for f in document.fields
+        if f.field_source == "custom"
+    }
+    contact_bucket: dict[str, object] = {}
+    lead_bucket: dict[str, object] = {}
+    for key, value in submitted.items():
+        if value is None or (isinstance(value, str) and value == ""):
+            continue
+        entity = entity_by_key.get(key, "contact")
+        if entity == "lead":
+            lead_bucket[key] = value
+        else:
+            contact_bucket[key] = value
+    return contact_bucket, lead_bucket
 
 
 def _combine_notes(

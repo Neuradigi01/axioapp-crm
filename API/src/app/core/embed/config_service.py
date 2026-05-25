@@ -182,13 +182,16 @@ async def update(
     return row
 
 
+_WIDGET_ENTITIES: tuple[str, ...] = ("contact", "lead")
+
+
 async def _validate_custom_field_refs(
     session: AsyncSession,
     *,
     fields: list[WidgetConfigField],
 ) -> None:
     """Reject the PUT if a custom-source field references an unknown
-    custom field, a non-contact entity, or a type the widget bundle
+    custom field, the wrong entity, or a type the widget bundle
     doesn't know how to render. Catches Owner typos + prevents
     exposing pack-defined system fields the renderer can't handle.
     """
@@ -196,64 +199,79 @@ async def _validate_custom_field_refs(
     if not custom_refs:
         return
 
-    keys = sorted({f.key for f in custom_refs})
+    # Look up by (entity_type, field_key) so contact `address` and lead
+    # `address` (if both exist) don't collide on the validation.
+    needed: set[tuple[str, str]] = {(f.entity, f.key) for f in custom_refs}
     rows = (
         (
             await session.execute(
                 select(CustomFieldDefinition).where(
-                    CustomFieldDefinition.entity_type == "contact",
-                    CustomFieldDefinition.field_key.in_(keys),
+                    CustomFieldDefinition.entity_type.in_(_WIDGET_ENTITIES),
+                    CustomFieldDefinition.field_key.in_(
+                        [k for _, k in needed]
+                    ),
                 )
             )
         )
         .scalars()
         .all()
     )
-    found_by_key = {r.field_key: r for r in rows}
+    found_by_pair: dict[tuple[str, str], CustomFieldDefinition] = {
+        (r.entity_type, r.field_key): r for r in rows
+    }
 
-    missing = [k for k in keys if k not in found_by_key]
+    missing = [
+        f"{entity}.{key}"
+        for entity, key in sorted(needed)
+        if (entity, key) not in found_by_pair
+    ]
     if missing:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
-                f"Custom field(s) {missing} are not defined on the "
-                "contact entity — add them under Settings → Custom "
-                "fields first, then opt them in to the widget."
+                f"Custom field(s) {missing} are not defined — add them "
+                "under Settings → Custom fields first (pick the right "
+                "Entity dropdown), then opt them in to the widget."
             ),
         )
 
     unsupported = [
-        (k, found_by_key[k].field_type.value)
-        for k in keys
-        if found_by_key[k].field_type.value
+        f"{entity}.{key} ({found_by_pair[(entity, key)].field_type.value})"
+        for entity, key in sorted(needed)
+        if found_by_pair[(entity, key)].field_type.value
         not in _WIDGET_SUPPORTED_CUSTOM_TYPES
     ]
     if unsupported:
-        labels = ", ".join(f"{k} ({t})" for k, t in unsupported)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
-                f"Custom field type not supported on the widget: {labels}. "
+                f"Custom field type not supported on the widget: "
+                f"{', '.join(unsupported)}. "
                 f"Supported: {sorted(_WIDGET_SUPPORTED_CUSTOM_TYPES)}."
             ),
         )
 
 
-async def list_available_contact_custom_fields(
+async def list_available_widget_custom_fields(
     session: AsyncSession,
 ) -> list[AvailableCustomField]:
-    """Read-only listing of contact custom fields the Settings picker
-    can offer for widget opt-in. Includes a `widget_supported` flag —
-    unsupported types stay in the list (so the Owner can see the
+    """Read-only listing of custom fields (contact OR lead) the Settings
+    picker can offer for widget opt-in. Includes a `widget_supported`
+    flag — unsupported types stay in the list (so the Owner can see the
     field exists) but the picker greys them out.
     """
     rows = (
         (
             await session.execute(
                 select(CustomFieldDefinition)
-                .where(CustomFieldDefinition.entity_type == "contact")
+                .where(
+                    CustomFieldDefinition.entity_type.in_(_WIDGET_ENTITIES)
+                )
                 .where(CustomFieldDefinition.is_hidden.is_(False))
-                .order_by(CustomFieldDefinition.display_order)
+                .order_by(
+                    CustomFieldDefinition.entity_type,
+                    CustomFieldDefinition.display_order,
+                )
             )
         )
         .scalars()
@@ -270,6 +288,7 @@ async def list_available_contact_custom_fields(
             opts = [str(v) for v in row.options]
         out.append(
             AvailableCustomField(
+                entity=row.entity_type,  # "contact" | "lead"
                 field_key=row.field_key,
                 field_label=row.field_label,
                 field_type=row.field_type.value,
@@ -281,6 +300,11 @@ async def list_available_contact_custom_fields(
             )
         )
     return out
+
+
+# Back-compat alias — the old function name still works in case anything
+# external imports it. Drop in a follow-on cleanup.
+list_available_contact_custom_fields = list_available_widget_custom_fields
 
 
 async def public_get(org_id: uuid.UUID) -> Optional[WidgetConfig]:
@@ -305,6 +329,7 @@ async def public_get(org_id: uuid.UUID) -> Optional[WidgetConfig]:
 __all__ = [
     "get_or_create",
     "list_available_contact_custom_fields",
+    "list_available_widget_custom_fields",
     "public_get",
     "update",
 ]

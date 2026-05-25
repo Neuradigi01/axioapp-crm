@@ -37,6 +37,13 @@ export type WidgetFieldType =
  */
 export type WidgetFieldSource = "standard" | "custom";
 
+/**
+ * Where a custom-source field's value gets routed at submission time
+ * — `contact` lands on the contact's custom_data, `lead` on the lead's.
+ * Ignored for standard-source fields (always on the contact).
+ */
+export type WidgetFieldEntity = "contact" | "lead";
+
 export interface WidgetField {
   key: string;
   label: string;
@@ -46,6 +53,7 @@ export interface WidgetField {
   field_type: WidgetFieldType;
   options?: string[] | null;
   field_source: WidgetFieldSource;
+  entity: WidgetFieldEntity;
 }
 
 export interface WidgetBranding {

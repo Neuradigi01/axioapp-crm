@@ -161,6 +161,7 @@ __all__ = [
     "WidgetConfigSpamProtection",
     "WidgetConfigSpamProtectionPublic",
     "WidgetConfigUpdate",
+    "WidgetFieldEntity",
 ]
 
 
@@ -168,12 +169,14 @@ __all__ = [
 
 
 class AvailableCustomField(BaseModel):
-    """One row in `GET /embed/available-custom-fields` — the contact
-    custom fields the Owner can opt IN to the widget. The Settings
-    picker uses this list; selecting a row appends a `WidgetConfigField`
-    with `field_source='custom'` to the widget config.
+    """One row in `GET /embed/available-custom-fields` — the custom
+    fields (on contact OR lead) the Owner can opt IN to the widget.
+    The Settings picker uses this list; selecting a row appends a
+    `WidgetConfigField` with `field_source='custom'` and the right
+    `entity` to the widget config.
     """
 
+    entity: WidgetFieldEntity
     field_key: str
     field_label: str
     field_type: str
@@ -214,6 +217,13 @@ WidgetFieldType = Literal[
 WidgetFieldSource = Literal["standard", "custom"]
 
 
+# Which entity a custom-source field belongs to. Contact is the default
+# for back-compat with widget configs saved before this field existed.
+# Lead is for fields like "company name" or "budget" that conceptually
+# attach to the opportunity rather than the person submitting it.
+WidgetFieldEntity = Literal["contact", "lead"]
+
+
 class WidgetConfigField(BaseModel):
     """One configurable field in the rendered widget form.
 
@@ -222,12 +232,13 @@ class WidgetConfigField(BaseModel):
     from `options` if the field is select-typed.
 
     For `field_source='standard'`, `key` must be one of the 5 baked-in
-    field keys (`full_name`, `phone`, `email`, `interest`, `notes`).
-    For `field_source='custom'`, `key` references a contact-level
-    custom field defined in the org's `custom_field_definitions`
-    table — validation that the referenced field actually exists
-    happens at `PUT /embed/config` time (not here, since this schema
-    is org-agnostic).
+    field keys (`full_name`, `phone`, `email`, `interest`, `notes`) and
+    `entity` is ignored (standard fields always land on the contact).
+
+    For `field_source='custom'`, `key` references a custom field defined
+    in the org's `custom_field_definitions` table for the entity given
+    by `entity` (`contact` or `lead`). Validation that the referenced
+    field actually exists happens at `PUT /embed/config` time.
     """
 
     key: str = Field(min_length=1, max_length=64)
@@ -238,6 +249,7 @@ class WidgetConfigField(BaseModel):
     field_type: WidgetFieldType = "text"
     options: Optional[list[str]] = Field(default=None, max_length=50)
     field_source: WidgetFieldSource = "standard"
+    entity: WidgetFieldEntity = "contact"
 
     @model_validator(mode="after")
     def _check_invariants(self) -> "WidgetConfigField":
