@@ -336,12 +336,14 @@ class _SubmitHarness:
         async def _find_existing(session, *, org_id, phone, email):
             return None
 
-        async def _create_contact(session, *, org_id, payload):
+        async def _create_contact(session, *, org_id, payload, **_kwargs):
+            # `**_kwargs` absorbs `require_all_required` and any future
+            # opt-in parameters added to the real service signature.
             contact = SimpleNamespace(id=_CONTACT_ID)
             self.created_contacts.append(contact)
             return contact
 
-        async def _create_lead(session, *, org_id, payload):
+        async def _create_lead(session, *, org_id, payload, **_kwargs):
             lead = SimpleNamespace(id=_LEAD_ID)
             self.created_leads.append(lead)
             return lead

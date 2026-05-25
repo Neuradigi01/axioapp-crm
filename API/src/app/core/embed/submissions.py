@@ -256,10 +256,19 @@ async def submit(
                         source="widget",
                         notes=combined_notes,
                     ),
+                    # Visitors filling out a public widget form can't
+                    # possibly know the org's required custom fields
+                    # (e.g. an `address` field added in Settings). Staff
+                    # fill those in via the contact edit form after the
+                    # lead lands. Required-field enforcement at create
+                    # time would just produce 422s on every submission.
+                    require_all_required=False,
                 )
                 contact_id = contact.id
 
-            # 10. Create the lead.
+            # 10. Create the lead. Same reasoning as create_contact —
+            # widget visitors don't know the org's required custom
+            # fields on the lead either.
             lead = await create_lead(
                 session,
                 org_id=org_id,
@@ -270,6 +279,7 @@ async def submit(
                         exclude_none=False
                     ),
                 ),
+                require_all_required=False,
             )
 
         # 11. Audit. The org context is still set so audit.log derives

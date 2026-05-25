@@ -256,13 +256,27 @@ async def create_lead(
     *,
     org_id: uuid.UUID,
     payload: LeadCreate,
+    require_all_required: bool = True,
 ) -> Lead:
+    """Create a lead.
+
+    `require_all_required=True` (default) enforces every required
+    custom-field definition — the right behaviour for staff-driven
+    forms where the operator knows the org's schema.
+
+    Public ingestion paths (embed widget, ad-form webhooks, bulk
+    imports of unknown shape) pass `False` because the submitter
+    can't possibly know the org's custom-field requirements;
+    staff fill in the blanks afterwards via the edit form.
+    """
     await _ensure_contact_in_scope(session, payload.contact_id)
     stage_key = await _resolve_initial_stage(
         session, requested=payload.pipeline_stage
     )
     cleaned_custom = await _validate_custom_data(
-        session, payload=payload.custom_data, require_all_required=True
+        session,
+        payload=payload.custom_data,
+        require_all_required=require_all_required,
     )
 
     lead = Lead(

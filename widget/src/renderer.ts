@@ -111,7 +111,7 @@ export function renderForm(
   if (config.branding.show_powered_by) {
     const footer = document.createElement("div");
     footer.className = "furnicrm-form__powered-by";
-    footer.textContent = "Powered by FurniCRM";
+    footer.textContent = "Powered by CRM";
     form.appendChild(footer);
   }
 
