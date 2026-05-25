@@ -69,6 +69,7 @@ def _snapshot(lead: Lead) -> dict[str, Any]:
             else None
         ),
         "custom_data": lead.custom_data,
+        "attribution": lead.attribution,
     }
 
 
@@ -274,6 +275,7 @@ async def create_lead(
         budget=payload.budget,
         expected_close_date=payload.expected_close_date,
         custom_data=cleaned_custom,
+        attribution=payload.attribution,
     )
     session.add(lead)
     await session.commit()

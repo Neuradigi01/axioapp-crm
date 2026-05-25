@@ -26,6 +26,9 @@ class LeadCreate(BaseModel):
     expected_close_date: Optional[date] = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
     source: LeadSource = LeadSource.manual
+    # Channel-supplied provenance (widget UTM, ad webhook ids, etc.).
+    # Stays None for manual + bulk-import paths.
+    attribution: Optional[dict[str, Any]] = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -64,6 +67,7 @@ class LeadOut(BaseModel):
     budget: Optional[Decimal]
     expected_close_date: Optional[date]
     custom_data: dict[str, Any]
+    attribution: Optional[dict[str, Any]]
     created_at: datetime
     updated_at: datetime
 

@@ -50,6 +50,7 @@ _CORE_ADMIN_KEYS: list[str] = [
     "custom_fields.read", "custom_fields.write",
     "settings.read", "settings.write",
     "settings.standard_fields.manage",
+    "settings.integrations.embed.manage",
     "contacts.read", "contacts.write",
     "leads.read", "leads.write", "leads.import",
     "appointments.read", "appointments.write",

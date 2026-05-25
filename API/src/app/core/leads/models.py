@@ -109,6 +109,13 @@ class Lead(Base, TenantScoped):
         nullable=False,
         server_default=text("'{}'::jsonb"),
     )
+    # Channel-supplied provenance (widget UTM, ad webhook ids, etc.).
+    # Nullable — manual + bulk-import leads typically have no attribution
+    # to capture; widget + ad-integration channels populate it.
+    attribution: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

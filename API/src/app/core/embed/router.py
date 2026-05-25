@@ -1,0 +1,178 @@
+"""HTTP routes for embeddable-widget.
+
+Admin (JWT-gated) — manage keys:
+
+  POST   /api/v1/embed/keys       → issue (returns plaintext ONCE)
+  GET    /api/v1/embed/keys       → list (no plaintext, ever)
+  DELETE /api/v1/embed/keys/{id}  → soft-revoke
+
+Public (no JWT) — visitor submissions:
+
+  POST   /api/v1/embed/leads      → submit a form (key in header or body)
+  OPTIONS /api/v1/embed/leads     → CORS preflight
+
+The admin endpoints are gated by `settings.integrations.embed.manage`.
+The public endpoint authenticates via the embed key alone — no JWT —
+so visitors on any third-party website can submit without first
+logging into FurnitureCRM.
+"""
+from __future__ import annotations
+
+import uuid
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Header, Request, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.app.core.auth.dependencies import require_permissions
+from src.app.core.embed.schemas import (
+    EmbedKeyIssue,
+    EmbedKeyIssueResponse,
+    EmbedKeyRead,
+    EmbedSubmission,
+    EmbedSubmissionResponse,
+)
+from src.app.core.embed.service import issue, list_keys, revoke
+from src.app.core.embed.submissions import submit as submit_widget_submission
+from src.app.core.users.models import User
+from src.app.shared.db import get_db
+
+
+router = APIRouter(prefix="/embed/keys", tags=["Embeddable Widget"])
+
+# Separate router for the public submission endpoint so the prefix
+# stays `/embed` (not `/embed/keys`). Mounted alongside the admin
+# router in main.py.
+public_router = APIRouter(prefix="/embed", tags=["Embeddable Widget — Public"])
+
+
+@router.post(
+    "",
+    response_model=EmbedKeyIssueResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def issue_embed_key_endpoint(
+    payload: EmbedKeyIssue,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("settings.integrations.embed.manage")
+    ),
+) -> EmbedKeyIssueResponse:
+    """Issue a new API key for the widget. The plaintext `secret`
+    appears in this response ONCE — the Owner must copy it before
+    navigating away. Subsequent reads only show the 11-char prefix.
+    """
+    row, plain = await issue(
+        db,
+        org_id=user.org_id,
+        actor_id=user.legacy_uuid,
+        name=payload.name,
+    )
+    return EmbedKeyIssueResponse(
+        id=row.id,
+        name=row.name,
+        prefix=row.prefix,
+        secret=plain,
+        created_at=row.created_at,
+    )
+
+
+@router.get("", response_model=list[EmbedKeyRead])
+async def list_embed_keys_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.embed.manage")
+    ),
+) -> list[EmbedKeyRead]:
+    rows = await list_keys(db)
+    return [EmbedKeyRead.model_validate(r) for r in rows]
+
+
+@router.delete(
+    "/{key_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def revoke_embed_key_endpoint(
+    key_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("settings.integrations.embed.manage")
+    ),
+) -> Response:
+    """Soft-revoke an API key. Idempotent — re-revoking returns 204
+    without emitting a second audit event."""
+    await revoke(
+        db,
+        org_id=user.org_id,
+        actor_id=user.legacy_uuid,
+        key_id=key_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Public submission endpoint -------------------------------------------
+
+# These headers go on every response from the public surface. The
+# global CORS middleware already sets `Access-Control-Allow-Origin: *`,
+# but we set them explicitly here too so any deployment that tightens
+# the global policy doesn't accidentally block embed traffic.
+_PUBLIC_CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-FurniCRM-Key",
+    "Access-Control-Max-Age": "3600",
+}
+
+
+def _client_ip(request: Request) -> str:
+    """Best-effort caller IP. Prefers `X-Forwarded-For` (left-most
+    hop is the original client) when a reverse proxy populates it,
+    falls back to the TCP-level client. Returns 'unknown' as a last
+    resort so the rate-limit bucket key is always well-defined."""
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+@public_router.options("/leads", include_in_schema=False)
+async def submit_lead_preflight() -> Response:
+    """CORS preflight for `POST /embed/leads`. Always 204 with the
+    open CORS headers — the actual `POST` enforces key auth + rate
+    limits."""
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers=_PUBLIC_CORS_HEADERS)
+
+
+@public_router.post(
+    "/leads",
+    response_model=EmbedSubmissionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def submit_embed_lead_endpoint(
+    payload: EmbedSubmission,
+    request: Request,
+    x_furnicrm_key: Optional[str] = Header(default=None, alias="X-FurniCRM-Key"),
+) -> Response:
+    """Public submission endpoint — no JWT, no admin auth.
+
+    Header `X-FurniCRM-Key: pk_live_…` is the preferred auth
+    transport; `embed_key` in the JSON body works as a fallback
+    (some hosts strip custom headers). Spam protection (honeypot,
+    min-fill-time, optional reCAPTCHA) lands in Step 8.
+    """
+    result = await submit_widget_submission(
+        payload=payload,
+        header_key=x_furnicrm_key,
+        ip=_client_ip(request),
+    )
+    body = EmbedSubmissionResponse(
+        ok=True,
+        lead_id=result.lead_id,
+        thank_you_url=result.thank_you_url,
+    )
+    return Response(
+        content=body.model_dump_json(),
+        media_type="application/json",
+        headers=_PUBLIC_CORS_HEADERS,
+    )

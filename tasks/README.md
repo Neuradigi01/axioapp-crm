@@ -209,8 +209,8 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 6: Frontend import history + error-report download](bulk-import/step-6-frontend-import-history.md) — Done
 
 #### Embeddable Widget (Track 3/4 — ~6 days, customer-site lead capture)
-- [Step 1: Backend `embed_keys` table + key issuance/revocation](embeddable-widget/step-1-backend-embed-keys.md) — Pending
-- [Step 2: Backend public `POST /embed/leads` + rate limit](embeddable-widget/step-2-backend-public-submission-endpoint.md) — Pending
+- [Step 1: Backend `embed_keys` table + key issuance/revocation](embeddable-widget/step-1-backend-embed-keys.md) — Done
+- [Step 2: Backend public `POST /embed/leads` + rate limit](embeddable-widget/step-2-backend-public-submission-endpoint.md) — Done
 - [Step 3: Backend per-org widget config](embeddable-widget/step-3-backend-widget-config.md) — Pending
 - [Step 4: Frontend Settings Embed tab (keys + config + snippet)](embeddable-widget/step-4-frontend-settings-embed-tab.md) — Pending
 - [Step 5: Widget build pipeline (Vite, vanilla TS)](embeddable-widget/step-5-widget-build-pipeline.md) — Pending
