@@ -5,26 +5,41 @@ extract HTTP details (key from header, IP from request) and call this.
 
 Pipeline:
 
-  1. Honeypot check — non-empty → silent 200, no lead created. Bots
-     learn nothing about being detected.
-  2. Key required (header or body field). Missing → 401.
-  3. Key lookup via `embed.service.find_by_plain_key`. Missing /
+  1. Key required (header or body field). Missing → 401.
+  2. Key lookup via `embed.service.find_by_plain_key`. Missing /
      revoked / garbage → 401 with a generic message (don't leak
      which keys exist).
-  4. Per-key + per-IP rate limit (sliding window, in-memory). Either
+  3. Per-key + per-IP rate limit (sliding window, in-memory). Either
      overage → 429 with `Retry-After` set to the longer of the two.
-  5. Open a tenant context for the key's org (since the public endpoint
+  4. Load the org's widget config (or bundle defaults).
+  5. Honeypot check — non-empty → silent 200 + audit. Bots learn
+     nothing about being detected.
+  6. Min-fill-time check — submissions arriving < `min_fill_time_ms`
+     after the form was rendered, or with `rendered_at` in the future
+     / > 24h in the past, → silent 200 + audit. Bots fill the form in
+     ms; legit humans take seconds.
+  7. reCAPTCHA check (if enabled in the org's config) — missing or
+     low-score token → silent 200 + audit. Google's siteverify is the
+     verdict; we fail closed on network / parse failures.
+  8. Open a tenant context for the key's org (since the public endpoint
      has no JWT, this is what authorises the dedup query + lead/contact
      writes against RLS).
-  6. Dedup-by-phone-or-email. If existing contact found, reuse its id.
+  9. Dedup-by-phone-or-email. If existing contact found, reuse its id.
      Otherwise create a new contact.
-  7. Create a lead with `source='widget'`, `actor_user_id=None`,
-     and the `attribution` payload from the request.
-  8. Emit `embed.submission.accepted` audit event.
+  10. Create a lead with `source='widget'`, `actor_user_id=None`,
+      and the `attribution` payload from the request.
+  11. Emit `embed.submission.accepted` audit event.
 
 `actor_user_id=None` is correct: there's no logged-in CRM user driving
 this — it's an anonymous form submission from a customer's website.
 Audit rows for these submissions correctly show `user_id=NULL`.
+
+**Why spam gates run AFTER key lookup:** earlier versions short-
+circuited on the honeypot before key resolution to save a DB hit.
+That made the audit event useless (no org_id) and meant the per-org
+`min_fill_time_ms` config couldn't be applied. Reordering costs one
+indexed lookup per bot submission — cheap relative to the value of
+per-org tuning + proper audit visibility.
 """
 from __future__ import annotations
 
@@ -32,6 +47,7 @@ import logging
 import math
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
@@ -41,10 +57,12 @@ from src.app.core.contacts.schemas import ContactCreate
 from src.app.core.contacts.service import create_contact
 from src.app.core.embed.config_service import public_get as public_get_config
 from src.app.core.embed.rate_limit import check_per_ip, check_per_key
+from src.app.core.embed.recaptcha import verify_token as verify_recaptcha_token
 from src.app.core.embed.schemas import (
     EmbedSubmission,
     WidgetConfigDocument,
     WidgetConfigField,
+    WidgetConfigSpamProtection,
 )
 from src.app.core.embed.service import find_by_plain_key
 from src.app.core.leads.imports.dedup import find_existing_contact
@@ -56,6 +74,14 @@ from src.app.shared.db import async_session
 
 
 logger = logging.getLogger(__name__)
+
+
+# Clock-skew tolerance for `rendered_at`. Submissions claiming to have
+# been rendered more than this far in the past are treated as suspect
+# (replay attacks, very stale tabs). 24h covers legit users who left
+# the form open overnight without crossing into "this is a stored
+# token being replayed weeks later" territory.
+_RENDERED_AT_MAX_AGE = timedelta(hours=24)
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,23 +102,11 @@ async def submit(
     """Process one widget submission. Raises HTTPException on auth /
     rate-limit failures; returns SubmissionResult otherwise.
 
-    A silent-drop (honeypot triggered) returns a result with
-    `accepted=False, lead_id=None` and the caller responds with a
-    200 — bots don't learn they were caught.
+    A silent-drop (honeypot triggered, min-time gate failed, reCAPTCHA
+    rejected) returns a result with `accepted=False, lead_id=None` and
+    the caller responds with a 200 — bots don't learn they were caught.
     """
-    # 1. Honeypot — bots fill every field, including hidden ones.
-    if payload.honeypot:
-        logger.info(
-            "embed.submission.silent_drop honeypot from ip=%s", ip
-        )
-        # Step 8 wires the `embed.submission.rejected_spam` audit
-        # event with the org context. We don't have org context here
-        # (lookup hasn't happened yet) so just log and return.
-        return SubmissionResult(
-            accepted=False, lead_id=None, thank_you_url=None
-        )
-
-    # 2. Resolve the embed key. Header wins over body.
+    # 1. Resolve the embed key. Header wins over body.
     plain_key = header_key or payload.embed_key
     if not plain_key:
         raise HTTPException(
@@ -100,7 +114,7 @@ async def submit(
             detail="Missing embed key.",
         )
 
-    # 3. Key lookup. find_by_plain_key opens its own session and
+    # 2. Key lookup. find_by_plain_key opens its own session and
     # bypasses tenant-context (no context set yet on this request).
     key_row = await find_by_plain_key(plain_key, ip=ip)
     if key_row is None:
@@ -109,7 +123,7 @@ async def submit(
             detail="Invalid or revoked embed key.",
         )
 
-    # 4. Rate limit per-key + per-IP. Either trip → 429.
+    # 3. Rate limit per-key + per-IP. Either trip → 429.
     rl_key = check_per_key(key_row.prefix)
     rl_ip = check_per_ip(ip)
     if not rl_key.allowed or not rl_ip.allowed:
@@ -123,12 +137,7 @@ async def submit(
     org_id = key_row.org_id
     key_id = key_row.id
 
-    # 5. Validate payload against the org's widget config — the
-    # config is the source of truth for which fields are exposed,
-    # which are required, and which enum values are allowed. If
-    # the org never opened Settings, `public_get_config` returns
-    # None and we use bundle defaults (every visible field allowed,
-    # `interest` defaulting to the system Sofas/Beds/... options).
+    # 4. Load the org's widget config (or bundle defaults).
     config_row = await public_get_config(org_id)
     if config_row is not None:
         document = WidgetConfigDocument.model_validate(config_row.config)
@@ -136,13 +145,54 @@ async def submit(
         from src.app.core.embed.config_service import _default_document
 
         document = _default_document()
+    spam = document.spam_protection
+
+    # 5. Honeypot check. Audit context is the key's org so the Owner
+    # can see spam blocks in Step 9's submission log.
+    if payload.honeypot:
+        await _audit_rejected_spam(
+            org_id=org_id, key_id=key_id, reason="honeypot", ip=ip
+        )
+        return SubmissionResult(
+            accepted=False, lead_id=None, thank_you_url=None
+        )
+
+    # 6. Min-fill-time check. Skip entirely when the org has set
+    # `min_fill_time_ms=0` (escape hatch for low-traffic test orgs).
+    if spam.min_fill_time_ms > 0:
+        if not _passes_min_fill_time(
+            rendered_at=payload.rendered_at,
+            min_fill_time_ms=spam.min_fill_time_ms,
+        ):
+            await _audit_rejected_spam(
+                org_id=org_id, key_id=key_id, reason="min_time", ip=ip
+            )
+            return SubmissionResult(
+                accepted=False, lead_id=None, thank_you_url=None
+            )
+
+    # 7. reCAPTCHA check (only when the org has enabled it).
+    if spam.recaptcha_enabled:
+        ok = await _check_recaptcha(
+            payload=payload,
+            spam=spam,
+            org_id=org_id,
+            key_id=key_id,
+            ip=ip,
+        )
+        if not ok:
+            return SubmissionResult(
+                accepted=False, lead_id=None, thank_you_url=None
+            )
+
+    # 8. Validate payload against the org's widget config.
     _validate_payload_against_config(payload, document)
 
-    # 6. Set tenant context so RLS + audit `org_id` derive correctly.
+    # 9. Set tenant context so RLS + audit `org_id` derive correctly.
     ctx_token = set_context(RequestContext(org_id=org_id, user_id=None))
     try:
         async with async_session() as session:
-            # 6. Dedup-by-phone-or-email — reuse the same helper the
+            # 9a. Dedup-by-phone-or-email — reuse the same helper the
             # bulk-import processor uses. If the visitor already exists
             # as a contact, we don't create a second contact row; we
             # do create a new lead so the rep sees a fresh inquiry.
@@ -174,7 +224,7 @@ async def submit(
                 )
                 contact_id = contact.id
 
-            # 7. Create the lead.
+            # 10. Create the lead.
             lead = await create_lead(
                 session,
                 org_id=org_id,
@@ -187,7 +237,7 @@ async def submit(
                 ),
             )
 
-        # 8. Audit. The org context is still set so audit.log derives
+        # 11. Audit. The org context is still set so audit.log derives
         # org_id from it; user_id stays None (anonymous submission).
         await audit.log(
             "embed.submission.accepted",
@@ -206,6 +256,121 @@ async def submit(
         )
     finally:
         reset_context(ctx_token)
+
+
+def _passes_min_fill_time(
+    *,
+    rendered_at: Optional[datetime],
+    min_fill_time_ms: int,
+) -> bool:
+    """True iff the submission was rendered at least `min_fill_time_ms`
+    ago, with a `rendered_at` value that's neither in the future nor
+    > 24h in the past.
+
+    Strict on `rendered_at=None` — bots could trivially bypass the gate
+    by omitting the field, so a missing value when the gate is enabled
+    counts as a failure. The widget renderer always sends it.
+    """
+    if rendered_at is None:
+        return False
+    now = datetime.now(timezone.utc)
+    rendered = (
+        rendered_at
+        if rendered_at.tzinfo is not None
+        else rendered_at.replace(tzinfo=timezone.utc)
+    )
+    delta = now - rendered
+    if delta < timedelta(0):
+        # Future timestamps — clock-skewed bot or forged payload.
+        return False
+    if delta > _RENDERED_AT_MAX_AGE:
+        # Stale beyond plausible legit use (tab open > 24h).
+        return False
+    return delta >= timedelta(milliseconds=min_fill_time_ms)
+
+
+async def _check_recaptcha(
+    *,
+    payload: EmbedSubmission,
+    spam: WidgetConfigSpamProtection,
+    org_id: uuid.UUID,
+    key_id: uuid.UUID,
+    ip: str,
+) -> bool:
+    """Run the reCAPTCHA gate. Emits the appropriate `rejected_spam`
+    audit event on failure (token missing → `recaptcha_invalid`,
+    Google says no → `recaptcha_low_score`). Returns True on success."""
+    token = payload.recaptcha_token
+    if not token:
+        await _audit_rejected_spam(
+            org_id=org_id, key_id=key_id, reason="recaptcha_invalid", ip=ip
+        )
+        return False
+
+    # spam.recaptcha_secret_key is guaranteed by the schema's
+    # model_validator when recaptcha_enabled=True. The assert below
+    # is for the type-checker / defence-in-depth — if it fires, the
+    # config validator was bypassed somehow.
+    assert spam.recaptcha_secret_key is not None
+    verified = await verify_recaptcha_token(
+        token=token,
+        secret=spam.recaptcha_secret_key,
+        remote_ip=ip if ip and ip != "unknown" else None,
+    )
+    if not verified:
+        await _audit_rejected_spam(
+            org_id=org_id,
+            key_id=key_id,
+            reason="recaptcha_low_score",
+            ip=ip,
+        )
+        return False
+    return True
+
+
+async def _audit_rejected_spam(
+    *,
+    org_id: uuid.UUID,
+    key_id: uuid.UUID,
+    reason: str,
+    ip: str,
+) -> None:
+    """Emit `embed.submission.rejected_spam` with the reason + key id.
+
+    Org context is set explicitly via the `org_id=` keyword because
+    the request context isn't set yet at this point in the pipeline
+    (we deliberately reject BEFORE opening the tenant scope to keep
+    the write side untouched for bot traffic).
+    """
+    logger.info(
+        "embed.submission.rejected_spam reason=%s key=%s ip=%s",
+        reason,
+        key_id,
+        ip,
+    )
+    await audit.log(
+        "embed.submission.rejected_spam",
+        entity_type="embed_key",
+        entity_id=key_id,
+        org_id=org_id,
+        ip=ip,
+        after={
+            "key_id": str(key_id),
+            "reason": reason,
+            "ip_hash": _hash_ip(ip),
+        },
+    )
+
+
+def _hash_ip(ip: str) -> str:
+    """Short, privacy-preserving fingerprint of the submitter's IP for
+    the submission log. Truncated SHA-256 is enough to spot patterns
+    (same IP hitting honeypot 20× in an hour) without storing the raw
+    address.
+    """
+    import hashlib
+
+    return hashlib.sha256(ip.encode("utf-8")).hexdigest()[:16]
 
 
 def _combine_notes(

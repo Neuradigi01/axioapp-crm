@@ -191,6 +191,85 @@
           Show "Powered by FurniCRM" link
         </label>
 
+        <!-- Spam protection sub-panel -->
+        <div class="space-y-3 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <h4 class="text-sm font-semibold text-zinc-800">Spam protection</h4>
+              <p class="text-xs text-zinc-500">
+                The honeypot is always on. Min-fill-time and reCAPTCHA are extra layers — none of them are visible to your visitors when configured correctly.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-1 block text-xs font-medium text-zinc-700">
+              Minimum fill time
+              <span class="font-normal text-zinc-400">(submissions arriving faster than this are silently dropped — set to 0 to disable)</span>
+            </label>
+            <div class="flex items-center gap-3">
+              <input
+                type="range"
+                min="0"
+                max="10000"
+                step="500"
+                [value]="cfg.spam_protection.min_fill_time_ms"
+                (input)="onMinFillTimeInput($event)"
+                class="flex-1"
+              />
+              <span class="w-20 text-right font-mono text-xs text-zinc-700">{{ cfg.spam_protection.min_fill_time_ms }}ms</span>
+            </div>
+          </div>
+
+          <label class="flex items-center gap-2 text-sm text-zinc-700">
+            <input
+              type="checkbox"
+              [checked]="cfg.spam_protection.recaptcha_enabled"
+              (change)="onRecaptchaToggle($event)"
+              class="rounded border-zinc-300"
+            />
+            Enable Google reCAPTCHA v3
+          </label>
+
+          @if (cfg.spam_protection.recaptcha_enabled) {
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label class="mb-1 block text-xs font-medium text-zinc-700">
+                  reCAPTCHA site key
+                  <span class="font-normal text-zinc-400">(public — used in the widget)</span>
+                </label>
+                <input
+                  type="text"
+                  [value]="cfg.spam_protection.recaptcha_site_key ?? ''"
+                  (input)="onRecaptchaSiteKeyInput($event)"
+                  placeholder="6Lc…"
+                  class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-mono"
+                  autocomplete="off"
+                />
+              </div>
+              <div>
+                <label class="mb-1 block text-xs font-medium text-zinc-700">
+                  reCAPTCHA secret key
+                  <span class="font-normal text-zinc-400">(server-side only, never sent to visitors)</span>
+                </label>
+                <input
+                  type="password"
+                  [value]="cfg.spam_protection.recaptcha_secret_key ?? ''"
+                  (input)="onRecaptchaSecretKeyInput($event)"
+                  placeholder="6Lc…"
+                  class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-mono"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+            <p class="text-[11px] text-zinc-500">
+              Issue keys from
+              <a href="https://www.google.com/recaptcha/admin/create" target="_blank" rel="noopener" class="text-zinc-700 underline">Google reCAPTCHA admin</a>
+              — pick <strong>reCAPTCHA v3</strong>, add the domain(s) the widget runs on.
+            </p>
+          }
+        </div>
+
         @if (saveError(); as err) {
           <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{{ err }}</div>
         }

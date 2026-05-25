@@ -37,12 +37,24 @@ export interface WidgetBranding {
   show_powered_by: boolean;
 }
 
+/**
+ * Public projection of the org's spam-protection settings. The
+ * `recaptcha_secret_key` lives server-side ONLY and never appears
+ * here — this is what reaches the visitor's browser.
+ */
+export interface WidgetSpamProtection {
+  recaptcha_enabled: boolean;
+  recaptcha_site_key: string | null;
+  min_fill_time_ms: number;
+}
+
 export interface WidgetConfig {
   fields: WidgetField[];
   submit_button_label: string;
   thank_you_message: string;
   thank_you_url: string | null;
   branding: WidgetBranding;
+  spam_protection: WidgetSpamProtection;
 }
 
 /**
@@ -95,6 +107,13 @@ export interface SubmissionPayload {
   notes?: string | null;
   honeypot?: string;
   rendered_at?: string;
+  /**
+   * Google reCAPTCHA v3 token. Populated by the orchestrator
+   * (via spam.ts → grecaptcha.execute) when the org's widget
+   * config has `recaptcha_enabled=true`. Absent on submissions
+   * from orgs that haven't enabled reCAPTCHA.
+   */
+  recaptcha_token?: string | null;
   attribution: Attribution;
 }
 

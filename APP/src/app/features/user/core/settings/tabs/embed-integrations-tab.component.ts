@@ -18,6 +18,7 @@ import {
   WidgetConfigBranding,
   WidgetConfigDocument,
   WidgetConfigField,
+  WidgetConfigSpamProtection,
   WidgetConfigUpdatePayload,
 } from './embed-api.service';
 import { IssueKeyModalComponent } from './issue-key-modal.component';
@@ -324,6 +325,43 @@ export class EmbedIntegrationsTabComponent {
     this.dirty.set(true);
   }
 
+  // --- Spam protection handlers ---------------------------------------
+
+  /** Apply a partial patch to `spam_protection` immutably + mark dirty. */
+  private updateSpam(patch: Partial<WidgetConfigSpamProtection>): void {
+    const cur = this.config();
+    if (!cur) return;
+    this.config.set({
+      ...cur,
+      spam_protection: { ...cur.spam_protection, ...patch },
+    });
+    this.dirty.set(true);
+  }
+
+  protected onRecaptchaToggle(event: Event): void {
+    this.updateSpam({
+      recaptcha_enabled: (event.target as HTMLInputElement).checked,
+    });
+  }
+
+  protected onRecaptchaSiteKeyInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value.trim();
+    this.updateSpam({ recaptcha_site_key: value || null });
+  }
+
+  protected onRecaptchaSecretKeyInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value.trim();
+    this.updateSpam({ recaptcha_secret_key: value || null });
+  }
+
+  protected onMinFillTimeInput(event: Event): void {
+    const raw = Number((event.target as HTMLInputElement).value);
+    const clamped = Number.isFinite(raw)
+      ? Math.min(60_000, Math.max(0, Math.round(raw)))
+      : 2000;
+    this.updateSpam({ min_fill_time_ms: clamped });
+  }
+
   protected save(): void {
     const cur = this.config();
     if (!cur || !this.dirty() || this.saving()) return;
@@ -335,6 +373,7 @@ export class EmbedIntegrationsTabComponent {
       thank_you_message: cur.thank_you_message,
       thank_you_url: cur.thank_you_url ?? null,
       branding: cur.branding,
+      spam_protection: cur.spam_protection,
     };
     this.api
       .updateConfig(payload)

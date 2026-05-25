@@ -27,6 +27,7 @@ import {
   renderSuccessState,
   type RenderedForm,
 } from "./renderer";
+import { getToken, warmRecaptcha } from "./spam";
 import { injectStyles } from "./styles";
 import type { InitConfig, SubmissionPayload, WidgetConfig } from "./types";
 
@@ -64,6 +65,11 @@ const FALLBACK_CONFIG: WidgetConfig = {
     logo_url: null,
     accent_color: "#4F46E5",
     show_powered_by: true,
+  },
+  spam_protection: {
+    recaptcha_enabled: false,
+    recaptcha_site_key: null,
+    min_fill_time_ms: 2000,
   },
 };
 
@@ -109,11 +115,25 @@ export async function init(config: InitConfig): Promise<void> {
     widgetConfig = FALLBACK_CONFIG;
   }
 
+  const recaptchaSiteKey =
+    widgetConfig.spam_protection?.recaptcha_enabled &&
+    widgetConfig.spam_protection.recaptcha_site_key
+      ? widgetConfig.spam_protection.recaptcha_site_key
+      : null;
+
   let handle: RenderedForm | null = null;
 
   const onSubmit = async (payload: SubmissionPayload): Promise<void> => {
     if (!handle) return;
     handle.setSubmitting(true);
+
+    // Mint a fresh reCAPTCHA token on every submit — v3 tokens are
+    // single-use + short-lived (2 min). Null on failure means we send
+    // the payload without a token; the backend silent-drops it.
+    if (recaptchaSiteKey) {
+      payload.recaptcha_token = await getToken(recaptchaSiteKey, "submit");
+    }
+
     try {
       await submitLead(config.key, config.host, payload);
       // Success — wipe the form, paint the thank-you.
@@ -142,6 +162,20 @@ export async function init(config: InitConfig): Promise<void> {
     formRoot.style.setProperty(
       "--fc-primary",
       widgetConfig.branding.accent_color,
+    );
+  }
+
+  // Pre-warm reCAPTCHA on first interaction. Loading the script lazily
+  // (rather than on page load) means the host site pays zero perf cost
+  // until a visitor actually engages with the form. By the time they
+  // hit Submit, the script + ready callback have resolved, so the
+  // token mint is sub-100ms instead of waiting on a fresh script fetch.
+  if (recaptchaSiteKey) {
+    const formEl = mount.querySelector<HTMLFormElement>("form");
+    formEl?.addEventListener(
+      "focusin",
+      () => void warmRecaptcha(recaptchaSiteKey),
+      { once: true },
     );
   }
 }

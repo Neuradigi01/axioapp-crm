@@ -105,9 +105,14 @@ class EmbedSubmission(BaseModel):
     # Empty / missing for legit humans. Non-empty triggers a silent 200
     # (no lead created) so bots don't learn they were caught.
     honeypot: Optional[str] = Field(default=None, max_length=255)
-    # When the widget rendered the form. Step 8 will use this for a
-    # min-time-to-fill check. Step 2 accepts but doesn't enforce.
+    # When the widget rendered the form. Step 8 enforces a min-fill-time
+    # check against this — submissions arriving < `min_fill_time_ms` after
+    # render are silently dropped.
     rendered_at: Optional[datetime] = None
+    # Google reCAPTCHA v3 token, populated by the widget when the org
+    # has enabled reCAPTCHA in their widget config. Verified server-side
+    # against the org's secret key; low-score or invalid tokens silent-drop.
+    recaptcha_token: Optional[str] = Field(default=None, max_length=4096)
     attribution: SubmissionAttribution = Field(
         default_factory=SubmissionAttribution
     )
@@ -137,9 +142,13 @@ __all__ = [
     "EmbedSubmissionResponse",
     "SubmissionAttribution",
     "WidgetConfigBranding",
+    "WidgetConfigDocument",
     "WidgetConfigField",
     "WidgetConfigPublic",
+    "WidgetConfigPublicDocument",
     "WidgetConfigRead",
+    "WidgetConfigSpamProtection",
+    "WidgetConfigSpamProtectionPublic",
     "WidgetConfigUpdate",
 ]
 
@@ -205,9 +214,56 @@ class WidgetConfigBranding(BaseModel):
     show_powered_by: bool = True
 
 
+class WidgetConfigSpamProtection(BaseModel):
+    """Per-org spam-protection knobs (Step 8). Submitted alongside the
+    rest of the widget config; admin endpoints round-trip the full
+    shape, the public endpoint projects only `recaptcha_site_key` +
+    `min_fill_time_ms` (the secret key MUST stay server-side).
+
+    Defaults: reCAPTCHA off, 2-second min fill time. Honeypot is
+    always on — no toggle, no perf cost.
+    """
+
+    recaptcha_enabled: bool = False
+    recaptcha_site_key: Optional[str] = Field(default=None, max_length=128)
+    recaptcha_secret_key: Optional[str] = Field(default=None, max_length=128)
+    min_fill_time_ms: int = Field(default=2000, ge=0, le=60000)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @model_validator(mode="after")
+    def _check_recaptcha_keys(self) -> "WidgetConfigSpamProtection":
+        """If reCAPTCHA is enabled, both keys must be set — otherwise
+        the gate fails closed on every submission, which silently
+        breaks the form for legit users.
+        """
+        if self.recaptcha_enabled and (
+            not self.recaptcha_site_key or not self.recaptcha_secret_key
+        ):
+            raise ValueError(
+                "recaptcha_enabled=true requires both "
+                "recaptcha_site_key and recaptcha_secret_key"
+            )
+        return self
+
+
+class WidgetConfigSpamProtectionPublic(BaseModel):
+    """Public projection — what the widget bundle on a customer's
+    website needs to render the reCAPTCHA challenge. Crucially does
+    NOT include `recaptcha_secret_key` (admin-only, used server-side
+    when calling Google's siteverify).
+    """
+
+    recaptcha_enabled: bool = False
+    recaptcha_site_key: Optional[str] = None
+    min_fill_time_ms: int = 2000
+
+
 class WidgetConfigDocument(BaseModel):
-    """The JSONB-persisted shape — used by both the admin and public
-    endpoints. Wraps the field list + branding + UX copy in one object.
+    """The JSONB-persisted shape — used by the admin endpoints. Wraps
+    the field list + branding + spam-protection + UX copy in one
+    object. The public endpoint projects this through
+    `WidgetConfigPublicDocument` to strip the reCAPTCHA secret.
     """
 
     fields: list[WidgetConfigField] = Field(default_factory=list)
@@ -219,6 +275,9 @@ class WidgetConfigDocument(BaseModel):
     )
     thank_you_url: Optional[str] = Field(default=None, max_length=2048)
     branding: WidgetConfigBranding = Field(default_factory=WidgetConfigBranding)
+    spam_protection: WidgetConfigSpamProtection = Field(
+        default_factory=WidgetConfigSpamProtection
+    )
 
     @field_validator("fields")
     @classmethod
@@ -229,6 +288,23 @@ class WidgetConfigDocument(BaseModel):
         if len(keys) != len(set(keys)):
             raise ValueError("duplicate field keys are not allowed")
         return value
+
+
+class WidgetConfigPublicDocument(BaseModel):
+    """Public projection of the document — the secret reCAPTCHA key is
+    omitted. Everything else round-trips identically so the widget
+    renderer's shape never has to switch on "is this the admin or
+    public response".
+    """
+
+    fields: list[WidgetConfigField] = Field(default_factory=list)
+    submit_button_label: str = "Get a quote"
+    thank_you_message: str = "Thanks — we'll reach out shortly."
+    thank_you_url: Optional[str] = None
+    branding: WidgetConfigBranding = Field(default_factory=WidgetConfigBranding)
+    spam_protection: WidgetConfigSpamProtectionPublic = Field(
+        default_factory=WidgetConfigSpamProtectionPublic
+    )
 
 
 class WidgetConfigUpdate(BaseModel):
@@ -246,6 +322,7 @@ class WidgetConfigUpdate(BaseModel):
     )
     thank_you_url: Optional[str] = Field(default=None, max_length=2048)
     branding: Optional[WidgetConfigBranding] = None
+    spam_protection: Optional[WidgetConfigSpamProtection] = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -263,6 +340,9 @@ class WidgetConfigRead(BaseModel):
 
 class WidgetConfigPublic(BaseModel):
     """Public response — the widget JS bundle's view. No admin
-    metadata; just what's needed to render the form."""
+    metadata; just what's needed to render the form. The nested
+    `config` uses the public projection so the reCAPTCHA secret
+    never reaches a visitor's browser.
+    """
 
-    config: WidgetConfigDocument
+    config: WidgetConfigPublicDocument

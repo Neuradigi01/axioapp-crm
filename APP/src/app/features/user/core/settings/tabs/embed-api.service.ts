@@ -39,12 +39,26 @@ export interface WidgetConfigBranding {
   show_powered_by: boolean;
 }
 
+/**
+ * Admin projection of the org's spam-protection settings. The
+ * `recaptcha_secret_key` round-trips through the admin endpoints
+ * (Owner can edit it) but never reaches the public widget bundle
+ * — the backend strips it before responding to `/embed/config/public`.
+ */
+export interface WidgetConfigSpamProtection {
+  recaptcha_enabled: boolean;
+  recaptcha_site_key: string | null;
+  recaptcha_secret_key: string | null;
+  min_fill_time_ms: number;
+}
+
 export interface WidgetConfigDocument {
   fields: WidgetConfigField[];
   submit_button_label: string;
   thank_you_message: string;
   thank_you_url?: string | null;
   branding: WidgetConfigBranding;
+  spam_protection: WidgetConfigSpamProtection;
 }
 
 export interface WidgetConfigRead {
@@ -62,6 +76,7 @@ export interface WidgetConfigUpdatePayload {
   thank_you_message?: string;
   thank_you_url?: string | null;
   branding?: WidgetConfigBranding;
+  spam_protection?: WidgetConfigSpamProtection;
 }
 
 export interface EmbedKey {

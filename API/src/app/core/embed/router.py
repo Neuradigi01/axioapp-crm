@@ -38,6 +38,7 @@ from src.app.core.embed.schemas import (
     EmbedSubmissionResponse,
     WidgetConfigDocument,
     WidgetConfigPublic,
+    WidgetConfigPublicDocument,
     WidgetConfigRead,
     WidgetConfigUpdate,
 )
@@ -283,7 +284,15 @@ async def public_widget_config_endpoint(
     else:
         document = WidgetConfigDocument.model_validate(row.config)
 
-    body = WidgetConfigPublic(config=document)
+    # Project to the public shape — strips `spam_protection.recaptcha_secret_key`
+    # so the secret never lands in a visitor's browser. `model_dump`
+    # exclude is bidirectional (recaptcha_secret_key isn't even a field
+    # on `WidgetConfigSpamProtectionPublic`), so a stray field in JSONB
+    # gets silently dropped on read.
+    public_doc = WidgetConfigPublicDocument.model_validate(
+        document.model_dump(mode="json")
+    )
+    body = WidgetConfigPublic(config=public_doc)
     return Response(
         content=body.model_dump_json(),
         media_type="application/json",
