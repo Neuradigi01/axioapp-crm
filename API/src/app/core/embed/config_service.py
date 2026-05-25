@@ -25,17 +25,38 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.custom_fields.models import (
+    CustomFieldDefinition,
+    FieldType,
+)
 from src.app.core.embed.models import WidgetConfig
 from src.app.core.embed.schemas import (
+    AvailableCustomField,
     WidgetConfigDocument,
     WidgetConfigField,
     WidgetConfigUpdate,
 )
 from src.app.shared.db import async_session
+
+
+# Contact custom-field types the widget can render. Limiting to a
+# safe subset of the full `FieldType` enum so unsupported types
+# (multiselect, datetime, boolean, currency) can't be opted in and
+# then fail to render — Owner gets a clear "not supported" error
+# instead of a broken form on customer sites.
+_WIDGET_SUPPORTED_CUSTOM_TYPES: set[str] = {
+    FieldType.text.value,
+    FieldType.number.value,
+    FieldType.select.value,
+    FieldType.date.value,
+    FieldType.phone.value,
+    FieldType.email.value,
+}
 
 
 def _default_document() -> WidgetConfigDocument:
@@ -137,6 +158,12 @@ async def update(
         merged_dict[key] = value
     merged = WidgetConfigDocument.model_validate(merged_dict)
 
+    # Cross-table validation — any field with `field_source='custom'`
+    # must reference a defined contact custom field whose type the
+    # widget can render. Done here (not in WidgetConfigField's own
+    # validator) because the validator is org-agnostic.
+    await _validate_custom_field_refs(session, fields=merged.fields)
+
     row.config = merged.model_dump(mode="json")
     row.updated_by = actor_id
     await session.commit()
@@ -153,6 +180,107 @@ async def update(
         },
     )
     return row
+
+
+async def _validate_custom_field_refs(
+    session: AsyncSession,
+    *,
+    fields: list[WidgetConfigField],
+) -> None:
+    """Reject the PUT if a custom-source field references an unknown
+    custom field, a non-contact entity, or a type the widget bundle
+    doesn't know how to render. Catches Owner typos + prevents
+    exposing pack-defined system fields the renderer can't handle.
+    """
+    custom_refs = [f for f in fields if f.field_source == "custom"]
+    if not custom_refs:
+        return
+
+    keys = sorted({f.key for f in custom_refs})
+    rows = (
+        (
+            await session.execute(
+                select(CustomFieldDefinition).where(
+                    CustomFieldDefinition.entity_type == "contact",
+                    CustomFieldDefinition.field_key.in_(keys),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    found_by_key = {r.field_key: r for r in rows}
+
+    missing = [k for k in keys if k not in found_by_key]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"Custom field(s) {missing} are not defined on the "
+                "contact entity — add them under Settings → Custom "
+                "fields first, then opt them in to the widget."
+            ),
+        )
+
+    unsupported = [
+        (k, found_by_key[k].field_type.value)
+        for k in keys
+        if found_by_key[k].field_type.value
+        not in _WIDGET_SUPPORTED_CUSTOM_TYPES
+    ]
+    if unsupported:
+        labels = ", ".join(f"{k} ({t})" for k, t in unsupported)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"Custom field type not supported on the widget: {labels}. "
+                f"Supported: {sorted(_WIDGET_SUPPORTED_CUSTOM_TYPES)}."
+            ),
+        )
+
+
+async def list_available_contact_custom_fields(
+    session: AsyncSession,
+) -> list[AvailableCustomField]:
+    """Read-only listing of contact custom fields the Settings picker
+    can offer for widget opt-in. Includes a `widget_supported` flag —
+    unsupported types stay in the list (so the Owner can see the
+    field exists) but the picker greys them out.
+    """
+    rows = (
+        (
+            await session.execute(
+                select(CustomFieldDefinition)
+                .where(CustomFieldDefinition.entity_type == "contact")
+                .where(CustomFieldDefinition.is_hidden.is_(False))
+                .order_by(CustomFieldDefinition.display_order)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    out: list[AvailableCustomField] = []
+    for row in rows:
+        opts: Optional[list[str]] = None
+        if isinstance(row.options, dict):
+            raw = row.options.get("choices") or row.options.get("options")
+            if isinstance(raw, list):
+                opts = [str(v) for v in raw]
+        elif isinstance(row.options, list):
+            opts = [str(v) for v in row.options]
+        out.append(
+            AvailableCustomField(
+                field_key=row.field_key,
+                field_label=row.field_label,
+                field_type=row.field_type.value,
+                is_required=row.is_required,
+                options=opts,
+                widget_supported=(
+                    row.field_type.value in _WIDGET_SUPPORTED_CUSTOM_TYPES
+                ),
+            )
+        )
+    return out
 
 
 async def public_get(org_id: uuid.UUID) -> Optional[WidgetConfig]:
@@ -174,4 +302,9 @@ async def public_get(org_id: uuid.UUID) -> Optional[WidgetConfig]:
         return row
 
 
-__all__ = ["get_or_create", "public_get", "update"]
+__all__ = [
+    "get_or_create",
+    "list_available_contact_custom_fields",
+    "public_get",
+    "update",
+]

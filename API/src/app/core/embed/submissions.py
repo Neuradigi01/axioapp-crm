@@ -246,6 +246,14 @@ async def submit(
                 combined_notes = _combine_notes(
                     payload.interest, payload.notes
                 )
+                # Drop empty-string custom values so they don't land as
+                # "" in JSONB (cleaner than storing literal empties; the
+                # field is just absent for visitors who left it blank).
+                widget_custom_data = {
+                    k: v
+                    for k, v in (payload.custom_data or {}).items()
+                    if v not in (None, "")
+                }
                 contact = await create_contact(
                     session,
                     org_id=org_id,
@@ -255,13 +263,14 @@ async def submit(
                         email=payload.email,
                         source="widget",
                         notes=combined_notes,
+                        custom_data=widget_custom_data,
                     ),
                     # Visitors filling out a public widget form can't
                     # possibly know the org's required custom fields
-                    # (e.g. an `address` field added in Settings). Staff
-                    # fill those in via the contact edit form after the
-                    # lead lands. Required-field enforcement at create
-                    # time would just produce 422s on every submission.
+                    # that AREN'T opted in to the widget. Required
+                    # fields that ARE on the widget are already enforced
+                    # by `_validate_payload_against_config` above; staff
+                    # fill the rest in via the edit form afterwards.
                     require_all_required=False,
                 )
                 contact_id = contact.id
@@ -466,57 +475,81 @@ def _validate_payload_against_config(
 ) -> None:
     """Enforce the org's widget config at submission time.
 
-    Three rules:
-      1. Every payload value (interest / email / notes) that's present
+    Rules (both standard and custom-source fields):
+      1. Every payload value (standard or custom) that's present
          must correspond to a field configured for this org. The widget
          only renders configured fields, so submissions for unconfigured
          fields signal either a stale cached config or a forged payload.
       2. Every required field per the config must be non-empty.
-      3. If `interest` is a `select` field, the value must be one of
-         the configured `options`.
+      3. Any `select` field's value must be one of the configured
+         `options` (applies to `interest` plus any custom select fields).
 
     Raises HTTPException 422 on any rule violation. `full_name` is
     always allowed regardless of config because Pydantic already
     enforces it at the request-body level.
     """
-    fields_by_key: dict[str, WidgetConfigField] = {
-        f.key: f for f in document.fields
+    standard_fields: dict[str, WidgetConfigField] = {
+        f.key: f for f in document.fields if f.field_source == "standard"
+    }
+    custom_fields: dict[str, WidgetConfigField] = {
+        f.key: f for f in document.fields if f.field_source == "custom"
     }
 
-    # Rule 1: fields supplied by the visitor must be configured.
-    # Pydantic already restricts the payload's top-level keys to the
-    # documented EmbedSubmission shape — we only need to gate the
-    # OPTIONAL ones (phone / email / interest / notes) against the
-    # per-org config. full_name is always required by the schema.
-    supplied: dict[str, Optional[str]] = {
+    # Rule 1a: standard-source fields. Pydantic already restricts the
+    # payload's top-level keys to the documented EmbedSubmission shape
+    # — we only need to gate the OPTIONAL ones (phone / email / interest
+    # / notes) against the per-org config. full_name is always required
+    # by the schema.
+    supplied_standard: dict[str, Optional[str]] = {
         "phone": payload.phone,
         "email": payload.email,
         "interest": payload.interest,
         "notes": payload.notes,
     }
-    for key, value in supplied.items():
+    for key, value in supplied_standard.items():
         if value is None or value == "":
             continue
-        if key not in fields_by_key:
+        if key not in standard_fields:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=(
                     f"Field '{key}' is not configured for this widget. "
-                    "Allowed fields: "
-                    f"{sorted(fields_by_key.keys())}."
+                    f"Allowed standard fields: {sorted(standard_fields)}."
                 ),
             )
 
-    # Rule 2: required fields per config must be present.
-    visitor_values: dict[str, Optional[str]] = {
+    # Rule 1b: custom-source values must reference a configured custom
+    # field. Visitors aren't allowed to write to arbitrary custom keys
+    # — that would bypass the Owner's opt-in toggle and could write to
+    # internal-only fields like `internal_notes`.
+    for key, value in (payload.custom_data or {}).items():
+        if value is None or (isinstance(value, str) and value == ""):
+            continue
+        if key not in custom_fields:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    f"Custom field '{key}' is not exposed on this widget. "
+                    f"Allowed custom fields: {sorted(custom_fields)}."
+                ),
+            )
+
+    # Rule 2: required fields per config must be present. Pulls values
+    # from both standard (top-level) and custom (custom_data) buckets.
+    visitor_values: dict[str, Optional[object]] = {
         "full_name": payload.full_name,
-        **supplied,
+        **supplied_standard,
+        **{k: v for k, v in (payload.custom_data or {}).items()},
     }
-    missing_required = [
-        f.key
-        for f in document.fields
-        if f.required and not (visitor_values.get(f.key) or "").strip()
-    ]
+    missing_required: list[str] = []
+    for field in document.fields:
+        if not field.required:
+            continue
+        raw = visitor_values.get(field.key)
+        if raw is None:
+            missing_required.append(field.key)
+        elif isinstance(raw, str) and not raw.strip():
+            missing_required.append(field.key)
     if missing_required:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -526,7 +559,9 @@ def _validate_payload_against_config(
         )
 
     # Rule 3: select-typed fields must use a configured option.
-    interest_def = fields_by_key.get("interest")
+    # Applies to `interest` (the only standard select) plus every
+    # custom field of type=select.
+    interest_def = standard_fields.get("interest")
     if (
         interest_def is not None
         and interest_def.field_type == "select"
@@ -541,6 +576,18 @@ def _validate_payload_against_config(
                 f"got {payload.interest!r}."
             ),
         )
+    for field in custom_fields.values():
+        if field.field_type != "select" or not field.options:
+            continue
+        value = (payload.custom_data or {}).get(field.key)
+        if value and value not in field.options:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    f"Custom field '{field.key}' must be one of "
+                    f"{field.options}, got {value!r}."
+                ),
+            )
 
 
 __all__ = ["SubmissionResult", "submit"]

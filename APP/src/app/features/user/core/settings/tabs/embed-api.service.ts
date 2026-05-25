@@ -14,23 +14,48 @@ import { environment } from '../../../../../../environments/environment';
  * only wraps the admin (JWT-gated) endpoints.
  */
 
-export type WidgetFieldKey =
+export type WidgetStandardFieldKey =
   | 'full_name'
   | 'phone'
   | 'email'
   | 'interest'
   | 'notes';
 
-export type WidgetFieldType = 'text' | 'email' | 'tel' | 'textarea' | 'select';
+export type WidgetFieldType =
+  | 'text'
+  | 'email'
+  | 'tel'
+  | 'textarea'
+  | 'select'
+  | 'number'
+  | 'date';
+
+export type WidgetFieldSource = 'standard' | 'custom';
 
 export interface WidgetConfigField {
-  key: WidgetFieldKey;
+  /** Standard-source keys are one of `WidgetStandardFieldKey`; custom-
+   *  source keys are the org's contact custom-field `field_key`. */
+  key: string;
   label: string;
   placeholder?: string | null;
   required: boolean;
   order: number;
   field_type: WidgetFieldType;
   options?: string[] | null;
+  field_source: WidgetFieldSource;
+}
+
+
+/** One row in `GET /embed/available-custom-fields` — drives the
+ *  Settings "Add custom field" picker. Unsupported types stay in the
+ *  list but get `widget_supported=false` so the UI greys them out. */
+export interface AvailableCustomField {
+  field_key: string;
+  field_label: string;
+  field_type: string;
+  is_required: boolean;
+  options: string[] | null;
+  widget_supported: boolean;
 }
 
 export interface WidgetConfigBranding {
@@ -129,6 +154,12 @@ export class EmbedApiService {
     payload: WidgetConfigUpdatePayload,
   ): Observable<WidgetConfigRead> {
     return this.http.put<WidgetConfigRead>(`${this.base}/config`, payload);
+  }
+
+  listAvailableCustomFields(): Observable<AvailableCustomField[]> {
+    return this.http.get<AvailableCustomField[]>(
+      `${this.base}/available-custom-fields`,
+    );
   }
 
   // --- Submission log (Step 9) ---------------------------------------

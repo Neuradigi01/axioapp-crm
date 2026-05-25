@@ -7,7 +7,12 @@
  * widget source file and changing its shape ripples broadly.
  */
 
-export type WidgetFieldKey =
+/**
+ * Standard field keys — the 5 baked-in fields that always route into
+ * their own top-level slot on the submission payload. Custom-source
+ * fields use arbitrary string keys and route into `custom_data`.
+ */
+export type WidgetStandardFieldKey =
   | "full_name"
   | "phone"
   | "email"
@@ -19,16 +24,28 @@ export type WidgetFieldType =
   | "email"
   | "tel"
   | "textarea"
-  | "select";
+  | "select"
+  | "number"
+  | "date";
+
+/**
+ * Where a field's value gets routed at submission time:
+ *   - "standard": one of the 5 baked-in keys → top-level payload slot
+ *     (full_name / phone / email / interest / notes).
+ *   - "custom":   free-form key → `payload.custom_data[key]` → contact's
+ *     custom_data JSONB. The Owner opts these in via Settings.
+ */
+export type WidgetFieldSource = "standard" | "custom";
 
 export interface WidgetField {
-  key: WidgetFieldKey;
+  key: string;
   label: string;
   placeholder?: string | null;
   required: boolean;
   order: number;
   field_type: WidgetFieldType;
   options?: string[] | null;
+  field_source: WidgetFieldSource;
 }
 
 export interface WidgetBranding {
@@ -114,6 +131,13 @@ export interface SubmissionPayload {
    * from orgs that haven't enabled reCAPTCHA.
    */
   recaptcha_token?: string | null;
+  /**
+   * Org-defined custom field values keyed by the custom field's
+   * `field_key`. Routed into the contact's `custom_data` JSONB
+   * server-side. Empty `{}` when no custom fields are opted in
+   * to the widget.
+   */
+  custom_data?: Record<string, string>;
   attribution: Attribution;
 }
 

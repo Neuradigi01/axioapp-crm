@@ -534,6 +534,166 @@ class TestSubmitSpamGates:
         assert len(h.created_leads) == 1
 
 
+# --- Step 10: custom-field routing ----------------------------------------
+
+
+def _config_row_with_custom_field():
+    """A config that exposes one standard field plus a custom `address`
+    text field — mirrors the Owner adding `address` via the picker."""
+    doc = WidgetConfigDocument(
+        fields=[
+            WidgetConfigField(
+                key="full_name", label="Name", required=True, order=0,
+                field_type="text", field_source="standard",
+            ),
+            WidgetConfigField(
+                key="phone", label="Phone", required=True, order=1,
+                field_type="tel", field_source="standard",
+            ),
+            WidgetConfigField(
+                key="address", label="Address", required=False, order=2,
+                field_type="text", field_source="custom",
+            ),
+        ],
+    )
+    return SimpleNamespace(config=doc.model_dump(mode="json"))
+
+
+class TestCustomFieldRouting:
+    @pytest.mark.asyncio
+    async def test_custom_field_value_routes_into_contact_custom_data(
+        self, monkeypatch
+    ):
+        # Build our own harness so we can intercept the ContactCreate
+        # payload and inspect what custom_data was passed in.
+        created_payloads: list = []
+
+        async def _find_key(plain, ip=None):
+            return SimpleNamespace(
+                id=_KEY_ID, org_id=_ORG_ID, prefix="pk_live_xx"
+            )
+
+        async def _public_get(_):
+            return _config_row_with_custom_field()
+
+        async def _audit_log(*_a, **_k):
+            return None
+
+        async def _record_log(*_a, **_k):
+            return None
+
+        async def _find_existing(*_a, **_k):
+            return None
+
+        async def _create_contact(session, *, org_id, payload, **_kwargs):
+            created_payloads.append(payload)
+            return SimpleNamespace(id=_CONTACT_ID)
+
+        async def _create_lead(*_a, **_k):
+            return SimpleNamespace(id=_LEAD_ID)
+
+        class _NullCM:
+            async def __aenter__(self_inner):
+                return MagicMock()
+
+            async def __aexit__(self_inner, *a):
+                return False
+
+        monkeypatch.setattr(submissions, "find_by_plain_key", _find_key)
+        monkeypatch.setattr(submissions, "public_get_config", _public_get)
+        monkeypatch.setattr(
+            submissions,
+            "check_per_key",
+            lambda _p: RateLimitResult(
+                allowed=True, remaining=100, retry_after=0.0
+            ),
+        )
+        monkeypatch.setattr(
+            submissions,
+            "check_per_ip",
+            lambda _ip: RateLimitResult(
+                allowed=True, remaining=10, retry_after=0.0
+            ),
+        )
+        monkeypatch.setattr(
+            submissions, "find_existing_contact", _find_existing
+        )
+        monkeypatch.setattr(submissions, "create_contact", _create_contact)
+        monkeypatch.setattr(submissions, "create_lead", _create_lead)
+        monkeypatch.setattr(submissions, "async_session", lambda: _NullCM())
+        monkeypatch.setattr(submissions.audit, "log", _audit_log)
+        monkeypatch.setattr(
+            submissions.log_service, "record", _record_log
+        )
+
+        payload = _payload_defaults(
+            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            custom_data={"address": "42 MG Road, Pune"},
+        )
+
+        result = await submissions.submit(
+            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
+        )
+
+        assert result.accepted is True
+        assert len(created_payloads) == 1
+        assert created_payloads[0].custom_data == {
+            "address": "42 MG Road, Pune"
+        }
+
+    @pytest.mark.asyncio
+    async def test_unconfigured_custom_field_rejected_422(
+        self, monkeypatch
+    ):
+        # Org's config does NOT include `internal_notes` — visitor's
+        # custom_data payload contains it. Must be rejected so a forged
+        # request can't write to fields the Owner hasn't opted in.
+        async def _find_key(plain, ip=None):
+            return SimpleNamespace(
+                id=_KEY_ID, org_id=_ORG_ID, prefix="pk_live_xx"
+            )
+
+        async def _public_get(_):
+            return _config_row_with_custom_field()  # only `address` exposed
+
+        async def _record_log(*_a, **_k):
+            return None
+
+        monkeypatch.setattr(submissions, "find_by_plain_key", _find_key)
+        monkeypatch.setattr(submissions, "public_get_config", _public_get)
+        monkeypatch.setattr(
+            submissions,
+            "check_per_key",
+            lambda _p: RateLimitResult(
+                allowed=True, remaining=100, retry_after=0.0
+            ),
+        )
+        monkeypatch.setattr(
+            submissions,
+            "check_per_ip",
+            lambda _ip: RateLimitResult(
+                allowed=True, remaining=10, retry_after=0.0
+            ),
+        )
+        monkeypatch.setattr(
+            submissions.log_service, "record", _record_log
+        )
+
+        from fastapi import HTTPException
+
+        payload = _payload_defaults(
+            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            custom_data={"internal_notes": "forged"},
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            await submissions.submit(
+                payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
+            )
+        assert exc.value.status_code == 422
+        assert "internal_notes" in str(exc.value.detail)
+
+
 # --- 4. public projection strips the secret -------------------------------
 
 

@@ -13,6 +13,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 import { environment } from '../../../../../../environments/environment';
 import {
+  AvailableCustomField,
   EmbedApiService,
   EmbedKey,
   WidgetConfigBranding,
@@ -23,6 +24,27 @@ import {
 } from './embed-api.service';
 import { IssueKeyModalComponent } from './issue-key-modal.component';
 import { SubmissionLogComponent } from './submission-log.component';
+
+
+/** Map a contact-custom-field type to the widget field_type the
+ *  renderer knows about. Backend `_WIDGET_SUPPORTED_CUSTOM_TYPES`
+ *  already filters out anything not in this set. */
+function customTypeToWidgetType(t: string): WidgetConfigField['field_type'] {
+  switch (t) {
+    case 'email':
+      return 'email';
+    case 'phone':
+      return 'tel';
+    case 'number':
+      return 'number';
+    case 'date':
+      return 'date';
+    case 'select':
+      return 'select';
+    default:
+      return 'text';
+  }
+}
 
 
 /**
@@ -76,6 +98,28 @@ export class EmbedIntegrationsTabComponent {
   // --- Panel 2: config (editable copy of the loaded doc) ---------------
   protected readonly config = signal<WidgetConfigDocument | null>(null);
   protected readonly dirty = signal(false);
+
+  // Contact custom fields the Owner can opt IN to the widget. Lazily
+  // loaded the first time the picker is opened (most Settings visits
+  // won't touch custom fields, so we avoid the extra request).
+  protected readonly availableCustomFields = signal<
+    AvailableCustomField[] | null
+  >(null);
+  protected readonly pickerOpen = signal(false);
+  protected readonly pickerLoading = signal(false);
+  protected readonly pickerError = signal<string | null>(null);
+
+  /** Subset of `availableCustomFields` not already in the config. The
+   *  picker filters these out so the same field can't be added twice. */
+  protected readonly pickerOptions = computed<AvailableCustomField[]>(() => {
+    const all = this.availableCustomFields() ?? [];
+    const cfg = this.config();
+    if (!cfg) return all;
+    const exposedKeys = new Set(
+      cfg.fields.filter((f) => f.field_source === 'custom').map((f) => f.key),
+    );
+    return all.filter((f) => !exposedKeys.has(f.field_key));
+  });
 
   // --- Panel 3: install snippet ----------------------------------------
   protected readonly snippetCopied = signal(false);
@@ -218,6 +262,73 @@ export class EmbedIntegrationsTabComponent {
     this.updateField(index, {
       required: (event.target as HTMLInputElement).checked,
     });
+  }
+
+  /** Remove a field from the widget. Standard fields stay defined on the
+   *  contact (Settings → Custom fields); they just stop appearing on the
+   *  widget. Custom fields likewise. Reversible by re-adding. */
+  protected removeField(index: number): void {
+    const cur = this.config();
+    if (!cur) return;
+    const next = {
+      ...cur,
+      fields: cur.fields
+        .filter((_, i) => i !== index)
+        // Re-pack `order` so the remaining fields are 0..n-1; the backend
+        // doesn't care, but consistent ordering avoids gaps in the UI.
+        .map((f, i) => ({ ...f, order: i })),
+    };
+    this.config.set(next);
+    this.dirty.set(true);
+  }
+
+  // --- "Add custom field" picker --------------------------------------
+
+  protected openPicker(): void {
+    this.pickerOpen.set(true);
+    if (this.availableCustomFields() !== null) return;
+    this.pickerLoading.set(true);
+    this.pickerError.set(null);
+    this.api
+      .listAvailableCustomFields()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          this.availableCustomFields.set(rows);
+          this.pickerLoading.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.pickerLoading.set(false);
+          this.pickerError.set(
+            extractApiError(err) ?? 'Could not load custom fields.',
+          );
+        },
+      });
+  }
+
+  protected closePicker(): void {
+    this.pickerOpen.set(false);
+  }
+
+  protected addCustomField(field: AvailableCustomField): void {
+    if (!field.widget_supported) return;
+    const cur = this.config();
+    if (!cur) return;
+    const nextField: WidgetConfigField = {
+      key: field.field_key,
+      label: field.field_label,
+      placeholder: null,
+      required: field.is_required,
+      order: cur.fields.length,
+      field_type: customTypeToWidgetType(field.field_type),
+      options: field.options ?? null,
+      field_source: 'custom',
+    };
+    this.config.set({
+      ...cur,
+      fields: [...cur.fields, nextField],
+    });
+    this.dirty.set(true);
   }
 
   protected moveField(index: number, direction: -1 | 1): void {

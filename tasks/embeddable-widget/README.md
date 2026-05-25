@@ -64,6 +64,7 @@ A new Owner, on a fresh org, can:
 | 7 | [Widget: CSS-variable theming + class-name override contract](step-7-widget-theming.md) | Done | ~½ day |
 | 8 | [Widget: spam protection (honeypot + token-bucket + reCAPTCHA hook)](step-8-widget-spam-protection.md) | Done | ~½ day |
 | 9 | [Frontend (Settings): submission log + abuse signals](step-9-frontend-submission-log.md) | Done | ~½ day |
+| 10 | [Widget: opt-in custom fields on the form](step-10-custom-fields-on-widget.md) | Done | ~½ day |
 
 **Total: ~6 working days.** Each step verifiable in under 30 min per Rule 8; stop-and-report per Rule 9.
 

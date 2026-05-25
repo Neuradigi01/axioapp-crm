@@ -132,16 +132,34 @@ export function renderForm(
       return;
     }
 
+    // Standard-source values land in their named slots on the payload.
+    // Custom-source values land in `custom_data[key]` so the backend
+    // can route them into the contact's `custom_data` JSONB.
+    const standardValueByKey: Record<string, string | null> = {};
+    const customData: Record<string, string> = {};
+    for (const field of orderedFields) {
+      const raw = values[field.key];
+      if (field.field_source === "custom") {
+        const trimmed = (raw ?? "").trim();
+        if (trimmed) customData[field.key] = trimmed;
+      } else {
+        standardValueByKey[field.key] = optString(raw);
+      }
+    }
+
     const payload: SubmissionPayload = {
       full_name: (values["full_name"] ?? "").trim(),
-      phone: optString(values["phone"]),
-      email: optString(values["email"]),
-      interest: optString(values["interest"]),
-      notes: optString(values["notes"]),
+      phone: standardValueByKey["phone"] ?? null,
+      email: standardValueByKey["email"] ?? null,
+      interest: standardValueByKey["interest"] ?? null,
+      notes: standardValueByKey["notes"] ?? null,
       honeypot: honeypot.value,
       rendered_at: renderedAt,
       attribution,
     };
+    if (Object.keys(customData).length > 0) {
+      payload.custom_data = customData;
+    }
 
     const result = onSubmit(payload);
     if (result instanceof Promise) {
@@ -322,6 +340,10 @@ function htmlInputType(t: WidgetField["field_type"]): string {
       return "email";
     case "tel":
       return "tel";
+    case "number":
+      return "number";
+    case "date":
+      return "date";
     default:
       return "text";
   }

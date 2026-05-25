@@ -29,11 +29,13 @@ from src.app.core.auth.dependencies import require_permissions
 from src.app.core.embed import log_service
 from src.app.core.embed.config_service import (
     get_or_create as get_or_create_config,
+    list_available_contact_custom_fields,
     public_get as public_get_config,
     update as update_config,
 )
 from src.app.core.embed.models import EmbedSubmissionOutcome
 from src.app.core.embed.schemas import (
+    AvailableCustomField,
     EmbedKeyIssue,
     EmbedKeyIssueResponse,
     EmbedKeyRead,
@@ -146,6 +148,23 @@ async def get_widget_config_endpoint(
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
+
+
+@router.get(
+    "/available-custom-fields",
+    response_model=list[AvailableCustomField],
+)
+async def list_available_custom_fields_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.embed.manage")
+    ),
+) -> list[AvailableCustomField]:
+    """Return the contact custom fields the Owner can opt IN to the
+    widget. Drives the Settings → Embed → "Add custom field" picker.
+    Unsupported types (multiselect/datetime/etc.) appear in the list
+    with `widget_supported=false` so the UI can grey them out."""
+    return await list_available_contact_custom_fields(db)
 
 
 @router.put("/config", response_model=WidgetConfigRead)

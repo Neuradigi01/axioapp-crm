@@ -123,13 +123,19 @@
                 <th class="px-3 py-2 text-left">Placeholder</th>
                 <th class="px-3 py-2 text-left">Required</th>
                 <th class="w-20 px-3 py-2 text-center">Order</th>
+                <th class="w-12 px-3 py-2 text-center"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-zinc-100">
               @for (f of cfg.fields; track f.key; let i = $index) {
                 <tr>
                   <td class="px-3 py-2">
-                    <code class="text-xs text-zinc-600">{{ f.key }}</code>
+                    <div class="flex items-center gap-1.5">
+                      <code class="text-xs text-zinc-600">{{ f.key }}</code>
+                      @if (f.field_source === 'custom') {
+                        <span class="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-medium text-indigo-700">CUSTOM</span>
+                      }
+                    </div>
                     <p class="text-[10px] text-zinc-400">{{ f.field_type }}</p>
                   </td>
                   <td class="px-3 py-2">
@@ -166,10 +172,81 @@
                       </button>
                     </div>
                   </td>
+                  <td class="px-3 py-2 text-center">
+                    <button
+                      type="button"
+                      (click)="removeField(i)"
+                      title="Remove this field from the widget"
+                      class="rounded p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
+                    </button>
+                  </td>
                 </tr>
               }
             </tbody>
           </table>
+        </div>
+
+        <!-- "Add custom field" picker -->
+        <div class="space-y-2">
+          @if (!pickerOpen()) {
+            <button
+              type="button"
+              (click)="openPicker()"
+              class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+            >
+              <lucide-icon name="plus" class="h-3.5 w-3.5" />
+              Add custom field to widget
+            </button>
+          } @else {
+            <div class="space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                  Pick a contact custom field
+                </h4>
+                <button type="button" (click)="closePicker()" class="text-xs text-zinc-500 hover:text-zinc-700">Close</button>
+              </div>
+
+              @if (pickerLoading()) {
+                <p class="text-xs text-zinc-500">Loading…</p>
+              } @else if (pickerError(); as err) {
+                <p class="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700">{{ err }}</p>
+              } @else if (pickerOptions().length === 0) {
+                <p class="text-xs text-zinc-500">
+                  No more custom fields available. Add new ones under
+                  <strong>Settings → Custom fields</strong>, then refresh
+                  this page.
+                </p>
+              } @else {
+                <ul class="divide-y divide-zinc-200 rounded-md border border-zinc-200 bg-white">
+                  @for (opt of pickerOptions(); track opt.field_key) {
+                    <li class="flex items-center justify-between gap-2 px-3 py-2">
+                      <div>
+                        <div class="text-sm font-medium text-zinc-900">{{ opt.field_label }}</div>
+                        <div class="text-[10px] text-zinc-500">
+                          <code>{{ opt.field_key }}</code> · {{ opt.field_type }}
+                          @if (opt.is_required) { · required }
+                          @if (!opt.widget_supported) { · <span class="text-amber-600">not supported on widget</span> }
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        (click)="addCustomField(opt)"
+                        [disabled]="!opt.widget_supported"
+                        class="rounded-md bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                      >
+                        Add
+                      </button>
+                    </li>
+                  }
+                </ul>
+                <p class="text-[10px] text-zinc-400">
+                  Adding a field makes it appear on the widget form. Visitors can leave it blank unless you mark it required.
+                </p>
+              }
+            </div>
+          }
         </div>
 
         <!-- Interest options — only shown when the `interest` field is configured. -->

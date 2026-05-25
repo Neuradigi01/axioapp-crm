@@ -113,6 +113,11 @@ class EmbedSubmission(BaseModel):
     # has enabled reCAPTCHA in their widget config. Verified server-side
     # against the org's secret key; low-score or invalid tokens silent-drop.
     recaptcha_token: Optional[str] = Field(default=None, max_length=4096)
+    # Org-defined contact custom fields the Owner has opted IN to the
+    # widget (Step 10). Each key matches a row in `custom_field_definitions`
+    # for `entity_type='contact'`. Values land in the contact's
+    # `custom_data` JSONB at create time.
+    custom_data: dict[str, Any] = Field(default_factory=dict)
     attribution: SubmissionAttribution = Field(
         default_factory=SubmissionAttribution
     )
@@ -135,6 +140,7 @@ class EmbedSubmissionResponse(BaseModel):
 
 
 __all__ = [
+    "AvailableCustomField",
     "EmbedKeyIssue",
     "EmbedKeyIssueResponse",
     "EmbedKeyRead",
@@ -158,16 +164,54 @@ __all__ = [
 ]
 
 
+# --- Available custom-field listing (Step 10) -----------------------------
+
+
+class AvailableCustomField(BaseModel):
+    """One row in `GET /embed/available-custom-fields` — the contact
+    custom fields the Owner can opt IN to the widget. The Settings
+    picker uses this list; selecting a row appends a `WidgetConfigField`
+    with `field_source='custom'` to the widget config.
+    """
+
+    field_key: str
+    field_label: str
+    field_type: str
+    is_required: bool
+    options: Optional[list[str]] = None
+    widget_supported: bool
+
+
 # --- Widget Config schemas (Step 3) -------------------------------------
 
-# v1 allowed field keys. Adding to this set requires bumping the widget
-# JS bundle version since the renderer hardcodes which fields it knows
-# how to display. Custom-data field routing is a future surface.
-WidgetFieldKey = Literal["full_name", "phone", "email", "interest", "notes"]
+# Standard field keys — the 5 baked-in fields the widget always knows
+# how to render and route. Custom fields use arbitrary string keys
+# matched against the org's `custom_field_definitions` table.
+WidgetStandardFieldKey = Literal[
+    "full_name", "phone", "email", "interest", "notes"
+]
 
-# v1 supported field types. The widget bundle hardcodes these — adding
-# `date` / `multiselect` / etc. requires a bundle bump.
-WidgetFieldType = Literal["text", "email", "tel", "textarea", "select"]
+_STANDARD_FIELD_KEYS: set[str] = {
+    "full_name", "phone", "email", "interest", "notes",
+}
+
+# v1 supported field types. `number` and `date` were added when custom
+# fields landed on the widget — they're common shapes for things like
+# budget, preferred-delivery-date custom fields. Adding `multiselect`
+# or `file` requires both a bundle bump AND a renderer extension.
+WidgetFieldType = Literal[
+    "text", "email", "tel", "textarea", "select", "number", "date"
+]
+
+# Where a widget field's value gets routed at submission time.
+#   - "standard": one of the 5 baked-in keys → top-level payload field
+#     → contact's standard column (full_name / phone / email) or notes.
+#   - "custom":  free-form key → submission's `custom_data[key]` →
+#     contact's `custom_data` JSONB.
+# Owner opts custom fields IN explicitly via Settings → Embed widget —
+# default state is "no custom fields visible to widget visitors" so
+# internal-only fields can't leak.
+WidgetFieldSource = Literal["standard", "custom"]
 
 
 class WidgetConfigField(BaseModel):
@@ -176,24 +220,38 @@ class WidgetConfigField(BaseModel):
     `options` is required when `field_type='select'`; ignored otherwise.
     The submission service enforces: every submitted value must come
     from `options` if the field is select-typed.
+
+    For `field_source='standard'`, `key` must be one of the 5 baked-in
+    field keys (`full_name`, `phone`, `email`, `interest`, `notes`).
+    For `field_source='custom'`, `key` references a contact-level
+    custom field defined in the org's `custom_field_definitions`
+    table — validation that the referenced field actually exists
+    happens at `PUT /embed/config` time (not here, since this schema
+    is org-agnostic).
     """
 
-    key: WidgetFieldKey
+    key: str = Field(min_length=1, max_length=64)
     label: str = Field(min_length=1, max_length=128)
     placeholder: Optional[str] = Field(default=None, max_length=128)
     required: bool = False
     order: int = Field(default=0, ge=0, le=999)
     field_type: WidgetFieldType = "text"
     options: Optional[list[str]] = Field(default=None, max_length=50)
+    field_source: WidgetFieldSource = "standard"
 
     @model_validator(mode="after")
-    def _check_select_options(self) -> "WidgetConfigField":
-        """Cross-field invariant: select fields MUST have non-empty
-        options; non-select fields MUST NOT carry options. Using a
-        model_validator (rather than a field_validator on `options`)
-        because Pydantic v2 skips field validators on default values
-        — and `options=None` is the default that we need to reject
-        when paired with `field_type='select'`.
+    def _check_invariants(self) -> "WidgetConfigField":
+        """Cross-field invariants:
+
+        1. Select fields MUST have non-empty options; non-select fields
+           MUST NOT carry options. Using a model_validator rather than a
+           field_validator on `options` because Pydantic v2 skips field
+           validators on default values — and `options=None` is the
+           default we need to reject when paired with select.
+        2. `field_source='standard'` keys must be one of the 5 baked-in
+           field keys. (Custom-source keys are free-form here — the
+           config-update service validates them against the org's
+           defined custom fields at PUT time.)
         """
         if self.field_type == "select":
             if not self.options:
@@ -206,6 +264,15 @@ class WidgetConfigField(BaseModel):
                     f"options are only allowed for field_type='select', "
                     f"not '{self.field_type}'"
                 )
+        if (
+            self.field_source == "standard"
+            and self.key not in _STANDARD_FIELD_KEYS
+        ):
+            raise ValueError(
+                f"field_source='standard' requires key in "
+                f"{sorted(_STANDARD_FIELD_KEYS)}, got {self.key!r} — "
+                f"set field_source='custom' for org-defined fields"
+            )
         return self
 
 
