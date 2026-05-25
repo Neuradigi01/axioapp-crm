@@ -39,8 +39,13 @@ from fastapi import HTTPException, status
 from src.app.core import audit
 from src.app.core.contacts.schemas import ContactCreate
 from src.app.core.contacts.service import create_contact
+from src.app.core.embed.config_service import public_get as public_get_config
 from src.app.core.embed.rate_limit import check_per_ip, check_per_key
-from src.app.core.embed.schemas import EmbedSubmission
+from src.app.core.embed.schemas import (
+    EmbedSubmission,
+    WidgetConfigDocument,
+    WidgetConfigField,
+)
 from src.app.core.embed.service import find_by_plain_key
 from src.app.core.leads.imports.dedup import find_existing_contact
 from src.app.core.leads.models import LeadSource
@@ -118,7 +123,22 @@ async def submit(
     org_id = key_row.org_id
     key_id = key_row.id
 
-    # 5. Set tenant context so RLS + audit `org_id` derive correctly.
+    # 5. Validate payload against the org's widget config — the
+    # config is the source of truth for which fields are exposed,
+    # which are required, and which enum values are allowed. If
+    # the org never opened Settings, `public_get_config` returns
+    # None and we use bundle defaults (every visible field allowed,
+    # `interest` defaulting to the system Sofas/Beds/... options).
+    config_row = await public_get_config(org_id)
+    if config_row is not None:
+        document = WidgetConfigDocument.model_validate(config_row.config)
+    else:
+        from src.app.core.embed.config_service import _default_document
+
+        document = _default_document()
+    _validate_payload_against_config(payload, document)
+
+    # 6. Set tenant context so RLS + audit `org_id` derive correctly.
     ctx_token = set_context(RequestContext(org_id=org_id, user_id=None))
     try:
         async with async_session() as session:
@@ -192,8 +212,9 @@ def _combine_notes(
     interest: Optional[str], notes: Optional[str]
 ) -> Optional[str]:
     """Fold the widget's `interest` + `notes` into a single notes
-    string so neither value is lost in v1. Step 3 will let orgs
-    route these to dedicated standard / custom fields.
+    string so neither value is lost in v1. A future improvement
+    could route these to dedicated standard / custom fields per
+    the org's config.
     """
     pieces: list[str] = []
     if interest:
@@ -201,6 +222,88 @@ def _combine_notes(
     if notes:
         pieces.append(notes)
     return "\n\n".join(pieces) if pieces else None
+
+
+def _validate_payload_against_config(
+    payload: EmbedSubmission, document: WidgetConfigDocument
+) -> None:
+    """Enforce the org's widget config at submission time.
+
+    Three rules:
+      1. Every payload value (interest / email / notes) that's present
+         must correspond to a field configured for this org. The widget
+         only renders configured fields, so submissions for unconfigured
+         fields signal either a stale cached config or a forged payload.
+      2. Every required field per the config must be non-empty.
+      3. If `interest` is a `select` field, the value must be one of
+         the configured `options`.
+
+    Raises HTTPException 422 on any rule violation. `full_name` is
+    always allowed regardless of config because Pydantic already
+    enforces it at the request-body level.
+    """
+    fields_by_key: dict[str, WidgetConfigField] = {
+        f.key: f for f in document.fields
+    }
+
+    # Rule 1: fields supplied by the visitor must be configured.
+    # Pydantic already restricts the payload's top-level keys to the
+    # documented EmbedSubmission shape — we only need to gate the
+    # OPTIONAL ones (phone / email / interest / notes) against the
+    # per-org config. full_name is always required by the schema.
+    supplied: dict[str, Optional[str]] = {
+        "phone": payload.phone,
+        "email": payload.email,
+        "interest": payload.interest,
+        "notes": payload.notes,
+    }
+    for key, value in supplied.items():
+        if value is None or value == "":
+            continue
+        if key not in fields_by_key:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    f"Field '{key}' is not configured for this widget. "
+                    "Allowed fields: "
+                    f"{sorted(fields_by_key.keys())}."
+                ),
+            )
+
+    # Rule 2: required fields per config must be present.
+    visitor_values: dict[str, Optional[str]] = {
+        "full_name": payload.full_name,
+        **supplied,
+    }
+    missing_required = [
+        f.key
+        for f in document.fields
+        if f.required and not (visitor_values.get(f.key) or "").strip()
+    ]
+    if missing_required:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"Required field(s) missing: {missing_required}."
+            ),
+        )
+
+    # Rule 3: select-typed fields must use a configured option.
+    interest_def = fields_by_key.get("interest")
+    if (
+        interest_def is not None
+        and interest_def.field_type == "select"
+        and interest_def.options
+        and payload.interest
+        and payload.interest not in interest_def.options
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"interest must be one of {interest_def.options}, "
+                f"got {payload.interest!r}."
+            ),
+        )
 
 
 __all__ = ["SubmissionResult", "submit"]

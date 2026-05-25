@@ -21,33 +21,41 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.embed.config_service import (
+    get_or_create as get_or_create_config,
+    public_get as public_get_config,
+    update as update_config,
+)
 from src.app.core.embed.schemas import (
     EmbedKeyIssue,
     EmbedKeyIssueResponse,
     EmbedKeyRead,
     EmbedSubmission,
     EmbedSubmissionResponse,
+    WidgetConfigDocument,
+    WidgetConfigPublic,
+    WidgetConfigRead,
+    WidgetConfigUpdate,
 )
-from src.app.core.embed.service import issue, list_keys, revoke
+from src.app.core.embed.service import find_by_plain_key, issue, list_keys, revoke
 from src.app.core.embed.submissions import submit as submit_widget_submission
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
 
-router = APIRouter(prefix="/embed/keys", tags=["Embeddable Widget"])
+router = APIRouter(prefix="/embed", tags=["Embeddable Widget"])
 
-# Separate router for the public submission endpoint so the prefix
-# stays `/embed` (not `/embed/keys`). Mounted alongside the admin
-# router in main.py.
+# Separate router for the public submission + public-config endpoints.
+# Same `/embed` prefix; mounted alongside the admin router in main.py.
 public_router = APIRouter(prefix="/embed", tags=["Embeddable Widget — Public"])
 
 
 @router.post(
-    "",
+    "/keys",
     response_model=EmbedKeyIssueResponse,
     status_code=status.HTTP_201_CREATED,
 )
@@ -77,7 +85,7 @@ async def issue_embed_key_endpoint(
     )
 
 
-@router.get("", response_model=list[EmbedKeyRead])
+@router.get("/keys", response_model=list[EmbedKeyRead])
 async def list_embed_keys_endpoint(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(
@@ -89,7 +97,7 @@ async def list_embed_keys_endpoint(
 
 
 @router.delete(
-    "/{key_id}", status_code=status.HTTP_204_NO_CONTENT
+    "/keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT
 )
 async def revoke_embed_key_endpoint(
     key_id: uuid.UUID,
@@ -107,6 +115,55 @@ async def revoke_embed_key_endpoint(
         key_id=key_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Admin: widget config -----------------------------------------------
+
+
+@router.get("/config", response_model=WidgetConfigRead)
+async def get_widget_config_endpoint(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("settings.integrations.embed.manage")
+    ),
+) -> WidgetConfigRead:
+    """Return the org's widget config, lazily seeding defaults on
+    first read so Owners always see a usable starting point."""
+    row = await get_or_create_config(db, org_id=user.org_id)
+    return WidgetConfigRead(
+        id=row.id,
+        org_id=row.org_id,
+        config=WidgetConfigDocument.model_validate(row.config),
+        updated_by=row.updated_by,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+@router.put("/config", response_model=WidgetConfigRead)
+async def update_widget_config_endpoint(
+    payload: WidgetConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("settings.integrations.embed.manage")
+    ),
+) -> WidgetConfigRead:
+    """Patch-style update — only supplied top-level fields change.
+    Emits `embed.config.updated` audit event."""
+    row = await update_config(
+        db,
+        org_id=user.org_id,
+        actor_id=user.legacy_uuid,
+        payload=payload,
+    )
+    return WidgetConfigRead(
+        id=row.id,
+        org_id=row.org_id,
+        config=WidgetConfigDocument.model_validate(row.config),
+        updated_by=row.updated_by,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
 
 
 # --- Public submission endpoint -------------------------------------------
@@ -175,4 +232,64 @@ async def submit_embed_lead_endpoint(
         content=body.model_dump_json(),
         media_type="application/json",
         headers=_PUBLIC_CORS_HEADERS,
+    )
+
+
+@public_router.options("/config/public", include_in_schema=False)
+async def public_config_preflight() -> Response:
+    """CORS preflight for the public config GET. Always 204."""
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT,
+        headers={
+            **_PUBLIC_CORS_HEADERS,
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+        },
+    )
+
+
+@public_router.get("/config/public", response_model=WidgetConfigPublic)
+async def public_widget_config_endpoint(
+    key: Optional[str] = None,
+    x_furnicrm_key: Optional[str] = Header(default=None, alias="X-FurniCRM-Key"),
+) -> Response:
+    """Public widget-config fetch — no JWT. Resolves `key` (query OR
+    header) → org via the embed-key lookup, then returns the org's
+    widget config in the renderer's projection.
+
+    `Cache-Control: public, max-age=60` lets the widget bundle cache
+    the result for a minute — config changes have ~1-min propagation,
+    which is fine since the Owner can hard-refresh after editing.
+    """
+    plain_key = x_furnicrm_key or key
+    if not plain_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing embed key.",
+        )
+    key_row = await find_by_plain_key(plain_key)
+    if key_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or revoked embed key.",
+        )
+
+    row = await public_get_config(key_row.org_id)
+    if row is None:
+        # Owner never opened the Settings tab to seed defaults. Return
+        # the bundle-default shape so the widget still renders.
+        from src.app.core.embed.config_service import _default_document
+
+        document = _default_document()
+    else:
+        document = WidgetConfigDocument.model_validate(row.config)
+
+    body = WidgetConfigPublic(config=document)
+    return Response(
+        content=body.model_dump_json(),
+        media_type="application/json",
+        headers={
+            **_PUBLIC_CORS_HEADERS,
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Cache-Control": "public, max-age=60",
+        },
     )
