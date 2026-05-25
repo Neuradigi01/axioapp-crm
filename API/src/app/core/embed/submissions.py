@@ -55,7 +55,9 @@ from fastapi import HTTPException, status
 from src.app.core import audit
 from src.app.core.contacts.schemas import ContactCreate
 from src.app.core.contacts.service import create_contact
+from src.app.core.embed import log_service
 from src.app.core.embed.config_service import public_get as public_get_config
+from src.app.core.embed.models import EmbedSubmissionOutcome
 from src.app.core.embed.rate_limit import check_per_ip, check_per_key
 from src.app.core.embed.recaptcha import verify_token as verify_recaptcha_token
 from src.app.core.embed.schemas import (
@@ -123,11 +125,21 @@ async def submit(
             detail="Invalid or revoked embed key.",
         )
 
-    # 3. Rate limit per-key + per-IP. Either trip → 429.
+    # 3. Rate limit per-key + per-IP. Either trip → 429 (also logged
+    # so Owners see "we're being hammered" in the submission log).
     rl_key = check_per_key(key_row.prefix)
     rl_ip = check_per_ip(ip)
     if not rl_key.allowed or not rl_ip.allowed:
         retry_after = max(rl_key.retry_after, rl_ip.retry_after)
+        await log_service.record(
+            org_id=key_row.org_id,
+            key_id=key_row.id,
+            outcome=EmbedSubmissionOutcome.rate_limited,
+            reason="per_key" if not rl_key.allowed else "per_ip",
+            ip=ip,
+            referrer=payload.attribution.referrer,
+            landing_url=payload.attribution.landing_url,
+        )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Rate limit exceeded. Please slow down.",
@@ -150,8 +162,12 @@ async def submit(
     # 5. Honeypot check. Audit context is the key's org so the Owner
     # can see spam blocks in Step 9's submission log.
     if payload.honeypot:
-        await _audit_rejected_spam(
-            org_id=org_id, key_id=key_id, reason="honeypot", ip=ip
+        await _record_spam_reject(
+            payload=payload,
+            org_id=org_id,
+            key_id=key_id,
+            reason="honeypot",
+            ip=ip,
         )
         return SubmissionResult(
             accepted=False, lead_id=None, thank_you_url=None
@@ -164,8 +180,12 @@ async def submit(
             rendered_at=payload.rendered_at,
             min_fill_time_ms=spam.min_fill_time_ms,
         ):
-            await _audit_rejected_spam(
-                org_id=org_id, key_id=key_id, reason="min_time", ip=ip
+            await _record_spam_reject(
+                payload=payload,
+                org_id=org_id,
+                key_id=key_id,
+                reason="min_time",
+                ip=ip,
             )
             return SubmissionResult(
                 accepted=False, lead_id=None, thank_you_url=None
@@ -186,7 +206,22 @@ async def submit(
             )
 
     # 8. Validate payload against the org's widget config.
-    _validate_payload_against_config(payload, document)
+    try:
+        _validate_payload_against_config(payload, document)
+    except HTTPException as exc:
+        # Surface the validation error to the caller, but log it as an
+        # `invalid_payload` row so the Owner sees a pattern (stale
+        # cached config, forged submissions) in the submission log.
+        await log_service.record(
+            org_id=org_id,
+            key_id=key_id,
+            outcome=EmbedSubmissionOutcome.invalid_payload,
+            reason=_truncate_reason(exc.detail),
+            ip=ip,
+            referrer=payload.attribution.referrer,
+            landing_url=payload.attribution.landing_url,
+        )
+        raise
 
     # 9. Set tenant context so RLS + audit `org_id` derive correctly.
     ctx_token = set_context(RequestContext(org_id=org_id, user_id=None))
@@ -251,6 +286,18 @@ async def submit(
                 "referrer": payload.attribution.referrer,
             },
         )
+        # 12. Submission log row — drives the Settings → Submission
+        # log sub-tab. log_service.record opens its own session +
+        # context so it works regardless of the parent's state.
+        await log_service.record(
+            org_id=org_id,
+            key_id=key_id,
+            outcome=EmbedSubmissionOutcome.accepted,
+            ip=ip,
+            referrer=payload.attribution.referrer,
+            landing_url=payload.attribution.landing_url,
+            lead_id=lead.id,
+        )
         return SubmissionResult(
             accepted=True, lead_id=lead.id, thank_you_url=None
         )
@@ -302,8 +349,12 @@ async def _check_recaptcha(
     Google says no → `recaptcha_low_score`). Returns True on success."""
     token = payload.recaptcha_token
     if not token:
-        await _audit_rejected_spam(
-            org_id=org_id, key_id=key_id, reason="recaptcha_invalid", ip=ip
+        await _record_spam_reject(
+            payload=payload,
+            org_id=org_id,
+            key_id=key_id,
+            reason="recaptcha_invalid",
+            ip=ip,
         )
         return False
 
@@ -318,7 +369,8 @@ async def _check_recaptcha(
         remote_ip=ip if ip and ip != "unknown" else None,
     )
     if not verified:
-        await _audit_rejected_spam(
+        await _record_spam_reject(
+            payload=payload,
             org_id=org_id,
             key_id=key_id,
             reason="recaptcha_low_score",
@@ -328,19 +380,24 @@ async def _check_recaptcha(
     return True
 
 
-async def _audit_rejected_spam(
+async def _record_spam_reject(
     *,
+    payload: EmbedSubmission,
     org_id: uuid.UUID,
     key_id: uuid.UUID,
     reason: str,
     ip: str,
 ) -> None:
-    """Emit `embed.submission.rejected_spam` with the reason + key id.
+    """One-stop spam-reject helper. Fires both the audit event
+    (`embed.submission.rejected_spam`) AND the submission-log row
+    (`outcome=rejected_spam`) so Settings → Submission log shows
+    every blocked attempt next to the accepted ones.
 
-    Org context is set explicitly via the `org_id=` keyword because
-    the request context isn't set yet at this point in the pipeline
-    (we deliberately reject BEFORE opening the tenant scope to keep
-    the write side untouched for bot traffic).
+    Org context is supplied explicitly via the `org_id=` keyword
+    because the request context isn't set yet at the spam-gate
+    point in the pipeline (we deliberately reject BEFORE opening
+    the tenant scope to keep the write side untouched for bot
+    traffic).
     """
     logger.info(
         "embed.submission.rejected_spam reason=%s key=%s ip=%s",
@@ -357,20 +414,25 @@ async def _audit_rejected_spam(
         after={
             "key_id": str(key_id),
             "reason": reason,
-            "ip_hash": _hash_ip(ip),
+            "ip_hash": log_service.hash_ip(ip),
         },
+    )
+    await log_service.record(
+        org_id=org_id,
+        key_id=key_id,
+        outcome=EmbedSubmissionOutcome.rejected_spam,
+        reason=reason,
+        ip=ip,
+        referrer=payload.attribution.referrer,
+        landing_url=payload.attribution.landing_url,
     )
 
 
-def _hash_ip(ip: str) -> str:
-    """Short, privacy-preserving fingerprint of the submitter's IP for
-    the submission log. Truncated SHA-256 is enough to spot patterns
-    (same IP hitting honeypot 20× in an hour) without storing the raw
-    address.
-    """
-    import hashlib
-
-    return hashlib.sha256(ip.encode("utf-8")).hexdigest()[:16]
+def _truncate_reason(value: object, length: int = 500) -> str:
+    """Coerce an HTTPException `detail` (str / list / dict) into a
+    short string for the submission log's `reason` column."""
+    text = value if isinstance(value, str) else str(value)
+    return text[:length]
 
 
 def _combine_notes(

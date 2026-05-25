@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
@@ -130,4 +130,89 @@ export class EmbedApiService {
   ): Observable<WidgetConfigRead> {
     return this.http.put<WidgetConfigRead>(`${this.base}/config`, payload);
   }
+
+  // --- Submission log (Step 9) ---------------------------------------
+
+  listSubmissions(
+    filters: EmbedSubmissionListFilters,
+  ): Observable<EmbedSubmissionListResponse> {
+    let params = new HttpParams()
+      .set('page', String(filters.page ?? 1))
+      .set('page_size', String(filters.page_size ?? 25));
+    if (filters.outcome) params = params.set('outcome', filters.outcome);
+    if (filters.from) params = params.set('from', filters.from);
+    if (filters.to) params = params.set('to', filters.to);
+    return this.http.get<EmbedSubmissionListResponse>(
+      `${this.base}/submissions`,
+      { params },
+    );
+  }
+
+  getSubmissionSummary(
+    range: EmbedSubmissionRange,
+  ): Observable<EmbedSubmissionSummary> {
+    let params = new HttpParams();
+    if (range.from) params = params.set('from', range.from);
+    if (range.to) params = params.set('to', range.to);
+    return this.http.get<EmbedSubmissionSummary>(
+      `${this.base}/submissions/summary`,
+      { params },
+    );
+  }
+}
+
+
+// --- Submission log shapes (Step 9) ------------------------------------
+
+export type EmbedSubmissionOutcome =
+  | 'accepted'
+  | 'rejected_spam'
+  | 'rate_limited'
+  | 'invalid_payload';
+
+export interface EmbedSubmissionRead {
+  id: string;
+  key_id: string | null;
+  lead_id: string | null;
+  outcome: EmbedSubmissionOutcome;
+  reason: string | null;
+  ip_hash: string | null;
+  referrer: string | null;
+  landing_url: string | null;
+  created_at: string;
+}
+
+export interface EmbedSubmissionListResponse {
+  items: EmbedSubmissionRead[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface EmbedSubmissionListFilters {
+  outcome?: EmbedSubmissionOutcome | null;
+  from?: string | null;
+  to?: string | null;
+  page?: number;
+  page_size?: number;
+}
+
+export interface EmbedSubmissionRange {
+  from?: string | null;
+  to?: string | null;
+}
+
+export interface EmbedSubmissionDayBucket {
+  day: string;
+  accepted: number;
+  rejected_spam: number;
+  rate_limited: number;
+  invalid_payload: number;
+}
+
+export interface EmbedSubmissionSummary {
+  range_from: string;
+  range_to: string;
+  by_outcome: Record<EmbedSubmissionOutcome, number>;
+  by_day: EmbedSubmissionDayBucket[];
 }

@@ -139,7 +139,12 @@ __all__ = [
     "EmbedKeyIssueResponse",
     "EmbedKeyRead",
     "EmbedSubmission",
+    "EmbedSubmissionDayBucket",
+    "EmbedSubmissionListResponse",
+    "EmbedSubmissionOutcomeLiteral",
+    "EmbedSubmissionRead",
     "EmbedSubmissionResponse",
+    "EmbedSubmissionSummary",
     "SubmissionAttribution",
     "WidgetConfigBranding",
     "WidgetConfigDocument",
@@ -346,3 +351,73 @@ class WidgetConfigPublic(BaseModel):
     """
 
     config: WidgetConfigPublicDocument
+
+
+# --- Submission log (Step 9) ----------------------------------------------
+
+
+# Mirrors `EmbedSubmissionOutcome` from models.py — duplicated as a
+# Literal to avoid importing the SQLAlchemy enum into Pydantic schemas
+# (keeps the schema module dependency-free of the ORM).
+EmbedSubmissionOutcomeLiteral = Literal[
+    "accepted", "rejected_spam", "rate_limited", "invalid_payload"
+]
+
+
+class EmbedSubmissionRead(BaseModel):
+    """One row in the paginated list. `lead_id` is set only for
+    `outcome='accepted'` rows; the UI surfaces a "View lead" link
+    in that column. `ip_hash` is the same 16-hex-char SHA-256
+    truncation used everywhere else in the embed module — never
+    a raw IP.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    key_id: Optional[uuid.UUID]
+    lead_id: Optional[uuid.UUID]
+    outcome: EmbedSubmissionOutcomeLiteral
+    reason: Optional[str]
+    ip_hash: Optional[str]
+    referrer: Optional[str]
+    landing_url: Optional[str]
+    created_at: datetime
+
+
+class EmbedSubmissionListResponse(BaseModel):
+    """Envelope for `GET /embed/submissions` — items + total +
+    page metadata so the UI can render a "showing 1–25 of N" footer
+    without a second round-trip."""
+
+    items: list[EmbedSubmissionRead]
+    total: int
+    page: int = Field(ge=1)
+    page_size: int = Field(ge=1, le=200)
+
+
+class EmbedSubmissionDayBucket(BaseModel):
+    """One day's bucket in the summary endpoint's per-day series.
+    Used by the stacked bar chart. The `day` is ISO date (UTC)."""
+
+    day: str
+    accepted: int = 0
+    rejected_spam: int = 0
+    rate_limited: int = 0
+    invalid_payload: int = 0
+
+
+class EmbedSubmissionSummary(BaseModel):
+    """Response for `GET /embed/submissions/summary` — drives the
+    counts card + bar chart at the top of the submission log tab.
+
+    `by_outcome` is the total over the requested window; `by_day`
+    is the per-day stacked breakdown (always one entry per day in
+    the window, even days with zero submissions, so the chart's
+    x-axis is dense).
+    """
+
+    range_from: datetime
+    range_to: datetime
+    by_outcome: dict[EmbedSubmissionOutcomeLiteral, int]
+    by_day: list[EmbedSubmissionDayBucket]

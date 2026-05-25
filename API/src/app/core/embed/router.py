@@ -21,21 +21,28 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from datetime import datetime, timedelta, timezone
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.embed import log_service
 from src.app.core.embed.config_service import (
     get_or_create as get_or_create_config,
     public_get as public_get_config,
     update as update_config,
 )
+from src.app.core.embed.models import EmbedSubmissionOutcome
 from src.app.core.embed.schemas import (
     EmbedKeyIssue,
     EmbedKeyIssueResponse,
     EmbedKeyRead,
     EmbedSubmission,
+    EmbedSubmissionListResponse,
+    EmbedSubmissionOutcomeLiteral,
+    EmbedSubmissionRead,
     EmbedSubmissionResponse,
+    EmbedSubmissionSummary,
     WidgetConfigDocument,
     WidgetConfigPublic,
     WidgetConfigPublicDocument,
@@ -164,6 +171,81 @@ async def update_widget_config_endpoint(
         updated_by=row.updated_by,
         created_at=row.created_at,
         updated_at=row.updated_at,
+    )
+
+
+# --- Admin: submission log (Step 9) --------------------------------------
+
+
+# Cap pagination — 200 rows per response is enough for any UI without
+# letting a curious operator paginate through millions of rows in a
+# single request.
+_LIST_PAGE_SIZE_MAX = 200
+
+
+def _default_range() -> tuple[datetime, datetime]:
+    """Default summary window: last 30 days, ending now (UTC)."""
+    now = datetime.now(timezone.utc)
+    return now - timedelta(days=30), now
+
+
+@router.get(
+    "/submissions",
+    response_model=EmbedSubmissionListResponse,
+)
+async def list_embed_submissions_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.embed.manage")
+    ),
+    outcome: EmbedSubmissionOutcomeLiteral | None = Query(default=None),
+    range_from: datetime | None = Query(default=None, alias="from"),
+    range_to: datetime | None = Query(default=None, alias="to"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=_LIST_PAGE_SIZE_MAX),
+) -> EmbedSubmissionListResponse:
+    """Paginated list of submission attempts, newest first. Optional
+    `outcome` filter narrows to one bucket; `from`/`to` constrain the
+    time window (defaults: whole table). Tenant context filters to
+    the caller's org via RLS + ORM mixin."""
+    outcome_filter = (
+        EmbedSubmissionOutcome(outcome) if outcome is not None else None
+    )
+    rows, total = await log_service.list_rows(
+        db,
+        outcome=outcome_filter,
+        range_from=range_from,
+        range_to=range_to,
+        page=page,
+        page_size=page_size,
+    )
+    return EmbedSubmissionListResponse(
+        items=[EmbedSubmissionRead.model_validate(r) for r in rows],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get(
+    "/submissions/summary",
+    response_model=EmbedSubmissionSummary,
+)
+async def submissions_summary_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.embed.manage")
+    ),
+    range_from: datetime | None = Query(default=None, alias="from"),
+    range_to: datetime | None = Query(default=None, alias="to"),
+) -> EmbedSubmissionSummary:
+    """Counts card + per-day stacked-bar chart payload. Defaults to
+    the last 30 days when no range is supplied."""
+    default_from, default_to = _default_range()
+    resolved_from = range_from or default_from
+    resolved_to = range_to or default_to
+    return await log_service.summary(
+        db, range_from=resolved_from, range_to=resolved_to
     )
 
 

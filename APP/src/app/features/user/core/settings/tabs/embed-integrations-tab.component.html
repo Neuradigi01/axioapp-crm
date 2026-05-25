@@ -1,10 +1,42 @@
-<div class="space-y-8 p-6 max-w-4xl">
+<div class="space-y-6 p-6 max-w-4xl">
   <header class="space-y-1">
     <h2 class="text-lg font-semibold text-zinc-900">Embed widget</h2>
     <p class="text-sm text-zinc-500">
       Issue keys, configure the form, and copy the snippet to paste onto your website.
     </p>
   </header>
+
+  <!-- Tab strip -->
+  <div class="flex items-center gap-1 border-b border-zinc-200">
+    <button
+      type="button"
+      (click)="activeTab.set('config')"
+      [class.text-zinc-900]="activeTab() === 'config'"
+      [class.border-zinc-900]="activeTab() === 'config'"
+      [class.text-zinc-500]="activeTab() !== 'config'"
+      [class.border-transparent]="activeTab() !== 'config'"
+      class="-mb-px border-b-2 px-3 py-2 text-sm font-medium hover:text-zinc-900"
+    >
+      Keys &amp; configuration
+    </button>
+    <button
+      type="button"
+      (click)="activeTab.set('log')"
+      [class.text-zinc-900]="activeTab() === 'log'"
+      [class.border-zinc-900]="activeTab() === 'log'"
+      [class.text-zinc-500]="activeTab() !== 'log'"
+      [class.border-transparent]="activeTab() !== 'log'"
+      class="-mb-px border-b-2 px-3 py-2 text-sm font-medium hover:text-zinc-900"
+    >
+      Submission log
+    </button>
+  </div>
+
+  @if (activeTab() === 'log') {
+    <app-embed-submission-log />
+  } @else {
+
+  <div class="space-y-8">
 
   @if (loading()) {
     <p class="text-sm text-zinc-500">Loading…</p>
@@ -327,6 +359,8 @@
         </div>
       }
     </section>
+  }
+  </div>
   }
 </div>
 

@@ -22,6 +22,7 @@ import {
   WidgetConfigUpdatePayload,
 } from './embed-api.service';
 import { IssueKeyModalComponent } from './issue-key-modal.component';
+import { SubmissionLogComponent } from './submission-log.component';
 
 
 /**
@@ -43,12 +44,17 @@ import { IssueKeyModalComponent } from './issue-key-modal.component';
   selector: 'app-settings-embed-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, IssueKeyModalComponent],
+  imports: [LucideAngularModule, IssueKeyModalComponent, SubmissionLogComponent],
   templateUrl: './embed-integrations-tab.component.html',
 })
 export class EmbedIntegrationsTabComponent {
   private readonly api = inject(EmbedApiService);
   private readonly destroyRef = inject(DestroyRef);
+
+  // Tab strip — toggle between Keys & Config (default) and the
+  // Submission log. State is component-local; deep-linking to a
+  // specific tab is a follow-on if Owners ask for it.
+  protected readonly activeTab = signal<'config' | 'log'>('config');
 
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);

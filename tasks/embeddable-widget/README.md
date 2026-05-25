@@ -63,7 +63,7 @@ A new Owner, on a fresh org, can:
 | 6 | [Widget: loader script + form renderer](step-6-widget-loader-and-renderer.md) | Pending | ~1 day |
 | 7 | [Widget: CSS-variable theming + class-name override contract](step-7-widget-theming.md) | Done | ~½ day |
 | 8 | [Widget: spam protection (honeypot + token-bucket + reCAPTCHA hook)](step-8-widget-spam-protection.md) | Done | ~½ day |
-| 9 | [Frontend (Settings): submission log + abuse signals](step-9-frontend-submission-log.md) | Pending | ~½ day |
+| 9 | [Frontend (Settings): submission log + abuse signals](step-9-frontend-submission-log.md) | Done | ~½ day |
 
 **Total: ~6 working days.** Each step verifiable in under 30 min per Rule 8; stop-and-report per Rule 9.
 
