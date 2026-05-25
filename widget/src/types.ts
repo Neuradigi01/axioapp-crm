@@ -59,3 +59,53 @@ export interface InitConfig {
   host: string;
   mountId: string;
 }
+
+/**
+ * Captured at render time, sent with every submission. All fields
+ * optional — visitors arriving via direct traffic have nothing to
+ * capture. Mirrors the backend's `SubmissionAttribution` Pydantic
+ * shape exactly.
+ */
+export interface Attribution {
+  referrer: string | null;
+  landing_url: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+}
+
+/**
+ * The POST body the widget sends to `/api/v1/embed/leads`.
+ * `full_name` is the only required string at the schema level
+ * (the backend's Pydantic enforces it). Everything else is gated
+ * by the org's widget config — the renderer enforces required
+ * fields client-side too so the visitor gets immediate feedback.
+ * `honeypot` is empty for legit humans; bots fill every field
+ * including hidden ones, which Step 8's backend rule traps.
+ * `rendered_at` is set when the form was first painted — Step 8
+ * uses it for a min-fill-time spam check.
+ */
+export interface SubmissionPayload {
+  full_name: string;
+  phone?: string | null;
+  email?: string | null;
+  interest?: string | null;
+  notes?: string | null;
+  honeypot?: string;
+  rendered_at?: string;
+  attribution: Attribution;
+}
+
+/**
+ * Response shape from `/api/v1/embed/leads`. `lead_id` is null on
+ * silent-drop cases (honeypot triggered, future spam gates). The
+ * widget treats `ok=true` as success regardless of whether a lead
+ * actually landed — bots learn nothing.
+ */
+export interface SubmitResult {
+  ok: boolean;
+  lead_id: string | null;
+  thank_you_url: string | null;
+}

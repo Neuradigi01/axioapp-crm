@@ -56,9 +56,14 @@ npm test
 ```
 widget/
 ├── src/
-│   ├── index.ts          # init() entry point — Step 5 placeholder, Step 6 renderer
-│   └── types.ts          # InitConfig / WidgetConfig / WidgetField contracts
-├── test/                 # Vitest specs
+│   ├── loader.ts         # bundle entry — auto-init from <script data-key>, re-exports init()
+│   ├── index.ts          # orchestrator — config → render → submit → success/error
+│   ├── api.ts            # fetch wrappers + ApiError
+│   ├── attribution.ts    # UTM + referrer + landing-URL capture
+│   ├── renderer.ts       # builds the form DOM tree (XSS-safe: textContent only)
+│   ├── styles.ts         # inline base stylesheet + injectStyles() (CSS-variable theming)
+│   └── types.ts          # InitConfig / WidgetConfig / WidgetField / Attribution / SubmissionPayload
+├── test/                 # Vitest specs (renderer + styles)
 ├── scripts/
 │   └── check-size.ts     # post-build bundle-size guard (30 KB gzipped ceiling)
 ├── dev/
@@ -70,9 +75,84 @@ widget/
 └── vite.config.ts
 ```
 
+## Theming
+
+The widget ships its own base stylesheet inline — customers don't need to add any CSS to render a usable form. **Two override paths** let host sites re-skin the widget to match their brand without rebuilding the bundle:
+
+### Path A — CSS variables (recommended)
+
+Set any subset of the variable contract on the `#furnicrm-form` container (or any ancestor). Variables cascade down; override one, keep the rest:
+
+```html
+<style>
+  #furnicrm-form {
+    --fc-primary: #b45309;
+    --fc-radius: 12px;
+    --fc-font: "Inter", sans-serif;
+  }
+</style>
+```
+
+The full variable contract:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `--fc-primary` | `#4F46E5` (or org's `accent_color`) | Submit button + focus accents |
+| `--fc-primary-contrast` | `#fff` | Text on the primary button |
+| `--fc-bg` | `transparent` | Form background |
+| `--fc-text` | `#111827` | Body text + labels |
+| `--fc-muted` | `#6b7280` | Placeholder + helper text |
+| `--fc-border` | `#d1d5db` | Input borders |
+| `--fc-border-focus` | `var(--fc-primary)` | Focused input border |
+| `--fc-error` | `#dc2626` | Validation errors + invalid inputs |
+| `--fc-radius` | `6px` | Border radius on inputs + button |
+| `--fc-spacing` | `12px` | Gap between fields |
+| `--fc-font` | `system-ui, sans-serif` | Font family |
+| `--fc-font-size` | `15px` | Base font size |
+
+### Path B — class-name overrides
+
+For deeper control, target the documented `.furnicrm-form__*` classes directly. The base stylesheet uses **low-specificity single-class selectors**, so host CSS wins without `!important`:
+
+```html
+<style>
+  .furnicrm-form__button {
+    background: linear-gradient(135deg, #6366f1, #ec4899);
+  }
+  .furnicrm-form__input {
+    box-shadow: inset 0 0 0 2px #18181b;
+  }
+</style>
+```
+
+Class catalogue (use these selectors; they are the public contract):
+
+| Class | Element |
+|---|---|
+| `.furnicrm-form` | Outer container |
+| `.furnicrm-form__form` | The `<form>` element |
+| `.furnicrm-form__field` | Per-field wrapper |
+| `.furnicrm-form__field--invalid` | Marker added on validation failure |
+| `.furnicrm-form__label` | Field `<label>` |
+| `.furnicrm-form__input` | Every `<input>` / `<select>` / `<textarea>` |
+| `.furnicrm-form__textarea` | Additional class on `<textarea>` only |
+| `.furnicrm-form__select` | Additional class on `<select>` only |
+| `.furnicrm-form__button` | Submit `<button>` |
+| `.furnicrm-form__error-banner` | Server-side error displayed above the form |
+| `.furnicrm-form__powered-by` | "Powered by FurniCRM" footer |
+| `.furnicrm-form--success` | Container shown after successful submit |
+| `.furnicrm-form__success-icon` | Checkmark in the success state |
+| `.furnicrm-form__success-message` | Thank-you message body |
+| `.furnicrm-form--error` | Container shown on catastrophic load failure |
+| `.furnicrm-form--loading` | Container shown while fetching config |
+
+### Org-level accent (no host CSS required)
+
+The org's `branding.accent_color` from Settings → Embed Widget is applied inline on the form container at render time. Owners can set a brand color without their integrator touching a single line of HTML on the host site. Host CSS variable overrides (Path A above) still win when present.
+
 ## Steps shipped here vs. coming next
 
-- **Step 5 (this scaffolding)** — package + build + placeholder `init()`.
+- **Step 5** — package + build + placeholder `init()`.
 - **Step 6** — auto-init loader from `<script>` data attributes + form renderer + submission flow + attribution capture.
-- **Step 7** — CSS-variable theming so the widget matches the host site's brand.
+- **Step 7 (this step)** — CSS-variable theming so the widget matches the host site's brand.
 - **Step 8** — honeypot + min-fill-time + optional reCAPTCHA hook.

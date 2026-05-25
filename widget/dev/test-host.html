@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FurniCRM widget — dev host</title>
     <style>
+      /* Host-page layout only. The widget bundle ships its own form
+         styles (Step 7) — nothing about the .furnicrm-form__* classes
+         needs to be defined here. */
       body {
         font-family: system-ui, -apple-system, sans-serif;
         max-width: 640px;
@@ -12,47 +15,75 @@
         padding: 0 1rem;
         color: #18181b;
       }
-      h1 {
-        font-size: 1.25rem;
-        margin: 0 0 0.5rem;
-      }
-      p.lead {
-        color: #71717a;
-        font-size: 0.875rem;
-        margin: 0 0 1.5rem;
-      }
+      h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+      p.lead { color: #71717a; font-size: 0.875rem; margin: 0 0 1.5rem; }
+      .help { color: #71717a; font-size: 0.75rem; margin-top: 1.5rem; }
+      .help code { background: #f4f4f5; padding: 0.1rem 0.4rem; border-radius: 0.2rem; }
       #furnicrm-form {
         margin-top: 1.5rem;
         padding: 1.5rem;
-        border: 1px dashed #d4d4d8;
+        border: 1px solid #d4d4d8;
         border-radius: 0.5rem;
-        background: #fafafa;
-        min-height: 4rem;
+        background: #ffffff;
       }
+
+      /*
+        Theming demo — uncomment ONE of the blocks below to verify
+        either override path works without a bundle rebuild.
+
+        Path A — CSS variables (recommended):
+        #furnicrm-form {
+          --fc-primary: #b45309;
+          --fc-radius: 12px;
+          --fc-font: Georgia, serif;
+        }
+
+        Path B — class-name overrides:
+        .furnicrm-form__button {
+          background: linear-gradient(135deg, #6366f1, #ec4899);
+        }
+        .furnicrm-form__input {
+          box-shadow: inset 0 0 0 2px #18181b;
+        }
+      */
     </style>
   </head>
   <body>
     <h1>FurniCRM widget — dev host</h1>
     <p class="lead">
       Local-only page that loads the widget bundle exactly like a customer
-      site would. Step 5 renders only the placeholder text; Step 6 will
-      render the actual form.
+      site would. Pass <code>?key=pk_live_…</code> in the URL to test against
+      a real key issued from Settings → Embed Widget.
     </p>
 
     <div id="furnicrm-form"></div>
 
+    <p class="help">
+      Default key is <code>pk_live_devplaceholder</code> which won't validate
+      against the backend — the widget will render an error. Issue a real
+      key from <code>/user/settings</code> → Embed Widget → Issue new key
+      and append <code>?key=…</code> to this URL to test the full flow.
+    </p>
+
     <!--
-      In production the host site uses:
-        <script src="https://widget.furnicrm.app/v1/widget.js" data-key="pk_live_…"></script>
-      For local dev we import the ES module directly so changes hot-reload.
+      Customer install snippet shape:
+        <script src="https://widget.furnicrm.app/v1/widget.js"
+                data-key="pk_live_…"></script>
+
+      Locally we inject the data-key from the URL query string so devs
+      can swap keys without editing this file.
     -->
-    <script type="module">
-      import { init } from "/v1/widget.js";
-      init({
-        key: "pk_live_devplaceholder",
-        host: "http://localhost:8000",
-        mountId: "furnicrm-form",
-      });
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var key = params.get("key") || "pk_live_devplaceholder";
+        var script = document.createElement("script");
+        script.src = "/v1/widget.js";
+        script.type = "module";
+        script.setAttribute("data-key", key);
+        script.setAttribute("data-host", "http://localhost:8000");
+        document.body.appendChild(script);
+      })();
     </script>
   </body>
 </html>

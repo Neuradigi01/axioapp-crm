@@ -19,7 +19,11 @@ import { defineConfig } from "vite";
 export default defineConfig({
   build: {
     lib: {
-      entry: "src/index.ts",
+      // Loader is the bundle's entry — it auto-discovers the
+      // <script> tag on customer pages and calls `init()`. The
+      // loader re-exports `init` + types so manual integrations
+      // can still `import { init } from "/v1/widget.js"`.
+      entry: "src/loader.ts",
       formats: ["es"],
       fileName: () => "v1/widget.js",
     },
