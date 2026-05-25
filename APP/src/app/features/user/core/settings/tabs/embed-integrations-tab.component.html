@@ -1,0 +1,257 @@
+<div class="space-y-8 p-6 max-w-4xl">
+  <header class="space-y-1">
+    <h2 class="text-lg font-semibold text-zinc-900">Embed widget</h2>
+    <p class="text-sm text-zinc-500">
+      Issue keys, configure the form, and copy the snippet to paste onto your website.
+    </p>
+  </header>
+
+  @if (loading()) {
+    <p class="text-sm text-zinc-500">Loading…</p>
+  } @else if (loadError(); as err) {
+    <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ err }}</p>
+  } @else {
+
+    <!-- =================== Panel 1: Keys =================== -->
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">Keys</h3>
+        <button
+          type="button"
+          (click)="openIssueModal()"
+          class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+        >
+          <lucide-icon name="plus" class="h-4 w-4" />
+          Issue new key
+        </button>
+      </div>
+
+      @if (keys().length === 0) {
+        <div class="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
+          No keys issued yet. Click <strong>Issue new key</strong> to create one.
+        </div>
+      } @else {
+        <div class="overflow-hidden rounded-md border border-zinc-200 bg-white">
+          <table class="min-w-full text-sm">
+            <thead class="bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500">
+              <tr>
+                <th class="px-4 py-2 text-left">Name</th>
+                <th class="px-4 py-2 text-left">Prefix</th>
+                <th class="px-4 py-2 text-left">Created</th>
+                <th class="px-4 py-2 text-left">Last used</th>
+                <th class="px-4 py-2 text-left">Status</th>
+                <th class="w-12 px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-100">
+              @for (k of keys(); track k.id) {
+                <tr>
+                  <td class="px-4 py-3 font-medium text-zinc-900">{{ k.name ?? '(unnamed)' }}</td>
+                  <td class="px-4 py-3 font-mono text-xs text-zinc-700">{{ k.prefix }}…</td>
+                  <td class="px-4 py-3 text-xs text-zinc-600">{{ relativeTime(k.created_at) }}</td>
+                  <td class="px-4 py-3 text-xs text-zinc-600">{{ relativeTime(k.last_used_at) }}</td>
+                  <td class="px-4 py-3">
+                    @let badge = keyStatusBadge(k);
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1" [class]="badge.cls">
+                      {{ badge.label }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    @if (!k.revoked_at) {
+                      <button
+                        type="button"
+                        (click)="revoke(k)"
+                        [disabled]="revokingId() === k.id"
+                        class="text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
+                      >
+                        {{ revokingId() === k.id ? 'Revoking…' : 'Revoke' }}
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    <!-- =================== Panel 2: Form configuration =================== -->
+    @if (config(); as cfg) {
+      <section class="space-y-3">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">Form configuration</h3>
+
+        <!-- Fields list -->
+        <div class="overflow-hidden rounded-md border border-zinc-200 bg-white">
+          <table class="min-w-full text-sm">
+            <thead class="bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500">
+              <tr>
+                <th class="px-3 py-2 text-left">Field</th>
+                <th class="px-3 py-2 text-left">Label</th>
+                <th class="px-3 py-2 text-left">Placeholder</th>
+                <th class="px-3 py-2 text-left">Required</th>
+                <th class="w-20 px-3 py-2 text-center">Order</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-100">
+              @for (f of cfg.fields; track f.key; let i = $index) {
+                <tr>
+                  <td class="px-3 py-2">
+                    <code class="text-xs text-zinc-600">{{ f.key }}</code>
+                    <p class="text-[10px] text-zinc-400">{{ f.field_type }}</p>
+                  </td>
+                  <td class="px-3 py-2">
+                    <input
+                      type="text"
+                      [value]="f.label"
+                      (input)="onFieldLabelInput(i, $event)"
+                      class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm"
+                    />
+                  </td>
+                  <td class="px-3 py-2">
+                    <input
+                      type="text"
+                      [value]="f.placeholder ?? ''"
+                      (input)="onFieldPlaceholderInput(i, $event)"
+                      class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm"
+                    />
+                  </td>
+                  <td class="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      [checked]="f.required"
+                      (change)="onFieldRequiredToggle(i, $event)"
+                      class="rounded border-zinc-300"
+                    />
+                  </td>
+                  <td class="px-3 py-2 text-center">
+                    <div class="inline-flex items-center gap-1">
+                      <button type="button" (click)="moveField(i, -1)" [disabled]="i === 0" class="rounded p-1 hover:bg-zinc-100 disabled:opacity-30">
+                        <lucide-icon name="chevron-up" class="h-3 w-3" />
+                      </button>
+                      <button type="button" (click)="moveField(i, 1)" [disabled]="i === cfg.fields.length - 1" class="rounded p-1 hover:bg-zinc-100 disabled:opacity-30">
+                        <lucide-icon name="chevron-down" class="h-3 w-3" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Interest options — only shown when the `interest` field is configured. -->
+        @if (interestIndex() >= 0) {
+          <div>
+            <label class="mb-1 block text-xs font-medium text-zinc-700">
+              Interest options
+              <span class="font-normal text-zinc-400">(comma-separated; used when "interest" is a select field)</span>
+            </label>
+            <input
+              type="text"
+              [value]="interestOptionsValue()"
+              (input)="onInterestOptionsInput($event)"
+              placeholder="Sofas, Beds, Dining, Wardrobes, Other"
+              class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+            />
+          </div>
+        }
+
+        <!-- Submit button label + thank-you copy -->
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div>
+            <label class="mb-1 block text-xs font-medium text-zinc-700">Submit button label</label>
+            <input type="text" [value]="cfg.submit_button_label" (input)="onSubmitLabelInput($event)" class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-zinc-700">Thank-you redirect URL <span class="font-normal text-zinc-400">(optional)</span></label>
+            <input type="url" [value]="cfg.thank_you_url ?? ''" (input)="onThankYouUrlInput($event)" placeholder="https://yoursite.com/thank-you" class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <div>
+          <label class="mb-1 block text-xs font-medium text-zinc-700">Thank-you message</label>
+          <input type="text" [value]="cfg.thank_you_message" (input)="onThankYouMessageInput($event)" class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm" />
+        </div>
+
+        <!-- Branding -->
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div>
+            <label class="mb-1 block text-xs font-medium text-zinc-700">Accent colour</label>
+            <input type="color" [value]="cfg.branding.accent_color" (input)="onAccentInput($event)" class="h-10 w-full rounded-md border border-zinc-300 bg-white" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="mb-1 block text-xs font-medium text-zinc-700">Logo URL <span class="font-normal text-zinc-400">(optional)</span></label>
+            <input type="url" [value]="cfg.branding.logo_url ?? ''" (input)="onLogoUrlInput($event)" placeholder="https://yoursite.com/logo.png" class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2 text-sm text-zinc-700">
+          <input type="checkbox" [checked]="cfg.branding.show_powered_by" (change)="onPoweredByToggle($event)" class="rounded border-zinc-300" />
+          Show "Powered by FurniCRM" link
+        </label>
+
+        @if (saveError(); as err) {
+          <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{{ err }}</div>
+        }
+
+        <div class="flex items-center justify-end gap-2 border-t border-zinc-200 pt-3">
+          @if (saveOkAt() !== null && !dirty()) {
+            <span class="text-xs text-emerald-600">Saved.</span>
+          }
+          <button
+            type="button"
+            [disabled]="!dirty() || saving()"
+            (click)="save()"
+            class="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {{ saving() ? 'Saving…' : 'Save configuration' }}
+          </button>
+        </div>
+      </section>
+    }
+
+    <!-- =================== Panel 3: Install snippet =================== -->
+    <section class="space-y-3">
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">Install snippet</h3>
+      @if (activeKey()) {
+        <p class="text-xs text-zinc-500">
+          Paste this snippet on any page of your website where you want the lead form to appear.
+          <br />
+          The widget JS bundle is shipped in Step 5 — for now the snippet is a preview.
+        </p>
+        <div class="overflow-hidden rounded-md border border-zinc-200 bg-zinc-900 p-4">
+          <pre class="whitespace-pre-wrap break-all text-xs text-zinc-100 font-mono">{{ snippet() }}</pre>
+        </div>
+        <div class="flex items-center justify-end">
+          <button
+            type="button"
+            (click)="copySnippet()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            @if (snippetCopied()) {
+              <lucide-icon name="check" class="h-4 w-4 text-emerald-600" />
+              Copied
+            } @else {
+              <lucide-icon name="check-circle-2" class="h-4 w-4" />
+              Copy snippet
+            }
+          </button>
+        </div>
+        <p class="text-[11px] text-zinc-400">
+          Note: the snippet shows the key prefix only ("{{ activeKey()?.prefix }}…").
+          Replace the `…` with the rest of the secret you saved when issuing the key.
+        </p>
+      } @else {
+        <div class="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
+          Issue a key first to see the install snippet.
+        </div>
+      }
+    </section>
+  }
+</div>
+
+<app-embed-issue-key-modal
+  [open]="issueModalOpen()"
+  (closed)="onModalClosed()"
+/>

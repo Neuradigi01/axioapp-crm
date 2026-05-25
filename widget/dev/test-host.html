@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FurniCRM widget — dev host</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 640px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: #18181b;
+      }
+      h1 {
+        font-size: 1.25rem;
+        margin: 0 0 0.5rem;
+      }
+      p.lead {
+        color: #71717a;
+        font-size: 0.875rem;
+        margin: 0 0 1.5rem;
+      }
+      #furnicrm-form {
+        margin-top: 1.5rem;
+        padding: 1.5rem;
+        border: 1px dashed #d4d4d8;
+        border-radius: 0.5rem;
+        background: #fafafa;
+        min-height: 4rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>FurniCRM widget — dev host</h1>
+    <p class="lead">
+      Local-only page that loads the widget bundle exactly like a customer
+      site would. Step 5 renders only the placeholder text; Step 6 will
+      render the actual form.
+    </p>
+
+    <div id="furnicrm-form"></div>
+
+    <!--
+      In production the host site uses:
+        <script src="https://widget.furnicrm.app/v1/widget.js" data-key="pk_live_…"></script>
+      For local dev we import the ES module directly so changes hot-reload.
+    -->
+    <script type="module">
+      import { init } from "/v1/widget.js";
+      init({
+        key: "pk_live_devplaceholder",
+        host: "http://localhost:8000",
+        mountId: "furnicrm-form",
+      });
+    </script>
+  </body>
+</html>

@@ -59,6 +59,11 @@ storage/
 postgres-data/
 redis-data/
 
+# Widget bundle (already covered by node_modules/ + dist/ above; listed
+# explicitly for discoverability — keep widget/package-lock.json IN tree).
+widget/node_modules/
+widget/dist/
+
 # Logs
 logs/
 *.log

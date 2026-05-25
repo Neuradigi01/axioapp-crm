@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
+import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
 import { IntegrationsTabComponent } from './tabs/integrations-tab.component';
 import { NotificationsTabComponent } from './tabs/notifications-tab.component';
 import { RolesTabComponent } from './tabs/roles-tab.component';
@@ -18,7 +19,8 @@ type SettingsTab =
   | 'notifications'
   | 'ai'
   | 'custom-fields'
-  | 'standard-fields';
+  | 'standard-fields'
+  | 'embed';
 
 interface TabDef {
   id: SettingsTab;
@@ -40,6 +42,11 @@ const TABS: ReadonlyArray<TabDef> = [
     label: 'Standard Fields',
     permission: 'settings.standard_fields.manage',
   },
+  {
+    id: 'embed',
+    label: 'Embed Widget',
+    permission: 'settings.integrations.embed.manage',
+  },
 ];
 
 @Component({
@@ -55,6 +62,7 @@ const TABS: ReadonlyArray<TabDef> = [
     AiSettingsTabComponent,
     CustomFieldsPageComponent,
     StandardFieldsTabComponent,
+    EmbedIntegrationsTabComponent,
   ],
   templateUrl: './settings-page.component.html',
 })
