@@ -47,7 +47,9 @@ A new Owner, on a fresh org, can:
 
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
-| 1 | [Backend: `integrations` table + token storage (encrypted at rest)](step-1-backend-integrations-table.md) | Pending | ~1 day |
+| 1 | [Backend: `integrations` table + token storage (encrypted at rest)](step-1-backend-integrations-table.md) | Done | ~1 day |
+| — | [Manual: Google Ads OAuth setup + verification](manual-google-oauth-setup.md) | DevOps — kick off NOW | 2-6 wk external |
+| — | [Manual: Meta Ads OAuth setup + verification](manual-meta-oauth-setup.md) | DevOps — kick off NOW | 1-3 wk external |
 | 2 | [Backend: Google Ads OAuth flow](step-2-backend-google-oauth.md) | Pending | ~1 day |
 | 3 | [Backend: Google Ads webhook receiver + signature verification + retry queue](step-3-backend-google-webhook.md) | Pending | ~1 day |
 | 4 | [Backend: Meta OAuth flow + auto-subscription](step-4-backend-meta-oauth-and-subscription.md) | Pending | ~1 day |

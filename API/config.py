@@ -114,6 +114,15 @@ WHATSAPP_VERIFY_TOKEN = _env(
 WHATSAPP_APP_SECRET = _env("WHATSAPP_APP_SECRET", "dev-app-secret")
 WHATSAPP_API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v18.0")
 
+# Ad integrations (Google Ads + Meta Ads) — OAuth-token encryption.
+# Fernet key — 32 url-safe-base64-encoded bytes. Generate with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Every access_token / refresh_token in the `integrations` table is
+# encrypted with this key. Losing the key = every org must reconnect.
+# Required for `core/integrations/*` to import; the module raises a
+# clear RuntimeError at startup if the key is missing or malformed.
+INTEGRATIONS_ENCRYPTION_KEY = _env("INTEGRATIONS_ENCRYPTION_KEY", "")
+
 # Celery / Redis
 CELERY_ENABLED = os.getenv("CELERY_ENABLED", "false").lower() == "true"
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
