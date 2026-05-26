@@ -147,6 +147,27 @@ GOOGLE_ADS_API_VERSION = os.getenv("GOOGLE_ADS_API_VERSION", "v17")
 # in callback construction; declared here as a documentation anchor.
 # (No new env var needed.)
 
+# Meta (Facebook + Instagram) Ads OAuth — Track 4 Step 4.
+# Provision from a Meta app at developers.facebook.com; see
+# tasks/ad-integrations/manual-meta-oauth-setup.md.
+# Test users on the app dashboard bypass App Review for the
+# `leads_retrieval` permission, so dev works today; production needs
+# 1-2 weeks of Meta App Review.
+META_APP_ID = os.getenv("META_APP_ID", "")
+META_APP_SECRET = _env("META_APP_SECRET", "")
+META_OAUTH_REDIRECT_URI = os.getenv(
+    "META_OAUTH_REDIRECT_URI",
+    "http://localhost:8000/api/v1/integrations/meta/callback",
+)
+# Random secret SHARED with the Meta app's Webhooks tab — Meta sends
+# it back to us during the GET-time subscription verification handshake
+# (Step 5). Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+# and paste the SAME value into both .env and the Meta app dashboard.
+META_WEBHOOK_VERIFY_TOKEN = _env("META_WEBHOOK_VERIFY_TOKEN", "")
+# Graph API version pin. Meta deprecates roughly every ~24 months;
+# bumping is a literal swap + a couple of response-shape adjustments.
+META_GRAPH_API_VERSION = os.getenv("META_GRAPH_API_VERSION", "v19.0")
+
 # Celery / Redis
 CELERY_ENABLED = os.getenv("CELERY_ENABLED", "false").lower() == "true"
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")

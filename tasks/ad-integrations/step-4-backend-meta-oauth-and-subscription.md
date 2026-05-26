@@ -2,7 +2,7 @@
 
 **Goal:** Implement Meta (Facebook + Instagram) OAuth flow and automatic webhook subscription. Unlike Google, Meta's webhook model is push-subscription: after OAuth the backend programmatically subscribes to the user's pages' lead_ads field via the Graph API, so leads start flowing without the user needing to paste any URLs.
 **Track:** Ad Integrations
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 1 (`integrations` table + crypto), Step 3 (subscription model — reused here), `META_APP_ID` + `META_APP_SECRET` + verify token env vars.
 
 ---
