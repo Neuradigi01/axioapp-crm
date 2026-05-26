@@ -123,6 +123,30 @@ WHATSAPP_API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v18.0")
 # clear RuntimeError at startup if the key is missing or malformed.
 INTEGRATIONS_ENCRYPTION_KEY = _env("INTEGRATIONS_ENCRYPTION_KEY", "")
 
+# Google Ads OAuth — Track 4 Step 2.
+# Provision these from Google Cloud Console; see
+# tasks/ad-integrations/manual-google-oauth-setup.md for full walkthrough.
+# Dev mode (test users only) doesn't need verification — works today.
+# The Developer Token requires a 1-5 day approval from Google.
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET = _env("GOOGLE_OAUTH_CLIENT_SECRET", "")
+GOOGLE_OAUTH_REDIRECT_URI = os.getenv(
+    "GOOGLE_OAUTH_REDIRECT_URI",
+    "http://localhost:8000/api/v1/integrations/google/callback",
+)
+# Developer Token — separate from OAuth, attached to Google Ads
+# Manager (MCC) account. See Stage 4 of the manual checklist.
+GOOGLE_ADS_DEVELOPER_TOKEN = _env("GOOGLE_ADS_DEVELOPER_TOKEN", "")
+# Google Ads REST API version pin. New versions land roughly every
+# two months and tend to deprecate the previous one within ~14 months;
+# bumping is a separate small task (literal swap + a couple of
+# response-shape adjustments). Override via env if a sunset forces it.
+GOOGLE_ADS_API_VERSION = os.getenv("GOOGLE_ADS_API_VERSION", "v17")
+# Where the frontend lives — the OAuth callback redirects here on
+# completion (?status=google_connected). Uses FRONTEND_URL from above
+# in callback construction; declared here as a documentation anchor.
+# (No new env var needed.)
+
 # Celery / Redis
 CELERY_ENABLED = os.getenv("CELERY_ENABLED", "false").lower() == "true"
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")

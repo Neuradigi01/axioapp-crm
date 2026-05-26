@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.integrations.google.router import router as google_router
 from src.app.core.integrations.models import IntegrationProvider
 from src.app.core.integrations.schemas import (
     IntegrationProviderLiteral,
@@ -30,6 +31,14 @@ from src.app.shared.db import get_db
 
 
 router = APIRouter(prefix="/integrations", tags=["Ad Integrations"])
+
+# Provider-specific subrouters mount UNDER /integrations/ via include
+# at module-import time — keeps the registration in one place and
+# means main.py only needs the one parent include. Google subrouter
+# uses its own /integrations/google prefix (full path becomes
+# /api/v1/integrations/google/...) — declared on the subrouter itself,
+# so include is one line, no double-prefix.
+router.include_router(google_router)
 
 
 @router.get("", response_model=list[IntegrationRead])
