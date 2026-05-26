@@ -2,7 +2,7 @@
 
 **Goal:** Receive Google Ads Lead Form webhook deliveries, verify them via the per-org delivery key (Google's "webhookSecret" model), enqueue lead-creation as a Celery task, and surface a DLQ for payloads that exhaust retries.
 **Track:** Ad Integrations
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 2 (Google OAuth + integration row), Step 1 (integrations table), Manual Lead Entry Step 1 (`lead.source='google_ads'`), Embeddable Widget Step 2 (`leads.attribution` column reused).
 
 ---

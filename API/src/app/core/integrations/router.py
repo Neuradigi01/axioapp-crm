@@ -1,30 +1,54 @@
 """HTTP routes for ad-integration management.
 
-  GET    /api/v1/integrations              → list rows for the org
-  DELETE /api/v1/integrations/{provider}   → disconnect a provider
+  GET    /api/v1/integrations                            → list rows for the org
+  DELETE /api/v1/integrations/{provider}                 → disconnect a provider
+  POST   /api/v1/integrations/{provider}/webhook/rotate  → mint new webhook secret
+  GET    /api/v1/integrations/subscriptions              → list form subscriptions
+  POST   /api/v1/integrations/subscriptions              → create
+  PATCH  /api/v1/integrations/subscriptions/{id}         → update mapping / enable
+  DELETE /api/v1/integrations/subscriptions/{id}         → remove
+  GET    /api/v1/integrations/dlq                        → list dead-letter rows
+  POST   /api/v1/integrations/dlq/{id}/replay            → re-enqueue
 
-Both gated by `settings.integrations.manage` (registered in
-`core/integrations/module.py` and auto-picked-up by the lifespan
-permission-registration step in `main.py`).
+All admin endpoints are gated by `settings.integrations.manage`.
 
-OAuth callback + connect endpoints land in Step 2 (Google) and
-Step 4 (Meta) — this step only ships the management surface.
+OAuth callback (Step 2) + the public webhook receiver (Step 3) are
+provider-specific and live on the google subrouter — those are the
+ONLY routes in this surface that don't gate on a CRM JWT (the OAuth
+state and the webhook secret are the trust roots respectively).
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.integrations.google.dlq import replay_dlq
 from src.app.core.integrations.google.router import router as google_router
+from src.app.core.integrations.google.webhook import (
+    router as google_webhook_router,
+)
 from src.app.core.integrations.models import IntegrationProvider
 from src.app.core.integrations.schemas import (
+    IntegrationDLQListResponse,
+    IntegrationDLQRead,
     IntegrationProviderLiteral,
     IntegrationRead,
+    IntegrationSubscriptionCreate,
+    IntegrationSubscriptionRead,
+    IntegrationSubscriptionUpdate,
 )
 from src.app.core.integrations.service import (
+    create_subscription,
+    delete_subscription,
     disconnect as disconnect_integration,
     list_all,
+    list_dlq,
+    list_subscriptions,
+    rotate_webhook_secret,
+    update_subscription,
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
@@ -39,6 +63,10 @@ router = APIRouter(prefix="/integrations", tags=["Ad Integrations"])
 # /api/v1/integrations/google/...) — declared on the subrouter itself,
 # so include is one line, no double-prefix.
 router.include_router(google_router)
+# Public webhook receiver — same /google prefix, separate router so the
+# public endpoint doesn't accidentally inherit any admin-only deps
+# someone might attach to the OAuth subrouter later.
+router.include_router(google_webhook_router)
 
 
 @router.get("", response_model=list[IntegrationRead])
@@ -79,3 +107,164 @@ async def disconnect_integration_endpoint(
             detail=f"No {provider} integration found for this org.",
         )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Webhook secret rotation --------------------------------------------
+
+
+@router.post(
+    "/{provider}/webhook/rotate",
+    response_model=IntegrationRead,
+)
+async def rotate_webhook_endpoint(
+    provider: IntegrationProviderLiteral,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> IntegrationRead:
+    """Mint a fresh webhook secret. Old URL stops authenticating
+    immediately — Settings UI must show the new URL to the Owner and
+    instruct them to update it in the ad platform's webhook config.
+    404 if the org has not connected this provider."""
+    provider_enum = IntegrationProvider(provider)
+    row = await rotate_webhook_secret(db, provider=provider_enum)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No {provider} integration found for this org.",
+        )
+    return IntegrationRead.model_validate(row)
+
+
+# --- Subscriptions CRUD --------------------------------------------------
+
+
+@router.get(
+    "/subscriptions",
+    response_model=list[IntegrationSubscriptionRead],
+)
+async def list_subscriptions_endpoint(
+    integration_id: uuid.UUID | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> list[IntegrationSubscriptionRead]:
+    """List form subscriptions in this org, optionally filtered to one
+    integration. The Settings UI loads this when rendering each
+    provider's picker."""
+    rows = await list_subscriptions(db, integration_id=integration_id)
+    return [IntegrationSubscriptionRead.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/subscriptions",
+    response_model=IntegrationSubscriptionRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_subscription_endpoint(
+    payload: IntegrationSubscriptionCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> IntegrationSubscriptionRead:
+    """Subscribe to a Google/Meta form. Body specifies the integration
+    + the platform's form_id + initial field mapping. 409 if the
+    integration is already subscribed to that form."""
+    row = await create_subscription(
+        db, org_id=user.org_id, payload=payload
+    )
+    return IntegrationSubscriptionRead.model_validate(row)
+
+
+@router.patch(
+    "/subscriptions/{subscription_id}",
+    response_model=IntegrationSubscriptionRead,
+)
+async def update_subscription_endpoint(
+    subscription_id: uuid.UUID,
+    payload: IntegrationSubscriptionUpdate,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> IntegrationSubscriptionRead:
+    """Partial update — typically the field-mapping editor in Step 8
+    or the enable/disable toggle on the Settings card. Returns the
+    updated row."""
+    row = await update_subscription(
+        db, subscription_id=subscription_id, payload=payload
+    )
+    return IntegrationSubscriptionRead.model_validate(row)
+
+
+@router.delete(
+    "/subscriptions/{subscription_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_subscription_endpoint(
+    subscription_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> Response:
+    """Hard-delete a subscription. Future deliveries for the removed
+    form will DLQ. 404 if no such row in this org."""
+    removed = await delete_subscription(
+        db, subscription_id=subscription_id
+    )
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="subscription not found",
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- DLQ list + replay ----------------------------------------------------
+
+
+@router.get(
+    "/dlq",
+    response_model=IntegrationDLQListResponse,
+)
+async def list_dlq_endpoint(
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> IntegrationDLQListResponse:
+    """Paginated DLQ for the active tenant. The Settings page calls
+    this on the Dead Letters tab; ordering is created_at desc so the
+    newest failures surface first."""
+    rows, total = await list_dlq(db, page=page, size=size)
+    return IntegrationDLQListResponse(
+        items=[IntegrationDLQRead.model_validate(r) for r in rows],
+        total=total,
+        page=page,
+        size=size,
+    )
+
+
+@router.post(
+    "/dlq/{dlq_id}/replay",
+    response_model=IntegrationDLQRead,
+)
+async def replay_dlq_endpoint(
+    dlq_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> IntegrationDLQRead:
+    """Re-enqueue a DLQ payload through the matching provider's
+    Celery task. Marks the row as replayed (the row survives so an
+    operator can see what's been retried). 404 if missing, 409 if the
+    original integration has been hard-deleted."""
+    row = await replay_dlq(db, dlq_id=dlq_id, actor_id=user.legacy_uuid)
+    return IntegrationDLQRead.model_validate(row)

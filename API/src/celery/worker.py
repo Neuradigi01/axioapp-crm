@@ -7,6 +7,7 @@ celery.config_from_object(config)
 celery.autodiscover_tasks([
     "src.celery.tasks",
     "src.app.core.leads.imports.tasks",
+    "src.app.core.integrations.google.tasks",
 ])
 
 if not CELERY_ENABLED:

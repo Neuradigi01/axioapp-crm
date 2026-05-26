@@ -62,9 +62,87 @@ class IntegrationUpsert(BaseModel):
     scopes: list[str] = Field(default_factory=list)
 
 
+class IntegrationSubscriptionRead(BaseModel):
+    """Subscription row projection — what the Settings UI shows in the
+    form-picker list. `field_mapping` is exposed in full so the editor
+    in Step 8 can drive its UI without a second fetch."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    org_id: uuid.UUID
+    integration_id: uuid.UUID
+    external_form_id: str
+    external_form_label: Optional[str]
+    field_mapping: dict
+    enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class IntegrationSubscriptionCreate(BaseModel):
+    """Settings UI: "subscribe to this form, with this mapping".
+
+    `field_mapping` is `{ad_field_name: "contact.full_name"}` /
+    `"contact.phone"` / `"contact.email"` / `"custom_data.<key>"`
+    — same target shape as the bulk-import mapping. Empty mapping is
+    allowed at create time; the editor in Step 8 fills it in."""
+
+    integration_id: uuid.UUID
+    external_form_id: str = Field(min_length=1, max_length=128)
+    external_form_label: Optional[str] = Field(default=None, max_length=255)
+    field_mapping: dict = Field(default_factory=dict)
+    enabled: bool = True
+
+
+class IntegrationSubscriptionUpdate(BaseModel):
+    """Partial-update shape for the mapping editor + enable/disable
+    toggle in the Settings UI. `external_form_id` is immutable — to
+    point at a different form, delete + recreate."""
+
+    external_form_label: Optional[str] = Field(default=None, max_length=255)
+    field_mapping: Optional[dict] = None
+    enabled: Optional[bool] = None
+
+
+class IntegrationDLQRead(BaseModel):
+    """DLQ row projection. The Settings page lists these with a
+    "Replay" button per row; `replayed_at` populates once the row has
+    been re-enqueued (and stays populated forever so an Owner can see
+    which payloads have already been retried)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    org_id: uuid.UUID
+    integration_id: Optional[uuid.UUID]
+    provider: IntegrationProviderLiteral
+    payload: dict
+    error_message: str
+    retries_attempted: int
+    created_at: datetime
+    replayed_at: Optional[datetime]
+    replayed_by: Optional[uuid.UUID]
+
+
+class IntegrationDLQListResponse(BaseModel):
+    """Paginated DLQ list. Tight envelope so the Settings page can
+    render counts + "load more" without a separate count call."""
+
+    items: list[IntegrationDLQRead]
+    total: int
+    page: int
+    size: int
+
+
 __all__ = [
+    "IntegrationDLQListResponse",
+    "IntegrationDLQRead",
     "IntegrationProviderLiteral",
     "IntegrationRead",
     "IntegrationStatusLiteral",
+    "IntegrationSubscriptionCreate",
+    "IntegrationSubscriptionRead",
+    "IntegrationSubscriptionUpdate",
     "IntegrationUpsert",
 ]

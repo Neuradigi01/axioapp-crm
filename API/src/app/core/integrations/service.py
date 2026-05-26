@@ -11,11 +11,13 @@ needs them — no module-level caching, no logging.
 """
 from __future__ import annotations
 
+import secrets
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select
+from fastapi import HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -26,10 +28,22 @@ from src.app.core.integrations.crypto import (
 )
 from src.app.core.integrations.models import (
     Integration,
+    IntegrationDLQ,
     IntegrationProvider,
     IntegrationStatus,
+    IntegrationSubscription,
 )
-from src.app.core.integrations.schemas import IntegrationUpsert
+from src.app.core.integrations.schemas import (
+    IntegrationSubscriptionCreate,
+    IntegrationSubscriptionUpdate,
+    IntegrationUpsert,
+)
+
+
+def _new_webhook_secret() -> str:
+    """A 32-byte url-safe random token. Long enough that brute-forcing
+    the per-tenant webhook path is computationally infeasible."""
+    return secrets.token_urlsafe(32)
 
 
 async def get(
@@ -105,6 +119,11 @@ async def upsert(
             connected_by=actor_id,
             disconnected_at=None,
             disconnected_by=None,
+            # Mint the webhook secret on first connect so the Settings
+            # UI can show the per-tenant webhook URL immediately. The
+            # secret survives across reconnects unless the row went
+            # through disconnect (which nulls it).
+            webhook_secret=_new_webhook_secret(),
         )
         session.add(row)
     else:
@@ -122,6 +141,11 @@ async def upsert(
         existing.connected_by = actor_id
         existing.disconnected_at = None
         existing.disconnected_by = None
+        # Re-mint on reconnect after a disconnect — old URL becomes
+        # immediately invalid, so a leaked webhook URL can't be revived
+        # by an ex-admin re-OAuthing a stolen account.
+        if existing.webhook_secret is None:
+            existing.webhook_secret = _new_webhook_secret()
         row = existing
 
     await session.commit()
@@ -167,6 +191,10 @@ async def disconnect(
     row.status = IntegrationStatus.disconnected
     row.disconnected_at = datetime.now(timezone.utc)
     row.disconnected_by = actor_id
+    # Null the webhook secret so the public webhook URL stops
+    # authenticating immediately — Google/Meta deliveries against the
+    # old URL will 401, which tells them to stop retrying.
+    row.webhook_secret = None
     await session.commit()
     await session.refresh(row)
 
@@ -207,10 +235,310 @@ def decrypt_tokens(integration: Integration) -> tuple[str, Optional[str]]:
     )
 
 
+# --- Webhook secret lookup ------------------------------------------------
+
+
+async def get_by_webhook_secret(
+    session: AsyncSession,
+    *,
+    webhook_secret: str,
+) -> Optional[Integration]:
+    """Resolve an integration row by its webhook URL discriminator.
+    Used by the public webhook endpoint to authenticate the inbound
+    delivery — no JWT, no tenant header; the secret IS the auth.
+
+    Returns None for any unknown / nulled secret. The endpoint then
+    returns 401 + emits the `integration.webhook.invalid_signature`
+    audit event with the request IP.
+
+    This is the only DB read in the codebase that bypasses the org
+    tenant filter (the receiver has no tenant context yet — we LEARN
+    it from this lookup). The bypass is safe: `webhook_secret` is
+    UNIQUE (per migration 0049) so the predicate selects at most one
+    row, and the secret itself is the authentication factor.
+    """
+    if not webhook_secret:
+        return None
+    # `do_orm_execute` tenant filter would reject this query (no
+    # active org_id). Use a raw connection-level SELECT to bypass.
+    from sqlalchemy import text
+
+    sql = text(
+        """
+        SELECT id, org_id, provider, status, account_id, account_label,
+               access_token_enc, refresh_token_enc, token_expires_at,
+               scopes, last_error, connected_at, connected_by,
+               disconnected_at, disconnected_by, updated_at,
+               webhook_secret
+        FROM integrations
+        WHERE webhook_secret = :secret
+        LIMIT 1
+        """
+    )
+    row = (
+        await session.execute(sql, {"secret": webhook_secret})
+    ).mappings().first()
+    if row is None:
+        return None
+    integration = Integration(
+        id=row["id"],
+        org_id=row["org_id"],
+        provider=IntegrationProvider(row["provider"]),
+        status=IntegrationStatus(row["status"]),
+        account_id=row["account_id"],
+        account_label=row["account_label"],
+        access_token_enc=row["access_token_enc"],
+        refresh_token_enc=row["refresh_token_enc"],
+        token_expires_at=row["token_expires_at"],
+        scopes=row["scopes"],
+        last_error=row["last_error"],
+        connected_at=row["connected_at"],
+        connected_by=row["connected_by"],
+        disconnected_at=row["disconnected_at"],
+        disconnected_by=row["disconnected_by"],
+        updated_at=row["updated_at"],
+        webhook_secret=row["webhook_secret"],
+    )
+    return integration
+
+
+async def rotate_webhook_secret(
+    session: AsyncSession,
+    *,
+    provider: IntegrationProvider,
+) -> Optional[Integration]:
+    """Issue a fresh webhook secret for the (active-tenant, provider)
+    integration. Returns the updated row or None if no row exists.
+    Old URL stops authenticating immediately — the Settings UI must
+    pull the new URL after this call. Audited as
+    `integration.webhook.rotated`."""
+    row = await get(session, provider=provider)
+    if row is None:
+        return None
+    row.webhook_secret = _new_webhook_secret()
+    await session.commit()
+    await session.refresh(row)
+    await audit.log(
+        "integration.webhook.rotated",
+        entity_type="integration",
+        entity_id=row.id,
+        after={"provider": provider.value},
+    )
+    return row
+
+
+# --- Subscription CRUD ----------------------------------------------------
+
+
+async def list_subscriptions(
+    session: AsyncSession,
+    *,
+    integration_id: Optional[uuid.UUID] = None,
+) -> list[IntegrationSubscription]:
+    """All subscriptions in the active tenant, optionally filtered to
+    one integration. RLS authorises the org scope via the ORM tenant
+    filter — no explicit org_id WHERE clause needed."""
+    stmt = select(IntegrationSubscription).order_by(
+        IntegrationSubscription.created_at.desc()
+    )
+    if integration_id is not None:
+        stmt = stmt.where(
+            IntegrationSubscription.integration_id == integration_id
+        )
+    rows = (await session.execute(stmt)).scalars().all()
+    return list(rows)
+
+
+async def create_subscription(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    payload: IntegrationSubscriptionCreate,
+) -> IntegrationSubscription:
+    """Insert a new (integration, external_form_id) subscription.
+    Raises 409 on duplicate — the `uq_integration_subscriptions_form`
+    constraint is what makes this safe to call from a re-render of the
+    Settings form picker."""
+    # Verify the integration exists in this tenant (the FK + RLS would
+    # catch a foreign-tenant ref, but a friendly 404 is better than a
+    # 500 from a constraint violation).
+    parent = (
+        await session.execute(
+            select(Integration).where(
+                Integration.id == payload.integration_id
+            )
+        )
+    ).scalar_one_or_none()
+    if parent is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"integration {payload.integration_id} not found",
+        )
+    row = IntegrationSubscription(
+        org_id=org_id,
+        integration_id=payload.integration_id,
+        external_form_id=payload.external_form_id,
+        external_form_label=payload.external_form_label,
+        field_mapping=dict(payload.field_mapping or {}),
+        enabled=payload.enabled,
+    )
+    session.add(row)
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Subscription already exists for form "
+                f"{payload.external_form_id} on this integration."
+            ),
+        )
+    await session.refresh(row)
+    await audit.log(
+        "integration.subscription.created",
+        entity_type="integration_subscription",
+        entity_id=row.id,
+        after={
+            "integration_id": str(payload.integration_id),
+            "external_form_id": payload.external_form_id,
+        },
+    )
+    return row
+
+
+async def update_subscription(
+    session: AsyncSession,
+    *,
+    subscription_id: uuid.UUID,
+    payload: IntegrationSubscriptionUpdate,
+) -> IntegrationSubscription:
+    """Partial update of a subscription. 404 if missing."""
+    row = (
+        await session.execute(
+            select(IntegrationSubscription).where(
+                IntegrationSubscription.id == subscription_id
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="subscription not found",
+        )
+    changes = payload.model_dump(exclude_unset=True)
+    for field, value in changes.items():
+        setattr(row, field, value)
+    await session.commit()
+    await session.refresh(row)
+    await audit.log(
+        "integration.subscription.updated",
+        entity_type="integration_subscription",
+        entity_id=row.id,
+        after=changes,
+    )
+    return row
+
+
+async def delete_subscription(
+    session: AsyncSession,
+    *,
+    subscription_id: uuid.UUID,
+) -> bool:
+    """Hard-delete a subscription. Returns True if a row was removed.
+    Future ad-form deliveries for the removed `external_form_id` will
+    DLQ with reason `no_subscription`."""
+    row = (
+        await session.execute(
+            select(IntegrationSubscription).where(
+                IntegrationSubscription.id == subscription_id
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return False
+    await session.delete(row)
+    await session.commit()
+    await audit.log(
+        "integration.subscription.deleted",
+        entity_type="integration_subscription",
+        entity_id=subscription_id,
+    )
+    return True
+
+
+async def find_subscription(
+    session: AsyncSession,
+    *,
+    integration_id: uuid.UUID,
+    external_form_id: str,
+) -> Optional[IntegrationSubscription]:
+    """Locate the subscription row for an inbound webhook payload.
+    Worker calls this with the integration + form id from the payload.
+    Returns None if no subscription matches (worker DLQs with
+    `no_subscription`)."""
+    return (
+        await session.execute(
+            select(IntegrationSubscription)
+            .where(
+                IntegrationSubscription.integration_id == integration_id
+            )
+            .where(
+                IntegrationSubscription.external_form_id
+                == external_form_id
+            )
+        )
+    ).scalar_one_or_none()
+
+
+# --- DLQ list + count helpers --------------------------------------------
+
+
+async def list_dlq(
+    session: AsyncSession,
+    *,
+    page: int = 1,
+    size: int = 50,
+) -> tuple[list[IntegrationDLQ], int]:
+    """Paginated DLQ list for the active tenant. Returns (rows, total)."""
+    base = select(IntegrationDLQ).order_by(
+        IntegrationDLQ.created_at.desc()
+    )
+    count_stmt = select(func.count()).select_from(IntegrationDLQ)
+    total = (await session.execute(count_stmt)).scalar_one()
+    rows = (
+        await session.execute(
+            base.offset((page - 1) * size).limit(size)
+        )
+    ).scalars().all()
+    return list(rows), total
+
+
+async def get_dlq(
+    session: AsyncSession, *, dlq_id: uuid.UUID
+) -> Optional[IntegrationDLQ]:
+    """Fetch a single DLQ row by id (RLS-scoped). Used by the replay
+    endpoint before it re-enqueues."""
+    return (
+        await session.execute(
+            select(IntegrationDLQ).where(IntegrationDLQ.id == dlq_id)
+        )
+    ).scalar_one_or_none()
+
+
 __all__ = [
+    "create_subscription",
     "decrypt_tokens",
+    "delete_subscription",
     "disconnect",
+    "find_subscription",
     "get",
+    "get_by_webhook_secret",
+    "get_dlq",
     "list_all",
+    "list_dlq",
+    "list_subscriptions",
+    "rotate_webhook_secret",
+    "update_subscription",
     "upsert",
 ]
