@@ -204,8 +204,12 @@ class TestStateSigning:
              "nonce": "x", "exp": int(time.time()) + 600}
         )
         body, sig = signed.split(".", 1)
-        # Flip the last char of the signature.
-        flipped = sig[:-1] + ("A" if sig[-1] != "A" else "B")
+        # Flip a char near the START of the signature — the LAST char
+        # of a base64url-encoded 32-byte digest only contributes 4 of
+        # its 6 bits to the decoded bytes, so flipping it doesn't
+        # always change the digest (flaky). The first char always
+        # does.
+        flipped = ("A" if sig[0] != "A" else "B") + sig[1:]
         with pytest.raises(Exception) as exc:
             oauth.verify_state(f"{body}.{flipped}")
         assert "signature" in str(exc.value.detail).lower()

@@ -218,16 +218,19 @@ async def subscribe_page_endpoint(
     integration = await _require_meta(db)
     client = MetaGraphClient(integration=integration, session=db)
     try:
-        page_token = await subscriptions.find_page_token(
-            client, page_id=page_id
+        # Pull the full Page record so we can cache its name alongside
+        # the token — picker UI shows it without an extra round trip.
+        all_pages = await subscriptions.list_pages(client)
+        page = next(
+            (p for p in all_pages if p.page_id == page_id), None
         )
-        if not page_token:
+        if page is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"Page {page_id} not managed by the connected Meta user.",
             )
         ok = await subscriptions.subscribe_page(
-            client, page_id=page_id, page_token=page_token
+            client, page_id=page_id, page_token=page.access_token
         )
     except MetaTokenExpiredError:
         raise HTTPException(
@@ -239,6 +242,17 @@ async def subscribe_page_endpoint(
             status_code=502,
             detail="Meta did not confirm the subscription.",
         )
+    # Cache the Page token so the Step-5 webhook worker can fetch lead
+    # details without re-OAuthing. Runs AFTER Meta confirms — we don't
+    # cache tokens for un-subscribed Pages.
+    await subscriptions.upsert_page_token(
+        db,
+        org_id=integration.org_id,
+        integration_id=integration.id,
+        page_id=page_id,
+        page_name=page.name,
+        page_token=page.access_token,
+    )
     return {"status": "subscribed", "page_id": page_id}
 
 
@@ -251,7 +265,9 @@ async def unsubscribe_page_endpoint(
     ),
 ) -> dict:
     """Stop `leadgen` deliveries for this Page. Doesn't touch other
-    Pages on the same integration."""
+    Pages on the same integration. Also drops the cached Page token
+    so a leaked DB dump after disconnect can't be used to call the
+    Graph API."""
     integration = await _require_meta(db)
     client = MetaGraphClient(integration=integration, session=db)
     try:
@@ -276,6 +292,11 @@ async def unsubscribe_page_endpoint(
             status_code=502,
             detail="Meta did not confirm the unsubscription.",
         )
+    # Always-OK to drop the cache (idempotent). Done AFTER Meta
+    # confirms so a half-success doesn't leave us with stale state.
+    await subscriptions.delete_page_token(
+        db, integration_id=integration.id, page_id=page_id
+    )
     return {"status": "unsubscribed", "page_id": page_id}
 
 

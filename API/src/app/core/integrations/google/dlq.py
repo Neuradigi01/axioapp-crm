@@ -1,31 +1,26 @@
 """Dead-letter helpers for Google Ads webhook processing.
 
-A payload lands in `integration_dlq` when:
+`record_dlq` (writer) is provider-neutral and lives in the parent
+`core.integrations.dlq` module — both Google (Step 3) and Meta
+(Step 5) workers share it. This file re-exports it for backwards
+compatibility with the Step-3 callers.
 
-  - the inbound integration is disconnected / missing
-  - no `integration_subscriptions` row matches the payload's `form_id`
-  - the Celery task exhausts its retry budget on a transient error
-  - lead-creation fails with a validation error the worker can't recover
-
-Replay re-enqueues the original payload through the same task. It
-does NOT delete the DLQ row — `replayed_at` flips so the Settings UI
-can show "replayed at X, see lead Y" without losing forensic trail.
-
-The Meta side (Step 5) shares the same DLQ table but the Meta-specific
-re-enqueue lives in `meta/dlq.py`. This module stays Google-only so
-each provider's replay path is independently testable.
+`replay_dlq` stays Google-specific because re-enqueue must call the
+Google Celery task. Meta's replay (if/when added) lives in
+`meta/dlq.py`.
 """
 from __future__ import annotations
 
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.integrations.dlq import record_dlq as _record_dlq
 from src.app.core.integrations.models import (
     IntegrationDLQ,
     IntegrationProvider,
@@ -41,42 +36,23 @@ async def record_dlq(
     *,
     org_id: uuid.UUID,
     integration_id: Optional[uuid.UUID],
-    payload: dict[str, Any],
+    payload: dict,
     error_message: str,
     retries_attempted: int = 0,
 ) -> IntegrationDLQ:
-    """Insert one DLQ row. Always commits — the caller is in the Celery
-    worker and has no other transactional work to bundle. Emits
-    `integration.webhook.dlq` audit so an operator can grep for spikes.
-
-    `payload` is stored verbatim — Google's body is small (a few KB)
-    and forensic replay benefits from the raw shape, not a normalised
-    one."""
-    row = IntegrationDLQ(
+    """Provider-neutral writer with the provider pre-filled to
+    `google_ads`. Existing Step-3 callers see no change. New code
+    should call `core.integrations.dlq.record_dlq` directly with an
+    explicit `provider=` kwarg."""
+    return await _record_dlq(
+        session,
+        provider=IntegrationProvider.google_ads,
         org_id=org_id,
         integration_id=integration_id,
-        provider=IntegrationProvider.google_ads,
         payload=payload,
-        error_message=error_message[:2000],
+        error_message=error_message,
         retries_attempted=retries_attempted,
     )
-    session.add(row)
-    await session.commit()
-    await session.refresh(row)
-    await audit.log(
-        "integration.webhook.dlq",
-        entity_type="integration_dlq",
-        entity_id=row.id,
-        after={
-            "provider": IntegrationProvider.google_ads.value,
-            "integration_id": (
-                str(integration_id) if integration_id else None
-            ),
-            "error_message": error_message[:500],
-            "retries_attempted": retries_attempted,
-        },
-    )
-    return row
 
 
 async def replay_dlq(

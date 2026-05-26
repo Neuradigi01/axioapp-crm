@@ -2,7 +2,7 @@
 
 **Goal:** Receive Meta's `leadgen` webhook deliveries, handle Meta's verify-token GET handshake, verify the `X-Hub-Signature-256` HMAC on every POST, enqueue lead-fetch as a Celery task (Meta payloads carry only `leadgen_id`; we have to call `GET /{leadgen_id}` to get the actual field values), and DLQ on exhaustion. Reuses subscriptions + DLQ infrastructure from Step 3.
 **Track:** Ad Integrations
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 4 (Meta OAuth + Page subscription), Step 3 (subscriptions + DLQ tables, retry/audit patterns).
 
 ---

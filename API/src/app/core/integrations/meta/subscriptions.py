@@ -28,10 +28,17 @@ field, so there's no parallel Instagram code path.
 """
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.app.core.integrations.crypto import encrypt
 from src.app.core.integrations.meta.api_client import MetaGraphClient
+from src.app.core.integrations.meta.models import MetaPageToken
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,7 +142,10 @@ async def subscribe_page(
     leadgen`. After this returns 200, Meta delivers lead events on
     every Lead Form attached to this Page to our webhook.
 
-    Returns True on Meta's `{"success": true}` response."""
+    Returns True on Meta's `{"success": true}` response. Caller is
+    responsible for caching the Page token via `upsert_page_token`
+    once Meta confirms — the worker needs the cache to fetch lead
+    details when webhooks arrive."""
     body = await client.post(
         f"/{page_id}/subscribed_apps",
         params={"subscribed_fields": "leadgen"},
@@ -152,7 +162,8 @@ async def unsubscribe_page(
 ) -> bool:
     """DELETE `/{page_id}/subscribed_apps`. Removes the leadgen
     subscription for this Page; deliveries stop within Meta's normal
-    propagation window (a few seconds).
+    propagation window (a few seconds). Caller should follow with
+    `delete_page_token` to clear the cached Page token.
 
     Returns True on Meta's `{"success": true}` response."""
     body = await client.delete(
@@ -160,6 +171,76 @@ async def unsubscribe_page(
         access_token=page_token,
     )
     return bool(body.get("success"))
+
+
+# --- Page-token cache (Step 5) --------------------------------------------
+
+
+async def upsert_page_token(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    integration_id: uuid.UUID,
+    page_id: str,
+    page_name: Optional[str],
+    page_token: str,
+) -> MetaPageToken:
+    """Cache the Page-scoped access_token in `meta_page_tokens` so the
+    Step-5 webhook worker doesn't need to re-fetch `/me/accounts` on
+    every delivery. UPSERT semantics — re-subscribing the same Page
+    rotates the cached token in place.
+
+    Token stored as Fernet ciphertext via Step 1's `crypto.encrypt`."""
+    existing = (
+        await session.execute(
+            select(MetaPageToken)
+            .where(MetaPageToken.integration_id == integration_id)
+            .where(MetaPageToken.page_id == page_id)
+        )
+    ).scalar_one_or_none()
+    enc = encrypt(page_token)
+    now = datetime.now(timezone.utc)
+    if existing is None:
+        row = MetaPageToken(
+            org_id=org_id,
+            integration_id=integration_id,
+            page_id=page_id,
+            page_name=page_name,
+            page_token_enc=enc,
+            updated_at=now,
+        )
+        session.add(row)
+    else:
+        existing.page_token_enc = enc
+        existing.page_name = page_name
+        existing.updated_at = now
+        row = existing
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+async def delete_page_token(
+    session: AsyncSession,
+    *,
+    integration_id: uuid.UUID,
+    page_id: str,
+) -> bool:
+    """Drop the cached Page token after `unsubscribe_page` succeeds.
+    Returns True if a row was removed, False if nothing was cached
+    (idempotent — safe to call on never-subscribed Pages)."""
+    row = (
+        await session.execute(
+            select(MetaPageToken)
+            .where(MetaPageToken.integration_id == integration_id)
+            .where(MetaPageToken.page_id == page_id)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return False
+    await session.delete(row)
+    await session.commit()
+    return True
 
 
 async def find_page_token(
@@ -184,9 +265,11 @@ async def find_page_token(
 __all__ = [
     "MetaLeadForm",
     "MetaPage",
+    "delete_page_token",
     "find_page_token",
     "list_lead_forms_for_page",
     "list_pages",
     "subscribe_page",
     "unsubscribe_page",
+    "upsert_page_token",
 ]

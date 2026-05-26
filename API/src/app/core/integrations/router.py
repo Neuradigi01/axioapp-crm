@@ -31,6 +31,9 @@ from src.app.core.integrations.google.webhook import (
     router as google_webhook_router,
 )
 from src.app.core.integrations.meta.router import router as meta_router
+from src.app.core.integrations.meta.webhook import (
+    router as meta_webhook_router,
+)
 from src.app.core.integrations.models import IntegrationProvider
 from src.app.core.integrations.schemas import (
     IntegrationDLQListResponse,
@@ -71,6 +74,10 @@ router.include_router(google_webhook_router)
 # Meta subrouter — symmetric to Google. Full paths become
 # /api/v1/integrations/meta/...
 router.include_router(meta_router)
+# Meta webhook receiver — single fixed URL per environment (Meta's
+# webhook model). Separate router so the public endpoint doesn't
+# inherit any admin-only deps that might land on the OAuth router.
+router.include_router(meta_webhook_router)
 
 
 @router.get("", response_model=list[IntegrationRead])

@@ -8,6 +8,7 @@ celery.autodiscover_tasks([
     "src.celery.tasks",
     "src.app.core.leads.imports.tasks",
     "src.app.core.integrations.google.tasks",
+    "src.app.core.integrations.meta.tasks",
 ])
 
 if not CELERY_ENABLED:
