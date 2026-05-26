@@ -58,6 +58,18 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // Alias so OAuth callbacks (Google + Meta) can bounce
+        // straight to the Integrations tab. The component reads
+        // `route.data.tab` to pre-select; existing /user/settings
+        // stays on its first-visible tab.
+        path: 'settings/integrations',
+        data: { tab: 'integrations' },
+        loadComponent: () =>
+          import('./core/settings/settings-page.component').then(
+            (m) => m.SettingsPageComponent,
+          ),
+      },
+      {
         path: 'profile',
         loadComponent: () =>
           import('./core/profile/profile-page.component').then(

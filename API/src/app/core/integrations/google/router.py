@@ -55,15 +55,22 @@ async def authorize_endpoint(
     user: User = Depends(
         require_permissions("settings.integrations.manage")
     ),
-) -> RedirectResponse:
-    """Build the Google consent URL + 302 to it. The OAuth `state`
-    encodes the active tenant + actor so the callback knows who to
-    upsert against (callback can't read the CRM JWT — it's invoked by
-    Google's browser, not the in-app frontend)."""
+) -> dict:
+    """Return the Google consent URL as JSON so the SPA can navigate
+    to it. We do NOT 302 here because a top-level browser GET to
+    `/api/v1/...` doesn't carry the Bearer header (only XHR does),
+    so a 302 path would 401 before reaching the redirect.
+
+    The frontend pattern is: fetch this endpoint with the bearer
+    interceptor → receive `{url}` → `window.location.assign(url)`.
+
+    The signed `state` inside the URL encodes the active tenant +
+    actor so the eventual `/callback` (which is unauthenticated —
+    Google's browser hits it) can re-establish org context."""
     url = oauth.start_authorize(
         org_id=user.org_id, actor_id=user.legacy_uuid
     )
-    return RedirectResponse(url=url, status_code=302)
+    return {"url": url}
 
 
 @router.get("/callback", include_in_schema=False)

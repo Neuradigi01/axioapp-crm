@@ -54,14 +54,16 @@ async def authorize_endpoint(
     user: User = Depends(
         require_permissions("settings.integrations.manage")
     ),
-) -> RedirectResponse:
-    """Build the Facebook consent URL + 302. State encodes the active
-    tenant + actor so the callback can re-establish scope without a
-    JWT (callback comes from Facebook's browser, not our frontend)."""
+) -> dict:
+    """Return the Facebook consent URL as JSON. Same reasoning as
+    `google/router.authorize_endpoint`: a top-level browser GET to a
+    JWT-gated endpoint can't carry the Bearer header, so the SPA
+    fetches the URL via XHR (interceptor-injected token) and then
+    navigates the browser to it."""
     url = oauth.start_authorize(
         org_id=user.org_id, actor_id=user.legacy_uuid
     )
-    return RedirectResponse(url=url, status_code=302)
+    return {"url": url}
 
 
 @router.get("/callback", include_in_schema=False)

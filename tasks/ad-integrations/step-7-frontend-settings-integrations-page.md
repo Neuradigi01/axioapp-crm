@@ -2,7 +2,7 @@
 
 **Goal:** Build `/user/settings/integrations` — a top-level Settings tab showing provider cards (Google Ads, Meta Ads), each with Connect/Disconnect buttons, post-connect Account info, Pages/Campaigns/Forms tree, per-form Subscribe toggle, webhook URL display (Google) or one-click subscription (Meta), and a "Re-connect required" warning when a token expires.
 **Track:** Ad Integrations
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 1–5 (backend complete enough to expose connect/disconnect + list pages/forms + subscribe).
 
 ---

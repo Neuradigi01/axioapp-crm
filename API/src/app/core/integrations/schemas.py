@@ -15,7 +15,9 @@ import uuid
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+from config import API_BASE_URL
 
 
 # Mirrors the SQLAlchemy `IntegrationProvider` / `IntegrationStatus`
@@ -27,9 +29,15 @@ IntegrationStatusLiteral = Literal[
 
 
 class IntegrationRead(BaseModel):
-    """Row projection for `GET /api/v1/integrations`. Tokens are
-    intentionally absent — the `*_enc` columns from the ORM never
-    surface here, even by accident, because they aren't declared."""
+    """Row projection for `GET /api/v1/integrations`. Encrypted-token
+    columns (`*_enc`) are intentionally absent — they aren't declared,
+    so a router accidentally returning the raw ORM row can't leak
+    ciphertext through this schema.
+
+    `webhook_secret` IS exposed — it's the secret an admin pastes into
+    the ad platform's webhook config, so they need to see it; tokens
+    are different (the admin never types them anywhere). The Settings
+    UI displays it inside the constructed `webhook_url`."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,6 +55,33 @@ class IntegrationRead(BaseModel):
     disconnected_at: Optional[datetime]
     disconnected_by: Optional[uuid.UUID]
     updated_at: datetime
+    # Per-tenant webhook URL discriminator (Google) — admin pastes it
+    # into the Google Ads UI. Meta uses a single env-level URL with no
+    # per-tenant component; `webhook_secret` stays None for Meta rows.
+    webhook_secret: Optional[str] = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def webhook_url(self) -> Optional[str]:
+        """Provider-aware webhook URL the Settings UI surfaces.
+
+        - `google_ads` (connected, has secret) →
+          `{API_BASE_URL}/api/v1/integrations/google/webhook/v1/<secret>`.
+          Admin pastes into each Google Ads Lead Form's webhook field.
+        - `meta_ads` (connected) → `{API_BASE_URL}/api/v1/integrations/meta/webhook`.
+          One URL per environment; admins configure it ONCE in the
+          Meta app dashboard, NOT per integration (Meta's webhook
+          model is push-subscription, not pull).
+        - otherwise → None.
+        """
+        if self.provider == "google_ads" and self.webhook_secret:
+            return (
+                f"{API_BASE_URL}/api/v1/integrations/google/webhook/v1/"
+                f"{self.webhook_secret}"
+            )
+        if self.provider == "meta_ads" and self.status == "connected":
+            return f"{API_BASE_URL}/api/v1/integrations/meta/webhook"
+        return None
 
 
 class IntegrationUpsert(BaseModel):
