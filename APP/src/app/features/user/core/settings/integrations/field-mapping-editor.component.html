@@ -1,0 +1,157 @@
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+  role="dialog"
+  aria-modal="true"
+  (click)="onBackdrop($event)"
+  data-testid="field-mapping-editor"
+>
+  <div
+    class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl"
+    (click)="$event.stopPropagation()"
+  >
+    <header class="flex items-start justify-between border-b border-zinc-200 px-5 py-4">
+      <div>
+        <h2 class="text-lg font-semibold text-zinc-900">
+          Edit field mapping
+        </h2>
+        <p class="mt-0.5 text-xs text-zinc-600">
+          @if (formLabel()) {
+            <span class="font-medium">{{ formLabel() }}</span>
+            <span class="text-zinc-400"> · </span>
+          }
+          <span class="font-mono">{{ subscription().external_form_id }}</span>
+        </p>
+        <p class="mt-1 text-xs text-zinc-500">
+          Pick the CRM field each ad-form field should land in. Unmapped
+          fields are ignored. Save persists; the next webhook payload
+          uses the new mapping.
+        </p>
+      </div>
+      <button
+        type="button"
+        class="rounded p-1 text-zinc-500 hover:bg-zinc-100"
+        aria-label="Close editor"
+        (click)="cancel()"
+      >
+        <lucide-icon name="x" size="16" aria-hidden="true"></lucide-icon>
+      </button>
+    </header>
+
+    <div class="px-5 py-4">
+      @if (loading()) {
+        <p class="flex items-center gap-2 text-sm text-zinc-500">
+          <lucide-icon
+            name="loader-2"
+            size="14"
+            class="animate-spin"
+            aria-hidden="true"
+          ></lucide-icon>
+          Loading targets…
+        </p>
+      } @else {
+        @if (error()) {
+          <div
+            class="mb-3 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+          >
+            <lucide-icon
+              name="alert-triangle"
+              size="16"
+              class="mt-0.5 shrink-0"
+              aria-hidden="true"
+            ></lucide-icon>
+            <span>{{ error() }}</span>
+          </div>
+        }
+
+        @if (formFields().length === 0) {
+          <p class="py-6 text-center text-sm text-zinc-500">
+            No form fields detected. Confirm the form is published in
+            Google Ads / Meta.
+          </p>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="text-left text-xs uppercase text-zinc-500">
+                <tr>
+                  <th class="px-2 py-2 font-medium">Ad-form field</th>
+                  <th class="px-2 py-2 font-medium">CRM target</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-100">
+                @for (field of formFields(); track field) {
+                  <tr>
+                    <td class="px-2 py-2 align-middle text-zinc-800 font-mono">
+                      {{ field }}
+                    </td>
+                    <td class="px-2 py-2 align-middle">
+                      <select
+                        class="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm"
+                        [value]="mapping()[field] || IGNORE"
+                        (change)="setTarget(field, $any($event.target).value)"
+                      >
+                        <option [value]="IGNORE">(Ignore)</option>
+                        @if (groupedTargets().standard.length > 0) {
+                          <optgroup label="Standard">
+                            @for (t of groupedTargets().standard; track t.key) {
+                              <option [value]="t.key">
+                                {{ t.label }}{{ t.required ? ' *' : '' }}
+                              </option>
+                            }
+                          </optgroup>
+                        }
+                        @if (groupedTargets().custom.length > 0) {
+                          <optgroup label="Custom fields">
+                            @for (t of groupedTargets().custom; track t.key) {
+                              <option [value]="t.key">{{ t.label }}</option>
+                            }
+                          </optgroup>
+                        }
+                      </select>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    </div>
+
+    <footer
+      class="flex items-center justify-between gap-2 border-t border-zinc-200 px-5 py-3"
+    >
+      <button
+        type="button"
+        class="text-xs font-medium text-blue-600 hover:text-blue-700"
+        (click)="applyDefaults()"
+      >
+        Use defaults
+      </button>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          (click)="cancel()"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          [disabled]="!canSave()"
+          (click)="save()"
+        >
+          @if (saving()) {
+            <lucide-icon
+              name="loader-2"
+              size="14"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+          }
+          Save mapping
+        </button>
+      </div>
+    </footer>
+  </div>
+</div>

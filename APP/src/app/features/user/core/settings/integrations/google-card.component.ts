@@ -57,6 +57,21 @@ export class GoogleCardComponent {
    *  succeeds so the parent can refetch the integrations list +
    *  subscriptions and re-render every card consistently. */
   readonly changed = output<void>();
+  /** Emitted when the user clicks "Edit mapping" on a subscribed
+   *  form row. The parent opens the field-mapping-editor modal
+   *  with the listed form fields as the dropdown rows.
+   *
+   *  Google Lead Forms don't expose user-defined field names — they
+   *  use a fixed set of well-known column types (FULL_NAME,
+   *  PHONE_NUMBER, EMAIL, WORK_EMAIL, ...). For v1 we surface the
+   *  same canonical-form-field list to every Google form mapper; a
+   *  follow-on can query `extension_feed_item.lead_form_field` per
+   *  form for the exact subset the customer's form actually asks. */
+  readonly editMapping = output<{
+    subscription: IntegrationSubscription;
+    formFields: string[];
+    formLabel: string | null;
+  }>();
   /** Toast-like inline error for failed actions (network errors,
    *  Google API rejections). Surfaced at the card top, not in a
    *  global toast — keeps the failure context next to the action. */
@@ -253,6 +268,38 @@ export class GoogleCardComponent {
     if (!url) return;
     void navigator.clipboard.writeText(url).catch(() => {
       this.inlineError.set('Could not copy to clipboard.');
+    });
+  }
+
+  /** Google's lead-form field vocabulary. Backend `_apply_mapping`
+   *  matches against `column_name` (snake or screaming-snake; the
+   *  worker accepts both). v1 surfaces a fixed list; per-form
+   *  precision is a follow-on. */
+  protected readonly googleFormFields: ReadonlyArray<string> = [
+    'FULL_NAME',
+    'FIRST_NAME',
+    'LAST_NAME',
+    'PHONE_NUMBER',
+    'EMAIL',
+    'WORK_EMAIL',
+    'CITY',
+    'STATE',
+    'POSTAL_CODE',
+    'COUNTRY',
+    'COMPANY_NAME',
+    'JOB_TITLE',
+  ];
+
+  /** Click handler on the per-form "Edit mapping" button. Forwards
+   *  the subscription + the canonical field list to the parent
+   *  page, which renders the modal. */
+  openMapping(form: GoogleLeadForm): void {
+    const sub = this.subscriptionsByForm()[form.form_id];
+    if (!sub) return;
+    this.editMapping.emit({
+      subscription: sub,
+      formFields: [...this.googleFormFields],
+      formLabel: form.name,
     });
   }
 }

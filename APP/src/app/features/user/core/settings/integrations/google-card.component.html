@@ -243,35 +243,46 @@
                           {{ form.form_id }}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        class="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium"
-                        [class.border-emerald-300]="subscriptionsByForm()[form.form_id]"
-                        [class.bg-emerald-50]="subscriptionsByForm()[form.form_id]"
-                        [class.text-emerald-700]="subscriptionsByForm()[form.form_id]"
-                        [class.border-zinc-300]="!subscriptionsByForm()[form.form_id]"
-                        [class.text-zinc-700]="!subscriptionsByForm()[form.form_id]"
-                        [disabled]="toggleInFlightFor() === form.form_id"
-                        (click)="toggleSubscribe(form)"
-                      >
-                        @if (toggleInFlightFor() === form.form_id) {
-                          <lucide-icon
-                            name="loader-2"
-                            size="14"
-                            class="animate-spin"
-                            aria-hidden="true"
-                          ></lucide-icon>
-                        } @else if (subscriptionsByForm()[form.form_id]) {
-                          <lucide-icon
-                            name="check"
-                            size="14"
-                            aria-hidden="true"
-                          ></lucide-icon>
-                          Subscribed
-                        } @else {
-                          Subscribe
+                      <div class="flex items-center gap-1">
+                        @if (subscriptionsByForm()[form.form_id]) {
+                          <button
+                            type="button"
+                            class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                            (click)="openMapping(form)"
+                          >
+                            Edit mapping
+                          </button>
                         }
-                      </button>
+                        <button
+                          type="button"
+                          class="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium"
+                          [class.border-emerald-300]="subscriptionsByForm()[form.form_id]"
+                          [class.bg-emerald-50]="subscriptionsByForm()[form.form_id]"
+                          [class.text-emerald-700]="subscriptionsByForm()[form.form_id]"
+                          [class.border-zinc-300]="!subscriptionsByForm()[form.form_id]"
+                          [class.text-zinc-700]="!subscriptionsByForm()[form.form_id]"
+                          [disabled]="toggleInFlightFor() === form.form_id"
+                          (click)="toggleSubscribe(form)"
+                        >
+                          @if (toggleInFlightFor() === form.form_id) {
+                            <lucide-icon
+                              name="loader-2"
+                              size="14"
+                              class="animate-spin"
+                              aria-hidden="true"
+                            ></lucide-icon>
+                          } @else if (subscriptionsByForm()[form.form_id]) {
+                            <lucide-icon
+                              name="check"
+                              size="14"
+                              aria-hidden="true"
+                            ></lucide-icon>
+                            Subscribed
+                          } @else {
+                            Subscribe
+                          }
+                        </button>
+                      </div>
                     </li>
                   }
                 </ul>

@@ -170,14 +170,55 @@ class IntegrationDLQListResponse(BaseModel):
     size: int
 
 
+class SubscriptionMappingUpdate(BaseModel):
+    """Step-8 endpoint body: full replacement of a subscription's
+    `field_mapping`. Keys are ad-platform field names (Google's
+    `column_name`, Meta's form field `name`); values are CRM target
+    keys validated by the router against `leads.imports.targets`.
+
+    Using a dict (not a list of pairs) matches the JSONB column shape
+    and lets the editor send one POST per save. Empty dict is allowed
+    — means "drop all fields" and the worker will DLQ inbound payloads
+    until the operator restores at least one mapping."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mapping: dict[str, str] = Field(default_factory=dict)
+
+
+class ProviderDeliveryStatus(BaseModel):
+    """Per-provider row inside `IntegrationStatusResponse`. Drives
+    the Settings dashboard panel: green dot if recent delivery,
+    amber if DLQ count > 0, none if neither connected nor delivered."""
+
+    provider: IntegrationProviderLiteral
+    status: IntegrationStatusLiteral
+    last_delivery_at: Optional[datetime]
+    deliveries_24h_accepted: int
+    deliveries_24h_failed: int
+
+
+class IntegrationStatusResponse(BaseModel):
+    """Response shape for `GET /api/v1/integrations/status`. Polled
+    every ~30s by the Settings panel. Always returns ALL providers
+    (even un-connected) so the panel can show "Not connected" tiles
+    consistently."""
+
+    providers: list[ProviderDeliveryStatus]
+    dlq_open_total: int  # unreplayed + undiscarded rows across providers
+
+
 __all__ = [
     "IntegrationDLQListResponse",
     "IntegrationDLQRead",
     "IntegrationProviderLiteral",
     "IntegrationRead",
     "IntegrationStatusLiteral",
+    "IntegrationStatusResponse",
     "IntegrationSubscriptionCreate",
     "IntegrationSubscriptionRead",
     "IntegrationSubscriptionUpdate",
     "IntegrationUpsert",
+    "ProviderDeliveryStatus",
+    "SubscriptionMappingUpdate",
 ]

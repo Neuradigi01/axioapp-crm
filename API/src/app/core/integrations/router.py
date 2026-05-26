@@ -40,20 +40,26 @@ from src.app.core.integrations.schemas import (
     IntegrationDLQRead,
     IntegrationProviderLiteral,
     IntegrationRead,
+    IntegrationStatusResponse,
     IntegrationSubscriptionCreate,
     IntegrationSubscriptionRead,
     IntegrationSubscriptionUpdate,
+    SubscriptionMappingUpdate,
 )
 from src.app.core.integrations.service import (
     create_subscription,
     delete_subscription,
+    discard_dlq,
     disconnect as disconnect_integration,
     list_all,
     list_dlq,
     list_subscriptions,
     rotate_webhook_secret,
     update_subscription,
+    update_subscription_mapping,
 )
+from src.app.core.integrations.status import build_status
+from src.app.core.leads.imports.targets import list_target_keys
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -235,7 +241,53 @@ async def delete_subscription_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-# --- DLQ list + replay ----------------------------------------------------
+# --- Step 8: Subscription field-mapping editor --------------------------
+
+
+@router.put(
+    "/subscriptions/{subscription_id}/mapping",
+    response_model=IntegrationSubscriptionRead,
+)
+async def update_subscription_mapping_endpoint(
+    subscription_id: uuid.UUID,
+    payload: SubscriptionMappingUpdate,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> IntegrationSubscriptionRead:
+    """Replace the subscription's `field_mapping`. Step-8 mapping
+    editor calls this on Save. Targets are validated against the
+    bulk-import target registry (`leads.imports.targets`) — sending
+    an unknown CRM target key returns 422 so the editor can surface
+    a precise validation error per row.
+
+    Empty mapping is allowed (means "drop everything" — the worker
+    will DLQ inbound payloads until at least one field is mapped
+    again). Sending the same mapping again is idempotent."""
+    if payload.mapping:
+        valid_keys = await list_target_keys(db)
+        invalid = sorted(
+            k for k in payload.mapping.values() if k not in valid_keys
+        )
+        if invalid:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Unknown CRM target keys: "
+                    f"{invalid}. Hit GET /api/v1/leads/import/targets "
+                    "for the valid list."
+                ),
+            )
+    row = await update_subscription_mapping(
+        db,
+        subscription_id=subscription_id,
+        mapping=payload.mapping,
+    )
+    return IntegrationSubscriptionRead.model_validate(row)
+
+
+# --- DLQ list + replay + discard (Step 8 extends Step 3) ----------------
 
 
 @router.get(
@@ -245,21 +297,80 @@ async def delete_subscription_endpoint(
 async def list_dlq_endpoint(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
+    provider: IntegrationProviderLiteral | None = Query(default=None),
+    include_replayed: bool = Query(default=True),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(
         require_permissions("settings.integrations.manage")
     ),
 ) -> IntegrationDLQListResponse:
-    """Paginated DLQ for the active tenant. The Settings page calls
-    this on the Dead Letters tab; ordering is created_at desc so the
-    newest failures surface first."""
-    rows, total = await list_dlq(db, page=page, size=size)
+    """Paginated DLQ for the active tenant.
+
+    `provider` filters to one platform. `include_replayed=false`
+    drops rows that have been replayed OR discarded — drives the
+    Step-8 status panel's "open failures" view. Step 7's summary
+    card uses the default (everything) since it just needs a total."""
+    provider_enum = (
+        IntegrationProvider(provider) if provider else None
+    )
+    rows, total = await list_dlq(
+        db,
+        page=page,
+        size=size,
+        provider=provider_enum,
+        include_replayed=include_replayed,
+    )
     return IntegrationDLQListResponse(
         items=[IntegrationDLQRead.model_validate(r) for r in rows],
         total=total,
         page=page,
         size=size,
     )
+
+
+@router.post(
+    "/dlq/{dlq_id}/discard",
+    response_model=IntegrationDLQRead,
+)
+async def discard_dlq_endpoint(
+    dlq_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> IntegrationDLQRead:
+    """Soft-discard a DLQ row — stamps `replayed_at = now()` with
+    `replayed_by = NULL`. The NULL `replayed_by` is the discriminator:
+    a real replay always carries the actor; a discard never does.
+    Row survives for forensic trail; the status panel + open-failures
+    list exclude it. 404 if the row doesn't exist."""
+    row = await discard_dlq(db, dlq_id=dlq_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="DLQ row not found",
+        )
+    return IntegrationDLQRead.model_validate(row)
+
+
+@router.get(
+    "/status",
+    response_model=IntegrationStatusResponse,
+)
+async def integration_status_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> IntegrationStatusResponse:
+    """Per-provider delivery snapshot for the Settings dashboard.
+    Polled every ~30s by the SPA. Always returns ALL providers
+    (even un-connected) so the panel renders consistent tiles.
+
+    Counts come from `audit_logs` events (Step 3 / Step 5 workers
+    emit `integration.webhook.received` on success +
+    `integration.webhook.dlq` on failure)."""
+    return await build_status(db)
 
 
 @router.post(

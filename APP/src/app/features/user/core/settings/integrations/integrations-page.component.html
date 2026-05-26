@@ -64,11 +64,33 @@
       Could not load integrations: {{ loadError() }}
     </div>
   } @else {
+    <!-- Step 8: Delivery status dashboard panel. Above the provider
+         cards so an Owner glances at it first. -->
+    <app-integration-status
+      (openDlq)="toggleDlq()"
+    ></app-integration-status>
+
+    <!-- Step 8: Inline DLQ table — visible only when the operator
+         clicks the status banner or the bottom-card link. -->
+    @if (dlqVisible()) {
+      <app-dlq-list
+        [visible]="dlqVisible()"
+        (changed)="onDlqChanged()"
+      ></app-dlq-list>
+    }
+
     <!-- Provider cards (Google first per spec). -->
     <app-google-card
       [integration]="google()"
       [subscriptions]="subscriptions()"
       (changed)="onCardChanged()"
+      (editMapping)="
+        openMappingEditor(
+          $event.subscription,
+          $event.formFields,
+          $event.formLabel
+        )
+      "
     ></app-google-card>
 
     <app-meta-card
@@ -77,8 +99,9 @@
       (changed)="onCardChanged()"
     ></app-meta-card>
 
-    <!-- Dead-letter summary. Step 8 builds the full table; Step 7
-         just surfaces the count so Owners notice spikes. -->
+    <!-- Compact DLQ summary card (Step 7) — kept as a quick-access
+         link to expand the inline table even when the status banner
+         isn't showing. -->
     <section
       class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm"
       data-testid="dlq-summary"
@@ -97,11 +120,13 @@
         </div>
         @if (dlqTotal() !== null) {
           @if (dlqTotal()! > 0) {
-            <span
-              class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200"
+            <button
+              type="button"
+              class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100"
+              (click)="toggleDlq()"
             >
-              {{ dlqTotal() }} payload{{ dlqTotal() === 1 ? '' : 's' }} need attention
-            </span>
+              {{ dlqTotal() }} payload{{ dlqTotal() === 1 ? '' : 's' }} total · view table
+            </button>
           } @else {
             <span
               class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
@@ -113,9 +138,21 @@
       </div>
       <p class="mt-2 text-xs text-zinc-500">
         Webhook payloads that exhausted their retry budget or failed
-        validation land here for manual replay. The full table +
-        replay UI ships in Step 8.
+        validation land here. Click a row's Replay button to re-enqueue,
+        or Discard to silence (the row stays for audit).
       </p>
     </section>
+  }
+
+  <!-- Step 8: Field-mapping editor modal. Renders only when a card
+       emits `editMapping`. -->
+  @if (mappingEditor(); as ed) {
+    <app-field-mapping-editor
+      [subscription]="ed.subscription"
+      [formFields]="ed.formFields"
+      [formLabel]="ed.formLabel"
+      (closed)="closeMappingEditor()"
+      (saved)="onMappingSaved()"
+    ></app-field-mapping-editor>
   }
 </div>

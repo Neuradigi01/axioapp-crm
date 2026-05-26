@@ -152,10 +152,57 @@ export interface AuthorizeUrlResponse {
 }
 
 
+// --- Step 8: dashboard + mapping editor shapes ------------------------
+
+
+/** One row in `GET /api/v1/leads/import/targets` — reused as the CRM
+ *  target dropdown options in the field-mapping editor (Step 8) and
+ *  the bulk-import column mapper. Schema mirrors backend
+ *  `core.leads.imports.schemas.MappingTarget`. */
+export interface MappingTarget {
+  key: string;
+  label: string;
+  field_type: string;
+  required: boolean;
+  custom: boolean;
+}
+
+
+export interface ProviderDeliveryStatus {
+  provider: IntegrationProvider;
+  status: IntegrationStatus;
+  last_delivery_at: string | null;
+  deliveries_24h_accepted: number;
+  deliveries_24h_failed: number;
+}
+
+
+export interface IntegrationStatusResponse {
+  providers: ProviderDeliveryStatus[];
+  /** Count of DLQ rows NOT yet replayed or discarded. Drives the
+   *  panel's "X failed deliveries need attention" banner. */
+  dlq_open_total: number;
+}
+
+
+export interface DlqListFilters {
+  page?: number;
+  size?: number;
+  provider?: IntegrationProvider;
+  /** Default true on the backend. Pass `false` to get only un-
+   *  addressed failures (drives the dashboard's open-failures view). */
+  include_replayed?: boolean;
+}
+
+
 @Injectable({ providedIn: 'root' })
 export class IntegrationsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/integrations`;
+  /** Bulk-import mapping-target endpoint is on `/leads/import`,
+   *  not under `/integrations` — but the field-mapping editor reuses
+   *  it verbatim, so we keep the dependency in one place. */
+  private readonly leadsImportBase = `${environment.apiBaseUrl}/leads/import`;
 
   // --- Generic management (Step 1) ---------------------------------
 
@@ -283,16 +330,70 @@ export class IntegrationsApiService {
     );
   }
 
-  // --- DLQ (Step 3 — list + count for this page; full UI in Step 8)
+  // --- DLQ (Step 3 list + Step 8 filters/discard/replay) ---------
 
-  /** Paginated DLQ list. Step 7 only needs the `total` for the
-   *  bottom summary card; the full table lives in Step 8. */
-  listDlq(page = 1, size = 1): Observable<IntegrationDLQListResponse> {
-    const params = new HttpParams()
-      .set('page', String(page))
-      .set('size', String(size));
+  /** Paginated DLQ list. Step 8 adds provider + include_replayed
+   *  filters so the dashboard can show "open failures only" while
+   *  Step 7's summary card just needs the unfiltered total. */
+  listDlq(filters: DlqListFilters = {}): Observable<IntegrationDLQListResponse> {
+    let params = new HttpParams()
+      .set('page', String(filters.page ?? 1))
+      .set('size', String(filters.size ?? 50));
+    if (filters.provider) {
+      params = params.set('provider', filters.provider);
+    }
+    if (filters.include_replayed === false) {
+      params = params.set('include_replayed', 'false');
+    }
     return this.http.get<IntegrationDLQListResponse>(`${this.base}/dlq`, {
       params,
     });
+  }
+
+  /** Re-enqueue a DLQ payload through the matching provider's
+   *  Celery task. Row survives with `replayed_at` stamped. */
+  replayDlq(dlqId: string): Observable<IntegrationDLQRow> {
+    return this.http.post<IntegrationDLQRow>(
+      `${this.base}/dlq/${dlqId}/replay`,
+      {},
+    );
+  }
+
+  /** Soft-discard a DLQ row — stamps `replayed_at` with
+   *  `replayed_by=NULL` so the status panel + open-failures view
+   *  exclude it. Row survives for forensic trail. */
+  discardDlq(dlqId: string): Observable<IntegrationDLQRow> {
+    return this.http.post<IntegrationDLQRow>(
+      `${this.base}/dlq/${dlqId}/discard`,
+      {},
+    );
+  }
+
+  // --- Step 8: Status dashboard + mapping editor -------------------
+
+  /** Per-provider delivery snapshot for the Settings dashboard.
+   *  Polled every ~30s by the Status panel. */
+  getStatus(): Observable<IntegrationStatusResponse> {
+    return this.http.get<IntegrationStatusResponse>(`${this.base}/status`);
+  }
+
+  /** Replace a subscription's `field_mapping`. Empty mapping is
+   *  allowed (means "drop everything" — webhook payloads will DLQ
+   *  until restored). Backend validates target keys against
+   *  `GET /leads/import/targets`. */
+  updateSubscriptionMapping(
+    subscriptionId: string,
+    mapping: Record<string, string>,
+  ): Observable<IntegrationSubscription> {
+    return this.http.put<IntegrationSubscription>(
+      `${this.base}/subscriptions/${subscriptionId}/mapping`,
+      { mapping },
+    );
+  }
+
+  /** Fetch the CRM target dropdown options. Reused from the bulk-
+   *  import surface — same shape, same validation contract. */
+  listMappingTargets(): Observable<MappingTarget[]> {
+    return this.http.get<MappingTarget[]>(`${this.leadsImportBase}/targets`);
   }
 }

@@ -42,7 +42,10 @@ import { forkJoin } from 'rxjs';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { DlqListComponent } from './dlq-list.component';
+import { FieldMappingEditorComponent } from './field-mapping-editor.component';
 import { GoogleCardComponent } from './google-card.component';
+import { IntegrationStatusComponent } from './integration-status.component';
 import { MetaCardComponent } from './meta-card.component';
 import {
   Integration,
@@ -64,7 +67,14 @@ type CallbackStatus =
   selector: 'app-settings-integrations-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [GoogleCardComponent, MetaCardComponent, LucideAngularModule],
+  imports: [
+    GoogleCardComponent,
+    MetaCardComponent,
+    IntegrationStatusComponent,
+    DlqListComponent,
+    FieldMappingEditorComponent,
+    LucideAngularModule,
+  ],
   templateUrl: './integrations-page.component.html',
 })
 export class IntegrationsPageComponent {
@@ -89,6 +99,19 @@ export class IntegrationsPageComponent {
     kind: 'success' | 'warn' | 'error';
     title: string;
     detail: string | null;
+  } | null>(null);
+
+  /** Inline DLQ list toggle (Step 8). Status panel emits `openDlq`
+   *  on the banner click; toggles `true` and the list lazy-loads on
+   *  first visibility. */
+  protected readonly dlqVisible = signal(false);
+
+  /** Active field-mapping editor target — null = closed. Set when a
+   *  card emits `editMapping` with the subscription + form-field list. */
+  protected readonly mappingEditor = signal<{
+    subscription: IntegrationSubscription;
+    formFields: string[];
+    formLabel: string | null;
   } | null>(null);
 
   // --- derived ------------------------------------------------------
@@ -120,6 +143,37 @@ export class IntegrationsPageComponent {
     this.callbackBanner.set(null);
   }
 
+  toggleDlq(): void {
+    this.dlqVisible.update((v) => !v);
+  }
+
+  /** Card emits this with the form-field list when the user clicks
+   *  Edit mapping on a subscribed row. */
+  openMappingEditor(
+    sub: IntegrationSubscription,
+    formFields: string[],
+    formLabel: string | null,
+  ): void {
+    this.mappingEditor.set({ subscription: sub, formFields, formLabel });
+  }
+
+  closeMappingEditor(): void {
+    this.mappingEditor.set(null);
+  }
+
+  onMappingSaved(): void {
+    // Refetch so the next time the editor opens for the same sub it
+    // reflects the saved mapping (mapping is only loaded once per
+    // editor instance).
+    this._refresh();
+  }
+
+  /** DLQ list emits `changed` after replay/discard so the open-DLQ
+   *  count in the status panel + the bottom summary card refresh. */
+  onDlqChanged(): void {
+    this._refresh();
+  }
+
   // --- internals ----------------------------------------------------
 
   private _refresh(): void {
@@ -128,7 +182,7 @@ export class IntegrationsPageComponent {
     forkJoin({
       integrations: this.api.list(),
       subscriptions: this.api.listSubscriptions(),
-      dlq: this.api.listDlq(1, 1),
+      dlq: this.api.listDlq({ page: 1, size: 1 }),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({

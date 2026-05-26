@@ -2,7 +2,7 @@
 
 **Goal:** Build the per-form field mapping editor (when an Owner opens a subscribed form, they edit the `{ad_field → crm_field}` map) and the integration status dashboard (last delivery timestamp per subscription, success/failure counts, the DLQ list with replay). Closes out the four-channel lead-ingestion track.
 **Track:** Ad Integrations
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 7 (integrations page exists, subscription rows exist), Steps 3 + 5 (DLQ table exists, replay endpoint exists), Bulk Import Step 3 (mapping-target endpoint reused).
 
 ---

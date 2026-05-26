@@ -499,12 +499,32 @@ async def list_dlq(
     *,
     page: int = 1,
     size: int = 50,
+    provider: Optional[IntegrationProvider] = None,
+    include_replayed: bool = True,
 ) -> tuple[list[IntegrationDLQ], int]:
-    """Paginated DLQ list for the active tenant. Returns (rows, total)."""
-    base = select(IntegrationDLQ).order_by(
-        IntegrationDLQ.created_at.desc()
+    """Paginated DLQ list for the active tenant. Returns (rows, total).
+
+    `provider` filters to one platform (Settings UI uses this to show
+    only Google or only Meta failures). `include_replayed=False`
+    excludes rows that have been replayed OR discarded — drives the
+    Step-8 status panel's "X deliveries failed in the last 24h"
+    counter (which doesn't double-count rows the operator already
+    addressed).
+    """
+    filters = []
+    if provider is not None:
+        filters.append(IntegrationDLQ.provider == provider)
+    if not include_replayed:
+        filters.append(IntegrationDLQ.replayed_at.is_(None))
+
+    base = (
+        select(IntegrationDLQ)
+        .where(*filters)
+        .order_by(IntegrationDLQ.created_at.desc())
     )
-    count_stmt = select(func.count()).select_from(IntegrationDLQ)
+    count_stmt = (
+        select(func.count()).select_from(IntegrationDLQ).where(*filters)
+    )
     total = (await session.execute(count_stmt)).scalar_one()
     rows = (
         await session.execute(
@@ -512,6 +532,72 @@ async def list_dlq(
         )
     ).scalars().all()
     return list(rows), total
+
+
+async def discard_dlq(
+    session: AsyncSession,
+    *,
+    dlq_id: uuid.UUID,
+) -> Optional[IntegrationDLQ]:
+    """Soft-discard a DLQ row — sets `replayed_at = now()` with
+    `replayed_by = NULL`. The NULL `replayed_by` is the discriminator:
+    a real replay always records the actor, a discard never does.
+    The row survives for forensic trail; the status counter excludes
+    it (via `include_replayed=False`).
+
+    Returns the updated row, or None if the row doesn't exist.
+    Idempotent — re-discarding (or discarding an already-replayed row)
+    is a no-op."""
+    row = await get_dlq(session, dlq_id=dlq_id)
+    if row is None:
+        return None
+    if row.replayed_at is not None:
+        return row
+    row.replayed_at = datetime.now(timezone.utc)
+    row.replayed_by = None
+    await session.commit()
+    await session.refresh(row)
+    await audit.log(
+        "integration.webhook.dlq_discarded",
+        entity_type="integration_dlq",
+        entity_id=row.id,
+        after={"provider": row.provider.value},
+    )
+    return row
+
+
+async def update_subscription_mapping(
+    session: AsyncSession,
+    *,
+    subscription_id: uuid.UUID,
+    mapping: dict,
+) -> IntegrationSubscription:
+    """Replace the subscription's `field_mapping` JSONB. The mapping
+    is `{ad_field_name: crm_target_key}`; the router validates target
+    keys against `leads.imports.targets.list_target_keys()` before
+    calling here so we never persist an invalid CRM target."""
+    row = (
+        await session.execute(
+            select(IntegrationSubscription).where(
+                IntegrationSubscription.id == subscription_id
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="subscription not found",
+        )
+    row.field_mapping = dict(mapping)
+    await session.commit()
+    await session.refresh(row)
+    await audit.log(
+        "integration.subscription.mapping_updated",
+        entity_type="integration_subscription",
+        entity_id=row.id,
+        after={"field_count": len(mapping)},
+    )
+    return row
 
 
 async def get_dlq(
@@ -530,6 +616,7 @@ __all__ = [
     "create_subscription",
     "decrypt_tokens",
     "delete_subscription",
+    "discard_dlq",
     "disconnect",
     "find_subscription",
     "get",
@@ -540,5 +627,6 @@ __all__ = [
     "list_subscriptions",
     "rotate_webhook_secret",
     "update_subscription",
+    "update_subscription_mapping",
     "upsert",
 ]
