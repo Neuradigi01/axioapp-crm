@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.leads.ingest import ingest as ingest_lead
 from src.app.core.leads.models import LeadStatus
 from src.app.core.leads.schemas import (
     LeadCreate,
@@ -29,13 +30,17 @@ from src.app.core.leads.schemas import (
     MoveStageRequest,
 )
 from src.app.core.leads.service import (
-    create_lead,
     delete_lead,
     get_lead,
     list_leads,
     move_stage_for_lead,
     update_lead,
 )
+from src.app.core.settings.schemas import (
+    LeadRoutingConfigOut,
+    LeadRoutingConfigUpdate,
+)
+from src.app.core.settings.service import get_or_create as get_or_create_settings
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -91,8 +96,64 @@ async def create_lead_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("leads.write")),
 ) -> LeadOut:
-    lead = await create_lead(db, org_id=user.org_id, payload=payload)
+    """Manual lead creation. Routes through `leads.ingest.ingest()`
+    so the dedup + round-robin assignment apply the same as for
+    inbound channel ingestion (bulk import, widget, Google, Meta).
+
+    If the picked contact already has an OPEN lead, the existing lead's
+    timeline gets a "Touchpoint via manual" activity and we 200 back
+    its id — no second lead is created. The caller can distinguish
+    by inspecting the returned lead's `created_at` (rep can move
+    rep-side state accordingly).
+    """
+    result = await ingest_lead(
+        db,
+        org_id=user.org_id,
+        source=payload.source,
+        contact_id=payload.contact_id,
+        lead_payload=payload,
+        actor_user_id=user.legacy_uuid,
+    )
+    lead = await get_lead(db, result.lead_id)
     return LeadOut.model_validate(lead)
+
+
+# --- Routing config (Step 6) --------------------------------------------
+# Registered BEFORE `/{lead_id}` so static paths win over the UUID
+# capture group — otherwise GET `/routing-config` would 422 on UUID
+# parse failure for `lead_id="routing-config"`.
+
+
+@router.get("/routing-config", response_model=LeadRoutingConfigOut)
+async def get_routing_config_endpoint(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("settings.read")),
+) -> LeadRoutingConfigOut:
+    """Read the org's lead-routing configuration. v1 ships only
+    `strategy="round_robin"` — the dedicated endpoint exists so the
+    Settings UI can render a specialised chooser while leaving the
+    generic /settings PATCH untouched (mutation goes through PUT
+    below)."""
+    row = await get_or_create_settings(db, org_id=user.org_id)
+    cfg = row.lead_routing_config or {}
+    return LeadRoutingConfigOut.model_validate(cfg)
+
+
+@router.put("/routing-config", response_model=LeadRoutingConfigOut)
+async def put_routing_config_endpoint(
+    payload: LeadRoutingConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("settings.write")),
+) -> LeadRoutingConfigOut:
+    """Replace the org's routing config. v1 only accepts
+    `strategy="round_robin"` (validated by the Literal type on
+    `LeadRoutingConfigUpdate.strategy`); future strategies slot in
+    here without an API break."""
+    row = await get_or_create_settings(db, org_id=user.org_id)
+    row.lead_routing_config = payload.model_dump()
+    await db.commit()
+    await db.refresh(row)
+    return LeadRoutingConfigOut.model_validate(row.lead_routing_config)
 
 
 @router.get("/{lead_id}", response_model=LeadOut)
@@ -141,3 +202,5 @@ async def move_lead_stage_endpoint(
         db, lead_id=lead_id, to_stage=payload.to_stage, user_id=user.legacy_uuid
     )
     return LeadOut.model_validate(lead)
+
+

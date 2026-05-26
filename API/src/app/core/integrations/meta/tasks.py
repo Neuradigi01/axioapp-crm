@@ -89,9 +89,9 @@ from src.app.core.integrations.dlq import record_dlq as _record_dlq
 from src.app.core.integrations.models import IntegrationProvider
 from src.app.core.integrations.service import find_subscription
 from src.app.core.leads.imports.dedup import find_existing_contact
+from src.app.core.leads.ingest import ingest as ingest_lead
 from src.app.core.leads.models import LeadSource
 from src.app.core.leads.schemas import LeadCreate
-from src.app.core.leads.service import create_lead
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 
@@ -296,33 +296,38 @@ async def process_meta_lead_async(
                 )
                 contact_id = contact.id
 
-            lead = await create_lead(
+            # Route through the centralised ingest service so the
+            # open-lead dedup + round-robin assignment apply uniformly
+            # across all five channels.
+            result = await ingest_lead(
                 session,
                 org_id=org_id,
-                payload=LeadCreate(
+                source=LeadSource.meta_ads,
+                contact_id=contact_id,
+                lead_payload=LeadCreate(
                     contact_id=contact_id,
                     custom_data=_extract_custom(mapped),
                     source=LeadSource.meta_ads,
                     attribution=_build_attribution(payload, leadgen_id),
                 ),
-                require_all_required=False,
             )
 
         await audit.log(
             "integration.webhook.received",
             entity_type="lead",
-            entity_id=lead.id,
+            entity_id=result.lead_id,
             after={
                 "provider": "meta_ads",
                 "integration_id": str(integration_id),
                 "external_form_id": form_id,
                 "external_lead_id": leadgen_id,
+                "ingest_action": result.action,
                 "page_id": page_id,
-                "lead_id": str(lead.id),
+                "lead_id": str(result.lead_id),
                 "contact_id": str(contact_id),
             },
         )
-        return {"status": "created", "lead_id": str(lead.id)}
+        return {"status": "created", "lead_id": str(result.lead_id)}
     finally:
         reset_context(ctx_token)
 

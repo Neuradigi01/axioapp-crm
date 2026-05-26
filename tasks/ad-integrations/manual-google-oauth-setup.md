@@ -127,12 +127,12 @@ Step 1 is pure backend table + crypto. None of these external steps are required
 
 | Stage | Started | Approved/done | Notes |
 |---|---|---|---|
-| 1. GCP project + APIs | | | |
-| 2. OAuth consent screen | | | |
-| 3. OAuth client created | | | |
-| 4. Developer token | | | Google takes 1–5 days |
-| 5. Verification submitted | | | Wait until production launch |
-| 6. Smoke OAuth flow | | | After Step 2 code |
-| 7. Lead form webhook configured | | | After Step 3 code |
+| 1. GCP project + APIs | 2026-05-26 | 2026-05-26 | Project: `crm-ad-integrations`. Google Ads API + People API enabled. |
+| 2. OAuth consent screen | 2026-05-26 | 2026-05-26 | App: CRM. Publishing status: Testing. External. Scopes: adwords, userinfo.email, openid. Test user: neuradigi01@gmail.com. |
+| 3. OAuth client created | 2026-05-26 | 2026-05-26 | Client: CRM backend. Client ID + Secret + Redirect URI in `API/.env`. Redirect path = `/api/v1/integrations/google/callback` (matches router). |
+| 4. Developer token | 2026-05-26 | submitted, waiting | Explorer Access token issued instantly (`Fg0Syn3D_eU1k446C5t37g`, in `.env`). Basic Access application submitted; Case ID `1-7463000041029`. MCC: Neuradigi Technologies (`938-729-9841`). Google flagged "slightly longer time" due to high volume. |
+| 5. Verification submitted | | | Wait until production launch (CASA assessment, $1k–$15k). Test users bypass during dev. |
+| 6. Smoke OAuth flow | | | After Step 2 code lands + Step 7 frontend Settings page ships. |
+| 7. Lead form webhook configured | | | After Step 3 code lands. Needs ngrok or public URL in dev. |
 
 Update this file as you complete each stage so the code team knows where you are.

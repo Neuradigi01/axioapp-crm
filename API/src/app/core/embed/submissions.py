@@ -70,7 +70,7 @@ from src.app.core.embed.service import find_by_plain_key
 from src.app.core.leads.imports.dedup import find_existing_contact
 from src.app.core.leads.models import LeadSource
 from src.app.core.leads.schemas import LeadCreate
-from src.app.core.leads.service import create_lead
+from src.app.core.leads.ingest import ingest as ingest_lead
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 
@@ -273,14 +273,18 @@ async def submit(
                 )
                 contact_id = contact.id
 
-            # 10. Create the lead. Same reasoning as create_contact —
-            # widget visitors don't know the org's required custom
-            # fields on the lead either. Lead-entity custom-data values
-            # (e.g. `companyname`) flow in via `lead_custom_data`.
-            lead = await create_lead(
+            # 10. Hand off to the centralised ingest service. If the
+            # contact already has an OPEN lead in this org, ingest
+            # merges the submission into that lead's timeline as a
+            # "touchpoint" activity instead of creating a new lead.
+            # Otherwise it creates the lead and picks a round-robin
+            # assignee in one shot.
+            result = await ingest_lead(
                 session,
                 org_id=org_id,
-                payload=LeadCreate(
+                source=LeadSource.widget,
+                contact_id=contact_id,
+                lead_payload=LeadCreate(
                     contact_id=contact_id,
                     source=LeadSource.widget,
                     attribution=payload.attribution.model_dump(
@@ -288,21 +292,23 @@ async def submit(
                     ),
                     custom_data=lead_custom_data,
                 ),
-                require_all_required=False,
+                actor_user_id=None,
             )
+            lead_id = result.lead_id
 
         # 11. Audit. The org context is still set so audit.log derives
         # org_id from it; user_id stays None (anonymous submission).
         await audit.log(
             "embed.submission.accepted",
             entity_type="lead",
-            entity_id=lead.id,
+            entity_id=lead_id,
             after={
-                "lead_id": str(lead.id),
+                "lead_id": str(lead_id),
                 "contact_id": str(contact_id),
                 "key_id": str(key_id),
                 "key_prefix": key_row.prefix,
                 "referrer": payload.attribution.referrer,
+                "ingest_action": result.action,
             },
         )
         # 12. Submission log row — drives the Settings → Submission
@@ -315,10 +321,10 @@ async def submit(
             ip=ip,
             referrer=payload.attribution.referrer,
             landing_url=payload.attribution.landing_url,
-            lead_id=lead.id,
+            lead_id=lead_id,
         )
         return SubmissionResult(
-            accepted=True, lead_id=lead.id, thank_you_url=None
+            accepted=True, lead_id=lead_id, thank_you_url=None
         )
     finally:
         reset_context(ctx_token)

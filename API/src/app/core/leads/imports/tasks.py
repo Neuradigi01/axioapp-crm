@@ -74,9 +74,9 @@ from src.app.core.custom_fields.models import CustomFieldDefinition
 from src.app.core.leads.imports.dedup import find_existing_contact
 from src.app.core.leads.imports.models import LeadImport, LeadImportStatus
 from src.app.core.leads.imports.parser import HeaderInfo, ParsedRow, parse_rows
+from src.app.core.leads.ingest import ingest as ingest_lead
 from src.app.core.leads.models import LeadSource
 from src.app.core.leads.schemas import LeadCreate
-from src.app.core.leads.service import create_lead
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 from src.app.shared.storage import get_storage
@@ -293,27 +293,34 @@ async def _commit_rows(
 
         try:
             async with async_session() as session:
-                existing = await find_existing_contact(
+                # Resolve contact: find-or-create. Step 6 routes the
+                # final lead-creation through `ingest()`, which handles
+                # the open-lead dedup + round-robin assignment uniformly
+                # across all five channels.
+                existing_contact_id = await find_existing_contact(
                     session, org_id=org_id, phone=phone, email=email
                 )
-                if existing is not None:
-                    duplicates += 1
-                    continue
-
-                contact_payload = ContactCreate(
-                    full_name=full_name,
-                    phone=phone,
-                    email=email,
-                    source=mapped.get("contact.source"),
-                    notes=mapped.get("contact.notes"),
-                    custom_data=contact_custom,
-                )
-                contact = await create_contact(
-                    session, org_id=org_id, payload=contact_payload
-                )
+                if existing_contact_id is not None:
+                    contact_id = existing_contact_id
+                else:
+                    contact_payload = ContactCreate(
+                        full_name=full_name,
+                        phone=phone,
+                        email=email,
+                        source=mapped.get("contact.source"),
+                        notes=mapped.get("contact.notes"),
+                        custom_data=contact_custom,
+                    )
+                    contact = await create_contact(
+                        session,
+                        org_id=org_id,
+                        payload=contact_payload,
+                        require_all_required=False,
+                    )
+                    contact_id = contact.id
 
                 lead_payload = LeadCreate(
-                    contact_id=contact.id,
+                    contact_id=contact_id,
                     pipeline_stage=mapped.get("lead.pipeline_stage"),
                     budget=_coerce_decimal(mapped.get("lead.budget")),
                     expected_close_date=_coerce_date(
@@ -322,8 +329,24 @@ async def _commit_rows(
                     custom_data=lead_custom,
                     source=LeadSource.bulk_import,
                 )
-                await create_lead(session, org_id=org_id, payload=lead_payload)
-                imported += 1
+                result = await ingest_lead(
+                    session,
+                    org_id=org_id,
+                    source=LeadSource.bulk_import,
+                    contact_id=contact_id,
+                    lead_payload=lead_payload,
+                )
+                if result.action == "merged":
+                    # `duplicates_skipped` keeps its original meaning
+                    # from the operator's POV: "no new lead landed in
+                    # the kanban for this row". Pre-Step-6, this fired
+                    # for any contact dedup; post-Step-6, it fires
+                    # when an OPEN lead already exists for the contact
+                    # (which is the more precise UX intent — the
+                    # existing lead got a touchpoint activity instead).
+                    duplicates += 1
+                else:
+                    imported += 1
         except Exception as exc:
             errors += 1
             error_rows.append(_make_error_row(parsed, _format_exc(exc)))

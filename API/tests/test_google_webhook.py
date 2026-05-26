@@ -629,14 +629,26 @@ async def test_process_async_creates_contact_and_lead(monkeypatch):
     async def _create_contact(*_a, **kwargs):
         return MagicMock(id=new_contact_id)
 
-    async def _create_lead(*_a, **kwargs):
-        captured["lead_payload"] = kwargs["payload"]
-        return MagicMock(id=new_lead_id)
-
     captured: dict[str, Any] = {}
 
+    async def _ingest_lead(*_a, **kwargs):
+        # Step 6: channels now route through `ingest_lead` instead of
+        # calling `create_lead` directly. Capture the payload it
+        # would have built so we can still assert on attribution shape.
+        captured["lead_payload"] = kwargs["lead_payload"]
+        captured["source"] = kwargs["source"]
+        captured["contact_id"] = kwargs["contact_id"]
+        from src.app.core.leads.ingest import IngestResult
+
+        return IngestResult(
+            action="created",
+            lead_id=new_lead_id,
+            contact_id=new_contact_id,
+            assignee_id=None,
+        )
+
     monkeypatch.setattr(tasks_module, "create_contact", _create_contact)
-    monkeypatch.setattr(tasks_module, "create_lead", _create_lead)
+    monkeypatch.setattr(tasks_module, "ingest_lead", _ingest_lead)
 
     async def _noop_audit(*_a, **_k):
         return None
@@ -662,6 +674,9 @@ async def test_process_async_creates_contact_and_lead(monkeypatch):
     assert lead_payload.attribution["external_lead_id"] == "lead-abc"
     assert lead_payload.attribution["campaign_id"] == "camp-1"
     assert lead_payload.attribution["gclid"] == "gclid-xyz"
+    # ingest_lead received the right source + contact id.
+    assert captured["source"].value == "google_ads"
+    assert captured["contact_id"] == new_contact_id
 
 
 @pytest.mark.asyncio
@@ -750,15 +765,23 @@ async def test_process_async_reuses_existing_contact_on_dedup(monkeypatch):
     new_lead_id = uuid.uuid4()
     captured: dict[str, Any] = {}
 
-    async def _create_lead(*_a, **kwargs):
-        captured["payload"] = kwargs["payload"]
-        return MagicMock(id=new_lead_id)
+    async def _ingest_lead(*_a, **kwargs):
+        captured["lead_payload"] = kwargs["lead_payload"]
+        captured["contact_id"] = kwargs["contact_id"]
+        from src.app.core.leads.ingest import IngestResult
+
+        return IngestResult(
+            action="created",
+            lead_id=new_lead_id,
+            contact_id=kwargs["contact_id"],
+            assignee_id=None,
+        )
 
     async def _noop_audit(*_a, **_k):
         return None
 
     monkeypatch.setattr(tasks_module, "create_contact", _create_contact)
-    monkeypatch.setattr(tasks_module, "create_lead", _create_lead)
+    monkeypatch.setattr(tasks_module, "ingest_lead", _ingest_lead)
     monkeypatch.setattr(tasks_module.audit, "log", _noop_audit)
     monkeypatch.setattr(
         tasks_module, "async_session", lambda: _CapturingSession()
@@ -770,7 +793,9 @@ async def test_process_async_reuses_existing_contact_on_dedup(monkeypatch):
     assert result["status"] == "created"
     # Reused existing contact — no new contact created.
     assert contact_create_called["called"] is False
-    assert captured["payload"].contact_id == existing_contact_id
+    # ingest_lead got the existing contact id.
+    assert captured["contact_id"] == existing_contact_id
+    assert captured["lead_payload"].contact_id == existing_contact_id
 
 
 # --- 7. Service: webhook_secret lifecycle -------------------------------

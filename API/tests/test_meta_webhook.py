@@ -691,9 +691,19 @@ async def test_task_creates_lead_with_attribution(
         captured["contact_payload"] = kwargs["payload"]
         return MagicMock(id=new_contact_id)
 
-    async def _create_lead(*_a, **kwargs):
-        captured["lead_payload"] = kwargs["payload"]
-        return MagicMock(id=new_lead_id)
+    async def _ingest_lead(*_a, **kwargs):
+        # Step 6: tasks.py routes through ingest_lead instead of
+        # calling create_lead directly. Capture the lead_payload so
+        # we can still verify attribution/source shape.
+        captured["lead_payload"] = kwargs["lead_payload"]
+        from src.app.core.leads.ingest import IngestResult
+
+        return IngestResult(
+            action="created",
+            lead_id=new_lead_id,
+            contact_id=kwargs["contact_id"],
+            assignee_id=None,
+        )
 
     async def _noop_audit(*_a, **_k):
         return None
@@ -707,7 +717,7 @@ async def test_task_creates_lead_with_attribution(
     )
     monkeypatch.setattr(tasks_module, "find_existing_contact", _no_contact)
     monkeypatch.setattr(tasks_module, "create_contact", _create_contact)
-    monkeypatch.setattr(tasks_module, "create_lead", _create_lead)
+    monkeypatch.setattr(tasks_module, "ingest_lead", _ingest_lead)
     monkeypatch.setattr(tasks_module.audit, "log", _noop_audit)
     monkeypatch.setattr(
         tasks_module, "async_session", lambda: _CapturingSession()
@@ -855,9 +865,17 @@ async def test_task_reuses_existing_contact(
     new_lead_id = uuid.uuid4()
     captured: dict[str, Any] = {}
 
-    async def _create_lead(*_a, **kwargs):
-        captured["payload"] = kwargs["payload"]
-        return MagicMock(id=new_lead_id)
+    async def _ingest_lead(*_a, **kwargs):
+        captured["payload"] = kwargs["lead_payload"]
+        captured["contact_id"] = kwargs["contact_id"]
+        from src.app.core.leads.ingest import IngestResult
+
+        return IngestResult(
+            action="created",
+            lead_id=new_lead_id,
+            contact_id=kwargs["contact_id"],
+            assignee_id=None,
+        )
 
     async def _noop_audit(*_a, **_k):
         return None
@@ -873,7 +891,7 @@ async def test_task_reuses_existing_contact(
         tasks_module, "find_existing_contact", _existing_contact
     )
     monkeypatch.setattr(tasks_module, "create_contact", _create_contact)
-    monkeypatch.setattr(tasks_module, "create_lead", _create_lead)
+    monkeypatch.setattr(tasks_module, "ingest_lead", _ingest_lead)
     monkeypatch.setattr(tasks_module.audit, "log", _noop_audit)
     monkeypatch.setattr(
         tasks_module, "async_session", lambda: _CapturingSession()

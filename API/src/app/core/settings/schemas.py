@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -44,8 +44,34 @@ class OrgSettingsOut(BaseModel):
     reviews_auto_request_enabled: bool
     reviews_auto_request_delay_hours: int
 
+    # Step 6 — lead routing. JSONB shape; v1 honours `{"strategy":
+    # "round_robin"}` only. Mutation goes through the dedicated
+    # `/api/v1/leads/routing-config` endpoints, not the generic
+    # settings PATCH, so the Settings UI can render a specialised
+    # editor while still surfacing the value in the read-only profile.
+    lead_routing_config: dict[str, Any]
+
     created_at: datetime
     updated_at: datetime
+
+
+class LeadRoutingConfigOut(BaseModel):
+    """Dedicated response shape for `GET /api/v1/leads/routing-config`.
+    Mirrors the JSONB on `org_settings.lead_routing_config` but with
+    a typed `strategy` literal so the frontend can switch on it."""
+
+    strategy: Literal["round_robin"] = "round_robin"
+
+
+class LeadRoutingConfigUpdate(BaseModel):
+    """Request shape for `PUT /api/v1/leads/routing-config`. v1 only
+    accepts `strategy="round_robin"` — the surface exists so the
+    Settings UI can render the chooser; future strategies slot in
+    here without an API break."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    strategy: Literal["round_robin"] = "round_robin"
 
 
 class OrgSettingsPatch(BaseModel):

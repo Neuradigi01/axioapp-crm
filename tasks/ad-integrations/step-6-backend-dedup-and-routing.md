@@ -2,7 +2,7 @@
 
 **Goal:** Centralise lead-ingestion side-effects. Every new lead (manual, bulk, widget, Google, Meta) flows through the same dedup check and assignment logic. Dedup: if a contact with matching phone/email already has an open lead in the same org, append a new activity to that lead and skip lead creation. Routing: round-robin assign across users with the `leads.own` permission, or honour a per-org routing rule.
 **Track:** Ad Integrations
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Manual Lead Entry Step 1 (`lead.source` enum), Bulk Import Step 2 (`dedup.py` foundation), Embeddable Widget Step 2 (attribution column), Steps 3 + 5 (ad webhook tasks call into this).
 
 ---

@@ -14,6 +14,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -25,7 +26,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy import text as sql_text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
@@ -86,6 +87,18 @@ class OrgSettings(Base, TenantScoped):
     )
     reviews_auto_request_delay_hours: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=sql_text("24")
+    )
+
+    # --- lead routing (Step 6) ---
+    # Per-org routing config — JSONB so the schema is forward-compatible
+    # with strategies we haven't built yet. v1 honours `{"strategy":
+    # "round_robin"}` only; future keys (`sticky_by_source`,
+    # `by_geography`, weighted distribution) slot in without a
+    # migration. The Settings endpoint validates the shape.
+    lead_routing_config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sql_text("'{\"strategy\":\"round_robin\"}'::jsonb"),
     )
 
     created_at: Mapped[datetime] = mapped_column(

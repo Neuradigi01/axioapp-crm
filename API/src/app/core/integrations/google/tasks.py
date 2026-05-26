@@ -90,13 +90,12 @@ from src.app.core.integrations.google.dlq import record_dlq
 from src.app.core.integrations.models import (
     Integration,
     IntegrationStatus,
-    IntegrationSubscription,
 )
 from src.app.core.integrations.service import find_subscription
 from src.app.core.leads.imports.dedup import find_existing_contact
+from src.app.core.leads.ingest import ingest as ingest_lead
 from src.app.core.leads.models import LeadSource
 from src.app.core.leads.schemas import LeadCreate
-from src.app.core.leads.service import create_lead
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 
@@ -284,32 +283,37 @@ async def process_google_lead_async(
                 )
                 contact_id = contact.id
 
-            lead = await create_lead(
+            # Route through the centralised ingest service so the
+            # open-lead dedup + round-robin assignment apply uniformly
+            # across all five channels.
+            result = await ingest_lead(
                 session,
                 org_id=org_id,
-                payload=LeadCreate(
+                source=LeadSource.google_ads,
+                contact_id=contact_id,
+                lead_payload=LeadCreate(
                     contact_id=contact_id,
                     custom_data=_extract_custom(mapped, prefix="lead."),
                     source=LeadSource.google_ads,
                     attribution=_build_attribution(payload),
                 ),
-                require_all_required=False,
             )
 
         await audit.log(
             "integration.webhook.received",
             entity_type="lead",
-            entity_id=lead.id,
+            entity_id=result.lead_id,
             after={
                 "provider": "google_ads",
                 "integration_id": str(integration_id),
                 "external_form_id": external_form_id,
                 "external_lead_id": external_lead_id,
-                "lead_id": str(lead.id),
+                "lead_id": str(result.lead_id),
                 "contact_id": str(contact_id),
+                "ingest_action": result.action,
             },
         )
-        return {"status": "created", "lead_id": str(lead.id)}
+        return {"status": "created", "lead_id": str(result.lead_id)}
     finally:
         reset_context(ctx_token)
 
