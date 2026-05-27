@@ -18,7 +18,6 @@ import { FurnitureAuthService } from '../auth/auth.service';
 import { ContactsApiService } from '../contacts/contacts-api.service';
 import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
-import { MailLinkDirective } from '../shared/directives/mail-link.directive';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
 import {
   UrlFilterStateConfig,
@@ -91,7 +90,6 @@ const FILTER_CHIPS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
     WalkinConvertModalComponent,
     PhoneLinkDirective,
     WhatsappLinkDirective,
-    MailLinkDirective,
     UrlFilterStateDirective,
   ],
   templateUrl: './walk-ins.page.html',

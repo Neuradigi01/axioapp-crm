@@ -27,6 +27,7 @@ export interface WalkIn {
   notes: string | null;
   custom_data: Record<string, unknown>;
   last_activity_at: string | null;
+  linked_lead_id: string | null;
   created_at: string;
   updated_at: string;
 }

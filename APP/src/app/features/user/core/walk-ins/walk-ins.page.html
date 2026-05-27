@@ -163,6 +163,7 @@
         <table class="min-w-full divide-y divide-zinc-200">
           <thead class="bg-zinc-50">
             <tr>
+              <th class="w-10 px-3 py-2.5"></th>
               <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Time</th>
               <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Customer</th>
               <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Phone</th>
@@ -179,7 +180,19 @@
           <tbody class="divide-y divide-zinc-100 bg-white">
             @for (w of visible(); track w.id) {
               @let contact = contactFor(w.contact_id);
-              <tr class="hover:bg-zinc-50">
+              <tr
+                class="hover:bg-zinc-50"
+                [class.bg-zinc-50]="isSelected(w.id)"
+              >
+                <td class="w-10 px-3 py-3" (click)="$event.stopPropagation()">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                    [checked]="isSelected(w.id)"
+                    (click)="toggleRow(w.id, $event)"
+                    [attr.aria-label]="'Select walk-in ' + (contact?.full_name ?? w.id)"
+                  />
+                </td>
                 <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
                   {{ formatTime(w.time_in) }}
                 </td>
@@ -188,13 +201,41 @@
                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700">
                       {{ initials(contact?.full_name) }}
                     </span>
-                    <span class="truncate text-sm font-medium text-zinc-900">
-                      {{ contact?.full_name ?? 'Loading…' }}
-                    </span>
+                    <div class="min-w-0">
+                      <div class="truncate text-sm font-medium text-zinc-900">
+                        {{ contact?.full_name ?? 'Loading…' }}
+                      </div>
+                      @if (w.linked_lead_id) {
+                        <span
+                          class="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+                          title="Linked to a lead"
+                        >
+                          <lucide-icon name="users" class="h-3 w-3" />
+                          Lead
+                        </span>
+                      }
+                    </div>
                   </div>
                 </td>
                 <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
-                  {{ contact?.phone ?? '—' }}
+                  @if (contact?.phone; as phone) {
+                    <div class="inline-flex items-center gap-2">
+                      <a
+                        [appPhoneLink]="phone"
+                        class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                      >
+                        {{ phone }}
+                      </a>
+                      <a
+                        [appWhatsappLink]="phone"
+                        class="text-emerald-600 hover:text-emerald-800"
+                      >
+                        <lucide-icon name="message-circle" class="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+                  } @else {
+                    —
+                  }
                 </td>
                 <td class="px-4 py-3 text-sm text-zinc-600">
                   <span class="block max-w-xs truncate">{{ w.requirement ?? '—' }}</span>
@@ -258,6 +299,17 @@
                         Check out
                       </button>
                     }
+                    @if (canConvert() && !w.linked_lead_id) {
+                      <button
+                        type="button"
+                        (click)="openConvert(w)"
+                        class="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100"
+                        title="Convert this walk-in to a lead"
+                      >
+                        <lucide-icon name="arrow-right-circle" class="h-3 w-3" />
+                        Convert
+                      </button>
+                    }
                   </div>
                 </td>
             </tr>
@@ -273,5 +325,74 @@
   <app-register-walkin-modal
     (registered)="onRegistered($event)"
     (cancel)="closeRegister()"
+  />
+}
+
+<!-- Bulk action bar — visible whenever rows are selected. -->
+<app-bulk-action-bar
+  [selectedCount]="selectedCount()"
+  [actions]="bulkActions()"
+  (action)="onBulkAction($event)"
+  (clear)="clearSelection()"
+/>
+
+<!-- Bulk reassign modal. -->
+@if (bulkModal() === 'reassign') {
+  <app-reassign-modal
+    [entityLabel]="'walk-in'"
+    [count]="selectedCount()"
+    [submitting]="bulkSubmitting()"
+    [error]="bulkError()"
+    (confirm)="onBulkReassign($event)"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Bulk check-out confirm. -->
+@if (bulkModal() === 'checkout') {
+  <app-confirm-dialog
+    [title]="'Check out ' + selectedCount() + ' walk-in' + (selectedCount() === 1 ? '' : 's') + '?'"
+    [body]="'Already-checked-out visits will be skipped.'"
+    [confirmLabel]="'Check out'"
+    [submitting]="bulkSubmitting()"
+    (confirm)="onBulkCheckout()"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Bulk delete confirm. -->
+@if (bulkModal() === 'delete') {
+  <app-confirm-dialog
+    [title]="'Delete ' + selectedCount() + ' walk-in' + (selectedCount() === 1 ? '' : 's') + '?'"
+    [body]="'This cannot be undone. Contacts and activities linked to these visits remain in their timelines.'"
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    [submitting]="bulkSubmitting()"
+    (confirm)="onBulkDelete()"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Single-row reassign (programmatic — pencil/menu added later). -->
+@if (singleReassignWalkIn(); as walkIn) {
+  <app-reassign-modal
+    [entityLabel]="'walk-in'"
+    [count]="1"
+    [currentOwnerId]="walkIn.assigned_to_id"
+    [submitting]="singleReassignSubmitting()"
+    [error]="singleReassignError()"
+    (confirm)="onSingleReassign($event)"
+    (cancel)="closeSingleReassign()"
+  />
+}
+
+<!-- Convert-to-Lead modal. -->
+@if (convertWalkIn(); as walkIn) {
+  <app-walkin-convert-modal
+    [walkIn]="walkIn"
+    [submitting]="convertSubmitting()"
+    [error]="convertError()"
+    (confirm)="onConvertConfirm($event)"
+    (cancel)="closeConvert()"
   />
 }

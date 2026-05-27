@@ -16,6 +16,7 @@ import {
   LucideAngularModule,
   AlertTriangle,
   ArrowRight,
+  ArrowRightCircle,
   Banknote,
   Bell,
   Calendar,
@@ -91,6 +92,7 @@ export const appConfig: ApplicationConfig = {
       LucideAngularModule.pick({
         AlertTriangle,
         ArrowRight,
+        ArrowRightCircle,
         Banknote,
         Bell,
         Calendar,
