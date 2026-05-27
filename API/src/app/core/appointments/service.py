@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timedelta
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, select
@@ -37,12 +37,22 @@ from src.app.core.appointments.schemas import (
     AppointmentCreate,
     AppointmentUpdate,
 )
+from src.app.core.appointments.status_workflow import ALLOWED_TRANSITIONS
 from src.app.core.contacts.models import Contact
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldType,
 )
 from src.app.core.users.models import User
+
+
+# Server-side sort whitelist. Router validates via FastAPI Literal; the
+# service resolves key → SQLA column without exposing attribute access.
+_SORT_COLUMNS = {
+    "scheduled_at": Appointment.scheduled_at,
+    "created_at": Appointment.created_at,
+    "last_activity_at": Appointment.last_activity_at,
+}
 
 
 _APPT_ENTITY = "appointment"
@@ -359,6 +369,28 @@ async def update_appointment(
     before = _snapshot(appt)
     changes = payload.model_dump(exclude_unset=True)
 
+    # State-machine enforcement: only allow status transitions declared
+    # in `ALLOWED_TRANSITIONS`. Identity transitions (X → X) are rejected
+    # — a no-op status change shouldn't ride along on a PATCH. Other
+    # field changes can still go through without re-sending `status`.
+    if "status" in changes and changes["status"] is not None:
+        new_status = changes["status"]
+        new_value = (
+            new_status.value
+            if isinstance(new_status, AppointmentStatus)
+            else str(new_status)
+        )
+        current = appt.status.value
+        allowed = ALLOWED_TRANSITIONS.get(current, frozenset())
+        if new_value not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"invalid appointment status transition "
+                    f"{current!r} → {new_value!r}"
+                ),
+            )
+
     # In-scope checks for any FKs being updated.
     if "assigned_to_id" in changes and changes["assigned_to_id"] is not None:
         await _ensure_user_in_scope(session, changes["assigned_to_id"])
@@ -453,13 +485,25 @@ async def list_appointments(
     to_dt: Optional[datetime] = None,
     assigned_to: Optional[uuid.UUID] = None,
     status_filter: Optional[AppointmentStatus] = None,
+    sort: Literal[
+        "scheduled_at", "created_at", "last_activity_at"
+    ] = "scheduled_at",
+    order: Literal["asc", "desc"] = "asc",
 ) -> list[Appointment]:
-    """Calendar listing: flat array, sorted by `scheduled_at`.
+    """Calendar / list reading.
 
-    Range is intentionally not paginated — frontends pass a bounded
-    `[from, to)` window and want every appointment that overlaps it.
-    Per-day / per-week views never produce result sets large enough to
-    warrant cursor pagination.
+    - `from_dt` / `to_dt` — bound the `scheduled_at` window. Calendar
+      views pass both; list views typically pass neither.
+    - `assigned_to` / `status_filter` — exact-match scoping.
+    - `sort` is server-whitelisted via `_SORT_COLUMNS`.
+      `last_activity_at` ordering appends `NULLS LAST` so
+      never-touched rows sink to the bottom of either direction.
+    - Default `scheduled_at asc` matches the prior calendar default
+      (upcoming first).
+
+    Not paginated — the FE either passes a bounded `[from, to)` slice
+    or filters down via assignee/status; per-day / per-week views
+    never produce result sets large enough to warrant cursor paging.
     """
     filters: list[Any] = []
     if from_dt is not None:
@@ -474,7 +518,17 @@ async def list_appointments(
     stmt = select(Appointment)
     if filters:
         stmt = stmt.where(and_(*filters))
-    stmt = stmt.order_by(Appointment.scheduled_at.asc(), Appointment.id.asc())
+
+    sort_col = _SORT_COLUMNS[sort]
+    if sort == "last_activity_at":
+        primary = (
+            sort_col.asc().nulls_last()
+            if order == "asc"
+            else sort_col.desc().nulls_last()
+        )
+    else:
+        primary = sort_col.asc() if order == "asc" else sort_col.desc()
+    stmt = stmt.order_by(primary, Appointment.id.asc())
 
     rows = (await session.execute(stmt)).scalars().all()
     return list(rows)

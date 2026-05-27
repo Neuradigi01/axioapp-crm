@@ -84,6 +84,15 @@ class Appointment(Base, TenantScoped):
         nullable=False,
         server_default=text("'{}'::jsonb"),
     )
+    # Denormalised "newest activity timestamp" — bumped by the
+    # activities-service insert hook. Mirrors contacts / leads /
+    # walk-ins. Source of truth lives in the `activities` table; this
+    # column powers cheap "stale appointment" and "recent activity"
+    # sorts in the list / calendar views.
+    last_activity_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

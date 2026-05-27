@@ -14,5 +14,9 @@ MODULE = ModuleDescriptor(
     route="/api/v1/appointments",
     frontend_route="/user/appointments",
     menu_position=350,
-    permissions=["appointments.read", "appointments.write"],
+    permissions=[
+        "appointments.read",
+        "appointments.write",
+        "appointments.reassign",
+    ],
 )

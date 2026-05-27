@@ -61,5 +61,6 @@ class AppointmentOut(BaseModel):
     status: AppointmentStatus
     assigned_to_id: uuid.UUID
     custom_data: dict[str, Any]
+    last_activity_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime

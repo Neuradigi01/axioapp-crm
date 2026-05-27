@@ -54,7 +54,7 @@ _CORE_ADMIN_KEYS: list[str] = [
     "settings.integrations.embed.manage",
     "contacts.read", "contacts.write", "contacts.reassign",
     "leads.read", "leads.write", "leads.import", "leads.reassign",
-    "appointments.read", "appointments.write",
+    "appointments.read", "appointments.write", "appointments.reassign",
     "walkins.read", "walkins.write", "walkins.reassign",
     "walk_ins.read", "walk_ins.write",
     "catalog.read", "catalog.write",
@@ -100,7 +100,7 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
 _CORE_SALES_MANAGER_KEYS: list[str] = [
     "contacts.read", "contacts.write", "contacts.reassign",
     "leads.read", "leads.write", "leads.reassign",
-    "appointments.read", "appointments.write",
+    "appointments.read", "appointments.write", "appointments.reassign",
     "walkins.read", "walkins.write", "walkins.reassign",
     "walk_ins.read", "walk_ins.write",
     "tasks.read", "tasks.write",

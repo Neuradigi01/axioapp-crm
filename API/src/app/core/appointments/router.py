@@ -1,6 +1,7 @@
 """HTTP routes for the appointments module.
 
-  GET    /api/v1/appointments?from=&to=&assigned_to=&status=  → flat array (calendar)
+  GET    /api/v1/appointments?from=&to=&assigned_to=&status=&sort=&order=
+                                                              → flat array
   POST   /api/v1/appointments                                  → create (409 on conflict)
   GET    /api/v1/appointments/{id}
   PATCH  /api/v1/appointments/{id}                             → 409 on conflict
@@ -13,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +48,10 @@ async def list_appointments_endpoint(
     status_filter: Optional[AppointmentStatus] = Query(
         default=None, alias="status"
     ),
+    sort: Literal["scheduled_at", "created_at", "last_activity_at"] = Query(
+        default="scheduled_at"
+    ),
+    order: Literal["asc", "desc"] = Query(default="asc"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("appointments.read")),
 ) -> list[AppointmentOut]:
@@ -56,6 +61,8 @@ async def list_appointments_endpoint(
         to_dt=to_dt,
         assigned_to=assigned_to,
         status_filter=status_filter,
+        sort=sort,
+        order=order,
     )
     return [AppointmentOut.model_validate(r) for r in rows]
 
