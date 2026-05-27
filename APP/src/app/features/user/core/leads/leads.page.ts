@@ -26,11 +26,22 @@ import { PipelineBoardComponent } from '../pipelines/pipeline-board.component';
 import { PipelineListComponent } from '../pipelines/pipeline-list.component';
 import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
+import { MailLinkDirective } from '../shared/directives/mail-link.directive';
+import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
+import {
+  UrlFilterStateConfig,
+  UrlFilterStateDirective,
+} from '../shared/directives/url-filter-state.directive';
+import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { LeadCardComponent } from './lead-card.component';
 import { LeadFormModalComponent } from './lead-form-modal.component';
+import {
+  LostReasonConfirm,
+  LostReasonModalComponent,
+} from './lost-reason-modal/lost-reason-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 import {
   Lead,
@@ -82,6 +93,11 @@ interface ContactSummary {
     BulkActionBarComponent,
     ReassignModalComponent,
     ConfirmDialogComponent,
+    UrlFilterStateDirective,
+    LostReasonModalComponent,
+    PhoneLinkDirective,
+    WhatsappLinkDirective,
+    MailLinkDirective,
   ],
   templateUrl: './leads.page.html',
 })
@@ -206,6 +222,85 @@ export class LeadsPageComponent {
   readonly singleReassignLead = signal<Lead | null>(null);
   readonly singleReassignSubmitting = signal(false);
   readonly singleReassignError = signal<string | null>(null);
+
+  /** Pending move-stage that's waiting on a Lost-reason. The Step 1
+   * backend rejects a move into an `is_lost=true` stage with 422 and
+   * a known detail; we catch that, snapshot the move here, open the
+   * `LostReasonModal`, and re-issue with the reason on confirm. */
+  readonly pendingLostMove = signal<ItemMovedEvent | null>(null);
+  readonly lostReasonSubmitting = signal(false);
+  readonly lostReasonError = signal<string | null>(null);
+
+  /** URL ↔ state map for the filter chip strip + filter row + view +
+   * page. Refresh / share / browser-back all preserve the view. */
+  readonly urlState: UrlFilterStateConfig = {
+    q: {
+      read: () => this.searchControl.value,
+      write: (v) => this.searchControl.setValue(v),
+      queryKey: 'q',
+    },
+    source: {
+      read: () => this.sourceControl.value,
+      write: (v) => this.sourceControl.setValue(v),
+      queryKey: 'source',
+    },
+    status: {
+      read: () => this.statusControl.value,
+      write: (v) => this.statusControl.setValue(v),
+      queryKey: 'status',
+    },
+    assignee: {
+      read: () => this.assigneeControl.value,
+      write: (v) => this.assigneeControl.setValue(v),
+      queryKey: 'assignee',
+    },
+    scope: {
+      read: () => this.scope(),
+      write: (v) => {
+        if (v === 'mine' || v === 'team' || v === 'all') this.scope.set(v);
+      },
+      queryKey: 'scope',
+    },
+    sort: {
+      read: () => this.sortKey(),
+      write: (v) => {
+        if (
+          v === 'created_at' ||
+          v === 'last_activity_at' ||
+          v === 'contact_name'
+        ) {
+          this.sortKey.set(v);
+        }
+      },
+      queryKey: 'sort',
+      defaultValue: 'created_at',
+    },
+    order: {
+      read: () => this.sortOrder(),
+      write: (v) => {
+        if (v === 'asc' || v === 'desc') this.sortOrder.set(v);
+      },
+      queryKey: 'order',
+      defaultValue: 'desc',
+    },
+    no_activity: {
+      read: () => this.noActivityFilter(),
+      write: (v) => {
+        if (v === '' || v === '7d' || v === '14d' || v === '30d') {
+          this.noActivityFilter.set(v);
+        }
+      },
+      queryKey: 'no_activity',
+    },
+    view: {
+      read: () => this.view(),
+      write: (v) => {
+        if (v === 'pipeline' || v === 'list') this.view.set(v);
+      },
+      queryKey: 'view',
+      defaultValue: 'pipeline',
+    },
+  };
 
   /** Cast Lead[] to PipelineItem[] for the board/list inputs. */
   readonly pipelineItems = computed<PipelineItem[]>(
@@ -396,10 +491,60 @@ export class LeadsPageComponent {
           );
         },
         error: (err: HttpErrorResponse) => {
+          // Backend signals "moving to Lost needs a reason" with a 422
+          // whose detail starts with `lost_reason`. Intercept that case:
+          // hold the optimistic position, open the lost-reason modal,
+          // and re-issue the move with the reason on confirm.
+          const detail = extractApiError(err) ?? '';
+          if (err.status === 422 && detail.toLowerCase().includes('lost_reason')) {
+            this.pendingLostMove.set(event);
+            this.lostReasonError.set(null);
+            return;
+          }
           this.leads.set(before);
-          this.loadError.set(extractApiError(err) ?? 'Could not move lead.');
+          this.loadError.set(detail || 'Could not move lead.');
         },
       });
+  }
+
+  protected onLostReasonConfirm(payload: LostReasonConfirm): void {
+    const move = this.pendingLostMove();
+    if (!move) return;
+    this.lostReasonSubmitting.set(true);
+    this.lostReasonError.set(null);
+    this.api
+      .moveStage(move.itemId, move.toStage, {
+        lost_reason: payload.lost_reason,
+        lost_reason_other: payload.lost_reason_other,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.leads.update((rows) =>
+            rows.map((r) => (r.id === updated.id ? updated : r)),
+          );
+          this.lostReasonSubmitting.set(false);
+          this.pendingLostMove.set(null);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.lostReasonSubmitting.set(false);
+          this.lostReasonError.set(
+            extractApiError(err) ?? 'Could not mark lead as Lost.',
+          );
+        },
+      });
+  }
+
+  protected onLostReasonCancel(): void {
+    // User backed out — undo the optimistic stage move.
+    const move = this.pendingLostMove();
+    if (move) {
+      this.pendingLostMove.set(null);
+      this.lostReasonError.set(null);
+      this.lostReasonSubmitting.set(false);
+      // Re-fetch the row from the server to revert any local state.
+      this.reload();
+    }
   }
 
   protected openCreate(): void {

@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-7xl p-6 space-y-5">
+<div class="mx-auto max-w-7xl p-6 space-y-5" [appUrlFilterState]="urlState">
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1 class="text-lg font-semibold text-zinc-900">Leads</h1>
@@ -236,44 +236,62 @@
             (change)="$event.stopPropagation()"
             [attr.aria-label]="'Select ' + (contact?.full_name ?? 'lead')"
           />
-          <button
-            type="button"
-            (click)="openEdit(item)"
-            class="block flex-1 text-left"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0 flex-1">
-                <p class="font-medium text-zinc-900">
+          <div class="flex-1 min-w-0">
+            <!-- Top row: name + status pill + last-activity -->
+            <button type="button" (click)="openEdit(item)" class="block w-full text-left">
+              <div class="flex items-start justify-between gap-3">
+                <p class="min-w-0 flex-1 font-medium text-zinc-900 truncate">
                   {{ contact?.full_name ?? 'Unknown contact' }}
                 </p>
-                <p class="mt-0.5 text-xs text-zinc-500">
-                  {{ contact?.phone ?? '—' }}
-                  @if (contact?.source) {
-                    <span class="ml-1 inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200">
-                      {{ contact?.source }}
-                    </span>
-                  }
-                  <span class="ml-1 text-zinc-400">·</span>
-                  <span class="ml-1 text-zinc-700">{{ item.budget ?? '—' }}</span>
-                </p>
+                <div class="flex flex-shrink-0 flex-col items-end gap-1">
+                  <span
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
+                    [class]="statusClass($any(item).status)"
+                  >
+                    {{ statusLabel($any(item).status) }}
+                  </span>
+                  <span class="text-[10px] text-zinc-500 tabular-nums">
+                    {{ $any(item).last_activity_at | relativeTime }}
+                  </span>
+                </div>
               </div>
-              <div class="flex flex-shrink-0 flex-col items-end gap-1">
-                <span
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
-                  [class]="statusClass($any(item).status)"
+            </button>
+
+            <!-- Bottom row: phone (tel:) + WhatsApp + source + budget. Outside
+                 the edit-button so the links remain clickable in isolation. -->
+            <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
+              @if (contact?.phone; as phone) {
+                <a
+                  [appPhoneLink]="phone"
+                  class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                  (click)="$event.stopPropagation()"
                 >
-                  {{ statusLabel($any(item).status) }}
+                  {{ phone }}
+                </a>
+                <a
+                  [appWhatsappLink]="phone"
+                  class="text-emerald-600 hover:text-emerald-800"
+                  (click)="$event.stopPropagation()"
+                >
+                  <lucide-icon name="message-circle" class="h-3 w-3" />
+                </a>
+              } @else {
+                <span>—</span>
+              }
+              @if (contact?.source; as src) {
+                <span class="ml-1 inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200">
+                  {{ src }}
                 </span>
-                <span class="text-[10px] text-zinc-500 tabular-nums">
-                  {{ $any(item).last_activity_at | relativeTime }}
-                </span>
-              </div>
+              }
+              <span class="text-zinc-400">·</span>
+              <span class="text-zinc-700">{{ item.budget ?? '—' }}</span>
+              <span class="text-zinc-400">·</span>
+              <span class="inline-flex items-center gap-1 text-[10px] text-zinc-500">
+                <lucide-icon name="user" class="h-3 w-3" />
+                {{ ownerLabel($any(item).assigned_to_id) }}
+              </span>
             </div>
-            <p class="mt-1 flex items-center gap-1 text-[10px] text-zinc-500">
-              <lucide-icon name="user" class="h-3 w-3" />
-              {{ ownerLabel($any(item).assigned_to_id) }}
-            </p>
-          </button>
+          </div>
         </div>
       </ng-template>
     </app-pipeline-list>
@@ -333,5 +351,19 @@
     [error]="singleReassignError()"
     (confirm)="onSingleReassign($event)"
     (cancel)="closeSingleReassign()"
+  />
+}
+
+<!-- Lost-reason modal: opens when the user moves a lead into a stage
+     marked is_lost=true. The kanban drag fires onItemMoved which calls
+     the backend; on 422 ("lost_reason required") we hold the pending
+     move here and prompt. Cancel reloads to revert; Confirm re-issues
+     move-stage with the reason. -->
+@if (pendingLostMove()) {
+  <app-lost-reason-modal
+    [submitting]="lostReasonSubmitting()"
+    [error]="lostReasonError()"
+    (confirm)="onLostReasonConfirm($event)"
+    (cancel)="onLostReasonCancel()"
   />
 }
