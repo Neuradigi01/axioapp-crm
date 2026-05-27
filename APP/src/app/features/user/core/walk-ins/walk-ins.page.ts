@@ -182,6 +182,12 @@ export class WalkInsPageComponent {
     this.auth.hasPermission('leads.write'),
   );
 
+  /** Can the user reassign a walk-in? Owner pencil + bulk reassign
+   * both gate on this. Junior staff lack the key. */
+  readonly canReassign = computed(() =>
+    this.auth.hasPermission('walkins.reassign'),
+  );
+
   /** URL ↔ state map for filters + view state. */
   readonly urlState: UrlFilterStateConfig = {
     status: {

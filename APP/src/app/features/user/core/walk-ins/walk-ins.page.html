@@ -243,12 +243,25 @@
                 <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
                   {{ w.budget | formatINR : true }}
                 </td>
-                <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
-                  @if (w.assigned_to_id) {
-                    {{ ownerLabel(w.assigned_to_id) }}
-                  } @else {
-                    <span class="text-zinc-400">Unassigned</span>
-                  }
+                <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600" (click)="$event.stopPropagation()">
+                  <div class="inline-flex items-center gap-1.5">
+                    @if (w.assigned_to_id) {
+                      <span>{{ ownerLabel(w.assigned_to_id) }}</span>
+                    } @else {
+                      <span class="text-zinc-400">Unassigned</span>
+                    }
+                    @if (canReassign()) {
+                      <button
+                        type="button"
+                        (click)="openSingleReassign(w)"
+                        class="rounded p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                        title="Reassign owner"
+                        [attr.aria-label]="'Reassign walk-in ' + w.id"
+                      >
+                        <lucide-icon name="pencil" class="h-3 w-3" />
+                      </button>
+                    }
+                  </div>
                 </td>
                 <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
                   {{ formatDuration(w.duration_min) }}
