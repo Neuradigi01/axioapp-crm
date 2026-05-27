@@ -25,11 +25,14 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.contacts.models import Contact
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldType,
 )
+from src.app.core.leads.models import Lead, LeadSource, LeadStatus
+from src.app.core.users.models import OrganizationMember, User
 from src.app.core.walk_ins.models import WalkIn, WalkInStatus
 from src.app.core.walk_ins.schemas import (
     QuickRegisterPayload,
@@ -491,13 +494,289 @@ async def checkout(
     return walk_in
 
 
+# --- Reassign / bulk-action / convert --------------------------------------
+
+
+async def _assert_user_in_org(
+    session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
+) -> None:
+    """422 if the target user has no active membership in this org.
+
+    Same join + check as contacts.service / leads.service — keeps the
+    cross-tenant guard uniform across reassign endpoints."""
+    result = await session.execute(
+        select(OrganizationMember.id)
+        .join(User, User.id == OrganizationMember.user_member_id)
+        .where(
+            User.legacy_uuid == user_uuid,
+            OrganizationMember.organization_id == org_id,
+            OrganizationMember.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="target user is not a member of this organisation",
+        )
+
+
+def _reassign_payload(
+    *, from_id: uuid.UUID | None, to_id: uuid.UUID | None, note: str | None
+) -> dict[str, Any]:
+    return {
+        "from": str(from_id) if from_id is not None else None,
+        "to": str(to_id) if to_id is not None else None,
+        "note": note,
+    }
+
+
+async def reassign_walk_in(
+    session: AsyncSession,
+    *,
+    walk_in_id: uuid.UUID,
+    org_id: uuid.UUID,
+    assigned_to_id: uuid.UUID | None,
+    note: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> WalkIn:
+    walk_in = await get_walk_in(session, walk_in_id)
+    if walk_in is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found"
+        )
+    if assigned_to_id is not None:
+        await _assert_user_in_org(
+            session, org_id=org_id, user_uuid=assigned_to_id
+        )
+
+    before_id = walk_in.assigned_to_id
+    if before_id == assigned_to_id:
+        return walk_in
+
+    before = _snapshot(walk_in)
+    walk_in.assigned_to_id = assigned_to_id
+    session.add(
+        Activity(
+            org_id=org_id,
+            entity_type="walk_in",
+            entity_id=walk_in.id,
+            type=ActivityType.reassign,
+            payload=_reassign_payload(
+                from_id=before_id, to_id=assigned_to_id, note=note
+            ),
+            user_id=actor_user_id,
+        )
+    )
+    await session.commit()
+    await session.refresh(walk_in)
+
+    await audit.log(
+        "walk_ins.reassigned",
+        entity_type="walk_in",
+        entity_id=walk_in.id,
+        before=before,
+        after=_snapshot(walk_in),
+    )
+    return walk_in
+
+
+async def bulk_reassign_walk_ins(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+    assigned_to_id: uuid.UUID | None,
+    note: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> int:
+    if assigned_to_id is not None:
+        await _assert_user_in_org(
+            session, org_id=org_id, user_uuid=assigned_to_id
+        )
+
+    reassigned = 0
+    for wid in ids:
+        walk_in = await get_walk_in(session, wid)
+        if walk_in is None:
+            continue
+        if walk_in.assigned_to_id == assigned_to_id:
+            continue
+        before_id = walk_in.assigned_to_id
+        walk_in.assigned_to_id = assigned_to_id
+        session.add(
+            Activity(
+                org_id=org_id,
+                entity_type="walk_in",
+                entity_id=walk_in.id,
+                type=ActivityType.reassign,
+                payload=_reassign_payload(
+                    from_id=before_id, to_id=assigned_to_id, note=note
+                ),
+                user_id=actor_user_id,
+            )
+        )
+        reassigned += 1
+
+    await session.commit()
+    return reassigned
+
+
+async def bulk_checkout_walk_ins(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> tuple[int, int]:
+    """Bulk equivalent of single-row `checkout`. Per-row processing
+    because already-checked-out rows are skipped (not errored) — same
+    semantic as the single endpoint. Returns
+    `(checked_out, already_checked_out)`."""
+    checked_out = 0
+    already_out = 0
+    now_ts = datetime.now(timezone.utc)
+    for wid in ids:
+        walk_in = await get_walk_in(session, wid)
+        if walk_in is None:
+            continue
+        if walk_in.org_id != org_id:
+            # ORM tenant filter scopes SELECTs but defence-in-depth:
+            # skip rows that somehow slipped through.
+            continue
+        if walk_in.time_out is not None:
+            already_out += 1
+            continue
+        walk_in.time_out = now_ts
+        checked_out += 1
+
+    await session.commit()
+    return checked_out, already_out
+
+
+async def convert_walk_in_to_lead(
+    session: AsyncSession,
+    *,
+    walk_in_id: uuid.UUID,
+    org_id: uuid.UUID,
+    contact_link_mode: str,
+    linked_contact_id: uuid.UUID | None,
+    notes: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> tuple[WalkIn, uuid.UUID, uuid.UUID]:
+    """Spin up a `Lead` from a walk-in. Returns (walk_in, contact_id,
+    lead_id).
+
+    - 404 if walk-in not found.
+    - 409 if walk-in already has `linked_lead_id` (idempotency guard —
+      the response embeds the existing lead id so the FE can redirect).
+    - 422 if `contact_link_mode='link'` and the `linked_contact_id`
+      isn't in the same org.
+
+    Resolves the target contact: `auto` keeps the walk-in's existing
+    `contact_id` (quick-register already created/linked it). `link`
+    overrides with the explicit contact id, validated tenant-scoped.
+
+    Creates the lead at the first stage of the `leads` pipeline,
+    inheriting the walk-in's owner. Source defaults to `manual`
+    because `LeadSource` has no `walk_in` enum value — manual is
+    accurate (a staffer flipped this).
+
+    Writes an `Activity(type=convert)` on the walk-in's timeline with
+    `payload={"contact_id":..., "lead_id":..., "notes":...}`. The
+    activity-insert hook then bumps `walk_in.last_activity_at` and
+    `lead.last_activity_at` automatically.
+    """
+    # Imported lazily to avoid a circular import at module load:
+    # leads.service imports walk_ins... actually it doesn't, but the
+    # pipelines / leads modules pull in chains that are easier to
+    # keep deferred from the walk_ins module's import graph.
+    from src.app.core.leads.schemas import LeadCreate
+    from src.app.core.leads.service import create_lead as create_lead_service
+
+    walk_in = await get_walk_in(session, walk_in_id)
+    if walk_in is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found"
+        )
+    if walk_in.linked_lead_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "walk-in already converted",
+                "lead_id": str(walk_in.linked_lead_id),
+            },
+        )
+
+    # Resolve contact.
+    if contact_link_mode == "link":
+        if linked_contact_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="linked_contact_id is required when contact_link_mode='link'",
+            )
+        await _ensure_contact_in_scope(session, linked_contact_id)
+        contact_id = linked_contact_id
+    else:
+        # auto — keep the walk-in's existing linked contact
+        contact_id = walk_in.contact_id
+
+    lead_payload = LeadCreate(
+        contact_id=contact_id,
+        assigned_to_id=walk_in.assigned_to_id,
+        budget=walk_in.budget,
+        custom_data={},  # walk-in.custom_data is walk-in-shaped, not lead-shaped
+        source=LeadSource.manual,
+    )
+    lead = await create_lead_service(
+        session,
+        org_id=org_id,
+        payload=lead_payload,
+        require_all_required=False,
+    )
+
+    walk_in.linked_lead_id = lead.id
+    session.add(
+        Activity(
+            org_id=org_id,
+            entity_type="walk_in",
+            entity_id=walk_in.id,
+            type=ActivityType.convert,
+            payload={
+                "contact_id": str(contact_id),
+                "lead_id": str(lead.id),
+                "notes": notes,
+            },
+            user_id=actor_user_id,
+        )
+    )
+    await session.commit()
+    await session.refresh(walk_in)
+
+    await audit.log(
+        "walk_ins.converted",
+        entity_type="walk_in",
+        entity_id=walk_in.id,
+        after={
+            **_snapshot(walk_in),
+            "lead_id": str(lead.id),
+            "contact_id": str(contact_id),
+        },
+    )
+
+    return walk_in, contact_id, lead.id
+
+
 __all__ = [
     "WalkInStatus",
+    "bulk_checkout_walk_ins",
+    "bulk_reassign_walk_ins",
     "checkout",
+    "convert_walk_in_to_lead",
     "create_walk_in",
     "delete_walk_in",
     "get_walk_in",
     "list_walk_ins",
     "quick_register",
+    "reassign_walk_in",
     "update_walk_in",
 ]

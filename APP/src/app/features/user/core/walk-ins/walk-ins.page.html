@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-7xl p-6 space-y-5">
+<div class="mx-auto max-w-7xl p-6 space-y-5" [appUrlFilterState]="urlState">
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1 class="text-lg font-semibold text-zinc-900">Walk-in Customers</h1>
@@ -44,13 +44,13 @@
     </div>
   </section>
 
-  <!-- Filter chips -->
-  <section class="flex flex-wrap items-center gap-2">
+  <!-- Filter chip strip: status · date · scope · sort -->
+  <section class="flex flex-wrap items-center gap-2 text-xs">
     @for (chip of chips; track chip.id) {
       <button
         type="button"
         (click)="setFilter(chip.id)"
-        class="rounded-full px-3 py-1 text-xs font-medium ring-1 transition"
+        class="rounded-full px-3 py-1 font-medium ring-1 transition"
         [class.bg-zinc-900]="statusFilter() === chip.id"
         [class.text-white]="statusFilter() === chip.id"
         [class.ring-zinc-900]="statusFilter() === chip.id"
@@ -62,6 +62,79 @@
         {{ chip.label }}
       </button>
     }
+
+    <!-- Date chips: today / this week / this month -->
+    <div class="inline-flex overflow-hidden rounded-full ring-1 ring-zinc-200 bg-white">
+      @for (d of [
+        { v: '',      label: 'All time' },
+        { v: 'today', label: 'Today' },
+        { v: 'week',  label: 'Week' },
+        { v: 'month', label: 'Month' }
+      ]; track d.v) {
+        <button
+          type="button"
+          (click)="setDateChip(d.v)"
+          class="px-2.5 py-1 transition"
+          [class.bg-zinc-900]="dateChip() === d.v"
+          [class.text-white]="dateChip() === d.v"
+          [class.text-zinc-700]="dateChip() !== d.v"
+          [class.hover:bg-zinc-50]="dateChip() !== d.v"
+        >
+          {{ d.label }}
+        </button>
+      }
+    </div>
+
+    <!-- Scope toggle (admin/owner/manager only) -->
+    @if (canChangeScope()) {
+      <div class="inline-flex overflow-hidden rounded-full ring-1 ring-zinc-200 bg-white">
+        @for (sc of [
+          { v: 'mine', label: 'Mine' },
+          { v: 'team', label: 'Team' },
+          { v: 'all',  label: 'All' }
+        ]; track sc.v) {
+          <button
+            type="button"
+            (click)="setScope(sc.v)"
+            class="px-2.5 py-1 transition"
+            [class.bg-zinc-900]="scope() === sc.v"
+            [class.text-white]="scope() === sc.v"
+            [class.text-zinc-700]="scope() !== sc.v"
+            [class.hover:bg-zinc-50]="scope() !== sc.v"
+          >
+            {{ sc.label }}
+          </button>
+        }
+      </div>
+    }
+
+    <!-- Sort dropdown -->
+    <select
+      [value]="sortKey() + ':' + sortOrder()"
+      (change)="setSort($any($event.target).value)"
+      class="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      aria-label="Sort"
+    >
+      <option value="time_in:desc">Newest visit</option>
+      <option value="time_in:asc">Oldest visit</option>
+      <option value="last_activity_at:desc">Recent activity</option>
+      <option value="last_activity_at:asc">Stale (oldest activity)</option>
+      <option value="created_at:desc">Newest created</option>
+      <option value="created_at:asc">Oldest created</option>
+    </select>
+
+    <!-- Owner dropdown -->
+    <select
+      [formControl]="assigneeControl"
+      class="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      aria-label="Owner"
+    >
+      <option value="">All owners</option>
+      <option value="me">Me</option>
+      @for (u of users(); track u.id) {
+        <option [value]="u.id">{{ u.full_name }}</option>
+      }
+    </select>
   </section>
 
   <!-- Body -->
@@ -95,9 +168,10 @@
               <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Phone</th>
               <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Requirement</th>
               <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Budget</th>
-              <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Assigned&nbsp;To</th>
+              <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Owner</th>
               <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Duration</th>
               <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Status</th>
+              <th class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">Last activity</th>
               <th class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Date</th>
               <th class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">Action</th>
             </tr>
@@ -129,7 +203,11 @@
                   {{ w.budget | formatINR : true }}
                 </td>
                 <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
-                  {{ assignedToLabel(w.assigned_to_id) }}
+                  @if (w.assigned_to_id) {
+                    {{ ownerLabel(w.assigned_to_id) }}
+                  } @else {
+                    <span class="text-zinc-400">Unassigned</span>
+                  }
                 </td>
                 <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
                   {{ formatDuration(w.duration_min) }}
@@ -142,23 +220,46 @@
                     {{ w.status }}
                   </span>
                 </td>
+                <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-zinc-600 tabular-nums">
+                  {{ w.last_activity_at | relativeTime }}
+                </td>
                 <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
                   {{ formatDate(w.time_in) }}
                 </td>
                 <td class="whitespace-nowrap px-4 py-3 text-right text-sm">
-                  @if (w.time_out === null) {
-                    <button
-                      type="button"
-                      (click)="onCheckout(w)"
-                      class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-                    >
-                      <lucide-icon name="log-out" class="h-3.5 w-3.5" />
-                    Check out
-                  </button>
-                } @else {
-                  <span class="text-xs text-zinc-400">—</span>
-                }
-              </td>
+                  <div class="flex items-center justify-end gap-1">
+                    <!-- Row-level status transitions, mirror of the
+                         backend state-machine. Buttons hidden when the
+                         transition isn't allowed from the current state. -->
+                    @for (target of allowedTransitions[w.status]; track target) {
+                      <button
+                        type="button"
+                        (click)="advanceStatus(w, target)"
+                        class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50"
+                        [title]="'Mark as ' + target"
+                      >
+                        @switch (target) {
+                          @case ('interested') { <lucide-icon name="user-check" class="h-3 w-3" /> Interested }
+                          @case ('follow_up')  { <lucide-icon name="refresh-cw" class="h-3 w-3" /> Follow-up }
+                          @case ('converted')  { <lucide-icon name="check-circle-2" class="h-3 w-3" /> Converted }
+                          @case ('left')       { <lucide-icon name="log-out" class="h-3 w-3" /> Left }
+                          @case ('browsing')   { <lucide-icon name="refresh-cw" class="h-3 w-3" /> Re-engage }
+                        }
+                      </button>
+                    }
+                    @if (w.time_out === null) {
+                      <button
+                        type="button"
+                        (click)="onCheckout(w)"
+                        class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50"
+                        title="Check out"
+                      >
+                        <lucide-icon name="log-out" class="h-3 w-3" />
+                        Check out
+                      </button>
+                    }
+                  </div>
+                </td>
             </tr>
           }
         </tbody>

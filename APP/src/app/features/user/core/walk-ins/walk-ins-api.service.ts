@@ -26,9 +26,13 @@ export interface WalkIn {
   status: WalkInStatus;
   notes: string | null;
   custom_data: Record<string, unknown>;
+  last_activity_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export type WalkInSortKey = 'time_in' | 'created_at' | 'last_activity_at';
+export type SortOrder = 'asc' | 'desc';
 
 export interface WalkInUpdate {
   requirement?: string | null;
@@ -59,8 +63,12 @@ export interface QuickRegisterResponse {
 
 export interface WalkInListQuery {
   status?: WalkInStatus;
-  assigned_to?: string;
+  assigned_to?: string | null;
   open_only?: boolean;
+  date_from?: string;
+  date_to?: string;
+  sort?: WalkInSortKey;
+  order?: SortOrder;
   page?: number;
   size?: number;
 }
@@ -76,6 +84,10 @@ export class WalkInsApiService {
     if (query.status) params = params.set('status', query.status);
     if (query.assigned_to) params = params.set('assigned_to', query.assigned_to);
     if (query.open_only) params = params.set('open_only', String(query.open_only));
+    if (query.date_from) params = params.set('date_from', query.date_from);
+    if (query.date_to) params = params.set('date_to', query.date_to);
+    if (query.sort) params = params.set('sort', query.sort);
+    if (query.order) params = params.set('order', query.order);
     if (query.page) params = params.set('page', String(query.page));
     if (query.size) params = params.set('size', String(query.size));
     return this.http.get<WalkIn[]>(this.base, { params });
@@ -102,6 +114,58 @@ export class WalkInsApiService {
       `${this.base}/quick-register`,
       payload,
     );
+  }
+
+  /** Single-row reassign. `userId === null` clears the owner. */
+  reassign(
+    id: string,
+    body: { userId: string | null; note?: string | null },
+  ): Observable<WalkIn> {
+    return this.http.post<WalkIn>(`${this.base}/${id}/reassign`, {
+      assigned_to_id: body.userId,
+      note: body.note ?? null,
+    });
+  }
+
+  bulkReassign(
+    ids: string[],
+    body: { userId: string | null; note?: string | null },
+  ): Observable<{ reassigned: number }> {
+    return this.http.post<{ reassigned: number }>(`${this.base}/bulk-reassign`, {
+      ids,
+      assigned_to_id: body.userId,
+      note: body.note ?? null,
+    });
+  }
+
+  bulkCheckout(
+    ids: string[],
+  ): Observable<{ checked_out: number; already_checked_out: number }> {
+    return this.http.post<{
+      checked_out: number;
+      already_checked_out: number;
+    }>(`${this.base}/bulk-checkout`, { ids });
+  }
+
+  /** Walk-in → Lead conversion. Returns ids of the touched rows so
+   * the caller can deep-link to the new lead. 409 if already converted. */
+  convert(
+    id: string,
+    body: {
+      contact_link_mode?: 'auto' | 'link';
+      linked_contact_id?: string | null;
+      notes?: string | null;
+    } = {},
+  ): Observable<{ walk_in_id: string; contact_id: string; lead_id: string }> {
+    return this.http.post<{
+      walk_in_id: string;
+      contact_id: string;
+      lead_id: string;
+    }>(`${this.base}/${id}/convert`, {
+      contact_link_mode: body.contact_link_mode ?? 'auto',
+      linked_contact_id: body.linked_contact_id ?? null,
+      notes: body.notes ?? null,
+    });
   }
 
   /** Field defs for `entity_type='walk_in'` — feeds the dynamic form. */

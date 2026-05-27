@@ -112,6 +112,15 @@ class WalkIn(Base, TenantScoped):
         DateTime(timezone=True),
         nullable=True,
     )
+    # Set by `convert_walk_in_to_lead` when a walk-in is promoted to
+    # a Lead. ON DELETE SET NULL — deleting the lead doesn't erase
+    # the visit history, which is independently useful for showroom
+    # analytics.
+    linked_lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("leads.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

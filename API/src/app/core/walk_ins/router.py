@@ -26,17 +26,28 @@ from src.app.core.walk_ins.models import WalkInStatus
 from src.app.core.walk_ins.schemas import (
     QuickRegisterPayload,
     QuickRegisterResponse,
+    WalkInBulkCheckout,
+    WalkInBulkCheckoutResult,
+    WalkInBulkReassign,
+    WalkInBulkReassignResult,
+    WalkInConvertRequest,
+    WalkInConvertResponse,
     WalkInCreate,
     WalkInOut,
+    WalkInReassign,
     WalkInUpdate,
 )
 from src.app.core.walk_ins.service import (
+    bulk_checkout_walk_ins,
+    bulk_reassign_walk_ins,
     checkout,
+    convert_walk_in_to_lead,
     create_walk_in,
     delete_walk_in,
     get_walk_in,
     list_walk_ins,
     quick_register,
+    reassign_walk_in,
     update_walk_in,
 )
 from src.app.shared.db import get_db
@@ -149,3 +160,83 @@ async def delete_walk_in_endpoint(
 ) -> Response:
     await delete_walk_in(db, walk_in_id=walk_in_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Reassign + bulk + convert endpoints ------------------------------------
+
+
+@router.post("/{walk_in_id}/reassign", response_model=WalkInOut)
+async def reassign_walk_in_endpoint(
+    walk_in_id: uuid.UUID,
+    payload: WalkInReassign,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("walkins.reassign")),
+) -> WalkInOut:
+    walk_in = await reassign_walk_in(
+        db,
+        walk_in_id=walk_in_id,
+        org_id=user.org_id,
+        assigned_to_id=payload.assigned_to_id,
+        note=payload.note,
+        actor_user_id=user.legacy_uuid,
+    )
+    return WalkInOut.model_validate(walk_in)
+
+
+@router.post("/bulk-reassign", response_model=WalkInBulkReassignResult)
+async def bulk_reassign_walk_ins_endpoint(
+    payload: WalkInBulkReassign,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("walkins.reassign")),
+) -> WalkInBulkReassignResult:
+    n = await bulk_reassign_walk_ins(
+        db,
+        ids=payload.ids,
+        org_id=user.org_id,
+        assigned_to_id=payload.assigned_to_id,
+        note=payload.note,
+        actor_user_id=user.legacy_uuid,
+    )
+    return WalkInBulkReassignResult(reassigned=n)
+
+
+@router.post("/bulk-checkout", response_model=WalkInBulkCheckoutResult)
+async def bulk_checkout_walk_ins_endpoint(
+    payload: WalkInBulkCheckout,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("walkins.write")),
+) -> WalkInBulkCheckoutResult:
+    checked_out, already = await bulk_checkout_walk_ins(
+        db, ids=payload.ids, org_id=user.org_id
+    )
+    return WalkInBulkCheckoutResult(
+        checked_out=checked_out, already_checked_out=already
+    )
+
+
+@router.post("/{walk_in_id}/convert", response_model=WalkInConvertResponse)
+async def convert_walk_in_endpoint(
+    walk_in_id: uuid.UUID,
+    payload: WalkInConvertRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("leads.write")),
+) -> WalkInConvertResponse:
+    """Convert a walk-in to a lead. Requires `leads.write` (the
+    feature's primary side-effect is creating a lead) plus the
+    `walkins.write` the caller already needs to mutate the walk-in
+    row — that's covered by the leads.write requirement here since
+    any role with leads.write also has walkins.write by template."""
+    walk_in, contact_id, lead_id = await convert_walk_in_to_lead(
+        db,
+        walk_in_id=walk_in_id,
+        org_id=user.org_id,
+        contact_link_mode=payload.contact_link_mode,
+        linked_contact_id=payload.linked_contact_id,
+        notes=payload.notes,
+        actor_user_id=user.legacy_uuid,
+    )
+    return WalkInConvertResponse(
+        walk_in_id=walk_in.id,
+        contact_id=contact_id,
+        lead_id=lead_id,
+    )

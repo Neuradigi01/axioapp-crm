@@ -41,6 +41,7 @@ class ActivityType(str, enum.Enum):
     status_change = "status_change"
     task = "task"
     reassign = "reassign"
+    convert = "convert"
 
 
 activity_type_enum = ENUM(

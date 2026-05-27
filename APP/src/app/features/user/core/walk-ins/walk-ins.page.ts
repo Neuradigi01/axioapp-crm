@@ -7,23 +7,56 @@
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, distinctUntilChanged } from 'rxjs/operators';
 
+import { FurnitureAuthService } from '../auth/auth.service';
 import { ContactsApiService } from '../contacts/contacts-api.service';
+import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
+import { MailLinkDirective } from '../shared/directives/mail-link.directive';
+import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
+import {
+  UrlFilterStateConfig,
+  UrlFilterStateDirective,
+} from '../shared/directives/url-filter-state.directive';
+import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
 import { InrPipe } from '../shared/pipes/inr.pipe';
+import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
+import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
+import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import {
   QuickRegisterResponse,
   WalkIn,
+  WalkInSortKey,
   WalkInStatus,
   WalkInsApiService,
+  SortOrder,
 } from './walk-ins-api.service';
 import { RegisterWalkinModalComponent } from './register-walkin-modal.component';
+import {
+  ConvertConfirm,
+  WalkinConvertModalComponent,
+} from './walkin-convert-modal/walkin-convert-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
+import { Router } from '@angular/router';
+
+
+/** FE mirror of `core/walk_ins/status_workflow.ALLOWED_TRANSITIONS`. The
+ * row-level action buttons read this to decide which buttons to show;
+ * the backend re-enforces on every PATCH so this is purely a UX hint. */
+const ALLOWED_TRANSITIONS: Record<WalkInStatus, ReadonlyArray<WalkInStatus>> = {
+  browsing: ['interested', 'left'],
+  interested: ['follow_up', 'converted', 'left'],
+  follow_up: ['converted', 'left'],
+  converted: [],
+  left: ['browsing'],
+};
 
 interface ContactSummary {
   id: string;
@@ -46,14 +79,32 @@ const FILTER_CHIPS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
   selector: 'app-walk-ins-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, InrPipe, RegisterWalkinModalComponent],
+  imports: [
+    LucideAngularModule,
+    InrPipe,
+    RegisterWalkinModalComponent,
+    RelativeTimePipe,
+    ReactiveFormsModule,
+    BulkActionBarComponent,
+    ReassignModalComponent,
+    ConfirmDialogComponent,
+    WalkinConvertModalComponent,
+    PhoneLinkDirective,
+    WhatsappLinkDirective,
+    MailLinkDirective,
+    UrlFilterStateDirective,
+  ],
   templateUrl: './walk-ins.page.html',
 })
 export class WalkInsPageComponent {
   protected readonly initials = initials;
+  protected readonly allowedTransitions = ALLOWED_TRANSITIONS;
   private readonly api = inject(WalkInsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(FurnitureAuthService);
+  private readonly usersDir = inject(UsersDirectoryService);
+  private readonly router = inject(Router);
 
   readonly all = signal<WalkIn[]>([]);
   readonly loading = signal(false);
@@ -65,16 +116,137 @@ export class WalkInsPageComponent {
   readonly contactsById = signal<Record<string, ContactSummary>>({});
   readonly modalOpen = signal(false);
 
-  /** Items filtered by the current chip, sorted by time_in desc. */
-  readonly visible = computed<WalkIn[]>(() => {
-    const filter = this.statusFilter();
-    const rows = filter === 'all'
-      ? this.all()
-      : this.all().filter((w) => w.status === filter);
-    return [...rows].sort((a, b) =>
-      a.time_in < b.time_in ? 1 : a.time_in > b.time_in ? -1 : 0,
-    );
+  // --- Step 2: filter + sort + scope --------------------------------------
+
+  /** Sort dropdown. Default `time_in desc` — matches the prior server default. */
+  readonly sortKey = signal<WalkInSortKey>('time_in');
+  readonly sortOrder = signal<SortOrder>('desc');
+
+  /** Date chip: `''` / `today` / `week` / `month`. Translates to a
+   * `date_from` ISO timestamp the backend filters `time_in` against. */
+  readonly dateChip = signal<'' | 'today' | 'week' | 'month'>('');
+
+  /** Visibility scope: which walk-ins to show before any other filter. */
+  readonly scope = signal<'mine' | 'team' | 'all'>(this.defaultScopeForRole());
+
+  /** Owner picker: empty / 'me' / UUID. */
+  readonly assigneeControl = new FormControl<string>('', { nonNullable: true });
+
+  /** User directory for the owner dropdown + ownerLabel lookup. */
+  readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
+
+  /** Owner-id → "Full Name" lookup. */
+  readonly userMap = computed(() => {
+    const map = new Map<string, string>();
+    for (const u of this.users()) map.set(u.id, u.full_name);
+    return map;
   });
+
+  /** Whether the scope toggle should be visible. Junior staff get the
+   * implicit "mine" default with no toggle. */
+  readonly canChangeScope = computed(() => {
+    const role = this.auth.currentRoleName().toLowerCase();
+    return role === 'owner' || role === 'admin' || role.includes('manager');
+  });
+
+  /** Items as fetched from the server — server already sorts + filters. */
+  readonly visible = computed<WalkIn[]>(() => this.all());
+
+  // --- Step 3: selection + bulk + single reassign + convert ---------------
+
+  readonly selectedIds = signal<Set<string>>(new Set());
+  readonly selectedCount = computed(() => this.selectedIds().size);
+
+  readonly bulkActions = computed<BulkAction[]>(() => [
+    { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'walkins.reassign' },
+    { key: 'checkout', label: 'Check out', icon: 'log-out', permissionKey: 'walkins.write' },
+    { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'walkins.write' },
+  ]);
+
+  readonly bulkModal = signal<'reassign' | 'checkout' | 'delete' | null>(null);
+  readonly bulkSubmitting = signal(false);
+  readonly bulkError = signal<string | null>(null);
+
+  /** Single-row reassign (from the pencil — added in Step 3 as a future
+   * polish on row hover). Same component as bulk. */
+  readonly singleReassignWalkIn = signal<WalkIn | null>(null);
+  readonly singleReassignSubmitting = signal(false);
+  readonly singleReassignError = signal<string | null>(null);
+
+  /** Convert-to-lead modal state. */
+  readonly convertWalkIn = signal<WalkIn | null>(null);
+  readonly convertSubmitting = signal(false);
+  readonly convertError = signal<string | null>(null);
+
+  /** Can the user run the Convert action? Same permission as creating
+   * a lead, which is what the convert side-effect produces. */
+  readonly canConvert = computed(() =>
+    this.auth.hasPermission('leads.write'),
+  );
+
+  /** URL ↔ state map for filters + view state. */
+  readonly urlState: UrlFilterStateConfig = {
+    status: {
+      read: () => this.statusFilter(),
+      write: (v) => {
+        if (
+          v === 'all' ||
+          v === 'browsing' ||
+          v === 'interested' ||
+          v === 'follow_up' ||
+          v === 'converted' ||
+          v === 'left'
+        ) {
+          this.statusFilter.set(v);
+        }
+      },
+      queryKey: 'status',
+      defaultValue: 'all',
+    },
+    assignee: {
+      read: () => this.assigneeControl.value,
+      write: (v) => this.assigneeControl.setValue(v),
+      queryKey: 'assignee',
+    },
+    date_chip: {
+      read: () => this.dateChip(),
+      write: (v) => {
+        if (v === '' || v === 'today' || v === 'week' || v === 'month') {
+          this.dateChip.set(v);
+        }
+      },
+      queryKey: 'date_chip',
+    },
+    scope: {
+      read: () => this.scope(),
+      write: (v) => {
+        if (v === 'mine' || v === 'team' || v === 'all') this.scope.set(v);
+      },
+      queryKey: 'scope',
+    },
+    sort: {
+      read: () => this.sortKey(),
+      write: (v) => {
+        if (
+          v === 'time_in' ||
+          v === 'created_at' ||
+          v === 'last_activity_at'
+        ) {
+          this.sortKey.set(v);
+        }
+      },
+      queryKey: 'sort',
+      defaultValue: 'time_in',
+    },
+    order: {
+      read: () => this.sortOrder(),
+      write: (v) => {
+        if (v === 'asc' || v === 'desc') this.sortOrder.set(v);
+      },
+      queryKey: 'order',
+      defaultValue: 'desc',
+    },
+  };
 
   // --- KPI cards (computed from `all`) ---
 
@@ -119,10 +291,304 @@ export class WalkInsPageComponent {
       if (missing.length === 0) return;
       this.fetchContacts(missing);
     });
+
+    this.assigneeControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.reload());
   }
 
   protected setFilter(f: StatusFilter): void {
     this.statusFilter.set(f);
+    this.reload();
+  }
+
+  protected setDateChip(value: string): void {
+    if (value !== '' && value !== 'today' && value !== 'week' && value !== 'month') {
+      return;
+    }
+    this.dateChip.set(value);
+    this.reload();
+  }
+
+  protected setScope(value: string): void {
+    if (value !== 'mine' && value !== 'team' && value !== 'all') return;
+    this.scope.set(value);
+    this.reload();
+  }
+
+  protected setSort(value: string): void {
+    const [key, order] = value.split(':');
+    if (key !== 'time_in' && key !== 'created_at' && key !== 'last_activity_at') {
+      return;
+    }
+    if (order !== 'asc' && order !== 'desc') return;
+    this.sortKey.set(key);
+    this.sortOrder.set(order);
+    this.reload();
+  }
+
+  /** Default visibility based on role. Same heuristic as leads.page. */
+  private defaultScopeForRole(): 'mine' | 'team' | 'all' {
+    const role = this.auth.currentRoleName();
+    if (!role) return 'mine';
+    const r = role.toLowerCase();
+    if (r === 'owner' || r === 'admin') return 'all';
+    if (r.includes('manager')) return 'team';
+    return 'mine';
+  }
+
+  /** Resolve the assignee filter to a UUID for the API call.
+   * `''` → undefined; `'me'` → current user; UUID → that UUID. */
+  private resolveAssignee(): string | undefined {
+    const raw = this.assigneeControl.value;
+    if (!raw) return undefined;
+    if (raw === 'me') return this.auth.currentUserId() ?? undefined;
+    return raw;
+  }
+
+  /** Date chip → ISO `date_from` cutoff. Returns null when no chip set. */
+  private resolveDateFrom(): string | null {
+    const chip = this.dateChip();
+    if (!chip) return null;
+    const now = new Date();
+    if (chip === 'today') {
+      now.setHours(0, 0, 0, 0);
+    } else if (chip === 'week') {
+      // Last 7 days rolling window — captures Monday-Sunday for typical
+      // store hours regardless of which weekday it is.
+      now.setDate(now.getDate() - 7);
+    } else if (chip === 'month') {
+      now.setDate(now.getDate() - 30);
+    }
+    return now.toISOString();
+  }
+
+  protected ownerLabel(assignedTo: string | null): string {
+    if (!assignedTo) return 'Unassigned';
+    return this.userMap().get(assignedTo) ?? 'Unknown';
+  }
+
+  // --- Selection + bulk ---------------------------------------------------
+
+  protected toggleRow(id: string, event: Event): void {
+    event.stopPropagation();
+    this.selectedIds.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  protected isSelected(id: string): boolean {
+    return this.selectedIds().has(id);
+  }
+
+  protected clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  protected onBulkAction(key: string): void {
+    this.bulkError.set(null);
+    if (key === 'reassign') this.bulkModal.set('reassign');
+    else if (key === 'checkout') this.bulkModal.set('checkout');
+    else if (key === 'delete') this.bulkModal.set('delete');
+  }
+
+  protected closeBulkModal(): void {
+    this.bulkModal.set(null);
+    this.bulkSubmitting.set(false);
+    this.bulkError.set(null);
+  }
+
+  protected onBulkReassign(payload: ReassignConfirm): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkReassign(ids, { userId: payload.userId, note: payload.note })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(extractApiError(err) ?? 'Could not reassign.');
+        },
+      });
+  }
+
+  protected onBulkCheckout(): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkCheckout(ids)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(extractApiError(err) ?? 'Could not check out.');
+        },
+      });
+  }
+
+  protected onBulkDelete(): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    // walk_ins has no batched delete endpoint — call per row. v2: add one.
+    let done = 0;
+    let failed = 0;
+    const finish = () => {
+      this.bulkSubmitting.set(false);
+      this.clearSelection();
+      this.closeBulkModal();
+      if (failed > 0) {
+        this.loadError.set(`${failed} delete(s) failed; ${done} succeeded.`);
+      }
+      this.reload();
+    };
+    for (const id of ids) {
+      this.api
+        .delete(id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: () => {
+            done++;
+            if (done + failed === ids.length) finish();
+          },
+          error: () => {
+            failed++;
+            if (done + failed === ids.length) finish();
+          },
+        });
+    }
+  }
+
+  // --- Single reassign (pencil — wired but no row UI yet, reachable
+  // programmatically; the dedicated pencil button can be added later
+  // without backend changes). ----------------------------------------------
+
+  protected openSingleReassign(walkIn: WalkIn): void {
+    this.singleReassignError.set(null);
+    this.singleReassignWalkIn.set(walkIn);
+  }
+
+  protected closeSingleReassign(): void {
+    this.singleReassignWalkIn.set(null);
+    this.singleReassignSubmitting.set(false);
+    this.singleReassignError.set(null);
+  }
+
+  protected onSingleReassign(payload: ReassignConfirm): void {
+    const w = this.singleReassignWalkIn();
+    if (!w) return;
+    this.singleReassignSubmitting.set(true);
+    this.singleReassignError.set(null);
+    this.api
+      .reassign(w.id, { userId: payload.userId, note: payload.note })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.singleReassignSubmitting.set(false);
+          this.all.update((rows) =>
+            rows.map((r) => (r.id === updated.id ? updated : r)),
+          );
+          this.closeSingleReassign();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.singleReassignSubmitting.set(false);
+          this.singleReassignError.set(
+            extractApiError(err) ?? 'Could not reassign walk-in.',
+          );
+        },
+      });
+  }
+
+  // --- Convert-to-lead ----------------------------------------------------
+
+  protected openConvert(walkIn: WalkIn): void {
+    this.convertError.set(null);
+    this.convertWalkIn.set(walkIn);
+  }
+
+  protected closeConvert(): void {
+    this.convertWalkIn.set(null);
+    this.convertSubmitting.set(false);
+    this.convertError.set(null);
+  }
+
+  protected onConvertConfirm(payload: ConvertConfirm): void {
+    const w = this.convertWalkIn();
+    if (!w) return;
+    this.convertSubmitting.set(true);
+    this.convertError.set(null);
+    this.api
+      .convert(w.id, payload)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resp) => {
+          this.convertSubmitting.set(false);
+          // Update the local row's linked_lead_id so the "→ Lead" badge
+          // appears immediately.
+          this.all.update((rows) =>
+            rows.map((r) =>
+              r.id === resp.walk_in_id ? { ...r, linked_lead_id: resp.lead_id } : r,
+            ),
+          );
+          this.closeConvert();
+          // Send the user straight to the new lead so they can fill in
+          // the details. The pipeline_stage defaulted to the first
+          // stage; they typically want to move it through right away.
+          this.router.navigate(['/user/leads'], { queryParams: { q: resp.lead_id } });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.convertSubmitting.set(false);
+          this.convertError.set(
+            extractApiError(err) ?? 'Could not convert walk-in.',
+          );
+        },
+      });
+  }
+
+  /** Advance a walk-in to a new state. Optimistic — replaces the row
+   * on success, reverts on error. */
+  protected advanceStatus(walkIn: WalkIn, target: WalkInStatus): void {
+    const before = this.all();
+    // Optimistic update.
+    this.all.update((rows) =>
+      rows.map((w) => (w.id === walkIn.id ? { ...w, status: target } : w)),
+    );
+    this.api
+      .update(walkIn.id, { status: target })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.all.update((rows) =>
+            rows.map((w) => (w.id === updated.id ? updated : w)),
+          );
+        },
+        error: (err: HttpErrorResponse) => {
+          this.all.set(before);
+          this.loadError.set(
+            extractApiError(err) ?? 'Could not update walk-in status.',
+          );
+        },
+      });
   }
 
   protected openRegister(): void {
@@ -226,8 +692,16 @@ export class WalkInsPageComponent {
   private reload(): void {
     this.loading.set(true);
     this.loadError.set(null);
+    const filter = this.statusFilter();
     this.api
-      .list({ size: 100 })
+      .list({
+        status: filter === 'all' ? undefined : filter,
+        assigned_to: this.resolveAssignee(),
+        date_from: this.resolveDateFrom() ?? undefined,
+        sort: this.sortKey(),
+        order: this.sortOrder(),
+        size: 100,
+      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {
