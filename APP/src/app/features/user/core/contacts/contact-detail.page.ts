@@ -17,8 +17,11 @@ import { ActivityTimelineComponent } from '../activities/activity-timeline.compo
 import { AddNoteComponent } from '../activities/add-note.component';
 import { Activity } from '../activities/activities-api.service';
 import { TasksPanelComponent } from '../tasks/tasks-panel.component';
+import { FurnitureAuthService } from '../auth/auth.service';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { FieldDef } from '../shared/dynamic-form/types';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
+import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import {
   Contact,
@@ -51,6 +54,8 @@ const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: strin
     AddNoteComponent,
     TasksPanelComponent,
     RelativeTimePipe,
+    ReassignModalComponent,
+    ConfirmDialogComponent,
   ],
   templateUrl: './contact-detail.page.html',
 })
@@ -61,6 +66,21 @@ export class ContactDetailPageComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly usersDir = inject(UsersDirectoryService);
+  private readonly auth = inject(FurnitureAuthService);
+
+  /** Reassign + delete confirmation modal state. */
+  readonly reassignOpen = signal(false);
+  readonly reassignSubmitting = signal(false);
+  readonly reassignError = signal<string | null>(null);
+
+  readonly deleteOpen = signal(false);
+  readonly deleteSubmitting = signal(false);
+  readonly deleteError = signal<string | null>(null);
+
+  /** Tied to `*ngIf` on the pencil-icon — junior staff shouldn't see it. */
+  readonly canReassign = computed(() =>
+    this.auth.hasPermission('contacts.reassign'),
+  );
 
   /** Owner-id → "Full Name" lookup so the header can show a name
    * without a per-contact round-trip. */
@@ -159,19 +179,71 @@ export class ContactDetailPageComponent implements OnInit {
   }
 
   protected onDelete(): void {
+    this.deleteError.set(null);
+    this.deleteOpen.set(true);
+  }
+
+  protected closeDelete(): void {
+    this.deleteOpen.set(false);
+    this.deleteSubmitting.set(false);
+    this.deleteError.set(null);
+  }
+
+  protected confirmDelete(): void {
     const c = this.contact();
     if (!c) return;
-    const ok = window.confirm(
-      `Delete contact "${c.full_name}"? This cannot be undone.`,
-    );
-    if (!ok) return;
+    this.deleteSubmitting.set(true);
+    this.deleteError.set(null);
     this.api
       .delete(c.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.router.navigate(['/user/contacts']),
+        next: () => {
+          this.deleteSubmitting.set(false);
+          this.closeDelete();
+          this.router.navigate(['/user/contacts']);
+        },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(extractApiError(err) ?? 'Could not delete contact.');
+          this.deleteSubmitting.set(false);
+          this.deleteError.set(
+            extractApiError(err) ?? 'Could not delete contact.',
+          );
+        },
+      });
+  }
+
+  protected openReassign(): void {
+    this.reassignError.set(null);
+    this.reassignOpen.set(true);
+  }
+
+  protected closeReassign(): void {
+    this.reassignOpen.set(false);
+    this.reassignSubmitting.set(false);
+    this.reassignError.set(null);
+  }
+
+  protected onReassign(payload: ReassignConfirm): void {
+    const c = this.contact();
+    if (!c) return;
+    this.reassignSubmitting.set(true);
+    this.reassignError.set(null);
+    this.api
+      .reassign(c.id, { userId: payload.userId, note: payload.note })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.contact.set(updated);
+          this.reassignSubmitting.set(false);
+          this.closeReassign();
+          // Activity timeline picks up the audit row on its next paint via
+          // the live signal; we don't need to force a refresh here.
+        },
+        error: (err: HttpErrorResponse) => {
+          this.reassignSubmitting.set(false);
+          this.reassignError.set(
+            extractApiError(err) ?? 'Could not reassign contact.',
+          );
         },
       });
   }

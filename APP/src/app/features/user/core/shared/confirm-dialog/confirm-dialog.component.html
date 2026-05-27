@@ -1,0 +1,32 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
+    <header class="border-b border-zinc-200 px-5 py-3">
+      <h2 class="text-sm font-semibold text-zinc-900">{{ title }}</h2>
+    </header>
+    @if (body) {
+      <div class="px-5 py-4 text-sm text-zinc-700">{{ body }}</div>
+    }
+    <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3 rounded-b-lg">
+      <button
+        type="button"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        [disabled]="submitting"
+        (click)="cancel.emit()"
+      >
+        {{ cancelLabel }}
+      </button>
+      <button
+        type="button"
+        [disabled]="submitting"
+        (click)="confirm.emit()"
+        [class]="
+          danger
+            ? 'rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-400'
+            : 'rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400'
+        "
+      >
+        {{ confirmLabel }}
+      </button>
+    </footer>
+  </div>
+</div>

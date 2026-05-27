@@ -22,13 +22,15 @@ from datetime import date, datetime
 from typing import Any, Iterable, Literal
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.contacts.models import Contact
 from src.app.core.contacts.schemas import ContactCreate, ContactUpdate
 from src.app.core.custom_fields.models import CustomFieldDefinition, FieldType
+from src.app.core.users.models import OrganizationMember, User
 
 
 _CONTACT_ENTITY = "contact"
@@ -385,3 +387,198 @@ async def list_contacts(
         await session.execute(base.offset((page - 1) * size).limit(size))
     ).scalars().all()
     return list(rows), int(total)
+
+
+# --- Reassign / bulk actions -------------------------------------------------
+
+
+async def _assert_user_in_org(
+    session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
+) -> None:
+    """422 if the target user has no active membership in this org.
+
+    Prevents a malicious / mistaken cross-tenant reassign — an attacker
+    on Org A submitting a user UUID belonging only to Org B should be
+    rejected before we mutate the row.
+    """
+    result = await session.execute(
+        select(OrganizationMember.id)
+        .join(User, User.id == OrganizationMember.user_member_id)
+        .where(
+            User.legacy_uuid == user_uuid,
+            OrganizationMember.organization_id == org_id,
+            OrganizationMember.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="target user is not a member of this organisation",
+        )
+
+
+def _reassign_payload(
+    *, from_id: uuid.UUID | None, to_id: uuid.UUID | None, note: str | None
+) -> dict[str, Any]:
+    """JSONB body for the `reassign` activity row."""
+    return {
+        "from": str(from_id) if from_id is not None else None,
+        "to": str(to_id) if to_id is not None else None,
+        "note": note,
+    }
+
+
+async def reassign_contact(
+    session: AsyncSession,
+    *,
+    contact_id: uuid.UUID,
+    org_id: uuid.UUID,
+    assigned_to_id: uuid.UUID | None,
+    note: str | None,
+    actor_user_id: uuid.UUID | None,
+    commit: bool = True,
+) -> Contact:
+    """Single-row reassign. Writes an audit `Activity(type=reassign)` on the
+    same session so the contact update + the timeline row commit atomically.
+
+    `commit=False` lets `bulk_reassign_contacts` batch many reassigns into
+    one transaction without N intermediate commits.
+    """
+    contact = await get_contact(session, contact_id)
+    if contact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
+        )
+
+    if assigned_to_id is not None:
+        await _assert_user_in_org(
+            session, org_id=org_id, user_uuid=assigned_to_id
+        )
+
+    before_id = contact.assigned_to_id
+    if before_id == assigned_to_id:
+        # No-op — don't write an audit row for an identity reassign.
+        return contact
+
+    before = _snapshot(contact)
+    contact.assigned_to_id = assigned_to_id
+
+    session.add(
+        Activity(
+            org_id=org_id,
+            entity_type="contact",
+            entity_id=contact.id,
+            type=ActivityType.reassign,
+            payload=_reassign_payload(
+                from_id=before_id, to_id=assigned_to_id, note=note
+            ),
+            user_id=actor_user_id,
+        )
+    )
+
+    if commit:
+        await session.commit()
+        await session.refresh(contact)
+
+    await audit.log(
+        "contacts.reassigned",
+        entity_type="contact",
+        entity_id=contact.id,
+        before=before,
+        after=_snapshot(contact),
+    )
+    return contact
+
+
+async def bulk_reassign_contacts(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+    assigned_to_id: uuid.UUID | None,
+    note: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> int:
+    """Reassign N contacts in a single transaction. Returns rows touched.
+
+    Each row gets its own audit `Activity(type=reassign)` so the timeline
+    on every contact shows the transfer. Rows whose owner doesn't change
+    are silently skipped (no-op activity).
+    """
+    if assigned_to_id is not None:
+        await _assert_user_in_org(
+            session, org_id=org_id, user_uuid=assigned_to_id
+        )
+
+    reassigned = 0
+    for cid in ids:
+        contact = await get_contact(session, cid)
+        if contact is None:
+            continue
+        if contact.assigned_to_id == assigned_to_id:
+            continue
+        before_id = contact.assigned_to_id
+        contact.assigned_to_id = assigned_to_id
+        session.add(
+            Activity(
+                org_id=org_id,
+                entity_type="contact",
+                entity_id=contact.id,
+                type=ActivityType.reassign,
+                payload=_reassign_payload(
+                    from_id=before_id, to_id=assigned_to_id, note=note
+                ),
+                user_id=actor_user_id,
+            )
+        )
+        reassigned += 1
+
+    await session.commit()
+    return reassigned
+
+
+async def bulk_delete_contacts(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> int:
+    """Hard-delete N contacts. Matches single `DELETE /contacts/{id}` semantics.
+
+    `org_id` is enforced in the WHERE clause as a belt to the tenant RLS
+    policy — the auto ORM tenant filter only injects on SELECTs.
+    """
+    result = await session.execute(
+        delete(Contact).where(Contact.id.in_(ids), Contact.org_id == org_id)
+    )
+    await session.commit()
+    return int(result.rowcount or 0)
+
+
+async def bulk_add_tag_contacts(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    tag: str,
+    org_id: uuid.UUID,
+) -> int:
+    """Append `tag` to the `tags` array on every selected contact.
+
+    Uses Postgres `array_append` so the same tag isn't duplicated.
+    Trims whitespace; rejects empty after trim (the request schema
+    already enforces non-empty + length cap).
+    """
+    clean = tag.strip()
+    if not clean:
+        return 0
+    # `tags = CASE WHEN clean = ANY(tags) THEN tags ELSE array_append(tags, clean) END`
+    # via SQLAlchemy text expression — keeps the per-row decision in PG.
+    result = await session.execute(
+        update(Contact)
+        .where(Contact.id.in_(ids), Contact.org_id == org_id)
+        .where(~Contact.tags.contains([clean]))
+        .values(tags=func.array_append(Contact.tags, clean))
+    )
+    await session.commit()
+    return int(result.rowcount or 0)

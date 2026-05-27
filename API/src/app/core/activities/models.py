@@ -40,6 +40,7 @@ class ActivityType(str, enum.Enum):
     whatsapp = "whatsapp"
     status_change = "status_change"
     task = "task"
+    reassign = "reassign"
 
 
 activity_type_enum = ENUM(

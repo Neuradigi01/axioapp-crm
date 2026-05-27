@@ -24,7 +24,10 @@ import {
 } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
 import { FurnitureAuthService } from '../auth/auth.service';
+import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
+import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
@@ -38,6 +41,9 @@ import { initials } from '@core/services/text.util';
     LucideAngularModule,
     ContactFormModalComponent,
     RelativeTimePipe,
+    BulkActionBarComponent,
+    ReassignModalComponent,
+    ConfirmDialogComponent,
   ],
   templateUrl: './contacts-list.page.html',
 })
@@ -114,6 +120,34 @@ export class ContactsListPageComponent {
     if (total === 0) return 1;
     return Math.ceil(total / this.size);
   });
+
+  // --- Multi-select + bulk actions -------------------------------------------
+
+  /** Row-id set for multi-select. Powers the BulkActionBar + bulk endpoints. */
+  readonly selectedIds = signal<Set<string>>(new Set());
+
+  readonly selectedCount = computed(() => this.selectedIds().size);
+
+  /** Header checkbox state — true only when every visible row is selected. */
+  readonly allOnPageSelected = computed(() => {
+    const ids = this.items();
+    if (ids.length === 0) return false;
+    const sel = this.selectedIds();
+    return ids.every((i) => sel.has(i.id));
+  });
+
+  /** Bulk-action menu. Each action is hide-don't-disable gated by permission. */
+  readonly bulkActions = computed<BulkAction[]>(() => [
+    { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'contacts.reassign' },
+    { key: 'tag', label: 'Add tag', icon: 'tag', permissionKey: 'contacts.write' },
+    { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'contacts.write' },
+  ]);
+
+  /** Which bulk modal is open (one at a time). */
+  readonly bulkModal = signal<'reassign' | 'tag' | 'delete' | null>(null);
+  readonly bulkSubmitting = signal(false);
+  readonly bulkError = signal<string | null>(null);
+  readonly tagInputControl = new FormControl<string>('', { nonNullable: true });
 
   /** Modal state: null = closed, undefined = create, Contact = edit. */
   readonly modalState = signal<Contact | null | undefined>(null);
@@ -282,6 +316,129 @@ export class ContactsListPageComponent {
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.formError.set(extractApiError(err) ?? 'Could not save contact.');
+        },
+      });
+  }
+
+  // --- Bulk-selection handlers ---------------------------------------------
+
+  protected toggleRow(id: string, event: Event): void {
+    // Stop the row's `(click)` from navigating to detail.
+    event.stopPropagation();
+    this.selectedIds.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  protected toggleAllOnPage(): void {
+    const ids = this.items().map((i) => i.id);
+    const sel = this.selectedIds();
+    const allSelected = ids.length > 0 && ids.every((id) => sel.has(id));
+    if (allSelected) {
+      // Drop just the visible rows; preserve any cross-page selections.
+      this.selectedIds.update((set) => {
+        const next = new Set(set);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+    } else {
+      this.selectedIds.update((set) => {
+        const next = new Set(set);
+        for (const id of ids) next.add(id);
+        return next;
+      });
+    }
+  }
+
+  protected clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  protected onBulkAction(key: string): void {
+    this.bulkError.set(null);
+    if (key === 'reassign') this.bulkModal.set('reassign');
+    else if (key === 'tag') {
+      this.tagInputControl.setValue('');
+      this.bulkModal.set('tag');
+    } else if (key === 'delete') this.bulkModal.set('delete');
+  }
+
+  protected closeBulkModal(): void {
+    this.bulkModal.set(null);
+    this.bulkError.set(null);
+    this.bulkSubmitting.set(false);
+  }
+
+  protected onBulkReassign(payload: ReassignConfirm): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkReassign(ids, { userId: payload.userId, note: payload.note })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(extractApiError(err) ?? 'Could not reassign.');
+        },
+      });
+  }
+
+  protected onBulkDelete(): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkDelete(ids)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(extractApiError(err) ?? 'Could not delete.');
+        },
+      });
+  }
+
+  protected onBulkAddTag(): void {
+    const tag = this.tagInputControl.value.trim();
+    if (!tag) {
+      this.bulkError.set('Enter a tag.');
+      return;
+    }
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkAddTag(ids, tag)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(extractApiError(err) ?? 'Could not add tag.');
         },
       });
   }

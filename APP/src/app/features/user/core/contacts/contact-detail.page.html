@@ -56,6 +56,16 @@
                     <span class="text-zinc-400">Unassigned</span>
                   }
                 </dd>
+                @if (canReassign()) {
+                  <button
+                    type="button"
+                    (click)="openReassign()"
+                    class="ml-1 inline-flex items-center rounded p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                    aria-label="Reassign owner"
+                  >
+                    <lucide-icon name="pencil" class="h-3 w-3" />
+                  </button>
+                }
               </div>
               <div class="flex items-center gap-1">
                 <dt class="font-medium text-zinc-500">Last activity</dt>
@@ -233,5 +243,29 @@
     [submitError]="formError()"
     (save)="onSave($event)"
     (cancel)="closeModal()"
+  />
+}
+
+@if (reassignOpen() && contact(); as c) {
+  <app-reassign-modal
+    [entityLabel]="'contact'"
+    [count]="1"
+    [currentOwnerId]="c.assigned_to_id"
+    [submitting]="reassignSubmitting()"
+    [error]="reassignError()"
+    (confirm)="onReassign($event)"
+    (cancel)="closeReassign()"
+  />
+}
+
+@if (deleteOpen() && contact(); as c) {
+  <app-confirm-dialog
+    [title]="'Delete contact “' + c.full_name + '”?'"
+    [body]="'This cannot be undone. Activities, tasks, and appointments linked to this contact remain in their respective timelines.'"
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    [submitting]="deleteSubmitting()"
+    (confirm)="confirmDelete()"
+    (cancel)="closeDelete()"
   />
 }

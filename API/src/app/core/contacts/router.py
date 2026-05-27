@@ -24,17 +24,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.contacts.schemas import (
+    ContactBulkAddTag,
+    ContactBulkAddTagResult,
+    ContactBulkDelete,
+    ContactBulkDeleteResult,
+    ContactBulkReassign,
+    ContactBulkReassignResult,
     ContactCreate,
     ContactListItem,
     ContactListResponse,
     ContactOut,
+    ContactReassign,
     ContactUpdate,
 )
 from src.app.core.contacts.service import (
+    bulk_add_tag_contacts,
+    bulk_delete_contacts,
+    bulk_reassign_contacts,
     create_contact,
     delete_contact,
     get_contact,
     list_contacts,
+    reassign_contact,
     update_contact,
 )
 from src.app.core.users.models import User
@@ -134,3 +145,63 @@ async def delete_contact_endpoint(
 ) -> Response:
     await delete_contact(db, contact_id=contact_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Reassign + bulk-action endpoints ---------------------------------------
+
+
+@router.post("/{contact_id}/reassign", response_model=ContactOut)
+async def reassign_contact_endpoint(
+    contact_id: uuid.UUID,
+    payload: ContactReassign,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.reassign")),
+) -> ContactOut:
+    contact = await reassign_contact(
+        db,
+        contact_id=contact_id,
+        org_id=user.org_id,
+        assigned_to_id=payload.assigned_to_id,
+        note=payload.note,
+        actor_user_id=user.legacy_uuid,
+    )
+    return ContactOut.model_validate(contact)
+
+
+@router.post("/bulk-reassign", response_model=ContactBulkReassignResult)
+async def bulk_reassign_endpoint(
+    payload: ContactBulkReassign,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.reassign")),
+) -> ContactBulkReassignResult:
+    n = await bulk_reassign_contacts(
+        db,
+        ids=payload.ids,
+        org_id=user.org_id,
+        assigned_to_id=payload.assigned_to_id,
+        note=payload.note,
+        actor_user_id=user.legacy_uuid,
+    )
+    return ContactBulkReassignResult(reassigned=n)
+
+
+@router.post("/bulk-delete", response_model=ContactBulkDeleteResult)
+async def bulk_delete_endpoint(
+    payload: ContactBulkDelete,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.write")),
+) -> ContactBulkDeleteResult:
+    n = await bulk_delete_contacts(db, ids=payload.ids, org_id=user.org_id)
+    return ContactBulkDeleteResult(deleted=n)
+
+
+@router.post("/bulk-add-tag", response_model=ContactBulkAddTagResult)
+async def bulk_add_tag_endpoint(
+    payload: ContactBulkAddTag,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.write")),
+) -> ContactBulkAddTagResult:
+    n = await bulk_add_tag_contacts(
+        db, ids=payload.ids, tag=payload.tag, org_id=user.org_id
+    )
+    return ContactBulkAddTagResult(updated=n)

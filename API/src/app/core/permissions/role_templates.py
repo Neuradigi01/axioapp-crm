@@ -52,7 +52,7 @@ _CORE_ADMIN_KEYS: list[str] = [
     "settings.standard_fields.manage",
     "settings.integrations.manage",
     "settings.integrations.embed.manage",
-    "contacts.read", "contacts.write",
+    "contacts.read", "contacts.write", "contacts.reassign",
     "leads.read", "leads.write", "leads.import",
     "appointments.read", "appointments.write",
     "walkins.read", "walkins.write",
@@ -98,7 +98,7 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
 # the team; a Support Agent talks to customers but doesn't touch the
 # pipeline shape or billing.
 _CORE_SALES_MANAGER_KEYS: list[str] = [
-    "contacts.read", "contacts.write",
+    "contacts.read", "contacts.write", "contacts.reassign",
     "leads.read", "leads.write",
     "appointments.read", "appointments.write",
     "walkins.read", "walkins.write",

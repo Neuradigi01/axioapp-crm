@@ -100,3 +100,47 @@ class ContactListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+# --- Reassign / bulk-action request and response shapes ---------------------
+
+
+class ContactReassign(BaseModel):
+    """Single-row reassign request. `null` clears the owner."""
+
+    assigned_to_id: uuid.UUID | None = None
+    # Free-form note saved on the audit activity payload. Optional.
+    note: str | None = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class ContactBulkReassign(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+    assigned_to_id: uuid.UUID | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class ContactBulkDelete(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
+class ContactBulkAddTag(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+    tag: str = Field(min_length=1, max_length=_TAG_MAX)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class ContactBulkReassignResult(BaseModel):
+    reassigned: int
+
+
+class ContactBulkDeleteResult(BaseModel):
+    deleted: int
+
+
+class ContactBulkAddTagResult(BaseModel):
+    updated: int

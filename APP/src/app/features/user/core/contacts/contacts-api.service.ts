@@ -119,6 +119,41 @@ export class ContactsApiService {
     return this.http.delete<void>(`${this.base}/${id}`);
   }
 
+  /** Single-row reassign. `userId === null` clears the owner. */
+  reassign(
+    id: string,
+    body: { userId: string | null; note?: string | null },
+  ): Observable<Contact> {
+    return this.http.post<Contact>(`${this.base}/${id}/reassign`, {
+      assigned_to_id: body.userId,
+      note: body.note ?? null,
+    });
+  }
+
+  bulkReassign(
+    ids: string[],
+    body: { userId: string | null; note?: string | null },
+  ): Observable<{ reassigned: number }> {
+    return this.http.post<{ reassigned: number }>(`${this.base}/bulk-reassign`, {
+      ids,
+      assigned_to_id: body.userId,
+      note: body.note ?? null,
+    });
+  }
+
+  bulkDelete(ids: string[]): Observable<{ deleted: number }> {
+    return this.http.post<{ deleted: number }>(`${this.base}/bulk-delete`, {
+      ids,
+    });
+  }
+
+  bulkAddTag(ids: string[], tag: string): Observable<{ updated: number }> {
+    return this.http.post<{ updated: number }>(`${this.base}/bulk-add-tag`, {
+      ids,
+      tag,
+    });
+  }
+
   /** Render-shape custom field defs for the contact dynamic form. */
   renderFields(): Observable<FieldDef[]> {
     return this.http.get<FieldDef[]>(this.renderUrl);
