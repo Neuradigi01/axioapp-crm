@@ -11,6 +11,35 @@
     </header>
 
     <form [formGroup]="standard" (ngSubmit)="onSubmit()" class="max-h-[70vh] overflow-y-auto px-6 py-5">
+      @if (duplicates().length > 0) {
+        <div class="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200">
+          <div class="flex items-start gap-2">
+            <lucide-icon name="alert-triangle" class="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+            <div class="flex-1">
+              <p class="font-medium">Possible duplicate — already in your contacts.</p>
+              <ul class="mt-1 space-y-0.5">
+                @for (d of duplicates(); track d.id) {
+                  <li>
+                    <a
+                      [routerLink]="['/user/contacts', d.id]"
+                      target="_blank"
+                      rel="noopener"
+                      class="font-medium underline hover:text-amber-700"
+                    >
+                      {{ d.full_name }}
+                    </a>
+                    @if (d.phone) { <span class="text-amber-800">· {{ d.phone }}</span> }
+                    @if (d.email) { <span class="text-amber-800">· {{ d.email }}</span> }
+                  </li>
+                }
+              </ul>
+              <p class="mt-1 text-amber-700">
+                Save anyway if this is intentional (e.g. shared household phone).
+              </p>
+            </div>
+          </div>
+        </div>
+      }
       <section>
         <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
           Standard

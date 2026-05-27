@@ -19,6 +19,9 @@ import { Activity } from '../activities/activities-api.service';
 import { TasksPanelComponent } from '../tasks/tasks-panel.component';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
+import { MailLinkDirective } from '../shared/directives/mail-link.directive';
+import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
+import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
 import { FieldDef } from '../shared/dynamic-form/types';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
@@ -56,6 +59,9 @@ const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: strin
     RelativeTimePipe,
     ReassignModalComponent,
     ConfirmDialogComponent,
+    PhoneLinkDirective,
+    WhatsappLinkDirective,
+    MailLinkDirective,
   ],
   templateUrl: './contact-detail.page.html',
 })

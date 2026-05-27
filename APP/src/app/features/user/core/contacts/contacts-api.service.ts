@@ -61,6 +61,16 @@ export type ContactUpdate = Partial<ContactCreate>;
 export type ContactSortKey = 'full_name' | 'created_at' | 'last_activity_at';
 export type SortOrder = 'asc' | 'desc';
 
+/** Wire shape for `GET /contacts/check-duplicate`. Slim — used by the
+ * create / edit modal to render a "view existing" banner without a
+ * second round-trip. */
+export interface ContactDuplicateMatch {
+  id: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+}
+
 export interface ContactListQuery {
   q?: string;
   source?: string;
@@ -151,6 +161,48 @@ export class ContactsApiService {
     return this.http.post<{ updated: number }>(`${this.base}/bulk-add-tag`, {
       ids,
       tag,
+    });
+  }
+
+  /** Live duplicate check called from the create / edit modal as the
+   * user types. Backend matches phone on last-10-digit suffix and
+   * email case-insensitively. */
+  checkDuplicate(query: {
+    phone?: string | null;
+    email?: string | null;
+    excludeId?: string | null;
+  }): Observable<{ matches: ContactDuplicateMatch[] }> {
+    let params = new HttpParams();
+    if (query.phone) params = params.set('phone', query.phone);
+    if (query.email) params = params.set('email', query.email);
+    if (query.excludeId) params = params.set('exclude_id', query.excludeId);
+    return this.http.get<{ matches: ContactDuplicateMatch[] }>(
+      `${this.base}/check-duplicate`,
+      { params },
+    );
+  }
+
+  /** Streamed CSV download of the current filter. Backend caps at 50k
+   * rows (returns 422). The caller is responsible for triggering the
+   * browser download via the returned Blob. */
+  exportCsv(query: ContactListQuery = {}): Observable<Blob> {
+    let params = new HttpParams();
+    if (query.q) params = params.set('q', query.q);
+    if (query.source) params = params.set('source', query.source);
+    if (query.tag) params = params.set('tag', query.tag);
+    if (query.assigned_to_id) {
+      params = params.set('assigned_to_id', query.assigned_to_id);
+    }
+    if (query.customFilters) {
+      for (const [key, value] of Object.entries(query.customFilters)) {
+        if (value !== undefined && value !== '') {
+          params = params.set(`custom.${key}`, value);
+        }
+      }
+    }
+    return this.http.get(`${this.base}/export.csv`, {
+      params,
+      responseType: 'blob',
     });
   }
 

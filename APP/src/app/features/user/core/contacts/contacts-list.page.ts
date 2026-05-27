@@ -26,6 +26,13 @@ import { ContactFormModalComponent } from './contact-form-modal.component';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
+import { MailLinkDirective } from '../shared/directives/mail-link.directive';
+import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
+import {
+  UrlFilterStateConfig,
+  UrlFilterStateDirective,
+} from '../shared/directives/url-filter-state.directive';
+import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
@@ -44,6 +51,10 @@ import { initials } from '@core/services/text.util';
     BulkActionBarComponent,
     ReassignModalComponent,
     ConfirmDialogComponent,
+    PhoneLinkDirective,
+    WhatsappLinkDirective,
+    MailLinkDirective,
+    UrlFilterStateDirective,
   ],
   templateUrl: './contacts-list.page.html',
 })
@@ -61,7 +72,15 @@ export class ContactsListPageComponent {
   readonly loadError = signal<string | null>(null);
 
   readonly page = signal<number>(1);
-  readonly size = 25;
+  /** Page-size dropdown choices. 25 is the default; bigger pages are
+   * useful when a manager is doing a sweeping review of unassigned
+   * rows but expensive on slow networks. */
+  readonly pageSize = signal<number>(25);
+  /** Backwards-compat alias for the prior constant `size` — many
+   * template + handler call-sites still read it as `size()`. */
+  protected get size(): number {
+    return this.pageSize();
+  }
 
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly sourceControl = new FormControl('', { nonNullable: true });
@@ -148,6 +167,71 @@ export class ContactsListPageComponent {
   readonly bulkSubmitting = signal(false);
   readonly bulkError = signal<string | null>(null);
   readonly tagInputControl = new FormControl<string>('', { nonNullable: true });
+
+  /** CSV export progress (single in-flight at a time). */
+  readonly exporting = signal(false);
+
+  /** URL ↔ filter state map. Wires every filter signal / FormControl to a
+   * query-param key so refresh / share / browser-back preserve the view.
+   * `replaceUrl: true` keeps history clean while typing in the search box. */
+  readonly urlState: UrlFilterStateConfig = {
+    q: {
+      read: () => this.searchControl.value,
+      write: (v) => this.searchControl.setValue(v),
+      queryKey: 'q',
+    },
+    source: {
+      read: () => this.sourceControl.value,
+      write: (v) => this.sourceControl.setValue(v),
+      queryKey: 'source',
+    },
+    tag: {
+      read: () => this.tagControl.value,
+      write: (v) => this.tagControl.setValue(v),
+      queryKey: 'tag',
+    },
+    assignee: {
+      read: () => this.assigneeControl.value,
+      write: (v) => this.assigneeControl.setValue(v),
+      queryKey: 'assignee',
+    },
+    sort: {
+      read: () => this.sortKey(),
+      write: (v) => {
+        if (v === 'full_name' || v === 'created_at' || v === 'last_activity_at') {
+          this.sortKey.set(v);
+        }
+      },
+      queryKey: 'sort',
+      defaultValue: 'created_at',
+    },
+    order: {
+      read: () => this.sortOrder(),
+      write: (v) => {
+        if (v === 'asc' || v === 'desc') this.sortOrder.set(v);
+      },
+      queryKey: 'order',
+      defaultValue: 'desc',
+    },
+    page: {
+      read: () => String(this.page()),
+      write: (v) => {
+        const n = Number.parseInt(v, 10);
+        if (Number.isFinite(n) && n >= 1) this.page.set(n);
+      },
+      queryKey: 'page',
+      defaultValue: '1',
+    },
+    size: {
+      read: () => String(this.pageSize()),
+      write: (v) => {
+        const n = Number.parseInt(v, 10);
+        if (n === 25 || n === 50 || n === 100) this.pageSize.set(n);
+      },
+      queryKey: 'size',
+      defaultValue: '25',
+    },
+  };
 
   /** Modal state: null = closed, undefined = create, Contact = edit. */
   readonly modalState = signal<Contact | null | undefined>(null);
@@ -279,6 +363,56 @@ export class ContactsListPageComponent {
     if (target < 1 || target > this.totalPages() || target === this.page()) return;
     this.page.set(target);
     this.reload();
+  }
+
+  protected setPageSize(target: number): void {
+    if (target !== 25 && target !== 50 && target !== 100) return;
+    if (target === this.pageSize()) return;
+    this.pageSize.set(target);
+    this.page.set(1);
+    this.reload();
+  }
+
+  protected onExportCsv(): void {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    this.api
+      .exportCsv({
+        q: this.q() || undefined,
+        source: this.sourceFilter() || undefined,
+        tag: this.tagFilter() || undefined,
+        assigned_to_id: this.resolveAssignee(),
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.triggerDownload(blob);
+          this.exporting.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.exporting.set(false);
+          this.loadError.set(
+            extractApiError(err) ??
+              'Could not export. Narrow the filter and try again.',
+          );
+        },
+      });
+  }
+
+  /** Browser-side blob → download. Synthesises a hidden anchor so the
+   * file lands on disk without leaving the SPA. Filename comes from
+   * the response Content-Disposition (set by the backend); browsers
+   * generally honour it on same-origin downloads. */
+  private triggerDownload(blob: Blob): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    // Filename fallback when Content-Disposition isn't honoured.
+    a.download = 'contacts.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
 

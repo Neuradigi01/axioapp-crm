@@ -33,13 +33,44 @@
           <div>
             <h1 class="text-lg font-semibold text-zinc-900">{{ c.full_name }}</h1>
             <dl class="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-600">
-              <div class="flex items-center gap-1">
+              <div class="flex items-center gap-1.5">
                 <dt class="font-medium text-zinc-500">Phone</dt>
-                <dd>{{ c.phone ?? '—' }}</dd>
+                <dd>
+                  @if (c.phone) {
+                    <a
+                      [appPhoneLink]="c.phone"
+                      class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                    >
+                      {{ c.phone }}
+                    </a>
+                  } @else {
+                    —
+                  }
+                </dd>
+                @if (c.phone) {
+                  <a
+                    [appWhatsappLink]="c.phone"
+                    class="inline-flex items-center text-emerald-600 hover:text-emerald-800"
+                    title="Open in WhatsApp"
+                  >
+                    <lucide-icon name="message-circle" class="h-3.5 w-3.5" />
+                  </a>
+                }
               </div>
               <div class="flex items-center gap-1">
                 <dt class="font-medium text-zinc-500">Email</dt>
-                <dd>{{ c.email ?? '—' }}</dd>
+                <dd>
+                  @if (c.email) {
+                    <a
+                      [appMailLink]="c.email"
+                      class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                    >
+                      {{ c.email }}
+                    </a>
+                  } @else {
+                    —
+                  }
+                </dd>
               </div>
               @if (c.source) {
                 <div class="flex items-center gap-1">

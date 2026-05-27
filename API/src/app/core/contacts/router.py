@@ -16,10 +16,15 @@ support arbitrary prefixed names.
 """
 from __future__ import annotations
 
+import csv
+import io
 import uuid
-from typing import Literal
+from datetime import datetime, timezone
+from typing import AsyncIterator, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
@@ -31,6 +36,8 @@ from src.app.core.contacts.schemas import (
     ContactBulkReassign,
     ContactBulkReassignResult,
     ContactCreate,
+    ContactDuplicateCheckResponse,
+    ContactDuplicateMatch,
     ContactListItem,
     ContactListResponse,
     ContactOut,
@@ -41,13 +48,16 @@ from src.app.core.contacts.service import (
     bulk_add_tag_contacts,
     bulk_delete_contacts,
     bulk_reassign_contacts,
+    check_duplicate,
     create_contact,
     delete_contact,
+    export_contacts_csv_rows,
     get_contact,
     list_contacts,
     reassign_contact,
     update_contact,
 )
+from src.app.core.tenants.models import Organization
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -205,3 +215,110 @@ async def bulk_add_tag_endpoint(
         db, ids=payload.ids, tag=payload.tag, org_id=user.org_id
     )
     return ContactBulkAddTagResult(updated=n)
+
+
+# --- Duplicate check + CSV export -------------------------------------------
+
+
+@router.get("/check-duplicate", response_model=ContactDuplicateCheckResponse)
+async def check_duplicate_endpoint(
+    phone: str | None = Query(default=None, max_length=32),
+    email: str | None = Query(default=None, max_length=255),
+    exclude_id: uuid.UUID | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.read")),
+) -> ContactDuplicateCheckResponse:
+    matches = await check_duplicate(
+        db,
+        org_id=user.org_id,
+        phone=phone,
+        email=email,
+        exclude_id=exclude_id,
+    )
+    return ContactDuplicateCheckResponse(
+        matches=[ContactDuplicateMatch.model_validate(m) for m in matches]
+    )
+
+
+@router.get("/export.csv")
+async def export_csv_endpoint(
+    request: Request,
+    q: str | None = Query(default=None, max_length=255),
+    source: str | None = Query(default=None, max_length=64),
+    tag: str | None = Query(default=None, max_length=64),
+    assigned_to_id: uuid.UUID | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.read")),
+) -> StreamingResponse:
+    """Stream the current filter as CSV. Capped at 50k rows server-side.
+
+    Columns: id, full_name, phone, email, source, tags, assigned_to_id,
+    last_activity_at, created_at, updated_at. Custom fields excluded
+    in v1 — adding them requires resolving the org's
+    `custom_field_definitions` and is a larger change.
+    """
+    rows = await export_contacts_csv_rows(
+        db,
+        q=q,
+        source=source,
+        tag=tag,
+        assigned_to_id=assigned_to_id,
+        custom_filters=_extract_custom_filters(request),
+    )
+
+    # Resolve org slug for the filename. Two reasons: (1) the user is
+    # often signed into multiple orgs and the file is more useful when
+    # named per-org; (2) keeps separate per-tenant exports from
+    # colliding on disk.
+    org = (
+        await db.execute(select(Organization).where(Organization.id == user.org_id))
+    ).scalar_one()
+
+    today = datetime.now(timezone.utc).date().isoformat()
+    filename = f"contacts-{org.slug}-{today}.csv"
+
+    async def _stream() -> AsyncIterator[bytes]:
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(
+            [
+                "id",
+                "full_name",
+                "phone",
+                "email",
+                "source",
+                "tags",
+                "assigned_to_id",
+                "last_activity_at",
+                "created_at",
+                "updated_at",
+            ]
+        )
+        yield buf.getvalue().encode("utf-8")
+        buf.seek(0)
+        buf.truncate()
+
+        for c in rows:
+            writer.writerow(
+                [
+                    str(c.id),
+                    c.full_name,
+                    c.phone or "",
+                    c.email or "",
+                    c.source or "",
+                    "|".join(c.tags or []),
+                    str(c.assigned_to_id) if c.assigned_to_id else "",
+                    c.last_activity_at.isoformat() if c.last_activity_at else "",
+                    c.created_at.isoformat(),
+                    c.updated_at.isoformat(),
+                ]
+            )
+            yield buf.getvalue().encode("utf-8")
+            buf.seek(0)
+            buf.truncate()
+
+    return StreamingResponse(
+        _stream(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

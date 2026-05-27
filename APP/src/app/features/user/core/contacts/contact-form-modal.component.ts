@@ -14,6 +14,9 @@
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { LucideAngularModule } from 'lucide-angular';
+import { RouterLink } from '@angular/router';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { FurnitureAuthService } from '../auth/auth.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
@@ -27,6 +30,7 @@ import { nullableTrim } from '@core/services/form.util';
 import {
   Contact,
   ContactCreate,
+  ContactDuplicateMatch,
   ContactUpdate,
   ContactsApiService,
 } from './contacts-api.service';
@@ -45,7 +49,7 @@ import {
   selector: 'app-contact-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, DynamicFormComponent],
+  imports: [ReactiveFormsModule, DynamicFormComponent, LucideAngularModule, RouterLink],
   templateUrl: './contact-form-modal.component.html',
 })
 export class ContactFormModalComponent implements OnInit {
@@ -59,6 +63,11 @@ export class ContactFormModalComponent implements OnInit {
 
   /** User list for the Owner dropdown. */
   protected readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
+
+  /** Live duplicate-match banner. Populated by debounced phone/email
+   * watchers; the user can still save through it (legitimate cases:
+   * shared household phone). */
+  protected readonly duplicates = signal<ContactDuplicateMatch[]>([]);
 
   // Standard fields registered for the `contact` entity. The registry
   // key `tags` maps to the FormControl `tags_csv` (we store the CSV
@@ -220,6 +229,46 @@ export class ContactFormModalComponent implements OnInit {
         });
       }
     }
+
+    // Live duplicate check on phone / email. Debounced so a typing user
+    // doesn't fire one HTTP call per keystroke; distinctUntilChanged
+    // skips re-asking when the value matches the last submitted query.
+    this.standard.controls.phone.valueChanges
+      .pipe(
+        debounceTime(400),
+        distinctUntilChanged(),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => this.runDuplicateCheck());
+    this.standard.controls.email.valueChanges
+      .pipe(
+        debounceTime(400),
+        distinctUntilChanged(),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => this.runDuplicateCheck());
+  }
+
+  private runDuplicateCheck(): void {
+    const phone = (this.standard.controls.phone.value ?? '').trim();
+    const email = (this.standard.controls.email.value ?? '').trim();
+    if (!phone && !email) {
+      this.duplicates.set([]);
+      return;
+    }
+    const excludeId = this._contact()?.id ?? null;
+    this.api
+      .checkDuplicate({
+        phone: phone || null,
+        email: email || null,
+        excludeId,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resp) => this.duplicates.set(resp.matches),
+        // Failure here is non-fatal — duplicate-warning is best-effort.
+        error: () => this.duplicates.set([]),
+      });
   }
 
   protected onCustomValueChange(v: FormValue): void {

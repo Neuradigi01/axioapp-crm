@@ -144,3 +144,25 @@ class ContactBulkDeleteResult(BaseModel):
 
 class ContactBulkAddTagResult(BaseModel):
     updated: int
+
+
+# --- Duplicate-check response shape -----------------------------------------
+
+
+class ContactDuplicateMatch(BaseModel):
+    """One existing row that matched the create-modal's dup check.
+
+    Slim shape (`id` + name + phone + email) so the FE can render a
+    yellow banner with a "view" link without an extra round-trip.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    full_name: str
+    phone: str | None
+    email: str | None
+
+
+class ContactDuplicateCheckResponse(BaseModel):
+    matches: list[ContactDuplicateMatch]

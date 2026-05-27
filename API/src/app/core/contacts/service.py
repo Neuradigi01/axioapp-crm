@@ -582,3 +582,143 @@ async def bulk_add_tag_contacts(
     )
     await session.commit()
     return int(result.rowcount or 0)
+
+
+# --- Duplicate check + CSV export -------------------------------------------
+
+
+# Hard cap on CSV export rows. Past this the caller has to narrow their
+# filter — protects the streamed response from blowing memory and
+# protects the user from a giant download they didn't intend.
+EXPORT_CSV_MAX_ROWS = 50_000
+
+
+def _normalise_phone_suffix(raw: str) -> str | None:
+    """Strip non-digit and return the last 10 digits.
+
+    Matches "9000000001", "+91 9000000001", "+91-9000000001", and
+    "919000000001" against the same key. None when input is too
+    short to be meaningful (< 6 digits — guards against `q=1` style
+    accidental queries from blanking the dedup screen).
+    """
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if len(digits) < 6:
+        return None
+    return digits[-10:] if len(digits) >= 10 else digits
+
+
+async def check_duplicate(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    phone: str | None = None,
+    email: str | None = None,
+    exclude_id: uuid.UUID | None = None,
+) -> list[Contact]:
+    """Return contacts that match the given phone (last-10-digit suffix)
+    or email (case-insensitive exact) within the caller's tenant.
+
+    Both parameters are optional. With neither, returns an empty list
+    (no point hitting the DB). `exclude_id` lets the edit modal skip
+    matching against the row being edited.
+    """
+    has_phone = bool(phone and phone.strip())
+    has_email = bool(email and email.strip())
+    if not has_phone and not has_email:
+        return []
+
+    or_filters: list[Any] = []
+    if has_phone:
+        suffix = _normalise_phone_suffix(phone or "")
+        if suffix is not None:
+            # `regexp_replace(phone, '\D', '', 'g')` strips non-digits at
+            # query time — keeps existing rows usable even if they were
+            # saved with formatting. `LIKE '%' || suffix` matches the
+            # last-10 suffix only. Trigram GIN doesn't help here, but
+            # the result set is small enough that a per-tenant index scan
+            # is acceptable; the phone column itself is already indexed
+            # per tenant by `ix_contacts_org_phone`.
+            or_filters.append(
+                func.regexp_replace(Contact.phone, r"\D", "", "g").like(
+                    f"%{suffix}"
+                )
+            )
+    if has_email:
+        # Case-insensitive exact match. Email column is indexed per
+        # tenant by `ix_contacts_org_email` — index won't help with
+        # `lower()` unless we add a functional index, but volume is
+        # small enough at v1 scale.
+        or_filters.append(func.lower(Contact.email) == (email or "").strip().lower())
+
+    if not or_filters:
+        return []
+
+    stmt = (
+        select(Contact)
+        .where(Contact.org_id == org_id)
+        .where(or_(*or_filters))
+        .order_by(Contact.created_at.desc())
+        .limit(10)
+    )
+    if exclude_id is not None:
+        stmt = stmt.where(Contact.id != exclude_id)
+
+    rows = (await session.execute(stmt)).scalars().all()
+    return list(rows)
+
+
+async def export_contacts_csv_rows(
+    session: AsyncSession,
+    *,
+    q: str | None = None,
+    source: str | None = None,
+    tag: str | None = None,
+    assigned_to_id: uuid.UUID | None = None,
+    custom_filters: Iterable[tuple[str, str]] = (),
+) -> list[Contact]:
+    """Resolve the export filter to a list of contacts (≤ EXPORT_CSV_MAX_ROWS).
+
+    Mirrors `list_contacts`'s filter logic — keeps the export and the
+    list view in sync without re-implementing the WHERE clauses. Raises
+    422 when the result set exceeds the cap so the caller can prompt
+    the user to narrow.
+    """
+    filters: list[Any] = []
+    if q:
+        like = f"%{q}%"
+        filters.append(
+            or_(
+                Contact.full_name.ilike(like),
+                Contact.phone.ilike(like),
+                Contact.email.ilike(like),
+            )
+        )
+    if source:
+        filters.append(Contact.source == source)
+    if tag:
+        filters.append(Contact.tags.contains([tag]))
+    if assigned_to_id is not None:
+        filters.append(Contact.assigned_to_id == assigned_to_id)
+    for key, value in custom_filters:
+        filters.append(Contact.custom_data[key].astext == value)
+
+    where = and_(*filters) if filters else None
+
+    count_stmt = select(func.count()).select_from(Contact)
+    if where is not None:
+        count_stmt = count_stmt.where(where)
+    total = int((await session.execute(count_stmt)).scalar_one())
+    if total > EXPORT_CSV_MAX_ROWS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"export would return {total} rows (cap {EXPORT_CSV_MAX_ROWS}); "
+                "narrow the filter and try again"
+            ),
+        )
+
+    stmt = select(Contact).order_by(Contact.created_at.desc(), Contact.id.desc())
+    if where is not None:
+        stmt = stmt.where(where)
+    rows = (await session.execute(stmt)).scalars().all()
+    return list(rows)

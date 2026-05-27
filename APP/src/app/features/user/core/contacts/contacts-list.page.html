@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-7xl p-6">
+<div class="mx-auto max-w-7xl p-6" [appUrlFilterState]="urlState">
   <header class="flex items-center justify-between">
     <div>
       <h1 class="text-lg font-semibold text-zinc-900">Contacts</h1>
@@ -6,14 +6,30 @@
         Showroom walk-ins, leads, returning customers. {{ total() }} total.
       </p>
     </div>
-    <button
-      type="button"
-      (click)="openCreate()"
-      class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-    >
-      <lucide-icon name="plus" class="h-4 w-4" />
-      New Contact
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        (click)="onExportCsv()"
+        [disabled]="exporting()"
+        class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        @if (exporting()) {
+          <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
+          Exporting…
+        } @else {
+          <lucide-icon name="download" class="h-4 w-4" />
+          Export CSV
+        }
+      </button>
+      <button
+        type="button"
+        (click)="openCreate()"
+        class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+      >
+        <lucide-icon name="plus" class="h-4 w-4" />
+        New Contact
+      </button>
+    </div>
   </header>
 
   <!-- Filters -->
@@ -177,11 +193,37 @@
                   {{ item.full_name }}
                 </div>
               </td>
-              <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600">
-                {{ item.phone ?? '—' }}
+              <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600" (click)="$event.stopPropagation()">
+                @if (item.phone) {
+                  <div class="inline-flex items-center gap-2">
+                    <a
+                      [appPhoneLink]="item.phone"
+                      class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                    >
+                      {{ item.phone }}
+                    </a>
+                    <a
+                      [appWhatsappLink]="item.phone"
+                      class="text-emerald-600 hover:text-emerald-800"
+                    >
+                      <lucide-icon name="message-circle" class="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                } @else {
+                  —
+                }
               </td>
-              <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600">
-                {{ item.email ?? '—' }}
+              <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600" (click)="$event.stopPropagation()">
+                @if (item.email) {
+                  <a
+                    [appMailLink]="item.email"
+                    class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                  >
+                    {{ item.email }}
+                  </a>
+                } @else {
+                  —
+                }
               </td>
               <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600">
                 {{ item.source ?? '—' }}
@@ -220,28 +262,45 @@
   </div>
 
   <!-- Pagination -->
-  @if (!loading() && total() > size) {
-    <div class="mt-4 flex items-center justify-between text-xs text-zinc-600">
+  @if (!loading() && total() > 0) {
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-600">
       <span>
         Page {{ page() }} of {{ totalPages() }} · {{ total() }} contact(s)
       </span>
-      <div class="flex items-center gap-1">
-        <button
-          type="button"
-          class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
-          [disabled]="page() <= 1"
-          (click)="goToPage(page() - 1)"
-        >
-          Previous
-        </button>
-        <button
-          type="button"
-          class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
-          [disabled]="page() >= totalPages()"
-          (click)="goToPage(page() + 1)"
-        >
-          Next
-        </button>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1.5">
+          <label for="contacts_pagesize" class="text-zinc-500">Rows</label>
+          <select
+            id="contacts_pagesize"
+            [value]="pageSize()"
+            (change)="setPageSize(+($any($event.target).value))"
+            class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          >
+            <option [value]="25">25</option>
+            <option [value]="50">50</option>
+            <option [value]="100">100</option>
+          </select>
+        </div>
+        @if (total() > pageSize()) {
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              [disabled]="page() <= 1"
+              (click)="goToPage(page() - 1)"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              [disabled]="page() >= totalPages()"
+              (click)="goToPage(page() + 1)"
+            >
+              Next
+            </button>
+          </div>
+        }
       </div>
     </div>
   }
