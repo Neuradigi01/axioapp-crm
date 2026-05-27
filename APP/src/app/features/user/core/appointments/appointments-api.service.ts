@@ -10,6 +10,13 @@ export type AppointmentStatus =
   | 'cancelled'
   | 'no_show';
 
+export type AppointmentSortKey =
+  | 'scheduled_at'
+  | 'created_at'
+  | 'last_activity_at';
+
+export type SortOrder = 'asc' | 'desc';
+
 export interface Appointment {
   id: string;
   org_id: string;
@@ -22,6 +29,7 @@ export interface Appointment {
   status: AppointmentStatus;
   assigned_to_id: string;
   custom_data: Record<string, unknown>;
+  last_activity_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -55,12 +63,14 @@ export interface ConflictBody {
   conflicts: string[];
 }
 
-export interface AppointmentRangeQuery {
+export interface AppointmentListQuery {
   /** ISO timestamps; backend expects `from` / `to` query params. */
-  fromIso: string;
-  toIso: string;
+  scheduledFrom?: string;
+  scheduledTo?: string;
   assignedTo?: string;
   status?: AppointmentStatus;
+  sort?: AppointmentSortKey;
+  order?: SortOrder;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -68,13 +78,16 @@ export class AppointmentsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/appointments`;
 
-  /** Calendar listing — returns a plain array sorted by scheduled_at. */
-  listRange(query: AppointmentRangeQuery): Observable<Appointment[]> {
-    let params = new HttpParams()
-      .set('from', query.fromIso)
-      .set('to', query.toIso);
+  /** Listing — works for both calendar (passes from/to) and list view
+   * (omits from/to, applies sort/order/status/assignee). */
+  list(query: AppointmentListQuery = {}): Observable<Appointment[]> {
+    let params = new HttpParams();
+    if (query.scheduledFrom) params = params.set('from', query.scheduledFrom);
+    if (query.scheduledTo) params = params.set('to', query.scheduledTo);
     if (query.assignedTo) params = params.set('assigned_to', query.assignedTo);
     if (query.status) params = params.set('status', query.status);
+    if (query.sort) params = params.set('sort', query.sort);
+    if (query.order) params = params.set('order', query.order);
     return this.http.get<Appointment[]>(this.base, { params });
   }
 
@@ -92,5 +105,53 @@ export class AppointmentsApiService {
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
+  }
+
+  /** Shift an appointment's slot without going through the full edit
+   * form. Server writes a dedicated `reschedule` audit activity. */
+  reschedule(
+    id: string,
+    body: { scheduledAt: string; reason?: string | null },
+  ): Observable<Appointment> {
+    return this.http.post<Appointment>(`${this.base}/${id}/reschedule`, {
+      scheduled_at: body.scheduledAt,
+      reason: body.reason ?? null,
+    });
+  }
+
+  /** Single-row reassign. Appointments require an owner, so `userId`
+   * must be non-null — the backend rejects null. */
+  reassign(
+    id: string,
+    body: { userId: string; note?: string | null },
+  ): Observable<Appointment> {
+    return this.http.post<Appointment>(`${this.base}/${id}/reassign`, {
+      assigned_to_id: body.userId,
+      note: body.note ?? null,
+    });
+  }
+
+  bulkReassign(
+    ids: string[],
+    body: { userId: string; note?: string | null },
+  ): Observable<{ reassigned: number }> {
+    return this.http.post<{ reassigned: number }>(`${this.base}/bulk-reassign`, {
+      ids,
+      assigned_to_id: body.userId,
+      note: body.note ?? null,
+    });
+  }
+
+  /** Bulk-cancel — rows not currently in `scheduled` are skipped.
+   * Returns `{cancelled, skipped}` so the FE can surface the
+   * partial-success split. */
+  bulkCancel(
+    ids: string[],
+    body: { reason?: string | null } = {},
+  ): Observable<{ cancelled: number; skipped: number }> {
+    return this.http.post<{ cancelled: number; skipped: number }>(
+      `${this.base}/bulk-cancel`,
+      { ids, reason: body.reason ?? null },
+    );
   }
 }

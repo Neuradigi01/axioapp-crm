@@ -31,7 +31,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import activities, audit
-from src.app.core.activities.models import ActivityType
+from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.appointments.models import Appointment, AppointmentStatus
 from src.app.core.appointments.schemas import (
     AppointmentCreate,
@@ -43,7 +43,7 @@ from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldType,
 )
-from src.app.core.users.models import User
+from src.app.core.users.models import OrganizationMember, User
 
 
 # Server-side sort whitelist. Router validates via FastAPI Literal; the
@@ -534,12 +534,289 @@ async def list_appointments(
     return list(rows)
 
 
+# --- Reschedule / reassign / bulk-action -----------------------------------
+
+
+async def _assert_user_in_org(
+    session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
+) -> None:
+    """422 if the target user has no active membership in this org.
+
+    Same join + check as contacts/leads/walk-ins reassign services —
+    keeps the cross-tenant guard uniform across modules."""
+    result = await session.execute(
+        select(OrganizationMember.id)
+        .join(User, User.id == OrganizationMember.user_member_id)
+        .where(
+            User.legacy_uuid == user_uuid,
+            OrganizationMember.organization_id == org_id,
+            OrganizationMember.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="target user is not a member of this organisation",
+        )
+
+
+def _reassign_payload(
+    *, from_id: uuid.UUID | None, to_id: uuid.UUID | None, note: str | None
+) -> dict[str, Any]:
+    return {
+        "from": str(from_id) if from_id is not None else None,
+        "to": str(to_id) if to_id is not None else None,
+        "note": note,
+    }
+
+
+async def reschedule_appointment(
+    session: AsyncSession,
+    *,
+    appointment_id: uuid.UUID,
+    org_id: uuid.UUID,
+    scheduled_at: datetime,
+    reason: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> Appointment:
+    """Shift an appointment's slot without going through the full edit
+    form. Re-runs the conflict check against the new slot. Writes a
+    dedicated `reschedule` audit activity (distinct from the edit-time
+    `note` activity that `update_appointment` writes) so the timeline
+    can render it with a calendar-clock icon.
+
+    404 if not found. 422 if status is terminal (`completed`) or if
+    the new slot collides. 409 on conflict via `find_conflicts`."""
+    appt = await get_appointment(session, appointment_id)
+    if appt is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="appointment not found",
+        )
+
+    # Don't allow rescheduling a completed appointment — it's terminal.
+    # Cancelled / no_show are still reschedulable (rebook the slot;
+    # state-machine handles the implicit transition back to scheduled
+    # if the caller wants that).
+    if appt.status == AppointmentStatus.completed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="cannot reschedule a completed appointment",
+        )
+
+    if scheduled_at == appt.scheduled_at:
+        # No-op — return as-is. The FE shouldn't have submitted but
+        # don't error on accidental double-submits.
+        return appt
+
+    # Conflict re-check at the new slot (only if the appointment is
+    # currently blocking — cancelled/no_show wouldn't collide with
+    # anything because we exclude self via exclude_id).
+    if appt.status not in _NON_BLOCKING_STATUSES:
+        conflicts = await find_conflicts(
+            session,
+            assigned_to_id=appt.assigned_to_id,
+            scheduled_at=scheduled_at,
+            duration_min=appt.duration_min,
+            exclude_id=appt.id,
+        )
+        if conflicts:
+            _raise_conflict_409(conflicts)
+
+    before = _snapshot(appt)
+    old_at = appt.scheduled_at
+    appt.scheduled_at = scheduled_at
+    session.add(
+        Activity(
+            org_id=org_id,
+            entity_type=_APPT_ENTITY,
+            entity_id=appt.id,
+            type=ActivityType.reschedule,
+            payload={
+                "from": old_at.isoformat(),
+                "to": scheduled_at.isoformat(),
+                "reason": reason,
+            },
+            user_id=actor_user_id,
+        )
+    )
+    await session.commit()
+    await session.refresh(appt)
+
+    await audit.log(
+        "appointments.rescheduled",
+        entity_type=_APPT_ENTITY,
+        entity_id=appt.id,
+        before=before,
+        after=_snapshot(appt),
+    )
+    return appt
+
+
+async def reassign_appointment(
+    session: AsyncSession,
+    *,
+    appointment_id: uuid.UUID,
+    org_id: uuid.UUID,
+    assigned_to_id: uuid.UUID | None,
+    note: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> Appointment:
+    """Single-row reassign. `None` clears the owner (set NULL on
+    `assigned_to_id` — wait, appointments require an owner). Actually
+    appointments.assigned_to_id is NOT NULL, so `None` is rejected
+    upstream by the Pydantic schema's required-ness check at the
+    router. We still accept Optional here so the type signature
+    matches the bulk variant; the router enforces non-null."""
+    appt = await get_appointment(session, appointment_id)
+    if appt is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="appointment not found",
+        )
+    if assigned_to_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="appointments require an owner; assigned_to_id cannot be null",
+        )
+    await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
+
+    before_id = appt.assigned_to_id
+    if before_id == assigned_to_id:
+        return appt
+
+    before = _snapshot(appt)
+    appt.assigned_to_id = assigned_to_id
+    session.add(
+        Activity(
+            org_id=org_id,
+            entity_type=_APPT_ENTITY,
+            entity_id=appt.id,
+            type=ActivityType.reassign,
+            payload=_reassign_payload(
+                from_id=before_id, to_id=assigned_to_id, note=note
+            ),
+            user_id=actor_user_id,
+        )
+    )
+    await session.commit()
+    await session.refresh(appt)
+
+    await audit.log(
+        "appointments.reassigned",
+        entity_type=_APPT_ENTITY,
+        entity_id=appt.id,
+        before=before,
+        after=_snapshot(appt),
+    )
+    return appt
+
+
+async def bulk_reassign_appointments(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+    assigned_to_id: uuid.UUID | None,
+    note: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> int:
+    """Bulk variant of `reassign_appointment`. Appointments require an
+    owner, so `assigned_to_id` must be non-null — the router enforces
+    this via schema. Per-row processing because rows with the same
+    owner are skipped (no-op, not an error)."""
+    if assigned_to_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="appointments require an owner; assigned_to_id cannot be null",
+        )
+    await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
+
+    reassigned = 0
+    for aid in ids:
+        appt = await get_appointment(session, aid)
+        if appt is None:
+            continue
+        if appt.assigned_to_id == assigned_to_id:
+            continue
+        before_id = appt.assigned_to_id
+        appt.assigned_to_id = assigned_to_id
+        session.add(
+            Activity(
+                org_id=org_id,
+                entity_type=_APPT_ENTITY,
+                entity_id=appt.id,
+                type=ActivityType.reassign,
+                payload=_reassign_payload(
+                    from_id=before_id, to_id=assigned_to_id, note=note
+                ),
+                user_id=actor_user_id,
+            )
+        )
+        reassigned += 1
+
+    await session.commit()
+    return reassigned
+
+
+async def bulk_cancel_appointments(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+    reason: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> tuple[int, int]:
+    """Move every row currently in `scheduled` to `cancelled`. Rows in
+    any other state are skipped (counted as `skipped`) — same partial
+    success semantic as walk-ins bulk-checkout. Each cancelled row
+    gets an audit `status_change` activity carrying the reason."""
+    cancelled = 0
+    skipped = 0
+    for aid in ids:
+        appt = await get_appointment(session, aid)
+        if appt is None:
+            continue
+        if appt.org_id != org_id:
+            # Defence-in-depth: ORM filter scopes SELECTs but skip
+            # anything that somehow slipped through.
+            continue
+        if appt.status != AppointmentStatus.scheduled:
+            skipped += 1
+            continue
+        before_status = appt.status.value
+        appt.status = AppointmentStatus.cancelled
+        session.add(
+            Activity(
+                org_id=org_id,
+                entity_type=_APPT_ENTITY,
+                entity_id=appt.id,
+                type=ActivityType.status_change,
+                payload={
+                    "from": before_status,
+                    "to": AppointmentStatus.cancelled.value,
+                    "reason": reason,
+                },
+                user_id=actor_user_id,
+            )
+        )
+        cancelled += 1
+
+    await session.commit()
+    return cancelled, skipped
+
+
 __all__ = [
     "AppointmentStatus",
+    "bulk_cancel_appointments",
+    "bulk_reassign_appointments",
     "create_appointment",
     "delete_appointment",
     "find_conflicts",
     "get_appointment",
     "list_appointments",
+    "reassign_appointment",
+    "reschedule_appointment",
     "update_appointment",
 ]

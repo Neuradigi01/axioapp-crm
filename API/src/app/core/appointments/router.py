@@ -21,15 +21,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.appointments.models import AppointmentStatus
 from src.app.core.appointments.schemas import (
+    AppointmentBulkCancel,
+    AppointmentBulkCancelResult,
+    AppointmentBulkReassign,
+    AppointmentBulkReassignResult,
     AppointmentCreate,
     AppointmentOut,
+    AppointmentReassign,
+    AppointmentReschedule,
     AppointmentUpdate,
 )
 from src.app.core.appointments.service import (
+    bulk_cancel_appointments,
+    bulk_reassign_appointments,
     create_appointment,
     delete_appointment,
     get_appointment,
     list_appointments,
+    reassign_appointment,
+    reschedule_appointment,
     update_appointment,
 )
 from src.app.core.auth.dependencies import require_permissions
@@ -120,3 +130,75 @@ async def delete_appointment_endpoint(
 ) -> Response:
     await delete_appointment(db, appointment_id=appointment_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Reschedule / reassign / bulk-action endpoints --------------------------
+
+
+@router.post("/{appointment_id}/reschedule", response_model=AppointmentOut)
+async def reschedule_appointment_endpoint(
+    appointment_id: uuid.UUID,
+    payload: AppointmentReschedule,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("appointments.write")),
+) -> AppointmentOut:
+    appt = await reschedule_appointment(
+        db,
+        appointment_id=appointment_id,
+        org_id=user.org_id,
+        scheduled_at=payload.scheduled_at,
+        reason=payload.reason,
+        actor_user_id=user.legacy_uuid,
+    )
+    return AppointmentOut.model_validate(appt)
+
+
+@router.post("/{appointment_id}/reassign", response_model=AppointmentOut)
+async def reassign_appointment_endpoint(
+    appointment_id: uuid.UUID,
+    payload: AppointmentReassign,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("appointments.reassign")),
+) -> AppointmentOut:
+    appt = await reassign_appointment(
+        db,
+        appointment_id=appointment_id,
+        org_id=user.org_id,
+        assigned_to_id=payload.assigned_to_id,
+        note=payload.note,
+        actor_user_id=user.legacy_uuid,
+    )
+    return AppointmentOut.model_validate(appt)
+
+
+@router.post("/bulk-reassign", response_model=AppointmentBulkReassignResult)
+async def bulk_reassign_appointments_endpoint(
+    payload: AppointmentBulkReassign,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("appointments.reassign")),
+) -> AppointmentBulkReassignResult:
+    n = await bulk_reassign_appointments(
+        db,
+        ids=payload.ids,
+        org_id=user.org_id,
+        assigned_to_id=payload.assigned_to_id,
+        note=payload.note,
+        actor_user_id=user.legacy_uuid,
+    )
+    return AppointmentBulkReassignResult(reassigned=n)
+
+
+@router.post("/bulk-cancel", response_model=AppointmentBulkCancelResult)
+async def bulk_cancel_appointments_endpoint(
+    payload: AppointmentBulkCancel,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("appointments.write")),
+) -> AppointmentBulkCancelResult:
+    cancelled, skipped = await bulk_cancel_appointments(
+        db,
+        ids=payload.ids,
+        org_id=user.org_id,
+        reason=payload.reason,
+        actor_user_id=user.legacy_uuid,
+    )
+    return AppointmentBulkCancelResult(cancelled=cancelled, skipped=skipped)

@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -7,7 +7,8 @@
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import {
@@ -19,25 +20,65 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, distinctUntilChanged } from 'rxjs/operators';
 
+import { FurnitureAuthService } from '../auth/auth.service';
+import {
+  BulkAction,
+  BulkActionBarComponent,
+} from '../shared/bulk-action-bar/bulk-action-bar.component';
 import {
   CalendarComponent,
   CalendarEvent,
 } from '../shared/calendar/calendar.component';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { ContactsApiService } from '../contacts/contacts-api.service';
+import { MailLinkDirective } from '../shared/directives/mail-link.directive';
+import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
+import {
+  UrlFilterStateConfig,
+  UrlFilterStateDirective,
+} from '../shared/directives/url-filter-state.directive';
+import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
+import { OwnerColor, ownerColor } from '../shared/owner-color.util';
+import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
+import {
+  ReassignConfirm,
+  ReassignModalComponent,
+} from '../shared/reassign-modal/reassign-modal.component';
+import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import {
   Appointment,
+  AppointmentSortKey,
   AppointmentsApiService,
+  SortOrder,
 } from './appointments-api.service';
+import { AppointmentPopoverComponent } from './appointment-popover.component';
 import { BookAppointmentModalComponent } from './book-appointment-modal.component';
+import {
+  RescheduleConfirm,
+  RescheduleModalComponent,
+} from './reschedule-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { initials } from '@core/services/text.util';
 
 interface ContactSummary {
   id: string;
   full_name: string;
   phone: string | null;
+  email: string | null;
 }
+
+type AppointmentStatusValue = 'scheduled' | 'completed' | 'no_show' | 'cancelled';
+type StatusFilter = 'all' | 'upcoming' | AppointmentStatusValue;
+
+const FILTER_CHIPS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'upcoming', label: 'Upcoming' },
+  { id: 'completed', label: 'Completed' },
+  { id: 'no_show', label: 'No-show' },
+  { id: 'cancelled', label: 'Cancelled' },
+];
 
 @Component({
   selector: 'app-appointments-page',
@@ -45,15 +86,34 @@ interface ContactSummary {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideAngularModule,
+    ReactiveFormsModule,
     CalendarComponent,
     BookAppointmentModalComponent,
+    BulkActionBarComponent,
+    ReassignModalComponent,
+    ConfirmDialogComponent,
+    RescheduleModalComponent,
+    AppointmentPopoverComponent,
+    PhoneLinkDirective,
+    WhatsappLinkDirective,
+    MailLinkDirective,
+    UrlFilterStateDirective,
+    RelativeTimePipe,
   ],
   templateUrl: './appointments.page.html',
 })
 export class AppointmentsPageComponent {
+  protected readonly ownerColor = ownerColor;
+  protected readonly initials = initials;
+
   private readonly api = inject(AppointmentsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(FurnitureAuthService);
+  private readonly usersDir = inject(UsersDirectoryService);
+
+  /** List vs calendar — controlled by the toggle at the top of the page. */
+  readonly view = signal<'list' | 'calendar'>('list');
 
   /** Calendar's currently-shown month. */
   readonly viewMonth = signal<Date>(new Date());
@@ -61,7 +121,7 @@ export class AppointmentsPageComponent {
   /** Currently-clicked day (right panel shows this day's appointments). */
   readonly selectedDay = signal<Date>(new Date());
 
-  /** All appointments overlapping the current viewMonth's visible range. */
+  /** Loaded rows. */
   readonly appointments = signal<Appointment[]>([]);
   readonly loading = signal(false);
   readonly loadError = signal<string | null>(null);
@@ -71,7 +131,34 @@ export class AppointmentsPageComponent {
   /** Modal state. */
   readonly modalOpen = signal(false);
 
-  /** Events aggregated per local-calendar day for the `<app-calendar>` dots. */
+  // --- Filter + sort + scope ---------------------------------------------
+
+  readonly sortKey = signal<AppointmentSortKey>('scheduled_at');
+  readonly sortOrder = signal<SortOrder>('asc');
+  readonly statusFilter = signal<StatusFilter>('all');
+  readonly chips = FILTER_CHIPS;
+
+  readonly scope = signal<'mine' | 'team' | 'all'>(
+    this.defaultScopeForRole(),
+  );
+
+  readonly assigneeControl = new FormControl<string>('', { nonNullable: true });
+
+  readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
+
+  readonly userMap = computed(() => {
+    const map = new Map<string, string>();
+    for (const u of this.users()) map.set(u.id, u.full_name);
+    return map;
+  });
+
+  readonly canChangeScope = computed(() => {
+    const role = this.auth.currentRoleName().toLowerCase();
+    return role === 'owner' || role === 'admin' || role.includes('manager');
+  });
+
+  // --- Calendar derived signals ------------------------------------------
+
   readonly events = computed<CalendarEvent<Appointment>[]>(() => {
     const map = new Map<string, CalendarEvent<Appointment>>();
     for (const a of this.appointments()) {
@@ -88,7 +175,6 @@ export class AppointmentsPageComponent {
     return [...map.values()];
   });
 
-  /** Appointments for the currently-selected day, sorted by scheduled_at asc. */
   readonly daysAppointments = computed<Appointment[]>(() => {
     const day = this.selectedDay();
     return this.appointments()
@@ -102,14 +188,158 @@ export class AppointmentsPageComponent {
     format(this.selectedDay(), 'EEEE, d MMMM yyyy'),
   );
 
+  // --- Selection + bulk --------------------------------------------------
+
+  readonly selectedIds = signal<Set<string>>(new Set());
+  readonly selectedCount = computed(() => this.selectedIds().size);
+
+  readonly bulkActions = computed<BulkAction[]>(() => [
+    {
+      key: 'reassign',
+      label: 'Reassign to…',
+      icon: 'user-cog',
+      permissionKey: 'appointments.reassign',
+    },
+    {
+      key: 'cancel',
+      label: 'Cancel',
+      icon: 'x-circle',
+      danger: true,
+      permissionKey: 'appointments.write',
+    },
+  ]);
+
+  readonly bulkModal = signal<'reassign' | 'cancel' | null>(null);
+  readonly bulkSubmitting = signal(false);
+  readonly bulkError = signal<string | null>(null);
+
+  // --- Single-row actions (popover-driven) -------------------------------
+
+  /** Appointment currently shown in the popover (`null` = closed). */
+  readonly popoverAppointment = signal<Appointment | null>(null);
+
+  /** Appointment being reassigned in the shared `ReassignModal`. */
+  readonly singleReassignAppt = signal<Appointment | null>(null);
+  readonly singleReassignSubmitting = signal(false);
+  readonly singleReassignError = signal<string | null>(null);
+
+  /** Appointment being rescheduled. */
+  readonly rescheduleAppt = signal<Appointment | null>(null);
+  readonly rescheduleSubmitting = signal(false);
+  readonly rescheduleError = signal<string | null>(null);
+
+  /** Appointment pending single-row cancel confirmation. */
+  readonly cancelAppt = signal<Appointment | null>(null);
+  readonly cancelSubmitting = signal(false);
+
+  // --- URL state ---------------------------------------------------------
+
+  readonly urlState: UrlFilterStateConfig = {
+    view: {
+      read: () => this.view(),
+      write: (v) => {
+        if (v === 'list' || v === 'calendar') this.view.set(v);
+      },
+      queryKey: 'view',
+      defaultValue: 'list',
+    },
+    status: {
+      read: () => this.statusFilter(),
+      write: (v) => {
+        if (
+          v === 'all' ||
+          v === 'upcoming' ||
+          v === 'scheduled' ||
+          v === 'completed' ||
+          v === 'no_show' ||
+          v === 'cancelled'
+        ) {
+          this.statusFilter.set(v);
+        }
+      },
+      queryKey: 'status',
+      defaultValue: 'all',
+    },
+    assignee: {
+      read: () => this.assigneeControl.value,
+      write: (v) => this.assigneeControl.setValue(v),
+      queryKey: 'assignee',
+    },
+    scope: {
+      read: () => this.scope(),
+      write: (v) => {
+        if (v === 'mine' || v === 'team' || v === 'all') this.scope.set(v);
+      },
+      queryKey: 'scope',
+    },
+    sort: {
+      read: () => this.sortKey(),
+      write: (v) => {
+        if (
+          v === 'scheduled_at' ||
+          v === 'created_at' ||
+          v === 'last_activity_at'
+        ) {
+          this.sortKey.set(v);
+        }
+      },
+      queryKey: 'sort',
+      defaultValue: 'scheduled_at',
+    },
+    order: {
+      read: () => this.sortOrder(),
+      write: (v) => {
+        if (v === 'asc' || v === 'desc') this.sortOrder.set(v);
+      },
+      queryKey: 'order',
+      defaultValue: 'asc',
+    },
+  };
+
   constructor() {
     effect(() => {
-      // Re-fetch whenever the visible month changes. The range covers
-      // the calendar's spillover days so dots in adjacent-month cells
-      // render correctly too.
-      const month = this.viewMonth();
-      this.reload(month);
+      // Track every filter signal so reload runs on any change.
+      this.viewMonth();
+      this.view();
+      this.statusFilter();
+      this.scope();
+      this.sortKey();
+      this.sortOrder();
+      this.reload();
     });
+
+    this.assigneeControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.reload());
+  }
+
+  // --- View / filter setters ---------------------------------------------
+
+  protected setView(value: 'list' | 'calendar'): void {
+    this.view.set(value);
+  }
+
+  protected setFilter(f: StatusFilter): void {
+    this.statusFilter.set(f);
+  }
+
+  protected setScope(value: string): void {
+    if (value !== 'mine' && value !== 'team' && value !== 'all') return;
+    this.scope.set(value);
+  }
+
+  protected setSort(value: string): void {
+    const [key, order] = value.split(':');
+    if (
+      key !== 'scheduled_at' &&
+      key !== 'created_at' &&
+      key !== 'last_activity_at'
+    ) {
+      return;
+    }
+    if (order !== 'asc' && order !== 'desc') return;
+    this.sortKey.set(key);
+    this.sortOrder.set(order);
   }
 
   protected onMonthChange(d: Date): void {
@@ -130,11 +360,10 @@ export class AppointmentsPageComponent {
 
   protected onAppointmentCreated(appt: Appointment): void {
     this.modalOpen.set(false);
-    // Jump the calendar + selected day to the newly-booked time.
     const at = new Date(appt.scheduled_at);
     this.viewMonth.set(at);
     this.selectedDay.set(at);
-    this.reload(at);
+    this.reload();
   }
 
   protected conflictTitleFor = (id: string): string | null => {
@@ -144,12 +373,294 @@ export class AppointmentsPageComponent {
     return `${a.title} (${time})`;
   };
 
+  // --- Selection ---------------------------------------------------------
+
+  protected toggleRow(id: string, event: Event): void {
+    event.stopPropagation();
+    this.selectedIds.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  protected isSelected(id: string): boolean {
+    return this.selectedIds().has(id);
+  }
+
+  protected clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  // --- Bulk actions ------------------------------------------------------
+
+  protected onBulkAction(key: string): void {
+    this.bulkError.set(null);
+    if (key === 'reassign') this.bulkModal.set('reassign');
+    else if (key === 'cancel') this.bulkModal.set('cancel');
+  }
+
+  protected closeBulkModal(): void {
+    this.bulkModal.set(null);
+    this.bulkSubmitting.set(false);
+    this.bulkError.set(null);
+  }
+
+  protected onBulkReassign(payload: ReassignConfirm): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    if (!payload.userId) {
+      this.bulkError.set('Appointments require an owner — pick a user.');
+      return;
+    }
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkReassign(ids, { userId: payload.userId, note: payload.note })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(
+            extractApiError(err) ?? 'Could not reassign appointments.',
+          );
+        },
+      });
+  }
+
+  protected onBulkCancel(): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkCancel(ids)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          if (result.skipped > 0) {
+            this.loadError.set(
+              `${result.cancelled} cancelled; ${result.skipped} skipped (already cancelled / completed / no-show).`,
+            );
+          }
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(
+            extractApiError(err) ?? 'Could not cancel appointments.',
+          );
+        },
+      });
+  }
+
+  // --- Popover -----------------------------------------------------------
+
+  protected openPopover(appt: Appointment, event?: Event): void {
+    event?.stopPropagation();
+    this.popoverAppointment.set(appt);
+  }
+
+  protected closePopover(): void {
+    this.popoverAppointment.set(null);
+  }
+
+  protected onPopoverReassign(): void {
+    const a = this.popoverAppointment();
+    if (!a) return;
+    this.closePopover();
+    this.singleReassignError.set(null);
+    this.singleReassignAppt.set(a);
+  }
+
+  protected onPopoverReschedule(): void {
+    const a = this.popoverAppointment();
+    if (!a) return;
+    this.closePopover();
+    this.rescheduleError.set(null);
+    this.rescheduleAppt.set(a);
+  }
+
+  protected onPopoverMarkCompleted(): void {
+    const a = this.popoverAppointment();
+    if (!a) return;
+    this.closePopover();
+    this.advanceStatus(a, 'completed');
+  }
+
+  protected onPopoverCancel(): void {
+    const a = this.popoverAppointment();
+    if (!a) return;
+    this.closePopover();
+    this.cancelAppt.set(a);
+  }
+
+  // --- Single-row reassign ----------------------------------------------
+
+  protected closeSingleReassign(): void {
+    this.singleReassignAppt.set(null);
+    this.singleReassignSubmitting.set(false);
+    this.singleReassignError.set(null);
+  }
+
+  protected onSingleReassign(payload: ReassignConfirm): void {
+    const appt = this.singleReassignAppt();
+    if (!appt) return;
+    if (!payload.userId) {
+      this.singleReassignError.set(
+        'Appointments require an owner — pick a user.',
+      );
+      return;
+    }
+    this.singleReassignSubmitting.set(true);
+    this.singleReassignError.set(null);
+    this.api
+      .reassign(appt.id, { userId: payload.userId, note: payload.note })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.singleReassignSubmitting.set(false);
+          this.appointments.update((rows) =>
+            rows.map((r) => (r.id === updated.id ? updated : r)),
+          );
+          this.closeSingleReassign();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.singleReassignSubmitting.set(false);
+          this.singleReassignError.set(
+            extractApiError(err) ?? 'Could not reassign appointment.',
+          );
+        },
+      });
+  }
+
+  // --- Reschedule --------------------------------------------------------
+
+  protected closeReschedule(): void {
+    this.rescheduleAppt.set(null);
+    this.rescheduleSubmitting.set(false);
+    this.rescheduleError.set(null);
+  }
+
+  protected onRescheduleConfirm(payload: RescheduleConfirm): void {
+    const appt = this.rescheduleAppt();
+    if (!appt) return;
+    this.rescheduleSubmitting.set(true);
+    this.rescheduleError.set(null);
+    this.api
+      .reschedule(appt.id, {
+        scheduledAt: payload.scheduledAt,
+        reason: payload.reason,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.rescheduleSubmitting.set(false);
+          this.appointments.update((rows) =>
+            rows.map((r) => (r.id === updated.id ? updated : r)),
+          );
+          this.closeReschedule();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.rescheduleSubmitting.set(false);
+          this.rescheduleError.set(
+            extractApiError(err) ?? 'Could not reschedule appointment.',
+          );
+        },
+      });
+  }
+
+  // --- Single-row cancel + status change --------------------------------
+
+  protected closeCancelConfirm(): void {
+    this.cancelAppt.set(null);
+    this.cancelSubmitting.set(false);
+  }
+
+  protected onCancelConfirm(): void {
+    const appt = this.cancelAppt();
+    if (!appt) return;
+    this.cancelSubmitting.set(true);
+    this.api
+      .update(appt.id, { status: 'cancelled' })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.cancelSubmitting.set(false);
+          this.appointments.update((rows) =>
+            rows.map((r) => (r.id === updated.id ? updated : r)),
+          );
+          this.closeCancelConfirm();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.cancelSubmitting.set(false);
+          this.closeCancelConfirm();
+          this.loadError.set(
+            extractApiError(err) ?? 'Could not cancel appointment.',
+          );
+        },
+      });
+  }
+
+  /** Inline status transition (e.g. Mark completed). Optimistic; reverts on error. */
+  private advanceStatus(appt: Appointment, target: Appointment['status']): void {
+    const before = this.appointments();
+    this.appointments.update((rows) =>
+      rows.map((r) => (r.id === appt.id ? { ...r, status: target } : r)),
+    );
+    this.api
+      .update(appt.id, { status: target })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.appointments.update((rows) =>
+            rows.map((r) => (r.id === updated.id ? updated : r)),
+          );
+        },
+        error: (err: HttpErrorResponse) => {
+          this.appointments.set(before);
+          this.loadError.set(
+            extractApiError(err) ?? 'Could not update appointment status.',
+          );
+        },
+      });
+  }
+
+  // --- Display helpers ---------------------------------------------------
+
   protected formatTime(iso: string): string {
     return format(new Date(iso), 'HH:mm');
   }
 
+  protected formatDateTime(iso: string): string {
+    return format(new Date(iso), 'd MMM yyyy, HH:mm');
+  }
+
   protected contactName(id: string): string {
-    return this.contactsById()[id]?.full_name ?? 'â€”';
+    return this.contactsById()[id]?.full_name ?? '—';
+  }
+
+  protected contactPhone(id: string): string | null {
+    return this.contactsById()[id]?.phone ?? null;
+  }
+
+  protected contactEmail(id: string): string | null {
+    return this.contactsById()[id]?.email ?? null;
+  }
+
+  protected ownerLabel(id: string | null): string {
+    if (!id) return 'Unassigned';
+    return this.userMap().get(id) ?? 'Unknown';
   }
 
   protected statusClass(status: Appointment['status']): string {
@@ -159,21 +670,85 @@ export class AppointmentsPageComponent {
       case 'cancelled':
         return 'bg-zinc-100 text-zinc-600 ring-zinc-200';
       case 'no_show':
-        return 'bg-red-100 text-red-700 ring-red-200';
+        return 'bg-amber-100 text-amber-700 ring-amber-200';
       default:
-        return 'bg-sky-100 text-sky-700 ring-sky-200';
+        return 'bg-blue-100 text-blue-700 ring-blue-200';
     }
   }
 
-  private reload(month: Date): void {
-    const fromDt = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
-    const toDt = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
+  protected ownerPalette(userId: string | null): OwnerColor {
+    return this.ownerColor(userId);
+  }
+
+  // --- Default scope-from-role ------------------------------------------
+
+  private defaultScopeForRole(): 'mine' | 'team' | 'all' {
+    const role = this.auth.currentRoleName();
+    if (!role) return 'mine';
+    const r = role.toLowerCase();
+    if (r === 'owner' || r === 'admin') return 'all';
+    if (r.includes('manager')) return 'team';
+    return 'mine';
+  }
+
+  private resolveAssignee(): string | undefined {
+    const raw = this.assigneeControl.value;
+    if (!raw) {
+      if (this.scope() === 'mine') {
+        return this.auth.currentUserId() ?? undefined;
+      }
+      return undefined;
+    }
+    if (raw === 'me') return this.auth.currentUserId() ?? undefined;
+    return raw;
+  }
+
+  private resolveStatusAndFrom(): {
+    status?: AppointmentStatusValue;
+    extraFrom?: string;
+  } {
+    const f = this.statusFilter();
+    if (f === 'all') return {};
+    if (f === 'upcoming') {
+      return {
+        status: 'scheduled',
+        extraFrom: new Date().toISOString(),
+      };
+    }
+    return { status: f };
+  }
+
+  private resolveDateWindow(extraFrom: string | undefined): {
+    scheduledFrom?: string;
+    scheduledTo?: string;
+  } {
+    if (this.view() === 'calendar') {
+      const month = this.viewMonth();
+      const fromDt = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
+      const toDt = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
+      const lower =
+        extraFrom && new Date(extraFrom) > fromDt
+          ? extraFrom
+          : fromDt.toISOString();
+      return { scheduledFrom: lower, scheduledTo: toDt.toISOString() };
+    }
+    return extraFrom ? { scheduledFrom: extraFrom } : {};
+  }
+
+  private reload(): void {
+    const { status, extraFrom } = this.resolveStatusAndFrom();
+    const { scheduledFrom, scheduledTo } = this.resolveDateWindow(extraFrom);
+
     this.loading.set(true);
     this.loadError.set(null);
     this.api
-      .listRange({
-        fromIso: fromDt.toISOString(),
-        toIso: toDt.toISOString(),
+      .list({
+        scheduledFrom,
+        scheduledTo,
+        assignedTo: this.resolveAssignee(),
+        status,
+        sort: this.sortKey(),
+        order: this.sortOrder(),
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -212,6 +787,7 @@ export class AppointmentsPageComponent {
                 id: c.id,
                 full_name: c.full_name,
                 phone: c.phone,
+                email: c.email,
               };
             }
           }
@@ -223,5 +799,4 @@ export class AppointmentsPageComponent {
   private dayKey(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
-
 }
