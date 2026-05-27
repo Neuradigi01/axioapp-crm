@@ -24,17 +24,25 @@ from src.app.core.auth.dependencies import require_permissions
 from src.app.core.leads.ingest import ingest as ingest_lead
 from src.app.core.leads.models import LeadStatus
 from src.app.core.leads.schemas import (
+    LeadBulkDelete,
+    LeadBulkDeleteResult,
+    LeadBulkReassign,
+    LeadBulkReassignResult,
     LeadCreate,
     LeadListResponse,
     LeadOut,
+    LeadReassign,
     LeadUpdate,
     MoveStageRequest,
 )
 from src.app.core.leads.service import (
+    bulk_delete_leads,
+    bulk_reassign_leads,
     delete_lead,
     get_lead,
     list_leads,
     move_stage_for_lead,
+    reassign_lead,
     update_lead,
 )
 from src.app.core.settings.schemas import (
@@ -218,5 +226,53 @@ async def move_lead_stage_endpoint(
         lost_reason_other=payload.lost_reason_other,
     )
     return LeadOut.model_validate(lead)
+
+
+# --- Reassign + bulk endpoints ----------------------------------------------
+
+
+@router.post("/{lead_id}/reassign", response_model=LeadOut)
+async def reassign_lead_endpoint(
+    lead_id: uuid.UUID,
+    payload: LeadReassign,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("leads.reassign")),
+) -> LeadOut:
+    lead = await reassign_lead(
+        db,
+        lead_id=lead_id,
+        org_id=user.org_id,
+        assigned_to_id=payload.assigned_to_id,
+        note=payload.note,
+        actor_user_id=user.legacy_uuid,
+    )
+    return LeadOut.model_validate(lead)
+
+
+@router.post("/bulk-reassign", response_model=LeadBulkReassignResult)
+async def bulk_reassign_leads_endpoint(
+    payload: LeadBulkReassign,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("leads.reassign")),
+) -> LeadBulkReassignResult:
+    n = await bulk_reassign_leads(
+        db,
+        ids=payload.ids,
+        org_id=user.org_id,
+        assigned_to_id=payload.assigned_to_id,
+        note=payload.note,
+        actor_user_id=user.legacy_uuid,
+    )
+    return LeadBulkReassignResult(reassigned=n)
+
+
+@router.post("/bulk-delete", response_model=LeadBulkDeleteResult)
+async def bulk_delete_leads_endpoint(
+    payload: LeadBulkDelete,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("leads.write")),
+) -> LeadBulkDeleteResult:
+    n = await bulk_delete_leads(db, ids=payload.ids, org_id=user.org_id)
+    return LeadBulkDeleteResult(deleted=n)
 
 

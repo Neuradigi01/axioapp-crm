@@ -24,7 +24,10 @@ import {
 } from '../pipelines/pipelines-api.service';
 import { PipelineBoardComponent } from '../pipelines/pipeline-board.component';
 import { PipelineListComponent } from '../pipelines/pipeline-list.component';
+import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
+import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { LeadCardComponent } from './lead-card.component';
 import { LeadFormModalComponent } from './lead-form-modal.component';
@@ -76,6 +79,9 @@ interface ContactSummary {
     LeadCardComponent,
     LeadFormModalComponent,
     RelativeTimePipe,
+    BulkActionBarComponent,
+    ReassignModalComponent,
+    ConfirmDialogComponent,
   ],
   templateUrl: './leads.page.html',
 })
@@ -177,6 +183,29 @@ export class LeadsPageComponent {
   });
   readonly submitting = signal(false);
   readonly formError = signal<string | null>(null);
+
+  // --- Multi-select + bulk + reassign state -------------------------------
+
+  /** Row ids selected on the list view. Pipeline board has its own
+   * single-click-pencil reassign; bulk select only runs on list. */
+  readonly selectedIds = signal<Set<string>>(new Set());
+  readonly selectedCount = computed(() => this.selectedIds().size);
+
+  /** Bulk action menu — hide-don't-disable gated. */
+  readonly bulkActions = computed<BulkAction[]>(() => [
+    { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'leads.reassign' },
+    { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'leads.write' },
+  ]);
+
+  /** Which bulk-action modal is open (one at a time). */
+  readonly bulkModal = signal<'reassign' | 'delete' | null>(null);
+  readonly bulkSubmitting = signal(false);
+  readonly bulkError = signal<string | null>(null);
+
+  /** Single-row reassign (from the pencil on a card or list row). */
+  readonly singleReassignLead = signal<Lead | null>(null);
+  readonly singleReassignSubmitting = signal(false);
+  readonly singleReassignError = signal<string | null>(null);
 
   /** Cast Lead[] to PipelineItem[] for the board/list inputs. */
   readonly pipelineItems = computed<PipelineItem[]>(
@@ -447,6 +476,122 @@ export class LeadsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.formError.set(extractApiError(err) ?? 'Could not save lead.');
+        },
+      });
+  }
+
+  // --- Single reassign (pencil on a card / list row) ----------------------
+
+  protected openSingleReassign(lead: Lead): void {
+    this.singleReassignError.set(null);
+    this.singleReassignLead.set(lead);
+  }
+
+  protected closeSingleReassign(): void {
+    this.singleReassignLead.set(null);
+    this.singleReassignSubmitting.set(false);
+    this.singleReassignError.set(null);
+  }
+
+  protected onSingleReassign(payload: ReassignConfirm): void {
+    const lead = this.singleReassignLead();
+    if (!lead) return;
+    this.singleReassignSubmitting.set(true);
+    this.singleReassignError.set(null);
+    this.api
+      .reassign(lead.id, { userId: payload.userId, note: payload.note })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.singleReassignSubmitting.set(false);
+          // Replace just the touched row in place so the kanban doesn't
+          // flicker its full re-layout for a single owner change.
+          this.leads.update((rows) =>
+            rows.map((r) => (r.id === updated.id ? updated : r)),
+          );
+          this.closeSingleReassign();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.singleReassignSubmitting.set(false);
+          this.singleReassignError.set(
+            extractApiError(err) ?? 'Could not reassign lead.',
+          );
+        },
+      });
+  }
+
+  // --- Bulk select (list view only) ----------------------------------------
+
+  protected toggleRow(id: string, event: Event): void {
+    event.stopPropagation();
+    this.selectedIds.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  protected isSelected(id: string): boolean {
+    return this.selectedIds().has(id);
+  }
+
+  protected clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  protected onBulkAction(key: string): void {
+    this.bulkError.set(null);
+    if (key === 'reassign') this.bulkModal.set('reassign');
+    else if (key === 'delete') this.bulkModal.set('delete');
+  }
+
+  protected closeBulkModal(): void {
+    this.bulkModal.set(null);
+    this.bulkSubmitting.set(false);
+    this.bulkError.set(null);
+  }
+
+  protected onBulkReassign(payload: ReassignConfirm): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkReassign(ids, { userId: payload.userId, note: payload.note })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(extractApiError(err) ?? 'Could not reassign.');
+        },
+      });
+  }
+
+  protected onBulkDelete(): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkDelete(ids)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(extractApiError(err) ?? 'Could not delete.');
         },
       });
   }

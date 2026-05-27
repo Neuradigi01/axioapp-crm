@@ -1,11 +1,17 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  EventEmitter,
+  Output,
   computed,
+  inject,
   input,
 } from '@angular/core';
+import { LucideAngularModule } from 'lucide-angular';
 
+import { FurnitureAuthService } from '../auth/auth.service';
 import { InrPipe } from '../shared/pipes/inr.pipe';
+import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import { Lead, LeadSource, LeadStatus } from './leads-api.service';
 
 /**
@@ -37,14 +43,34 @@ const AVATAR_PALETTE: ReadonlyArray<string> = [
   selector: 'app-lead-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [InrPipe],
+  imports: [InrPipe, RelativeTimePipe, LucideAngularModule],
   templateUrl: './lead-card.component.html',
 })
 export class LeadCardComponent {
+  private readonly auth = inject(FurnitureAuthService);
+
   readonly lead = input.required<Lead>();
   readonly contactName = input<string | null>(null);
   readonly contactPhone = input<string | null>(null);
   readonly contactSource = input<string | null>(null);
+  /** Display label for the lead's owner — looked up by the parent
+   * (leads.page.ts) from its `userMap` so the card stays dumb. */
+  readonly ownerName = input<string | null>(null);
+
+  /** Emitted when the pencil-reassign button on the card is clicked.
+   * Parent (pipeline board template) opens the shared ReassignModal. */
+  @Output() readonly reassignClick = new EventEmitter<MouseEvent>();
+
+  /** Card-level permission gate — junior reps see no pencil. */
+  protected readonly canReassign = computed(() =>
+    this.auth.hasPermission('leads.reassign'),
+  );
+
+  protected onReassignClick(event: MouseEvent): void {
+    // Stop the parent <button (click)="openEdit(item)"> from firing.
+    event.stopPropagation();
+    this.reassignClick.emit(event);
+  }
 
   readonly initials = computed(() => {
     const name = this.contactName() ?? '?';

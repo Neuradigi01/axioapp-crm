@@ -35,12 +35,34 @@
     </p>
   }
 
-  <div>
+  <div class="flex items-center justify-between gap-2">
     <span
       class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1"
       [class]="sourceBadgeClass()"
     >
       {{ sourceBadgeLabel() }}
     </span>
+    <span class="text-[10px] text-zinc-500 tabular-nums">
+      {{ lead().last_activity_at | relativeTime }}
+    </span>
+  </div>
+
+  <!-- Owner footer: name + pencil-reassign for admins / managers. -->
+  <div class="flex items-center justify-between border-t border-zinc-100 pt-1.5">
+    <span class="inline-flex items-center gap-1 text-[10px] text-zinc-600">
+      <lucide-icon name="user" class="h-3 w-3" />
+      {{ ownerName() ?? 'Unassigned' }}
+    </span>
+    @if (canReassign()) {
+      <button
+        type="button"
+        (click)="onReassignClick($event)"
+        class="rounded p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+        title="Reassign owner"
+        aria-label="Reassign owner"
+      >
+        <lucide-icon name="pencil" class="h-3 w-3" />
+      </button>
+    }
   </div>
 </div>

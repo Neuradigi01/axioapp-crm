@@ -30,10 +30,11 @@ from decimal import Decimal
 from typing import Any, Iterable, Literal, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.contacts.models import Contact
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
@@ -43,6 +44,7 @@ from src.app.core.leads.models import Lead, LeadSource, LeadStatus
 from src.app.core.leads.schemas import LOST_REASONS, LeadCreate, LeadUpdate
 from src.app.core.pipelines import move_card
 from src.app.core.pipelines.service import get_pipeline_by_key
+from src.app.core.users.models import OrganizationMember, User
 
 
 # Server-side whitelist for `?sort=` on the list endpoint. Anything
@@ -575,11 +577,162 @@ async def move_stage_for_lead(
     return lead
 
 
+# --- Reassign / bulk actions -------------------------------------------------
+
+
+async def _assert_user_in_org(
+    session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
+) -> None:
+    """422 if the target user has no active membership in this org.
+
+    Mirrors `contacts.service._assert_user_in_org` — same cross-tenant
+    guard wording, same OrganizationMember + User.legacy_uuid join."""
+    result = await session.execute(
+        select(OrganizationMember.id)
+        .join(User, User.id == OrganizationMember.user_member_id)
+        .where(
+            User.legacy_uuid == user_uuid,
+            OrganizationMember.organization_id == org_id,
+            OrganizationMember.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="target user is not a member of this organisation",
+        )
+
+
+def _reassign_payload(
+    *, from_id: uuid.UUID | None, to_id: uuid.UUID | None, note: str | None
+) -> dict[str, Any]:
+    return {
+        "from": str(from_id) if from_id is not None else None,
+        "to": str(to_id) if to_id is not None else None,
+        "note": note,
+    }
+
+
+async def reassign_lead(
+    session: AsyncSession,
+    *,
+    lead_id: uuid.UUID,
+    org_id: uuid.UUID,
+    assigned_to_id: uuid.UUID | None,
+    note: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> Lead:
+    """Single-row reassign. Writes an `Activity(type=reassign)` on the
+    same session so the lead update + the timeline row commit atomically."""
+    lead = await get_lead(session, lead_id)
+    if lead is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
+        )
+    if assigned_to_id is not None:
+        await _assert_user_in_org(
+            session, org_id=org_id, user_uuid=assigned_to_id
+        )
+
+    before_id = lead.assigned_to_id
+    if before_id == assigned_to_id:
+        # Identity reassign — no-op; don't pollute the timeline.
+        return lead
+
+    before = _snapshot(lead)
+    lead.assigned_to_id = assigned_to_id
+    session.add(
+        Activity(
+            org_id=org_id,
+            entity_type="lead",
+            entity_id=lead.id,
+            type=ActivityType.reassign,
+            payload=_reassign_payload(
+                from_id=before_id, to_id=assigned_to_id, note=note
+            ),
+            user_id=actor_user_id,
+        )
+    )
+    await session.commit()
+    await session.refresh(lead)
+
+    await audit.log(
+        "leads.reassigned",
+        entity_type="lead",
+        entity_id=lead.id,
+        before=before,
+        after=_snapshot(lead),
+    )
+    return lead
+
+
+async def bulk_reassign_leads(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+    assigned_to_id: uuid.UUID | None,
+    note: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> int:
+    """Reassign N leads in one transaction. Returns rows actually touched
+    (identity-reassign rows are silently skipped)."""
+    if assigned_to_id is not None:
+        await _assert_user_in_org(
+            session, org_id=org_id, user_uuid=assigned_to_id
+        )
+
+    reassigned = 0
+    for lid in ids:
+        lead = await get_lead(session, lid)
+        if lead is None:
+            continue
+        if lead.assigned_to_id == assigned_to_id:
+            continue
+        before_id = lead.assigned_to_id
+        lead.assigned_to_id = assigned_to_id
+        session.add(
+            Activity(
+                org_id=org_id,
+                entity_type="lead",
+                entity_id=lead.id,
+                type=ActivityType.reassign,
+                payload=_reassign_payload(
+                    from_id=before_id, to_id=assigned_to_id, note=note
+                ),
+                user_id=actor_user_id,
+            )
+        )
+        reassigned += 1
+
+    await session.commit()
+    return reassigned
+
+
+async def bulk_delete_leads(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> int:
+    """Hard-delete N leads. Belt + suspenders: `org_id` in WHERE alongside
+    the per-tenant RLS policy."""
+    result = await session.execute(
+        delete(Lead).where(Lead.id.in_(ids), Lead.org_id == org_id)
+    )
+    await session.commit()
+    return int(result.rowcount or 0)
+
+
 __all__ = [
+    "bulk_delete_leads",
+    "bulk_reassign_leads",
     "create_lead",
     "delete_lead",
     "get_lead",
     "list_leads",
     "move_stage_for_lead",
+    "reassign_lead",
     "update_lead",
 ]

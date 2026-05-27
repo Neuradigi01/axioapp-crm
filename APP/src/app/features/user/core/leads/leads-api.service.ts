@@ -133,9 +133,43 @@ export class LeadsApiService {
     return this.http.delete<void>(`${this.base}/${id}`);
   }
 
-  moveStage(id: string, toStage: string): Observable<Lead> {
+  moveStage(
+    id: string,
+    toStage: string,
+    extras?: { lost_reason?: string | null; lost_reason_other?: string | null },
+  ): Observable<Lead> {
     return this.http.post<Lead>(`${this.base}/${id}/move-stage`, {
       to_stage: toStage,
+      lost_reason: extras?.lost_reason ?? null,
+      lost_reason_other: extras?.lost_reason_other ?? null,
+    });
+  }
+
+  /** Single-row reassign. `userId === null` clears the owner. */
+  reassign(
+    id: string,
+    body: { userId: string | null; note?: string | null },
+  ): Observable<Lead> {
+    return this.http.post<Lead>(`${this.base}/${id}/reassign`, {
+      assigned_to_id: body.userId,
+      note: body.note ?? null,
+    });
+  }
+
+  bulkReassign(
+    ids: string[],
+    body: { userId: string | null; note?: string | null },
+  ): Observable<{ reassigned: number }> {
+    return this.http.post<{ reassigned: number }>(`${this.base}/bulk-reassign`, {
+      ids,
+      assigned_to_id: body.userId,
+      note: body.note ?? null,
+    });
+  }
+
+  bulkDelete(ids: string[]): Observable<{ deleted: number }> {
+    return this.http.post<{ deleted: number }>(`${this.base}/bulk-delete`, {
+      ids,
     });
   }
 

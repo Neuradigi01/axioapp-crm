@@ -210,6 +210,8 @@
             [contactName]="contact?.full_name ?? null"
             [contactPhone]="contact?.phone ?? null"
             [contactSource]="contact?.source ?? null"
+            [ownerName]="ownerLabel($any(item).assigned_to_id)"
+            (reassignClick)="openSingleReassign(item)"
           />
         </button>
       </ng-template>
@@ -222,44 +224,57 @@
     >
       <ng-template let-item>
         @let contact = contactFor(item.contact_id);
-        <button
-          type="button"
-          (click)="openEdit(item)"
-          class="block w-full text-left"
+        <div
+          class="flex items-start gap-2"
+          [class.bg-zinc-50]="isSelected(item.id)"
         >
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0 flex-1">
-              <p class="font-medium text-zinc-900">
-                {{ contact?.full_name ?? 'Unknown contact' }}
-              </p>
-              <p class="mt-0.5 text-xs text-zinc-500">
-                {{ contact?.phone ?? '—' }}
-                @if (contact?.source) {
-                  <span class="ml-1 inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200">
-                    {{ contact?.source }}
-                  </span>
-                }
-                <span class="ml-1 text-zinc-400">·</span>
-                <span class="ml-1 text-zinc-700">{{ item.budget ?? '—' }}</span>
-              </p>
+          <input
+            type="checkbox"
+            class="mt-1 h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+            [checked]="isSelected(item.id)"
+            (click)="toggleRow(item.id, $event)"
+            (change)="$event.stopPropagation()"
+            [attr.aria-label]="'Select ' + (contact?.full_name ?? 'lead')"
+          />
+          <button
+            type="button"
+            (click)="openEdit(item)"
+            class="block flex-1 text-left"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <p class="font-medium text-zinc-900">
+                  {{ contact?.full_name ?? 'Unknown contact' }}
+                </p>
+                <p class="mt-0.5 text-xs text-zinc-500">
+                  {{ contact?.phone ?? '—' }}
+                  @if (contact?.source) {
+                    <span class="ml-1 inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200">
+                      {{ contact?.source }}
+                    </span>
+                  }
+                  <span class="ml-1 text-zinc-400">·</span>
+                  <span class="ml-1 text-zinc-700">{{ item.budget ?? '—' }}</span>
+                </p>
+              </div>
+              <div class="flex flex-shrink-0 flex-col items-end gap-1">
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
+                  [class]="statusClass($any(item).status)"
+                >
+                  {{ statusLabel($any(item).status) }}
+                </span>
+                <span class="text-[10px] text-zinc-500 tabular-nums">
+                  {{ $any(item).last_activity_at | relativeTime }}
+                </span>
+              </div>
             </div>
-            <div class="flex flex-shrink-0 flex-col items-end gap-1">
-              <span
-                class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
-                [class]="statusClass($any(item).status)"
-              >
-                {{ statusLabel($any(item).status) }}
-              </span>
-              <span class="text-[10px] text-zinc-500 tabular-nums">
-                {{ $any(item).last_activity_at | relativeTime }}
-              </span>
-            </div>
-          </div>
-          <p class="mt-1 text-[10px] text-zinc-500">
-            <lucide-icon name="user" class="mr-1 inline-block h-3 w-3 align-text-bottom" />
-            {{ ownerLabel($any(item).assigned_to_id) }}
-          </p>
-        </button>
+            <p class="mt-1 flex items-center gap-1 text-[10px] text-zinc-500">
+              <lucide-icon name="user" class="h-3 w-3" />
+              {{ ownerLabel($any(item).assigned_to_id) }}
+            </p>
+          </button>
+        </div>
       </ng-template>
     </app-pipeline-list>
   }
@@ -272,5 +287,51 @@
     [submitError]="formError()"
     (save)="onSave($event)"
     (cancel)="closeModal()"
+  />
+}
+
+<!-- Bulk action bar: visible whenever rows are selected on list view. -->
+<app-bulk-action-bar
+  [selectedCount]="selectedCount()"
+  [actions]="bulkActions()"
+  (action)="onBulkAction($event)"
+  (clear)="clearSelection()"
+/>
+
+<!-- Bulk reassign modal — shared `ReassignModal`. -->
+@if (bulkModal() === 'reassign') {
+  <app-reassign-modal
+    [entityLabel]="'lead'"
+    [count]="selectedCount()"
+    [submitting]="bulkSubmitting()"
+    [error]="bulkError()"
+    (confirm)="onBulkReassign($event)"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Bulk delete confirm. -->
+@if (bulkModal() === 'delete') {
+  <app-confirm-dialog
+    [title]="'Delete ' + selectedCount() + ' lead' + (selectedCount() === 1 ? '' : 's') + '?'"
+    [body]="'This cannot be undone. Contacts and activities linked to these leads remain in their respective timelines.'"
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    [submitting]="bulkSubmitting()"
+    (confirm)="onBulkDelete()"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Single-lead reassign (from pencil on a card / list row). -->
+@if (singleReassignLead(); as lead) {
+  <app-reassign-modal
+    [entityLabel]="'lead'"
+    [count]="1"
+    [currentOwnerId]="lead.assigned_to_id"
+    [submitting]="singleReassignSubmitting()"
+    [error]="singleReassignError()"
+    (confirm)="onSingleReassign($event)"
+    (cancel)="closeSingleReassign()"
   />
 }
