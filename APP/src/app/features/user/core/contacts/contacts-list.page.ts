@@ -17,10 +17,15 @@ import {
   Contact,
   ContactCreate,
   ContactListItem,
+  ContactSortKey,
   ContactUpdate,
   ContactsApiService,
+  SortOrder,
 } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
+import { FurnitureAuthService } from '../auth/auth.service';
+import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
+import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
 
@@ -28,7 +33,12 @@ import { initials } from '@core/services/text.util';
   selector: 'app-contacts-list-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, LucideAngularModule, ContactFormModalComponent],
+  imports: [
+    ReactiveFormsModule,
+    LucideAngularModule,
+    ContactFormModalComponent,
+    RelativeTimePipe,
+  ],
   templateUrl: './contacts-list.page.html',
 })
 export class ContactsListPageComponent {
@@ -36,6 +46,8 @@ export class ContactsListPageComponent {
   private readonly api = inject(ContactsApiService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(FurnitureAuthService);
+  private readonly usersDir = inject(UsersDirectoryService);
 
   readonly items = signal<ContactListItem[]>([]);
   readonly total = signal<number>(0);
@@ -48,6 +60,24 @@ export class ContactsListPageComponent {
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly sourceControl = new FormControl('', { nonNullable: true });
   readonly tagControl = new FormControl('', { nonNullable: true });
+  /** Assignee filter. Empty = all, `'me'` resolves to current user, or a user UUID. */
+  readonly assigneeControl = new FormControl<string>('', { nonNullable: true });
+
+  /** Sort state. Defaults match the backend (`created_at desc`). */
+  readonly sortKey = signal<ContactSortKey>('created_at');
+  readonly sortOrder = signal<SortOrder>('desc');
+
+  /** Cached list of users for the assignee dropdown. */
+  readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
+
+  /** Owner-id → "Full Name" lookup so the list row can show a name
+   * without round-tripping to the backend. Tolerates a missing user
+   * (deactivated mid-session) by falling back to "Unknown". */
+  readonly userMap = computed(() => {
+    const map = new Map<string, string>();
+    for (const u of this.users()) map.set(u.id, u.full_name);
+    return map;
+  });
 
   private readonly q = toSignal(
     this.searchControl.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
@@ -118,6 +148,43 @@ export class ContactsListPageComponent {
         this.page.set(1);
         this.reload();
       });
+    this.assigneeControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.page.set(1);
+        this.reload();
+      });
+  }
+
+  /** Click a sortable header. Same key → flip order; new key → reset to a
+   * sensible default (ascending for `full_name`, descending for the
+   * timestamp columns where the user usually wants newest first). */
+  protected toggleSort(key: ContactSortKey): void {
+    if (this.sortKey() === key) {
+      this.sortOrder.update((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      this.sortKey.set(key);
+      this.sortOrder.set(key === 'full_name' ? 'asc' : 'desc');
+    }
+    this.page.set(1);
+    this.reload();
+  }
+
+  /** Resolve the assignee filter to a UUID. `'me'` reads the current user
+   * id from `FurnitureAuthService` (populated by `/users/me`). Empty
+   * string means "no filter". */
+  private resolveAssignee(): string | undefined {
+    const raw = this.assigneeControl.value;
+    if (!raw) return undefined;
+    if (raw === 'me') return this.auth.currentUserId() ?? undefined;
+    return raw;
+  }
+
+  /** Display label for the Owner column. Tries the cached users
+   * directory; falls back to "Unassigned" / "Unknown". */
+  protected ownerLabel(assignedTo: string | null): string {
+    if (!assignedTo) return 'Unassigned';
+    return this.userMap().get(assignedTo) ?? 'Unknown';
   }
 
   protected reload(): void {
@@ -128,6 +195,9 @@ export class ContactsListPageComponent {
         q: this.q() || undefined,
         source: this.sourceFilter() || undefined,
         tag: this.tagFilter() || undefined,
+        assigned_to_id: this.resolveAssignee(),
+        sort: this.sortKey(),
+        order: this.sortOrder(),
         page: this.page(),
         size: this.size,
       })

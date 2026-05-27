@@ -76,6 +76,11 @@ export class FurnitureAuthService {
    * "Admin", "Employee", "Sales Manager", …). Empty before first /me. */
   readonly currentRoleName = signal<string>('');
 
+  /** Signed-in user's UUID (matches `assigned_to_id` shape on contacts /
+   * leads / walk-ins / appointments / tasks). Drives the "My contacts"
+   * / "Mine" preset on list filters. Null before first /me. */
+  readonly currentUserId = signal<string | null>(null);
+
   hasPermission(key: string): boolean {
     return this.currentPermissions().includes(key);
   }
@@ -114,6 +119,7 @@ export class FurnitureAuthService {
           this.storage.clear();
           this.currentOrg.set(null);
           this.currentPermissions.set([]);
+          this.currentUserId.set(null);
         }),
       );
   }
@@ -126,6 +132,7 @@ export class FurnitureAuthService {
           this.currentOrg.set(res.org);
           this.currentPermissions.set(res.permission_keys);
           this.currentRoleName.set(res.role_name);
+          this.currentUserId.set(res.id);
         }),
       );
   }
@@ -139,5 +146,6 @@ export class FurnitureAuthService {
     this.currentOrg.set(null);
     this.currentPermissions.set([]);
     this.currentRoleName.set('');
+    this.currentUserId.set(null);
   }
 }

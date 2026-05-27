@@ -347,6 +347,8 @@ export class LeadFormModalComponent implements OnInit {
             email: c.email,
             source: c.source,
             tags: c.tags,
+            assigned_to_id: c.assigned_to_id,
+            last_activity_at: c.last_activity_at,
             created_at: c.created_at,
           }),
         error: () => {

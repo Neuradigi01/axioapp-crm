@@ -11,12 +11,14 @@
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
+import { FurnitureAuthService } from '../auth/auth.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
 import { StandardFieldsSignalsService } from '../standard-fields/standard-fields-signals.service';
 import type { StandardFieldRendered } from '../standard-fields/types';
@@ -52,6 +54,11 @@ export class ContactFormModalComponent implements OnInit {
   private readonly stdApi = inject(StandardFieldsApiService);
   private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(FurnitureAuthService);
+  private readonly usersDir = inject(UsersDirectoryService);
+
+  /** User list for the Owner dropdown. */
+  protected readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
 
   // Standard fields registered for the `contact` entity. The registry
   // key `tags` maps to the FormControl `tags_csv` (we store the CSV
@@ -109,6 +116,7 @@ export class ContactFormModalComponent implements OnInit {
     email: ['', [Validators.email, Validators.maxLength(255)]],
     source: ['', [Validators.maxLength(64)]],
     tags_csv: [''],
+    assigned_to_id: [''],
   });
 
   constructor() {
@@ -201,7 +209,17 @@ export class ContactFormModalComponent implements OnInit {
       });
 
     const existing = this._contact();
-    if (existing) this.resetForm(existing);
+    if (existing) {
+      this.resetForm(existing);
+    } else {
+      // Create mode: default Owner to the signed-in user.
+      const me = this.auth.currentUserId();
+      if (me) {
+        this.standard.controls.assigned_to_id.setValue(me, {
+          emitEvent: false,
+        });
+      }
+    }
   }
 
   protected onCustomValueChange(v: FormValue): void {
@@ -232,6 +250,7 @@ export class ContactFormModalComponent implements OnInit {
       email: nullableTrim(raw.email),
       source: nullableTrim(raw.source),
       tags: this.parseTags(raw.tags_csv),
+      assigned_to_id: nullableTrim(raw.assigned_to_id),
       custom_data: this.customValue() as Record<string, unknown>,
     };
 
@@ -249,6 +268,7 @@ export class ContactFormModalComponent implements OnInit {
       email: contact.email ?? '',
       source: contact.source ?? '',
       tags_csv: contact.tags.join(', '),
+      assigned_to_id: contact.assigned_to_id ?? '',
     });
     this.customValue.set(contact.custom_data as FormValue);
   }

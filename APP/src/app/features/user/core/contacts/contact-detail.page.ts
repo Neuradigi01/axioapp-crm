@@ -8,7 +8,7 @@
   signal,
   viewChild,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
@@ -18,6 +18,8 @@ import { AddNoteComponent } from '../activities/add-note.component';
 import { Activity } from '../activities/activities-api.service';
 import { TasksPanelComponent } from '../tasks/tasks-panel.component';
 import { FieldDef } from '../shared/dynamic-form/types';
+import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
+import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import {
   Contact,
   ContactCreate,
@@ -48,6 +50,7 @@ const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: strin
     ActivityTimelineComponent,
     AddNoteComponent,
     TasksPanelComponent,
+    RelativeTimePipe,
   ],
   templateUrl: './contact-detail.page.html',
 })
@@ -57,6 +60,19 @@ export class ContactDetailPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly usersDir = inject(UsersDirectoryService);
+
+  /** Owner-id → "Full Name" lookup so the header can show a name
+   * without a per-contact round-trip. */
+  readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
+
+  protected ownerLabel(assignedTo: string | null): string {
+    if (!assignedTo) return 'Unassigned';
+    for (const u of this.users()) {
+      if (u.id === assignedTo) return u.full_name;
+    }
+    return 'Unknown';
+  }
 
   readonly contact = signal<Contact | null>(null);
   readonly fields = signal<FieldDef[]>([]);

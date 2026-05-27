@@ -47,6 +47,20 @@
                   <dd>{{ c.source }}</dd>
                 </div>
               }
+              <div class="flex items-center gap-1">
+                <dt class="font-medium text-zinc-500">Owner</dt>
+                <dd>
+                  @if (c.assigned_to_id) {
+                    {{ ownerLabel(c.assigned_to_id) }}
+                  } @else {
+                    <span class="text-zinc-400">Unassigned</span>
+                  }
+                </dd>
+              </div>
+              <div class="flex items-center gap-1">
+                <dt class="font-medium text-zinc-500">Last activity</dt>
+                <dd>{{ c.last_activity_at | relativeTime }}</dd>
+              </div>
             </dl>
             @if (c.tags.length > 0) {
               <div class="mt-2 flex flex-wrap gap-1">
@@ -157,6 +171,20 @@
                 <div class="flex justify-between gap-3">
                   <dt class="text-zinc-500">Source</dt>
                   <dd class="text-zinc-900">{{ c.source ?? '—' }}</dd>
+                </div>
+                <div class="flex justify-between gap-3">
+                  <dt class="text-zinc-500">Owner</dt>
+                  <dd class="text-zinc-900">
+                    @if (c.assigned_to_id) {
+                      {{ ownerLabel(c.assigned_to_id) }}
+                    } @else {
+                      <span class="text-zinc-400">Unassigned</span>
+                    }
+                  </dd>
+                </div>
+                <div class="flex justify-between gap-3">
+                  <dt class="text-zinc-500">Last activity</dt>
+                  <dd class="text-zinc-900">{{ c.last_activity_at | relativeTime }}</dd>
                 </div>
                 <div class="flex justify-between gap-3">
                   <dt class="text-zinc-500">Tags</dt>

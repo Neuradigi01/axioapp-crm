@@ -17,6 +17,8 @@ export interface ContactListItem {
   email: string | null;
   source: string | null;
   tags: string[];
+  assigned_to_id: string | null;
+  last_activity_at: string | null;
   created_at: string;
 }
 
@@ -37,6 +39,8 @@ export interface Contact {
   tags: string[];
   notes: string | null;
   custom_data: Record<string, unknown>;
+  assigned_to_id: string | null;
+  last_activity_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -49,14 +53,22 @@ export interface ContactCreate {
   tags?: string[];
   notes?: string | null;
   custom_data?: Record<string, unknown>;
+  assigned_to_id?: string | null;
 }
 
 export type ContactUpdate = Partial<ContactCreate>;
+
+export type ContactSortKey = 'full_name' | 'created_at' | 'last_activity_at';
+export type SortOrder = 'asc' | 'desc';
 
 export interface ContactListQuery {
   q?: string;
   source?: string;
   tag?: string;
+  /** Owner UUID. Pass undefined to skip the filter. */
+  assigned_to_id?: string | null;
+  sort?: ContactSortKey;
+  order?: SortOrder;
   page?: number;
   size?: number;
   /** `custom.<field_key> = value` filters. */
@@ -74,6 +86,11 @@ export class ContactsApiService {
     if (query.q) params = params.set('q', query.q);
     if (query.source) params = params.set('source', query.source);
     if (query.tag) params = params.set('tag', query.tag);
+    if (query.assigned_to_id) {
+      params = params.set('assigned_to_id', query.assigned_to_id);
+    }
+    if (query.sort) params = params.set('sort', query.sort);
+    if (query.order) params = params.set('order', query.order);
     if (query.page) params = params.set('page', String(query.page));
     if (query.size) params = params.set('size', String(query.size));
     if (query.customFilters) {

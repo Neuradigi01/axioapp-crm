@@ -131,6 +131,25 @@
               </p>
             </div>
           }
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-700" for="cf_owner">
+              Owner
+            </label>
+            <select
+              id="cf_owner"
+              formControlName="assigned_to_id"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            >
+              <option value="">Unassigned</option>
+              @for (u of users(); track u.id) {
+                <option [value]="u.id">{{ u.full_name }}</option>
+              }
+            </select>
+            <p class="mt-1 text-xs text-zinc-500">
+              Sales rep responsible for this contact.
+            </p>
+          </div>
         </div>
       </section>
 

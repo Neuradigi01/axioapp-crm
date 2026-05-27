@@ -17,7 +17,7 @@
   </header>
 
   <!-- Filters -->
-  <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-4">
+  <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-5">
     <div class="sm:col-span-2">
       <label for="contacts_q" class="sr-only">Search</label>
       <div class="relative">
@@ -62,6 +62,21 @@
         }
       </select>
     </div>
+
+    <div>
+      <label for="contacts_assignee" class="sr-only">Owner</label>
+      <select
+        id="contacts_assignee"
+        [formControl]="assigneeControl"
+        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        <option value="">All owners</option>
+        <option value="me">Me</option>
+        @for (u of users(); track u.id) {
+          <option [value]="u.id">{{ u.full_name }}</option>
+        }
+      </select>
+    </div>
   </div>
 
   <!-- Body -->
@@ -90,11 +105,41 @@
       <table class="min-w-full divide-y divide-zinc-200">
         <thead class="bg-zinc-50">
           <tr>
-            <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Name</th>
+            <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 hover:text-zinc-900 focus:outline-none focus:text-zinc-900"
+                (click)="toggleSort('full_name')"
+              >
+                Name
+                @if (sortKey() === 'full_name') {
+                  <lucide-icon
+                    [name]="sortOrder() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                    class="h-3 w-3"
+                  />
+                }
+              </button>
+            </th>
             <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Phone</th>
             <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Email</th>
             <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Source</th>
+            <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Owner</th>
             <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Tags</th>
+            <th scope="col" class="px-6 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 hover:text-zinc-900 focus:outline-none focus:text-zinc-900"
+                (click)="toggleSort('last_activity_at')"
+              >
+                Last activity
+                @if (sortKey() === 'last_activity_at') {
+                  <lucide-icon
+                    [name]="sortOrder() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                    class="h-3 w-3"
+                  />
+                }
+              </button>
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-100 bg-white">
@@ -122,6 +167,18 @@
               <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600">
                 {{ item.source ?? '—' }}
               </td>
+              <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600">
+                @if (item.assigned_to_id) {
+                  <div class="flex items-center gap-2">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700">
+                      {{ initials(ownerLabel(item.assigned_to_id)) }}
+                    </span>
+                    <span>{{ ownerLabel(item.assigned_to_id) }}</span>
+                  </div>
+                } @else {
+                  <span class="text-zinc-400">Unassigned</span>
+                }
+              </td>
               <td class="px-6 py-3 text-sm text-zinc-600">
                 <div class="flex flex-wrap gap-1">
                   @for (tag of item.tags; track tag) {
@@ -132,6 +189,9 @@
                     <span class="text-zinc-400">—</span>
                   }
                 </div>
+              </td>
+              <td class="whitespace-nowrap px-6 py-3 text-right text-sm text-zinc-600 tabular-nums">
+                {{ item.last_activity_at | relativeTime }}
               </td>
             </tr>
           }
