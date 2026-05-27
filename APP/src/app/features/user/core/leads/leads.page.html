@@ -51,8 +51,92 @@
     </div>
   </header>
 
+  <!-- Chip strip: status / scope / no-activity / sort -->
+  <div class="flex flex-wrap items-center gap-2 text-xs">
+    <!-- Status chips -->
+    <div class="inline-flex overflow-hidden rounded-full ring-1 ring-zinc-200 bg-white">
+      @for (s of [
+        { v: '',       label: 'All' },
+        { v: 'active', label: 'Active' },
+        { v: 'won',    label: 'Won' },
+        { v: 'lost',   label: 'Lost' }
+      ]; track s.v) {
+        <button
+          type="button"
+          (click)="setStatus(s.v)"
+          class="px-2.5 py-1 transition"
+          [class.bg-zinc-900]="statusControl.value === s.v"
+          [class.text-white]="statusControl.value === s.v"
+          [class.text-zinc-700]="statusControl.value !== s.v"
+          [class.hover:bg-zinc-50]="statusControl.value !== s.v"
+        >
+          {{ s.label }}
+        </button>
+      }
+    </div>
+
+    <!-- Scope toggle (hidden for junior staff) -->
+    @if (canChangeScope()) {
+      <div class="inline-flex overflow-hidden rounded-full ring-1 ring-zinc-200 bg-white">
+        @for (sc of [
+          { v: 'mine', label: 'Mine' },
+          { v: 'team', label: 'Team' },
+          { v: 'all',  label: 'All' }
+        ]; track sc.v) {
+          <button
+            type="button"
+            (click)="setScope(sc.v)"
+            class="px-2.5 py-1 transition"
+            [class.bg-zinc-900]="scope() === sc.v"
+            [class.text-white]="scope() === sc.v"
+            [class.text-zinc-700]="scope() !== sc.v"
+            [class.hover:bg-zinc-50]="scope() !== sc.v"
+          >
+            {{ sc.label }}
+          </button>
+        }
+      </div>
+    }
+
+    <!-- No-activity chip -->
+    <select
+      [value]="noActivityFilter()"
+      (change)="setNoActivity($any($event.target).value)"
+      class="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      aria-label="No activity filter"
+    >
+      <option value="">Any activity</option>
+      <option value="7d">No activity 7d+</option>
+      <option value="14d">No activity 14d+</option>
+      <option value="30d">No activity 30d+</option>
+    </select>
+
+    <!-- Sort dropdown — applies to both pipeline (within-stage order)
+         and list views. -->
+    <select
+      [value]="sortKey() + ':' + sortOrder()"
+      (change)="
+        $any($event.target).value === 'created_at:desc' ? (sortKey.set('created_at') || sortOrder.set('desc') || reload()) :
+        $any($event.target).value === 'created_at:asc'  ? (sortKey.set('created_at') || sortOrder.set('asc')  || reload()) :
+        $any($event.target).value === 'last_activity_at:desc' ? (sortKey.set('last_activity_at') || sortOrder.set('desc') || reload()) :
+        $any($event.target).value === 'last_activity_at:asc'  ? (sortKey.set('last_activity_at') || sortOrder.set('asc')  || reload()) :
+        $any($event.target).value === 'contact_name:asc'  ? (sortKey.set('contact_name') || sortOrder.set('asc')  || reload()) :
+        $any($event.target).value === 'contact_name:desc' ? (sortKey.set('contact_name') || sortOrder.set('desc') || reload()) : null
+      "
+      class="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      aria-label="Sort"
+    >
+      <option value="created_at:desc">Newest first</option>
+      <option value="created_at:asc">Oldest first</option>
+      <option value="last_activity_at:desc">Recent activity</option>
+      <option value="last_activity_at:asc">Stale (oldest activity)</option>
+      <option value="contact_name:asc">Contact A→Z</option>
+      <option value="contact_name:desc">Contact Z→A</option>
+    </select>
+  </div>
+
   <!-- Filters -->
-  <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
+  <div class="grid grid-cols-1 gap-3 sm:grid-cols-5">
     <div class="sm:col-span-2">
       <label for="leads_q" class="sr-only">Search</label>
       <div class="relative">
@@ -79,6 +163,20 @@
         <option value="">All sources</option>
         @for (s of sourceOptions(); track s) {
           <option [value]="s">{{ s }}</option>
+        }
+      </select>
+    </div>
+    <div>
+      <label for="leads_assignee" class="sr-only">Owner</label>
+      <select
+        id="leads_assignee"
+        [formControl]="assigneeControl"
+        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        <option value="">All owners</option>
+        <option value="me">Me</option>
+        @for (u of users(); track u.id) {
+          <option [value]="u.id">{{ u.full_name }}</option>
         }
       </select>
     </div>
@@ -127,20 +225,39 @@
         <button
           type="button"
           (click)="openEdit(item)"
-          class="block text-left"
+          class="block w-full text-left"
         >
-          <p class="font-medium text-zinc-900">
-            {{ contact?.full_name ?? 'Unknown contact' }}
-          </p>
-          <p class="text-xs text-zinc-500">
-            {{ contact?.phone ?? '—' }}
-            @if (contact?.source) {
-              <span class="ml-1 inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200">
-                {{ contact?.source }}
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="font-medium text-zinc-900">
+                {{ contact?.full_name ?? 'Unknown contact' }}
+              </p>
+              <p class="mt-0.5 text-xs text-zinc-500">
+                {{ contact?.phone ?? '—' }}
+                @if (contact?.source) {
+                  <span class="ml-1 inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200">
+                    {{ contact?.source }}
+                  </span>
+                }
+                <span class="ml-1 text-zinc-400">·</span>
+                <span class="ml-1 text-zinc-700">{{ item.budget ?? '—' }}</span>
+              </p>
+            </div>
+            <div class="flex flex-shrink-0 flex-col items-end gap-1">
+              <span
+                class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
+                [class]="statusClass($any(item).status)"
+              >
+                {{ statusLabel($any(item).status) }}
               </span>
-            }
-            <span class="ml-1 text-zinc-400">·</span>
-            <span class="ml-1 text-zinc-700">{{ item.budget ?? '—' }}</span>
+              <span class="text-[10px] text-zinc-500 tabular-nums">
+                {{ $any(item).last_activity_at | relativeTime }}
+              </span>
+            </div>
+          </div>
+          <p class="mt-1 text-[10px] text-zinc-500">
+            <lucide-icon name="user" class="mr-1 inline-block h-3 w-3 align-text-bottom" />
+            {{ ownerLabel($any(item).assigned_to_id) }}
           </p>
         </button>
       </ng-template>

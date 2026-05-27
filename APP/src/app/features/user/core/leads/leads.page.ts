@@ -24,15 +24,19 @@ import {
 } from '../pipelines/pipelines-api.service';
 import { PipelineBoardComponent } from '../pipelines/pipeline-board.component';
 import { PipelineListComponent } from '../pipelines/pipeline-list.component';
+import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
+import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { LeadCardComponent } from './lead-card.component';
 import { LeadFormModalComponent } from './lead-form-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 import {
   Lead,
   LeadCreate,
+  LeadSortKey,
   LeadStatus,
   LeadUpdate,
   LeadsApiService,
+  SortOrder,
 } from './leads-api.service';
 
 /**
@@ -71,6 +75,7 @@ interface ContactSummary {
     PipelineListComponent,
     LeadCardComponent,
     LeadFormModalComponent,
+    RelativeTimePipe,
   ],
   templateUrl: './leads.page.html',
 })
@@ -81,6 +86,7 @@ export class LeadsPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(FurnitureAuthService);
+  private readonly usersDir = inject(UsersDirectoryService);
 
   /** Gates the "Import" header button; backend enforces too. */
   protected readonly canImport = computed(() =>
@@ -94,6 +100,36 @@ export class LeadsPageComponent {
   readonly view = signal<View>('pipeline');
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly sourceControl = new FormControl('', { nonNullable: true });
+  /** Assignee filter. `''` = all; `'me'` resolves to current user;
+   * `'unassigned'` filters `assigned_to_id IS NULL`; UUID = that user. */
+  readonly assigneeControl = new FormControl<string>('', { nonNullable: true });
+  /** Status chip filter: `''` = all, otherwise `active | won | lost`. */
+  readonly statusControl = new FormControl<string>('', { nonNullable: true });
+
+  /** Sort state — backend whitelist is created_at / last_activity_at /
+   * contact_name. Default newest-created first, matches the prior server
+   * default so existing users see no change. */
+  readonly sortKey = signal<LeadSortKey>('created_at');
+  readonly sortOrder = signal<SortOrder>('desc');
+
+  /** "No activity in N days" chip — translates to `last_activity_lt`. */
+  readonly noActivityFilter = signal<'' | '7d' | '14d' | '30d'>('');
+
+  /** Visibility scope: which leads to show before any other filter.
+   * Junior reps default to "mine" and don't see the toggle; managers
+   * default to "team"; admin/owner default to "all". */
+  readonly scope = signal<'mine' | 'team' | 'all'>(this.defaultScopeForRole());
+
+  /** Cached user list for the assignee dropdown. */
+  readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
+
+  /** Owner-id → "Full Name" lookup so list rows can render a name
+   * without round-tripping per row. */
+  readonly userMap = computed(() => {
+    const map = new Map<string, string>();
+    for (const u of this.users()) map.set(u.id, u.full_name);
+    return map;
+  });
 
   private readonly q = toSignal(
     this.searchControl.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
@@ -157,6 +193,12 @@ export class LeadsPageComponent {
     this.sourceControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.reload());
+    this.assigneeControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.reload());
+    this.statusControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.reload());
 
     // Whenever leads change, fetch any contacts we don't already have cached.
     effect(() => {
@@ -197,6 +239,11 @@ export class LeadsPageComponent {
       .list({
         q: this.q() || undefined,
         source: this.sourceFilter() || undefined,
+        status: (this.statusControl.value as LeadStatus) || undefined,
+        assigned_to: this.resolveAssignee(),
+        last_activity_lt: this.resolveNoActivityCutoff() ?? undefined,
+        sort: this.sortKey(),
+        order: this.sortOrder(),
         size: 100,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -211,6 +258,95 @@ export class LeadsPageComponent {
           this.loadError.set(extractApiError(err) ?? 'Could not load leads.');
         },
       });
+  }
+
+  /** Resolve the assignee filter to a value the backend understands.
+   * `''` (no filter) → undefined. `'me'` → current user id. `'unassigned'`
+   * → undefined (special-case handled in Step 3 with a dedicated server
+   * param; for now we surface "All" rows when picked, so the chip is
+   * visible but inert until that lands). UUID → that UUID. */
+  private resolveAssignee(): string | undefined {
+    const raw = this.assigneeControl.value;
+    if (!raw) return undefined;
+    if (raw === 'me') return this.auth.currentUserId() ?? undefined;
+    if (raw === 'unassigned') return undefined;
+    return raw;
+  }
+
+  /** Translate the no-activity chip to an ISO timestamp the backend
+   * `last_activity_lt` param accepts. Returns null when no chip is
+   * active so the caller can omit the param. */
+  private resolveNoActivityCutoff(): string | null {
+    const choice = this.noActivityFilter();
+    if (!choice) return null;
+    const days = choice === '7d' ? 7 : choice === '14d' ? 14 : 30;
+    const cutoff = new Date(Date.now() - days * 86_400_000);
+    return cutoff.toISOString();
+  }
+
+  protected toggleSort(key: LeadSortKey): void {
+    if (this.sortKey() === key) {
+      this.sortOrder.update((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      this.sortKey.set(key);
+      this.sortOrder.set(key === 'contact_name' ? 'asc' : 'desc');
+    }
+    this.reload();
+  }
+
+  protected setStatus(value: string): void {
+    this.statusControl.setValue(value);
+  }
+
+  protected setScope(value: 'mine' | 'team' | 'all'): void {
+    this.scope.set(value);
+    this.reload();
+  }
+
+  protected setNoActivity(value: '' | '7d' | '14d' | '30d'): void {
+    this.noActivityFilter.set(value);
+    this.reload();
+  }
+
+  /** Default visibility based on the user's role. Junior reps see only
+   * their leads; managers see their team; admin/owner see all. Roles
+   * the codebase ships with — Owner, Admin, Sales Manager, Employee
+   * etc. — are matched by template name. */
+  private defaultScopeForRole(): 'mine' | 'team' | 'all' {
+    const role = this.auth.currentRoleName();
+    if (!role) return 'mine';
+    const r = role.toLowerCase();
+    if (r === 'owner' || r === 'admin') return 'all';
+    if (r.includes('manager')) return 'team';
+    return 'mine';
+  }
+
+  /** Whether the scope toggle should be visible. Junior staff get the
+   * implicit "mine" default with no toggle — keeps their view focused. */
+  protected readonly canChangeScope = computed(() => {
+    const role = this.auth.currentRoleName().toLowerCase();
+    return role === 'owner' || role === 'admin' || role.includes('manager');
+  });
+
+  /** Tailwind class string for a status pill. */
+  protected statusClass(s: LeadStatus): string {
+    switch (s) {
+      case 'won':
+        return 'bg-emerald-100 text-emerald-800 ring-emerald-200';
+      case 'lost':
+        return 'bg-rose-100 text-rose-800 ring-rose-200';
+      default:
+        return 'bg-blue-100 text-blue-800 ring-blue-200';
+    }
+  }
+
+  protected statusLabel(s: LeadStatus): string {
+    return s === 'active' ? 'Active' : s === 'won' ? 'Won' : 'Lost';
+  }
+
+  protected ownerLabel(assignedTo: string | null): string {
+    if (!assignedTo) return 'Unassigned';
+    return this.userMap().get(assignedTo) ?? 'Unknown';
   }
 
   protected onItemMoved(event: ItemMovedEvent): void {

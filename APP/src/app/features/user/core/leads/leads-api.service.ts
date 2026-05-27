@@ -27,11 +27,17 @@ export interface Lead {
   budget: string | null;
   expected_close_date: string | null;
   custom_data: Record<string, unknown>;
+  last_activity_at: string | null;
+  lost_reason: string | null;
+  lost_reason_other: string | null;
   created_at: string;
   updated_at: string;
   /** Index signature so `Lead` is structurally compatible with `PipelineItem`. */
   [key: string]: unknown;
 }
+
+export type LeadSortKey = 'created_at' | 'last_activity_at' | 'contact_name';
+export type SortOrder = 'asc' | 'desc';
 
 export interface LeadListResponse {
   items: Lead[];
@@ -57,14 +63,24 @@ export type LeadUpdate = Partial<{
   budget: string | null;
   expected_close_date: string | null;
   custom_data: Record<string, unknown>;
+  lost_reason: string | null;
+  lost_reason_other: string | null;
 }>;
 
 export interface LeadListQuery {
   stage?: string;
   status?: LeadStatus;
-  assigned_to?: string;
+  assigned_to?: string | null;
   q?: string;
   source?: string;
+  /** ISO timestamps for the no-activity chip. `lt` returns rows older
+   * than the cutoff OR with a NULL `last_activity_at` — the backend
+   * treats never-touched leads as "very old" so they surface in the
+   * "no activity > N days" filter. */
+  last_activity_lt?: string;
+  last_activity_gt?: string;
+  sort?: LeadSortKey;
+  order?: SortOrder;
   page?: number;
   size?: number;
   customFilters?: Record<string, string>;
@@ -83,6 +99,14 @@ export class LeadsApiService {
     if (query.assigned_to) params = params.set('assigned_to', query.assigned_to);
     if (query.q) params = params.set('q', query.q);
     if (query.source) params = params.set('source', query.source);
+    if (query.last_activity_lt) {
+      params = params.set('last_activity_lt', query.last_activity_lt);
+    }
+    if (query.last_activity_gt) {
+      params = params.set('last_activity_gt', query.last_activity_gt);
+    }
+    if (query.sort) params = params.set('sort', query.sort);
+    if (query.order) params = params.set('order', query.order);
     if (query.page) params = params.set('page', String(query.page));
     if (query.size) params = params.set('size', String(query.size));
     if (query.customFilters) {
