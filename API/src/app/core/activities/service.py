@@ -23,16 +23,67 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.activities.models import Activity, ActivityType
+from src.app.core.contacts.models import Contact
 from src.app.shared.context import get_context
 from src.app.shared.db import async_session
 
 logger = logging.getLogger(__name__)
+
+
+# Dispatch table for the `last_activity_at` denormalisation hook.
+# Each parent entity that wants its `last_activity_at` column kept
+# fresh on every activity insert adds itself here. Starts with
+# `contact`; the other entity-update tracks (leads, walk-ins,
+# appointments, tasks) append their models in their own steps.
+_LAST_ACTIVITY_TABLES: dict[str, type] = {"contact": Contact}
+
+
+async def _bump_last_activity(
+    session: AsyncSession,
+    *,
+    entity_type: str,
+    entity_id: uuid.UUID,
+    timestamp: datetime,
+) -> None:
+    """Bump the parent row's `last_activity_at` if it's older than `timestamp`.
+
+    Best-effort: a failure here (e.g. parent row deleted between the
+    activity insert and the bump) is logged and swallowed. The activity
+    row is the authoritative log; this column is a fast-path read.
+
+    Caller is responsible for committing the session. We deliberately
+    do NOT commit inside this helper so the bump rides on the same
+    transaction as the activity insert when called from `create_note`,
+    and on the dedicated short-lived session opened by `log()`.
+    """
+    table = _LAST_ACTIVITY_TABLES.get(entity_type)
+    if table is None:
+        return
+    try:
+        await session.execute(
+            update(table)
+            .where(table.id == entity_id)
+            .where(
+                or_(
+                    table.last_activity_at.is_(None),
+                    table.last_activity_at < timestamp,
+                )
+            )
+            .values(last_activity_at=timestamp)
+        )
+    except Exception:
+        logger.exception(
+            "last_activity_at bump failed (entity_type=%s, entity_id=%s)",
+            entity_type,
+            entity_id,
+        )
 
 
 async def log(
@@ -58,15 +109,21 @@ async def log(
 
     try:
         async with async_session() as session:
-            session.add(
-                Activity(
-                    org_id=resolved_org_id,
-                    entity_type=entity_type,
-                    entity_id=entity_id,
-                    type=type,
-                    payload=payload or {},
-                    user_id=resolved_user_id,
-                )
+            activity = Activity(
+                org_id=resolved_org_id,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                type=type,
+                payload=payload or {},
+                user_id=resolved_user_id,
+            )
+            session.add(activity)
+            await session.flush()
+            await _bump_last_activity(
+                session,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                timestamp=activity.created_at,
             )
             await session.commit()
     except Exception:
@@ -131,6 +188,13 @@ async def create_note(
         user_id=user_id,
     )
     session.add(activity)
+    await session.flush()
+    await _bump_last_activity(
+        session,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        timestamp=activity.created_at,
+    )
     await session.commit()
     await session.refresh(activity)
     return activity

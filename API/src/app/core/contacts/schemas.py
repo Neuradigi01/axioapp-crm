@@ -28,6 +28,7 @@ class ContactCreate(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=_TAG_COUNT_MAX)
     notes: str | None = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
+    assigned_to_id: uuid.UUID | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -42,7 +43,11 @@ class ContactCreate(BaseModel):
 
 
 class ContactUpdate(BaseModel):
-    """Every field optional. `custom_data` REPLACES (not merges) the JSONB."""
+    """Every field optional. `custom_data` REPLACES (not merges) the JSONB.
+
+    `last_activity_at` is intentionally absent — server-managed by the
+    activities-service insert hook; never accepted from the client.
+    """
 
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
     phone: str | None = Field(default=None, max_length=32)
@@ -51,6 +56,7 @@ class ContactUpdate(BaseModel):
     tags: list[str] | None = Field(default=None, max_length=_TAG_COUNT_MAX)
     notes: str | None = None
     custom_data: dict[str, Any] | None = None
+    assigned_to_id: uuid.UUID | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -67,6 +73,8 @@ class ContactOut(BaseModel):
     tags: list[str]
     notes: str | None
     custom_data: dict[str, Any]
+    assigned_to_id: uuid.UUID | None
+    last_activity_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -82,6 +90,8 @@ class ContactListItem(BaseModel):
     email: str | None
     source: str | None
     tags: list[str]
+    assigned_to_id: uuid.UUID | None
+    last_activity_at: datetime | None
     created_at: datetime
 
 

@@ -17,6 +17,7 @@ support arbitrary prefixed names.
 from __future__ import annotations
 
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,6 +61,11 @@ async def list_contacts_endpoint(
     q: str | None = Query(default=None, max_length=255),
     source: str | None = Query(default=None, max_length=64),
     tag: str | None = Query(default=None, max_length=64),
+    assigned_to_id: uuid.UUID | None = Query(default=None),
+    sort: Literal["full_name", "created_at", "last_activity_at"] = Query(
+        default="created_at"
+    ),
+    order: Literal["asc", "desc"] = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -70,7 +76,10 @@ async def list_contacts_endpoint(
         q=q,
         source=source,
         tag=tag,
+        assigned_to_id=assigned_to_id,
         custom_filters=_extract_custom_filters(request),
+        sort=sort,
+        order=order,
         page=page,
         size=size,
     )

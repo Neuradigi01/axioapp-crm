@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Any, Iterable
+from typing import Any, Iterable, Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, func, or_, select
@@ -33,6 +33,16 @@ from src.app.core.custom_fields.models import CustomFieldDefinition, FieldType
 
 _CONTACT_ENTITY = "contact"
 
+# Server-side whitelist for `?sort=`. Anything outside this set is
+# rejected at the router via FastAPI's Literal Query validation, but
+# we keep the dict here so the service can resolve the key → column
+# without exposing arbitrary attribute access.
+_SORT_COLUMNS = {
+    "full_name": Contact.full_name,
+    "created_at": Contact.created_at,
+    "last_activity_at": Contact.last_activity_at,
+}
+
 
 def _snapshot(contact: Contact) -> dict[str, Any]:
     """JSONB-friendly snapshot for audit `before`/`after`."""
@@ -45,6 +55,11 @@ def _snapshot(contact: Contact) -> dict[str, Any]:
         "tags": list(contact.tags),
         "notes": contact.notes,
         "custom_data": contact.custom_data,
+        "assigned_to_id": (
+            str(contact.assigned_to_id)
+            if contact.assigned_to_id is not None
+            else None
+        ),
     }
 
 
@@ -217,6 +232,7 @@ async def create_contact(
         tags=payload.cleaned_tags(),
         notes=payload.notes,
         custom_data=cleaned_custom,
+        assigned_to_id=payload.assigned_to_id,
     )
     session.add(contact)
     await session.commit()
@@ -303,7 +319,10 @@ async def list_contacts(
     q: str | None = None,
     source: str | None = None,
     tag: str | None = None,
+    assigned_to_id: uuid.UUID | None = None,
     custom_filters: Iterable[tuple[str, str]] = (),
+    sort: Literal["full_name", "created_at", "last_activity_at"] = "created_at",
+    order: Literal["asc", "desc"] = "desc",
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Contact], int]:
@@ -313,10 +332,16 @@ async def list_contacts(
       accelerates the full_name leg.
     - `source` is exact match.
     - `tag` checks the value is contained in the `tags` array.
+    - `assigned_to_id` filters by owner. None means no filter (show all);
+      the "show only unassigned" UI predicate is wired in Step 2 via a
+      separate query param so we don't overload the UUID semantic here.
     - `custom_filters` is an iterable of `(key, expected_string_value)`
       pairs that translate to `custom_data ->> key = :value`. String
       compare is intentional: it's what the master prompt example uses
       and avoids server-side type guessing.
+    - `sort` + `order` are server-whitelisted via `_SORT_COLUMNS`.
+      `last_activity_at desc` appends `NULLS LAST` so never-touched
+      contacts sink to the bottom.
     """
     filters: list[Any] = []
 
@@ -333,6 +358,8 @@ async def list_contacts(
         filters.append(Contact.source == source)
     if tag:
         filters.append(Contact.tags.contains([tag]))
+    if assigned_to_id is not None:
+        filters.append(Contact.assigned_to_id == assigned_to_id)
     for key, value in custom_filters:
         filters.append(Contact.custom_data[key].astext == value)
 
@@ -343,7 +370,16 @@ async def list_contacts(
         base = base.where(where)
         count_stmt = count_stmt.where(where)
 
-    base = base.order_by(Contact.created_at.desc(), Contact.id.desc())
+    sort_col = _SORT_COLUMNS[sort]
+    if sort == "last_activity_at":
+        primary = sort_col.asc().nulls_last() if order == "asc" else sort_col.desc().nulls_last()
+    else:
+        primary = sort_col.asc() if order == "asc" else sort_col.desc()
+    # Stable tiebreaker on `id` so paginated pages don't shuffle when
+    # multiple rows share the same sort key (e.g. created in the same
+    # transaction, or `last_activity_at IS NULL` on multiple rows).
+    base = base.order_by(primary, Contact.id.desc())
+
     total = (await session.execute(count_stmt)).scalar_one()
     rows = (
         await session.execute(base.offset((page - 1) * size).limit(size))

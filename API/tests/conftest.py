@@ -235,35 +235,102 @@ async def layered_client():
 
 @pytest_asyncio.fixture
 async def seeded_admin():
-    """One org + admin role + admin user. The user's password is `Admin@123`.
+    """One org + admin role + admin user. Password is `Admin@123`.
 
-    Returns a dict with the inserted objects. Yields a TestSession-managed
-    snapshot — IDs are stable across the test.
+    Builds the post-DR.7 three-table user layout (`tbl_user_login` +
+    `tbl_user_info` + `tbl_organization_members`):
+      - `Organization` (UUID id, unique slug per test) — TenantScoped parent.
+      - `Role` (UUID id, scoped to the org, name='admin', is_system=true).
+      - `tbl_user_login` (BigInteger id, legacy_uuid UUID, password, is_active).
+        Uses the legacy `UserLogin` class for INSERT because the layered
+        `User` mapper excludes the legacy `user_id` text login-handle (NOT
+        NULL on the table). `legacy_uuid` is set with a raw UPDATE because
+        the legacy class doesn't map it.
+      - `tbl_user_info` (member_id → tbl_user_login.id, first_name, email).
+      - `tbl_organization_members` (org_id, user_member_id, role_id,
+        is_active=true, status='active').
+
+    Returns dict keyed by `org`, `role`, `user` (layered `User` instance with
+    selectin relationships populated → `.email`, `.org_id`, `.role_id`
+    properties resolve correctly), `password` (plaintext).
     """
     import uuid as _uuid
 
-    from src.app.core.tenants.models import Organization
-    from src.app.core.users.models import User
-    from src.app.core.permissions.models import Role
-    from src.app.shared.security.password import hash_password as _hp
+    from sqlalchemy import select, text as sql_text
 
-    org = Organization(id=_uuid.uuid4(), name="Demo", slug=f"demo-{_uuid.uuid4().hex[:6]}")
-    role = Role(id=_uuid.uuid4(), org_id=org.id, name="admin", is_system=True)
-    user = User(
-        id=_uuid.uuid4(),
-        org_id=org.id,
-        email="admin@demo.local",
-        password_hash=_hp("Admin@123"),
-        full_name="Admin",
-        role_id=role.id,
+    from src.app.core.permissions.models import Role
+    from src.app.core.tenants.models import Organization
+    from src.app.core.users.models import OrganizationMember, User
+    from src.app.shared.security.password import hash_password as _hp
+    from src.models.user import UserInfo as LegacyUserInfo, UserLogin
+
+    org_uuid = _uuid.uuid4()
+    role_uuid = _uuid.uuid4()
+    user_uuid = _uuid.uuid4()
+    slug = f"demo-{_uuid.uuid4().hex[:6]}"
+    login_handle = f"test-{_uuid.uuid4().hex[:8]}"
+
+    org = Organization(id=org_uuid, name="Demo", slug=slug)
+    role = Role(id=role_uuid, org_id=org_uuid, name="admin", is_system=True)
+    user_login = UserLogin(
+        user_id=login_handle,
+        password=_hp("Admin@123"),
         is_active=True,
     )
+
     async with TestSession() as session:
         session.add(org)
         await session.flush()
         session.add(role)
         await session.flush()
-        session.add(user)
+
+        session.add(user_login)
+        await session.flush()  # populates user_login.id (bigint)
+
+        # `legacy_uuid` lives on `tbl_user_login` (DR.6.1) but the legacy
+        # mapper doesn't include it. Set via raw UPDATE.
+        await session.execute(
+            sql_text("UPDATE tbl_user_login SET legacy_uuid = :uuid WHERE id = :id"),
+            {"uuid": str(user_uuid), "id": user_login.id},
+        )
+
+        # The `users` shim Table (UUID id PK) is what every cross-table
+        # `user_id UUID` FK in the codebase still references — auth_sessions,
+        # audit_logs, staff_sessions, demo_credentials. In production the
+        # DR.6 migrations populated `users(id)` for the existing user set
+        # and ongoing flows mirror new logins into it; in a fresh test DB
+        # the shim is empty so any post-login flow (e.g. AuthSession insert)
+        # FK-violates. Insert the mirror row here.
+        await session.execute(
+            sql_text("INSERT INTO users (id) VALUES (:uuid) ON CONFLICT DO NOTHING"),
+            {"uuid": str(user_uuid)},
+        )
+
+        session.add(
+            LegacyUserInfo(
+                member_id=user_login.id,
+                first_name="Admin",
+                last_name="User",
+                email="admin@demo.local",
+                mobile_no="0000000000",
+            )
+        )
+        session.add(
+            OrganizationMember(
+                organization_id=org_uuid,
+                user_member_id=user_login.id,
+                role_id=role_uuid,
+                status="active",
+                is_active=True,
+                is_demo=False,
+            )
+        )
         await session.commit()
+
+        # Re-fetch the layered `User` so `.info` and `.memberships` populate
+        # via selectin. Tests rely on the @property aliases (.email, .org_id,
+        # .role_id) which read off those relationships.
+        result = await session.execute(select(User).where(User.id == user_login.id))
+        user = result.scalar_one()
 
     return {"org": org, "role": role, "user": user, "password": "Admin@123"}
