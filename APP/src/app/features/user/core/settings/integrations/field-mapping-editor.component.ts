@@ -75,7 +75,7 @@ export class FieldMappingEditorComponent {
   /** Ad-platform field names — passed in by the parent which already
    *  fetched the form definition. The dropdowns iterate these. */
   readonly formFields = input.required<ReadonlyArray<string>>();
-  /** Human label for the modal header, e.g. "Mumbai Showroom Form". */
+  /** Human label for the modal header — the form's display name. */
   readonly formLabel = input<string | null>(null);
 
   /** Emitted when the modal should close — backdrop click, Cancel,
