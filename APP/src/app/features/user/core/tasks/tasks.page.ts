@@ -8,13 +8,29 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { environment } from '../../../../../environments/environment';
 import { FurnitureAuthService } from '../auth/auth.service';
+import {
+  BulkAction,
+  BulkActionBarComponent,
+} from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
+import {
+  UrlFilterStateConfig,
+  UrlFilterStateDirective,
+} from '../shared/directives/url-filter-state.directive';
+import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
+import {
+  ReassignConfirm,
+  ReassignModalComponent,
+} from '../shared/reassign-modal/reassign-modal.component';
+import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 import {
@@ -55,7 +71,17 @@ interface ChipDef {
   selector: 'app-tasks-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule, TaskFormModalComponent],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    LucideAngularModule,
+    TaskFormModalComponent,
+    BulkActionBarComponent,
+    ConfirmDialogComponent,
+    ReassignModalComponent,
+    UrlFilterStateDirective,
+    RelativeTimePipe,
+  ],
   templateUrl: './tasks.page.html',
 })
 export class TasksPageComponent {
@@ -63,6 +89,7 @@ export class TasksPageComponent {
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
+  private readonly usersDir = inject(UsersDirectoryService);
 
   protected readonly items = signal<Task[]>([]);
   protected readonly total = signal<number>(0);
@@ -93,6 +120,81 @@ export class TasksPageComponent {
 
   protected readonly modalOpen = signal(false);
   protected readonly editingTask = signal<Task | null>(null);
+
+  // --- Assignee dropdown (Step 2) ----------------------------------------
+
+  /** Owner filter — `'' | 'me' | <uuid>`. Orthogonal to chips: chips set
+   * scope (mine vs all + status/due), this narrows whatever scope is
+   * showing to one user. */
+  readonly assigneeControl = new FormControl<string>('', { nonNullable: true });
+
+  /** Directory of org users for the dropdown. Cached by `UsersDirectoryService`,
+   * so this is cheap to read across the page. */
+  readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
+
+  // --- Selection + bulk (Step 2) -----------------------------------------
+
+  readonly selectedIds = signal<Set<string>>(new Set());
+  readonly selectedCount = computed(() => this.selectedIds().size);
+
+  readonly bulkActions = computed<BulkAction[]>(() => [
+    { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'tasks.write' },
+    { key: 'done', label: 'Mark done', icon: 'check-circle-2', permissionKey: 'tasks.write' },
+    { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'tasks.write' },
+  ]);
+
+  readonly bulkModal = signal<'reassign' | 'done' | 'delete' | null>(null);
+  readonly bulkSubmitting = signal(false);
+  readonly bulkError = signal<string | null>(null);
+
+  // --- URL state (Step 2) ------------------------------------------------
+
+  readonly urlState: UrlFilterStateConfig = {
+    chip: {
+      read: () => this.activeChip(),
+      write: (v) => {
+        if (
+          v === 'all' ||
+          v === 'mine' ||
+          v === 'overdue' ||
+          v === 'today' ||
+          v === 'done'
+        ) {
+          this.selectChip(v);
+        }
+      },
+      queryKey: 'chip',
+    },
+    assignee: {
+      read: () => this.assigneeControl.value,
+      write: (v) => this.assigneeControl.setValue(v),
+      queryKey: 'assignee',
+    },
+    sort_by: {
+      read: () => this.sortBy(),
+      write: (v) => {
+        if (
+          v === 'due_at' ||
+          v === 'priority' ||
+          v === 'title' ||
+          v === 'created_at' ||
+          v === 'last_activity_at'
+        ) {
+          this.sortBy.set(v);
+        }
+      },
+      queryKey: 'sort',
+      defaultValue: 'due_at',
+    },
+    sort_dir: {
+      read: () => this.sortDir(),
+      write: (v) => {
+        if (v === 'asc' || v === 'desc') this.sortDir.set(v);
+      },
+      queryKey: 'order',
+      defaultValue: 'asc',
+    },
+  };
 
   protected readonly chips = computed<ChipDef[]>(() => {
     const base: ChipDef[] = [];
@@ -166,6 +268,10 @@ export class TasksPageComponent {
         this.q.set((v ?? '').trim());
         this.fetch();
       });
+
+    this.assigneeControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.fetch());
 
     // Re-fetch whenever any of the filter signals change. The first
     // run is suppressed because nothing is set up yet — guarded by
@@ -332,6 +438,7 @@ export class TasksPageComponent {
       due_filter: this.dueFilter(),
       sort_by: this.sortBy(),
       sort_dir: this.sortDir(),
+      assigned_to_id: this.resolveAssignee(),
       size: 100,
     };
 
@@ -369,5 +476,127 @@ export class TasksPageComponent {
         // (it hides the dropdown and defaults to the caller).
         error: () => this.assignees.set([]),
       });
+  }
+
+  // --- Selection (Step 2) ------------------------------------------------
+
+  protected toggleRow(id: string, event: Event): void {
+    event.stopPropagation();
+    this.selectedIds.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  protected isSelected(id: string): boolean {
+    return this.selectedIds().has(id);
+  }
+
+  protected clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  // --- Bulk handlers (Step 2) -------------------------------------------
+
+  protected onBulkAction(key: string): void {
+    this.bulkError.set(null);
+    if (key === 'reassign') this.bulkModal.set('reassign');
+    else if (key === 'done') this.bulkModal.set('done');
+    else if (key === 'delete') this.bulkModal.set('delete');
+  }
+
+  protected closeBulkModal(): void {
+    this.bulkModal.set(null);
+    this.bulkSubmitting.set(false);
+    this.bulkError.set(null);
+  }
+
+  protected onBulkReassign(payload: ReassignConfirm): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    if (!payload.userId) {
+      this.bulkError.set('Tasks require an owner — pick a user.');
+      return;
+    }
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkReassign(ids, { userId: payload.userId, note: payload.note })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.fetch();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(extractApiError(err) ?? 'Could not reassign tasks.');
+        },
+      });
+  }
+
+  protected onBulkMarkDone(): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkMarkDone(ids)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          if (result.skipped > 0) {
+            this.loadError.set(
+              `${result.done} marked done; ${result.skipped} skipped (already done).`,
+            );
+          }
+          this.fetch();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(
+            extractApiError(err) ?? 'Could not mark tasks done.',
+          );
+        },
+      });
+  }
+
+  protected onBulkDelete(): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkSubmitting.set(true);
+    this.bulkError.set(null);
+    this.api
+      .bulkDelete(ids)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.fetch();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkSubmitting.set(false);
+          this.bulkError.set(extractApiError(err) ?? 'Could not delete tasks.');
+        },
+      });
+  }
+
+  /** Resolve the assignee dropdown value into the backend's
+   * `assigned_to_id` query param. `''` → undefined; `'me'` → current
+   * user; UUID → that UUID. */
+  private resolveAssignee(): string | undefined {
+    const raw = this.assigneeControl.value;
+    if (!raw) return undefined;
+    if (raw === 'me') return this.callerUuid() ?? undefined;
+    return raw;
   }
 }

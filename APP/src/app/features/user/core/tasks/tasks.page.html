@@ -1,4 +1,4 @@
-<div class="px-6 py-6">
+<div class="px-6 py-6" [appUrlFilterState]="urlState">
 
   <!-- Header -->
   <header class="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -28,7 +28,7 @@
     </button>
   </header>
 
-  <!-- Chips + search -->
+  <!-- Chips + assignee dropdown + search -->
   <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
     <div class="flex flex-wrap items-center gap-2">
       @for (c of chips(); track c.key) {
@@ -43,6 +43,21 @@
           {{ c.label }}
         </button>
       }
+
+      <!-- Assignee dropdown — orthogonal to chips. Selecting "All
+           owners" leaves the chip scope in charge; picking a user
+           narrows the visible list to that owner. -->
+      <select
+        [formControl]="assigneeControl"
+        class="rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        aria-label="Filter by assignee"
+      >
+        <option value="">All owners</option>
+        <option value="me">Me</option>
+        @for (u of users(); track u.id) {
+          <option [value]="u.id">{{ u.full_name }}</option>
+        }
+      </select>
     </div>
     <input
       [formControl]="searchCtrl"
@@ -82,6 +97,7 @@
         <thead class="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
           <tr>
             <th class="w-10 px-3 py-2"></th>
+            <th class="w-10 px-3 py-2"></th>
             <th
               class="cursor-pointer px-3 py-2 text-left font-medium hover:text-zinc-900"
               (click)="setSort('title')"
@@ -109,13 +125,37 @@
                 <span class="ml-1 text-zinc-400">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
               }
             </th>
+            <th
+              class="cursor-pointer px-3 py-2 text-right font-medium hover:text-zinc-900"
+              (click)="setSort('last_activity_at')"
+            >
+              Last activity
+              @if (sortBy() === 'last_activity_at') {
+                <span class="ml-1 text-zinc-400">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
+              }
+            </th>
             <th class="px-3 py-2 text-left font-medium">Assignee</th>
             <th class="px-3 py-2 text-left font-medium">Related</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-100">
           @for (t of items(); track t.id) {
-            <tr class="group hover:bg-zinc-50">
+            <tr
+              class="group hover:bg-zinc-50"
+              [class.bg-zinc-50]="isSelected(t.id)"
+            >
+              <!-- Selection checkbox (Step 2). Separate from the
+                   quick-complete checkbox below. -->
+              <td class="px-3 py-2 align-middle" (click)="$event.stopPropagation()">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                  [checked]="isSelected(t.id)"
+                  (click)="toggleRow(t.id, $event)"
+                  [attr.aria-label]="'Select task ' + t.title"
+                />
+              </td>
+              <!-- Existing quick-complete checkbox. -->
               <td class="px-3 py-2 align-middle">
                 <input
                   type="checkbox"
@@ -153,6 +193,9 @@
                   {{ formatDue(t.due_at) }}
                 </span>
               </td>
+              <td class="whitespace-nowrap px-3 py-2 text-right text-xs text-zinc-600 tabular-nums">
+                {{ t.last_activity_at | relativeTime }}
+              </td>
               <td class="px-3 py-2 text-xs text-zinc-600">
                 {{ assigneeName(t) }}
               </td>
@@ -180,5 +223,50 @@
     [callerUuid]="callerUuid()"
     (saved)="onSaved()"
     (cancelled)="closeModal()"
+  />
+}
+
+<!-- Bulk action bar -->
+<app-bulk-action-bar
+  [selectedCount]="selectedCount()"
+  [actions]="bulkActions()"
+  (action)="onBulkAction($event)"
+  (clear)="clearSelection()"
+/>
+
+<!-- Bulk reassign modal -->
+@if (bulkModal() === 'reassign') {
+  <app-reassign-modal
+    [entityLabel]="'task'"
+    [count]="selectedCount()"
+    [submitting]="bulkSubmitting()"
+    [error]="bulkError()"
+    (confirm)="onBulkReassign($event)"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Bulk mark-done confirm -->
+@if (bulkModal() === 'done') {
+  <app-confirm-dialog
+    [title]="'Mark ' + selectedCount() + ' task' + (selectedCount() === 1 ? '' : 's') + ' as done?'"
+    [body]="'Already-done tasks are skipped.'"
+    [confirmLabel]="'Mark done'"
+    [submitting]="bulkSubmitting()"
+    (confirm)="onBulkMarkDone()"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Bulk delete confirm -->
+@if (bulkModal() === 'delete') {
+  <app-confirm-dialog
+    [title]="'Delete ' + selectedCount() + ' task' + (selectedCount() === 1 ? '' : 's') + '?'"
+    [body]="'This cannot be undone.'"
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    [submitting]="bulkSubmitting()"
+    (confirm)="onBulkDelete()"
+    (cancel)="closeBulkModal()"
   />
 }

@@ -12,7 +12,12 @@ import { environment } from '../../../../../environments/environment';
 export type TaskStatus = 'open' | 'done' | 'cancelled';
 export type TaskPriority = 'low' | 'med' | 'high';
 export type TaskDueFilter = 'today' | 'overdue' | 'upcoming';
-export type TaskSortBy = 'due_at' | 'priority' | 'title' | 'created_at';
+export type TaskSortBy =
+  | 'due_at'
+  | 'priority'
+  | 'title'
+  | 'created_at'
+  | 'last_activity_at';
 export type TaskSortDir = 'asc' | 'desc';
 
 export interface TaskListFilters {
@@ -38,6 +43,7 @@ export interface Task {
   related_entity_id: string | null;
   status: TaskStatus;
   priority: TaskPriority;
+  last_activity_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -127,5 +133,39 @@ export class TasksApiService {
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
+  }
+
+  /** Bulk reassign N tasks to `userId`. Tasks require an owner — the
+   * server rejects null. Audit `reassign` activities are written per
+   * row. */
+  bulkReassign(
+    ids: string[],
+    body: { userId: string; note?: string | null },
+  ): Observable<{ reassigned: number }> {
+    return this.http.post<{ reassigned: number }>(
+      `${this.base}/bulk-reassign`,
+      {
+        ids,
+        assigned_to_id: body.userId,
+        note: body.note ?? null,
+      },
+    );
+  }
+
+  /** Bulk mark-done. Already-done rows are skipped (counted). Returns
+   * `{done, skipped}` so the FE can surface partial success. */
+  bulkMarkDone(
+    ids: string[],
+  ): Observable<{ done: number; skipped: number }> {
+    return this.http.post<{ done: number; skipped: number }>(
+      `${this.base}/bulk-mark-done`,
+      { ids },
+    );
+  }
+
+  bulkDelete(ids: string[]): Observable<{ deleted: number }> {
+    return this.http.post<{ deleted: number }>(`${this.base}/bulk-delete`, {
+      ids,
+    });
   }
 }
