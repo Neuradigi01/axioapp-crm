@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
@@ -36,9 +36,20 @@ from src.app.core.walk_ins.schemas import (
     WalkInCreate,
     WalkInUpdate,
 )
+from src.app.core.walk_ins.status_workflow import ALLOWED_TRANSITIONS
 
 
 _WALK_IN_ENTITY = "walk_in"
+
+
+# Server-side sort whitelist. The router rejects anything outside via
+# FastAPI Literal validation; the service uses this dict to resolve key
+# → SQLA column without exposing arbitrary attribute access.
+_SORT_COLUMNS = {
+    "time_in": WalkIn.time_in,
+    "created_at": WalkIn.created_at,
+    "last_activity_at": WalkIn.last_activity_at,
+}
 
 
 def _snapshot(w: WalkIn) -> dict[str, Any]:
@@ -263,6 +274,32 @@ async def update_walk_in(
 
     before = _snapshot(walk_in)
     changes = payload.model_dump(exclude_unset=True)
+
+    # State-machine enforcement: only allow status transitions declared
+    # in `ALLOWED_TRANSITIONS`. Identity transitions (X → X) are no-ops
+    # at the data layer but we accept them so a PATCH that re-sends the
+    # current status alongside other field changes still succeeds.
+    if "status" in changes and changes["status"] is not None:
+        new_status = changes["status"]
+        # Pydantic deserialises status as WalkInStatus when typed; allow
+        # either the enum or its `.value` string to flow through.
+        new_value = (
+            new_status.value
+            if isinstance(new_status, WalkInStatus)
+            else str(new_status)
+        )
+        current = walk_in.status.value
+        if new_value != current:
+            allowed = ALLOWED_TRANSITIONS.get(current, frozenset())
+            if new_value not in allowed:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"invalid walk-in status transition "
+                        f"{current!r} → {new_value!r}"
+                    ),
+                )
+
     if "custom_data" in changes:
         changes["custom_data"] = await _validate_custom_data(
             session,
@@ -309,11 +346,24 @@ async def list_walk_ins(
     status_filter: Optional[WalkInStatus] = None,
     assigned_to: Optional[uuid.UUID] = None,
     open_only: bool = False,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    sort: Literal["time_in", "created_at", "last_activity_at"] = "time_in",
+    order: Literal["asc", "desc"] = "desc",
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[WalkIn], int]:
-    """Paginated list. `open_only=True` filters to rows with no
-    `time_out` (currently in-store)."""
+    """Paginated list with filters.
+
+    - `status_filter` / `assigned_to` — exact-match scoping.
+    - `open_only=True` filters to rows with no `time_out` (currently
+      in-store). Front-desk dashboards default this on.
+    - `date_from` / `date_to` — `time_in` window. Powers the
+      "Today / This week / This month" FE chips (Step 2).
+    - `sort` is server-whitelisted via `_SORT_COLUMNS`.
+      `last_activity_at desc` appends `NULLS LAST` so never-touched
+      walk-ins sink to the bottom.
+    """
     filters: list[Any] = []
     if status_filter is not None:
         filters.append(WalkIn.status == status_filter)
@@ -321,6 +371,10 @@ async def list_walk_ins(
         filters.append(WalkIn.assigned_to_id == assigned_to)
     if open_only:
         filters.append(WalkIn.time_out.is_(None))
+    if date_from is not None:
+        filters.append(WalkIn.time_in >= date_from)
+    if date_to is not None:
+        filters.append(WalkIn.time_in <= date_to)
 
     where = and_(*filters) if filters else None
 
@@ -329,7 +383,13 @@ async def list_walk_ins(
     if where is not None:
         base = base.where(where)
         count_stmt = count_stmt.where(where)
-    base = base.order_by(WalkIn.time_in.desc(), WalkIn.id.desc())
+
+    sort_col = _SORT_COLUMNS[sort]
+    if sort == "last_activity_at":
+        primary = sort_col.asc().nulls_last() if order == "asc" else sort_col.desc().nulls_last()
+    else:
+        primary = sort_col.asc() if order == "asc" else sort_col.desc()
+    base = base.order_by(primary, WalkIn.id.desc())
 
     total = (await session.execute(count_stmt)).scalar_one()
     rows = (

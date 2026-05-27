@@ -16,5 +16,5 @@ MODULE = ModuleDescriptor(
     route="/api/v1/walk-ins",
     frontend_route="/user/walk-ins",
     menu_position=220,
-    permissions=["walkins.read", "walkins.write"],
+    permissions=["walkins.read", "walkins.write", "walkins.reassign"],
 )

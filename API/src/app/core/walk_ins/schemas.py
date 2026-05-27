@@ -74,6 +74,7 @@ class WalkInOut(BaseModel):
     status: WalkInStatus
     notes: Optional[str]
     custom_data: dict[str, Any]
+    last_activity_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
 

@@ -105,6 +105,13 @@ class WalkIn(Base, TenantScoped):
         nullable=False,
         server_default=text("'{}'::jsonb"),
     )
+    # Denormalised "newest activity timestamp" — bumped by the
+    # activities-service insert hook. Mirrors contacts / leads.
+    # Source of truth lives in the `activities` table.
+    last_activity_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

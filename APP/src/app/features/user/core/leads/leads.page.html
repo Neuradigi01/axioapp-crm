@@ -115,14 +115,7 @@
          and list views. -->
     <select
       [value]="sortKey() + ':' + sortOrder()"
-      (change)="
-        $any($event.target).value === 'created_at:desc' ? (sortKey.set('created_at') || sortOrder.set('desc') || reload()) :
-        $any($event.target).value === 'created_at:asc'  ? (sortKey.set('created_at') || sortOrder.set('asc')  || reload()) :
-        $any($event.target).value === 'last_activity_at:desc' ? (sortKey.set('last_activity_at') || sortOrder.set('desc') || reload()) :
-        $any($event.target).value === 'last_activity_at:asc'  ? (sortKey.set('last_activity_at') || sortOrder.set('asc')  || reload()) :
-        $any($event.target).value === 'contact_name:asc'  ? (sortKey.set('contact_name') || sortOrder.set('asc')  || reload()) :
-        $any($event.target).value === 'contact_name:desc' ? (sortKey.set('contact_name') || sortOrder.set('desc') || reload()) : null
-      "
+      (change)="setSort($any($event.target).value)"
       class="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       aria-label="Sort"
     >

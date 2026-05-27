@@ -26,7 +26,6 @@ import { PipelineBoardComponent } from '../pipelines/pipeline-board.component';
 import { PipelineListComponent } from '../pipelines/pipeline-list.component';
 import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
-import { MailLinkDirective } from '../shared/directives/mail-link.directive';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
 import {
   UrlFilterStateConfig,
@@ -97,7 +96,6 @@ interface ContactSummary {
     LostReasonModalComponent,
     PhoneLinkDirective,
     WhatsappLinkDirective,
-    MailLinkDirective,
   ],
   templateUrl: './leads.page.html',
 })
@@ -422,13 +420,33 @@ export class LeadsPageComponent {
     this.statusControl.setValue(value);
   }
 
-  protected setScope(value: 'mine' | 'team' | 'all'): void {
+  protected setScope(value: string): void {
+    if (value !== 'mine' && value !== 'team' && value !== 'all') return;
     this.scope.set(value);
     this.reload();
   }
 
-  protected setNoActivity(value: '' | '7d' | '14d' | '30d'): void {
+  protected setNoActivity(value: string): void {
+    if (value !== '' && value !== '7d' && value !== '14d' && value !== '30d') return;
     this.noActivityFilter.set(value);
+    this.reload();
+  }
+
+  /** Parse a `<sort>:<order>` token from the sort dropdown and update both
+   * signals + reload. Whitelisted to keep the URL state in lockstep with
+   * the backend's accepted sort keys. */
+  protected setSort(value: string): void {
+    const [key, order] = value.split(':');
+    if (
+      key !== 'created_at' &&
+      key !== 'last_activity_at' &&
+      key !== 'contact_name'
+    ) {
+      return;
+    }
+    if (order !== 'asc' && order !== 'desc') return;
+    this.sortKey.set(key);
+    this.sortOrder.set(order);
     this.reload();
   }
 

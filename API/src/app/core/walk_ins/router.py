@@ -13,7 +13,8 @@ Reads need `walkins.read`; writes need `walkins.write`.
 from __future__ import annotations
 
 import uuid
-from typing import Optional
+from datetime import datetime
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,6 +50,12 @@ async def list_walk_ins_endpoint(
     status_filter: Optional[WalkInStatus] = Query(default=None, alias="status"),
     assigned_to: Optional[uuid.UUID] = Query(default=None),
     open_only: bool = Query(default=False),
+    date_from: Optional[datetime] = Query(default=None),
+    date_to: Optional[datetime] = Query(default=None),
+    sort: Literal["time_in", "created_at", "last_activity_at"] = Query(
+        default="time_in"
+    ),
+    order: Literal["asc", "desc"] = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -59,6 +66,10 @@ async def list_walk_ins_endpoint(
         status_filter=status_filter,
         assigned_to=assigned_to,
         open_only=open_only,
+        date_from=date_from,
+        date_to=date_to,
+        sort=sort,
+        order=order,
         page=page,
         size=size,
     )
