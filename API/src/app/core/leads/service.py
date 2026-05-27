@@ -27,7 +27,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Literal, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, func, or_, select
@@ -40,9 +40,19 @@ from src.app.core.custom_fields.models import (
     FieldType,
 )
 from src.app.core.leads.models import Lead, LeadSource, LeadStatus
-from src.app.core.leads.schemas import LeadCreate, LeadUpdate
+from src.app.core.leads.schemas import LOST_REASONS, LeadCreate, LeadUpdate
 from src.app.core.pipelines import move_card
 from src.app.core.pipelines.service import get_pipeline_by_key
+
+
+# Server-side whitelist for `?sort=` on the list endpoint. Anything
+# outside this set is rejected at the router via FastAPI's Literal
+# Query validation. `contact_name` sorts via a JOIN to `contacts`.
+_SORT_COLUMNS = {
+    "created_at": Lead.created_at,
+    "last_activity_at": Lead.last_activity_at,
+    "contact_name": Contact.full_name,
+}
 
 
 _LEAD_ENTITY = "lead"
@@ -70,6 +80,8 @@ def _snapshot(lead: Lead) -> dict[str, Any]:
         ),
         "custom_data": lead.custom_data,
         "attribution": lead.attribution,
+        "lost_reason": lead.lost_reason,
+        "lost_reason_other": lead.lost_reason_other,
     }
 
 
@@ -371,6 +383,10 @@ async def list_leads(
     assigned_to: Optional[uuid.UUID] = None,
     q: Optional[str] = None,
     source: Optional[str] = None,
+    last_activity_lt: Optional[datetime] = None,
+    last_activity_gt: Optional[datetime] = None,
+    sort: Literal["created_at", "last_activity_at", "contact_name"] = "created_at",
+    order: Literal["asc", "desc"] = "desc",
     custom_filters: Iterable[tuple[str, str]] = (),
     page: int = 1,
     size: int = 50,
@@ -381,6 +397,15 @@ async def list_leads(
     person's name / phone / email / source without first looking up
     contact ids on the client. All other filters apply directly to the
     leads row.
+
+    `last_activity_lt` powers the "no activity in N days" chip — the FE
+    passes `now() - 7d` to get leads gone cold. `last_activity_gt` is
+    the inverse for "recently touched" if a future filter needs it.
+
+    `sort` keys are whitelisted via `_SORT_COLUMNS`; `contact_name`
+    forces the contacts JOIN even when `q`/`source` are absent.
+    `last_activity_at` desc appends `NULLS LAST` so never-touched
+    leads sink to the bottom.
     """
     filters: list[Any] = []
     needs_contact_join = False
@@ -391,6 +416,17 @@ async def list_leads(
         filters.append(Lead.status == status_filter)
     if assigned_to is not None:
         filters.append(Lead.assigned_to_id == assigned_to)
+    if last_activity_lt is not None:
+        # Treat NULL last_activity_at as "very old" so the no-activity
+        # chip surfaces never-touched leads, which is what reps want.
+        filters.append(
+            or_(
+                Lead.last_activity_at < last_activity_lt,
+                Lead.last_activity_at.is_(None),
+            )
+        )
+    if last_activity_gt is not None:
+        filters.append(Lead.last_activity_at > last_activity_gt)
     if q:
         like = f"%{q}%"
         filters.append(
@@ -407,6 +443,9 @@ async def list_leads(
     for key, value in custom_filters:
         filters.append(Lead.custom_data[key].astext == value)
 
+    if sort == "contact_name":
+        needs_contact_join = True
+
     where = and_(*filters) if filters else None
 
     base = select(Lead)
@@ -418,7 +457,12 @@ async def list_leads(
         base = base.where(where)
         count_stmt = count_stmt.where(where)
 
-    base = base.order_by(Lead.created_at.desc(), Lead.id.desc())
+    sort_col = _SORT_COLUMNS[sort]
+    if sort == "last_activity_at":
+        primary = sort_col.asc().nulls_last() if order == "asc" else sort_col.desc().nulls_last()
+    else:
+        primary = sort_col.asc() if order == "asc" else sort_col.desc()
+    base = base.order_by(primary, Lead.id.desc())
     total = (await session.execute(count_stmt)).scalar_one()
     rows = (
         await session.execute(base.offset((page - 1) * size).limit(size))
@@ -435,6 +479,8 @@ async def move_stage_for_lead(
     lead_id: uuid.UUID,
     to_stage: str,
     user_id: uuid.UUID,
+    lost_reason: Optional[str] = None,
+    lost_reason_other: Optional[str] = None,
 ) -> Lead:
     """Move a lead to a new stage and keep `status` in sync.
 
@@ -444,12 +490,48 @@ async def move_stage_for_lead(
     flags. The two writes are separate transactions; that's acceptable
     because the lead's `status` is derived state, not authoritative —
     the pipeline_stage column is the source of truth.
+
+    When the destination stage has `is_lost=true`, `lost_reason` is
+    required (picklist enforced by `LOST_REASONS`). The FE collects
+    it in the move-to-Lost modal and passes it through here in a
+    single API call, so the timeline shows "moved to <stage> with
+    reason=<x>" instead of two disconnected events.
     """
     lead = await get_lead(session, lead_id)
     if lead is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
         )
+
+    # Resolve the destination stage's flags up-front so we can reject
+    # an incomplete move-to-Lost call before any DB mutation.
+    pipeline = await get_pipeline_by_key(session, key=_LEADS_PIPELINE_KEY)
+    new_stage = (
+        next((s for s in pipeline.stages if s.key == to_stage), None)
+        if pipeline is not None
+        else None
+    )
+    if new_stage is not None and new_stage.is_lost:
+        if lost_reason is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "lost_reason is required when moving a lead to a "
+                    "Lost stage"
+                ),
+            )
+        if lost_reason not in LOST_REASONS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"lost_reason must be one of {list(LOST_REASONS)}",
+            )
+        if lost_reason == "other" and not (
+            lost_reason_other and lost_reason_other.strip()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="lost_reason_other is required when lost_reason='other'",
+            )
 
     # `move_card` validates pipeline + stage + card-table-allowlist and
     # raises HTTPException with the right status code on any problem.
@@ -467,12 +549,6 @@ async def move_stage_for_lead(
     # decide whether `status` needs syncing.
     await session.refresh(lead)
 
-    pipeline = await get_pipeline_by_key(session, key=_LEADS_PIPELINE_KEY)
-    new_stage = (
-        next((s for s in pipeline.stages if s.key == to_stage), None)
-        if pipeline is not None
-        else None
-    )
     new_status = (
         LeadStatus.won
         if new_stage and new_stage.is_won
@@ -481,8 +557,19 @@ async def move_stage_for_lead(
         else LeadStatus.active
     )
 
+    needs_commit = False
     if lead.status != new_status:
         lead.status = new_status
+        needs_commit = True
+    if new_stage is not None and new_stage.is_lost:
+        if lead.lost_reason != lost_reason:
+            lead.lost_reason = lost_reason
+            needs_commit = True
+        if lead.lost_reason_other != lost_reason_other:
+            lead.lost_reason_other = lost_reason_other
+            needs_commit = True
+
+    if needs_commit:
         await session.commit()
         await session.refresh(lead)
     return lead

@@ -13,7 +13,7 @@
 - `APP/src/app/features/user/core/shared/url-filter-state.directive.ts` — round-trips a `Record<string, signal>` ↔ query params.
 
 ### Modified backend
-- `API/src/app/core/contacts/router.py` — `GET /contacts/export.csv`, `GET /contacts/check-duplicate`.
+- `API/src/app/c` 1ore/contacts/router.py` — `GET /contacts/export.csv`, `GET /contacts/check-duplicate`.
 - `API/src/app/core/contacts/service.py` — `export_contacts_csv(...)`, `check_duplicate(...)`.
 
 ### Modified frontend

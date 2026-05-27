@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.contacts.models import Contact
+from src.app.core.leads.models import Lead
 from src.app.shared.context import get_context
 from src.app.shared.db import async_session
 
@@ -39,10 +40,12 @@ logger = logging.getLogger(__name__)
 
 # Dispatch table for the `last_activity_at` denormalisation hook.
 # Each parent entity that wants its `last_activity_at` column kept
-# fresh on every activity insert adds itself here. Starts with
-# `contact`; the other entity-update tracks (leads, walk-ins,
-# appointments, tasks) append their models in their own steps.
-_LAST_ACTIVITY_TABLES: dict[str, type] = {"contact": Contact}
+# fresh on every activity insert adds itself here. Walk-ins,
+# appointments, tasks join in their own update tracks.
+_LAST_ACTIVITY_TABLES: dict[str, type] = {
+    "contact": Contact,
+    "lead": Lead,
+}
 
 
 async def _bump_last_activity(

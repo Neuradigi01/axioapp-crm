@@ -14,7 +14,8 @@ The dynamic ``custom.<key>=<value>`` filter is parsed off
 from __future__ import annotations
 
 import uuid
-from typing import Optional
+from datetime import datetime
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -66,6 +67,12 @@ async def list_leads_endpoint(
     assigned_to: Optional[uuid.UUID] = Query(default=None),
     q: Optional[str] = Query(default=None, max_length=255),
     source: Optional[str] = Query(default=None, max_length=64),
+    last_activity_lt: Optional[datetime] = Query(default=None),
+    last_activity_gt: Optional[datetime] = Query(default=None),
+    sort: Literal["created_at", "last_activity_at", "contact_name"] = Query(
+        default="created_at"
+    ),
+    order: Literal["asc", "desc"] = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -78,6 +85,10 @@ async def list_leads_endpoint(
         assigned_to=assigned_to,
         q=q,
         source=source,
+        last_activity_lt=last_activity_lt,
+        last_activity_gt=last_activity_gt,
+        sort=sort,
+        order=order,
         custom_filters=_extract_custom_filters(request),
         page=page,
         size=size,
@@ -199,7 +210,12 @@ async def move_lead_stage_endpoint(
     user: User = Depends(require_permissions("leads.write")),
 ) -> LeadOut:
     lead = await move_stage_for_lead(
-        db, lead_id=lead_id, to_stage=payload.to_stage, user_id=user.legacy_uuid
+        db,
+        lead_id=lead_id,
+        to_stage=payload.to_stage,
+        user_id=user.legacy_uuid,
+        lost_reason=payload.lost_reason,
+        lost_reason_other=payload.lost_reason_other,
     )
     return LeadOut.model_validate(lead)
 

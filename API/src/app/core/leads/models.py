@@ -104,6 +104,21 @@ class Lead(Base, TenantScoped):
     )
     budget: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     expected_close_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Denormalised "newest activity timestamp" — bumped by the
+    # activities-service insert hook. Mirrors `contacts.last_activity_at`.
+    # Source of truth lives in the `activities` table.
+    last_activity_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    # Required when the lead's pipeline-stage flips to `is_lost=true`
+    # (enforced in `move_stage_for_lead`). Picklist values are pinned
+    # in the DB via the `ck_leads_lost_reason_picklist` CHECK
+    # constraint added in migration 0054.
+    lost_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    lost_reason_other: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
     custom_data: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,

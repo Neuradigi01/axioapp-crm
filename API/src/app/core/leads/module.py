@@ -30,5 +30,10 @@ MODULE = ModuleDescriptor(
         # `leads.write` so org admins who oversee but don't sell can
         # be excluded from the rotation.
         "leads.own",
+        # Single + bulk transfer permission. Distinct from
+        # `leads.write` because a junior sales rep can edit their own
+        # leads but shouldn't be able to hand them off to a peer —
+        # transfers are a management-level action.
+        "leads.reassign",
     ],
 )

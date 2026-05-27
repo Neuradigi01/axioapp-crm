@@ -53,7 +53,7 @@ _CORE_ADMIN_KEYS: list[str] = [
     "settings.integrations.manage",
     "settings.integrations.embed.manage",
     "contacts.read", "contacts.write", "contacts.reassign",
-    "leads.read", "leads.write", "leads.import",
+    "leads.read", "leads.write", "leads.import", "leads.reassign",
     "appointments.read", "appointments.write",
     "walkins.read", "walkins.write",
     "walk_ins.read", "walk_ins.write",
@@ -99,7 +99,7 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
 # pipeline shape or billing.
 _CORE_SALES_MANAGER_KEYS: list[str] = [
     "contacts.read", "contacts.write", "contacts.reassign",
-    "leads.read", "leads.write",
+    "leads.read", "leads.write", "leads.reassign",
     "appointments.read", "appointments.write",
     "walkins.read", "walkins.write",
     "walk_ins.read", "walk_ins.write",
