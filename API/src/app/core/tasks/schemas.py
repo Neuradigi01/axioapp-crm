@@ -63,6 +63,7 @@ class TaskOut(BaseModel):
     related_entity_id: Optional[uuid.UUID]
     status: TaskStatus
     priority: TaskPriority
+    last_activity_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
 
@@ -72,3 +73,47 @@ class TaskListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+# --- Bulk action shapes -----------------------------------------------------
+
+
+class TaskBulkReassign(BaseModel):
+    """Bulk reassign. Tasks require an owner (`assigned_to_id NOT NULL`)
+    so the service rejects `None`; the type stays optional here to
+    match the cross-module schema shape but the service raises 422 if
+    the caller actually sends null."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+    assigned_to_id: Optional[uuid.UUID] = None
+    note: Optional[str] = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class TaskBulkMarkDone(BaseModel):
+    """Bulk-mark-done. Rows already in `done` are skipped (counted as
+    `skipped`) — same partial-success semantic as appointments
+    bulk-cancel."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
+class TaskBulkDelete(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
+class TaskBulkReassignResult(BaseModel):
+    reassigned: int
+
+
+class TaskBulkMarkDoneResult(BaseModel):
+    """`done` counts rows newly transitioned. `skipped` counts rows
+    already in `done`."""
+
+    done: int
+    skipped: int
+
+
+class TaskBulkDeleteResult(BaseModel):
+    deleted: int

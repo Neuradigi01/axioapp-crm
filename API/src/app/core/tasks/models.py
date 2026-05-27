@@ -86,6 +86,15 @@ class Task(Base, TenantScoped):
         nullable=False,
         server_default=text("'med'"),
     )
+    # Denormalised "newest activity timestamp" — bumped by the
+    # activities-service insert hook AND by the tasks-service write
+    # paths (update_task) so even no-activity edits (title fixes,
+    # priority shuffles) refresh recency. Mirrors contacts / leads /
+    # walk-ins / appointments.
+    last_activity_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

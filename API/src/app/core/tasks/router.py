@@ -24,6 +24,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.tasks.models import TaskPriority, TaskStatus
 from src.app.core.tasks.schemas import (
+    TaskBulkDelete,
+    TaskBulkDeleteResult,
+    TaskBulkMarkDone,
+    TaskBulkMarkDoneResult,
+    TaskBulkReassign,
+    TaskBulkReassignResult,
     TaskCreate,
     TaskListResponse,
     TaskOut,
@@ -33,6 +39,9 @@ from src.app.core.tasks.service import (
     DueFilter,
     SortBy,
     SortDir,
+    bulk_delete_tasks,
+    bulk_mark_done_tasks,
+    bulk_reassign_tasks,
     create_task,
     delete_task,
     get_task,
@@ -152,6 +161,54 @@ async def create_task_endpoint(
         db, org_id=user.org_id, current_user_id=user.legacy_uuid, payload=payload
     )
     return TaskOut.model_validate(task)
+
+
+# --- Bulk-action endpoints --------------------------------------------------
+#
+# Declared before `/tasks/{task_id}` so FastAPI matches the literal
+# segments (`bulk-reassign`, `bulk-mark-done`, `bulk-delete`) ahead of
+# the UUID-typed dynamic segment.
+
+
+@router.post("/bulk-reassign", response_model=TaskBulkReassignResult)
+async def bulk_reassign_tasks_endpoint(
+    payload: TaskBulkReassign,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("tasks.write")),
+) -> TaskBulkReassignResult:
+    n = await bulk_reassign_tasks(
+        db,
+        ids=payload.ids,
+        org_id=user.org_id,
+        assigned_to_id=payload.assigned_to_id,
+        note=payload.note,
+        actor_user_id=user.legacy_uuid,
+    )
+    return TaskBulkReassignResult(reassigned=n)
+
+
+@router.post("/bulk-mark-done", response_model=TaskBulkMarkDoneResult)
+async def bulk_mark_done_tasks_endpoint(
+    payload: TaskBulkMarkDone,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("tasks.write")),
+) -> TaskBulkMarkDoneResult:
+    done, skipped = await bulk_mark_done_tasks(
+        db, ids=payload.ids, org_id=user.org_id
+    )
+    return TaskBulkMarkDoneResult(done=done, skipped=skipped)
+
+
+@router.post("/bulk-delete", response_model=TaskBulkDeleteResult)
+async def bulk_delete_tasks_endpoint(
+    payload: TaskBulkDelete,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("tasks.write")),
+) -> TaskBulkDeleteResult:
+    n = await bulk_delete_tasks(
+        db, ids=payload.ids, org_id=user.org_id
+    )
+    return TaskBulkDeleteResult(deleted=n)
 
 
 @router.get("/{task_id}", response_model=TaskOut)

@@ -33,6 +33,7 @@ from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.appointments.models import Appointment
 from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead
+from src.app.core.tasks.models import Task
 from src.app.core.walk_ins.models import WalkIn
 from src.app.shared.context import get_context
 from src.app.shared.db import async_session
@@ -42,13 +43,13 @@ logger = logging.getLogger(__name__)
 
 # Dispatch table for the `last_activity_at` denormalisation hook.
 # Each parent entity that wants its `last_activity_at` column kept
-# fresh on every activity insert adds itself here. Tasks joins in its
-# own update track.
+# fresh on every activity insert registers itself here.
 _LAST_ACTIVITY_TABLES: dict[str, type] = {
     "contact": Contact,
     "lead": Lead,
     "walk_in": WalkIn,
     "appointment": Appointment,
+    "task": Task,
 }
 
 

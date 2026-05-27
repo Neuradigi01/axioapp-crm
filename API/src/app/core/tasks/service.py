@@ -16,19 +16,24 @@ status changes for free.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Literal, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import case, func, nulls_first, nulls_last, select
+from sqlalchemy import case, delete as sqla_delete, func, nulls_first, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.tasks.models import Task, TaskPriority, TaskStatus
 from src.app.core.tasks.schemas import TaskCreate, TaskUpdate
+from src.app.core.users.models import OrganizationMember, User
 
 
 DueFilter = Literal["today", "overdue", "upcoming"]
-SortBy = Literal["due_at", "priority", "title", "created_at"]
+SortBy = Literal[
+    "due_at", "priority", "title", "created_at", "last_activity_at"
+]
 SortDir = Literal["asc", "desc"]
 
 
@@ -84,6 +89,8 @@ def _apply_task_filters(
         col = Task.title
     elif sort_by == "created_at":
         col = Task.created_at
+    elif sort_by == "last_activity_at":
+        col = Task.last_activity_at
     else:
         col = Task.due_at
 
@@ -94,6 +101,13 @@ def _apply_task_filters(
         ordered = (
             nulls_last(col.asc()) if sort_dir == "asc"
             else nulls_first(col.desc())
+        )
+    # Same trick for `last_activity_at` — never-touched tasks sink
+    # to the bottom of either direction.
+    elif sort_by == "last_activity_at":
+        ordered = (
+            nulls_last(col.asc()) if sort_dir == "asc"
+            else nulls_last(col.desc())
         )
 
     return stmt.order_by(ordered, Task.created_at.desc())
@@ -168,6 +182,11 @@ async def update_task(
     changes = payload.model_dump(exclude_unset=True)
     for key, value in changes.items():
         setattr(task, key, value)
+    # Bump `last_activity_at` independently of the activity-insert
+    # hook — not every task PATCH writes an activity (a title fix
+    # doesn't, for instance), but the user still expects "recent
+    # activity" to surface the edit.
+    task.last_activity_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(task)
 
@@ -311,6 +330,140 @@ async def list_all_in_org(
     return list(rows), int(total)
 
 
+# --- Bulk actions ----------------------------------------------------------
+
+
+async def _assert_user_in_org(
+    session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
+) -> None:
+    """422 if the target user has no active membership in this org.
+
+    Same cross-tenant guard used by contacts / leads / walk-ins /
+    appointments reassign services."""
+    result = await session.execute(
+        select(OrganizationMember.id)
+        .join(User, User.id == OrganizationMember.user_member_id)
+        .where(
+            User.legacy_uuid == user_uuid,
+            OrganizationMember.organization_id == org_id,
+            OrganizationMember.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="target user is not a member of this organisation",
+        )
+
+
+def _reassign_payload(
+    *, from_id: uuid.UUID | None, to_id: uuid.UUID | None, note: str | None
+) -> dict[str, Any]:
+    return {
+        "from": str(from_id) if from_id is not None else None,
+        "to": str(to_id) if to_id is not None else None,
+        "note": note,
+    }
+
+
+async def bulk_reassign_tasks(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+    assigned_to_id: uuid.UUID | None,
+    note: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> int:
+    """Bulk reassign. Tasks require an owner (the column is NOT NULL),
+    so `None` is rejected with 422 even though the schema typing is
+    optional. Per-row processing because rows already owned by the
+    target are skipped (no-op, not an error)."""
+    if assigned_to_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="tasks require an owner; assigned_to_id cannot be null",
+        )
+    await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
+
+    reassigned = 0
+    for tid in ids:
+        task = await get_task(session, tid)
+        if task is None:
+            continue
+        if task.assigned_to_id == assigned_to_id:
+            continue
+        before_id = task.assigned_to_id
+        task.assigned_to_id = assigned_to_id
+        session.add(
+            Activity(
+                org_id=org_id,
+                entity_type="task",
+                entity_id=task.id,
+                type=ActivityType.reassign,
+                payload=_reassign_payload(
+                    from_id=before_id, to_id=assigned_to_id, note=note
+                ),
+                user_id=actor_user_id,
+            )
+        )
+        reassigned += 1
+
+    await session.commit()
+    return reassigned
+
+
+async def bulk_mark_done_tasks(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> tuple[int, int]:
+    """Move every `open` (or `cancelled`) task in the batch to `done`.
+    Rows already in `done` are skipped — same partial-success
+    semantic as appointments bulk-cancel. Returns
+    `(done, skipped)`."""
+    done = 0
+    skipped = 0
+    for tid in ids:
+        task = await get_task(session, tid)
+        if task is None:
+            continue
+        if task.org_id != org_id:
+            continue
+        if task.status == TaskStatus.done:
+            skipped += 1
+            continue
+        task.status = TaskStatus.done
+        # Hook the bump in here as well — the activities table
+        # doesn't get a row for a bulk action, but the user still
+        # expects the closed-out task to surface in "recent activity".
+        task.last_activity_at = datetime.now(timezone.utc)
+        done += 1
+
+    await session.commit()
+    return done, skipped
+
+
+async def bulk_delete_tasks(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> int:
+    """Hard delete in bulk — matches the single-row delete semantic.
+    Uses a single DELETE statement scoped by org_id so a misconfigured
+    tenant context can't leak cross-org rows."""
+    result = await session.execute(
+        sqla_delete(Task)
+        .where(Task.org_id == org_id)
+        .where(Task.id.in_(ids))
+    )
+    await session.commit()
+    return result.rowcount or 0
+
+
 # Re-export enums so callers get a stable import path through this module.
 __all__ = [
     "DueFilter",
@@ -318,6 +471,9 @@ __all__ = [
     "SortDir",
     "TaskPriority",
     "TaskStatus",
+    "bulk_delete_tasks",
+    "bulk_mark_done_tasks",
+    "bulk_reassign_tasks",
     "create_task",
     "delete_task",
     "get_task",
