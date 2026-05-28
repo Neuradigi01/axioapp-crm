@@ -33,6 +33,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import (
     WHATSAPP_API_VERSION,
@@ -51,6 +52,16 @@ logger = logging.getLogger(__name__)
 
 class WhatsAppSendError(Exception):
     """Raised when the Cloud API returns a non-2xx."""
+
+
+class WhatsAppNotConnected(Exception):
+    """Raised by `resolve_whatsapp_adapter` when the active tenant has
+    no `connected` `Integration` row for the `whatsapp` provider.
+
+    Callers (conversations send + campaigns dispatch) surface this as
+    HTTP 409 ("Connect WhatsApp in Settings → Integrations") or, in
+    the campaigns dispatch path, mark every `CampaignMessage` row as
+    `failed` with the message so the UI shows the configuration gap."""
 
 
 _PHONE_RE = re.compile(r"\D+")
@@ -228,9 +239,61 @@ class WhatsAppAdapter:
         return mode == "subscribe" and token == self._verify_token
 
 
+async def resolve_whatsapp_adapter(
+    session: AsyncSession,
+) -> "WhatsAppAdapter":
+    """Build a fully-configured `WhatsAppAdapter` from the active
+    tenant's `Integration` row + `WhatsAppAccountConfig` sidecar.
+
+    Relies on the ORM tenant filter from `TenantScoped` for org
+    isolation — the caller must be inside a request / Celery task
+    context where `app.org_id` is set. RLS authorises the read.
+
+    Plaintext credentials (bearer token + app_secret) live only inside
+    the returned adapter instance — never logged, never returned to
+    any API response. The adapter falls out of scope as soon as the
+    send completes, so the plaintext doesn't linger.
+
+    Raises `WhatsAppNotConnected` if the active tenant has not
+    connected WhatsApp (or has disconnected) — callers surface that
+    as a 409 / `CampaignMessage.failed` rather than a generic 500."""
+    from src.app.core.integrations.crypto import decrypt
+    from src.app.core.integrations.whatsapp.connect import get_active_config
+
+    bundle = await get_active_config(session)
+    if bundle is None:
+        raise WhatsAppNotConnected(
+            "WhatsApp is not connected for this org. "
+            "Connect it in Settings → Integrations."
+        )
+    integration, config = bundle
+    return WhatsAppAdapter(
+        phone_id=config.phone_id,
+        token=decrypt(integration.access_token_enc),
+        app_secret=decrypt(config.app_secret_enc),
+        verify_token=config.verify_token,
+        api_version=config.api_version,
+    )
+
+
 def register_default_whatsapp_adapter() -> None:
-    """Wire the adapter into the engine registry. Called once at
-    startup from `main.py` lifespan."""
+    """Wire an env-var-backed `WhatsAppAdapter` into the engine
+    registry. Called once at startup from `main.py` lifespan.
+
+    Post-Step-3.5.3, the OUTBOUND path (`conversations.send_outbound`
+    + `campaigns.dispatch_chunk`) no longer goes through this
+    registered factory for the `whatsapp` channel — both call sites
+    short-circuit to `resolve_whatsapp_adapter(session)` which loads
+    the active tenant's encrypted credentials from the DB.
+
+    This registered adapter remains in place for the INBOUND webhook
+    path (`POST /webhooks/whatsapp`), which arrives without a tenant
+    context — Meta's payload identifies the target phone, not the
+    target org. Migrating the webhook to per-org credentials requires
+    a `phone_id → org_id` lookup in `whatsapp_account_configs`, which
+    is the body of work for Step 3.5.12 (delivery webhook receiver).
+    Until that lands, the webhook uses the env-var fallback (single
+    Meta test app per environment)."""
     from src.app.core.conversations.models import ConversationChannel
     from src.app.core.conversations.registry import register_channel
 
@@ -241,6 +304,8 @@ def register_default_whatsapp_adapter() -> None:
 
 __all__ = [
     "WhatsAppAdapter",
+    "WhatsAppNotConnected",
     "WhatsAppSendError",
     "register_default_whatsapp_adapter",
+    "resolve_whatsapp_adapter",
 ]

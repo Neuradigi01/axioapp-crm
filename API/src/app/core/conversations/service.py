@@ -46,6 +46,9 @@ from src.app.core.conversations.models import (
     Message,
     MessageDirection,
 )
+from src.app.core.conversations.adapters.whatsapp import (
+    resolve_whatsapp_adapter,
+)
 from src.app.core.conversations.registry import resolve
 from src.app.core.conversations.schemas import ConversationPatch
 from src.app.core.notifications.service import notify
@@ -142,7 +145,14 @@ async def send_outbound(
     attachments: list[dict[str, Any]],
 ) -> Message:
     conv = await get_conversation(session, conversation_id)
-    adapter = resolve(conv.channel)
+    # WhatsApp goes through the per-org resolver (Step 3.5.3) — it
+    # loads the active tenant's encrypted token from the integrations
+    # table and instantiates an adapter with those credentials. Other
+    # channels stay on the registry's zero-arg factory.
+    if conv.channel == ConversationChannel.whatsapp:
+        adapter = await resolve_whatsapp_adapter(session)
+    else:
+        adapter = resolve(conv.channel)
 
     is_first_outbound = await _is_first_outbound(session, conversation_id)
 

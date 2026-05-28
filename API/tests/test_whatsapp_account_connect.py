@@ -30,6 +30,11 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
+from src.app.core.conversations.adapters.whatsapp import (
+    WhatsAppAdapter,
+    WhatsAppNotConnected,
+    resolve_whatsapp_adapter,
+)
 from src.app.core.integrations import crypto
 from src.app.core.integrations.models import (
     Integration,
@@ -421,6 +426,73 @@ class TestTestConnection:
 
 
 # --- status projection ---------------------------------------------------
+
+
+class TestResolveAdapter:
+    """Step 3.5.3 — `resolve_whatsapp_adapter` builds a per-org
+    `WhatsAppAdapter` from the active tenant's encrypted credentials.
+
+    The function reads through the same `get_active_config` path
+    used by the Settings UI, so RLS / ORM filtering covers org
+    isolation — these tests just confirm the assembly + decrypt
+    round-trip + the not-connected error surface."""
+
+    @pytest.mark.asyncio
+    async def test_returns_configured_adapter_when_connected(self):
+        session = _CapturingSession()
+        integration, config = _existing_connected_pair()
+        session.rows[Integration] = [integration]
+        session.rows[WhatsAppAccountConfig] = [config]
+
+        adapter = await resolve_whatsapp_adapter(session)
+
+        assert isinstance(adapter, WhatsAppAdapter)
+        # Adapter is configured with the sidecar's identifiers, not
+        # the env-var defaults.
+        assert adapter._phone_id == config.phone_id
+        assert adapter._verify_token == config.verify_token
+        assert adapter._api_version == config.api_version
+
+    @pytest.mark.asyncio
+    async def test_adapter_uses_decrypted_token(self):
+        session = _CapturingSession()
+        integration, config = _existing_connected_pair()
+        # Confirm setup: integration's enc column round-trips back to
+        # the same plaintext we stamped into the test fixture.
+        plaintext_token = "stored-bearer"
+        plaintext_secret = "stored-app-secret"
+        assert crypto.decrypt(integration.access_token_enc) == plaintext_token
+        assert crypto.decrypt(config.app_secret_enc) == plaintext_secret
+        session.rows[Integration] = [integration]
+        session.rows[WhatsAppAccountConfig] = [config]
+
+        adapter = await resolve_whatsapp_adapter(session)
+
+        # The adapter holds the decrypted plaintexts — the whole point
+        # of the resolver. The ciphertext should never leave the DB.
+        assert adapter._token == plaintext_token
+        assert adapter._app_secret == plaintext_secret
+        # And neither plaintext leaks into the encrypted columns by
+        # accident (sanity).
+        assert plaintext_token not in integration.access_token_enc
+        assert plaintext_secret not in config.app_secret_enc
+
+    @pytest.mark.asyncio
+    async def test_raises_when_never_connected(self):
+        session = _CapturingSession()
+        with pytest.raises(WhatsAppNotConnected, match="not connected"):
+            await resolve_whatsapp_adapter(session)
+
+    @pytest.mark.asyncio
+    async def test_raises_when_disconnected(self):
+        session = _CapturingSession()
+        integration, _ = _existing_connected_pair()
+        integration.status = IntegrationStatus.disconnected
+        integration.access_token_enc = None
+        session.rows[Integration] = [integration]
+
+        with pytest.raises(WhatsAppNotConnected, match="not connected"):
+            await resolve_whatsapp_adapter(session)
 
 
 class TestStatusProjection:

@@ -43,6 +43,10 @@ from src.app.core.campaigns.schemas import (
 )
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations.adapters import ChannelMessageRef
+from src.app.core.conversations.adapters.whatsapp import (
+    WhatsAppNotConnected,
+    resolve_whatsapp_adapter,
+)
 from src.app.core.conversations.models import (
     Conversation,
     ConversationChannel,
@@ -376,9 +380,17 @@ async def dispatch_chunk(
     """Send the template to each contact via the adapter; persist
     `CampaignMessage` status + `channel_message_id`."""
     campaign = await get_campaign(session, campaign_id)
+    # WhatsApp uses the per-org resolver (Step 3.5.3) which loads the
+    # campaign org's encrypted token from the integrations table. A
+    # disconnected org raises `WhatsAppNotConnected` — caught here
+    # alongside `ChannelNotRegistered` so the same failure surface
+    # works for both "channel never wired" and "org never connected".
     try:
-        adapter = resolve_channel(campaign.channel)
-    except ChannelNotRegistered as exc:
+        if campaign.channel == ConversationChannel.whatsapp:
+            adapter = await resolve_whatsapp_adapter(session)
+        else:
+            adapter = resolve_channel(campaign.channel)
+    except (ChannelNotRegistered, WhatsAppNotConnected) as exc:
         # Mark every queued row as failed so the UI surfaces the
         # configuration gap.
         for cid in contact_ids:
