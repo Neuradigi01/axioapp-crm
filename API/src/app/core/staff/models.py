@@ -25,7 +25,6 @@ from sqlalchemy import (
     Computed,
     Date,
     DateTime,
-    ForeignKey,
     Index,
     Numeric,
     Text,
@@ -56,7 +55,6 @@ class StaffProfile(Base, TenantScoped):
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
         primary_key=True,
     )
     commission_rate: Mapped[Decimal] = mapped_column(
@@ -102,7 +100,6 @@ class Attendance(Base, TenantScoped):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
     clock_in_at: Mapped[datetime] = mapped_column(

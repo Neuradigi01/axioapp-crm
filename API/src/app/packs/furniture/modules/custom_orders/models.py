@@ -78,7 +78,6 @@ class CustomOrder(Base, TenantScoped):
     )
     assigned_to_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     expected_delivery_date: Mapped[date | None] = mapped_column(
@@ -194,7 +193,6 @@ class CustomOrderStageHistory(Base, TenantScoped):
     to_stage: Mapped[str] = mapped_column(String(64), nullable=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

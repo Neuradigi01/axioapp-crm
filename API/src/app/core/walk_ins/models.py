@@ -91,7 +91,6 @@ class WalkIn(Base, TenantScoped):
     budget: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     assigned_to_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     status: Mapped[WalkInStatus] = mapped_column(

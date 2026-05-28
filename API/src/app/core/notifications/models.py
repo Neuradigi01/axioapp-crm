@@ -25,7 +25,6 @@ from typing import Any
 from sqlalchemy import (
     Boolean,
     DateTime,
-    ForeignKey,
     Index,
     String,
     UniqueConstraint,
@@ -69,7 +68,6 @@ class Notification(Base, TenantScoped):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
     type: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -109,7 +107,6 @@ class NotificationPreference(Base, TenantScoped):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
     type: Mapped[str] = mapped_column(String(64), nullable=False)

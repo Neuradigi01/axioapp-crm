@@ -76,7 +76,6 @@ class Appointment(Base, TenantScoped):
     )
     assigned_to_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
     custom_data: Mapped[dict[str, Any]] = mapped_column(
