@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 3.5.1 (`whatsapp_account_configs.phone_id` lookup), 3.5.3 (outbound per-org), existing webhook receiver
-**Status:** PROPOSED — awaiting "begin"
+**Status:** ⏳ PENDING — awaiting "begin"
 
 After this step Meta sends "delivered" / "read" status updates to the webhook → backend identifies the org by `phone_number_id` in payload → updates the matching `CampaignMessage` row's timestamps. The Settings UI's WhatsApp card shows real per-org webhook URL (different secret per org). Env-var fallback removed.
 

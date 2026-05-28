@@ -4,7 +4,7 @@
 
 **Phase:** 3.5 (WhatsApp Campaigns)
 **Depends on:** 3.5.1 (Integration + sidecar), 3.5.3 (resolver — sync calls Meta with the org's stored creds)
-**Status:** PROPOSED — awaiting "begin"
+**Status:** ⏳ PENDING — awaiting "begin"
 
 After this step:
 - Owner hits "Sync templates" → backend fetches Meta's `/{waba_id}/message_templates` → upserts each into `whatsapp_templates` (per-org)

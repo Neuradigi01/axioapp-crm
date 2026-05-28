@@ -4,7 +4,7 @@
 
 **Phase:** 3.5 (WhatsApp Campaigns)
 **Depends on:** 3.8 (channel registry), 3.9 (WA adapter), Steps 1–7 of Ad Integrations (existing `Integration` table + `crypto`)
-**Status:** PROPOSED — awaiting "begin"
+**Status:** ✅ COMPLETED
 
 After this step the WhatsApp adapter **still uses env-vars** — that's intentional. The adapter rewire happens in **Step 3.5.3**. This step only builds the storage + connect/test API. Verification: hit `POST /api/v1/integrations/whatsapp/connect`, see encrypted credentials saved + `IntegrationStatus.connected`.
 

@@ -4,7 +4,7 @@
 
 **Phase:** 3.5 (WhatsApp Campaigns)
 **Depends on:** 3.5.1 (backend: `/api/v1/integrations/whatsapp/*` endpoints)
-**Status:** PROPOSED — awaiting "begin"
+**Status:** ✅ COMPLETED — commit `6630c45`
 
 After this step the Owner role can connect a WhatsApp Business Account via UI (no curl, no .env edit). Adapter rewire still pending → Step 3.5.3.
 

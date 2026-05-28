@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 1.x (contacts module)
-**Status:** PROPOSED — awaiting "begin"
+**Status:** ⏳ PENDING — awaiting "begin"
 
 After this step an Owner / Sales Manager can POST `/api/v1/contact-groups` with a name + an optional filter shape (same as `/contacts` query) OR an explicit list of contact ids; campaigns reference the group via `audience_filter.group_id`.
 

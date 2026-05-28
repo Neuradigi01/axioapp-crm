@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 3.5.14 (Celery dispatch)
-**Status:** PROPOSED — awaiting "begin"
+**Status:** ⏳ PENDING — awaiting "begin"
 
 After this step a 5,000-contact campaign runs steadily at the configured rate without bursting and triggering Meta 429 rate-limit errors, even if 3 orgs send concurrently from the same Celery worker pool.
 

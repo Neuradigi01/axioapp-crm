@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 3.5.10
-**Status:** PROPOSED — awaiting "begin"
+**Status:** ⏳ PENDING — awaiting "begin"
 
 After this step the operator can: drag XLSX onto upload zone → see auto-detected column mapping with overrides → see dry-run summary "192 will be added, 8 errors (phone dupes)" → click Commit → toast "192 contacts added, group 'Q3 Leads' created".
 

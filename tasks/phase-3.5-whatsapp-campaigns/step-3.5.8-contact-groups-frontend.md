@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 3.5.7
-**Status:** PROPOSED — awaiting "begin"
+**Status:** ⏳ PENDING — awaiting "begin"
 
 After this step a user can save the filter "source = walk-in AND tag = sofa" as a group named "Walk-in sofa shoppers", reusable across multiple campaigns.
 

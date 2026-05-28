@@ -4,7 +4,7 @@
 
 **Phase:** 3.5 (WhatsApp Campaigns)
 **Depends on:** 3.5.1 (DB schema + connect service), 3.8 (channel registry)
-**Status:** PROPOSED — awaiting "begin"
+**Status:** ✅ COMPLETED — commit `d332113`
 
 After this step:
 - Owner clicks Connect → DB row + sidecar saved with encrypted token
