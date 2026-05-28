@@ -34,6 +34,9 @@ from src.app.core.integrations.meta.router import router as meta_router
 from src.app.core.integrations.meta.webhook import (
     router as meta_webhook_router,
 )
+from src.app.core.integrations.whatsapp.router import (
+    router as whatsapp_router,
+)
 from src.app.core.integrations.models import IntegrationProvider
 from src.app.core.integrations.schemas import (
     IntegrationDLQListResponse,
@@ -84,6 +87,10 @@ router.include_router(meta_router)
 # webhook model). Separate router so the public endpoint doesn't
 # inherit any admin-only deps that might land on the OAuth router.
 router.include_router(meta_webhook_router)
+# WhatsApp subrouter — Step 3.5.1. Connect/disconnect/test/status for
+# the WhatsApp Business Cloud API channel. Full paths become
+# /api/v1/integrations/whatsapp/...
+router.include_router(whatsapp_router)
 
 
 @router.get("", response_model=list[IntegrationRead])
