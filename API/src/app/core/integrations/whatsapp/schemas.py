@@ -11,6 +11,7 @@ leaves the server.
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Literal, Optional
 
@@ -57,8 +58,60 @@ class WhatsAppStatusOut(BaseModel):
     connected_at: Optional[datetime] = None
 
 
+WhatsAppTemplateStatus = Literal[
+    "APPROVED", "PENDING", "REJECTED", "DISABLED"
+]
+WhatsAppTemplateCategory = Literal[
+    "MARKETING", "UTILITY", "AUTHENTICATION"
+]
+WhatsAppTemplateHeaderType = Literal[
+    "TEXT", "IMAGE", "VIDEO", "DOCUMENT"
+]
+
+
+class WhatsAppTemplateRead(BaseModel):
+    """Row projection for `GET /api/v1/integrations/whatsapp/templates`.
+
+    Used by the Settings UI template list (Step 3.5.4) and the campaign
+    create-modal picker (Step 3.5.5). `variable_count` lets the picker
+    render the right number of variable-binding inputs without parsing
+    the body."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    language: str
+    category: str
+    status: str
+    body: str
+    header_type: Optional[str] = None
+    header_text: Optional[str] = None
+    footer_text: Optional[str] = None
+    variable_count: int
+    meta_template_id: Optional[str] = None
+    last_synced_at: datetime
+
+
+class WhatsAppTemplateSyncOut(BaseModel):
+    """Counts returned by `POST /api/v1/integrations/whatsapp/templates/sync`.
+
+    The Settings UI uses these in a toast: "3 added, 1 updated, 0 removed".
+    `total` is the post-sync row count for the org (added + unchanged)."""
+
+    added: int
+    updated: int
+    removed: int
+    total: int
+
+
 __all__ = [
     "WhatsAppConnectIn",
     "WhatsAppIntegrationStatus",
     "WhatsAppStatusOut",
+    "WhatsAppTemplateCategory",
+    "WhatsAppTemplateHeaderType",
+    "WhatsAppTemplateRead",
+    "WhatsAppTemplateStatus",
+    "WhatsAppTemplateSyncOut",
 ]

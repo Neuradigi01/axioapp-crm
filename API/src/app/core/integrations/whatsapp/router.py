@@ -1,22 +1,27 @@
 """HTTP routes for the WhatsApp Business Account connect surface.
 
-  POST /api/v1/integrations/whatsapp/connect      → validate + store
-  POST /api/v1/integrations/whatsapp/disconnect   → null token + status
-  POST /api/v1/integrations/whatsapp/test         → ping Meta now
-  GET  /api/v1/integrations/whatsapp/status       → projection (no creds)
+  POST /api/v1/integrations/whatsapp/connect          → validate + store
+  POST /api/v1/integrations/whatsapp/disconnect       → null token + status
+  POST /api/v1/integrations/whatsapp/test             → ping Meta now
+  GET  /api/v1/integrations/whatsapp/status           → projection (no creds)
+  POST /api/v1/integrations/whatsapp/templates/sync   → pull Meta library
+  GET  /api/v1/integrations/whatsapp/templates        → list for picker
 
-All endpoints gate on `settings.integrations.manage` — Owner-only by
-default, same as the rest of the integrations surface. Encrypted-
-credential columns NEVER appear in any response body (the schemas don't
-declare them; the connect service returns the projection from
-`get_status`, which has no token fields).
+Admin endpoints (connect/disconnect/test/sync) gate on
+`settings.integrations.manage` — Owner-only by default. The templates
+LIST endpoint gates on `campaigns.read` instead — any campaign-author
+needs to see the picker, not just integration admins. Encrypted
+credential columns NEVER appear in any response body.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.conversations.adapters.whatsapp import WhatsAppNotConnected
 from src.app.core.integrations.whatsapp.connect import (
     MetaValidationError,
     connect_account,
@@ -27,6 +32,12 @@ from src.app.core.integrations.whatsapp.connect import (
 from src.app.core.integrations.whatsapp.schemas import (
     WhatsAppConnectIn,
     WhatsAppStatusOut,
+    WhatsAppTemplateRead,
+    WhatsAppTemplateSyncOut,
+)
+from src.app.core.integrations.whatsapp.templates import (
+    list_templates,
+    sync_templates,
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
@@ -116,3 +127,47 @@ async def status_endpoint(
     response, no 404 needed."""
     projection = await get_status(db)
     return WhatsAppStatusOut.model_validate(projection)
+
+
+# --- Templates (Step 3.5.4) ---------------------------------------------
+
+
+@router.post(
+    "/templates/sync",
+    response_model=WhatsAppTemplateSyncOut,
+)
+async def sync_templates_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> WhatsAppTemplateSyncOut:
+    """Pull `/{waba_id}/message_templates` from Meta and reconcile the
+    local cache. Returns counts the Settings UI shows in a toast.
+    409 if the org is not connected — operator must connect first."""
+    try:
+        counts = await sync_templates(db)
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        )
+    return WhatsAppTemplateSyncOut.model_validate(counts)
+
+
+@router.get(
+    "/templates",
+    response_model=list[WhatsAppTemplateRead],
+)
+async def list_templates_endpoint(
+    status_filter: Optional[str] = Query(default=None, alias="status"),
+    category: Optional[str] = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("campaigns.read")),
+) -> list[WhatsAppTemplateRead]:
+    """Templates for the active org, optionally filtered by status /
+    category. Powers the campaign create-modal picker (Step 3.5.5)."""
+    rows = await list_templates(
+        db, status=status_filter, category=category
+    )
+    return [WhatsAppTemplateRead.model_validate(r) for r in rows]

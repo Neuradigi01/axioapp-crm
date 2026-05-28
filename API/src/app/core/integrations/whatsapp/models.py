@@ -18,16 +18,20 @@ to one sidecar per integration row.
 """
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Text, text
+from sqlalchemy import DateTime, ForeignKey, Integer, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
+
+
+_VARIABLE_RE = re.compile(r"\{\{(\d+)\}\}")
 
 
 class WhatsAppAccountConfig(Base, TenantScoped):
@@ -73,4 +77,69 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     )
 
 
-__all__ = ["WhatsAppAccountConfig"]
+class WhatsAppTemplate(Base, TenantScoped):
+    """Per-(org, integration) cache of one Meta-approved WhatsApp
+    message template.
+
+    Populated by `templates.sync_templates`; read by the campaign
+    template picker (Step 3.5.5) and by `dispatch_chunk`'s template
+    branch (Step 3.5.6).
+
+    `variable_count` is precomputed at sync time from the `{{n}}`
+    placeholder count in `body` so the picker doesn't re-parse the
+    body on every render. `meta_template_id` is kept for forensic
+    traceability; idempotent upsert is keyed on
+    `(integration_id, name, language)` because Meta's id can change
+    when a template is edited."""
+
+    __tablename__ = "whatsapp_templates"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    integration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("integrations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    language: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    header_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    header_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    footer_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    variable_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    meta_template_id: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
+    last_synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=text("now()"),
+    )
+
+    @property
+    def variables(self) -> list[int]:
+        """Sorted unique placeholder numbers found in the body — the
+        picker (Step 3.5.5) uses this to render one input per variable."""
+        return sorted({int(m) for m in _VARIABLE_RE.findall(self.body)})
+
+
+__all__ = ["WhatsAppAccountConfig", "WhatsAppTemplate"]

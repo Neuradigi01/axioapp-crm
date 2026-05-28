@@ -19,11 +19,17 @@ from src.app.core.integrations.whatsapp.connect import (
     get_status,
     test_connection,
 )
+from src.app.core.integrations.whatsapp.templates import (
+    list_templates,
+    sync_templates,
+)
 
 __all__ = [
     "connect_account",
     "disconnect_account",
     "get_active_config",
     "get_status",
+    "list_templates",
+    "sync_templates",
     "test_connection",
 ]
