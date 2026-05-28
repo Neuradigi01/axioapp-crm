@@ -19,7 +19,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, text
+from sqlalchemy import DateTime, String, Text, text
 from sqlalchemy.dialects.postgresql import ENUM, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -67,7 +67,6 @@ class Task(Base, TenantScoped):
     )
     assigned_to_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
     related_entity_type: Mapped[Optional[str]] = mapped_column(

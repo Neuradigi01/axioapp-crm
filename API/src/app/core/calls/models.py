@@ -118,7 +118,6 @@ class Call(Base, TenantScoped):
     )
     assigned_to_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     custom_data: Mapped[dict[str, Any]] = mapped_column(

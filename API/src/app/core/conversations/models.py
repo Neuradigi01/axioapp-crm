@@ -110,7 +110,6 @@ class Conversation(Base, TenantScoped):
     )
     assigned_to_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     status: Mapped[ConversationStatus] = mapped_column(
@@ -159,7 +158,6 @@ class Message(Base, TenantScoped):
     )
     sender_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
