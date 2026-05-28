@@ -1,0 +1,122 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
+    <header class="border-b border-zinc-200 px-5 py-3">
+      <h2 class="text-sm font-semibold text-zinc-900">
+        Deactivate {{ _user()?.full_name || 'user' }}
+      </h2>
+      @if (_user(); as u) {
+        <p class="mt-0.5 text-xs text-zinc-500">{{ u.email }}</p>
+      }
+    </header>
+
+    <div class="space-y-3 px-5 py-4">
+      @if (loadingCounts()) {
+        <div class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 py-4 text-center text-xs text-zinc-500">
+          Loading open records…
+        </div>
+      } @else if (counts(); as c) {
+        <!-- Counts table -->
+        <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs">
+          <p class="mb-1.5 font-medium text-zinc-700">Open records</p>
+          <dl class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-zinc-700">
+            <dt>Contacts</dt><dd class="tabular-nums">{{ c.contacts }}</dd>
+            <dt>Leads</dt><dd class="tabular-nums">{{ c.leads }}</dd>
+            <dt>Walk-ins</dt><dd class="tabular-nums">{{ c.walk_ins }}</dd>
+            <dt>Appointments</dt><dd class="tabular-nums">{{ c.appointments }}</dd>
+            <dt>Tasks</dt><dd class="tabular-nums">{{ c.tasks }}</dd>
+            <dt class="mt-1 border-t border-zinc-200 pt-1 font-medium">Total</dt>
+            <dd class="mt-1 border-t border-zinc-200 pt-1 font-medium tabular-nums">{{ c.total }}</dd>
+          </dl>
+        </div>
+
+        @if (hasOpenRecords()) {
+          <!-- Transfer target picker -->
+          <div>
+            <label for="staff_deactivate_target" class="block text-xs font-medium text-zinc-700">
+              Transfer to <span class="text-rose-600">*</span>
+            </label>
+            <select
+              id="staff_deactivate_target"
+              [formControl]="transferTargetControl"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            >
+              <option value="">Choose a teammate…</option>
+              @for (cand of transferCandidates(); track cand.id) {
+                <option [value]="cand.id">{{ cand.full_name }} — {{ cand.email }}</option>
+              }
+            </select>
+            @if (transferCandidates().length === 0) {
+              <p class="mt-1 text-xs text-rose-700">
+                No active teammates available. Reassign manually before deactivating.
+              </p>
+            }
+          </div>
+
+          <!-- Disabled "Skip transfer" affordance, per spec. -->
+          <p class="text-[11px] text-zinc-500" title="User has open records; choose a transfer target before deactivation.">
+            <lucide-icon name="user-x" class="mr-1 inline h-3 w-3 align-text-bottom" />
+            Skip transfer is unavailable — the server rejects deactivation while open records exist.
+          </p>
+        } @else {
+          <p class="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200">
+            User has no open records. Safe to deactivate.
+          </p>
+        }
+
+        <!-- Optional reason -->
+        <div>
+          <label for="staff_deactivate_reason" class="block text-xs font-medium text-zinc-700">
+            Reason <span class="text-zinc-400">(optional)</span>
+          </label>
+          <textarea
+            id="staff_deactivate_reason"
+            [formControl]="reasonControl"
+            rows="2"
+            placeholder="e.g. left the company on 2026-05-30"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          ></textarea>
+          @if (hasOpenRecords()) {
+            <p class="mt-1 text-[11px] text-zinc-500">
+              Saved on every transferred record's timeline.
+            </p>
+          }
+        </div>
+      } @else if (error()) {
+        <!-- Counts load failed; error surface only -->
+        <div class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+          {{ error() }}
+        </div>
+      }
+
+      @if (counts() && error(); as err) {
+        <div class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+          {{ err }}
+        </div>
+      }
+    </div>
+
+    <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3 rounded-b-lg">
+      <button
+        type="button"
+        [disabled]="submitting()"
+        (click)="cancel.emit()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        [disabled]="!canConfirm()"
+        (click)="onConfirm()"
+        class="inline-flex items-center gap-1.5 rounded-md bg-rose-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+      >
+        <lucide-icon name="user-x" class="h-3.5 w-3.5" />
+        @if (submitting()) {
+          @if (stage() === 'deactivating') { Deactivating… } @else { Transferring… }
+        } @else {
+          @if (hasOpenRecords()) { Transfer & Deactivate } @else { Deactivate }
+        }
+      </button>
+    </footer>
+  </div>
+</div>

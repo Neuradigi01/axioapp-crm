@@ -1,4 +1,41 @@
 <div>
+  <!-- Sub-tab nav: Users (default) | Workload. Workload is gated by
+       `users.read` (same as the staff list itself) — the toggle hides
+       for anyone who can only see their own row. -->
+  @if (canWrite()) {
+    <nav class="mb-4 flex items-center gap-1 border-b border-zinc-200">
+      <button
+        type="button"
+        (click)="subTab.set('users')"
+        class="border-b-2 px-3 py-2 text-sm font-medium transition"
+        [class.border-zinc-900]="subTab() === 'users'"
+        [class.text-zinc-900]="subTab() === 'users'"
+        [class.border-transparent]="subTab() !== 'users'"
+        [class.text-zinc-500]="subTab() !== 'users'"
+        [class.hover:text-zinc-700]="subTab() !== 'users'"
+      >
+        Users
+      </button>
+      <button
+        type="button"
+        (click)="subTab.set('workload')"
+        class="border-b-2 px-3 py-2 text-sm font-medium transition"
+        [class.border-zinc-900]="subTab() === 'workload'"
+        [class.text-zinc-900]="subTab() === 'workload'"
+        [class.border-transparent]="subTab() !== 'workload'"
+        [class.text-zinc-500]="subTab() !== 'workload'"
+        [class.hover:text-zinc-700]="subTab() !== 'workload'"
+      >
+        Workload
+      </button>
+    </nav>
+  }
+</div>
+
+@if (subTab() === 'workload' && canWrite()) {
+  <app-staff-workload />
+} @else {
+<div>
   <div class="mb-3 flex items-center justify-between">
     <p class="text-sm text-zinc-500">
       {{ items().length }} {{ items().length === 1 ? 'member' : 'members' }} in this organisation
@@ -390,3 +427,14 @@
     </div>
   }
 </div>
+}
+
+<!-- Offboarding modal: opens when an admin clicks Deactivate. -->
+@if (deactivateTarget(); as target) {
+  <app-staff-deactivate-modal
+    [user]="target"
+    [usersInOrg]="deactivateTargetCandidates()"
+    (cancel)="closeDeactivateModal()"
+    (completed)="onDeactivationCompleted()"
+  />
+}

@@ -21,6 +21,11 @@ import { FurnitureAuthService } from '../../auth/auth.service';
 import { initials } from '@core/services/text.util';
 import { extractApiError } from '@core/services/api-error.util';
 import {
+  DeactivateTargetUser,
+  StaffDeactivateModalComponent,
+} from '../staff/staff-deactivate-modal.component';
+import { StaffWorkloadComponent } from '../staff/staff-workload.component';
+import {
   InvitationRow,
   InvitationsApiService,
 } from './invitations.service';
@@ -62,7 +67,12 @@ interface RoleRow {
   selector: 'app-settings-team-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, ReactiveFormsModule],
+  imports: [
+    DatePipe,
+    ReactiveFormsModule,
+    StaffDeactivateModalComponent,
+    StaffWorkloadComponent,
+  ],
   templateUrl: './team-tab.component.html',
 })
 export class TeamTabComponent {
@@ -84,6 +94,13 @@ export class TeamTabComponent {
   protected readonly editingId = signal<string | null>(null);
   protected readonly savingId = signal<string | null>(null);
   protected readonly rowError = signal<{ id: string; message: string } | null>(null);
+
+  // Sub-tab: Users (the existing list) vs Workload. Workload is gated
+  // by `users.read`; junior staff without it never see the toggle.
+  protected readonly subTab = signal<'users' | 'workload'>('users');
+
+  // Deactivate-modal state (the offboarding two-step flow).
+  protected readonly deactivateTarget = signal<DeactivateTargetUser | null>(null);
 
   // Transfer-ownership modal state
   protected readonly transferModalOpen = signal(false);
@@ -407,11 +424,19 @@ export class TeamTabComponent {
 
   protected toggleStatus(user: UserRow): void {
     if (this.savingId() !== null) return;
+    // Deactivation goes through the offboarding modal: it fetches
+    // open-records-counts and (when total > 0) requires a transfer
+    // target so the backend's 409 guard doesn't block the click.
+    // Activation stays direct — no transfer needed.
+    if (user.is_active) {
+      this.openDeactivateModal(user);
+      return;
+    }
     this.savingId.set(user.id);
     this.rowError.set(null);
     this.http
       .patch<UserRow>(`${this.base}/users/${user.id}/status`, {
-        is_active: !user.is_active,
+        is_active: true,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -430,5 +455,35 @@ export class TeamTabComponent {
         },
       });
   }
+
+  protected openDeactivateModal(user: UserRow): void {
+    this.deactivateTarget.set({
+      id: user.id,
+      full_name: user.full_name,
+      email: user.email,
+      is_active: user.is_active,
+    });
+  }
+
+  protected closeDeactivateModal(): void {
+    this.deactivateTarget.set(null);
+  }
+
+  protected onDeactivationCompleted(): void {
+    this.closeDeactivateModal();
+    this.reload();
+  }
+
+  /** List passed into the deactivate modal so its transfer-target
+   * dropdown shows the active teammates. Mirrors `transferTargets`
+   * shape but lives here for the modal's narrower API surface. */
+  protected readonly deactivateTargetCandidates = computed<DeactivateTargetUser[]>(() =>
+    this.items().map((u) => ({
+      id: u.id,
+      full_name: u.full_name,
+      email: u.email,
+      is_active: u.is_active,
+    })),
+  );
 
 }
