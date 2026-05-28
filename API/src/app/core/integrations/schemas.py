@@ -22,7 +22,7 @@ from config import API_BASE_URL
 
 # Mirrors the SQLAlchemy `IntegrationProvider` / `IntegrationStatus`
 # enums as Literals so schema consumers don't have to import the ORM.
-IntegrationProviderLiteral = Literal["google_ads", "meta_ads"]
+IntegrationProviderLiteral = Literal["google_ads", "meta_ads", "whatsapp"]
 IntegrationStatusLiteral = Literal[
     "connected", "disconnected", "expired", "error"
 ]
