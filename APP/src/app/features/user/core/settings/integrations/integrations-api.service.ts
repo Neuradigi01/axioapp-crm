@@ -30,7 +30,7 @@ import { environment } from '../../../../../../environments/environment';
 // --- Shared shapes (mirror backend `core/integrations/schemas.py`) ----
 
 
-export type IntegrationProvider = 'google_ads' | 'meta_ads';
+export type IntegrationProvider = 'google_ads' | 'meta_ads' | 'whatsapp';
 
 export type IntegrationStatus =
   | 'connected'
@@ -182,6 +182,38 @@ export interface IntegrationStatusResponse {
   /** Count of DLQ rows NOT yet replayed or discarded. Drives the
    *  panel's "X failed deliveries need attention" banner. */
   dlq_open_total: number;
+}
+
+
+// --- WhatsApp Business Account (Step 3.5.1+) -------------------------
+
+
+/** Projection returned by every WA endpoint that reports lifecycle
+ *  state. Mirrors backend `WhatsAppStatusOut`. The Settings card uses
+ *  the same shape for the initial `GET /status` fetch and for every
+ *  subsequent action response — single render path keeps the UI tidy. */
+export interface WhatsAppStatus {
+  status: IntegrationStatus;
+  phone_id: string | null;
+  waba_id: string | null;
+  display_phone_number: string | null;
+  verified_name: string | null;
+  api_version: string | null;
+  last_error: string | null;
+  connected_at: string | null;
+}
+
+
+/** HTTP body for `POST /api/v1/integrations/whatsapp/connect`.
+ *  All 5 base fields are required; `api_version` defaults to `v18.0`
+ *  on the backend if omitted. Mirrors backend `WhatsAppConnectIn`. */
+export interface WhatsAppConnectPayload {
+  phone_id: string;
+  waba_id: string;
+  access_token: string;
+  app_secret: string;
+  verify_token: string;
+  api_version?: string;
 }
 
 
@@ -395,5 +427,45 @@ export class IntegrationsApiService {
    *  import surface — same shape, same validation contract. */
   listMappingTargets(): Observable<MappingTarget[]> {
     return this.http.get<MappingTarget[]>(`${this.leadsImportBase}/targets`);
+  }
+
+  // --- WhatsApp Business Account (Step 3.5.1) ---------------------
+
+  /** Current connection state for the active org's WhatsApp Business
+   *  Account. Returns `{status:'disconnected'}` (200, not 404) when the
+   *  org has never connected — keeps the Settings card render path
+   *  uniform. NEVER includes `access_token` or `app_secret`. */
+  getWhatsAppStatus(): Observable<WhatsAppStatus> {
+    return this.http.get<WhatsAppStatus>(`${this.base}/whatsapp/status`);
+  }
+
+  /** Validate credentials with Meta's Graph API, then persist on
+   *  success. Single-call connect-and-test — backend rejects with
+   *  HTTP 400 if Meta refuses the token (response detail is Meta's
+   *  error message verbatim, suitable for showing to the operator). */
+  connectWhatsApp(payload: WhatsAppConnectPayload): Observable<WhatsAppStatus> {
+    return this.http.post<WhatsAppStatus>(
+      `${this.base}/whatsapp/connect`,
+      payload,
+    );
+  }
+
+  /** Re-ping Meta with stored credentials. Flips status to `error`
+   *  with `last_error` populated on rejection; returns 400 in that
+   *  case. Also 400 when the org has never connected. */
+  testWhatsApp(): Observable<WhatsAppStatus> {
+    return this.http.post<WhatsAppStatus>(
+      `${this.base}/whatsapp/test`,
+      {},
+    );
+  }
+
+  /** Null the stored token + flip status to `disconnected`. Sidecar
+   *  config (phone_id, waba_id) survives so reconnect can prefill. */
+  disconnectWhatsApp(): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/whatsapp/disconnect`,
+      {},
+    );
   }
 }

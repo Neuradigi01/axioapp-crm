@@ -47,10 +47,12 @@ import { FieldMappingEditorComponent } from './field-mapping-editor.component';
 import { GoogleCardComponent } from './google-card.component';
 import { IntegrationStatusComponent } from './integration-status.component';
 import { MetaCardComponent } from './meta-card.component';
+import { WhatsAppCardComponent } from './whatsapp-card.component';
 import {
   Integration,
   IntegrationsApiService,
   IntegrationSubscription,
+  WhatsAppStatus,
 } from './integrations-api.service';
 
 
@@ -70,6 +72,7 @@ type CallbackStatus =
   imports: [
     GoogleCardComponent,
     MetaCardComponent,
+    WhatsAppCardComponent,
     IntegrationStatusComponent,
     DlqListComponent,
     FieldMappingEditorComponent,
@@ -87,6 +90,7 @@ export class IntegrationsPageComponent {
 
   protected readonly integrations = signal<Integration[]>([]);
   protected readonly subscriptions = signal<IntegrationSubscription[]>([]);
+  protected readonly whatsapp = signal<WhatsAppStatus | null>(null);
   protected readonly dlqTotal = signal<number | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
@@ -183,13 +187,15 @@ export class IntegrationsPageComponent {
       integrations: this.api.list(),
       subscriptions: this.api.listSubscriptions(),
       dlq: this.api.listDlq({ page: 1, size: 1 }),
+      whatsapp: this.api.getWhatsAppStatus(),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: ({ integrations, subscriptions, dlq }) => {
+        next: ({ integrations, subscriptions, dlq, whatsapp }) => {
           this.integrations.set(integrations);
           this.subscriptions.set(subscriptions);
           this.dlqTotal.set(dlq.total);
+          this.whatsapp.set(whatsapp);
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {

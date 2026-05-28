@@ -99,6 +99,11 @@
       (changed)="onCardChanged()"
     ></app-meta-card>
 
+    <app-whatsapp-card
+      [status]="whatsapp()"
+      (changed)="onCardChanged()"
+    ></app-whatsapp-card>
+
     <!-- Compact DLQ summary card (Step 7) — kept as a quick-access
          link to expand the inline table even when the status banner
          isn't showing. -->

@@ -1,0 +1,353 @@
+<section
+  class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm"
+  data-testid="whatsapp-card"
+>
+  <header class="flex items-start justify-between gap-4">
+    <div class="flex items-start gap-3">
+      <span
+        class="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-50 font-bold text-emerald-700"
+        aria-hidden="true"
+      >
+        W
+      </span>
+      <div>
+        <h3 class="text-base font-semibold text-zinc-900">
+          WhatsApp Business
+          <span class="text-zinc-500 font-normal">(Cloud API)</span>
+        </h3>
+        <p class="mt-0.5 text-sm text-zinc-600">
+          Connect your WhatsApp Business Account so campaigns can send
+          template messages from your verified number. Paste the five
+          values from Meta's WhatsApp Manager — the token is validated
+          against Meta before it's stored.
+        </p>
+        @if (status()?.display_phone_number) {
+          <p class="mt-1 text-xs text-zinc-500">
+            Connected as
+            <span class="font-mono">{{ status()?.display_phone_number }}</span>
+            @if (status()?.verified_name) {
+              · <span>{{ status()?.verified_name }}</span>
+            }
+          </p>
+        }
+      </div>
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+      @if (isDisconnected()) {
+        <span
+          class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200"
+        >
+          Not connected
+        </span>
+      } @else if (isConnected()) {
+        <span
+          class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+        >
+          Connected
+        </span>
+      } @else {
+        <span
+          class="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
+        >
+          Error
+        </span>
+      }
+    </div>
+  </header>
+
+  @if (inlineError(); as err) {
+    <div
+      class="mt-4 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+    >
+      <lucide-icon
+        name="alert-triangle"
+        size="16"
+        class="mt-0.5 shrink-0"
+        aria-hidden="true"
+      ></lucide-icon>
+      <span>{{ err }}</span>
+    </div>
+  }
+
+  @if (isError() && status()?.last_error && !inlineError()) {
+    <div
+      class="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900"
+    >
+      <p class="font-medium">Last Meta call failed.</p>
+      <p class="mt-1 text-xs">{{ status()?.last_error }}</p>
+      <p class="mt-2 text-xs">
+        Reconnect to mint a fresh token, or Disconnect to clear the
+        broken state. Campaigns won't send while this card is red.
+      </p>
+    </div>
+  }
+
+  <!-- Action row: top-level CTAs (Connect / Test / Reconnect / Disconnect). -->
+  @if (!formExpanded()) {
+    <div class="mt-5 flex flex-wrap items-center gap-2">
+      @if (isDisconnected()) {
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
+          (click)="openForm()"
+        >
+          <lucide-icon name="arrow-right" size="16" aria-hidden="true"></lucide-icon>
+          Connect WhatsApp
+        </button>
+      } @else if (isConnected()) {
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          [disabled]="testing()"
+          (click)="test()"
+        >
+          @if (testing()) {
+            <lucide-icon
+              name="loader-2"
+              size="16"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            Testing…
+          } @else {
+            <lucide-icon name="zap" size="16" aria-hidden="true"></lucide-icon>
+            Test connection
+          }
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          [disabled]="disconnecting()"
+          (click)="disconnect()"
+        >
+          @if (disconnecting()) {
+            <lucide-icon
+              name="loader-2"
+              size="16"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            Disconnecting…
+          } @else {
+            <lucide-icon name="trash-2" size="16" aria-hidden="true"></lucide-icon>
+            Disconnect
+          }
+        </button>
+      } @else {
+        <!-- Error state -->
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-700"
+          (click)="reconnect()"
+        >
+          <lucide-icon name="refresh-cw" size="16" aria-hidden="true"></lucide-icon>
+          Reconnect
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          [disabled]="disconnecting()"
+          (click)="disconnect()"
+        >
+          @if (disconnecting()) {
+            <lucide-icon
+              name="loader-2"
+              size="16"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            Disconnecting…
+          } @else {
+            <lucide-icon name="trash-2" size="16" aria-hidden="true"></lucide-icon>
+            Disconnect
+          }
+        </button>
+      }
+    </div>
+  }
+
+  <!-- Connected details panel (phone_id, waba_id — copyable). -->
+  @if (isConnected() && !formExpanded()) {
+    <dl class="mt-5 grid grid-cols-1 gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-2">
+      <div>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+          Phone Number ID
+        </dt>
+        <dd class="mt-0.5 font-mono text-sm text-zinc-800">
+          {{ status()?.phone_id }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+          WABA ID
+        </dt>
+        <dd class="mt-0.5 font-mono text-sm text-zinc-800">
+          {{ status()?.waba_id }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+          Display number
+        </dt>
+        <dd class="mt-0.5 text-sm text-zinc-800">
+          {{ status()?.display_phone_number }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+          Graph API version
+        </dt>
+        <dd class="mt-0.5 font-mono text-sm text-zinc-800">
+          {{ status()?.api_version }}
+        </dd>
+      </div>
+    </dl>
+  }
+
+  <!-- Inline connect form. -->
+  @if (formExpanded()) {
+    <form
+      class="mt-5 space-y-4 rounded-md border border-zinc-200 bg-zinc-50 p-4"
+      [formGroup]="form"
+      (ngSubmit)="connect()"
+    >
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-700">
+            Phone Number ID <span class="text-rose-600">*</span>
+          </span>
+          <input
+            type="text"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            placeholder="123456789012345"
+            formControlName="phone_id"
+            autocomplete="off"
+          />
+        </label>
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-700">
+            WABA ID <span class="text-rose-600">*</span>
+          </span>
+          <input
+            type="text"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            placeholder="987654321098765"
+            formControlName="waba_id"
+            autocomplete="off"
+          />
+        </label>
+      </div>
+
+      <label class="block">
+        <span class="text-xs font-medium text-zinc-700">
+          Access Token <span class="text-rose-600">*</span>
+        </span>
+        <input
+          type="password"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          placeholder="EAA… (System User permanent token)"
+          formControlName="access_token"
+          autocomplete="off"
+        />
+        <span class="mt-1 block text-xs text-zinc-500">
+          Generate in Meta Business Settings → System Users → Add Token.
+          Scopes: <code>whatsapp_business_messaging</code> +
+          <code>whatsapp_business_management</code>.
+        </span>
+      </label>
+
+      <label class="block">
+        <span class="text-xs font-medium text-zinc-700">
+          App Secret <span class="text-rose-600">*</span>
+        </span>
+        <input
+          type="password"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          placeholder="Meta App → Settings → Basic → App Secret"
+          formControlName="app_secret"
+          autocomplete="off"
+        />
+        <span class="mt-1 block text-xs text-zinc-500">
+          Used to verify incoming webhook signatures from Meta.
+        </span>
+      </label>
+
+      <label class="block">
+        <span class="text-xs font-medium text-zinc-700">
+          Verify Token <span class="text-rose-600">*</span>
+        </span>
+        <input
+          type="text"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          placeholder="furniturecrm-verify-xyz123"
+          formControlName="verify_token"
+          autocomplete="off"
+        />
+        <span class="mt-1 block text-xs text-zinc-500">
+          Any random string — you'll paste the same value into Meta's
+          webhook console when wiring up delivery events.
+        </span>
+      </label>
+
+      <div>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 text-xs font-medium text-zinc-600 hover:text-zinc-900"
+          (click)="toggleAdvanced()"
+        >
+          <lucide-icon
+            [name]="advancedExpanded() ? 'chevron-down' : 'chevron-right'"
+            size="12"
+            aria-hidden="true"
+          ></lucide-icon>
+          Advanced
+        </button>
+        @if (advancedExpanded()) {
+          <label class="mt-2 block">
+            <span class="text-xs font-medium text-zinc-700">
+              Graph API version
+            </span>
+            <input
+              type="text"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              formControlName="api_version"
+              autocomplete="off"
+            />
+            <span class="mt-1 block text-xs text-zinc-500">
+              Default <code>v18.0</code>. Bump only if Meta deprecates it.
+            </span>
+          </label>
+        }
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          [disabled]="connecting()"
+          (click)="cancelForm()"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+          [disabled]="connecting() || form.invalid"
+        >
+          @if (connecting()) {
+            <lucide-icon
+              name="loader-2"
+              size="16"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            Connecting…
+          } @else {
+            <lucide-icon name="check" size="16" aria-hidden="true"></lucide-icon>
+            Connect WhatsApp
+          }
+        </button>
+      </div>
+    </form>
+  }
+</section>
