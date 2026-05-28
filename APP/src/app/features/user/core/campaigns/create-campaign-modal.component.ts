@@ -1,9 +1,11 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
   EventEmitter,
   Output,
+  computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -14,24 +16,35 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ConversationChannel } from '../conversations/conversations-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 import {
+  IntegrationsApiService,
+  WhatsAppTemplate,
+} from '../settings/integrations/integrations-api.service';
+import {
   Campaign,
   CampaignsApiService,
+  TemplateVariableBinding,
 } from './campaigns-api.service';
 
 /**
  * Create-campaign modal.
  *
- * Fields:
- *   - Name
- *   - Channel (whatsapp / sms / email / web / facebook / instagram)
- *   - Audience filter: q / source / tag (same shape as /contacts list).
- *     Empty filter = everyone in the org.
- *   - Template with `{{full_name}}` placeholder support
- *   - Schedule_at (optional, datetime-local) â€” if blank, send now-ish
- *     when the operator clicks Start.
+ * Two template authoring modes drive the body input:
  *
- * The campaign is created in `status='draft'`. The operator clicks
- * Start on the list/detail page to actually dispatch.
+ *  - **Free text** (non-WA channels, or WA-text-fallback): textarea
+ *    with `{{full_name}}` Mustache placeholder for the legacy
+ *    contact-name interpolation.
+ *  - **WA template picker** (Step 3.5.5 — channel='whatsapp'):
+ *    dropdown of approved templates loaded from
+ *    `GET /api/v1/integrations/whatsapp/templates?status=APPROVED`.
+ *    Selecting a template shows a body preview + one input per
+ *    `{{n}}` placeholder; each input has a "Static text" / "Contact
+ *    field" toggle so the operator can either pin a literal value
+ *    or bind to a contact attribute (full_name / phone / email).
+ *    Step 3.5.6 dispatch resolves the field bindings per contact.
+ *
+ * Schema-level validation (backend `CampaignCreate`) enforces
+ * "exactly one of template or template_id" — this modal serializes
+ * the right shape based on the selected mode.
  */
 @Component({
   selector: 'app-create-campaign-modal',
@@ -43,6 +56,7 @@ import {
 export class CreateCampaignModalComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(CampaignsApiService);
+  private readonly integrationsApi = inject(IntegrationsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   @Output() readonly created = new EventEmitter<Campaign>();
@@ -51,12 +65,50 @@ export class CreateCampaignModalComponent {
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
 
-  // String constants holding literal `{{...}}` so the template can
-  // render them as text without Angular trying to interpolate them.
+  // --- WhatsApp template picker state -------------------------------
+
+  protected readonly templates = signal<WhatsAppTemplate[]>([]);
+  protected readonly templatesLoading = signal(false);
+  protected readonly templatesLoaded = signal(false);
+  protected readonly selectedTemplateId = signal<string | null>(null);
+  /** Variable bindings per `{{n}}`. Key is the variable number as
+   *  string ('1','2',...) to match backend's JSONB shape. */
+  protected readonly variables = signal<Record<string, TemplateVariableBinding>>({});
+
+  protected readonly contactFieldOptions: ReadonlyArray<{
+    value: string;
+    label: string;
+  }> = [
+    { value: 'full_name', label: 'Contact full name' },
+    { value: 'phone', label: 'Contact phone' },
+    { value: 'email', label: 'Contact email' },
+  ];
+
+  protected readonly selectedTemplate = computed<WhatsAppTemplate | null>(
+    () =>
+      this.templates().find((t) => t.id === this.selectedTemplateId()) ??
+      null,
+  );
+
+  protected readonly templateVariableNumbers = computed<number[]>(() => {
+    const t = this.selectedTemplate();
+    if (!t) return [];
+    // Match the backend's _VARIABLE_RE — distinct, sorted.
+    const found = new Set<number>();
+    const re = /\{\{(\d+)\}\}/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(t.body)) !== null) {
+      found.add(parseInt(m[1], 10));
+    }
+    return [...found].sort((a, b) => a - b);
+  });
+
+  // --- form ---------------------------------------------------------
+
   protected readonly varFullName = '{{full_name}}';
   protected readonly varPhone = '{{phone}}';
   protected readonly templatePlaceholder =
-    'Hi {{full_name}} â€” our Diwali sale is live! 20% off everything this week.';
+    'Hi {{full_name}} — our Diwali sale is live! 20% off everything this week.';
 
   protected readonly channels: ReadonlyArray<{
     value: ConversationChannel;
@@ -82,12 +134,103 @@ export class CreateCampaignModalComponent {
     audience_q: this.fb.control<string | null>(null),
     audience_source: this.fb.control<string | null>(null),
     audience_tag: this.fb.control<string | null>(null),
-    template: this.fb.control('', {
+    // Free-text body — required ONLY when no template is selected for
+    // a WA campaign, OR for any non-WA channel. The submit handler
+    // does the conditional check rather than dynamic Validators.
+    template: this.fb.control<string>('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(4096)],
+      validators: [Validators.maxLength(4096)],
     }),
     schedule_at: this.fb.control<string | null>(null),
   });
+
+  protected readonly isWhatsApp = computed(() =>
+    // computed reads channel via valueChanges — track manually
+    false,
+  );
+
+  constructor() {
+    // Load templates whenever the channel flips to WhatsApp. Single
+    // shot — once cached we don't re-fetch on every channel toggle.
+    this.form.controls.channel.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((channel) => {
+        if (channel === 'whatsapp' && !this.templatesLoaded()) {
+          this._loadTemplates();
+        }
+      });
+
+    // Initial load — default channel is whatsapp.
+    if (this.form.controls.channel.value === 'whatsapp') {
+      this._loadTemplates();
+    }
+
+    // Reset variable bindings whenever the selected template changes
+    // — pre-fill each `{{n}}` with an empty static binding.
+    effect(() => {
+      const nums = this.templateVariableNumbers();
+      if (this.selectedTemplate() === null) {
+        this.variables.set({});
+        return;
+      }
+      const next: Record<string, TemplateVariableBinding> = {};
+      for (const n of nums) {
+        next[String(n)] = { kind: 'static', value: '' };
+      }
+      this.variables.set(next);
+    });
+  }
+
+  protected isWhatsAppChannel(): boolean {
+    return this.form.controls.channel.value === 'whatsapp';
+  }
+
+  protected onTemplateChange(templateId: string): void {
+    this.selectedTemplateId.set(templateId || null);
+  }
+
+  protected onVariableKindChange(varNum: number, kind: 'static' | 'field'): void {
+    const current = this.variables();
+    const key = String(varNum);
+    const existing = current[key] ?? { kind: 'static', value: '' };
+    this.variables.set({
+      ...current,
+      [key]: {
+        kind,
+        // Switching mode clears the value so the operator picks fresh.
+        value: existing.kind === kind ? existing.value : '',
+      },
+    });
+  }
+
+  protected onVariableValueChange(varNum: number, value: string): void {
+    const current = this.variables();
+    const key = String(varNum);
+    const existing = current[key] ?? { kind: 'static', value: '' };
+    this.variables.set({
+      ...current,
+      [key]: { kind: existing.kind, value },
+    });
+  }
+
+  private _loadTemplates(): void {
+    this.templatesLoading.set(true);
+    this.integrationsApi
+      .listWhatsAppTemplates({ status: 'APPROVED' })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          this.templates.set(rows);
+          this.templatesLoaded.set(true);
+          this.templatesLoading.set(false);
+        },
+        error: () => {
+          this.templatesLoading.set(false);
+          // Don't block the modal on template load failure — operator
+          // can still use the free-text fallback.
+        },
+      });
+  }
 
   protected save(): void {
     if (!this.form.valid) {
@@ -100,6 +243,29 @@ export class CreateCampaignModalComponent {
     if (v.audience_source?.trim()) audience.source = v.audience_source.trim();
     if (v.audience_tag?.trim()) audience.tag = v.audience_tag.trim();
 
+    // Decide template vs template_id mode.
+    const useTemplatePicker =
+      v.channel === 'whatsapp' && this.selectedTemplateId() !== null;
+
+    if (useTemplatePicker) {
+      // Validate every variable has a non-empty value.
+      const bindings = this.variables();
+      for (const n of this.templateVariableNumbers()) {
+        const b = bindings[String(n)];
+        if (!b || !b.value.trim()) {
+          this.submitError.set(
+            `Fill in a value for variable {{${n}}}.`,
+          );
+          return;
+        }
+      }
+    } else if (!v.template.trim()) {
+      this.submitError.set(
+        'Provide a message body or pick a WhatsApp template.',
+      );
+      return;
+    }
+
     this.submitting.set(true);
     this.submitError.set(null);
     this.api
@@ -107,7 +273,9 @@ export class CreateCampaignModalComponent {
         name: v.name,
         channel: v.channel,
         audience_filter: audience,
-        template: v.template,
+        template: useTemplatePicker ? null : v.template,
+        template_id: useTemplatePicker ? this.selectedTemplateId() : null,
+        template_variables: useTemplatePicker ? this.variables() : null,
         schedule_at: v.schedule_at
           ? new Date(v.schedule_at).toISOString()
           : null,
@@ -130,5 +298,4 @@ export class CreateCampaignModalComponent {
   protected close(): void {
     this.cancel.emit();
   }
-
 }

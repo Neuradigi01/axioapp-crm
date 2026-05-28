@@ -122,6 +122,12 @@ async def create_campaign(
         channel=payload.channel,
         audience_filter=payload.audience_filter.model_dump(exclude_none=True),
         template=payload.template,
+        template_id=payload.template_id,
+        template_variables=(
+            {k: v.model_dump() for k, v in payload.template_variables.items()}
+            if payload.template_variables is not None
+            else None
+        ),
         schedule_at=payload.schedule_at,
         status=CampaignStatus.draft,
         created_by_id=user_id,
@@ -162,6 +168,20 @@ async def update_campaign(
         changed = True
     if payload.template is not None:
         campaign.template = payload.template
+        # Switching to free-text body clears any template binding so
+        # the row never has both — dispatch's branch (Step 3.5.6) is
+        # unambiguous.
+        campaign.template_id = None
+        campaign.template_variables = None
+        changed = True
+    if payload.template_id is not None:
+        campaign.template_id = payload.template_id
+        campaign.template = None
+        campaign.template_variables = (
+            {k: v.model_dump() for k, v in payload.template_variables.items()}
+            if payload.template_variables is not None
+            else {}
+        )
         changed = True
     if payload.schedule_at is not None:
         campaign.schedule_at = payload.schedule_at

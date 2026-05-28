@@ -1,5 +1,5 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 px-4">
-  <div class="w-full max-w-xl rounded-lg bg-white p-5 shadow-xl">
+  <div class="w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl max-h-[90vh] overflow-y-auto">
     <header class="mb-4">
       <h2 class="text-lg font-semibold text-zinc-900">New campaign</h2>
       <p class="mt-1 text-xs text-zinc-500">
@@ -65,17 +65,113 @@
         </div>
       </fieldset>
 
+      @if (isWhatsAppChannel() && templates().length > 0) {
+        <!-- WhatsApp template picker — Step 3.5.5 -->
+        <div class="rounded-md border border-zinc-200 p-3 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-zinc-600">
+              WhatsApp template
+            </span>
+            <span class="text-[10px] text-zinc-400">
+              Synced from Meta · Settings → Integrations
+            </span>
+          </div>
+          <select
+            [value]="selectedTemplateId() ?? ''"
+            (change)="onTemplateChange($any($event.target).value)"
+            class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          >
+            <option value="">— Pick a template (or use free text below) —</option>
+            @for (t of templates(); track t.id) {
+              <option [value]="t.id">
+                {{ t.name }} · {{ t.language }} · {{ t.category }}
+              </option>
+            }
+          </select>
+
+          @if (selectedTemplate(); as t) {
+            <!-- Preview -->
+            <div class="rounded-md bg-zinc-50 p-3 text-sm text-zinc-700 whitespace-pre-wrap font-mono text-xs">
+              @if (t.header_text) {
+                <div class="font-semibold mb-1">{{ t.header_text }}</div>
+              }
+              {{ t.body }}
+              @if (t.footer_text) {
+                <div class="mt-1 text-zinc-500">{{ t.footer_text }}</div>
+              }
+            </div>
+
+            <!-- Variable bindings -->
+            @if (templateVariableNumbers().length > 0) {
+              <div class="space-y-2">
+                <span class="text-xs font-medium text-zinc-600">
+                  Variable bindings
+                </span>
+                @for (n of templateVariableNumbers(); track n) {
+                  <div class="grid grid-cols-12 gap-2 items-start">
+                    <div class="col-span-2 text-xs text-zinc-700 font-mono pt-1.5">
+                      {{ '{{' + n + '}}' }}
+                    </div>
+                    <select
+                      [value]="variables()[n.toString()]?.kind ?? 'static'"
+                      (change)="onVariableKindChange(n, $any($event.target).value)"
+                      class="col-span-3 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                    >
+                      <option value="static">Static text</option>
+                      <option value="field">Contact field</option>
+                    </select>
+                    @if (variables()[n.toString()]?.kind === 'field') {
+                      <select
+                        [value]="variables()[n.toString()]?.value ?? ''"
+                        (change)="onVariableValueChange(n, $any($event.target).value)"
+                        class="col-span-7 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                      >
+                        <option value="">— Select field —</option>
+                        @for (f of contactFieldOptions; track f.value) {
+                          <option [value]="f.value">{{ f.label }}</option>
+                        }
+                      </select>
+                    } @else {
+                      <input
+                        type="text"
+                        [value]="variables()[n.toString()]?.value ?? ''"
+                        (input)="onVariableValueChange(n, $any($event.target).value)"
+                        placeholder="e.g. 30%"
+                        class="col-span-7 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                      />
+                    }
+                  </div>
+                }
+              </div>
+            }
+          }
+        </div>
+      } @else if (isWhatsAppChannel() && templatesLoaded() && templates().length === 0) {
+        <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          No approved templates synced yet. Go to Settings → Integrations → WhatsApp and click "Sync templates".
+        </div>
+      } @else if (isWhatsAppChannel() && templatesLoading()) {
+        <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+          Loading templates…
+        </div>
+      }
+
       <label class="block text-sm">
         <span class="block text-xs font-medium text-zinc-600">
-          Template
-          <span class="ml-1 text-[10px] text-zinc-400">
-            Use <code>{{ varFullName }}</code> · <code>{{ varPhone }}</code> for personalisation
-          </span>
+          @if (isWhatsAppChannel() && selectedTemplateId()) {
+            Free-text fallback body (ignored — template selected above)
+          } @else {
+            Message body
+            <span class="ml-1 text-[10px] text-zinc-400">
+              Use <code>{{ varFullName }}</code> · <code>{{ varPhone }}</code> for personalisation
+            </span>
+          }
         </span>
         <textarea
           rows="4"
           formControlName="template"
           [placeholder]="templatePlaceholder"
+          [class.opacity-50]="isWhatsAppChannel() && selectedTemplateId()"
           class="mt-1 block w-full resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         ></textarea>
       </label>

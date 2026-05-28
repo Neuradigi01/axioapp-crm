@@ -77,6 +77,53 @@ def _normalize_phone(raw: str) -> str:
     return f"+{digits}"
 
 
+def _render_template_components(
+    *,
+    variables: dict[int, str],
+    header_type: str | None = None,
+    header_text: str | None = None,
+) -> list[dict[str, Any]]:
+    """Turn a `{1: "Asha", 2: "30%"}` dict into Meta's `components[]`
+    payload shape:
+
+        [{"type":"body","parameters":[
+            {"type":"text","text":"Asha"},
+            {"type":"text","text":"30%"}]}]
+
+    Header parameters are added as a separate `{"type":"header"}` entry
+    only when `header_type='TEXT'` and `header_text` carries a `{{1}}`
+    placeholder — Meta's spec allows a single header variable.
+
+    Variables are emitted in numeric order so `{{1}}` always lands at
+    parameter index 0 (Meta substitutes by position, not by name)."""
+    out: list[dict[str, Any]] = []
+
+    if header_type == "TEXT" and header_text and "{{1}}" in header_text:
+        # Header has its own single-variable slot. Use the variable's
+        # resolved value at key 1 if present; otherwise fall back to
+        # the raw header_text (rare — the picker should have collected
+        # an input for it).
+        header_value = variables.get(1, "")
+        if header_value:
+            out.append(
+                {
+                    "type": "header",
+                    "parameters": [
+                        {"type": "text", "text": str(header_value)}
+                    ],
+                }
+            )
+
+    body_params = [
+        {"type": "text", "text": str(variables[n])}
+        for n in sorted(variables)
+    ]
+    if body_params:
+        out.append({"type": "body", "parameters": body_params})
+
+    return out
+
+
 class WhatsAppAdapter:
     """Implements `ChannelAdapter` for Meta's WhatsApp Cloud API."""
 
@@ -143,6 +190,72 @@ class WhatsAppAdapter:
         if resp.status_code >= 400:
             raise WhatsAppSendError(
                 f"whatsapp send failed: {resp.status_code} {resp.text}"
+            )
+        body = resp.json()
+        msg_id = (
+            body.get("messages", [{}])[0].get("id")
+            if isinstance(body, dict)
+            else None
+        )
+        return ChannelMessageRef(
+            channel_message_id=str(msg_id) if msg_id else "",
+            sent_at=datetime.now(timezone.utc),
+        )
+
+    # --- outbound (template) ----------------------------------------------
+
+    async def send_template(
+        self,
+        *,
+        org_id: uuid.UUID,
+        external_id: str,
+        template_name: str,
+        language: str,
+        variables: dict[int, str],
+        header_type: str | None = None,
+        header_text: str | None = None,
+    ) -> ChannelMessageRef:
+        """POST a template message to Meta's Cloud API.
+
+        `variables` maps `{{n}}` → resolved plaintext (e.g. `{1: "Asha",
+        2: "30%"}`). The caller (Step 3.5.6 dispatch) is responsible for
+        resolving `kind=field` bindings against the contact before calling
+        this method — the adapter only deals with flat values.
+
+        `header_type` + `header_text` are passed-through for templates
+        whose HEADER is TEXT with a `{{1}}` variable (Meta supports a
+        single header variable). Other header formats (IMAGE/VIDEO/
+        DOCUMENT) are out of scope here — caller pre-validates.
+        """
+        to = _normalize_phone(external_id).lstrip("+")
+        components = _render_template_components(
+            variables=variables,
+            header_type=header_type,
+            header_text=header_text,
+        )
+        envelope: dict[str, Any] = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": language},
+            },
+        }
+        if components:
+            envelope["template"]["components"] = components
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Content-Type": "application/json",
+        }
+        async with self._http_factory() as client:
+            resp = await client.post(
+                self.endpoint, json=envelope, headers=headers
+            )
+        if resp.status_code >= 400:
+            raise WhatsAppSendError(
+                f"whatsapp template send failed: {resp.status_code} {resp.text}"
             )
         body = resp.json()
         msg_id = (
@@ -306,6 +419,7 @@ __all__ = [
     "WhatsAppAdapter",
     "WhatsAppNotConnected",
     "WhatsAppSendError",
+    "_render_template_components",
     "register_default_whatsapp_adapter",
     "resolve_whatsapp_adapter",
 ]

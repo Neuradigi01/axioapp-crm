@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 3.5.4 (`whatsapp_templates` table + sync API)
-**Status:** ⏳ PENDING — awaiting "begin"
+**Status:** ✅ COMPLETED — backend tests 30/30 + Angular build clean
 
 After this step a campaign author can: open Create Campaign → pick channel "WhatsApp" → pick from approved templates → fill in `{{1}} = full_name`, `{{2}} = "sofa set"` style variable bindings → save as draft. Actual dispatch happens in Step 3.5.6.
 

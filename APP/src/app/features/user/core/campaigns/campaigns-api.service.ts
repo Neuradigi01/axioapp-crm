@@ -25,13 +25,23 @@ export interface AudienceFilter {
   tag?: string;
 }
 
+/** One `{{n}}` binding in `template_variables`. `kind=static` is
+ *  literal text every recipient sees; `kind=field` resolves against
+ *  the contact at dispatch time (Step 3.5.6). */
+export interface TemplateVariableBinding {
+  kind: 'static' | 'field';
+  value: string;
+}
+
 export interface Campaign {
   id: string;
   org_id: string;
   name: string;
   channel: ConversationChannel;
   audience_filter: AudienceFilter;
-  template: string;
+  template: string | null;
+  template_id: string | null;
+  template_variables: Record<string, TemplateVariableBinding> | null;
   schedule_at: string | null;
   status: CampaignStatus;
   created_by_id: string | null;
@@ -49,14 +59,18 @@ export interface CampaignCreate {
   name: string;
   channel: ConversationChannel;
   audience_filter?: AudienceFilter;
-  template: string;
+  template?: string | null;
+  template_id?: string | null;
+  template_variables?: Record<string, TemplateVariableBinding> | null;
   schedule_at?: string | null;
 }
 
 export type CampaignUpdate = Partial<{
   name: string;
   audience_filter: AudienceFilter;
-  template: string;
+  template: string | null;
+  template_id: string | null;
+  template_variables: Record<string, TemplateVariableBinding> | null;
   schedule_at: string | null;
 }>;
 

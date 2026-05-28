@@ -92,13 +92,33 @@ class Campaign(Base, TenantScoped):
     audience_filter: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=sql_text("'{}'::jsonb")
     )
-    template: Mapped[str] = mapped_column(
-        # Free-text body for now; in 5.x we'll add template_id +
-        # variable substitution. For now `{{full_name}}` is honoured by
-        # the send task as a tiny Mustache-style placeholder.
-        # (No template lookup table yet.)
+    template: Mapped[str | None] = mapped_column(
+        # Free-text body for non-template campaigns (any channel) +
+        # legacy WhatsApp text campaigns. For WA campaigns that use an
+        # approved Meta template, `template_id` is set instead and
+        # this column is NULL. Schema-level validation in
+        # `CampaignCreate` enforces "exactly one of template or
+        # template_id".
         String(4096),
-        nullable=False,
+        nullable=True,
+    )
+    # WA template campaigns reference an approved Meta template by id.
+    # ON DELETE SET NULL preserves the campaign row if Meta deletes
+    # the template (Step 3.5.4 hard-delete on sync); the dispatch path
+    # will then fail with a clear "template no longer exists" error.
+    template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("whatsapp_templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    # Operator's variable bindings — shape:
+    #   {"1": {"kind":"static","value":"30%"},
+    #    "2": {"kind":"field","value":"full_name"}}
+    # Step 3.5.6's dispatch resolves `kind=field` against each contact
+    # at send time. `kind=static` passes through verbatim.
+    template_variables: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB,
+        nullable=True,
     )
     schedule_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

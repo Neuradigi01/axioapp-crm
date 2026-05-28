@@ -69,6 +69,22 @@
     </div>
   }
 
+  @if (syncResult(); as r) {
+    <div
+      class="mt-4 flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
+    >
+      <lucide-icon
+        name="check-circle-2"
+        size="16"
+        class="mt-0.5 shrink-0"
+        aria-hidden="true"
+      ></lucide-icon>
+      <span>
+        Templates synced — {{ r.added }} added, {{ r.updated }} updated, {{ r.removed }} removed.
+      </span>
+    </div>
+  }
+
   @if (isError() && status()?.last_error && !inlineError()) {
     <div
       class="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900"
@@ -112,6 +128,25 @@
           } @else {
             <lucide-icon name="zap" size="16" aria-hidden="true"></lucide-icon>
             Test connection
+          }
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          [disabled]="syncing()"
+          (click)="syncTemplates()"
+        >
+          @if (syncing()) {
+            <lucide-icon
+              name="loader-2"
+              size="16"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            Syncing…
+          } @else {
+            <lucide-icon name="download" size="16" aria-hidden="true"></lucide-icon>
+            Sync templates
           }
         </button>
         <button

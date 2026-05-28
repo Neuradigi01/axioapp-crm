@@ -112,12 +112,20 @@ export class WhatsAppCardComponent {
    *  operators use the v18.0 default. */
   protected readonly advancedExpanded = signal(false);
 
-  /** Per-button in-flight flags drive spinner state. Three separate
-   *  signals (not one shared) so two simultaneous actions can't both
-   *  reset each other's UI. */
+  /** Per-button in-flight flags drive spinner state. Four separate
+   *  signals (not one shared) so concurrent actions can't reset each
+   *  other's UI. */
   protected readonly connecting = signal(false);
   protected readonly testing = signal(false);
   protected readonly disconnecting = signal(false);
+  protected readonly syncing = signal(false);
+  /** Last successful sync counts — toast text. Cleared after 5s by
+   *  the template's CSS transition; no JS timer needed. */
+  protected readonly syncResult = signal<{
+    added: number;
+    updated: number;
+    removed: number;
+  } | null>(null);
 
   protected readonly form: FormGroup<WhatsAppConnectForm> = this.fb.nonNullable.group({
     phone_id: this.fb.nonNullable.control('', Validators.required),
@@ -258,5 +266,33 @@ export class WhatsAppCardComponent {
 
   reconnect(): void {
     this.openForm();
+  }
+
+  /** Pull approved templates from Meta into the local cache. Drives
+   *  the Settings card's "Sync templates" button — only visible when
+   *  the account is connected (the API rejects with 409 otherwise,
+   *  but hiding the button avoids the round-trip). */
+  syncTemplates(): void {
+    if (this.syncing()) return;
+    this.inlineError.set(null);
+    this.syncResult.set(null);
+    this.syncing.set(true);
+    this.api
+      .syncWhatsAppTemplates()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.syncing.set(false);
+          this.syncResult.set({
+            added: result.added,
+            updated: result.updated,
+            removed: result.removed,
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.syncing.set(false);
+          this.inlineError.set(extractApiError(err));
+        },
+      });
   }
 }

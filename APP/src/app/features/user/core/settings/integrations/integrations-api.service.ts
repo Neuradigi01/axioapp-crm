@@ -217,6 +217,30 @@ export interface WhatsAppConnectPayload {
 }
 
 
+export interface WhatsAppTemplate {
+  id: string;
+  name: string;
+  language: string;
+  category: string;
+  status: string;
+  body: string;
+  header_type: string | null;
+  header_text: string | null;
+  footer_text: string | null;
+  variable_count: number;
+  meta_template_id: string | null;
+  last_synced_at: string;
+}
+
+
+export interface WhatsAppTemplateSyncResult {
+  added: number;
+  updated: number;
+  removed: number;
+  total: number;
+}
+
+
 export interface DlqListFilters {
   page?: number;
   size?: number;
@@ -466,6 +490,34 @@ export class IntegrationsApiService {
     return this.http.post<void>(
       `${this.base}/whatsapp/disconnect`,
       {},
+    );
+  }
+
+  // --- WhatsApp templates (Step 3.5.4 backend, 3.5.5 frontend) ----
+
+  /** Pull approved templates from Meta into local cache. Returns
+   *  counts the Settings UI shows in a toast: "3 added, 1 updated".
+   *  409 if WA is not connected. */
+  syncWhatsAppTemplates(): Observable<WhatsAppTemplateSyncResult> {
+    return this.http.post<WhatsAppTemplateSyncResult>(
+      `${this.base}/whatsapp/templates/sync`,
+      {},
+    );
+  }
+
+  /** List cached templates for the active org. The campaign create-
+   *  modal picker calls this with `status=APPROVED` to show only
+   *  Meta-approved templates. */
+  listWhatsAppTemplates(filters?: {
+    status?: string;
+    category?: string;
+  }): Observable<WhatsAppTemplate[]> {
+    let params = new HttpParams();
+    if (filters?.status) params = params.set('status', filters.status);
+    if (filters?.category) params = params.set('category', filters.category);
+    return this.http.get<WhatsAppTemplate[]>(
+      `${this.base}/whatsapp/templates`,
+      { params },
     );
   }
 }
