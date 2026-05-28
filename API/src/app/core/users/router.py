@@ -27,10 +27,17 @@ from src.app.core.permissions.service import (
 )
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import User
+from src.app.core.users.offboarding import (
+    compute_open_records_counts,
+    transfer_records,
+)
 from src.app.core.users.schemas import (
     MeUpdate,
+    OpenRecordsCounts,
     OrgSummary,
     PasswordChange,
+    TransferRecordsRequest,
+    TransferRecordsResponse,
     UserCreate,
     UserMe,
     UserOut,
@@ -164,3 +171,66 @@ async def set_user_status_endpoint(
         is_active=payload.is_active,
     )
     return UserOut.model_validate(updated)
+
+
+# --- Offboarding endpoints --------------------------------------------------
+
+
+@router.get(
+    "/{user_id}/open-records-counts",
+    response_model=OpenRecordsCounts,
+)
+async def open_records_counts_endpoint(
+    user_id: uuid.UUID,
+    _user: User = Depends(require_permissions("users.read")),
+    session: AsyncSession = Depends(get_db),
+) -> OpenRecordsCounts:
+    """Per-entity open-record counts for one user — feeds the
+    deactivation modal so the admin can see what would need to be
+    transferred. The five entities counted: contacts, leads,
+    walk_ins, appointments, tasks. See `offboarding.py` for the
+    "open" predicates."""
+    counts = await compute_open_records_counts(
+        session, user_uuid=user_id, org_id=_user.org_id
+    )
+    return OpenRecordsCounts(
+        user_id=user_id,
+        contacts=counts["contacts"],
+        leads=counts["leads"],
+        walk_ins=counts["walk_ins"],
+        appointments=counts["appointments"],
+        tasks=counts["tasks"],
+        total=counts["total"],
+    )
+
+
+@router.post(
+    "/{user_id}/transfer-records",
+    response_model=TransferRecordsResponse,
+)
+async def transfer_records_endpoint(
+    user_id: uuid.UUID,
+    payload: TransferRecordsRequest,
+    user: User = Depends(require_permissions("users.write")),
+    session: AsyncSession = Depends(get_db),
+) -> TransferRecordsResponse:
+    """Atomic bulk-reassign of every open record across the named
+    entities (defaults to all five). Each transferred row gets a
+    `reassign` audit activity carrying the optional `reason`."""
+    entities = payload.normalised_entities()
+    summary = await transfer_records(
+        session,
+        from_user_uuid=user_id,
+        to_user_uuid=payload.to_user_id,
+        org_id=user.org_id,
+        entities=entities,
+        reason=payload.reason,
+        actor_user_uuid=user.legacy_uuid,
+    )
+    return TransferRecordsResponse(
+        from_user_id=user_id,
+        to_user_id=payload.to_user_id,
+        transferred=summary["transferred"],
+        total=summary["total"],
+        audit_activities_written=summary["audit_activities_written"],
+    )

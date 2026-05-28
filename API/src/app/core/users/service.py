@@ -331,7 +331,21 @@ async def set_user_status(
 
     Deactivating revokes every non-revoked `auth_sessions` row for the
     user so existing JWTs can no longer authenticate.
+
+    Deactivation is refused under two conditions:
+      - the target user is the workspace Owner (403) — they must
+        transfer ownership first;
+      - the target still has open records (409) — the caller must
+        run `POST /users/{id}/transfer-records` to a new owner first.
     """
+    # Imported lazily to avoid a circular import at module load:
+    # offboarding depends on every entity's service which in turn
+    # imports core.users for the OrganizationMember type.
+    from src.app.core.users.offboarding import (
+        assert_not_owner_role,
+        compute_open_records_counts,
+    )
+
     user = await get_user_by_id(session, user_id)
     if user is None:
         raise HTTPException(
@@ -352,6 +366,27 @@ async def set_user_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"user {user_id} is not a member of this org",
         )
+
+    if not is_active:
+        # Owner guard first — the most authoritative refusal.
+        await assert_not_owner_role(
+            session, user_uuid=user_id, org_id=org_id
+        )
+        counts = await compute_open_records_counts(
+            session, user_uuid=user_id, org_id=org_id
+        )
+        if counts["total"] > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "user has open records",
+                    "open_records": counts,
+                    "hint": (
+                        "POST /users/{id}/transfer-records to a new owner "
+                        "before deactivating."
+                    ),
+                },
+            )
 
     user.is_active = is_active
     membership.is_active = is_active

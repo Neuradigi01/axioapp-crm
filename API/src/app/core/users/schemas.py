@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -99,3 +100,79 @@ class PasswordChange(BaseModel):
     current_password: str = Field(min_length=1)
     new_password: str = Field(min_length=8, max_length=255)
     sign_out_others: bool = False
+
+
+# --- Offboarding / workload shapes -----------------------------------------
+
+
+_TRANSFER_ENTITIES = ("contacts", "leads", "walk_ins", "appointments", "tasks")
+
+
+class OpenRecordsCounts(BaseModel):
+    """Per-entity open-record counts for one user. `total` is the
+    convenience sum the FE renders in the deactivation modal."""
+
+    user_id: uuid.UUID
+    contacts: int = 0
+    leads: int = 0
+    walk_ins: int = 0
+    appointments: int = 0
+    tasks: int = 0
+    total: int = 0
+
+
+class TransferRecordsRequest(BaseModel):
+    """Atomic bulk-reassign for an offboarding user. `entities` lets
+    the caller scope to a subset — default is all five. The Pydantic
+    validator rejects any unknown entity name."""
+
+    to_user_id: uuid.UUID
+    entities: list[str] = Field(default_factory=lambda: list(_TRANSFER_ENTITIES))
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @classmethod
+    def _validate_entity(cls, name: str) -> str:
+        if name not in _TRANSFER_ENTITIES:
+            raise ValueError(
+                f"unknown entity {name!r}; expected one of {_TRANSFER_ENTITIES}"
+            )
+        return name
+
+    def normalised_entities(self) -> list[str]:
+        if not self.entities:
+            raise ValueError("entities must be a non-empty list")
+        # Validate + deduplicate while preserving caller order so the
+        # transfer summary's per-entity ordering matches the request.
+        seen: set[str] = set()
+        out: list[str] = []
+        for name in self.entities:
+            self._validate_entity(name)
+            if name not in seen:
+                seen.add(name)
+                out.append(name)
+        return out
+
+
+class TransferRecordsResponse(BaseModel):
+    """Summary of an atomic transfer."""
+
+    from_user_id: uuid.UUID
+    to_user_id: uuid.UUID
+    transferred: dict[str, int]
+    total: int
+    audit_activities_written: int
+
+
+class WorkloadEntry(BaseModel):
+    user_id: uuid.UUID
+    first_name: str
+    last_name: str
+    is_active: bool
+    counts: OpenRecordsCounts
+
+
+class WorkloadReport(BaseModel):
+    users: list[WorkloadEntry]
+    as_of: datetime
