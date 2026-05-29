@@ -48,6 +48,22 @@ class WhatsAppSendError(Exception):
     """Raised when the Cloud API returns a non-2xx."""
 
 
+class WhatsAppRateLimited(Exception):
+    """Raised by `send` / `send_template` when Meta returns 429.
+
+    Carries `retry_after_seconds` parsed from the `Retry-After` header
+    (or a sensible default if Meta omitted it). The Celery task
+    catches this, sleeps the suggested duration, and either retries
+    in-place or surfaces to Celery's autoretry policy if the burst
+    persists. The pure-API path (conversations inbox send) returns
+    503 with the same Retry-After header so the SPA can back off.
+    """
+
+    def __init__(self, message: str, *, retry_after_seconds: int = 60) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
+
+
 class WhatsAppNotConnected(Exception):
     """Raised by `resolve_whatsapp_adapter` when the active tenant has
     no `connected` `Integration` row for the `whatsapp` provider.
@@ -69,6 +85,26 @@ def _normalize_phone(raw: str) -> str:
     if not digits:
         return ""
     return f"+{digits}"
+
+
+def _make_rate_limit_error(response: httpx.Response) -> "WhatsAppRateLimited":
+    """Translate Meta's 429 into our typed exception.
+
+    Honours the `Retry-After` header when present (Meta sends seconds
+    in the standard form). Falls back to 60s — a defensive default
+    that's longer than Meta's typical rate-limit window."""
+    retry_after_raw = response.headers.get("retry-after")
+    retry_after = 60
+    try:
+        if retry_after_raw:
+            retry_after = max(1, int(float(retry_after_raw)))
+    except (TypeError, ValueError):
+        pass
+    detail = response.text[:200] if response.text else ""
+    return WhatsAppRateLimited(
+        f"whatsapp rate limited (retry after {retry_after}s): {detail}",
+        retry_after_seconds=retry_after,
+    )
 
 
 def _render_template_components(
@@ -181,6 +217,8 @@ class WhatsAppAdapter:
             resp = await client.post(
                 self.endpoint, json=envelope, headers=headers
             )
+        if resp.status_code == 429:
+            raise _make_rate_limit_error(resp)
         if resp.status_code >= 400:
             raise WhatsAppSendError(
                 f"whatsapp send failed: {resp.status_code} {resp.text}"
@@ -247,6 +285,8 @@ class WhatsAppAdapter:
             resp = await client.post(
                 self.endpoint, json=envelope, headers=headers
             )
+        if resp.status_code == 429:
+            raise _make_rate_limit_error(resp)
         if resp.status_code >= 400:
             raise WhatsAppSendError(
                 f"whatsapp template send failed: {resp.status_code} {resp.text}"
@@ -470,6 +510,7 @@ def parse_statuses(payload: dict[str, Any]) -> list["WhatsAppStatusEvent"]:
 __all__ = [
     "WhatsAppAdapter",
     "WhatsAppNotConnected",
+    "WhatsAppRateLimited",
     "WhatsAppSendError",
     "WhatsAppStatusEvent",
     "_render_template_components",

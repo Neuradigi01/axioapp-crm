@@ -47,6 +47,7 @@ from src.app.core.contacts.models import Contact
 from src.app.core.conversations.adapters import ChannelMessageRef
 from src.app.core.conversations.adapters.whatsapp import (
     WhatsAppNotConnected,
+    WhatsAppRateLimited,
     resolve_whatsapp_adapter,
 )
 from src.app.core.conversations.models import (
@@ -499,6 +500,18 @@ async def dispatch_chunk(
                 )
             return
 
+    # Step 3.5.15 — per-org rate cap. Fetch once per chunk; the same
+    # value applies to every contact in this dispatch. Non-WA channels
+    # bypass this (no token-bucket coupling).
+    wa_rate_per_sec = 50
+    if campaign.channel == ConversationChannel.whatsapp:
+        from src.app.core.integrations.whatsapp.connect import get_active_config
+
+        bundle = await get_active_config(session)
+        if bundle is not None:
+            _, _wa_config = bundle
+            wa_rate_per_sec = max(1, int(_wa_config.rate_limit_per_sec or 50))
+
     for cid in contact_ids:
         contact = (
             await session.execute(select(Contact).where(Contact.id == cid))
@@ -529,35 +542,72 @@ async def dispatch_chunk(
         # template campaigns we synthesize a preview so the timeline
         # shows something meaningful even though Meta renders the
         # final text from approved template + parameters.
-        try:
-            if template_row is not None:
-                variables = _resolve_template_variables(campaign, contact)
-                ref: ChannelMessageRef = await adapter.send_template(
-                    org_id=campaign.org_id,
-                    external_id=contact.phone,
-                    template_name=template_row.name,
-                    language=template_row.language,
-                    variables=variables,
-                    header_type=template_row.header_type,
-                    header_text=template_row.header_text,
+        #
+        # Step 3.5.15 — per-org token-bucket acquire before each WA
+        # send + single in-place retry on Meta 429.
+        ref: ChannelMessageRef | None = None
+        body = ""
+        rate_retry_used = False
+        send_error: Exception | None = None
+        for _ in range(2):
+            if campaign.channel == ConversationChannel.whatsapp:
+                from src.app.core.integrations.whatsapp.rate_limit import (
+                    acquire_wa_rate_token,
                 )
-                body = _preview_template_body(template_row, variables)
-            else:
-                body = _render_template(campaign.template or "", contact)
-                ref = await adapter.send(
-                    org_id=campaign.org_id,
-                    external_id=contact.phone,
-                    text=body,
-                    attachments=[],
+
+                await acquire_wa_rate_token(
+                    campaign.org_id, rate_per_sec=wa_rate_per_sec
                 )
-        except Exception as exc:  # adapter-side failure
-            logger.exception("campaign send failed", extra={"contact_id": str(cid)})
+            try:
+                if template_row is not None:
+                    variables = _resolve_template_variables(campaign, contact)
+                    ref = await adapter.send_template(
+                        org_id=campaign.org_id,
+                        external_id=contact.phone,
+                        template_name=template_row.name,
+                        language=template_row.language,
+                        variables=variables,
+                        header_type=template_row.header_type,
+                        header_text=template_row.header_text,
+                    )
+                    body = _preview_template_body(template_row, variables)
+                else:
+                    body = _render_template(campaign.template or "", contact)
+                    ref = await adapter.send(
+                        org_id=campaign.org_id,
+                        external_id=contact.phone,
+                        text=body,
+                        attachments=[],
+                    )
+                send_error = None
+                break
+            except WhatsAppRateLimited as rl_exc:
+                # Honour Meta's Retry-After and try the SAME contact
+                # once more. A second 429 means the token bucket isn't
+                # protecting hard enough — surface as a per-message
+                # failure so the chunk doesn't stall the rest.
+                if rate_retry_used:
+                    send_error = rl_exc
+                    break
+                rate_retry_used = True
+                import asyncio
+
+                await asyncio.sleep(rl_exc.retry_after_seconds)
+                continue
+            except Exception as exc:  # adapter-side failure
+                send_error = exc
+                break
+
+        if send_error is not None or ref is None:
+            logger.exception(
+                "campaign send failed", extra={"contact_id": str(cid)}
+            )
             await _mark_message(
                 session,
                 campaign_id=campaign_id,
                 contact_id=cid,
                 new_status=CampaignMessageStatus.failed,
-                error=str(exc)[:512],
+                error=str(send_error or "send failed")[:512],
             )
             continue
 

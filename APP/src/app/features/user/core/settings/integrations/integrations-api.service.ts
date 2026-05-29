@@ -199,6 +199,7 @@ export interface WhatsAppStatus {
   display_phone_number: string | null;
   verified_name: string | null;
   api_version: string | null;
+  rate_limit_per_sec: number | null;
   last_error: string | null;
   connected_at: string | null;
 }
@@ -214,6 +215,8 @@ export interface WhatsAppConnectPayload {
   app_secret: string;
   verify_token: string;
   api_version?: string;
+  /** Step 3.5.15 — per-org outbound rate cap (msg/sec). 1..1000. */
+  rate_limit_per_sec?: number;
 }
 
 

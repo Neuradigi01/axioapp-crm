@@ -64,6 +64,12 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     api_version: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'v18.0'")
     )
+    # Step 3.5.15 — per-org outbound rate cap (msg/sec). Operator-set
+    # in Settings → Integrations → WhatsApp → Advanced. Free-tier Meta
+    # WABAs are ~50/sec; business-verified can go up to 1000.
+    rate_limit_per_sec: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("50")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

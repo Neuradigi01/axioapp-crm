@@ -38,6 +38,9 @@ class WhatsAppConnectIn(BaseModel):
     app_secret: str = Field(min_length=1, max_length=255)
     verify_token: str = Field(min_length=1, max_length=255)
     api_version: str = Field(default="v18.0", max_length=16)
+    # Step 3.5.15 — per-org rate cap (msg/sec). Free-tier ~50, verified
+    # accounts up to 1000. Operator-editable; default 50.
+    rate_limit_per_sec: int = Field(default=50, ge=1, le=1000)
 
 
 class WhatsAppStatusOut(BaseModel):
@@ -54,6 +57,7 @@ class WhatsAppStatusOut(BaseModel):
     display_phone_number: Optional[str] = None
     verified_name: Optional[str] = None
     api_version: Optional[str] = None
+    rate_limit_per_sec: Optional[int] = None
     last_error: Optional[str] = None
     connected_at: Optional[datetime] = None
 

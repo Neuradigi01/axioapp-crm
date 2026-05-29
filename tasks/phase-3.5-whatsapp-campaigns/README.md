@@ -4,7 +4,7 @@ End-to-end WhatsApp Business Cloud API campaigns: multi-tenant connect → templ
 
 ## Status overview
 
-**Progress:** 14 of 15 steps complete (93%)
+**Progress:** 15 of 15 steps complete (100%) 🎉
 
 | # | Step | Layer | Status | Commit |
 |---|---|---|---|---|
@@ -22,7 +22,7 @@ End-to-end WhatsApp Business Cloud API campaigns: multi-tenant connect → templ
 | 3.5.12 | [Delivery webhook (per-org)](step-3.5.12-delivery-webhook.md) | Backend | ✅ COMPLETE | uncommitted |
 | 3.5.13 | [Delivery ticks UI](step-3.5.13-delivery-ticks-ui.md) | Frontend | ✅ COMPLETE | uncommitted |
 | 3.5.14 | [Celery async dispatch](step-3.5.14-celery-dispatch.md) | Backend | ✅ COMPLETE | uncommitted |
-| 3.5.15 | [Per-org rate limit + 429 backoff](step-3.5.15-rate-limit-backoff.md) | Both | ⏳ Pending | — |
+| 3.5.15 | [Per-org rate limit + 429 backoff](step-3.5.15-rate-limit-backoff.md) | Both | ✅ COMPLETE | uncommitted |
 
 **Legend:** ✅ COMPLETE · 🚧 IN PROGRESS · ⏳ Pending · ❌ Blocked
 

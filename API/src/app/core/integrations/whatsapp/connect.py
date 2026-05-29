@@ -125,6 +125,7 @@ async def get_status(session: AsyncSession) -> dict[str, Any]:
                 "display_phone_number": config.display_phone_number,
                 "verified_name": config.verified_name,
                 "api_version": config.api_version,
+                "rate_limit_per_sec": config.rate_limit_per_sec,
             }
         )
     return payload
@@ -336,6 +337,7 @@ async def _upsert_config_row(
             app_secret_enc=app_secret_enc,
             verify_token=payload.verify_token,
             api_version=payload.api_version,
+            rate_limit_per_sec=payload.rate_limit_per_sec,
         )
         session.add(row)
     else:
@@ -346,6 +348,7 @@ async def _upsert_config_row(
         existing.app_secret_enc = app_secret_enc
         existing.verify_token = payload.verify_token
         existing.api_version = payload.api_version
+        existing.rate_limit_per_sec = payload.rate_limit_per_sec
         row = existing
     await session.commit()
     await session.refresh(row)

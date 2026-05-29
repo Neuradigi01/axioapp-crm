@@ -84,6 +84,7 @@ interface WhatsAppConnectForm {
   app_secret: FormControl<string>;
   verify_token: FormControl<string>;
   api_version: FormControl<string>;
+  rate_limit_per_sec: FormControl<number>;
 }
 
 
@@ -134,6 +135,11 @@ export class WhatsAppCardComponent {
     app_secret: this.fb.nonNullable.control('', Validators.required),
     verify_token: this.fb.nonNullable.control('', Validators.required),
     api_version: this.fb.nonNullable.control('v18.0', Validators.required),
+    rate_limit_per_sec: this.fb.nonNullable.control(50, [
+      Validators.required,
+      Validators.min(1),
+      Validators.max(1000),
+    ]),
   });
 
   // --- derived UI flags --------------------------------------------
@@ -162,10 +168,18 @@ export class WhatsAppCardComponent {
       if (!s || this.isConnected()) {
         return;
       }
-      const patch: Partial<Record<keyof WhatsAppConnectForm, string>> = {};
+      const patch: Partial<{
+        phone_id: string;
+        waba_id: string;
+        api_version: string;
+        rate_limit_per_sec: number;
+      }> = {};
       if (s.phone_id) patch.phone_id = s.phone_id;
       if (s.waba_id) patch.waba_id = s.waba_id;
       if (s.api_version) patch.api_version = s.api_version;
+      if (s.rate_limit_per_sec !== null && s.rate_limit_per_sec !== undefined) {
+        patch.rate_limit_per_sec = s.rate_limit_per_sec;
+      }
       if (Object.keys(patch).length > 0) {
         this.form.patchValue(patch);
       }
