@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 3.5.7 (static groups — import can create one)
-**Status:** ⏳ PENDING — awaiting "begin"
+**Status:** ✅ COMPLETED — 93/93 tests, 3 routes, openpyxl installed
 
 After this step the operator can take `sales_leads_q3.xlsx` (full_name, phone, email columns + custom columns) and turn it into 200 new contacts + a "Q3 Sales Leads" static group, in 3 clicks.
 

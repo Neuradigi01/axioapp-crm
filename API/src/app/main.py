@@ -34,6 +34,7 @@ from src.app.core.campaigns.router import router as campaigns_router
 from src.app.core.catalog.router import router as catalog_router
 from src.app.core.contacts.router import router as contacts_router
 from src.app.core.contacts.groups.router import router as contact_groups_router
+from src.app.core.contacts.imports.router import router as contact_imports_router
 from src.app.core.conversations.router import router as conversations_router
 from src.app.core.custom_fields.router import router as custom_fields_router
 from src.app.core.health.router import router as health_router
@@ -163,6 +164,7 @@ app.include_router(audit_router, prefix="/api/v1")
 app.include_router(custom_fields_router, prefix="/api/v1")
 app.include_router(contacts_router, prefix="/api/v1")
 app.include_router(contact_groups_router, prefix="/api/v1")
+app.include_router(contact_imports_router, prefix="/api/v1")
 app.include_router(activities_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(pipelines_router, prefix="/api/v1")

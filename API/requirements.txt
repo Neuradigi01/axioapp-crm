@@ -21,3 +21,4 @@ qrcode[pil]
 captcha
 firebase-admin
 reportlab
+openpyxl
