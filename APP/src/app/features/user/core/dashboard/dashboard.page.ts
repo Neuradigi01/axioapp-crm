@@ -14,6 +14,7 @@ import { RouterLink } from '@angular/router';
 import { environment } from '../../../../../environments/environment';
 import { extractApiError } from '@core/services/api-error.util';
 import { DashboardKpiTileComponent } from './shared/dashboard-kpi-tile.component';
+import { FunnelChartComponent } from './widgets/funnel-chart.component';
 import { TrendChartComponent } from './widgets/trend-chart.component';
 
 interface DashboardCard {
@@ -82,6 +83,7 @@ interface DashboardSummary {
     DecimalPipe,
     DashboardKpiTileComponent,
     TrendChartComponent,
+    FunnelChartComponent,
   ],
   templateUrl: './dashboard.page.html',
 })
