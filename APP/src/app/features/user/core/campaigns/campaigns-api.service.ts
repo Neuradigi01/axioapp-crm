@@ -23,6 +23,9 @@ export interface AudienceFilter {
   q?: string;
   source?: string;
   tag?: string;
+  /** Saved contact group id. Mutually exclusive with q/source/tag —
+   *  backend rejects mixed payloads with 422. */
+  group_id?: string;
 }
 
 /** One `{{n}}` binding in `template_variables`. `kind=static` is

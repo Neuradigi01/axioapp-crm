@@ -30,38 +30,131 @@
         </label>
       </div>
 
-      <fieldset class="rounded-md border border-zinc-200 p-3">
-        <legend class="px-1 text-xs font-medium text-zinc-600">
-          Audience (leave blank = everyone)
-        </legend>
-        <div class="grid grid-cols-3 gap-2">
-          <label class="block text-sm">
-            <span class="block text-[10px] text-zinc-500">Search (q)</span>
-            <input
-              type="text"
-              formControlName="audience_q"
-              placeholder="name / phone / email"
-              class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-            />
-          </label>
-          <label class="block text-sm">
-            <span class="block text-[10px] text-zinc-500">Source</span>
-            <input
-              type="text"
-              formControlName="audience_source"
-              placeholder="walk-in"
-              class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-            />
-          </label>
-          <label class="block text-sm">
-            <span class="block text-[10px] text-zinc-500">Tag</span>
-            <input
-              type="text"
-              formControlName="audience_tag"
-              placeholder="vip"
-              class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-            />
-          </label>
+      <fieldset class="rounded-md border border-zinc-200 p-3 space-y-3">
+        <legend class="px-1 text-xs font-medium text-zinc-600">Audience</legend>
+        <!-- 3-mode radio toggle (Step 3.5.9) -->
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <button
+            type="button"
+            class="rounded-md border p-2 text-left transition"
+            [class.border-zinc-700]="audienceMode() === 'everyone'"
+            [class.bg-zinc-100]="audienceMode() === 'everyone'"
+            [class.border-zinc-300]="audienceMode() !== 'everyone'"
+            (click)="onAudienceModeChange('everyone')"
+          >
+            <span class="font-medium text-zinc-900">Everyone</span>
+            <p class="mt-0.5 text-[10px] text-zinc-500">
+              All contacts in the org
+            </p>
+          </button>
+          <button
+            type="button"
+            class="rounded-md border p-2 text-left transition"
+            [class.border-zinc-700]="audienceMode() === 'group'"
+            [class.bg-zinc-100]="audienceMode() === 'group'"
+            [class.border-zinc-300]="audienceMode() !== 'group'"
+            (click)="onAudienceModeChange('group')"
+          >
+            <span class="font-medium text-zinc-900">Saved group</span>
+            <p class="mt-0.5 text-[10px] text-zinc-500">
+              Pick a contact group
+            </p>
+          </button>
+          <button
+            type="button"
+            class="rounded-md border p-2 text-left transition"
+            [class.border-zinc-700]="audienceMode() === 'filter'"
+            [class.bg-zinc-100]="audienceMode() === 'filter'"
+            [class.border-zinc-300]="audienceMode() !== 'filter'"
+            (click)="onAudienceModeChange('filter')"
+          >
+            <span class="font-medium text-zinc-900">Custom filter</span>
+            <p class="mt-0.5 text-[10px] text-zinc-500">
+              q / source / tag
+            </p>
+          </button>
+        </div>
+
+        @if (audienceMode() === 'group') {
+          @if (groups().length === 0 && groupsLoaded()) {
+            <div class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+              No saved groups yet.
+              <a routerLink="/user/contacts/groups/new" class="font-medium underline">
+                Create one
+              </a>
+              first, then pick it here.
+            </div>
+          } @else {
+            <select
+              [value]="selectedGroupId() ?? ''"
+              (change)="onSelectedGroupChange($any($event.target).value)"
+              class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            >
+              <option value="">— Pick a saved group —</option>
+              @for (g of groups(); track g.id) {
+                <option [value]="g.id">
+                  {{ g.name }} ({{ g.is_dynamic ? 'Dynamic' : 'Static' }}{{ g.member_count !== null ? ' · ' + g.member_count + ' members' : '' }})
+                </option>
+              }
+            </select>
+          }
+        }
+
+        @if (audienceMode() === 'filter') {
+          <div class="grid grid-cols-3 gap-2">
+            <label class="block text-sm">
+              <span class="block text-[10px] text-zinc-500">Search (q)</span>
+              <input
+                type="text"
+                formControlName="audience_q"
+                placeholder="name / phone / email"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+            </label>
+            <label class="block text-sm">
+              <span class="block text-[10px] text-zinc-500">Source</span>
+              <input
+                type="text"
+                formControlName="audience_source"
+                placeholder="walk-in"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+            </label>
+            <label class="block text-sm">
+              <span class="block text-[10px] text-zinc-500">Tag</span>
+              <input
+                type="text"
+                formControlName="audience_tag"
+                placeholder="vip"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+            </label>
+          </div>
+        }
+
+        <!-- Live count preview -->
+        <div class="flex items-center gap-2 rounded-md bg-zinc-50 px-2 py-1.5 text-xs text-zinc-700">
+          <lucide-icon name="users" class="h-3 w-3 text-zinc-500" />
+          @if (audienceCountLoading()) {
+            <span class="text-zinc-500">Counting…</span>
+          } @else if (audienceCount() !== null) {
+            <span>
+              <span class="font-medium">{{ audienceCount() }}</span>
+              {{ audienceCount() === 1 ? 'contact' : 'contacts' }} will receive this campaign.
+            </span>
+          } @else if (audienceMode() === 'everyone') {
+            <span class="text-zinc-500">
+              All contacts in the org. Counts shown after save.
+            </span>
+          } @else {
+            <span class="text-zinc-500">
+              @if (audienceMode() === 'group') {
+                Pick a group to see the count.
+              } @else {
+                Add a filter to see the count.
+              }
+            </span>
+          }
         </div>
       </fieldset>
 

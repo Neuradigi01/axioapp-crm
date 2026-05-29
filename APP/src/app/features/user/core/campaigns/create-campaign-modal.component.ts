@@ -12,14 +12,24 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
+import { Subject, of } from 'rxjs';
+import { catchError, debounceTime, switchMap } from 'rxjs/operators';
 
 import { ConversationChannel } from '../conversations/conversations-api.service';
 import { extractApiError } from '@core/services/api-error.util';
+import {
+  ContactGroup,
+  ContactGroupsApiService,
+  GroupFilter,
+} from '../contacts/groups/groups-api.service';
 import {
   IntegrationsApiService,
   WhatsAppTemplate,
 } from '../settings/integrations/integrations-api.service';
 import {
+  AudienceFilter,
   Campaign,
   CampaignsApiService,
   TemplateVariableBinding,
@@ -50,13 +60,14 @@ import {
   selector: 'app-create-campaign-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, RouterLink, LucideAngularModule],
   templateUrl: './create-campaign-modal.component.html',
 })
 export class CreateCampaignModalComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(CampaignsApiService);
   private readonly integrationsApi = inject(IntegrationsApiService);
+  private readonly groupsApi = inject(ContactGroupsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   @Output() readonly created = new EventEmitter<Campaign>();
@@ -64,6 +75,22 @@ export class CreateCampaignModalComponent {
 
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
+
+  // --- Audience builder state (Step 3.5.9) --------------------------
+
+  /** Three modes — Everyone (default), Saved group, Custom filter.
+   *  Per Step 3.5.9 pre-implementation choice (a) — "Everyone" is
+   *  the safest default for a fresh campaign. */
+  protected readonly audienceMode = signal<'everyone' | 'group' | 'filter'>(
+    'everyone',
+  );
+  protected readonly groups = signal<ContactGroup[]>([]);
+  protected readonly groupsLoaded = signal(false);
+  protected readonly selectedGroupId = signal<string | null>(null);
+
+  protected readonly audienceCount = signal<number | null>(null);
+  protected readonly audienceCountLoading = signal(false);
+  private readonly audiencePreview$ = new Subject<void>();
 
   // --- WhatsApp template picker state -------------------------------
 
@@ -165,6 +192,39 @@ export class CreateCampaignModalComponent {
       this._loadTemplates();
     }
 
+    // Load saved groups once for the audience builder dropdown.
+    this._loadGroups();
+
+    // Audience-size preview — debounced, runs on mode/filter/group changes.
+    this.audiencePreview$
+      .pipe(
+        debounceTime(300),
+        switchMap(() => this._currentAudiencePreviewObservable()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((count) => {
+        this.audienceCount.set(count);
+        this.audienceCountLoading.set(false);
+      });
+
+    // Recompute audience preview whenever any of the audience inputs
+    // change. The mode signal + filter form controls all feed in.
+    effect(() => {
+      // tracks audienceMode + selectedGroupId
+      this.audienceMode();
+      this.selectedGroupId();
+      this.audiencePreview$.next();
+    });
+    this.form.controls.audience_q.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.audiencePreview$.next());
+    this.form.controls.audience_source.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.audiencePreview$.next());
+    this.form.controls.audience_tag.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.audiencePreview$.next());
+
     // Reset variable bindings whenever the selected template changes
     // — pre-fill each `{{n}}` with an empty static binding.
     effect(() => {
@@ -183,6 +243,81 @@ export class CreateCampaignModalComponent {
 
   protected isWhatsAppChannel(): boolean {
     return this.form.controls.channel.value === 'whatsapp';
+  }
+
+  protected onAudienceModeChange(mode: 'everyone' | 'group' | 'filter'): void {
+    this.audienceMode.set(mode);
+    if (mode !== 'group') {
+      this.selectedGroupId.set(null);
+    }
+    if (mode !== 'filter') {
+      this.form.patchValue({
+        audience_q: null,
+        audience_source: null,
+        audience_tag: null,
+      });
+    }
+  }
+
+  protected onSelectedGroupChange(groupId: string): void {
+    this.selectedGroupId.set(groupId || null);
+  }
+
+  private _loadGroups(): void {
+    this.groupsApi
+      .list(1, 100)
+      .pipe(
+        catchError(() => of({ items: [], total: 0, page: 1, size: 0 })),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((response) => {
+        this.groups.set(response.items);
+        this.groupsLoaded.set(true);
+      });
+  }
+
+  private _currentAudiencePreviewObservable() {
+    const mode = this.audienceMode();
+    if (mode === 'everyone') {
+      // "Everyone" = empty filter. The preview-size endpoint rejects
+      // both-empty payloads, so we skip the call and show null.
+      this.audienceCountLoading.set(false);
+      return of(null);
+    }
+    if (mode === 'group') {
+      const gid = this.selectedGroupId();
+      if (!gid) {
+        this.audienceCountLoading.set(false);
+        return of(null);
+      }
+      this.audienceCountLoading.set(true);
+      return this.groupsApi
+        .previewSize({ group_id: gid })
+        .pipe(
+          switchMap((r) => of(r.count)),
+          catchError(() => of(null)),
+        );
+    }
+    // filter mode — call shape uses `GroupFilter` (the
+    // preview-size endpoint is owned by the groups API and only
+    // accepts q/source/tag; `group_id` belongs to the campaign-side
+    // AudienceFilter shape, not the preview request).
+    const filter: GroupFilter = {};
+    const v = this.form.getRawValue();
+    if (v.audience_q?.trim()) filter.q = v.audience_q.trim();
+    if (v.audience_source?.trim()) filter.source = v.audience_source.trim();
+    if (v.audience_tag?.trim()) filter.tag = v.audience_tag.trim();
+    if (!filter.q && !filter.source && !filter.tag) {
+      this.audienceCountLoading.set(false);
+      return of(null);
+    }
+    this.audienceCountLoading.set(true);
+    return this.groupsApi
+      .previewSize({ filter_json: filter })
+      .pipe(
+        switchMap((r) => of(r.count)),
+        catchError(() => of(null)),
+      );
   }
 
   protected onTemplateChange(templateId: string): void {
@@ -238,10 +373,30 @@ export class CreateCampaignModalComponent {
       return;
     }
     const v = this.form.getRawValue();
-    const audience: { q?: string; source?: string; tag?: string } = {};
-    if (v.audience_q?.trim()) audience.q = v.audience_q.trim();
-    if (v.audience_source?.trim()) audience.source = v.audience_source.trim();
-    if (v.audience_tag?.trim()) audience.tag = v.audience_tag.trim();
+    // Audience serialization is mode-driven (Step 3.5.9):
+    //   - everyone → empty object (backend interprets as "all contacts")
+    //   - group    → { group_id }
+    //   - filter   → { q?, source?, tag? } (only fields with values)
+    // Mixing modes is impossible by construction here, and the
+    // backend's AudienceFilter validator double-checks.
+    const audience: AudienceFilter = {};
+    const mode = this.audienceMode();
+    if (mode === 'group') {
+      const gid = this.selectedGroupId();
+      if (!gid) {
+        this.submitError.set(
+          'Pick a saved group, or switch to a different audience mode.',
+        );
+        return;
+      }
+      audience.group_id = gid;
+    } else if (mode === 'filter') {
+      if (v.audience_q?.trim()) audience.q = v.audience_q.trim();
+      if (v.audience_source?.trim()) audience.source = v.audience_source.trim();
+      if (v.audience_tag?.trim()) audience.tag = v.audience_tag.trim();
+    }
+    // 'everyone' mode leaves `audience` as {} — backend treats as
+    // "all org contacts" (already the existing default behaviour).
 
     // Decide template vs template_id mode.
     const useTemplatePicker =

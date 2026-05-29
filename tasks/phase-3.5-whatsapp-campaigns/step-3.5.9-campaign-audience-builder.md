@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 3.5.7 + 3.5.8 (groups exist)
-**Status:** ⏳ PENDING — awaiting "begin"
+**Status:** ✅ COMPLETED — 69/69 backend tests + Angular build clean
 
 After this step a campaign author opens Create Campaign → audience section shows 3 radio options → picks "Saved group" → dropdown loads groups → pick "Walk-in sofa shoppers" → live count "82 contacts will receive this". Submit serializes `audience_filter = {group_id: "..."}` to backend.
 

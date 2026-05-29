@@ -226,9 +226,38 @@ async def delete_campaign(
 async def resolve_audience(
     session: AsyncSession, *, audience_filter: dict[str, Any]
 ) -> list[uuid.UUID]:
-    """Translate a `{q, source, tag}` filter into a list of contact ids."""
+    """Translate the campaign's `audience_filter` JSONB into a list of
+    contact ids. Three modes per `AudienceFilter`:
+
+      - Empty filter → every contact in the org (RLS handles isolation).
+      - `group_id` set → delegate to `contact_groups.resolve_group_contacts`
+        which honours static-vs-dynamic group semantics.
+      - `q/source/tag` set → run the predicate directly.
+
+    A campaign that references a deleted group resolves to an empty
+    list — the dispatch path then marks all queued messages failed
+    with a clear "audience empty" error rather than silently sending
+    zero messages."""
     af = AudienceFilter.model_validate(audience_filter or {})
 
+    if af.group_id is not None:
+        # Saved-group mode. Use a delayed import to avoid the
+        # `contacts.groups → campaigns` direction (groups doesn't
+        # know about campaigns; campaigns reaches in).
+        from src.app.core.contacts.groups.service import (
+            get_group,
+            resolve_group_contacts,
+        )
+
+        try:
+            await get_group(session, af.group_id)
+        except HTTPException:
+            # Group deleted (Step 3.5.7 hard-delete) — empty audience.
+            return []
+        return await resolve_group_contacts(session, group_id=af.group_id)
+
+    # Filter mode (q / source / tag) — falls through to "" empty
+    # filter = "everyone" by intentional design.
     filters: list[Any] = []
     if af.q:
         like = f"%{af.q}%"
