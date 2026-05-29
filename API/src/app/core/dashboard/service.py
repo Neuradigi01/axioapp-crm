@@ -29,9 +29,11 @@ from src.app.core.contacts.models import Contact
 from src.app.core.dashboard.schemas import (
     ActivityItem,
     DashboardCard,
+    DashboardFunnelResponse,
     DashboardSummary,
     DashboardTrendPoint,
     DashboardTrendResponse,
+    FunnelStageBucket,
     Greeting,
     TrendMetric,
     TrendRange,
@@ -41,6 +43,7 @@ from src.app.core.invitations.models import Invitation
 from src.app.core.leads.models import Lead, LeadStatus
 from src.app.core.permissions.models import Role
 from src.app.core.permissions.service import list_permissions_for_role
+from src.app.core.pipelines.models import Pipeline, PipelineStage
 from src.app.core.tasks.models import Task, TaskStatus
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import User, UserInfo
@@ -919,4 +922,135 @@ async def assemble_trend(
         range=range_str,
         scope=scope,
         points=points,
+    )
+
+
+_LEADS_PIPELINE_KEY = "leads"
+
+
+async def assemble_funnel(
+    session: AsyncSession,
+    caller: User,
+    range_str: TrendRange,
+) -> DashboardFunnelResponse:
+    """Build a per-stage funnel snapshot of leads created in the range.
+
+    Same scope rule as `get_summary`: callers with `users.read` get
+    org-wide counts, everyone else gets `assigned_to_id = caller`
+    personal counts. The `stages` list is deterministic — every
+    non-terminal stage of the org's leads pipeline appears in
+    `display_order` order, zero-filled when no leads landed there.
+
+    `won_count` / `lost_count` are reported separately off the
+    terminal `Lead.status` enum so the frontend can render the
+    funnel-mouth (stages) and the win/loss outcomes side by side
+    without double-counting. `total_leads_in_range` is the sum of
+    everything so labels can render "% of total" without an extra
+    request.
+
+    Leads link to stages by `pipeline_stage` (the stage's stable
+    text `key`), not by stage UUID — matching the pipelines engine
+    convention. Soft-deleted stages do not exist as a concept here
+    (no `is_active` column), so every stage of the leads pipeline is
+    considered active.
+    """
+    org_id = caller.org_id
+    range_days = _RANGE_DAYS[range_str]
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=range_days)
+
+    if org_id is None:
+        return DashboardFunnelResponse(
+            range=range_str,
+            scope="personal",
+            total_leads_in_range=0,
+            stages=[],
+            won_count=0,
+            lost_count=0,
+        )
+
+    is_org_scope = await _has_users_read(session, caller.role_id)
+    scope: Literal["org", "personal"] = "org" if is_org_scope else "personal"
+    caller_uuid = caller.legacy_uuid
+
+    # Non-terminal stages of the org's leads pipeline, deterministic
+    # left-to-right via `display_order`. Won/lost stages are excluded
+    # from the funnel list because their counts surface separately via
+    # `Lead.status` (won/lost are terminal outcomes, not funnel steps).
+    stage_rows = (
+        await session.execute(
+            select(
+                PipelineStage.id,
+                PipelineStage.key,
+                PipelineStage.name,
+                PipelineStage.display_order,
+            )
+            .join(Pipeline, Pipeline.id == PipelineStage.pipeline_id)
+            .where(
+                PipelineStage.org_id == org_id,
+                Pipeline.org_id == org_id,
+                Pipeline.key == _LEADS_PIPELINE_KEY,
+                PipelineStage.is_won.is_(False),
+                PipelineStage.is_lost.is_(False),
+            )
+            .order_by(PipelineStage.display_order.asc())
+        )
+    ).all()
+
+    # Per-stage lead counts within the range. Group by the stage's
+    # stable key (the column leads actually store) so the dict lookup
+    # below is a direct hit.
+    lead_stmt = (
+        select(Lead.pipeline_stage, func.count(Lead.id))
+        .where(
+            Lead.org_id == org_id,
+            Lead.created_at >= start,
+            Lead.status == LeadStatus.active,
+        )
+        .group_by(Lead.pipeline_stage)
+    )
+    if not is_org_scope:
+        lead_stmt = lead_stmt.where(Lead.assigned_to_id == caller_uuid)
+    count_by_key: dict[str, int] = {
+        key: int(count) for key, count in (await session.execute(lead_stmt)).all()
+    }
+
+    stages: list[FunnelStageBucket] = [
+        FunnelStageBucket(
+            stage_id=row.id,
+            stage_name=row.name,
+            stage_order=row.display_order,
+            count=count_by_key.get(row.key, 0),
+        )
+        for row in stage_rows
+    ]
+
+    # Won/lost outcomes in the same range. Single statement, grouped
+    # by status, so terminal counts come back together.
+    outcome_stmt = (
+        select(Lead.status, func.count(Lead.id))
+        .where(
+            Lead.org_id == org_id,
+            Lead.created_at >= start,
+            Lead.status.in_((LeadStatus.won, LeadStatus.lost)),
+        )
+        .group_by(Lead.status)
+    )
+    if not is_org_scope:
+        outcome_stmt = outcome_stmt.where(Lead.assigned_to_id == caller_uuid)
+    outcome_counts: dict[LeadStatus, int] = {
+        s: int(c) for s, c in (await session.execute(outcome_stmt)).all()
+    }
+    won_count = outcome_counts.get(LeadStatus.won, 0)
+    lost_count = outcome_counts.get(LeadStatus.lost, 0)
+
+    total = sum(s.count for s in stages) + won_count + lost_count
+
+    return DashboardFunnelResponse(
+        range=range_str,
+        scope=scope,
+        total_leads_in_range=total,
+        stages=stages,
+        won_count=won_count,
+        lost_count=lost_count,
     )

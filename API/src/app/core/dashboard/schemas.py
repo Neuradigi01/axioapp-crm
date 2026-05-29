@@ -90,3 +90,30 @@ class DashboardTrendResponse(BaseModel):
     range: TrendRange
     scope: Scope
     points: list[DashboardTrendPoint]
+
+
+class FunnelStageBucket(BaseModel):
+    """One stage of the leads pipeline with its in-range lead count."""
+    stage_id: uuid.UUID
+    stage_name: str
+    stage_order: int
+    count: int
+
+
+class DashboardFunnelResponse(BaseModel):
+    """Funnel payload — every active non-terminal pipeline stage + won/lost.
+
+    `stages` always contains every non-terminal stage (sorted by
+    `stage_order` ascending) so the chart bar count is deterministic
+    and empty stages render as zero-height bars rather than gaps.
+    `won_count` / `lost_count` are reported separately because they
+    correspond to the terminal `Lead.status` values rather than to
+    stages in the funnel chart itself; `total_leads_in_range` =
+    sum(stages) + won_count + lost_count.
+    """
+    range: TrendRange
+    scope: Scope
+    total_leads_in_range: int
+    stages: list[FunnelStageBucket]
+    won_count: int
+    lost_count: int
