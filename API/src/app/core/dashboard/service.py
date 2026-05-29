@@ -30,7 +30,11 @@ from src.app.core.dashboard.schemas import (
     ActivityItem,
     DashboardCard,
     DashboardSummary,
+    DashboardTrendPoint,
+    DashboardTrendResponse,
     Greeting,
+    TrendMetric,
+    TrendRange,
     UpcomingAppointment,
 )
 from src.app.core.invitations.models import Invitation
@@ -822,4 +826,97 @@ async def get_summary(session: AsyncSession, caller: User) -> DashboardSummary:
         cards=cards,
         recent_activity=recent,
         upcoming_appointments=upcoming,
+    )
+
+
+_RANGE_DAYS: dict[TrendRange, int] = {"7d": 7, "30d": 30, "90d": 90, "365d": 365}
+
+
+async def assemble_trend(
+    session: AsyncSession,
+    caller: User,
+    metric: TrendMetric,
+    range_str: TrendRange,
+) -> DashboardTrendResponse:
+    """Build a day-bucketed time series for `metric` over `range_str`.
+
+    Same scope rule as `get_summary`: callers with `users.read` get
+    org-wide buckets, everyone else gets `assigned_to_id = caller`
+    personal buckets. The series is always exactly `range_days` points,
+    zero-filled for missing buckets so the frontend never sees gaps.
+
+    `pipeline_value` is intentionally simplified to "sum of `budget` for
+    leads created in the bucket" rather than a running-snapshot of
+    active pipeline — the latter requires a status-history table we
+    don't have, and the daily-creation sum is what a v1 trend chart
+    needs.
+    """
+    org_id = caller.org_id
+    range_days = _RANGE_DAYS[range_str]
+    today = datetime.now(timezone.utc).date()
+    start = today - timedelta(days=range_days - 1)
+
+    if org_id is None:
+        # Same defensive shape as `get_summary`: no membership → empty
+        # but well-formed series.
+        return DashboardTrendResponse(
+            metric=metric,
+            range=range_str,
+            scope="personal",
+            points=[
+                DashboardTrendPoint(date=start + timedelta(days=i), value=0.0)
+                for i in range(range_days)
+            ],
+        )
+
+    is_org_scope = await _has_users_read(session, caller.role_id)
+    scope: Literal["org", "personal"] = "org" if is_org_scope else "personal"
+    caller_uuid = caller.legacy_uuid
+
+    if metric == "leads_created":
+        ts_col = Lead.created_at
+        value_expr = func.count(Lead.id)
+        scope_col = Lead.assigned_to_id
+        org_col = Lead.org_id
+    elif metric == "pipeline_value":
+        ts_col = Lead.created_at
+        value_expr = func.coalesce(func.sum(Lead.budget), 0)
+        scope_col = Lead.assigned_to_id
+        org_col = Lead.org_id
+    elif metric == "calls":
+        ts_col = Call.started_at
+        value_expr = func.count(Call.id)
+        scope_col = Call.assigned_to_id
+        org_col = Call.org_id
+    else:  # metric == "appointments"
+        ts_col = Appointment.scheduled_at
+        value_expr = func.count(Appointment.id)
+        scope_col = Appointment.assigned_to_id
+        org_col = Appointment.org_id
+
+    bucket = func.date(ts_col).label("bucket")
+    stmt = (
+        select(bucket, value_expr.label("v"))
+        .where(org_col == org_id, ts_col >= start)
+        .group_by(bucket)
+        .order_by(bucket.asc())
+    )
+    if not is_org_scope:
+        stmt = stmt.where(scope_col == caller_uuid)
+
+    rows = (await session.execute(stmt)).all()
+    by_date: dict[date, float] = {row.bucket: float(row.v or 0) for row in rows}
+
+    points = [
+        DashboardTrendPoint(
+            date=(d := start + timedelta(days=i)),
+            value=by_date.get(d, 0.0),
+        )
+        for i in range(range_days)
+    ]
+    return DashboardTrendResponse(
+        metric=metric,
+        range=range_str,
+        scope=scope,
+        points=points,
     )
