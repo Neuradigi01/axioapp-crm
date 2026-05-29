@@ -47,10 +47,32 @@
     </div>
   }
 
-  <!-- KPI cards grid -->
+  <!-- Hero KPI strip — the 4 highest-signal metrics with delta pills -->
+  @if (summary(); as s) {
+    <section class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      @for (card of heroCards(); track card.key) {
+        <app-dashboard-kpi-tile
+          [label]="card.label"
+          [value]="$any(card.value)"
+          [format]="$any(card.format)"
+          [deltaPct]="card.delta_pct ?? null"
+          [deltaDirection]="card.delta_direction ?? null"
+          [link]="card.link"
+        />
+      }
+    </section>
+  } @else {
+    <section class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      @for (i of [1,2,3,4]; track i) {
+        <div class="h-28 animate-pulse rounded-xl border border-zinc-200 bg-zinc-50"></div>
+      }
+    </section>
+  }
+
+  <!-- Secondary KPI cards grid — everything not already in the hero strip -->
   @if (summary(); as s) {
     <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      @for (card of s.cards; track card.key) {
+      @for (card of secondaryCards(); track card.key) {
         @if (card.link; as link) {
           <a
             [routerLink]="link"
@@ -67,11 +89,17 @@
     </section>
   } @else {
     <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      @for (i of [1,2,3,4,5,6,7,8]; track i) {
+      @for (i of [1,2,3,4]; track i) {
         <div class="h-24 animate-pulse rounded-xl border border-zinc-200 bg-zinc-50"></div>
       }
     </section>
   }
+
+  <!-- Trend + funnel chart row -->
+  <section class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <app-dashboard-trend-chart />
+    <!-- funnel chart slot from Step 7 -->
+  </section>
 
   <!-- Two-column bottom: recent activity + upcoming appointments -->
   <section class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">

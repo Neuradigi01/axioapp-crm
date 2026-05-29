@@ -2,6 +2,7 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   inject,
   signal,
@@ -12,6 +13,8 @@ import { RouterLink } from '@angular/router';
 
 import { environment } from '../../../../../environments/environment';
 import { extractApiError } from '@core/services/api-error.util';
+import { DashboardKpiTileComponent } from './shared/dashboard-kpi-tile.component';
+import { TrendChartComponent } from './widgets/trend-chart.component';
 
 interface DashboardCard {
   key: string;
@@ -19,6 +22,9 @@ interface DashboardCard {
   value: number | string | LeaderboardEntry[];
   format: 'number' | 'currency' | 'percent' | 'text' | 'leaderboard';
   link: string | null;
+  previous_value?: number | string | null;
+  delta_pct?: number | null;
+  delta_direction?: 'up' | 'down' | 'flat' | null;
 }
 
 interface LeaderboardEntry {
@@ -70,7 +76,13 @@ interface DashboardSummary {
   selector: 'app-dashboard-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterLink, DecimalPipe],
+  imports: [
+    CommonModule,
+    RouterLink,
+    DecimalPipe,
+    DashboardKpiTileComponent,
+    TrendChartComponent,
+  ],
   templateUrl: './dashboard.page.html',
 })
 export class DashboardPageComponent {
@@ -81,6 +93,41 @@ export class DashboardPageComponent {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly refreshing = signal(false);
+
+  // Hero strip surfaces the 4 highest-signal KPIs at the top of the
+  // dashboard with period-over-period delta pills. Selection is keyed
+  // by `scope` (server-decided from the caller's permission set) so
+  // there's no role-name branching anywhere on the frontend.
+  private readonly HERO_KEYS: Record<'org' | 'personal', string[]> = {
+    org: [
+      'leads.pipeline_value',
+      'leads.new_today',
+      'appointments.today',
+      'conversion.rate',
+    ],
+    personal: [
+      'leads.my_count',
+      'tasks.my_open',
+      'appointments.my_today',
+      'conversion.my_rate',
+    ],
+  };
+
+  protected readonly heroCards = computed<DashboardCard[]>(() => {
+    const s = this.summary();
+    if (!s) return [];
+    const keys = this.HERO_KEYS[s.scope] ?? [];
+    return keys
+      .map((k) => s.cards.find((c) => c.key === k))
+      .filter((c): c is DashboardCard => !!c);
+  });
+
+  protected readonly secondaryCards = computed<DashboardCard[]>(() => {
+    const s = this.summary();
+    if (!s) return [];
+    const heroKeys = new Set(this.HERO_KEYS[s.scope] ?? []);
+    return s.cards.filter((c) => !heroKeys.has(c.key));
+  });
 
   constructor() {
     this.load(false);
