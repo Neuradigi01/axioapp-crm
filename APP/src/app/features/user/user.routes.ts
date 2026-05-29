@@ -84,6 +84,17 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // MUST precede `contacts/:id` — same reason as the `groups`
+        // route below: otherwise `:id` would try to load "import"
+        // as a contact UUID.
+        path: 'contacts/import',
+        canActivate: [permissionGuard('contacts.write')],
+        loadComponent: () =>
+          import('./core/contacts/imports/import-wizard.page').then(
+            (m) => m.ContactImportWizardPageComponent,
+          ),
+      },
+      {
         // MUST precede `contacts/:id` — otherwise the `:id` route
         // would match `/contacts/groups` and try to load it as a
         // contact UUID.

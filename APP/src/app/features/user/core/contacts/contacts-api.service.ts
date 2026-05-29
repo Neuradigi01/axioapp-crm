@@ -85,6 +85,58 @@ export interface ContactListQuery {
   customFilters?: Record<string, string>;
 }
 
+/** Targets the operator can map a CSV column to. Mirrors the
+ * `ContactFieldTarget` literal in the backend schemas — keep both
+ * lists in sync. */
+export type ContactFieldTarget =
+  | 'full_name'
+  | 'phone'
+  | 'email'
+  | 'source'
+  | 'tag'
+  | 'skip';
+
+/** Response from `POST /contacts/imports/upload`. */
+export interface ContactImportUploadOut {
+  id: string;
+  filename: string;
+  row_count: number;
+  headers: string[];
+  /** Backend's first-pass column → field guess; UI starts from this. */
+  suggested_mapping: Record<string, ContactFieldTarget>;
+  sample_rows: Record<string, unknown>[];
+}
+
+/** Body for `POST /contacts/imports/{id}/dry-run` and `/commit`. */
+export interface ContactImportRunIn {
+  mapping: Record<string, ContactFieldTarget>;
+  create_group: boolean;
+  group_name?: string | null;
+}
+
+export interface ContactImportRowError {
+  row: number;
+  reason: string;
+}
+
+/** Response from `POST /contacts/imports/{id}/dry-run`. */
+export interface ContactImportDryRunOut {
+  will_insert: number;
+  will_skip: number;
+  duplicate_phone: number;
+  errors: ContactImportRowError[];
+}
+
+/** Response from `POST /contacts/imports/{id}/commit`. */
+export interface ContactImportCommitOut {
+  id: string;
+  status: string;
+  row_count: number;
+  success_count: number;
+  error_count: number;
+  created_group_id: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ContactsApiService {
   private readonly http = inject(HttpClient);
@@ -209,5 +261,40 @@ export class ContactsApiService {
   /** Render-shape custom field defs for the contact dynamic form. */
   renderFields(): Observable<FieldDef[]> {
     return this.http.get<FieldDef[]>(this.renderUrl);
+  }
+
+  /** Step 1 of bulk import: stream the file to the backend, get back
+   * the import id + detected headers + suggested column mapping. */
+  uploadImport(file: File): Observable<ContactImportUploadOut> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return this.http.post<ContactImportUploadOut>(
+      `${this.base}/imports/upload`,
+      form,
+    );
+  }
+
+  /** Step 2 of bulk import: preview what commit would do without
+   * touching the contacts table. Returns dupe + skip + error counts. */
+  dryRunImport(
+    importId: string,
+    body: ContactImportRunIn,
+  ): Observable<ContactImportDryRunOut> {
+    return this.http.post<ContactImportDryRunOut>(
+      `${this.base}/imports/${importId}/dry-run`,
+      body,
+    );
+  }
+
+  /** Step 3 of bulk import: write the contacts. Backend is idempotent
+   * on `importId` so re-clicks don't double-insert. */
+  commitImport(
+    importId: string,
+    body: ContactImportRunIn,
+  ): Observable<ContactImportCommitOut> {
+    return this.http.post<ContactImportCommitOut>(
+      `${this.base}/imports/${importId}/commit`,
+      body,
+    );
   }
 }
