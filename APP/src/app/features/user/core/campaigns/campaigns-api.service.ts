@@ -105,6 +105,10 @@ export interface CampaignMessage {
   status: CampaignMessageStatus;
   error: string | null;
   sent_at: string | null;
+  /** Step 3.5.12 — stamped when Meta reports `status='delivered'`. */
+  delivered_at: string | null;
+  /** Step 3.5.12 — stamped when Meta reports `status='read'`. */
+  read_at: string | null;
   created_at: string;
 }
 

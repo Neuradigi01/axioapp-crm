@@ -60,11 +60,43 @@
             }
             <p
               [class]="
-                'mt-1 text-right text-[10px] ' +
+                'mt-1 flex items-center justify-end gap-1 text-[10px] ' +
                 (m.direction === 'out' ? 'text-zinc-300' : 'text-zinc-500')
               "
             >
-              {{ formatTime(m.sent_at || m.created_at) }}
+              <span>{{ formatTime(m.sent_at || m.created_at) }}</span>
+              @if (m.direction === 'out') {
+                @switch (tickState(m)) {
+                  @case ('read') {
+                    <lucide-icon
+                      name="check-check"
+                      class="h-3 w-3 text-sky-300"
+                      aria-label="Read"
+                    />
+                  }
+                  @case ('delivered') {
+                    <lucide-icon
+                      name="check-check"
+                      class="h-3 w-3"
+                      aria-label="Delivered"
+                    />
+                  }
+                  @case ('sent') {
+                    <lucide-icon
+                      name="check"
+                      class="h-3 w-3"
+                      aria-label="Sent"
+                    />
+                  }
+                  @case ('pending') {
+                    <lucide-icon
+                      name="clock"
+                      class="h-3 w-3"
+                      aria-label="Pending"
+                    />
+                  }
+                }
+              }
             </p>
           </div>
         </div>

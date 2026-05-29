@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 3.5.12 (delivery timestamps populated)
-**Status:** ⏳ PENDING — awaiting "begin"
+**Status:** ✅ COMPLETED — Angular build clean
 
 After this step a conversation message looks like:
 

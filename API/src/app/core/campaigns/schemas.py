@@ -129,6 +129,8 @@ class CampaignMessageOut(BaseModel):
     status: CampaignMessageStatus
     error: Optional[str]
     sent_at: Optional[datetime]
+    delivered_at: Optional[datetime] = None
+    read_at: Optional[datetime] = None
     created_at: datetime
 
 

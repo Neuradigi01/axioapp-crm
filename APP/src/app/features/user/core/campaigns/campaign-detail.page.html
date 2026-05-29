@@ -48,14 +48,23 @@
         <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center">
           <div class="text-[10px] uppercase tracking-wide text-emerald-700">Delivered</div>
           <div class="mt-1 text-xl font-semibold text-emerald-900">{{ s.delivered }}</div>
+          @if (deliveryRate() !== null) {
+            <div class="text-[10px] text-emerald-700">{{ deliveryRate() }}% of sent</div>
+          }
         </div>
         <div class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
           <div class="text-[10px] uppercase tracking-wide text-violet-700">Read</div>
           <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.read }}</div>
+          @if (readRate() !== null) {
+            <div class="text-[10px] text-violet-700">{{ readRate() }}% of delivered</div>
+          }
         </div>
         <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-center">
           <div class="text-[10px] uppercase tracking-wide text-rose-700">Failed</div>
           <div class="mt-1 text-xl font-semibold text-rose-900">{{ s.failed }}</div>
+          @if (failureRate() !== null) {
+            <div class="text-[10px] text-rose-700">{{ failureRate() }}% of attempts</div>
+          }
         </div>
       </div>
     }
@@ -86,6 +95,7 @@
             <tr>
               <th class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500">Contact</th>
               <th class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500">Status</th>
+              <th class="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-500">Tick</th>
               <th class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500">Channel msg</th>
               <th class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500">Error</th>
               <th class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500">Sent</th>
@@ -107,6 +117,25 @@
                   >
                     {{ m.status }}
                   </span>
+                </td>
+                <td class="px-3 py-2 text-center">
+                  @switch (tickState(m)) {
+                    @case ('read') {
+                      <lucide-icon name="check-check" class="inline h-4 w-4 text-sky-500" aria-label="Read" />
+                    }
+                    @case ('delivered') {
+                      <lucide-icon name="check-check" class="inline h-4 w-4 text-zinc-500" aria-label="Delivered" />
+                    }
+                    @case ('sent') {
+                      <lucide-icon name="check" class="inline h-4 w-4 text-zinc-500" aria-label="Sent" />
+                    }
+                    @case ('pending') {
+                      <lucide-icon name="clock" class="inline h-4 w-4 text-amber-500" aria-label="Pending" />
+                    }
+                    @case ('failed') {
+                      <lucide-icon name="x" class="inline h-4 w-4 text-rose-500" aria-label="Failed" />
+                    }
+                  }
                 </td>
                 <td class="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-zinc-500">
                   {{ m.channel_message_id || '—' }}

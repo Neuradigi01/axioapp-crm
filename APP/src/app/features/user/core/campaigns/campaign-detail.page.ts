@@ -9,6 +9,8 @@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
+
 import { extractApiError } from '@core/services/api-error.util';
 
 import {
@@ -32,7 +34,7 @@ const POLL_INTERVAL_MS = 5_000;
   selector: 'app-campaign-detail-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink],
+  imports: [RouterLink, LucideAngularModule],
   templateUrl: './campaign-detail.page.html',
 })
 export class CampaignDetailPageComponent {
@@ -142,6 +144,55 @@ export class CampaignDetailPageComponent {
           );
         },
       });
+  }
+
+  /** Step 3.5.13 — delivery rate as a percentage of the sent count.
+   *  Returns null when nothing has been sent yet (avoids "0% of 0"
+   *  noise during the first dispatch tick). */
+  protected readonly deliveryRate = computed<number | null>(() => {
+    const s = this.stats();
+    if (!s) return null;
+    const sent = s.sent + s.delivered + s.read;
+    if (sent === 0) return null;
+    return Math.round(((s.delivered + s.read) / sent) * 100);
+  });
+
+  /** Read rate as a percentage of delivered (read-after-delivered). */
+  protected readonly readRate = computed<number | null>(() => {
+    const s = this.stats();
+    if (!s) return null;
+    const delivered = s.delivered + s.read;
+    if (delivered === 0) return null;
+    return Math.round((s.read / delivered) * 100);
+  });
+
+  /** Failure rate as a percentage of total attempts (sent + failed).
+   *  Excludes still-queued rows to avoid alarming the operator while
+   *  dispatch is in progress. */
+  protected readonly failureRate = computed<number | null>(() => {
+    const s = this.stats();
+    if (!s) return null;
+    const attempted = s.sent + s.delivered + s.read + s.failed;
+    if (attempted === 0) return null;
+    return Math.round((s.failed / attempted) * 100);
+  });
+
+  /** Step 3.5.13 — WhatsApp-style tick for the per-row table.
+   *
+   *   `read`      → ✓✓ blue   — Meta `status='read'`
+   *   `delivered` → ✓✓ grey   — Meta `status='delivered'`
+   *   `sent`      → ✓ grey    — outbound POST succeeded
+   *   `pending`   → clock     — queued, not yet attempted
+   *   `failed`    → x         — terminal failure
+   */
+  protected tickState(
+    m: CampaignMessage,
+  ): 'read' | 'delivered' | 'sent' | 'pending' | 'failed' {
+    if (m.status === 'failed') return 'failed';
+    if (m.read_at) return 'read';
+    if (m.delivered_at) return 'delivered';
+    if (m.sent_at) return 'sent';
+    return 'pending';
   }
 
   protected messageStatusCls(s: CampaignMessageStatus): string {

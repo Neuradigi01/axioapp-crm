@@ -66,6 +66,27 @@ export class ChatThreadComponent implements AfterViewChecked {
     return m.id.startsWith('tmp-');
   }
 
+  /**
+   * WhatsApp-style tick state for outbound messages (Step 3.5.13).
+   *
+   *   `read`      → ✓✓ blue   — Meta `status='read'`
+   *   `delivered` → ✓✓ grey   — Meta `status='delivered'`
+   *   `sent`      → ✓ grey    — outbound POST returned a message id
+   *   `pending`   → clock     — local optimistic row, no `sent_at` yet
+   *
+   * Inbound messages have no tick state — caller checks `direction`
+   * before rendering. Other channels (SMS/email) currently have no
+   * delivery tracking; for them only `sent` shows after dispatch.
+   */
+  protected tickState(
+    m: ConversationMessage,
+  ): 'read' | 'delivered' | 'sent' | 'pending' {
+    if (m.read_at) return 'read';
+    if (m.delivered_at) return 'delivered';
+    if (m.sent_at) return 'sent';
+    return 'pending';
+  }
+
   protected toggle(): void {
     this.toggleAi.emit(!this.conversation.ai_handling);
   }
