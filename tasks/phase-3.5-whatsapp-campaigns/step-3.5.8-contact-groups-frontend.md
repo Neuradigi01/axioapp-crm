@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 3.5.7
-**Status:** ⏳ PENDING — awaiting "begin"
+**Status:** ✅ COMPLETED — Angular build clean (11.9s)
 
 After this step a user can save the filter "source = walk-in AND tag = sofa" as a group named "Walk-in sofa shoppers", reusable across multiple campaigns.
 
