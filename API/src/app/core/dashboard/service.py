@@ -17,8 +17,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from typing import Literal
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.appointments.models import Appointment, AppointmentStatus
@@ -69,6 +70,56 @@ def _week_start(now: datetime) -> datetime:
     return midnight - timedelta(days=now.weekday())
 
 
+def _delta(
+    current: float, previous: float
+) -> tuple[float, Literal["up", "down", "flat"]]:
+    """Return `(signed_pct, direction)` for a current/previous pair.
+
+    Zero baseline collapses to `+100` when current > 0 so the frontend
+    still renders a meaningful pill; both zero collapses to flat. The
+    0.05 % deadband on direction prevents noisy near-zero arrows.
+    """
+    if previous == 0:
+        if current > 0:
+            return (100.0, "up")
+        return (0.0, "flat")
+    pct = round((current - previous) / previous * 100.0, 1)
+    if pct > 0.05:
+        direction: Literal["up", "down", "flat"] = "up"
+    elif pct < -0.05:
+        direction = "down"
+    else:
+        direction = "flat"
+    return (pct, direction)
+
+
+def _scalar_card(
+    *,
+    key: str,
+    label: str,
+    current: float | int,
+    previous: float | int,
+    format: Literal["number", "currency", "percent"],
+    link: str | None,
+) -> DashboardCard:
+    """Build a scalar KPI card with prior-period delta fields populated.
+
+    Currency / number / percent share the same delta-pill rendering on
+    the frontend so a single helper covers all three.
+    """
+    pct, direction = _delta(float(current), float(previous))
+    return DashboardCard(
+        key=key,
+        label=label,
+        value=current,
+        format=format,
+        link=link,
+        previous_value=previous,
+        delta_pct=pct,
+        delta_direction=direction,
+    )
+
+
 async def _has_users_read(session: AsyncSession, role_id: uuid.UUID) -> bool:
     granted = {p.key for p in await list_permissions_for_role(session, role_id)}
     return "users.read" in granted
@@ -98,10 +149,17 @@ async def _assemble_org_cards(
     session: AsyncSession, org_id: uuid.UUID, now: datetime
 ) -> list[DashboardCard]:
     today = now.date()
+    yesterday = today - timedelta(days=1)
     week_start = _week_start(now)
+    prev_week_start = week_start - timedelta(days=7)
+    prev_week_cutoff = prev_week_start + (now - week_start)
+    seven_days_ago = now - timedelta(days=7)
+    thirty_days_ago = now - timedelta(days=30)
+    sixty_days_ago = now - timedelta(days=60)
 
     cards: list[DashboardCard] = []
 
+    # leads.new_today  vs  leads created yesterday
     leads_new_today = (
         await session.execute(
             select(func.count(Lead.id)).where(
@@ -110,16 +168,31 @@ async def _assemble_org_cards(
             )
         )
     ).scalar_one()
+    leads_new_prev = (
+        await session.execute(
+            select(func.count(Lead.id)).where(
+                Lead.org_id == org_id,
+                func.date(Lead.created_at) == yesterday,
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="leads.new_today",
             label="New leads today",
-            value=int(leads_new_today),
+            current=int(leads_new_today),
+            previous=int(leads_new_prev),
             format="number",
             link="/user/leads",
         )
     )
 
+    # leads.pipeline_value  vs  pipeline as-of 30d ago.
+    # No status-history table exists, so "active 30d ago" approximates
+    # via `created_at <= 30d ago AND status == active`. Undercounts
+    # leads that have since been won/lost (they were active then but
+    # not now). Acceptable for a trend arrow; documented to keep the
+    # assumption visible.
     pipeline_value = (
         await session.execute(
             select(func.coalesce(func.sum(Lead.budget), 0)).where(
@@ -128,16 +201,32 @@ async def _assemble_org_cards(
             )
         )
     ).scalar_one()
+    pipeline_value_prev = (
+        await session.execute(
+            select(func.coalesce(func.sum(Lead.budget), 0)).where(
+                Lead.org_id == org_id,
+                Lead.status == LeadStatus.active,
+                Lead.created_at <= thirty_days_ago,
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="leads.pipeline_value",
             label="Total pipeline value",
-            value=float(pipeline_value or 0),
+            current=float(pipeline_value or 0),
+            previous=float(pipeline_value_prev or 0),
             format="currency",
             link="/user/leads",
         )
     )
 
+    # tasks.open_count  vs  snapshot of open tasks as-of 7d ago.
+    # `Task` has no `closed_at`; we approximate by counting tasks that
+    # existed 7d ago AND were either still open or were closed within
+    # the last 7d (so they were open then). `updated_at` proxies the
+    # status-change timestamp because the only column that bumps on
+    # close is `updated_at`.
     tasks_open = (
         await session.execute(
             select(func.count(Task.id)).where(
@@ -146,16 +235,30 @@ async def _assemble_org_cards(
             )
         )
     ).scalar_one()
+    tasks_open_prev = (
+        await session.execute(
+            select(func.count(Task.id)).where(
+                Task.org_id == org_id,
+                Task.created_at <= seven_days_ago,
+                or_(
+                    Task.status == TaskStatus.open,
+                    Task.updated_at > seven_days_ago,
+                ),
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="tasks.open_count",
             label="Open tasks (team)",
-            value=int(tasks_open),
+            current=int(tasks_open),
+            previous=int(tasks_open_prev),
             format="number",
             link="/user/tasks",
         )
     )
 
+    # appointments.today  vs  yesterday
     appts_today = (
         await session.execute(
             select(func.count(Appointment.id)).where(
@@ -165,16 +268,29 @@ async def _assemble_org_cards(
             )
         )
     ).scalar_one()
+    appts_prev = (
+        await session.execute(
+            select(func.count(Appointment.id)).where(
+                Appointment.org_id == org_id,
+                func.date(Appointment.scheduled_at) == yesterday,
+                Appointment.status == AppointmentStatus.scheduled,
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="appointments.today",
             label="Today's appointments",
-            value=int(appts_today),
+            current=int(appts_today),
+            previous=int(appts_prev),
             format="number",
             link="/user/appointments",
         )
     )
 
+    # calls.this_week  vs  same week-to-date offset in the previous
+    # week (so on Wed at 3pm we compare Mon 00:00 → Wed 3pm vs the
+    # equivalent range one week earlier).
     calls_this_week = (
         await session.execute(
             select(func.count(Call.id)).where(
@@ -183,26 +299,46 @@ async def _assemble_org_cards(
             )
         )
     ).scalar_one()
+    calls_prev_week = (
+        await session.execute(
+            select(func.count(Call.id)).where(
+                Call.org_id == org_id,
+                Call.started_at >= prev_week_start,
+                Call.started_at < prev_week_cutoff,
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="calls.this_week",
             label="Calls this week",
-            value=int(calls_this_week),
+            current=int(calls_this_week),
+            previous=int(calls_prev_week),
             format="number",
             link="/user/calls",
         )
     )
 
+    # contacts.total (cumulative)  vs  cumulative count as-of 30d ago
     contacts_total = (
         await session.execute(
             select(func.count(Contact.id)).where(Contact.org_id == org_id)
         )
     ).scalar_one()
+    contacts_prev = (
+        await session.execute(
+            select(func.count(Contact.id)).where(
+                Contact.org_id == org_id,
+                Contact.created_at < thirty_days_ago,
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="contacts.total",
             label="Total contacts",
-            value=int(contacts_total),
+            current=int(contacts_total),
+            previous=int(contacts_prev),
             format="number",
             link="/user/contacts",
         )
@@ -211,17 +347,17 @@ async def _assemble_org_cards(
     # Conversion rate over the last 30 days: won / (won + lost) * 100.
     # NULLIF on the denominator collapses the zero-leads case to NULL,
     # which COALESCE turns into 0 so the card is always renderable.
-    thirty_days_ago = now - timedelta(days=30)
+    # Prior period is the 30 days before that.
     closed_filter = (Lead.status == LeadStatus.won) | (
         Lead.status == LeadStatus.lost
     )
-    won_count = func.sum(case((Lead.status == LeadStatus.won, 1), else_=0))
-    closed_count = func.sum(case((closed_filter, 1), else_=0))
+    won_count_expr = func.sum(case((Lead.status == LeadStatus.won, 1), else_=0))
+    closed_count_expr = func.sum(case((closed_filter, 1), else_=0))
     conversion = (
         await session.execute(
             select(
                 func.coalesce(
-                    won_count * 100.0 / func.nullif(closed_count, 0), 0
+                    won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0
                 )
             ).where(
                 Lead.org_id == org_id,
@@ -229,11 +365,25 @@ async def _assemble_org_cards(
             )
         )
     ).scalar_one()
+    conversion_prev = (
+        await session.execute(
+            select(
+                func.coalesce(
+                    won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0
+                )
+            ).where(
+                Lead.org_id == org_id,
+                Lead.updated_at >= sixty_days_ago,
+                Lead.updated_at < thirty_days_ago,
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="conversion.rate",
             label="Conversion rate (30d)",
-            value=round(float(conversion or 0), 1),
+            current=round(float(conversion or 0), 1),
+            previous=round(float(conversion_prev or 0), 1),
             format="percent",
             link="/user/leads",
         )
@@ -289,9 +439,17 @@ async def _assemble_personal_cards(
 ) -> list[DashboardCard]:
     today = now.date()
     week_start = _week_start(now)
+    prev_week_start = week_start - timedelta(days=7)
+    prev_week_cutoff = prev_week_start + (now - week_start)
+    seven_days_ago = now - timedelta(days=7)
+    thirty_days_ago = now - timedelta(days=30)
+    sixty_days_ago = now - timedelta(days=60)
 
     cards: list[DashboardCard] = []
 
+    # tasks.my_open  vs  snapshot of own open tasks as-of 7d ago.
+    # Same approximation rule as the org card: open then = created
+    # before 7d ago AND (still open OR closed within the last 7d).
     my_tasks = (
         await session.execute(
             select(func.count(Task.id)).where(
@@ -301,16 +459,31 @@ async def _assemble_personal_cards(
             )
         )
     ).scalar_one()
+    my_tasks_prev = (
+        await session.execute(
+            select(func.count(Task.id)).where(
+                Task.org_id == org_id,
+                Task.assigned_to_id == user_uuid,
+                Task.created_at <= seven_days_ago,
+                or_(
+                    Task.status == TaskStatus.open,
+                    Task.updated_at > seven_days_ago,
+                ),
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="tasks.my_open",
             label="My open tasks",
-            value=int(my_tasks),
+            current=int(my_tasks),
+            previous=int(my_tasks_prev),
             format="number",
             link="/user/tasks",
         )
     )
 
+    # leads.my_count (cumulative)  vs  cumulative as-of 30d ago
     my_leads = (
         await session.execute(
             select(func.count(Lead.id)).where(
@@ -319,16 +492,27 @@ async def _assemble_personal_cards(
             )
         )
     ).scalar_one()
+    my_leads_prev = (
+        await session.execute(
+            select(func.count(Lead.id)).where(
+                Lead.org_id == org_id,
+                Lead.assigned_to_id == user_uuid,
+                Lead.created_at < thirty_days_ago,
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="leads.my_count",
             label="My leads",
-            value=int(my_leads),
+            current=int(my_leads),
+            previous=int(my_leads_prev),
             format="number",
             link="/user/leads",
         )
     )
 
+    # appointments.my_today  vs  yesterday
     my_appts_today = (
         await session.execute(
             select(func.count(Appointment.id)).where(
@@ -339,16 +523,28 @@ async def _assemble_personal_cards(
             )
         )
     ).scalar_one()
+    my_appts_prev = (
+        await session.execute(
+            select(func.count(Appointment.id)).where(
+                Appointment.org_id == org_id,
+                Appointment.assigned_to_id == user_uuid,
+                func.date(Appointment.scheduled_at) == today - timedelta(days=1),
+                Appointment.status == AppointmentStatus.scheduled,
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="appointments.my_today",
             label="My appointments today",
-            value=int(my_appts_today),
+            current=int(my_appts_today),
+            previous=int(my_appts_prev),
             format="number",
             link="/user/appointments",
         )
     )
 
+    # calls.my_this_week  vs  same week-to-date offset in the prior week
     my_calls = (
         await session.execute(
             select(func.count(Call.id)).where(
@@ -358,27 +554,38 @@ async def _assemble_personal_cards(
             )
         )
     ).scalar_one()
+    my_calls_prev = (
+        await session.execute(
+            select(func.count(Call.id)).where(
+                Call.org_id == org_id,
+                Call.assigned_to_id == user_uuid,
+                Call.started_at >= prev_week_start,
+                Call.started_at < prev_week_cutoff,
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="calls.my_this_week",
             label="My calls this week",
-            value=int(my_calls),
+            current=int(my_calls),
+            previous=int(my_calls_prev),
             format="number",
             link="/user/calls",
         )
     )
 
-    thirty_days_ago = now - timedelta(days=30)
+    # conversion.my_rate (last 30d)  vs  the 30d before
     closed_filter = (Lead.status == LeadStatus.won) | (
         Lead.status == LeadStatus.lost
     )
-    won_count = func.sum(case((Lead.status == LeadStatus.won, 1), else_=0))
-    closed_count = func.sum(case((closed_filter, 1), else_=0))
+    won_count_expr = func.sum(case((Lead.status == LeadStatus.won, 1), else_=0))
+    closed_count_expr = func.sum(case((closed_filter, 1), else_=0))
     my_conversion = (
         await session.execute(
             select(
                 func.coalesce(
-                    won_count * 100.0 / func.nullif(closed_count, 0), 0
+                    won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0
                 )
             ).where(
                 Lead.org_id == org_id,
@@ -387,11 +594,26 @@ async def _assemble_personal_cards(
             )
         )
     ).scalar_one()
+    my_conversion_prev = (
+        await session.execute(
+            select(
+                func.coalesce(
+                    won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0
+                )
+            ).where(
+                Lead.org_id == org_id,
+                Lead.assigned_to_id == user_uuid,
+                Lead.updated_at >= sixty_days_ago,
+                Lead.updated_at < thirty_days_ago,
+            )
+        )
+    ).scalar_one()
     cards.append(
-        DashboardCard(
+        _scalar_card(
             key="conversion.my_rate",
             label="My conversion rate (30d)",
-            value=round(float(my_conversion or 0), 1),
+            current=round(float(my_conversion or 0), 1),
+            previous=round(float(my_conversion_prev or 0), 1),
             format="percent",
             link="/user/leads",
         )

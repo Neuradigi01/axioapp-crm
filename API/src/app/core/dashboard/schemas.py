@@ -12,6 +12,9 @@ Format = Literal["number", "currency", "percent", "text", "leaderboard"]
 Scope = Literal["org", "personal"]
 
 
+DeltaDirection = Literal["up", "down", "flat"]
+
+
 class DashboardCard(BaseModel):
     """A single KPI on the dashboard.
 
@@ -21,12 +24,21 @@ class DashboardCard(BaseModel):
 
     `value` is `Any` because the leaderboard format carries a
     `list[{name, count}]` instead of a scalar.
+
+    For scalar formats (`number`, `currency`, `percent`) the three
+    `previous_value` / `delta_pct` / `delta_direction` fields are
+    always populated so the frontend can render a trend pill. For
+    `leaderboard` and `text` formats they stay `None` (no meaningful
+    period comparison).
     """
     key: str
     label: str
     value: Any
     format: Format
     link: str | None = None
+    previous_value: float | int | None = None
+    delta_pct: float | None = None
+    delta_direction: DeltaDirection | None = None
 
 
 class ActivityItem(BaseModel):
