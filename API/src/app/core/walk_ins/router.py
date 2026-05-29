@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.contacts.schemas import ContactOut
+from src.app.core.permissions.service import role_has_permission
 from src.app.core.users.models import User
 from src.app.core.walk_ins.models import WalkInStatus
 from src.app.core.walk_ins.schemas import (
@@ -70,8 +71,13 @@ async def list_walk_ins_endpoint(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("walkins.read")),
+    caller: User = Depends(require_permissions("walkins.read")),
 ) -> list[WalkInOut]:
+    # Row-level visibility: callers without `users.read` (employees,
+    # not managers) can only see walk-ins assigned to them. Any
+    # `?assigned_to=<other>` they pass is silently clamped to self.
+    if not await role_has_permission(db, caller.role_id, "users.read"):
+        assigned_to = caller.legacy_uuid
     rows, _ = await list_walk_ins(
         db,
         status_filter=status_filter,
@@ -121,10 +127,20 @@ async def create_walk_in_endpoint(
 async def get_walk_in_endpoint(
     walk_in_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("walkins.read")),
+    caller: User = Depends(require_permissions("walkins.read")),
 ) -> WalkInOut:
     walk_in = await get_walk_in(db, walk_in_id)
     if walk_in is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found"
+        )
+    # Row-level visibility: non-privileged callers can only fetch
+    # walk-ins assigned to them. 404 (not 403) so we don't leak the
+    # existence of walk-ins outside the caller's book.
+    if (
+        walk_in.assigned_to_id != caller.legacy_uuid
+        and not await role_has_permission(db, caller.role_id, "users.read")
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found"
         )

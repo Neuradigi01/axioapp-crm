@@ -39,6 +39,25 @@ async def list_permissions_for_role(
     return list(result.scalars().all())
 
 
+async def role_has_permission(
+    session: AsyncSession, role_id: uuid.UUID, key: str
+) -> bool:
+    """`True` iff the role has been granted `key`.
+
+    Single-key existence check used by row-level scope rules (e.g. the
+    `users.read` gate that decides "team view vs personal view" on the
+    leads / walk-ins / dashboard endpoints). One query — cheaper than
+    materialising the full permission set when only one key matters.
+    """
+    stmt = (
+        select(func.count())
+        .select_from(RolePermission)
+        .join(Permission, Permission.id == RolePermission.permission_id)
+        .where(RolePermission.role_id == role_id, Permission.key == key)
+    )
+    return ((await session.execute(stmt)).scalar_one() or 0) > 0
+
+
 async def register_permission(
     session: AsyncSession,
     *,
