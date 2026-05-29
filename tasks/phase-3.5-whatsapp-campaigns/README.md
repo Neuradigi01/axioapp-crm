@@ -4,7 +4,7 @@ End-to-end WhatsApp Business Cloud API campaigns: multi-tenant connect → templ
 
 ## Status overview
 
-**Progress:** 5 of 15 steps complete (33%)
+**Progress:** 6 of 15 steps complete (40%)
 
 | # | Step | Layer | Status | Commit |
 |---|---|---|---|---|
@@ -13,7 +13,7 @@ End-to-end WhatsApp Business Cloud API campaigns: multi-tenant connect → templ
 | 3.5.3 | [Adapter rewire (per-org outbound)](step-3.5.3-whatsapp-adapter-rewire.md) | Backend | ✅ COMPLETE | `d332113` |
 | 3.5.4 | [Templates sync API](step-3.5.4-whatsapp-templates-sync.md) | Backend | ✅ COMPLETE | uncommitted |
 | 3.5.5 | [Template send + picker UI](step-3.5.5-whatsapp-template-send-and-picker.md) | Both | ✅ COMPLETE | uncommitted |
-| 3.5.6 | [Dispatch text-vs-template branch](step-3.5.6-dispatch-template-branch.md) | Backend | ⏳ Pending | — |
+| 3.5.6 | [Dispatch text-vs-template branch](step-3.5.6-dispatch-template-branch.md) | Backend | ✅ COMPLETE | uncommitted |
 | 3.5.7 | [Contact groups backend](step-3.5.7-contact-groups-backend.md) | Backend | ⏳ Pending | — |
 | 3.5.8 | [Contact groups frontend](step-3.5.8-contact-groups-frontend.md) | Frontend | ⏳ Pending | — |
 | 3.5.9 | [Campaign audience builder](step-3.5.9-campaign-audience-builder.md) | Both | ⏳ Pending | — |

@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 3.5.5 (adapter `send_template`, campaign `template_id` + `template_variables`)
-**Status:** ⏳ PENDING — awaiting "begin"
+**Status:** ✅ COMPLETED — code wired; tests pending Docker restart for run-verify
 
 After this step a real template campaign delivers — the Celery task (currently in-process per dev default) walks the contact list, substitutes `{{1}}=contact.full_name`, `{{2}}=campaign.template_variables['2']` etc., and POSTs each to Meta.
 
