@@ -110,14 +110,12 @@ async def lifespan(app: FastAPI):
         async with async_session() as session:
             await register_permissions(session, all_permission_keys)
 
-    # Wire channel adapters into the conversations engine registry.
-    # Adapters that need extra config keys (e.g. WhatsApp credentials)
-    # still register here — `send()` will fail loudly at call-time when
-    # the credentials are dev stubs, which is the correct behaviour.
-    from src.app.core.conversations.adapters.whatsapp import (
-        register_default_whatsapp_adapter,
-    )
-    register_default_whatsapp_adapter()
+    # Step 3.5.12 — WhatsApp no longer needs a startup adapter
+    # registration. Outbound is per-org via `resolve_whatsapp_adapter`
+    # (DB lookup); inbound is per-org via `find_org_by_phone_id` in
+    # the webhook receiver. The conversations registry still holds
+    # any non-WhatsApp adapter modules' factories registered at their
+    # own import time.
 
     yield
     logger.info("FurnitureCRM API shutting down...")

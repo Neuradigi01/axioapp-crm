@@ -14,8 +14,8 @@ What this module owns:
   value → messages[]`) and returns a channel-agnostic `InboundMessage`.
 - `WhatsAppAdapter.verify_signature(...)`: validates Meta's
   `X-Hub-Signature-256` header — HMAC-SHA256 of the raw request body
-  with `WHATSAPP_APP_SECRET`. The webhook router rejects payloads that
-  fail this check.
+  with the org's `app_secret` (decrypted from `whatsapp_account_configs`
+  by the webhook receiver per Step 3.5.12). Failures return 403.
 - `WhatsAppAdapter.verify_subscription(...)`: implements the
   Meta-required GET-time verification handshake (`hub.mode=subscribe`).
 
@@ -29,19 +29,13 @@ import hmac
 import logging
 import re
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import (
-    WHATSAPP_API_VERSION,
-    WHATSAPP_APP_SECRET,
-    WHATSAPP_PHONE_ID,
-    WHATSAPP_TOKEN,
-    WHATSAPP_VERIFY_TOKEN,
-)
 from src.app.core.conversations.adapters import (
     ChannelMessageRef,
     InboundMessage,
@@ -130,11 +124,11 @@ class WhatsAppAdapter:
     def __init__(
         self,
         *,
-        phone_id: str = WHATSAPP_PHONE_ID,
-        token: str = WHATSAPP_TOKEN,
-        app_secret: str = WHATSAPP_APP_SECRET,
-        verify_token: str = WHATSAPP_VERIFY_TOKEN,
-        api_version: str = WHATSAPP_API_VERSION,
+        phone_id: str,
+        token: str,
+        app_secret: str,
+        verify_token: str,
+        api_version: str = "v18.0",
         http_client_factory: Any = None,
     ) -> None:
         self._phone_id = phone_id
@@ -331,10 +325,12 @@ class WhatsAppAdapter:
     # --- signature / handshake --------------------------------------------
 
     def verify_signature(self, body: bytes, header: str | None) -> bool:
-        """HMAC-SHA256 of `body` with `WHATSAPP_APP_SECRET` matches the
-        `sha256=<hex>` prefix of the `X-Hub-Signature-256` header.
+        """HMAC-SHA256 of `body` with the adapter's `app_secret` matches
+        the `sha256=<hex>` prefix of the `X-Hub-Signature-256` header.
 
-        Constant-time compared (no timing side channel)."""
+        Constant-time compared (no timing side channel). The webhook
+        receiver (Step 3.5.12) decrypts the org's app_secret per
+        request and passes it through this adapter's constructor."""
         if not header or not header.startswith("sha256="):
             return False
         provided = header.split("=", 1)[1]
@@ -389,37 +385,94 @@ async def resolve_whatsapp_adapter(
     )
 
 
-def register_default_whatsapp_adapter() -> None:
-    """Wire an env-var-backed `WhatsAppAdapter` into the engine
-    registry. Called once at startup from `main.py` lifespan.
+# --- Step 3.5.12: Meta status events ------------------------------------
 
-    Post-Step-3.5.3, the OUTBOUND path (`conversations.send_outbound`
-    + `campaigns.dispatch_chunk`) no longer goes through this
-    registered factory for the `whatsapp` channel — both call sites
-    short-circuit to `resolve_whatsapp_adapter(session)` which loads
-    the active tenant's encrypted credentials from the DB.
 
-    This registered adapter remains in place for the INBOUND webhook
-    path (`POST /webhooks/whatsapp`), which arrives without a tenant
-    context — Meta's payload identifies the target phone, not the
-    target org. Migrating the webhook to per-org credentials requires
-    a `phone_id → org_id` lookup in `whatsapp_account_configs`, which
-    is the body of work for Step 3.5.12 (delivery webhook receiver).
-    Until that lands, the webhook uses the env-var fallback (single
-    Meta test app per environment)."""
-    from src.app.core.conversations.models import ConversationChannel
-    from src.app.core.conversations.registry import register_channel
+@dataclass(frozen=True, slots=True)
+class WhatsAppStatusEvent:
+    """One delivery-status update parsed from Meta's `statuses[]` array.
 
-    register_channel(
-        ConversationChannel.whatsapp, lambda: WhatsAppAdapter()
-    )
+    `status` is Meta's lifecycle value verbatim (`sent` / `delivered`
+    / `read` / `failed`). `recipient_id` is the contact's phone (E.164,
+    no `+`). `timestamp` is the unix-seconds Meta reports for the
+    event. `error` is populated only when `status='failed'` — Meta's
+    error.message field.
+    """
+
+    channel_message_id: str
+    status: str
+    recipient_id: str
+    timestamp: datetime
+    error: str | None = None
+
+
+def parse_statuses(payload: dict[str, Any]) -> list["WhatsAppStatusEvent"]:
+    """Extract delivery-status events from a Meta webhook payload.
+
+    Webhook envelopes carry EITHER `messages[]` (inbound replies) OR
+    `statuses[]` (delivery acknowledgements) — never both in v1
+    Cloud API. This helper handles the `statuses` branch; the existing
+    `parse_webhook` handles `messages`.
+
+    Returns `[]` when the payload has no statuses (the caller treats
+    that as "not a status payload, try the inbound-message path
+    instead"). Skips malformed entries rather than raising — Meta
+    occasionally adds fields to the envelope, and we don't want a
+    single bad row to discard the whole batch.
+    """
+    out: list[WhatsAppStatusEvent] = []
+    try:
+        value = payload["entry"][0]["changes"][0]["value"]
+    except (KeyError, IndexError, TypeError):
+        return out
+    statuses = value.get("statuses") if isinstance(value, dict) else None
+    if not isinstance(statuses, list):
+        return out
+    for status in statuses:
+        if not isinstance(status, dict):
+            continue
+        msg_id = status.get("id")
+        s = status.get("status")
+        if not msg_id or not s:
+            continue
+        recipient = str(status.get("recipient_id") or "")
+        ts_raw = status.get("timestamp")
+        try:
+            timestamp = (
+                datetime.fromtimestamp(int(ts_raw), tz=timezone.utc)
+                if ts_raw
+                else datetime.now(timezone.utc)
+            )
+        except (TypeError, ValueError):
+            timestamp = datetime.now(timezone.utc)
+        error_msg: str | None = None
+        errors_list = status.get("errors")
+        if isinstance(errors_list, list) and errors_list:
+            first = errors_list[0]
+            if isinstance(first, dict):
+                error_msg = (
+                    first.get("title")
+                    or first.get("message")
+                    or str(first)
+                )[:512]
+        out.append(
+            WhatsAppStatusEvent(
+                channel_message_id=str(msg_id),
+                status=str(s),
+                recipient_id=recipient,
+                timestamp=timestamp,
+                error=error_msg,
+            )
+        )
+    return out
 
 
 __all__ = [
     "WhatsAppAdapter",
     "WhatsAppNotConnected",
     "WhatsAppSendError",
+    "WhatsAppStatusEvent",
     "_render_template_components",
-    "register_default_whatsapp_adapter",
+    "parse_statuses",
     "resolve_whatsapp_adapter",
 ]

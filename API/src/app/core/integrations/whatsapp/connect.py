@@ -483,10 +483,126 @@ async def test_connection(
     return await get_status(session)
 
 
+# --- webhook routing helpers (Step 3.5.12) ------------------------------
+
+
+async def find_org_by_phone_id(
+    session: AsyncSession, *, phone_id: str
+) -> Optional[tuple[Integration, WhatsAppAccountConfig]]:
+    """Look up the org that owns a given WhatsApp phone number id.
+
+    Used by the inbound webhook receiver to learn which org's
+    credentials to verify the payload against — Meta's webhook payload
+    carries `entry[0].changes[0].value.metadata.phone_number_id`,
+    which uniquely identifies the destination phone across all orgs.
+
+    Bypasses the ORM tenant filter intentionally: the webhook arrives
+    without any tenant context (Meta doesn't send our JWT). The
+    `phone_id` IS the routing key. Returns None if no org has this
+    phone connected (webhook receiver translates to 404 → integration
+    DLQ for forensics).
+    """
+    from sqlalchemy import text as sql_text
+
+    if not phone_id:
+        return None
+    sql = sql_text(
+        """
+        SELECT
+            i.id AS i_id, i.org_id, i.provider, i.account_id,
+            i.account_label, i.access_token_enc, i.refresh_token_enc,
+            i.token_expires_at, i.scopes, i.status, i.last_error,
+            i.connected_at, i.connected_by, i.disconnected_at,
+            i.disconnected_by, i.updated_at, i.webhook_secret,
+            c.id AS c_id, c.phone_id, c.waba_id, c.display_phone_number,
+            c.verified_name, c.app_secret_enc, c.verify_token,
+            c.api_version, c.created_at AS c_created_at,
+            c.updated_at AS c_updated_at
+        FROM whatsapp_account_configs c
+        JOIN integrations i ON i.id = c.integration_id
+        WHERE c.phone_id = :phone_id
+        LIMIT 1
+        """
+    )
+    row = (
+        await session.execute(sql, {"phone_id": phone_id})
+    ).mappings().first()
+    if row is None:
+        return None
+    integration = Integration(
+        id=row["i_id"],
+        org_id=row["org_id"],
+        provider=IntegrationProvider(row["provider"]),
+        account_id=row["account_id"],
+        account_label=row["account_label"],
+        access_token_enc=row["access_token_enc"],
+        refresh_token_enc=row["refresh_token_enc"],
+        token_expires_at=row["token_expires_at"],
+        scopes=row["scopes"],
+        status=IntegrationStatus(row["status"]),
+        last_error=row["last_error"],
+        connected_at=row["connected_at"],
+        connected_by=row["connected_by"],
+        disconnected_at=row["disconnected_at"],
+        disconnected_by=row["disconnected_by"],
+        updated_at=row["updated_at"],
+        webhook_secret=row["webhook_secret"],
+    )
+    config = WhatsAppAccountConfig(
+        id=row["c_id"],
+        org_id=row["org_id"],
+        integration_id=integration.id,
+        phone_id=row["phone_id"],
+        waba_id=row["waba_id"],
+        display_phone_number=row["display_phone_number"],
+        verified_name=row["verified_name"],
+        app_secret_enc=row["app_secret_enc"],
+        verify_token=row["verify_token"],
+        api_version=row["api_version"],
+        created_at=row["c_created_at"],
+        updated_at=row["c_updated_at"],
+    )
+    return integration, config
+
+
+async def find_org_by_verify_token(
+    session: AsyncSession, *, verify_token: str
+) -> Optional[tuple[Integration, WhatsAppAccountConfig]]:
+    """Look up the org whose verify_token matches the one Meta sent on
+    the GET-handshake. Same bypass-tenant-filter approach as
+    `find_org_by_phone_id` — the handshake carries no other identifier.
+
+    Multiple orgs MAY share a verify_token if operators choose the
+    same random string (unlikely but possible). We return the first
+    match — the handshake is one-shot at webhook setup, not a security
+    boundary; the signature check on subsequent POSTs is what
+    isolates orgs."""
+    from sqlalchemy import text as sql_text
+
+    if not verify_token:
+        return None
+    sql = sql_text(
+        """
+        SELECT c.phone_id
+        FROM whatsapp_account_configs c
+        WHERE c.verify_token = :vt
+        LIMIT 1
+        """
+    )
+    row = (
+        await session.execute(sql, {"vt": verify_token})
+    ).mappings().first()
+    if row is None:
+        return None
+    return await find_org_by_phone_id(session, phone_id=row["phone_id"])
+
+
 __all__ = [
     "MetaValidationError",
     "connect_account",
     "disconnect_account",
+    "find_org_by_phone_id",
+    "find_org_by_verify_token",
     "get_active_config",
     "get_status",
     "test_connection",

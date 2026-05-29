@@ -735,6 +735,105 @@ def _resolve_template_variables(
     return resolved
 
 
+# --- Step 3.5.12: Meta webhook status updates ---------------------------
+
+
+# Map Meta's status strings → our `CampaignMessageStatus` enum +
+# which timestamp column to stamp. `sent` is intentionally a no-op
+# here: the dispatch path already stamps `sent_at` + `status='sent'`
+# when the outbound POST returns 200, and Meta's `sent` echo is
+# redundant.
+_META_STATUS_TO_LOCAL: dict[str, tuple[CampaignMessageStatus | None, str | None]] = {
+    "sent":      (None, None),
+    "delivered": (CampaignMessageStatus.delivered, "delivered_at"),
+    "read":      (CampaignMessageStatus.read, "read_at"),
+    "failed":    (CampaignMessageStatus.failed, None),
+}
+
+
+async def apply_meta_status(
+    session: AsyncSession,
+    *,
+    channel_message_id: str,
+    meta_status: str,
+    timestamp: datetime,
+    error: str | None = None,
+) -> bool:
+    """Update the `CampaignMessage` row keyed by Meta's
+    `channel_message_id` to reflect the lifecycle event.
+
+    Status flow is forward-only (lower → higher): we don't downgrade
+    a `read` row to `delivered` if a delayed event arrives, and we
+    don't overwrite an existing `failed` status with a later
+    `delivered`. Timestamps are stamped on the first event of their
+    kind (later events ignored — Meta occasionally re-sends).
+
+    Returns True when a row was actually updated; False otherwise
+    (unknown message id — likely an outbound that didn't originate
+    from our campaigns engine, e.g. a manual reply from the inbox).
+    """
+    if not channel_message_id:
+        return False
+    mapping = _META_STATUS_TO_LOCAL.get(meta_status)
+    if mapping is None:
+        # Unknown Meta status; nothing to do but don't crash.
+        return False
+
+    row = (
+        await session.execute(
+            select(CampaignMessage).where(
+                CampaignMessage.channel_message_id == channel_message_id
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return False
+
+    # `failed` is terminal — any later non-failed event (delivered,
+    # read) is ignored entirely, including timestamps. Meta sometimes
+    # re-sends status events out of order; this guard keeps the row's
+    # error stable and prevents misleading "delivered after failed"
+    # signals in the UI.
+    if (
+        row.status == CampaignMessageStatus.failed
+        and meta_status != "failed"
+    ):
+        return False
+
+    new_status, ts_column = mapping
+    changed = False
+
+    # Status: forward-only. The enum order in our model is
+    # queued < sent < delivered < read < failed (failed is terminal).
+    _ORDER = {
+        CampaignMessageStatus.queued: 0,
+        CampaignMessageStatus.sent: 1,
+        CampaignMessageStatus.delivered: 2,
+        CampaignMessageStatus.read: 3,
+        # `failed` is terminal — never overwritten by a later success.
+        CampaignMessageStatus.failed: 99,
+    }
+    if (
+        new_status is not None
+        and row.status != CampaignMessageStatus.failed
+        and _ORDER.get(new_status, 0) > _ORDER.get(row.status, 0)
+    ):
+        row.status = new_status
+        changed = True
+
+    if ts_column is not None and getattr(row, ts_column) is None:
+        setattr(row, ts_column, timestamp)
+        changed = True
+
+    if meta_status == "failed" and error and row.error is None:
+        row.error = error[:512]
+        changed = True
+
+    if changed:
+        await session.commit()
+    return changed
+
+
 def _preview_template_body(
     template_row: WhatsAppTemplate, variables: dict[int, str]
 ) -> str:
@@ -874,6 +973,7 @@ def _snapshot(c: Campaign) -> dict[str, Any]:
 
 __all__ = [
     "CHUNK_SIZE",
+    "apply_meta_status",
     "create_campaign",
     "delete_campaign",
     "dispatch_chunk",

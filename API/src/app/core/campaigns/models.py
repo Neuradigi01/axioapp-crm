@@ -182,6 +182,16 @@ class CampaignMessage(Base, TenantScoped):
     sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Meta status webhook timestamps (Step 3.5.12). NULL until the
+    # corresponding `statuses[]` event arrives from Meta. The
+    # Step 3.5.13 UI uses these to render the WhatsApp tick state
+    # (✓ sent / ✓✓ delivered / ✓✓ blue read) per message.
+    delivered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    read_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
