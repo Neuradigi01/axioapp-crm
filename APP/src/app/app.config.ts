@@ -79,6 +79,7 @@ import {
 } from 'lucide-angular';
 
 import { authInterceptor } from '@core/interceptors/auth.interceptor';
+import { retryInterceptor } from '@core/interceptors/retry.interceptor';
 import { RoutesHelperService } from '@core/services/routes-helper.service';
 import { ThemeService } from '@core/services/theme.service';
 import { SwUpdateService } from '@core/services/sw-update.service';
@@ -91,7 +92,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideRouter([]),
-    provideHttpClient(withInterceptors([jwtInterceptor, authInterceptor])),
+    provideHttpClient(withInterceptors([retryInterceptor, jwtInterceptor, authInterceptor])),
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
     importProvidersFrom(
       LucideAngularModule.pick({
