@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -10,6 +10,8 @@ from pydantic import BaseModel, ConfigDict
 
 Format = Literal["number", "currency", "percent", "text", "leaderboard"]
 Scope = Literal["org", "personal"]
+TrendMetric = Literal["leads_created", "pipeline_value", "calls", "appointments"]
+TrendRange = Literal["7d", "30d", "90d", "365d"]
 
 
 DeltaDirection = Literal["up", "down", "flat"]
@@ -69,3 +71,22 @@ class DashboardSummary(BaseModel):
     cards: list[DashboardCard]
     recent_activity: list[ActivityItem]
     upcoming_appointments: list[UpcomingAppointment]
+
+
+class DashboardTrendPoint(BaseModel):
+    """One day-bucket in a trend series. UTC date, never null value."""
+    date: date
+    value: float
+
+
+class DashboardTrendResponse(BaseModel):
+    """Time-series payload for the dashboard trend chart.
+
+    `points` always has exactly `range_days` entries sorted ascending —
+    missing buckets are zero-filled in the service so the frontend can
+    render without gap-handling logic.
+    """
+    metric: TrendMetric
+    range: TrendRange
+    scope: Scope
+    points: list[DashboardTrendPoint]
