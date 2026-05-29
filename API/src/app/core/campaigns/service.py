@@ -59,6 +59,7 @@ from src.app.core.conversations.registry import (
     ChannelNotRegistered,
     resolve as resolve_channel,
 )
+from src.app.core.integrations.whatsapp.models import WhatsAppTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -425,6 +426,36 @@ async def dispatch_chunk(
             )
         return
 
+    # Template campaigns (Step 3.5.6): load the WhatsAppTemplate row
+    # once per chunk so the loop doesn't re-query for every contact.
+    # If the template was deleted from local cache between campaign
+    # creation and dispatch (Step 3.5.4 hard-delete on sync), every
+    # queued row in this chunk fails with a clear error — the row's
+    # ON DELETE SET NULL FK kept the campaign intact, but there's
+    # nothing to send.
+    template_row: WhatsAppTemplate | None = None
+    if campaign.template_id is not None:
+        template_row = (
+            await session.execute(
+                select(WhatsAppTemplate).where(
+                    WhatsAppTemplate.id == campaign.template_id
+                )
+            )
+        ).scalar_one_or_none()
+        if template_row is None:
+            for cid in contact_ids:
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error=(
+                        "Template no longer exists locally — re-sync "
+                        "from Settings → Integrations → WhatsApp."
+                    ),
+                )
+            return
+
     for cid in contact_ids:
         contact = (
             await session.execute(select(Contact).where(Contact.id == cid))
@@ -449,14 +480,33 @@ async def dispatch_chunk(
             contact_id=contact.id,
         )
 
-        body = _render_template(campaign.template, contact)
+        # Template vs text branch (Step 3.5.6). `template_row` is set
+        # iff this is a WA template campaign (loaded once before the
+        # loop). `body` is what the inbox Message row records; for
+        # template campaigns we synthesize a preview so the timeline
+        # shows something meaningful even though Meta renders the
+        # final text from approved template + parameters.
         try:
-            ref: ChannelMessageRef = await adapter.send(
-                org_id=campaign.org_id,
-                external_id=contact.phone,
-                text=body,
-                attachments=[],
-            )
+            if template_row is not None:
+                variables = _resolve_template_variables(campaign, contact)
+                ref: ChannelMessageRef = await adapter.send_template(
+                    org_id=campaign.org_id,
+                    external_id=contact.phone,
+                    template_name=template_row.name,
+                    language=template_row.language,
+                    variables=variables,
+                    header_type=template_row.header_type,
+                    header_text=template_row.header_text,
+                )
+                body = _preview_template_body(template_row, variables)
+            else:
+                body = _render_template(campaign.template or "", contact)
+                ref = await adapter.send(
+                    org_id=campaign.org_id,
+                    external_id=contact.phone,
+                    text=body,
+                    attachments=[],
+                )
         except Exception as exc:  # adapter-side failure
             logger.exception("campaign send failed", extra={"contact_id": str(cid)})
             await _mark_message(
@@ -583,6 +633,96 @@ def _render_template(template: str, contact: Contact) -> str:
         return fields.get(match.group(1), match.group(0))
 
     return _TEMPLATE_VAR_RE.sub(_sub, template)
+
+
+# --- Step 3.5.6: template variable resolution + preview -----------------
+
+
+# Fallback string used when a `kind=field` binding resolves to empty
+# (missing full_name, etc.). Meta rejects template messages whose body
+# parameters are empty strings — surfacing a generic placeholder keeps
+# delivery healthy. Per-template configurable fallbacks are P2 work.
+_TEMPLATE_FIELD_FALLBACK = "Customer"
+
+
+def _get_contact_field(contact: Contact, field_name: str) -> str:
+    """Resolve a `kind=field` binding's target against the contact.
+    Returns "" (empty) when the field is missing — caller substitutes
+    the fallback string (`_TEMPLATE_FIELD_FALLBACK`).
+
+    Supported fields:
+      - `full_name`, `phone`, `email`
+      - `custom_data.<key>` — pulls from the JSONB column
+
+    Unknown field names return "" (treated as missing); the picker
+    only surfaces known fields, so this is a defensive default
+    rather than a user-reachable code path."""
+    if field_name == "full_name":
+        return contact.full_name or ""
+    if field_name == "phone":
+        return contact.phone or ""
+    if field_name == "email":
+        return contact.email or ""
+    if field_name.startswith("custom_data."):
+        key = field_name.split(".", 1)[1]
+        custom = getattr(contact, "custom_data", None) or {}
+        value = custom.get(key)
+        return str(value) if value not in (None, "") else ""
+    return ""
+
+
+def _resolve_template_variables(
+    campaign: Campaign, contact: Contact
+) -> dict[int, str]:
+    """Turn `campaign.template_variables` JSONB into a flat `{n: str}`
+    dict the adapter's `send_template` consumes.
+
+    Per-binding behaviour:
+      - `kind='static'` → `value` verbatim.
+      - `kind='field'`  → contact attribute lookup; empty → fallback
+        to "Customer" (option (b) per Step 3.5.6 design).
+
+    The picker pre-validated that every `{{n}}` in the template body
+    has a binding, so this function trusts the JSONB shape and skips
+    template-body re-parsing."""
+    bindings: dict[str, Any] = campaign.template_variables or {}
+    resolved: dict[int, str] = {}
+    for key, binding in bindings.items():
+        try:
+            n = int(key)
+        except (TypeError, ValueError):
+            # Defensive: skip malformed keys rather than raise. Picker
+            # validates int keys, so this is "should never happen".
+            continue
+        if not isinstance(binding, dict):
+            continue
+        kind = binding.get("kind")
+        value = binding.get("value", "")
+        if kind == "static":
+            resolved[n] = str(value)
+        elif kind == "field":
+            raw = _get_contact_field(contact, str(value))
+            resolved[n] = raw if raw else _TEMPLATE_FIELD_FALLBACK
+    return resolved
+
+
+def _preview_template_body(
+    template_row: WhatsAppTemplate, variables: dict[int, str]
+) -> str:
+    """Substitute resolved variables into the template body for the
+    inbox Message row's `text`. Meta renders the final message
+    server-side from the approved template + parameters — this preview
+    is what the operator + contact-timeline UI display.
+
+    Mirrors Meta's positional substitution: `{{1}}` → variables[1] etc.
+    Unfilled placeholders pass through unchanged (defensive — picker
+    validation should prevent this)."""
+
+    def _sub(match: re.Match[str]) -> str:
+        n = int(match.group(1))
+        return variables.get(n, match.group(0))
+
+    return re.sub(r"\{\{(\d+)\}\}", _sub, template_row.body or "")
 
 
 # --- stats --------------------------------------------------------------
