@@ -9,6 +9,8 @@ celery.autodiscover_tasks([
     "src.app.core.leads.imports.tasks",
     "src.app.core.integrations.google.tasks",
     "src.app.core.integrations.meta.tasks",
+    # Step 3.5.14 — campaign chunk sender + scheduled-campaigns beat.
+    "src.app.core.campaigns.tasks",
 ])
 
 if not CELERY_ENABLED:

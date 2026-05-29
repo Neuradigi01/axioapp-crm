@@ -25,4 +25,11 @@ beat_schedule = {
         'task': 'src.celery.tasks.execute_every_day',
         'schedule': crontab(hour=0, minute=0),
     },
+    # Step 3.5.14 — sweep for scheduled campaigns whose schedule_at
+    # has elapsed. 60s cadence; tighter would only matter for sub-
+    # minute schedules (not a real operator workflow).
+    'dispatch-scheduled-campaigns': {
+        'task': 'src.app.core.campaigns.tasks.dispatch_scheduled_campaigns',
+        'schedule': 60.0,
+    },
 }

@@ -350,22 +350,36 @@ async def enqueue(
             session, campaign_id=campaign.id, contact_ids=chunk
         )
 
-    # Dispatch the chunks. Today we run them inline (one POST per
-    # contact per chunk, sequentially) because Celery isn't wired into
-    # this build. The architecture stays sound: a future swap to
-    # `send_campaign_chunk.delay(...)` (Celery task) replaces just
-    # this loop — chunk size, audience resolver, and per-message
-    # persistence don't change.
+    # Step 3.5.14 — Celery-aware dispatch.
     #
-    # Scheduled-for-future campaigns stay in `status='scheduled'`
-    # with their queued rows pre-inserted; an operator can flip back
-    # to draft + re-start to force a now-send. A periodic scheduler
-    # (Celery beat, in production) will pick up the eta'd ones.
+    # CELERY_ENABLED=true (prod): each chunk goes to Celery via
+    # `.delay(...)`; the API request returns immediately while workers
+    # burn through chunks at the per-org rate (Step 3.5.15).
+    # CELERY_ENABLED=false (dev): tasks run eager-inline through the
+    # shim so smoke tests don't need a worker.
+    #
+    # Scheduled-for-future campaigns stay in `status='scheduled'` with
+    # their queued rows pre-inserted; the beat task
+    # `dispatch_scheduled_campaigns` picks them up every 60s.
     if not is_scheduled:
-        for chunk in chunks:
-            await dispatch_chunk(
-                session, campaign_id=campaign.id, contact_ids=chunk
-            )
+        from src.app.core.campaigns.tasks import (
+            HAS_CELERY,
+            send_campaign_chunk,
+        )
+
+        from config import CELERY_ENABLED as _CELERY_ENABLED
+
+        if HAS_CELERY and _CELERY_ENABLED:
+            for chunk in chunks:
+                send_campaign_chunk.delay(
+                    str(campaign.id),
+                    [str(c) for c in chunk],
+                )
+        else:
+            for chunk in chunks:
+                await dispatch_chunk(
+                    session, campaign_id=campaign.id, contact_ids=chunk
+                )
 
     await audit.log(
         "campaigns.started",

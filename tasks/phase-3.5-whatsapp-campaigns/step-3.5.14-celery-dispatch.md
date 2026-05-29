@@ -4,7 +4,7 @@
 
 **Phase:** 3.5
 **Depends on:** 1.2 (Celery infrastructure), 3.5.6 (dispatch_chunk text/template branch)
-**Status:** ⏳ PENDING — awaiting "begin"
+**Status:** ✅ COMPLETED — 112/112 tests; eager-mode dev + Celery prod path wired
 
 After this step:
 - Operator hits "Start campaign" → API returns 200 instantly with `{enqueued: 2,348, chunks: 47}` → Celery worker burns through chunks at the configured rate
