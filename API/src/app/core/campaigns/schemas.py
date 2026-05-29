@@ -12,11 +12,34 @@ from src.app.core.conversations.models import ConversationChannel
 
 
 class AudienceFilter(BaseModel):
-    """Same shape as `/contacts` list query — q / source / tag."""
+    """Campaign audience target — three mutually-exclusive modes:
+
+      1. **Empty** (`{}`): "Everyone in the org". The default.
+      2. **Filter**: any of `q` / `source` / `tag` — same shape as the
+         `/contacts` list query. Dynamic resolution at send time.
+      3. **Group**: `group_id` references a saved `contact_groups` row
+         (Step 3.5.7). Dynamic groups re-resolve at send time; static
+         groups send to their frozen member list.
+
+    Mixing modes 2 and 3 is rejected at the schema layer — the
+    audience builder UI (Step 3.5.9) enforces "one mode at a time"
+    via radio toggle, and the backend echoes the same constraint so
+    a direct API call can't bypass it."""
 
     q: Optional[str] = None
     source: Optional[str] = None
     tag: Optional[str] = None
+    group_id: Optional[uuid.UUID] = None
+
+    @model_validator(mode="after")
+    def _no_mixed_modes(self) -> "AudienceFilter":
+        has_filter = bool(self.q or self.source or self.tag)
+        has_group = self.group_id is not None
+        if has_filter and has_group:
+            raise ValueError(
+                "Use either filter fields (q/source/tag) OR group_id, not both."
+            )
+        return self
 
 
 class TemplateVariableBinding(BaseModel):

@@ -4,7 +4,7 @@ End-to-end WhatsApp Business Cloud API campaigns: multi-tenant connect → templ
 
 ## Status overview
 
-**Progress:** 8 of 15 steps complete (53%)
+**Progress:** 9 of 15 steps complete (60%)
 
 | # | Step | Layer | Status | Commit |
 |---|---|---|---|---|
@@ -16,7 +16,7 @@ End-to-end WhatsApp Business Cloud API campaigns: multi-tenant connect → templ
 | 3.5.6 | [Dispatch text-vs-template branch](step-3.5.6-dispatch-template-branch.md) | Backend | ✅ COMPLETE | uncommitted |
 | 3.5.7 | [Contact groups backend](step-3.5.7-contact-groups-backend.md) | Backend | ✅ COMPLETE | uncommitted |
 | 3.5.8 | [Contact groups frontend](step-3.5.8-contact-groups-frontend.md) | Frontend | ✅ COMPLETE | uncommitted |
-| 3.5.9 | [Campaign audience builder](step-3.5.9-campaign-audience-builder.md) | Both | ⏳ Pending | — |
+| 3.5.9 | [Campaign audience builder](step-3.5.9-campaign-audience-builder.md) | Both | ✅ COMPLETE | uncommitted |
 | 3.5.10 | [Contact import backend](step-3.5.10-contact-import-backend.md) | Backend | ⏳ Pending | — |
 | 3.5.11 | [Contact import frontend](step-3.5.11-contact-import-frontend.md) | Frontend | ⏳ Pending | — |
 | 3.5.12 | [Delivery webhook (per-org)](step-3.5.12-delivery-webhook.md) | Backend | ⏳ Pending | — |
