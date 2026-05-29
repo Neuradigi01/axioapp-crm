@@ -22,6 +22,8 @@ import {
 import { forkJoin, of } from 'rxjs';
 import { catchError, distinctUntilChanged } from 'rxjs/operators';
 
+import { ActivatedRoute, Router } from '@angular/router';
+
 import { FurnitureAuthService } from '../auth/auth.service';
 import {
   BulkAction,
@@ -111,6 +113,8 @@ export class AppointmentsPageComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
   private readonly usersDir = inject(UsersDirectoryService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   /** List vs calendar — controlled by the toggle at the top of the page. */
   readonly view = signal<'list' | 'calendar'>('list');
@@ -311,6 +315,23 @@ export class AppointmentsPageComponent {
     this.assigneeControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.reload());
+
+    // Honour `/user/appointments?new=1` (dashboard quick-action) so
+    // landing on the page from elsewhere opens the book-appointment
+    // modal directly. Strip the param after consuming it.
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        if (params.get('new') !== null && !this.modalOpen()) {
+          this.openBook();
+          this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { new: null },
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+          });
+        }
+      });
   }
 
   // --- View / filter setters ---------------------------------------------

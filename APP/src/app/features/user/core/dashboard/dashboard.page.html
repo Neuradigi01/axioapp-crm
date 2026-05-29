@@ -1,7 +1,9 @@
 <div class="px-6 py-6">
 
-  <!-- Header -->
-  <header class="mb-6 flex items-end justify-between gap-3">
+  <!-- Header — greeting + scope pill (left); date-range picker + Refresh (right) -->
+  <header
+    class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
+  >
     <div>
       @if (summary(); as s) {
         <h1 class="text-2xl font-semibold text-zinc-900">
@@ -24,15 +26,21 @@
         <div class="mt-2 h-4 w-40 animate-pulse rounded bg-zinc-100"></div>
       }
     </div>
-    <button
-      type="button"
-      (click)="refresh()"
-      [disabled]="refreshing()"
-      class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {{ refreshing() ? 'Refreshing…' : 'Refresh' }}
-    </button>
+    <div class="flex items-center gap-2">
+      <app-dashboard-date-range />
+      <button
+        type="button"
+        (click)="refresh()"
+        [disabled]="refreshing()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {{ refreshing() ? 'Refreshing…' : 'Refresh' }}
+      </button>
+    </div>
   </header>
+
+  <!-- Quick-actions row — permission-gated; collapses entirely when none visible -->
+  <app-dashboard-quick-actions />
 
   @if (error(); as err) {
     <div class="mb-4 flex items-center justify-between gap-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -69,9 +77,15 @@
     </section>
   }
 
+  <!-- Trend + funnel chart row -->
+  <section class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <app-dashboard-trend-chart />
+    <app-dashboard-funnel-chart />
+  </section>
+
   <!-- Secondary KPI cards grid — everything not already in the hero strip -->
   @if (summary(); as s) {
-    <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <section class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       @for (card of secondaryCards(); track card.key) {
         @if (card.link; as link) {
           <a
@@ -88,18 +102,12 @@
       }
     </section>
   } @else {
-    <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <section class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       @for (i of [1,2,3,4]; track i) {
         <div class="h-24 animate-pulse rounded-xl border border-zinc-200 bg-zinc-50"></div>
       }
     </section>
   }
-
-  <!-- Trend + funnel chart row -->
-  <section class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-    <app-dashboard-trend-chart />
-    <app-dashboard-funnel-chart />
-  </section>
 
   <!-- Two-column bottom: recent activity + upcoming appointments -->
   <section class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">

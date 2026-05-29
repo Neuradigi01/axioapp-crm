@@ -13,8 +13,10 @@ import { RouterLink } from '@angular/router';
 
 import { environment } from '../../../../../environments/environment';
 import { extractApiError } from '@core/services/api-error.util';
+import { DashboardDateRangeComponent } from './shared/dashboard-date-range.component';
 import { DashboardKpiTileComponent } from './shared/dashboard-kpi-tile.component';
 import { FunnelChartComponent } from './widgets/funnel-chart.component';
+import { QuickActionsComponent } from './widgets/quick-actions.component';
 import { TrendChartComponent } from './widgets/trend-chart.component';
 
 interface DashboardCard {
@@ -81,7 +83,9 @@ interface DashboardSummary {
     CommonModule,
     RouterLink,
     DecimalPipe,
+    DashboardDateRangeComponent,
     DashboardKpiTileComponent,
+    QuickActionsComponent,
     TrendChartComponent,
     FunnelChartComponent,
   ],

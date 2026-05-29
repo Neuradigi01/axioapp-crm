@@ -8,7 +8,7 @@
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
@@ -63,6 +63,7 @@ export class ContactsListPageComponent {
   protected readonly initials = initials;
   private readonly api = inject(ContactsApiService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
   private readonly usersDir = inject(UsersDirectoryService);
@@ -267,6 +268,24 @@ export class ContactsListPageComponent {
         this.page.set(1);
         this.reload();
       });
+    // Honour `/user/contacts?new=1` (used by the dashboard quick-action)
+    // so landing on the page from elsewhere drops the user straight
+    // into the create-contact modal. Strip the param after consuming
+    // it so a refresh doesn't re-open.
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        if (params.get('new') !== null && this.modalState() === null) {
+          this.openCreate();
+          this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { new: null },
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+          });
+        }
+      });
+
     this.assigneeControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {

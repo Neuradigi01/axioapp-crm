@@ -7,6 +7,7 @@
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import {
@@ -32,6 +33,8 @@ import { extractApiError } from '@core/services/api-error.util';
 export class CallLogsTabComponent {
   private readonly api = inject(CallsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   protected readonly items = signal<Call[]>([]);
   protected readonly outcomes = signal<CallOutcome[]>([]);
@@ -55,6 +58,23 @@ export class CallLogsTabComponent {
         error: () => {
           /* outcomes aren't fatal â€” leave list empty */
         },
+      });
+
+    // Honour `/user/calls?new=1` (dashboard quick-action) so landing
+    // on the call-center from elsewhere opens the log-call modal
+    // directly on the default (Logs) tab. Strip the param after.
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        if (params.get('new') !== null && !this.modalOpen()) {
+          this.openModal();
+          this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { new: null },
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+          });
+        }
       });
   }
 
