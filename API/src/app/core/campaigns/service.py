@@ -300,10 +300,17 @@ async def enqueue(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"campaign already {campaign.status.value}",
         )
-    # Adapter must exist before we accept the start request.
+    # Adapter must exist before we accept the start request. WhatsApp
+    # uses the per-org resolver (Step 3.5.3) — checking the generic
+    # registry would always fail for it. Mirror the branch used in
+    # `dispatch_chunk` so a connected org passes pre-flight and a
+    # disconnected one is rejected with a clear message.
     try:
-        resolve_channel(campaign.channel)
-    except ChannelNotRegistered as exc:
+        if campaign.channel == ConversationChannel.whatsapp:
+            await resolve_whatsapp_adapter(session)
+        else:
+            resolve_channel(campaign.channel)
+    except (ChannelNotRegistered, WhatsAppNotConnected) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
