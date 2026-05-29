@@ -84,6 +84,30 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // MUST precede `contacts/:id` — otherwise the `:id` route
+        // would match `/contacts/groups` and try to load it as a
+        // contact UUID.
+        path: 'contacts/groups',
+        loadComponent: () =>
+          import('./core/contacts/groups/groups-list.page').then(
+            (m) => m.ContactGroupsListPageComponent,
+          ),
+      },
+      {
+        path: 'contacts/groups/new',
+        loadComponent: () =>
+          import('./core/contacts/groups/group-edit.page').then(
+            (m) => m.ContactGroupEditPageComponent,
+          ),
+      },
+      {
+        path: 'contacts/groups/:id/edit',
+        loadComponent: () =>
+          import('./core/contacts/groups/group-edit.page').then(
+            (m) => m.ContactGroupEditPageComponent,
+          ),
+      },
+      {
         path: 'contacts/:id',
         loadComponent: () =>
           import('./core/contacts/contact-detail.page').then(

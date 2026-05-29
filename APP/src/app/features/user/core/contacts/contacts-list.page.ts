@@ -8,7 +8,7 @@
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
@@ -46,6 +46,7 @@ import { initials } from '@core/services/text.util';
   imports: [
     ReactiveFormsModule,
     LucideAngularModule,
+    RouterLink,
     ContactFormModalComponent,
     RelativeTimePipe,
     BulkActionBarComponent,
