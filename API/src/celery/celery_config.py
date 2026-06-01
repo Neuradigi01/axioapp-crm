@@ -32,4 +32,14 @@ beat_schedule = {
         'task': 'src.app.core.campaigns.tasks.dispatch_scheduled_campaigns',
         'schedule': 60.0,
     },
+    # Step 5 — refresh every lead's lead_score against the active
+    # rule set. Per-write recompute already keeps things mostly fresh;
+    # this hourly sweep handles the case where an operator edits a
+    # rule and we need to apply the new shape org-wide without
+    # touching every lead manually. Per-org loop is internal to the
+    # task.
+    'recompute-all-lead-scores': {
+        'task': 'src.app.core.leads.scoring.recompute_all_lead_scores',
+        'schedule': crontab(minute=0),
+    },
 }

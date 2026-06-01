@@ -35,5 +35,14 @@ MODULE = ModuleDescriptor(
         # leads but shouldn't be able to hand them off to a peer —
         # transfers are a management-level action.
         "leads.reassign",
+        # Streaming CSV export. Distinct from `leads.read` because
+        # an export is a power action (data takeout) and is typically
+        # restricted to Owner / Admin even when junior reps can read
+        # individual leads.
+        "leads.export",
+        # Create / edit / delete lead-scoring rules and trigger an
+        # org-wide recompute. Owner-only by default; Admins editable
+        # per the RBAC track.
+        "leads.scoring.manage",
     ],
 )

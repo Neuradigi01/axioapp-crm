@@ -18,19 +18,27 @@ Responsibilities:
    `is_won` / `is_lost` flags. The pipeline engine writes the audit
    row + status_change activity; this wrapper just stamps the status
    field afterwards.
+4. List endpoint supports both offset pagination (legacy callers,
+   ``page`` + ``size``) and cursor pagination (Step 6 FE, ``cursor`` +
+   ``limit``). The two modes share the same WHERE pipeline, including
+   the new JSON filter DSL.
+5. Lead-scoring rule CRUD and the score-recompute hook fired from
+   ``create_lead`` and ``update_lead``.
 
 Filtered list joins the `contacts` table so `q` (name/phone/email
 search) and `source` (contact.source equality) can apply.
 """
 from __future__ import annotations
 
+import base64
+import json
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Iterable, Literal, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -40,8 +48,21 @@ from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldType,
 )
-from src.app.core.leads.models import Lead, LeadSource, LeadStatus
-from src.app.core.leads.schemas import LOST_REASONS, LeadCreate, LeadUpdate
+from src.app.core.leads import filter_dsl, scoring
+from src.app.core.leads.csv_export import resolve_custom_columns
+from src.app.core.leads.models import (
+    Lead,
+    LeadScoringRule,
+    LeadSource,
+    LeadStatus,
+)
+from src.app.core.leads.schemas import (
+    LOST_REASONS,
+    LeadCreate,
+    LeadScoringRuleCreate,
+    LeadScoringRuleUpdate,
+    LeadUpdate,
+)
 from src.app.core.pipelines import move_card
 from src.app.core.pipelines.service import get_pipeline_by_key
 from src.app.core.users.models import OrganizationMember, User
@@ -53,8 +74,18 @@ from src.app.core.users.models import OrganizationMember, User
 _SORT_COLUMNS = {
     "created_at": Lead.created_at,
     "last_activity_at": Lead.last_activity_at,
+    "lead_score": Lead.lead_score,
     "contact_name": Contact.full_name,
 }
+
+
+# Limits for the cursor-paginated list endpoint. Tightening below 1
+# would let a caller spin on empty pages; loosening above 200 stops
+# being a "page" and starts being an export — they should use the
+# CSV endpoint instead.
+_LIMIT_MIN = 1
+_LIMIT_MAX = 200
+_LIMIT_DEFAULT = 50
 
 
 _LEAD_ENTITY = "lead"
@@ -306,6 +337,10 @@ async def create_lead(
         attribution=payload.attribution,
     )
     session.add(lead)
+    await session.flush()
+    # Score the freshly inserted row before the commit so the persisted
+    # value matches what the caller will see when they next GET the lead.
+    await scoring.recompute_lead(session, lead=lead)
     await session.commit()
     await session.refresh(lead)
 
@@ -345,6 +380,16 @@ async def update_lead(
 
     for key, value in changes.items():
         setattr(lead, key, value)
+    await session.flush()
+    # Recompute the score iff a column referenced by any active rule
+    # changed — keeps the hot path cheap when reps update freeform
+    # notes / custom_data that no rule cares about. ``custom_data`` is
+    # tracked as a single key here; nested-key invalidation would
+    # require parsing the JSONB diff which we don't yet do.
+    changed_fields = set(changes.keys())
+    relevant = await scoring.rule_relevant_fields(session, org_id=lead.org_id)
+    if relevant and changed_fields & relevant:
+        await scoring.recompute_lead(session, lead=lead)
     await session.commit()
     await session.refresh(lead)
 
@@ -377,37 +422,27 @@ async def delete_lead(session: AsyncSession, *, lead_id: uuid.UUID) -> None:
     )
 
 
-async def list_leads(
+async def _build_list_query(
     session: AsyncSession,
     *,
-    stage: Optional[str] = None,
-    status_filter: Optional[LeadStatus] = None,
-    assigned_to: Optional[uuid.UUID] = None,
-    q: Optional[str] = None,
-    source: Optional[str] = None,
-    last_activity_lt: Optional[datetime] = None,
-    last_activity_gt: Optional[datetime] = None,
-    sort: Literal["created_at", "last_activity_at", "contact_name"] = "created_at",
-    order: Literal["asc", "desc"] = "desc",
-    custom_filters: Iterable[tuple[str, str]] = (),
-    page: int = 1,
-    size: int = 50,
-) -> tuple[list[Lead], int]:
-    """Filtered list of leads.
+    stage: Optional[str],
+    status_filter: Optional[LeadStatus],
+    assigned_to: Optional[uuid.UUID],
+    q: Optional[str],
+    source: Optional[str],
+    last_activity_lt: Optional[datetime],
+    last_activity_gt: Optional[datetime],
+    custom_filters: Iterable[tuple[str, str]],
+    filter_dsl_payload: Optional[dict[str, Any]],
+    sort: str,
+) -> tuple[Any, list[Any], bool]:
+    """Translate the union of convenience filters + DSL into a single
+    boolean WHERE clause + the JOIN hint.
 
-    `q` and `source` join `contacts` so the caller can search by the
-    person's name / phone / email / source without first looking up
-    contact ids on the client. All other filters apply directly to the
-    leads row.
-
-    `last_activity_lt` powers the "no activity in N days" chip — the FE
-    passes `now() - 7d` to get leads gone cold. `last_activity_gt` is
-    the inverse for "recently touched" if a future filter needs it.
-
-    `sort` keys are whitelisted via `_SORT_COLUMNS`; `contact_name`
-    forces the contacts JOIN even when `q`/`source` are absent.
-    `last_activity_at` desc appends `NULLS LAST` so never-touched
-    leads sink to the bottom.
+    Returned tuple: ``(where_clause_or_None, filters_list, needs_contact_join)``.
+    ``filters_list`` is kept for callers that want to inspect or
+    pass-through individual clauses (the CSV export passes the
+    combined expression).
     """
     filters: list[Any] = []
     needs_contact_join = False
@@ -445,10 +480,145 @@ async def list_leads(
     for key, value in custom_filters:
         filters.append(Lead.custom_data[key].astext == value)
 
+    if filter_dsl_payload:
+        try:
+            parsed = filter_dsl.parse(filter_dsl_payload)
+            allowed_custom = set(await resolve_custom_columns(session))
+            dsl_clause, dsl_needs_join = filter_dsl.to_sqlalchemy(
+                parsed, allowed_custom_keys=allowed_custom
+            )
+        except filter_dsl.FilterDslError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"invalid filter: {exc}",
+            ) from exc
+        if dsl_clause is not None:
+            filters.append(dsl_clause)
+        needs_contact_join = needs_contact_join or dsl_needs_join
+
     if sort == "contact_name":
         needs_contact_join = True
 
     where = and_(*filters) if filters else None
+    return where, filters, needs_contact_join
+
+
+def _order_clause(sort: str, order: str):
+    sort_col = _SORT_COLUMNS[sort]
+    if sort == "last_activity_at":
+        return (
+            sort_col.asc().nulls_last()
+            if order == "asc"
+            else sort_col.desc().nulls_last()
+        )
+    return sort_col.asc() if order == "asc" else sort_col.desc()
+
+
+def _encode_cursor(sort_value: Any, lead_id: uuid.UUID) -> str:
+    """Base64-encode the keyset cursor. ``sort_value`` is ISO-formatted
+    for date/datetime; raw otherwise."""
+    if isinstance(sort_value, datetime):
+        payload_v: Any = sort_value.isoformat()
+    elif isinstance(sort_value, date):
+        payload_v = sort_value.isoformat()
+    elif sort_value is None:
+        payload_v = None
+    else:
+        payload_v = sort_value if isinstance(sort_value, (int, float, str)) else str(sort_value)
+    raw = json.dumps({"v": payload_v, "id": str(lead_id)})
+    return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii")
+
+
+def _decode_cursor(
+    cursor: str, sort: str
+) -> tuple[Any, uuid.UUID]:
+    """Inverse of ``_encode_cursor``. Tampering → 400."""
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8")
+        payload = json.loads(raw)
+        v_raw = payload["v"]
+        id_str = payload["id"]
+        lead_id = uuid.UUID(id_str)
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid cursor",
+        ) from exc
+    # Coerce v back to the column's native Python type so the keyset
+    # comparison matches the index.
+    if v_raw is None:
+        return None, lead_id
+    if sort in ("created_at", "last_activity_at"):
+        try:
+            return datetime.fromisoformat(v_raw), lead_id
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid cursor",
+            ) from exc
+    if sort == "lead_score":
+        try:
+            return int(v_raw), lead_id
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid cursor",
+            ) from exc
+    # contact_name
+    return str(v_raw), lead_id
+
+
+async def list_leads(
+    session: AsyncSession,
+    *,
+    stage: Optional[str] = None,
+    status_filter: Optional[LeadStatus] = None,
+    assigned_to: Optional[uuid.UUID] = None,
+    q: Optional[str] = None,
+    source: Optional[str] = None,
+    last_activity_lt: Optional[datetime] = None,
+    last_activity_gt: Optional[datetime] = None,
+    sort: Literal[
+        "created_at", "last_activity_at", "lead_score", "contact_name"
+    ] = "created_at",
+    order: Literal["asc", "desc"] = "desc",
+    custom_filters: Iterable[tuple[str, str]] = (),
+    filter_dsl_payload: Optional[dict[str, Any]] = None,
+    page: int = 1,
+    size: int = _LIMIT_DEFAULT,
+    cursor: Optional[str] = None,
+    limit: Optional[int] = None,
+    with_total: bool = True,
+) -> tuple[list[Lead], Optional[int], Optional[str]]:
+    """Filtered list of leads, supporting two pagination modes.
+
+    Offset mode (legacy callers): pass ``page`` + ``size``. Returns
+    ``(rows, total, None)``. ``with_total`` is honoured but the
+    default is ``True`` to match historical behaviour.
+
+    Cursor mode: pass ``cursor`` (opaque base64 token) + ``limit``.
+    Returns ``(rows, total_or_None, next_cursor_or_None)``. ``total``
+    only when the caller opted in with ``with_total=True``. ``cursor``
+    on first request is ``None``; the response's ``next_cursor`` feeds
+    the next request and is itself ``None`` when the set is exhausted.
+
+    Filters: convenience args (``q``, ``source``, ``status_filter``…)
+    compose with the JSON ``filter_dsl_payload`` via AND. ``q`` /
+    ``source`` / ``sort=contact_name`` force the contacts JOIN.
+    """
+    where, _filters, needs_contact_join = await _build_list_query(
+        session,
+        stage=stage,
+        status_filter=status_filter,
+        assigned_to=assigned_to,
+        q=q,
+        source=source,
+        last_activity_lt=last_activity_lt,
+        last_activity_gt=last_activity_gt,
+        custom_filters=custom_filters,
+        filter_dsl_payload=filter_dsl_payload,
+        sort=sort,
+    )
 
     base = select(Lead)
     count_stmt = select(func.count()).select_from(Lead)
@@ -459,17 +629,110 @@ async def list_leads(
         base = base.where(where)
         count_stmt = count_stmt.where(where)
 
-    sort_col = _SORT_COLUMNS[sort]
-    if sort == "last_activity_at":
-        primary = sort_col.asc().nulls_last() if order == "asc" else sort_col.desc().nulls_last()
-    else:
-        primary = sort_col.asc() if order == "asc" else sort_col.desc()
-    base = base.order_by(primary, Lead.id.desc())
-    total = (await session.execute(count_stmt)).scalar_one()
+    primary = _order_clause(sort, order)
+    # Secondary key on `Lead.id` makes the keyset bound unambiguous on
+    # ties (e.g. two leads with identical created_at) and matches the
+    # composite indexes added in migration 0070.
+    secondary = Lead.id.desc() if order == "desc" else Lead.id.asc()
+    base = base.order_by(primary, secondary)
+
+    total: Optional[int] = None
+    if with_total:
+        total = int((await session.execute(count_stmt)).scalar_one())
+
+    # Cursor mode is restricted to lead-direct sort keys — sorting by
+    # ``contact_name`` would need the joined name on every result for the
+    # keyset bound, which adds complexity without buying much (the
+    # contact-name sort is a UI nicety used on small pages). FE callers
+    # using ``contact_name`` keep offset mode.
+    cursor_eligible_sorts = {"created_at", "last_activity_at", "lead_score"}
+    if cursor is not None and sort not in cursor_eligible_sorts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"cursor pagination does not support sort={sort!r}; "
+                "use page/size mode instead"
+            ),
+        )
+
+    if cursor is not None:
+        # --- cursor mode ---
+        effective_limit = max(_LIMIT_MIN, min(_LIMIT_MAX, limit or _LIMIT_DEFAULT))
+        sort_value, last_id = _decode_cursor(cursor, sort)
+        sort_col = _SORT_COLUMNS[sort]
+        if order == "desc":
+            keyset = tuple_(sort_col, Lead.id) < tuple_(sort_value, last_id)
+        else:
+            keyset = tuple_(sort_col, Lead.id) > tuple_(sort_value, last_id)
+        base = base.where(keyset)
+        # Fetch limit+1 to determine whether there's a next page
+        # without a separate COUNT.
+        rows = (
+            await session.execute(base.limit(effective_limit + 1))
+        ).scalars().all()
+        has_more = len(rows) > effective_limit
+        page_rows = list(rows[:effective_limit])
+        next_cursor: Optional[str] = None
+        if has_more and page_rows:
+            tail = page_rows[-1]
+            next_cursor = _encode_cursor(getattr(tail, sort), tail.id)
+        return page_rows, total, next_cursor
+
+    # --- offset mode (default / legacy) ---
+    effective_size = max(_LIMIT_MIN, min(_LIMIT_MAX, size))
+    effective_page = max(1, page)
     rows = (
-        await session.execute(base.offset((page - 1) * size).limit(size))
+        await session.execute(
+            base.offset((effective_page - 1) * effective_size).limit(effective_size + 1)
+        )
     ).scalars().all()
-    return list(rows), int(total)
+    has_more = len(rows) > effective_size
+    page_rows = list(rows[:effective_size])
+    next_cursor = None
+    if (
+        has_more
+        and page_rows
+        and sort in cursor_eligible_sorts
+    ):
+        tail = page_rows[-1]
+        next_cursor = _encode_cursor(getattr(tail, sort), tail.id)
+    return page_rows, total, next_cursor
+
+
+async def list_leads_where(
+    session: AsyncSession,
+    *,
+    stage: Optional[str] = None,
+    status_filter: Optional[LeadStatus] = None,
+    assigned_to: Optional[uuid.UUID] = None,
+    q: Optional[str] = None,
+    source: Optional[str] = None,
+    last_activity_lt: Optional[datetime] = None,
+    last_activity_gt: Optional[datetime] = None,
+    custom_filters: Iterable[tuple[str, str]] = (),
+    filter_dsl_payload: Optional[dict[str, Any]] = None,
+    sort: Literal[
+        "created_at", "last_activity_at", "lead_score", "contact_name"
+    ] = "created_at",
+) -> tuple[Any, bool]:
+    """Companion to ``list_leads`` used by the CSV export: builds and
+    returns the same combined WHERE clause + JOIN hint, without
+    executing it. Keeps export and list in lockstep on filter
+    semantics without paying for two builders."""
+    where, _filters, needs_join = await _build_list_query(
+        session,
+        stage=stage,
+        status_filter=status_filter,
+        assigned_to=assigned_to,
+        q=q,
+        source=source,
+        last_activity_lt=last_activity_lt,
+        last_activity_gt=last_activity_gt,
+        custom_filters=custom_filters,
+        filter_dsl_payload=filter_dsl_payload,
+        sort=sort,
+    )
+    return where, needs_join
 
 
 # --- move-stage with status auto-sync ---
@@ -725,14 +988,153 @@ async def bulk_delete_leads(
     return int(result.rowcount or 0)
 
 
+# --- Scoring rule CRUD ------------------------------------------------------
+
+
+def _scoring_snapshot(rule: LeadScoringRule) -> dict[str, Any]:
+    return {
+        "id": str(rule.id),
+        "name": rule.name,
+        "condition": rule.condition,
+        "points": rule.points,
+        "active": rule.active,
+    }
+
+
+def _validate_scoring_condition(condition: dict[str, Any]) -> None:
+    """Parse + validate that a rule condition is scorable in-memory.
+    Mapped to 422 via HTTPException."""
+    try:
+        parsed = filter_dsl.parse(condition)
+        filter_dsl.validate_scorable(parsed)
+    except filter_dsl.FilterDslError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"invalid rule condition: {exc}",
+        ) from exc
+
+
+async def list_scoring_rules(
+    session: AsyncSession, *, org_id: uuid.UUID
+) -> list[LeadScoringRule]:
+    """All rules (active + inactive) for the tenant, oldest first.
+    The settings page surfaces both so an admin can re-enable a rule
+    without losing its history."""
+    result = await session.execute(
+        select(LeadScoringRule)
+        .where(LeadScoringRule.org_id == org_id)
+        .order_by(LeadScoringRule.created_at.asc())
+    )
+    return list(result.scalars())
+
+
+async def get_scoring_rule(
+    session: AsyncSession, *, rule_id: uuid.UUID
+) -> Optional[LeadScoringRule]:
+    result = await session.execute(
+        select(LeadScoringRule).where(LeadScoringRule.id == rule_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def create_scoring_rule(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    payload: LeadScoringRuleCreate,
+) -> LeadScoringRule:
+    _validate_scoring_condition(payload.condition)
+    rule = LeadScoringRule(
+        org_id=org_id,
+        name=payload.name,
+        condition=payload.condition,
+        points=payload.points,
+        active=payload.active,
+    )
+    session.add(rule)
+    await session.commit()
+    await session.refresh(rule)
+
+    scoring.invalidate_rule_field_cache(org_id)
+    await audit.log(
+        "leads.scoring_rule.created",
+        entity_type="lead_scoring_rule",
+        entity_id=rule.id,
+        after=_scoring_snapshot(rule),
+    )
+    return rule
+
+
+async def update_scoring_rule(
+    session: AsyncSession,
+    *,
+    rule_id: uuid.UUID,
+    payload: LeadScoringRuleUpdate,
+) -> LeadScoringRule:
+    rule = await get_scoring_rule(session, rule_id=rule_id)
+    if rule is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="scoring rule not found",
+        )
+    before = _scoring_snapshot(rule)
+    changes = payload.model_dump(exclude_unset=True)
+    if "condition" in changes and changes["condition"] is not None:
+        _validate_scoring_condition(changes["condition"])
+    for key, value in changes.items():
+        setattr(rule, key, value)
+    await session.commit()
+    await session.refresh(rule)
+
+    scoring.invalidate_rule_field_cache(rule.org_id)
+    await audit.log(
+        "leads.scoring_rule.updated",
+        entity_type="lead_scoring_rule",
+        entity_id=rule.id,
+        before=before,
+        after=_scoring_snapshot(rule),
+    )
+    return rule
+
+
+async def delete_scoring_rule(
+    session: AsyncSession, *, rule_id: uuid.UUID
+) -> None:
+    rule = await get_scoring_rule(session, rule_id=rule_id)
+    if rule is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="scoring rule not found",
+        )
+    before = _scoring_snapshot(rule)
+    org_id = rule.org_id
+    rule_uuid = rule.id
+    await session.delete(rule)
+    await session.commit()
+
+    scoring.invalidate_rule_field_cache(org_id)
+    await audit.log(
+        "leads.scoring_rule.deleted",
+        entity_type="lead_scoring_rule",
+        entity_id=rule_uuid,
+        before=before,
+    )
+
+
 __all__ = [
     "bulk_delete_leads",
     "bulk_reassign_leads",
     "create_lead",
+    "create_scoring_rule",
     "delete_lead",
+    "delete_scoring_rule",
     "get_lead",
+    "get_scoring_rule",
     "list_leads",
+    "list_leads_where",
+    "list_scoring_rules",
     "move_stage_for_lead",
     "reassign_lead",
     "update_lead",
+    "update_scoring_rule",
 ]

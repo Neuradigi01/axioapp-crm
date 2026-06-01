@@ -24,9 +24,12 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
+    Integer,
     Numeric,
     String,
     text,
@@ -103,6 +106,16 @@ class Lead(Base, TenantScoped):
     )
     budget: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     expected_close_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Operator-defined rule engine output, clamped to [0, 100]. Recomputed
+    # by `leads.scoring.recompute_lead` after every create/update that
+    # touches a rule-relevant field, and by the hourly Celery sweep when
+    # rules themselves change. Indexed `(org_id, lead_score DESC)` in
+    # migration 0070 for "hot leads first" sorting.
+    lead_score: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
     # Denormalised "newest activity timestamp" — bumped by the
     # activities-service insert hook. Mirrors `contacts.last_activity_at`.
     # Source of truth lives in the `activities` table.
@@ -129,6 +142,55 @@ class Lead(Base, TenantScoped):
     attribution: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB,
         nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=text("now()"),
+    )
+
+
+class LeadScoringRule(Base, TenantScoped):
+    """One operator-defined rule contributing to ``Lead.lead_score``.
+
+    ``condition`` is a Filter-DSL fragment (see
+    ``src.app.core.leads.filter_dsl``) evaluated in-memory per lead
+    by the scoring engine. Only lead-direct fields are allowed in the
+    condition — rules can't reference contact-joined fields because the
+    engine doesn't join. ``validate_scorable`` enforces this at the
+    rule-create/update API edge.
+
+    ``points`` is bounded to ``[-100, 100]`` (negative points let an
+    operator deduct for, e.g., "no_response" status). The aggregate
+    score is clamped to ``[0, 100]`` after summing matching rules.
+    """
+
+    __tablename__ = "lead_scoring_rules"
+    __table_args__ = (
+        CheckConstraint(
+            "points BETWEEN -100 AND 100",
+            name="ck_lead_scoring_rules_points_range",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    condition: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    points: Mapped[int] = mapped_column(Integer, nullable=False)
+    active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

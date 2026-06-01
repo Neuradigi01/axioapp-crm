@@ -118,6 +118,11 @@ class LeadOut(BaseModel):
     assigned_to_id: Optional[uuid.UUID]
     budget: Optional[Decimal]
     expected_close_date: Optional[date]
+    # Rule-engine output, ``[0, 100]``. Computed by
+    # ``src.app.core.leads.scoring`` after every create / update that
+    # touches a rule-relevant column. The hourly Celery sweep keeps the
+    # value fresh when rules themselves change.
+    lead_score: int = 0
     custom_data: dict[str, Any]
     attribution: Optional[dict[str, Any]]
     last_activity_at: Optional[datetime]
@@ -128,10 +133,23 @@ class LeadOut(BaseModel):
 
 
 class LeadListResponse(BaseModel):
+    """Paged leads response.
+
+    Two pagination modes coexist on the same endpoint:
+
+      - **Offset mode** (default, legacy callers): caller passes
+        ``page`` + ``size``; response carries ``total / page / size``.
+      - **Cursor mode** (Step 6 FE): caller passes ``cursor`` + ``limit``;
+        response carries ``next_cursor``. ``total`` is populated only
+        when the caller opts in with ``with_total=true`` because the
+        COUNT undoes the keyset performance win on large tables.
+    """
+
     items: list[LeadOut]
-    total: int
-    page: int
-    size: int
+    total: Optional[int] = None
+    page: int = 1
+    size: int = 50
+    next_cursor: Optional[str] = None
 
 
 # --- Reassign / bulk action request + response shapes -----------------------
@@ -164,3 +182,55 @@ class LeadBulkReassignResult(BaseModel):
 
 class LeadBulkDeleteResult(BaseModel):
     deleted: int
+
+
+# --- Scoring rule schemas ---------------------------------------------------
+
+
+class LeadScoringRuleCreate(BaseModel):
+    """Create a scoring rule.
+
+    ``condition`` is a filter-DSL fragment (see
+    ``src.app.core.leads.filter_dsl``). The service layer parses + runs
+    ``validate_scorable`` to reject conditions that would reference
+    contact-joined fields, which the in-memory engine can't evaluate.
+    """
+
+    name: str = Field(min_length=1, max_length=120)
+    condition: dict[str, Any]
+    points: int = Field(ge=-100, le=100)
+    active: bool = True
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class LeadScoringRuleUpdate(BaseModel):
+    """Partial update. All fields optional; same validation as create
+    applies whenever the field is supplied."""
+
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    condition: Optional[dict[str, Any]] = None
+    points: Optional[int] = Field(default=None, ge=-100, le=100)
+    active: Optional[bool] = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class LeadScoringRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    org_id: uuid.UUID
+    name: str
+    condition: dict[str, Any]
+    points: int
+    active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class LeadScoringRecomputeResult(BaseModel):
+    """Returned by ``POST /leads/scoring-rules/recompute``. ``touched``
+    is the number of leads whose ``lead_score`` changed."""
+
+    touched: int
