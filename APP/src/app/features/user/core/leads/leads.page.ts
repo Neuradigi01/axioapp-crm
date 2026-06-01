@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -23,8 +23,8 @@ import {
   PipelineItem,
 } from '../pipelines/pipelines-api.service';
 import { PipelineBoardComponent } from '../pipelines/pipeline-board.component';
-import { PipelineListComponent } from '../pipelines/pipeline-list.component';
 import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { ColumnDef, ColumnPrefsService } from '../shared/column-prefs.service';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
 import {
@@ -32,9 +32,13 @@ import {
   UrlFilterStateDirective,
 } from '../shared/directives/url-filter-state.directive';
 import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
+import { FieldDef } from '../shared/dynamic-form/types';
+import { clauseCount, FilterDsl } from '../shared/filter-dsl.types';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
+import { AdvancedFilterModalComponent } from './advanced-filter-modal.component';
+import { ColumnCustomizationMenuComponent } from './column-customization-menu.component';
 import { LeadCardComponent } from './lead-card.component';
 import { LeadFormModalComponent } from './lead-form-modal.component';
 import {
@@ -45,6 +49,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import {
   Lead,
   LeadCreate,
+  LeadListQuery,
   LeadSortKey,
   LeadStatus,
   LeadUpdate,
@@ -56,15 +61,18 @@ import {
  * Top-level Leads page.
  *
  * Tabs:
- *   - **Pipeline** â€” wraps `<app-pipeline-board pipelineKey="leads">`
+ *   - **Pipeline** — wraps `<app-pipeline-board pipelineKey="leads">`
  *     and feeds it the loaded leads. The lead-card template projects
  *     into each kanban card. `(itemMoved)` calls the move-stage
  *     endpoint; on error we revert the optimistic local mutation.
- *   - **List** â€” wraps `<app-pipeline-list>` for the same data with
- *     the same `itemMoved` semantics.
+ *   - **List** — wraps `<app-pipeline-list>` for the same data with
+ *     the same `itemMoved` semantics. List view layers on the Step 6
+ *     power-user kit: cursor pagination, column customization, advanced
+ *     filter modal, and CSV export. Pipeline view is intentionally
+ *     unpaginated (kanban is per-stage already).
  *
  * Contact info on each card comes from a one-shot
- * `forkJoin(contactsApi.get(id))` after the leads load â€” keeps the
+ * `forkJoin(contactsApi.get(id))` after the leads load — keeps the
  * card component dumb and avoids it issuing its own HTTP per render.
  */
 type View = 'pipeline' | 'list';
@@ -76,6 +84,24 @@ interface ContactSummary {
   source: string | null;
 }
 
+/** Default column layout for the list view. The customization menu
+ * persists per-user overrides in localStorage via `ColumnPrefsService`. */
+const DEFAULT_LEAD_COLUMNS: ColumnDef[] = [
+  { key: 'contact_name', label: 'Contact', visible: true },
+  { key: 'status', label: 'Status', visible: true },
+  { key: 'owner', label: 'Owner', visible: true },
+  { key: 'source', label: 'Source', visible: true },
+  { key: 'lead_score', label: 'Score', visible: true },
+  { key: 'last_activity_at', label: 'Last activity', visible: true },
+  { key: 'created_at', label: 'Created', visible: true },
+  { key: 'budget', label: 'Budget', visible: false },
+  { key: 'phone', label: 'Phone', visible: false },
+  { key: 'email', label: 'Email', visible: false },
+];
+
+/** Pagination sizes the footer dropdown offers. 200 is the server cap. */
+const PAGE_SIZES = [25, 50, 100, 200] as const;
+
 @Component({
   selector: 'app-leads-page',
   standalone: true,
@@ -85,7 +111,6 @@ interface ContactSummary {
     RouterLink,
     LucideAngularModule,
     PipelineBoardComponent,
-    PipelineListComponent,
     LeadCardComponent,
     LeadFormModalComponent,
     RelativeTimePipe,
@@ -96,6 +121,8 @@ interface ContactSummary {
     LostReasonModalComponent,
     PhoneLinkDirective,
     WhatsappLinkDirective,
+    ColumnCustomizationMenuComponent,
+    AdvancedFilterModalComponent,
   ],
   templateUrl: './leads.page.html',
 })
@@ -107,10 +134,16 @@ export class LeadsPageComponent {
   private readonly router = inject(Router);
   private readonly auth = inject(FurnitureAuthService);
   private readonly usersDir = inject(UsersDirectoryService);
+  private readonly columnPrefs = inject(ColumnPrefsService);
 
   /** Gates the "Import" header button; backend enforces too. */
   protected readonly canImport = computed(() =>
     this.auth.currentPermissions().includes('leads.import'),
+  );
+
+  /** Gates the "Export CSV" toolbar button; backend enforces too. */
+  protected readonly canExport = computed(() =>
+    this.auth.currentPermissions().includes('leads.export'),
   );
 
   readonly leads = signal<Lead[]>([]);
@@ -127,8 +160,8 @@ export class LeadsPageComponent {
   readonly statusControl = new FormControl<string>('', { nonNullable: true });
 
   /** Sort state — backend whitelist is created_at / last_activity_at /
-   * contact_name. Default newest-created first, matches the prior server
-   * default so existing users see no change. */
+   * lead_score / contact_name. Default newest-created first, matches
+   * the prior server default so existing users see no change. */
   readonly sortKey = signal<LeadSortKey>('created_at');
   readonly sortOrder = signal<SortOrder>('desc');
 
@@ -151,6 +184,69 @@ export class LeadsPageComponent {
     return map;
   });
 
+  // --- Step 6: pagination + columns + advanced filter ---------------------
+
+  /** Cursor-mode page size. List view only — pipeline view fetches
+   * size=200 (its kanban needs the union across stages and tops out
+   * at the same server cap). */
+  readonly pageSize = signal<number>(50);
+  protected readonly pageSizeOptions = PAGE_SIZES;
+
+  /** Current opaque cursor. `null` = first page. */
+  readonly cursor = signal<string | null>(null);
+
+  /** Cursor of the next page, or `null` when the set is exhausted. */
+  readonly nextCursor = signal<string | null>(null);
+
+  /** Back-stack of previously visited cursors so "Previous" can walk
+   * back. Each entry is the cursor that was active when the page was
+   * rendered; popping gives us the cursor to fetch. */
+  readonly cursorHistory = signal<(string | null)[]>([]);
+
+  /** Server-reported total. `null` on cursor-only pages (we only ask
+   * for it on the first page of a filter set). */
+  readonly totalCount = signal<number | null>(null);
+
+  /** 1-based page index, derived from `cursorHistory.length`. */
+  readonly currentPage = computed(() => this.cursorHistory().length + 1);
+
+  /** "Showing X–Y of N" — built from page index + page size + total. */
+  readonly pageRangeStart = computed(() => {
+    if (this.leads().length === 0) return 0;
+    return (this.currentPage() - 1) * this.pageSize() + 1;
+  });
+  readonly pageRangeEnd = computed(
+    () => this.pageRangeStart() + this.leads().length - 1,
+  );
+
+  /** Customized columns for the list-view table. */
+  readonly columns = signal<ColumnDef[]>(
+    this.columnPrefs.get('leads', DEFAULT_LEAD_COLUMNS),
+  );
+  protected readonly defaultColumns = DEFAULT_LEAD_COLUMNS;
+  readonly visibleColumns = computed(() =>
+    this.columns().filter((c) => c.visible),
+  );
+  protected isColumnVisible(key: string): boolean {
+    return this.visibleColumns().some((c) => c.key === key);
+  }
+
+  /** Advanced filter DSL — emitted by the modal on Apply. Empty
+   * object means no DSL clauses (convenience filters still apply). */
+  readonly advancedFilter = signal<FilterDsl>({});
+  readonly advancedFilterOpen = signal(false);
+  readonly advancedFilterCount = computed(() => clauseCount(this.advancedFilter()));
+
+  /** Custom field definitions for the org. Fetched once on mount to
+   * feed the advanced-filter modal's field picker. */
+  readonly customFields = signal<FieldDef[]>([]);
+
+  /** CSV export submit state. */
+  readonly exporting = signal(false);
+  readonly exportError = signal<string | null>(null);
+
+  // --- Existing state -----------------------------------------------------
+
   private readonly q = toSignal(
     this.searchControl.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
     { initialValue: '' },
@@ -170,8 +266,9 @@ export class LeadsPageComponent {
     return [...set].sort();
   });
 
-  /** "X total Â· Y new today" â€” header subtitle. */
-  readonly totalCount = computed(() => this.leads().length);
+  /** Header subtitle counts: `loadedCount` is what's on screen now,
+   * `totalCount` is server-reported for the active filter. */
+  readonly loadedCount = computed(() => this.leads().length);
   readonly newTodayCount = computed(() => {
     const todayKey = this.todayKey();
     return this.leads().filter(
@@ -230,7 +327,11 @@ export class LeadsPageComponent {
   readonly lostReasonError = signal<string | null>(null);
 
   /** URL ↔ state map for the filter chip strip + filter row + view +
-   * page. Refresh / share / browser-back all preserve the view. */
+   * page. Refresh / share / browser-back all preserve the view.
+   * Pagination cursor is intentionally NOT URL-persisted: the cursor
+   * is opaque and stale-prone (it encodes the sort-column value of
+   * the last row, so a row mutation invalidates the cursor). Filters,
+   * sort, scope, and view ARE persisted — that's the useful slice. */
   readonly urlState: UrlFilterStateConfig = {
     q: {
       read: () => this.searchControl.value,
@@ -265,6 +366,7 @@ export class LeadsPageComponent {
         if (
           v === 'created_at' ||
           v === 'last_activity_at' ||
+          v === 'lead_score' ||
           v === 'contact_name'
         ) {
           this.sortKey.set(v);
@@ -307,20 +409,21 @@ export class LeadsPageComponent {
 
   constructor() {
     this.reload();
+    this.loadCustomFields();
 
     // Filter changes trigger re-fetch.
     this.searchControl.valueChanges
       .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.reload());
+      .subscribe(() => this.resetCursorAndReload());
     this.sourceControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.reload());
+      .subscribe(() => this.resetCursorAndReload());
     this.assigneeControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.reload());
+      .subscribe(() => this.resetCursorAndReload());
     this.statusControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.reload());
+      .subscribe(() => this.resetCursorAndReload());
 
     // Whenever leads change, fetch any contacts we don't already have cached.
     effect(() => {
@@ -354,33 +457,170 @@ export class LeadsPageComponent {
     this.view.set(v);
   }
 
+  /** Build the query for the current page. List view uses cursor
+   * pagination + the advanced filter DSL; pipeline view skips both
+   * (it fetches the union across all stages at the server cap, the
+   * same way it did before Step 6). */
+  protected buildQuery(): LeadListQuery {
+    const base: LeadListQuery = {
+      q: this.q() || undefined,
+      source: this.sourceFilter() || undefined,
+      status: (this.statusControl.value as LeadStatus) || undefined,
+      assigned_to: this.resolveAssignee(),
+      last_activity_lt: this.resolveNoActivityCutoff() ?? undefined,
+      sort: this.sortKey(),
+      order: this.sortOrder(),
+    };
+    if (this.advancedFilterCount() > 0) {
+      base.filter = this.advancedFilter();
+    }
+    if (this.view() === 'list') {
+      base.limit = this.pageSize();
+      base.cursor = this.cursor();
+      // Only ask for the count on the first page so the COUNT(*) hit
+      // is amortised across the whole walk. The server returns `null`
+      // for `total` on subsequent pages.
+      base.with_total = this.cursorHistory().length === 0;
+    } else {
+      // Pipeline view: keep the existing one-shot bulk fetch.
+      base.size = 200;
+      base.with_total = true;
+    }
+    return base;
+  }
+
   protected reload(): void {
     this.loading.set(true);
     this.loadError.set(null);
     this.api
-      .list({
-        q: this.q() || undefined,
-        source: this.sourceFilter() || undefined,
-        status: (this.statusControl.value as LeadStatus) || undefined,
-        assigned_to: this.resolveAssignee(),
-        last_activity_lt: this.resolveNoActivityCutoff() ?? undefined,
-        sort: this.sortKey(),
-        order: this.sortOrder(),
-        size: 100,
-      })
+      .list(this.buildQuery())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
           this.leads.set(resp.items);
+          this.nextCursor.set(resp.next_cursor);
+          if (resp.total !== null && resp.total !== undefined) {
+            this.totalCount.set(resp.total);
+          }
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
           this.leads.set([]);
+          this.nextCursor.set(null);
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load leads.');
         },
       });
   }
+
+  /** Reset the cursor stack before re-issuing — any filter / sort
+   * change invalidates the keyset bounds. */
+  protected resetCursorAndReload(): void {
+    this.cursor.set(null);
+    this.cursorHistory.set([]);
+    this.totalCount.set(null);
+    this.reload();
+  }
+
+  // --- Step 6: pagination handlers ---------------------------------------
+
+  protected onNextPage(): void {
+    const next = this.nextCursor();
+    if (!next) return;
+    this.cursorHistory.update((stack) => [...stack, this.cursor()]);
+    this.cursor.set(next);
+    this.reload();
+  }
+
+  protected onPrevPage(): void {
+    const stack = this.cursorHistory();
+    if (stack.length === 0) return;
+    const prev = stack[stack.length - 1];
+    this.cursorHistory.set(stack.slice(0, -1));
+    this.cursor.set(prev);
+    this.reload();
+  }
+
+  protected onPageSizeChange(value: string): void {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return;
+    if (!PAGE_SIZES.includes(n as (typeof PAGE_SIZES)[number])) return;
+    this.pageSize.set(n);
+    this.resetCursorAndReload();
+  }
+
+  protected canGoNext = computed(() => this.nextCursor() !== null);
+  protected canGoPrev = computed(() => this.cursorHistory().length > 0);
+
+  // --- Step 6: column customization handlers -----------------------------
+
+  protected onColumnsChange(cols: ColumnDef[]): void {
+    this.columns.set(cols);
+    this.columnPrefs.set('leads', cols);
+  }
+
+  // --- Step 6: advanced filter handlers ----------------------------------
+
+  protected openAdvancedFilter(): void {
+    this.advancedFilterOpen.set(true);
+  }
+
+  protected closeAdvancedFilter(): void {
+    this.advancedFilterOpen.set(false);
+  }
+
+  protected onAdvancedFilterApply(dsl: FilterDsl): void {
+    this.advancedFilter.set(dsl);
+    this.advancedFilterOpen.set(false);
+    this.resetCursorAndReload();
+  }
+
+  // --- Step 6: CSV export ------------------------------------------------
+
+  protected onExportCsv(): void {
+    if (!this.canExport()) return;
+    this.exporting.set(true);
+    this.exportError.set(null);
+    this.api
+      .exportCsv(this.buildQuery())
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.exporting.set(false);
+          this.api.triggerDownload(blob, this.suggestedExportFilename());
+        },
+        error: (err: HttpErrorResponse) => {
+          this.exporting.set(false);
+          this.exportError.set(
+            extractApiError(err) ?? 'Could not export leads.',
+          );
+        },
+      });
+  }
+
+  /** UTC-dated default; the server's `Content-Disposition` overrides
+   * via the helper but only when the response is parsed — for blob
+   * downloads we set the filename ourselves. */
+  private suggestedExportFilename(): string {
+    const d = new Date();
+    const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    return `leads-${iso}.csv`;
+  }
+
+  private loadCustomFields(): void {
+    this.api
+      .renderFields()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (fields) => this.customFields.set(fields),
+        error: () => {
+          // Non-fatal — the modal just won't show custom-field options.
+          this.customFields.set([]);
+        },
+      });
+  }
+
+  // --- Existing handlers --------------------------------------------------
 
   /** Resolve the assignee filter to a value the backend understands.
    * `''` (no filter) → undefined. `'me'` → current user id. `'unassigned'`
@@ -413,7 +653,7 @@ export class LeadsPageComponent {
       this.sortKey.set(key);
       this.sortOrder.set(key === 'contact_name' ? 'asc' : 'desc');
     }
-    this.reload();
+    this.resetCursorAndReload();
   }
 
   protected setStatus(value: string): void {
@@ -423,13 +663,13 @@ export class LeadsPageComponent {
   protected setScope(value: string): void {
     if (value !== 'mine' && value !== 'team' && value !== 'all') return;
     this.scope.set(value);
-    this.reload();
+    this.resetCursorAndReload();
   }
 
   protected setNoActivity(value: string): void {
     if (value !== '' && value !== '7d' && value !== '14d' && value !== '30d') return;
     this.noActivityFilter.set(value);
-    this.reload();
+    this.resetCursorAndReload();
   }
 
   /** Parse a `<sort>:<order>` token from the sort dropdown and update both
@@ -440,6 +680,7 @@ export class LeadsPageComponent {
     if (
       key !== 'created_at' &&
       key !== 'last_activity_at' &&
+      key !== 'lead_score' &&
       key !== 'contact_name'
     ) {
       return;
@@ -447,7 +688,7 @@ export class LeadsPageComponent {
     if (order !== 'asc' && order !== 'desc') return;
     this.sortKey.set(key);
     this.sortOrder.set(order);
-    this.reload();
+    this.resetCursorAndReload();
   }
 
   /** Default visibility based on the user's role. Junior reps see only
@@ -484,6 +725,16 @@ export class LeadsPageComponent {
 
   protected statusLabel(s: LeadStatus): string {
     return s === 'active' ? 'Active' : s === 'won' ? 'Won' : 'Lost';
+  }
+
+  /** Color-band the score pill. 0–29 cold zinc, 30–59 warm amber,
+   * 60–89 hot orange, 90+ on-fire red. Matches the spec's intuition
+   * that warmer = closer to a sale. */
+  protected scoreClass(score: number): string {
+    if (score >= 90) return 'bg-red-100 text-red-800 ring-red-200';
+    if (score >= 60) return 'bg-orange-100 text-orange-800 ring-orange-200';
+    if (score >= 30) return 'bg-amber-100 text-amber-800 ring-amber-200';
+    return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
   }
 
   protected ownerLabel(assignedTo: string | null): string {
