@@ -56,6 +56,11 @@ import {
   LeadsApiService,
   SortOrder,
 } from './leads-api.service';
+import {
+  SavedView,
+  SavedViewConfig,
+  SavedViewsApiService,
+} from './saved-views-api.service';
 
 /**
  * Top-level Leads page.
@@ -135,6 +140,7 @@ export class LeadsPageComponent {
   private readonly auth = inject(FurnitureAuthService);
   private readonly usersDir = inject(UsersDirectoryService);
   private readonly columnPrefs = inject(ColumnPrefsService);
+  private readonly savedViewsApi = inject(SavedViewsApiService);
 
   /** Gates the "Import" header button; backend enforces too. */
   protected readonly canImport = computed(() =>
@@ -244,6 +250,53 @@ export class LeadsPageComponent {
   /** CSV export submit state. */
   readonly exporting = signal(false);
   readonly exportError = signal<string | null>(null);
+
+  // --- Step 7: saved views ------------------------------------------------
+
+  /** All views the current user can see for `entity='leads'` — owned
+   * first, then shared. Backend already sorts; we re-bucket for the
+   * popover. Refreshed via `reloadSavedViews()` after any mutation. */
+  readonly savedViews = signal<SavedView[]>([]);
+
+  /** Currently applied view id, or `null` when the user is on the
+   * default (unsaved) page state. Set by `applyView`; cleared whenever
+   * the user changes a filter/sort/scope/column manually. */
+  readonly currentViewId = signal<string | null>(null);
+
+  /** Resolved view object — `null` when no view is active. */
+  readonly currentView = computed<SavedView | null>(() => {
+    const id = this.currentViewId();
+    if (!id) return null;
+    return this.savedViews().find((v) => v.id === id) ?? null;
+  });
+
+  /** Display name in the toolbar trigger. */
+  readonly currentViewName = computed<string | null>(
+    () => this.currentView()?.name ?? null,
+  );
+
+  /** True when the active view belongs to the current user (gates the
+   * "Update / Delete this view" affordances). Shared views applied by
+   * non-owners are read-only. */
+  readonly isCurrentViewOwner = computed(() => {
+    const view = this.currentView();
+    if (!view) return false;
+    return view.owner_user_id === this.auth.currentUserId();
+  });
+
+  /** Popover open/closed. */
+  readonly viewsMenuOpen = signal(false);
+
+  /** Mini "Save view" modal state. `null` = closed. */
+  readonly saveViewModalOpen = signal(false);
+  readonly saveViewName = signal('');
+  readonly saveViewShared = signal(false);
+  readonly saveViewSubmitting = signal(false);
+  readonly saveViewError = signal<string | null>(null);
+
+  /** Delete-view confirm dialog visibility. */
+  readonly deleteViewConfirmOpen = signal(false);
+  readonly deleteViewSubmitting = signal(false);
 
   // --- Existing state -----------------------------------------------------
 
@@ -410,6 +463,7 @@ export class LeadsPageComponent {
   constructor() {
     this.reload();
     this.loadCustomFields();
+    this.reloadSavedViews();
 
     // Filter changes trigger re-fetch.
     this.searchControl.valueChanges
@@ -616,6 +670,228 @@ export class LeadsPageComponent {
         error: () => {
           // Non-fatal — the modal just won't show custom-field options.
           this.customFields.set([]);
+        },
+      });
+  }
+
+  // --- Step 7: saved views ------------------------------------------------
+
+  private reloadSavedViews(): void {
+    this.savedViewsApi
+      .list('leads')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (views) => this.savedViews.set(views),
+        error: () => this.savedViews.set([]),
+      });
+  }
+
+  /** Snapshot the current page state into a `SavedViewConfig`. The
+   * leads page is the only consumer right now so this is inline; when
+   * walk-ins / contacts wire up saved views, lift to a strategy on the
+   * API service. */
+  private buildCurrentConfig(): SavedViewConfig {
+    return {
+      filter: this.advancedFilterCount() > 0 ? this.advancedFilter() : undefined,
+      sort: this.sortKey(),
+      order: this.sortOrder(),
+      scope: this.scope(),
+      columns: this.columns(),
+      view: this.view(),
+    };
+  }
+
+  protected toggleViewsMenu(): void {
+    this.viewsMenuOpen.update((v) => !v);
+  }
+
+  protected closeViewsMenu(): void {
+    this.viewsMenuOpen.set(false);
+  }
+
+  /** Restore every saved slice of state. Missing keys keep the current
+   * value — that lets the menu apply a "partial" view (e.g. "just sort
+   * by score, leave my columns alone") without re-spec'ing the UI. */
+  protected applyView(view: SavedView): void {
+    const cfg = view.config ?? {};
+    if (cfg.filter && Object.keys(cfg.filter).length > 0) {
+      this.advancedFilter.set(cfg.filter);
+    } else {
+      this.advancedFilter.set({});
+    }
+    if (cfg.sort) {
+      const k = cfg.sort;
+      if (
+        k === 'created_at' ||
+        k === 'last_activity_at' ||
+        k === 'lead_score' ||
+        k === 'contact_name'
+      ) {
+        this.sortKey.set(k);
+      }
+    }
+    if (cfg.order === 'asc' || cfg.order === 'desc') {
+      this.sortOrder.set(cfg.order);
+    }
+    if (cfg.scope === 'mine' || cfg.scope === 'team' || cfg.scope === 'all') {
+      this.scope.set(cfg.scope);
+    }
+    if (cfg.columns && cfg.columns.length > 0) {
+      this.columns.set(cfg.columns);
+      this.columnPrefs.set('leads', cfg.columns);
+    }
+    if (cfg.view === 'list' || cfg.view === 'pipeline') {
+      this.view.set(cfg.view);
+    }
+    this.currentViewId.set(view.id);
+    this.viewsMenuOpen.set(false);
+    this.cursor.set(null);
+    this.cursorHistory.set([]);
+    this.totalCount.set(null);
+    this.reload();
+  }
+
+  protected openSaveViewModal(): void {
+    this.saveViewName.set(this.currentView()?.name ?? '');
+    this.saveViewShared.set(this.currentView()?.shared ?? false);
+    this.saveViewError.set(null);
+    this.saveViewModalOpen.set(true);
+    this.viewsMenuOpen.set(false);
+  }
+
+  protected closeSaveViewModal(): void {
+    this.saveViewModalOpen.set(false);
+    this.saveViewSubmitting.set(false);
+    this.saveViewError.set(null);
+  }
+
+  protected onSaveViewNameInput(value: string): void {
+    this.saveViewName.set(value);
+  }
+
+  protected onSaveViewSharedChange(value: boolean): void {
+    this.saveViewShared.set(value);
+  }
+
+  protected submitSaveView(): void {
+    const name = this.saveViewName().trim();
+    if (!name) {
+      this.saveViewError.set('Please enter a name for this view.');
+      return;
+    }
+    this.saveViewSubmitting.set(true);
+    this.saveViewError.set(null);
+    this.savedViewsApi
+      .create({
+        entity: 'leads',
+        name,
+        config: this.buildCurrentConfig(),
+        shared: this.saveViewShared(),
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (view) => {
+          this.savedViews.update((rows) => [...rows, view]);
+          this.currentViewId.set(view.id);
+          this.closeSaveViewModal();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.saveViewSubmitting.set(false);
+          // The backend returns 409 with `detail` set when the unique
+          // (owner, entity, name) constraint trips. Surface the original
+          // detail so the user can rename.
+          if (err.status === 409) {
+            this.saveViewError.set(
+              extractApiError(err) ?? 'You already have a view by that name.',
+            );
+          } else {
+            this.saveViewError.set(
+              extractApiError(err) ?? 'Could not save view.',
+            );
+          }
+        },
+      });
+  }
+
+  /** Overwrite the active view with the current page state. Only callable
+   * when the caller owns the active view (the button is gated). */
+  protected updateCurrentView(): void {
+    const view = this.currentView();
+    if (!view || !this.isCurrentViewOwner()) return;
+    this.savedViewsApi
+      .update(view.id, {
+        config: this.buildCurrentConfig(),
+        shared: view.shared,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.savedViews.update((rows) =>
+            rows.map((r) => (r.id === updated.id ? updated : r)),
+          );
+          this.viewsMenuOpen.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loadError.set(
+            extractApiError(err) ?? 'Could not update view.',
+          );
+        },
+      });
+  }
+
+  /** Toggle the active view's `shared` flag without rewriting its
+   * config. Bound from the popover's "Share with team" inline switch. */
+  protected toggleCurrentViewShared(): void {
+    const view = this.currentView();
+    if (!view || !this.isCurrentViewOwner()) return;
+    this.savedViewsApi
+      .update(view.id, { shared: !view.shared })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.savedViews.update((rows) =>
+            rows.map((r) => (r.id === updated.id ? updated : r)),
+          );
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loadError.set(
+            extractApiError(err) ?? 'Could not change sharing.',
+          );
+        },
+      });
+  }
+
+  protected openDeleteViewConfirm(): void {
+    if (!this.isCurrentViewOwner()) return;
+    this.deleteViewConfirmOpen.set(true);
+    this.viewsMenuOpen.set(false);
+  }
+
+  protected closeDeleteViewConfirm(): void {
+    this.deleteViewConfirmOpen.set(false);
+    this.deleteViewSubmitting.set(false);
+  }
+
+  protected confirmDeleteView(): void {
+    const view = this.currentView();
+    if (!view || !this.isCurrentViewOwner()) return;
+    this.deleteViewSubmitting.set(true);
+    this.savedViewsApi
+      .delete(view.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.savedViews.update((rows) =>
+            rows.filter((r) => r.id !== view.id),
+          );
+          this.currentViewId.set(null);
+          this.closeDeleteViewConfirm();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.deleteViewSubmitting.set(false);
+          this.loadError.set(
+            extractApiError(err) ?? 'Could not delete view.',
+          );
         },
       });
   }

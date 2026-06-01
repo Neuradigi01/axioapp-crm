@@ -70,6 +70,14 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        path: 'settings/lead-scoring',
+        canActivate: [permissionGuard('leads.scoring.manage')],
+        loadComponent: () =>
+          import('./core/settings/lead-scoring-rules.page').then(
+            (m) => m.LeadScoringRulesPage,
+          ),
+      },
+      {
         path: 'profile',
         loadComponent: () =>
           import('./core/profile/profile-page.component').then(

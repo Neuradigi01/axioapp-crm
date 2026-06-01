@@ -54,6 +54,7 @@ _CORE_ADMIN_KEYS: list[str] = [
     "settings.integrations.embed.manage",
     "contacts.read", "contacts.write", "contacts.reassign",
     "leads.read", "leads.write", "leads.import", "leads.reassign",
+    "leads.export",
     "appointments.read", "appointments.write", "appointments.reassign",
     "walkins.read", "walkins.write", "walkins.reassign",
     "walk_ins.read", "walk_ins.write",
@@ -68,13 +69,17 @@ _CORE_ADMIN_KEYS: list[str] = [
     "staff.read", "staff.write",
     "attendance.write",
     "billing.read", "billing.write",
+    "saved_views.use",
 ]
 
 
 # Owner = Admin + the few keys only the workspace owner should hold.
 # Curated (not ALL_KEYS) so pack-specific permissions don't leak into
 # the sidebar of a `pack_id='core'` org.
-_CORE_OWNER_KEYS: list[str] = _CORE_ADMIN_KEYS + ["billing.refund"]
+_CORE_OWNER_KEYS: list[str] = _CORE_ADMIN_KEYS + [
+    "billing.refund",
+    "leads.scoring.manage",
+]
 
 
 _CORE_EMPLOYEE_KEYS: list[str] = [
@@ -89,6 +94,7 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     "conversations.read", "conversations.write",
     "calls.read", "calls.write",
     "pipelines.read",
+    "saved_views.use",
 ]
 
 
@@ -99,7 +105,7 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
 # pipeline shape or billing.
 _CORE_SALES_MANAGER_KEYS: list[str] = [
     "contacts.read", "contacts.write", "contacts.reassign",
-    "leads.read", "leads.write", "leads.reassign",
+    "leads.read", "leads.write", "leads.reassign", "leads.export",
     "appointments.read", "appointments.write", "appointments.reassign",
     "walkins.read", "walkins.write", "walkins.reassign",
     "walk_ins.read", "walk_ins.write",
@@ -112,6 +118,7 @@ _CORE_SALES_MANAGER_KEYS: list[str] = [
     "catalog.read",
     "staff.read",
     "users.read",
+    "saved_views.use",
 ]
 
 
@@ -126,6 +133,7 @@ _CORE_SUPPORT_AGENT_KEYS: list[str] = [
     "walkins.read",
     "walk_ins.read",
     "leads.read",
+    "saved_views.use",
 ]
 
 

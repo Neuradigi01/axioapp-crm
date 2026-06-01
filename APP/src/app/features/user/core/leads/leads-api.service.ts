@@ -83,6 +83,38 @@ export type LeadUpdate = Partial<{
   lost_reason_other: string | null;
 }>;
 
+// --- Lead scoring rules (Step 7 admin UI) ---------------------------------
+
+/** A single scoring rule. `condition` is the same shape as the leads
+ * filter DSL (an `all`/`any` group of clauses) — the backend's scoring
+ * engine evaluates it against each lead row at write time and on
+ * recompute. Points are bounded `[-100, 100]`; the engine clamps the
+ * final score to `[0, 100]` after summing active matches. */
+export interface LeadScoringRule {
+  id: string;
+  org_id: string;
+  name: string;
+  condition: FilterDsl;
+  points: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeadScoringRuleCreate {
+  name: string;
+  condition: FilterDsl;
+  points: number;
+  active?: boolean;
+}
+
+export type LeadScoringRuleUpdate = Partial<{
+  name: string;
+  condition: FilterDsl;
+  points: number;
+  active: boolean;
+}>;
+
 export interface LeadListQuery {
   stage?: string;
   status?: LeadStatus;
@@ -224,6 +256,37 @@ export class LeadsApiService {
   /** Field defs for `entity_type='lead'` — feeds the dynamic form. */
   renderFields(): Observable<FieldDef[]> {
     return this.http.get<FieldDef[]>(this.renderUrl);
+  }
+
+  // --- Lead scoring rules (Step 7 admin UI) ------------------------------
+
+  listScoringRules(): Observable<LeadScoringRule[]> {
+    return this.http.get<LeadScoringRule[]>(`${this.base}/scoring-rules`);
+  }
+
+  createScoringRule(payload: LeadScoringRuleCreate): Observable<LeadScoringRule> {
+    return this.http.post<LeadScoringRule>(`${this.base}/scoring-rules`, payload);
+  }
+
+  updateScoringRule(
+    id: string,
+    payload: LeadScoringRuleUpdate,
+  ): Observable<LeadScoringRule> {
+    return this.http.patch<LeadScoringRule>(
+      `${this.base}/scoring-rules/${id}`,
+      payload,
+    );
+  }
+
+  deleteScoringRule(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/scoring-rules/${id}`);
+  }
+
+  recomputeScores(): Observable<{ touched: number }> {
+    return this.http.post<{ touched: number }>(
+      `${this.base}/scoring-rules/recompute`,
+      {},
+    );
   }
 
   private buildParams(query: LeadListQuery): HttpParams {
