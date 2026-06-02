@@ -15,6 +15,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from src.app.shared.schemas import PaginatedResponse
+
 
 _TAG_MAX = 64
 _TAG_COUNT_MAX = 32
@@ -95,11 +97,7 @@ class ContactListItem(BaseModel):
     created_at: datetime
 
 
-class ContactListResponse(BaseModel):
-    items: list[ContactListItem]
-    total: int
-    page: int
-    size: int
+ContactListResponse = PaginatedResponse[ContactListItem]
 
 
 # --- Reassign / bulk-action request and response shapes ---------------------

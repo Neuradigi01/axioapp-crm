@@ -19,6 +19,8 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from config import API_BASE_URL
 
+from src.app.shared.schemas import PaginatedResponse
+
 
 # Mirrors the SQLAlchemy `IntegrationProvider` / `IntegrationStatus`
 # enums as Literals so schema consumers don't have to import the ORM.
@@ -160,14 +162,7 @@ class IntegrationDLQRead(BaseModel):
     replayed_by: Optional[uuid.UUID]
 
 
-class IntegrationDLQListResponse(BaseModel):
-    """Paginated DLQ list. Tight envelope so the Settings page can
-    render counts + "load more" without a separate count call."""
-
-    items: list[IntegrationDLQRead]
-    total: int
-    page: int
-    size: int
+IntegrationDLQListResponse = PaginatedResponse[IntegrationDLQRead]
 
 
 class SubscriptionMappingUpdate(BaseModel):

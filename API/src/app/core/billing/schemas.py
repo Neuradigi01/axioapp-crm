@@ -9,6 +9,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.billing.models import InvoiceStatus, PaymentMethod
+from src.app.shared.schemas import PaginatedResponse
 
 
 # --- Invoices -------------------------------------------------------------
@@ -78,11 +79,7 @@ class InvoiceWithLines(InvoiceOut):
     lines: list[InvoiceLineOut] = Field(default_factory=list)
 
 
-class InvoiceListResponse(BaseModel):
-    items: list[InvoiceOut]
-    total: int
-    page: int
-    size: int
+InvoiceListResponse = PaginatedResponse[InvoiceOut]
 
 
 # --- Issuance + payments -------------------------------------------------

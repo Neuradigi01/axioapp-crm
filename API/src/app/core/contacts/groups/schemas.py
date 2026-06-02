@@ -12,6 +12,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from src.app.shared.schemas import PaginatedResponse
+
 
 class GroupFilter(BaseModel):
     """Filter predicates for a dynamic group — same `q/source/tag`
@@ -113,11 +115,7 @@ class GroupDetail(GroupRead):
     sample_contact_ids: list[uuid.UUID] = Field(default_factory=list)
 
 
-class GroupListResponse(BaseModel):
-    items: list[GroupRead]
-    total: int
-    page: int
-    size: int
+GroupListResponse = PaginatedResponse[GroupRead]
 
 
 class PreviewSizeIn(BaseModel):

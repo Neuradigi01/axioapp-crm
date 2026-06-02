@@ -8,6 +8,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.calls.models import CallDirection
+from src.app.shared.schemas import PaginatedResponse
 
 
 # --- Outcomes (config) ----------------------------------------------------
@@ -80,11 +81,7 @@ class CallOut(BaseModel):
     created_at: datetime
 
 
-class CallListResponse(BaseModel):
-    items: list[CallOut]
-    total: int
-    page: int
-    size: int
+CallListResponse = PaginatedResponse[CallOut]
 
 
 # --- Transcript -----------------------------------------------------------

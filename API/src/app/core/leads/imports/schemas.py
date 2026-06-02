@@ -19,6 +19,8 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.app.shared.schemas import PaginatedResponse
+
 from src.app.core.leads.imports.models import LeadImportStatus
 
 
@@ -53,11 +55,7 @@ class LeadImportRead(BaseModel):
     updated_at: datetime
 
 
-class LeadImportListResponse(BaseModel):
-    items: list[LeadImportRead]
-    total: int
-    page: int
-    size: int
+LeadImportListResponse = PaginatedResponse[LeadImportRead]
 
 
 class LeadImportCommit(BaseModel):

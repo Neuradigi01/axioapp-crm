@@ -15,6 +15,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.app.core.activities.models import ActivityType
+from src.app.shared.schemas import PaginatedResponse
 
 
 _ENTITY_TYPE_MIN = 1
@@ -64,8 +65,4 @@ class ActivityOut(BaseModel):
     created_at: datetime
 
 
-class ActivityListResponse(BaseModel):
-    items: list[ActivityOut]
-    total: int
-    page: int
-    size: int
+ActivityListResponse = PaginatedResponse[ActivityOut]

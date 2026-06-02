@@ -8,6 +8,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.reviews.models import ReviewStatus
+from src.app.shared.schemas import PaginatedResponse
 
 
 class ReviewCreate(BaseModel):
@@ -54,11 +55,7 @@ class ReviewOut(BaseModel):
     created_at: datetime
 
 
-class ReviewListResponse(BaseModel):
-    items: list[ReviewOut]
-    total: int
-    page: int
-    size: int
+ReviewListResponse = PaginatedResponse[ReviewOut]
 
 
 class RatingDistributionRow(BaseModel):

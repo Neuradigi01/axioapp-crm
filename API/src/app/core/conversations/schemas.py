@@ -17,6 +17,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.app.shared.schemas import PaginatedResponse
 from src.app.core.conversations.models import (
     ConversationChannel,
     ConversationStatus,
@@ -51,11 +52,7 @@ class ConversationOut(BaseModel):
     created_at: datetime
 
 
-class ConversationListResponse(BaseModel):
-    items: list[ConversationOut]
-    total: int
-    page: int
-    size: int
+ConversationListResponse = PaginatedResponse[ConversationOut]
 
 
 class MessageOut(BaseModel):

@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.app.core.campaigns.models import CampaignMessageStatus, CampaignStatus
 from src.app.core.conversations.models import ConversationChannel
+from src.app.shared.schemas import PaginatedResponse
 
 
 class AudienceFilter(BaseModel):
@@ -111,11 +112,7 @@ class CampaignOut(BaseModel):
     created_at: datetime
 
 
-class CampaignListResponse(BaseModel):
-    items: list[CampaignOut]
-    total: int
-    page: int
-    size: int
+CampaignListResponse = PaginatedResponse[CampaignOut]
 
 
 class CampaignMessageOut(BaseModel):

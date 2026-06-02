@@ -14,6 +14,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from src.app.shared.schemas import PaginatedResponse
+
 
 _SKU_MAX = 64
 _NAME_MAX = 255
@@ -78,8 +80,4 @@ class CatalogItemOut(BaseModel):
     updated_at: datetime
 
 
-class CatalogListResponse(BaseModel):
-    items: list[CatalogItemOut]
-    total: int
-    page: int
-    size: int
+CatalogListResponse = PaginatedResponse[CatalogItemOut]

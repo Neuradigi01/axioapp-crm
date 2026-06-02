@@ -14,6 +14,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.app.core.tasks.models import TaskPriority, TaskStatus
+from src.app.shared.schemas import PaginatedResponse
 
 
 class TaskCreate(BaseModel):
@@ -68,11 +69,7 @@ class TaskOut(BaseModel):
     updated_at: datetime
 
 
-class TaskListResponse(BaseModel):
-    items: list[TaskOut]
-    total: int
-    page: int
-    size: int
+TaskListResponse = PaginatedResponse[TaskOut]
 
 
 # --- Bulk action shapes -----------------------------------------------------
