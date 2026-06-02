@@ -22,91 +22,14 @@ parses these 422 details directly) keeps working:
 
 from __future__ import annotations
 
-from datetime import date, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.custom_fields.models import CustomFieldDefinition, FieldType
-
-
-def _coerce_value(field_type: FieldType, key: str, value: Any) -> Any:
-    """Validate / coerce a single ``custom_data`` value. Raises 422 on mismatch."""
-    if value is None:
-        return None
-
-    if field_type in (FieldType.text, FieldType.phone, FieldType.email, FieldType.select):
-        if not isinstance(value, str):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected string",
-            )
-        return value
-
-    if field_type is FieldType.multiselect:
-        if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected list of strings",
-            )
-        return value
-
-    if field_type in (FieldType.number, FieldType.currency):
-        # `bool` is a subclass of `int` in Python — reject it explicitly so
-        # `True` doesn't sneak past a number check.
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected number",
-            )
-        return value
-
-    if field_type is FieldType.boolean:
-        if not isinstance(value, bool):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected boolean",
-            )
-        return value
-
-    if field_type is FieldType.date:
-        if not isinstance(value, str):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected ISO date string",
-            )
-        try:
-            date.fromisoformat(value)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: invalid ISO date",
-            ) from exc
-        return value
-
-    if field_type is FieldType.datetime:
-        if not isinstance(value, str):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected ISO datetime string",
-            )
-        try:
-            datetime.fromisoformat(value)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: invalid ISO datetime",
-            ) from exc
-        return value
-
-    # `FieldType` is an exhaustive enum; reaching here means a new type
-    # was added without extending this switch. Fail loudly.
-    raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=f"unhandled field_type {field_type!r}",
-    )
+from src.app.core.custom_fields.models import CustomFieldDefinition
+from src.app.shared.custom_fields.coercion import coerce_value
 
 
 async def _load_field_defs(
@@ -148,7 +71,7 @@ async def validate_custom_data(
 
     cleaned: dict[str, Any] = {}
     for key, value in payload.items():
-        cleaned[key] = _coerce_value(defs[key].field_type, key, value)
+        cleaned[key] = coerce_value(defs[key].field_type, key, value)
 
     if require_all_required:
         missing = [
