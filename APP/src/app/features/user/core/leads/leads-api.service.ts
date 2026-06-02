@@ -1,10 +1,10 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { FieldDef } from '../shared/dynamic-form/types';
 import { FilterDsl, isEmptyFilter } from '../shared/filter-dsl.types';
+import { BaseCrudApiService } from '../shared/services/base-crud-api.service';
 import { buildHttpParams, prefixCustomFilters } from '../shared/services/query-builder';
 
 export type LeadStatus = 'active' | 'won' | 'lost';
@@ -149,9 +149,12 @@ export interface LeadListQuery {
 }
 
 @Injectable({ providedIn: 'root' })
-export class LeadsApiService {
-  private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiBaseUrl}/leads`;
+export class LeadsApiService extends BaseCrudApiService<
+  Lead,
+  LeadCreate,
+  LeadUpdate
+> {
+  protected readonly base = `${environment.apiBaseUrl}/leads`;
   private readonly renderUrl = `${environment.apiBaseUrl}/custom-fields/lead/render`;
 
   list(query: LeadListQuery = {}): Observable<LeadListResponse> {
@@ -196,22 +199,6 @@ export class LeadsApiService {
     // before the URL becomes invalid. 0ms via setTimeout puts it after
     // the current microtask, which is enough.
     setTimeout(() => URL.revokeObjectURL(url), 0);
-  }
-
-  get(id: string): Observable<Lead> {
-    return this.http.get<Lead>(`${this.base}/${id}`);
-  }
-
-  create(payload: LeadCreate): Observable<Lead> {
-    return this.http.post<Lead>(this.base, payload);
-  }
-
-  update(id: string, payload: LeadUpdate): Observable<Lead> {
-    return this.http.patch<Lead>(`${this.base}/${id}`, payload);
-  }
-
-  delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${id}`);
   }
 
   moveStage(

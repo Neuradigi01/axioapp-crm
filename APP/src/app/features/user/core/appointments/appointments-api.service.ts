@@ -1,8 +1,8 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { BaseCrudApiService } from '../shared/services/base-crud-api.service';
 import { buildHttpParams } from '../shared/services/query-builder';
 
 export type AppointmentStatus =
@@ -75,9 +75,12 @@ export interface AppointmentListQuery {
 }
 
 @Injectable({ providedIn: 'root' })
-export class AppointmentsApiService {
-  private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiBaseUrl}/appointments`;
+export class AppointmentsApiService extends BaseCrudApiService<
+  Appointment,
+  AppointmentCreate,
+  AppointmentUpdate
+> {
+  protected readonly base = `${environment.apiBaseUrl}/appointments`;
 
   /** Listing — works for both calendar (passes from/to) and list view
    * (omits from/to, applies sort/order/status/assignee). */
@@ -91,22 +94,6 @@ export class AppointmentsApiService {
       order: query.order,
     });
     return this.http.get<Appointment[]>(this.base, { params });
-  }
-
-  get(id: string): Observable<Appointment> {
-    return this.http.get<Appointment>(`${this.base}/${id}`);
-  }
-
-  create(payload: AppointmentCreate): Observable<Appointment> {
-    return this.http.post<Appointment>(this.base, payload);
-  }
-
-  update(id: string, payload: AppointmentUpdate): Observable<Appointment> {
-    return this.http.patch<Appointment>(`${this.base}/${id}`, payload);
-  }
-
-  delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${id}`);
   }
 
   /** Shift an appointment's slot without going through the full edit

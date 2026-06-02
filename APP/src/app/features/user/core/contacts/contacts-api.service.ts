@@ -1,9 +1,9 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { FieldDef } from '../shared/dynamic-form/types';
+import { BaseCrudApiService } from '../shared/services/base-crud-api.service';
 import { buildHttpParams, prefixCustomFilters } from '../shared/services/query-builder';
 
 /**
@@ -139,9 +139,12 @@ export interface ContactImportCommitOut {
 }
 
 @Injectable({ providedIn: 'root' })
-export class ContactsApiService {
-  private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiBaseUrl}/contacts`;
+export class ContactsApiService extends BaseCrudApiService<
+  Contact,
+  ContactCreate,
+  ContactUpdate
+> {
+  protected readonly base = `${environment.apiBaseUrl}/contacts`;
   private readonly renderUrl = `${environment.apiBaseUrl}/custom-fields/contact/render`;
 
   list(query: ContactListQuery = {}): Observable<ContactListResponse> {
@@ -157,22 +160,6 @@ export class ContactsApiService {
       ...prefixCustomFilters(query.customFilters),
     });
     return this.http.get<ContactListResponse>(this.base, { params });
-  }
-
-  get(id: string): Observable<Contact> {
-    return this.http.get<Contact>(`${this.base}/${id}`);
-  }
-
-  create(payload: ContactCreate): Observable<Contact> {
-    return this.http.post<Contact>(this.base, payload);
-  }
-
-  update(id: string, payload: ContactUpdate): Observable<Contact> {
-    return this.http.patch<Contact>(`${this.base}/${id}`, payload);
-  }
-
-  delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${id}`);
   }
 
   /** Single-row reassign. `userId === null` clears the owner. */

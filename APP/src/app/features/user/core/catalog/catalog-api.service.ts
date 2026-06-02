@@ -1,8 +1,8 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { BaseCrudApiService } from '../shared/services/base-crud-api.service';
 import { buildHttpParams } from '../shared/services/query-builder';
 
 export interface CatalogItem {
@@ -54,9 +54,12 @@ export interface CatalogListQuery {
 }
 
 @Injectable({ providedIn: 'root' })
-export class CatalogApiService {
-  private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiBaseUrl}/catalog`;
+export class CatalogApiService extends BaseCrudApiService<
+  CatalogItem,
+  CatalogItemCreate,
+  CatalogItemUpdate
+> {
+  protected readonly base = `${environment.apiBaseUrl}/catalog`;
 
   list(query: CatalogListQuery = {}): Observable<CatalogListResponse> {
     const params = buildHttpParams({
@@ -67,21 +70,5 @@ export class CatalogApiService {
       size: query.size,
     });
     return this.http.get<CatalogListResponse>(this.base, { params });
-  }
-
-  get(id: string): Observable<CatalogItem> {
-    return this.http.get<CatalogItem>(`${this.base}/${id}`);
-  }
-
-  create(payload: CatalogItemCreate): Observable<CatalogItem> {
-    return this.http.post<CatalogItem>(this.base, payload);
-  }
-
-  update(id: string, payload: CatalogItemUpdate): Observable<CatalogItem> {
-    return this.http.patch<CatalogItem>(`${this.base}/${id}`, payload);
-  }
-
-  delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${id}`);
   }
 }

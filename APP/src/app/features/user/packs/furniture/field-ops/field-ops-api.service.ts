@@ -1,9 +1,9 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
 import { AppointmentCreate } from '../../../core/appointments/appointments-api.service';
+import { BaseCrudApiService } from '../../../core/shared/services/base-crud-api.service';
 import { buildHttpParams } from '../../../core/shared/services/query-builder';
 
 export type FieldVisitPurpose = 'measurement' | 'installation' | 'inspection';
@@ -80,9 +80,12 @@ export interface FieldVisitListQuery {
 }
 
 @Injectable({ providedIn: 'root' })
-export class FieldOpsApiService {
-  private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiBaseUrl}/field-visits`;
+export class FieldOpsApiService extends BaseCrudApiService<
+  FieldVisit,
+  FieldVisitCreate,
+  FieldVisitUpdate
+> {
+  protected readonly base = `${environment.apiBaseUrl}/field-visits`;
 
   list(query: FieldVisitListQuery = {}): Observable<FieldVisitListResponse> {
     const params = buildHttpParams({
@@ -94,22 +97,6 @@ export class FieldOpsApiService {
       size: query.size,
     });
     return this.http.get<FieldVisitListResponse>(this.base, { params });
-  }
-
-  get(id: string): Observable<FieldVisit> {
-    return this.http.get<FieldVisit>(`${this.base}/${id}`);
-  }
-
-  create(payload: FieldVisitCreate): Observable<FieldVisit> {
-    return this.http.post<FieldVisit>(this.base, payload);
-  }
-
-  update(id: string, payload: FieldVisitUpdate): Observable<FieldVisit> {
-    return this.http.patch<FieldVisit>(`${this.base}/${id}`, payload);
-  }
-
-  delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${id}`);
   }
 
   complete(

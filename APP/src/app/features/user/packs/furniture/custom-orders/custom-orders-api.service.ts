@@ -1,8 +1,8 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
+import { BaseCrudApiService } from '../../../core/shared/services/base-crud-api.service';
 import { buildHttpParams } from '../../../core/shared/services/query-builder';
 
 export interface CustomOrder {
@@ -100,9 +100,12 @@ export interface StageHistoryEntry {
 }
 
 @Injectable({ providedIn: 'root' })
-export class CustomOrdersApiService {
-  private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiBaseUrl}/custom-orders`;
+export class CustomOrdersApiService extends BaseCrudApiService<
+  CustomOrder,
+  CustomOrderCreate,
+  CustomOrderUpdate
+> {
+  protected readonly base = `${environment.apiBaseUrl}/custom-orders`;
 
   list(query: CustomOrderListQuery = {}): Observable<CustomOrderListResponse> {
     const params = buildHttpParams({
@@ -113,22 +116,6 @@ export class CustomOrdersApiService {
       size: query.size,
     });
     return this.http.get<CustomOrderListResponse>(this.base, { params });
-  }
-
-  get(id: string): Observable<CustomOrder> {
-    return this.http.get<CustomOrder>(`${this.base}/${id}`);
-  }
-
-  create(payload: CustomOrderCreate): Observable<CustomOrder> {
-    return this.http.post<CustomOrder>(this.base, payload);
-  }
-
-  update(id: string, payload: CustomOrderUpdate): Observable<CustomOrder> {
-    return this.http.patch<CustomOrder>(`${this.base}/${id}`, payload);
-  }
-
-  delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${id}`);
   }
 
   moveStage(

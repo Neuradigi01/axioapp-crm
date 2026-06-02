@@ -1,9 +1,9 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { ConversationChannel } from '../conversations/conversations-api.service';
+import { BaseCrudApiService } from '../shared/services/base-crud-api.service';
 import { buildHttpParams } from '../shared/services/query-builder';
 
 export type CampaignStatus =
@@ -114,29 +114,16 @@ export interface CampaignMessage {
 }
 
 @Injectable({ providedIn: 'root' })
-export class CampaignsApiService {
-  private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiBaseUrl}/campaigns`;
+export class CampaignsApiService extends BaseCrudApiService<
+  Campaign,
+  CampaignCreate,
+  CampaignUpdate
+> {
+  protected readonly base = `${environment.apiBaseUrl}/campaigns`;
 
   list(page = 1, size = 50): Observable<CampaignListResponse> {
     const params = buildHttpParams({ page, size });
     return this.http.get<CampaignListResponse>(this.base, { params });
-  }
-
-  get(id: string): Observable<Campaign> {
-    return this.http.get<Campaign>(`${this.base}/${id}`);
-  }
-
-  create(payload: CampaignCreate): Observable<Campaign> {
-    return this.http.post<Campaign>(this.base, payload);
-  }
-
-  update(id: string, payload: CampaignUpdate): Observable<Campaign> {
-    return this.http.patch<Campaign>(`${this.base}/${id}`, payload);
-  }
-
-  delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${id}`);
   }
 
   start(id: string): Observable<CampaignStartResponse> {
