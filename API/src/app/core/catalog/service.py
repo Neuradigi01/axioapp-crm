@@ -32,6 +32,7 @@ from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldType,
 )
+from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 
 
@@ -286,17 +287,11 @@ async def list_items(
 
     where = and_(*filters) if filters else None
     base = select(CatalogItem)
-    count_stmt = select(func.count()).select_from(CatalogItem)
     if where is not None:
         base = base.where(where)
-        count_stmt = count_stmt.where(where)
     base = base.order_by(CatalogItem.name.asc(), CatalogItem.sku.asc())
 
-    total = (await session.execute(count_stmt)).scalar_one()
-    rows = (
-        await session.execute(base.offset((page - 1) * size).limit(size))
-    ).scalars().all()
-    return list(rows), int(total)
+    return await paginate(session, base, page=page, size=size)
 
 
 __all__ = [

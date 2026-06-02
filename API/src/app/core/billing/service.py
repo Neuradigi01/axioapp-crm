@@ -48,6 +48,7 @@ from src.app.core.billing.schemas import (
     PaymentCreate,
 )
 from src.app.core.settings.service import get_or_create as get_org_settings
+from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found, get_or_404
 
 
@@ -69,20 +70,11 @@ async def list_invoices(
         filters.append(Invoice.contact_id == contact_id)
 
     base = select(Invoice)
-    count_stmt = select(func.count()).select_from(Invoice)
     if filters:
-        where = and_(*filters)
-        base = base.where(where)
-        count_stmt = count_stmt.where(where)
+        base = base.where(and_(*filters))
     base = base.order_by(Invoice.created_at.desc())
-    total = (await session.execute(count_stmt)).scalar_one()
-    offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
-    )
-    return list(rows), int(total)
+
+    return await paginate(session, base, page=page, size=size)
 
 
 async def get_invoice(

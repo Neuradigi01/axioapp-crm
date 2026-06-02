@@ -28,6 +28,7 @@ from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.tasks.models import Task, TaskPriority, TaskStatus
 from src.app.core.tasks.schemas import TaskCreate, TaskUpdate
 from src.app.core.users.models import OrganizationMember, User
+from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 
 
@@ -240,13 +241,7 @@ async def list_tasks_for_entity(
         .where(*filters)
         .order_by(nulls_last(Task.due_at.asc()), Task.created_at.desc())
     )
-    count_stmt = select(func.count()).select_from(Task).where(*filters)
-
-    total = (await session.execute(count_stmt)).scalar_one()
-    rows = (
-        await session.execute(base.offset((page - 1) * size).limit(size))
-    ).scalars().all()
-    return list(rows), int(total)
+    return await paginate(session, base, page=page, size=size)
 
 
 async def list_my_tasks(
@@ -275,12 +270,7 @@ async def list_my_tasks(
         sort_dir=sort_dir,
     )
 
-    count_stmt = select(func.count()).select_from(base.subquery())
-    total = (await session.execute(count_stmt)).scalar_one()
-    rows = (
-        await session.execute(base.offset((page - 1) * size).limit(size))
-    ).scalars().all()
-    return list(rows), int(total)
+    return await paginate(session, base, page=page, size=size)
 
 
 async def list_all_in_org(
@@ -315,12 +305,7 @@ async def list_all_in_org(
         sort_dir=sort_dir,
     )
 
-    count_stmt = select(func.count()).select_from(base.subquery())
-    total = (await session.execute(count_stmt)).scalar_one()
-    rows = (
-        await session.execute(base.offset((page - 1) * size).limit(size))
-    ).scalars().all()
-    return list(rows), int(total)
+    return await paginate(session, base, page=page, size=size)
 
 
 # --- Bulk actions ----------------------------------------------------------

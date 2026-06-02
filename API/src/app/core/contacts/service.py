@@ -31,6 +31,7 @@ from src.app.core.contacts.models import Contact
 from src.app.core.contacts.schemas import ContactCreate, ContactUpdate
 from src.app.core.custom_fields.models import CustomFieldDefinition, FieldType
 from src.app.core.users.models import OrganizationMember, User
+from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 
 
@@ -360,10 +361,8 @@ async def list_contacts(
 
     where = and_(*filters) if filters else None
     base = select(Contact)
-    count_stmt = select(func.count()).select_from(Contact)
     if where is not None:
         base = base.where(where)
-        count_stmt = count_stmt.where(where)
 
     sort_col = _SORT_COLUMNS[sort]
     if sort == "last_activity_at":
@@ -375,11 +374,7 @@ async def list_contacts(
     # transaction, or `last_activity_at IS NULL` on multiple rows).
     base = base.order_by(primary, Contact.id.desc())
 
-    total = (await session.execute(count_stmt)).scalar_one()
-    rows = (
-        await session.execute(base.offset((page - 1) * size).limit(size))
-    ).scalars().all()
-    return list(rows), int(total)
+    return await paginate(session, base, page=page, size=size)
 
 
 # --- Reassign / bulk actions -------------------------------------------------

@@ -40,6 +40,7 @@ from src.app.core.walk_ins.schemas import (
     WalkInUpdate,
 )
 from src.app.core.walk_ins.status_workflow import ALLOWED_TRANSITIONS
+from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 
 
@@ -375,10 +376,8 @@ async def list_walk_ins(
     where = and_(*filters) if filters else None
 
     base = select(WalkIn)
-    count_stmt = select(func.count()).select_from(WalkIn)
     if where is not None:
         base = base.where(where)
-        count_stmt = count_stmt.where(where)
 
     sort_col = _SORT_COLUMNS[sort]
     if sort == "last_activity_at":
@@ -387,11 +386,7 @@ async def list_walk_ins(
         primary = sort_col.asc() if order == "asc" else sort_col.desc()
     base = base.order_by(primary, WalkIn.id.desc())
 
-    total = (await session.execute(count_stmt)).scalar_one()
-    rows = (
-        await session.execute(base.offset((page - 1) * size).limit(size))
-    ).scalars().all()
-    return list(rows), int(total)
+    return await paginate(session, base, page=page, size=size)
 
 
 # --- quick_register + checkout ---

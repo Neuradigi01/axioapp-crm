@@ -42,6 +42,7 @@ from src.app.core.calls.schemas import (
     CallTranscriptUpsert,
     CallUpdate,
 )
+from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import get_or_404
 
 
@@ -165,18 +166,7 @@ async def list_calls(
         base = base.where(where)
     base = base.order_by(Call.started_at.desc(), Call.created_at.desc())
 
-    total_stmt = select(func.count()).select_from(Call)
-    if where is not None:
-        total_stmt = total_stmt.where(where)
-    total = (await session.execute(total_stmt)).scalar_one()
-
-    offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
-    )
-    return list(rows), int(total)
+    return await paginate(session, base, page=page, size=size)
 
 
 async def get_call(session: AsyncSession, call_id: uuid.UUID) -> Call:

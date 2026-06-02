@@ -52,6 +52,7 @@ from src.app.core.conversations.adapters.whatsapp import (
 from src.app.core.conversations.registry import resolve
 from src.app.core.conversations.schemas import ConversationPatch
 from src.app.core.notifications.service import notify
+from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import get_or_404
 
 
@@ -93,18 +94,7 @@ async def list_conversations(
         Conversation.created_at.desc(),
     )
 
-    total_stmt = select(func.count()).select_from(Conversation)
-    if where is not None:
-        total_stmt = total_stmt.where(where)
-    total = (await session.execute(total_stmt)).scalar_one()
-
-    offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
-    )
-    return list(rows), int(total)
+    return await paginate(session, base, page=page, size=size)
 
 
 async def get_conversation(

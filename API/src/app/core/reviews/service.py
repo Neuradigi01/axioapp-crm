@@ -38,6 +38,7 @@ from src.app.core.reviews.schemas import (
     ReviewReplyPayload,
     ReviewUpdate,
 )
+from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import get_or_404
 
 
@@ -67,18 +68,7 @@ async def list_reviews(
         base = base.where(where)
     base = base.order_by(Review.created_at.desc())
 
-    total_stmt = select(func.count()).select_from(Review)
-    if where is not None:
-        total_stmt = total_stmt.where(where)
-    total = (await session.execute(total_stmt)).scalar_one()
-
-    offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
-    )
-    return list(rows), int(total)
+    return await paginate(session, base, page=page, size=size)
 
 
 async def get_review(session: AsyncSession, review_id: uuid.UUID) -> Review:
