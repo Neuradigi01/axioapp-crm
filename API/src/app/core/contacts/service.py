@@ -18,7 +18,6 @@ inside each write path.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
 from typing import Any, Iterable, Literal
 
 from fastapi import HTTPException, status
@@ -29,9 +28,9 @@ from src.app.core import audit
 from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.contacts.models import Contact
 from src.app.core.contacts.schemas import ContactCreate, ContactUpdate
-from src.app.core.custom_fields.models import CustomFieldDefinition, FieldType
 from src.app.core.users.models import OrganizationMember, User
 from src.app.shared.audit import log_entity_change, snapshot
+from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 
@@ -67,134 +66,6 @@ def _snapshot(contact: Contact) -> dict[str, Any]:
     return snapshot(contact, fields=_SNAPSHOT_FIELDS)
 
 
-async def _load_field_defs(session: AsyncSession) -> dict[str, CustomFieldDefinition]:
-    result = await session.execute(
-        select(CustomFieldDefinition).where(
-            CustomFieldDefinition.entity_type == _CONTACT_ENTITY
-        )
-    )
-    return {row.field_key: row for row in result.scalars()}
-
-
-def _coerce_value(field_type: FieldType, key: str, value: Any) -> Any:
-    """Validate / coerce a single `custom_data` value. Raises 422 on mismatch."""
-    if value is None:
-        return None
-
-    if field_type in (FieldType.text, FieldType.phone, FieldType.email, FieldType.select):
-        if not isinstance(value, str):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected string",
-            )
-        return value
-
-    if field_type is FieldType.multiselect:
-        if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected list of strings",
-            )
-        return value
-
-    if field_type in (FieldType.number, FieldType.currency):
-        # `bool` is a subclass of `int` in Python — reject it explicitly so
-        # `True` doesn't sneak past a number check.
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected number",
-            )
-        return value
-
-    if field_type is FieldType.boolean:
-        if not isinstance(value, bool):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected boolean",
-            )
-        return value
-
-    if field_type is FieldType.date:
-        if not isinstance(value, str):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected ISO date string",
-            )
-        try:
-            date.fromisoformat(value)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: invalid ISO date",
-            ) from exc
-        return value
-
-    if field_type is FieldType.datetime:
-        if not isinstance(value, str):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected ISO datetime string",
-            )
-        try:
-            datetime.fromisoformat(value)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: invalid ISO datetime",
-            ) from exc
-        return value
-
-    # `FieldType` is an exhaustive enum; reaching here means a new type
-    # was added without extending this switch. Fail loudly.
-    raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=f"unhandled field_type {field_type!r}",
-    )
-
-
-async def _validate_custom_data(
-    session: AsyncSession,
-    *,
-    payload: dict[str, Any],
-    require_all_required: bool,
-) -> dict[str, Any]:
-    """Validate `payload` against defined `contact` custom fields.
-
-    `require_all_required=True` on create; False on partial update.
-    Returns a sanitized copy (values coerced where applicable).
-    """
-    defs = await _load_field_defs(session)
-
-    unknown = set(payload) - set(defs)
-    if unknown:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                "custom_data contains keys not defined for entity "
-                f"'contact': {sorted(unknown)}"
-            ),
-        )
-
-    cleaned: dict[str, Any] = {}
-    for key, value in payload.items():
-        cleaned[key] = _coerce_value(defs[key].field_type, key, value)
-
-    if require_all_required:
-        missing = [
-            key
-            for key, defn in defs.items()
-            if defn.is_required and (key not in cleaned or cleaned[key] is None)
-        ]
-        if missing:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data missing required keys: {sorted(missing)}",
-            )
-
-    return cleaned
-
-
 async def get_contact(
     session: AsyncSession, contact_id: uuid.UUID
 ) -> Contact | None:
@@ -221,8 +92,9 @@ async def create_contact(
     can't possibly know the org's custom-field requirements;
     staff fill in the blanks afterwards via the edit form.
     """
-    cleaned_custom = await _validate_custom_data(
+    cleaned_custom = await validate_custom_data(
         session,
+        entity_type=_CONTACT_ENTITY,
         payload=payload.custom_data,
         require_all_required=require_all_required,
     )
@@ -263,8 +135,9 @@ async def update_contact(
     changes = payload.model_dump(exclude_unset=True)
 
     if "custom_data" in changes:
-        changes["custom_data"] = await _validate_custom_data(
+        changes["custom_data"] = await validate_custom_data(
             session,
+            entity_type=_CONTACT_ENTITY,
             payload=changes["custom_data"] or {},
             require_all_required=False,
         )

@@ -39,12 +39,9 @@ from src.app.core.appointments.schemas import (
 )
 from src.app.core.appointments.status_workflow import ALLOWED_TRANSITIONS
 from src.app.core.contacts.models import Contact
-from src.app.core.custom_fields.models import (
-    CustomFieldDefinition,
-    FieldType,
-)
 from src.app.core.users.models import OrganizationMember, User
 from src.app.shared.audit import log_entity_change, snapshot
+from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.queries import ensure_found
 
 
@@ -82,128 +79,6 @@ _SNAPSHOT_FIELDS = (
 
 def _snapshot(a: Appointment) -> dict[str, Any]:
     return snapshot(a, fields=_SNAPSHOT_FIELDS)
-
-
-# --- custom_data validation (mirrors contacts/leads — same engine) ---
-
-
-async def _load_field_defs(
-    session: AsyncSession,
-) -> dict[str, CustomFieldDefinition]:
-    result = await session.execute(
-        select(CustomFieldDefinition).where(
-            CustomFieldDefinition.entity_type == _APPT_ENTITY
-        )
-    )
-    return {row.field_key: row for row in result.scalars()}
-
-
-def _coerce_value(field_type: FieldType, key: str, value: Any) -> Any:
-    if value is None:
-        return None
-    if field_type in (
-        FieldType.text,
-        FieldType.phone,
-        FieldType.email,
-        FieldType.select,
-    ):
-        if not isinstance(value, str):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected string",
-            )
-        return value
-    if field_type is FieldType.multiselect:
-        if not isinstance(value, list) or not all(
-            isinstance(v, str) for v in value
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected list of strings",
-            )
-        return value
-    if field_type in (FieldType.number, FieldType.currency):
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected number",
-            )
-        return value
-    if field_type is FieldType.boolean:
-        if not isinstance(value, bool):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected boolean",
-            )
-        return value
-    if field_type is FieldType.date:
-        if not isinstance(value, str):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected ISO date string",
-            )
-        try:
-            date.fromisoformat(value)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: invalid ISO date",
-            ) from exc
-        return value
-    if field_type is FieldType.datetime:
-        if not isinstance(value, str):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: expected ISO datetime string",
-            )
-        try:
-            datetime.fromisoformat(value)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data.{key}: invalid ISO datetime",
-            ) from exc
-        return value
-    raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=f"unhandled field_type {field_type!r}",
-    )
-
-
-async def _validate_custom_data(
-    session: AsyncSession,
-    *,
-    payload: dict[str, Any],
-    require_all_required: bool,
-) -> dict[str, Any]:
-    defs = await _load_field_defs(session)
-
-    unknown = set(payload) - set(defs)
-    if unknown:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                "custom_data contains keys not defined for entity "
-                f"'appointment': {sorted(unknown)}"
-            ),
-        )
-
-    cleaned: dict[str, Any] = {}
-    for key, value in payload.items():
-        cleaned[key] = _coerce_value(defs[key].field_type, key, value)
-
-    if require_all_required:
-        missing = [
-            key
-            for key, defn in defs.items()
-            if defn.is_required and (key not in cleaned or cleaned[key] is None)
-        ]
-        if missing:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"custom_data missing required keys: {sorted(missing)}",
-            )
-    return cleaned
 
 
 # --- in-scope existence helpers ---
@@ -306,8 +181,11 @@ async def create_appointment(
 ) -> Appointment:
     await _ensure_contact_in_scope(session, payload.contact_id)
     await _ensure_user_in_scope(session, payload.assigned_to_id)
-    cleaned_custom = await _validate_custom_data(
-        session, payload=payload.custom_data, require_all_required=True
+    cleaned_custom = await validate_custom_data(
+        session,
+        entity_type=_APPT_ENTITY,
+        payload=payload.custom_data,
+        require_all_required=True,
     )
 
     conflicts = await find_conflicts(
@@ -396,8 +274,9 @@ async def update_appointment(
         await _ensure_user_in_scope(session, changes["assigned_to_id"])
 
     if "custom_data" in changes:
-        changes["custom_data"] = await _validate_custom_data(
+        changes["custom_data"] = await validate_custom_data(
             session,
+            entity_type=_APPT_ENTITY,
             payload=changes["custom_data"] or {},
             require_all_required=False,
         )
