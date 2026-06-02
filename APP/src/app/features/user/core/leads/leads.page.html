@@ -354,11 +354,11 @@
     </div>
   </div>
 
-  @if (loadError(); as err) {
+  @if (state.loadError(); as err) {
     <p class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
       {{ err }}
     </p>
-  } @else if (loading() && leads().length === 0) {
+  } @else if (state.loading() && state.items().length === 0) {
     <div class="flex gap-3 overflow-x-auto animate-pulse">
       @for (i of [0, 1, 2, 3]; track i) {
         <div class="h-48 w-64 shrink-0 rounded-lg bg-zinc-100"></div>
@@ -476,7 +476,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-zinc-100">
-            @for (lead of leads(); track lead.id) {
+            @for (lead of state.items(); track lead.id) {
               @let contact = contactFor(lead.contact_id);
               <tr
                 class="hover:bg-zinc-50 cursor-pointer"
@@ -604,9 +604,9 @@
       <!-- Pagination footer -->
       <div class="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 bg-zinc-50 px-4 py-2.5 text-xs text-zinc-600">
         <div>
-          @if (totalCount() !== null && leads().length > 0) {
+          @if (totalCount() !== null && state.items().length > 0) {
             Showing {{ pageRangeStart() }}–{{ pageRangeEnd() }} of {{ totalCount() }}
-          } @else if (leads().length > 0) {
+          } @else if (state.items().length > 0) {
             Showing {{ pageRangeStart() }}–{{ pageRangeEnd() }}
           } @else {
             No results
@@ -616,7 +616,7 @@
           <label class="flex items-center gap-1.5">
             <span class="text-zinc-500">Page size</span>
             <select
-              [value]="pageSize()"
+              [value]="state.pageSize()"
               (change)="onPageSizeChange($any($event.target).value)"
               class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               aria-label="Page size"
@@ -666,32 +666,32 @@
 
 <!-- Bulk action bar: visible whenever rows are selected on list view. -->
 <app-bulk-action-bar
-  [selectedCount]="selectedCount()"
+  [selectedCount]="state.selectedCount()"
   [actions]="bulkActions()"
   (action)="onBulkAction($event)"
   (clear)="clearSelection()"
 />
 
 <!-- Bulk reassign modal — shared `ReassignModal`. -->
-@if (bulkModal() === 'reassign') {
+@if (state.bulkModal() === 'reassign') {
   <app-reassign-modal
     [entityLabel]="'lead'"
-    [count]="selectedCount()"
-    [submitting]="bulkSubmitting()"
-    [error]="bulkError()"
+    [count]="state.selectedCount()"
+    [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
     (confirm)="onBulkReassign($event)"
     (cancel)="closeBulkModal()"
   />
 }
 
 <!-- Bulk delete confirm. -->
-@if (bulkModal() === 'delete') {
+@if (state.bulkModal() === 'delete') {
   <app-confirm-dialog
-    [title]="'Delete ' + selectedCount() + ' lead' + (selectedCount() === 1 ? '' : 's') + '?'"
+    [title]="'Delete ' + state.selectedCount() + ' lead' + (state.selectedCount() === 1 ? '' : 's') + '?'"
     [body]="'This cannot be undone. Contacts and activities linked to these leads remain in their respective timelines.'"
     [confirmLabel]="'Delete'"
     [danger]="true"
-    [submitting]="bulkSubmitting()"
+    [submitting]="state.bulkSubmitting()"
     (confirm)="onBulkDelete()"
     (cancel)="closeBulkModal()"
   />

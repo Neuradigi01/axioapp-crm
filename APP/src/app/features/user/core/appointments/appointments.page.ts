@@ -48,6 +48,7 @@ import {
   ReassignConfirm,
   ReassignModalComponent,
 } from '../shared/reassign-modal/reassign-modal.component';
+import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import {
   Appointment,
@@ -82,6 +83,8 @@ const FILTER_CHIPS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
   { id: 'cancelled', label: 'Cancelled' },
 ];
 
+class AppointmentsListState extends ListPageState<Appointment> {}
+
 @Component({
   selector: 'app-appointments-page',
   standalone: true,
@@ -102,6 +105,7 @@ const FILTER_CHIPS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
     UrlFilterStateDirective,
     RelativeTimePipe,
   ],
+  providers: [AppointmentsListState],
   templateUrl: './appointments.page.html',
 })
 export class AppointmentsPageComponent {
@@ -116,6 +120,8 @@ export class AppointmentsPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
+  protected readonly state = inject(AppointmentsListState);
+
   /** List vs calendar — controlled by the toggle at the top of the page. */
   readonly view = signal<'list' | 'calendar'>('list');
 
@@ -124,11 +130,6 @@ export class AppointmentsPageComponent {
 
   /** Currently-clicked day (right panel shows this day's appointments). */
   readonly selectedDay = signal<Date>(new Date());
-
-  /** Loaded rows. */
-  readonly appointments = signal<Appointment[]>([]);
-  readonly loading = signal(false);
-  readonly loadError = signal<string | null>(null);
 
   readonly contactsById = signal<Record<string, ContactSummary>>({});
 
@@ -165,7 +166,7 @@ export class AppointmentsPageComponent {
 
   readonly events = computed<CalendarEvent<Appointment>[]>(() => {
     const map = new Map<string, CalendarEvent<Appointment>>();
-    for (const a of this.appointments()) {
+    for (const a of this.state.items()) {
       const d = new Date(a.scheduled_at);
       const key = this.dayKey(d);
       const existing = map.get(key);
@@ -181,7 +182,7 @@ export class AppointmentsPageComponent {
 
   readonly daysAppointments = computed<Appointment[]>(() => {
     const day = this.selectedDay();
-    return this.appointments()
+    return this.state.items()
       .filter((a) => isSameDay(new Date(a.scheduled_at), day))
       .sort((a, b) =>
         a.scheduled_at < b.scheduled_at ? -1 : a.scheduled_at > b.scheduled_at ? 1 : 0,
@@ -193,9 +194,6 @@ export class AppointmentsPageComponent {
   );
 
   // --- Selection + bulk --------------------------------------------------
-
-  readonly selectedIds = signal<Set<string>>(new Set());
-  readonly selectedCount = computed(() => this.selectedIds().size);
 
   readonly bulkActions = computed<BulkAction[]>(() => [
     {
@@ -212,10 +210,6 @@ export class AppointmentsPageComponent {
       permissionKey: 'appointments.write',
     },
   ]);
-
-  readonly bulkModal = signal<'reassign' | 'cancel' | null>(null);
-  readonly bulkSubmitting = signal(false);
-  readonly bulkError = signal<string | null>(null);
 
   // --- Single-row actions (popover-driven) -------------------------------
 
@@ -388,7 +382,7 @@ export class AppointmentsPageComponent {
   }
 
   protected conflictTitleFor = (id: string): string | null => {
-    const a = this.appointments().find((x) => x.id === id);
+    const a = this.state.items().find((x) => x.id === id);
     if (!a) return null;
     const time = format(new Date(a.scheduled_at), 'd MMM, HH:mm');
     return `${a.title} (${time})`;
@@ -398,7 +392,7 @@ export class AppointmentsPageComponent {
 
   protected toggleRow(id: string, event: Event): void {
     event.stopPropagation();
-    this.selectedIds.update((set) => {
+    this.state.selectedIds.update((set) => {
       const next = new Set(set);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -407,49 +401,49 @@ export class AppointmentsPageComponent {
   }
 
   protected isSelected(id: string): boolean {
-    return this.selectedIds().has(id);
+    return this.state.selectedIds().has(id);
   }
 
   protected clearSelection(): void {
-    this.selectedIds.set(new Set());
+    this.state.selectedIds.set(new Set());
   }
 
   // --- Bulk actions ------------------------------------------------------
 
   protected onBulkAction(key: string): void {
-    this.bulkError.set(null);
-    if (key === 'reassign') this.bulkModal.set('reassign');
-    else if (key === 'cancel') this.bulkModal.set('cancel');
+    this.state.bulkError.set(null);
+    if (key === 'reassign') this.state.bulkModal.set('reassign');
+    else if (key === 'cancel') this.state.bulkModal.set('cancel');
   }
 
   protected closeBulkModal(): void {
-    this.bulkModal.set(null);
-    this.bulkSubmitting.set(false);
-    this.bulkError.set(null);
+    this.state.bulkModal.set(null);
+    this.state.bulkSubmitting.set(false);
+    this.state.bulkError.set(null);
   }
 
   protected onBulkReassign(payload: ReassignConfirm): void {
-    const ids = [...this.selectedIds()];
+    const ids = [...this.state.selectedIds()];
     if (ids.length === 0) return;
     if (!payload.userId) {
-      this.bulkError.set('Appointments require an owner — pick a user.');
+      this.state.bulkError.set('Appointments require an owner — pick a user.');
       return;
     }
-    this.bulkSubmitting.set(true);
-    this.bulkError.set(null);
+    this.state.bulkSubmitting.set(true);
+    this.state.bulkError.set(null);
     this.api
       .bulkReassign(ids, { userId: payload.userId, note: payload.note })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.bulkSubmitting.set(false);
+          this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
         },
         error: (err: HttpErrorResponse) => {
-          this.bulkSubmitting.set(false);
-          this.bulkError.set(
+          this.state.bulkSubmitting.set(false);
+          this.state.bulkError.set(
             extractApiError(err) ?? 'Could not reassign appointments.',
           );
         },
@@ -457,28 +451,28 @@ export class AppointmentsPageComponent {
   }
 
   protected onBulkCancel(): void {
-    const ids = [...this.selectedIds()];
+    const ids = [...this.state.selectedIds()];
     if (ids.length === 0) return;
-    this.bulkSubmitting.set(true);
-    this.bulkError.set(null);
+    this.state.bulkSubmitting.set(true);
+    this.state.bulkError.set(null);
     this.api
       .bulkCancel(ids)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (result) => {
-          this.bulkSubmitting.set(false);
+          this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
           if (result.skipped > 0) {
-            this.loadError.set(
+            this.state.loadError.set(
               `${result.cancelled} cancelled; ${result.skipped} skipped (already cancelled / completed / no-show).`,
             );
           }
           this.reload();
         },
         error: (err: HttpErrorResponse) => {
-          this.bulkSubmitting.set(false);
-          this.bulkError.set(
+          this.state.bulkSubmitting.set(false);
+          this.state.bulkError.set(
             extractApiError(err) ?? 'Could not cancel appointments.',
           );
         },
@@ -551,7 +545,7 @@ export class AppointmentsPageComponent {
       .subscribe({
         next: (updated) => {
           this.singleReassignSubmitting.set(false);
-          this.appointments.update((rows) =>
+          this.state.items.update((rows) =>
             rows.map((r) => (r.id === updated.id ? updated : r)),
           );
           this.closeSingleReassign();
@@ -587,7 +581,7 @@ export class AppointmentsPageComponent {
       .subscribe({
         next: (updated) => {
           this.rescheduleSubmitting.set(false);
-          this.appointments.update((rows) =>
+          this.state.items.update((rows) =>
             rows.map((r) => (r.id === updated.id ? updated : r)),
           );
           this.closeReschedule();
@@ -618,7 +612,7 @@ export class AppointmentsPageComponent {
       .subscribe({
         next: (updated) => {
           this.cancelSubmitting.set(false);
-          this.appointments.update((rows) =>
+          this.state.items.update((rows) =>
             rows.map((r) => (r.id === updated.id ? updated : r)),
           );
           this.closeCancelConfirm();
@@ -626,7 +620,7 @@ export class AppointmentsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.cancelSubmitting.set(false);
           this.closeCancelConfirm();
-          this.loadError.set(
+          this.state.loadError.set(
             extractApiError(err) ?? 'Could not cancel appointment.',
           );
         },
@@ -635,8 +629,8 @@ export class AppointmentsPageComponent {
 
   /** Inline status transition (e.g. Mark completed). Optimistic; reverts on error. */
   private advanceStatus(appt: Appointment, target: Appointment['status']): void {
-    const before = this.appointments();
-    this.appointments.update((rows) =>
+    const before = this.state.items();
+    this.state.items.update((rows) =>
       rows.map((r) => (r.id === appt.id ? { ...r, status: target } : r)),
     );
     this.api
@@ -644,13 +638,13 @@ export class AppointmentsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.appointments.update((rows) =>
+          this.state.items.update((rows) =>
             rows.map((r) => (r.id === updated.id ? updated : r)),
           );
         },
         error: (err: HttpErrorResponse) => {
-          this.appointments.set(before);
-          this.loadError.set(
+          this.state.items.set(before);
+          this.state.loadError.set(
             extractApiError(err) ?? 'Could not update appointment status.',
           );
         },
@@ -760,8 +754,8 @@ export class AppointmentsPageComponent {
     const { status, extraFrom } = this.resolveStatusAndFrom();
     const { scheduledFrom, scheduledTo } = this.resolveDateWindow(extraFrom);
 
-    this.loading.set(true);
-    this.loadError.set(null);
+    this.state.loading.set(true);
+    this.state.loadError.set(null);
     this.api
       .list({
         scheduledFrom,
@@ -774,14 +768,14 @@ export class AppointmentsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {
-          this.appointments.set(rows);
-          this.loading.set(false);
+          this.state.items.set(rows);
+          this.state.loading.set(false);
           this.hydrateContacts(rows);
         },
         error: (err: HttpErrorResponse) => {
-          this.appointments.set([]);
-          this.loading.set(false);
-          this.loadError.set(
+          this.state.items.set([]);
+          this.state.loading.set(false);
+          this.state.loadError.set(
             extractApiError(err) ?? 'Could not load appointments.',
           );
         },

@@ -139,9 +139,9 @@
 
   <!-- Body -->
   <section class="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-zinc-200">
-    @if (loadError(); as err) {
+    @if (state.loadError(); as err) {
       <div class="px-6 py-4 text-sm text-red-700">{{ err }}</div>
-    } @else if (loading() && visible().length === 0) {
+    } @else if (state.loading() && visible().length === 0) {
       <div class="divide-y divide-zinc-200">
         @for (i of [0, 1, 2, 3, 4]; track i) {
           <div class="flex items-center gap-4 px-6 py-4">
@@ -343,44 +343,44 @@
 
 <!-- Bulk action bar — visible whenever rows are selected. -->
 <app-bulk-action-bar
-  [selectedCount]="selectedCount()"
+  [selectedCount]="state.selectedCount()"
   [actions]="bulkActions()"
   (action)="onBulkAction($event)"
   (clear)="clearSelection()"
 />
 
 <!-- Bulk reassign modal. -->
-@if (bulkModal() === 'reassign') {
+@if (state.bulkModal() === 'reassign') {
   <app-reassign-modal
     [entityLabel]="'walk-in'"
-    [count]="selectedCount()"
-    [submitting]="bulkSubmitting()"
-    [error]="bulkError()"
+    [count]="state.selectedCount()"
+    [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
     (confirm)="onBulkReassign($event)"
     (cancel)="closeBulkModal()"
   />
 }
 
 <!-- Bulk check-out confirm. -->
-@if (bulkModal() === 'checkout') {
+@if (state.bulkModal() === 'checkout') {
   <app-confirm-dialog
-    [title]="'Check out ' + selectedCount() + ' walk-in' + (selectedCount() === 1 ? '' : 's') + '?'"
+    [title]="'Check out ' + state.selectedCount() + ' walk-in' + (state.selectedCount() === 1 ? '' : 's') + '?'"
     [body]="'Already-checked-out visits will be skipped.'"
     [confirmLabel]="'Check out'"
-    [submitting]="bulkSubmitting()"
+    [submitting]="state.bulkSubmitting()"
     (confirm)="onBulkCheckout()"
     (cancel)="closeBulkModal()"
   />
 }
 
 <!-- Bulk delete confirm. -->
-@if (bulkModal() === 'delete') {
+@if (state.bulkModal() === 'delete') {
   <app-confirm-dialog
-    [title]="'Delete ' + selectedCount() + ' walk-in' + (selectedCount() === 1 ? '' : 's') + '?'"
+    [title]="'Delete ' + state.selectedCount() + ' walk-in' + (state.selectedCount() === 1 ? '' : 's') + '?'"
     [body]="'This cannot be undone. Contacts and activities linked to these visits remain in their timelines.'"
     [confirmLabel]="'Delete'"
     [danger]="true"
-    [submitting]="bulkSubmitting()"
+    [submitting]="state.bulkSubmitting()"
     (confirm)="onBulkDelete()"
     (cancel)="closeBulkModal()"
   />

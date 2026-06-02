@@ -48,7 +48,7 @@
     </div>
   </header>
 
-  @if (loadError(); as err) {
+  @if (state.loadError(); as err) {
     <p class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
       {{ err }}
     </p>
@@ -197,7 +197,7 @@
   } @else {
     <!-- List view -->
     <section class="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-zinc-200">
-      @if (loading() && appointments().length === 0) {
+      @if (state.loading() && state.items().length === 0) {
         <div class="divide-y divide-zinc-200">
           @for (i of [0, 1, 2, 3, 4]; track i) {
             <div class="flex items-center gap-4 px-6 py-4">
@@ -209,7 +209,7 @@
             </div>
           }
         </div>
-      } @else if (appointments().length === 0) {
+      } @else if (state.items().length === 0) {
         <div class="px-6 py-10 text-center text-sm text-zinc-500">
           No appointments match the current filters.
           <span class="block text-xs text-zinc-400">Try "All" status + "All" scope.</span>
@@ -230,7 +230,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-zinc-100 bg-white">
-              @for (a of appointments(); track a.id) {
+              @for (a of state.items(); track a.id) {
                 @let palette = ownerPalette(a.assigned_to_id);
                 <tr
                   class="hover:bg-zinc-50"
@@ -347,32 +347,32 @@
 
 <!-- Bulk action bar -->
 <app-bulk-action-bar
-  [selectedCount]="selectedCount()"
+  [selectedCount]="state.selectedCount()"
   [actions]="bulkActions()"
   (action)="onBulkAction($event)"
   (clear)="clearSelection()"
 />
 
 <!-- Bulk reassign modal -->
-@if (bulkModal() === 'reassign') {
+@if (state.bulkModal() === 'reassign') {
   <app-reassign-modal
     [entityLabel]="'appointment'"
-    [count]="selectedCount()"
-    [submitting]="bulkSubmitting()"
-    [error]="bulkError()"
+    [count]="state.selectedCount()"
+    [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
     (confirm)="onBulkReassign($event)"
     (cancel)="closeBulkModal()"
   />
 }
 
 <!-- Bulk cancel confirm -->
-@if (bulkModal() === 'cancel') {
+@if (state.bulkModal() === 'cancel') {
   <app-confirm-dialog
-    [title]="'Cancel ' + selectedCount() + ' appointment' + (selectedCount() === 1 ? '' : 's') + '?'"
+    [title]="'Cancel ' + state.selectedCount() + ' appointment' + (state.selectedCount() === 1 ? '' : 's') + '?'"
     [body]="'Only appointments in `scheduled` state will be cancelled. Already-completed / cancelled / no-show rows are skipped.'"
     [confirmLabel]="'Cancel selected'"
     [danger]="true"
-    [submitting]="bulkSubmitting()"
+    [submitting]="state.bulkSubmitting()"
     (confirm)="onBulkCancel()"
     (cancel)="closeBulkModal()"
   />

@@ -67,20 +67,20 @@
     />
   </div>
 
-  @if (loadError(); as err) {
+  @if (state.loadError(); as err) {
     <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
       {{ err }}
     </div>
   }
 
   <!-- Table -->
-  @if (loading() && items().length === 0) {
+  @if (state.loading() && state.items().length === 0) {
     <div class="space-y-2">
       @for (i of [1,2,3,4]; track i) {
         <div class="h-12 animate-pulse rounded-lg border border-zinc-200 bg-zinc-50"></div>
       }
     </div>
-  } @else if (items().length === 0) {
+  } @else if (state.items().length === 0) {
     <div class="rounded-xl border border-dashed border-zinc-300 bg-white p-12 text-center">
       <p class="text-sm text-zinc-500">No tasks match this filter.</p>
       <button
@@ -139,7 +139,7 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-100">
-          @for (t of items(); track t.id) {
+          @for (t of state.items(); track t.id) {
             <tr
               class="group hover:bg-zinc-50"
               [class.bg-zinc-50]="isSelected(t.id)"
@@ -207,8 +207,8 @@
         </tbody>
       </table>
       <div class="border-t border-zinc-100 bg-zinc-50 px-3 py-2 text-[11px] text-zinc-500">
-        Showing {{ items().length }} of {{ total() }}
-        @if (loading()) {
+        Showing {{ state.items().length }} of {{ state.total() }}
+        @if (state.loading()) {
           <span class="ml-2">refreshing…</span>
         }
       </div>
@@ -228,44 +228,44 @@
 
 <!-- Bulk action bar -->
 <app-bulk-action-bar
-  [selectedCount]="selectedCount()"
+  [selectedCount]="state.selectedCount()"
   [actions]="bulkActions()"
   (action)="onBulkAction($event)"
   (clear)="clearSelection()"
 />
 
 <!-- Bulk reassign modal -->
-@if (bulkModal() === 'reassign') {
+@if (state.bulkModal() === 'reassign') {
   <app-reassign-modal
     [entityLabel]="'task'"
-    [count]="selectedCount()"
-    [submitting]="bulkSubmitting()"
-    [error]="bulkError()"
+    [count]="state.selectedCount()"
+    [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
     (confirm)="onBulkReassign($event)"
     (cancel)="closeBulkModal()"
   />
 }
 
 <!-- Bulk mark-done confirm -->
-@if (bulkModal() === 'done') {
+@if (state.bulkModal() === 'done') {
   <app-confirm-dialog
-    [title]="'Mark ' + selectedCount() + ' task' + (selectedCount() === 1 ? '' : 's') + ' as done?'"
+    [title]="'Mark ' + state.selectedCount() + ' task' + (state.selectedCount() === 1 ? '' : 's') + ' as done?'"
     [body]="'Already-done tasks are skipped.'"
     [confirmLabel]="'Mark done'"
-    [submitting]="bulkSubmitting()"
+    [submitting]="state.bulkSubmitting()"
     (confirm)="onBulkMarkDone()"
     (cancel)="closeBulkModal()"
   />
 }
 
 <!-- Bulk delete confirm -->
-@if (bulkModal() === 'delete') {
+@if (state.bulkModal() === 'delete') {
   <app-confirm-dialog
-    [title]="'Delete ' + selectedCount() + ' task' + (selectedCount() === 1 ? '' : 's') + '?'"
+    [title]="'Delete ' + state.selectedCount() + ' task' + (state.selectedCount() === 1 ? '' : 's') + '?'"
     [body]="'This cannot be undone.'"
     [confirmLabel]="'Delete'"
     [danger]="true"
-    [submitting]="bulkSubmitting()"
+    [submitting]="state.bulkSubmitting()"
     (confirm)="onBulkDelete()"
     (cancel)="closeBulkModal()"
   />
