@@ -53,6 +53,42 @@ export function buildHttpParams(
 }
 
 /**
+ * Pagination keys an `exportCsv` request should never carry — the
+ * server streams every matching row regardless. Centralised here so
+ * each `exportCsv()` method doesn't have to remember the list (the
+ * old leads implementation had five hand-written `delete query.X`
+ * lines that drifted whenever a new pagination param appeared on
+ * `list()`).
+ */
+const PAGINATION_KEYS = new Set([
+  'page',
+  'size',
+  'pageSize',
+  'cursor',
+  'limit',
+  'with_total',
+]);
+
+/**
+ * Return a shallow copy of `query` with every known pagination key
+ * stripped. Other keys (filters, sort, customFilters) pass through
+ * unchanged. Use in `exportCsv()` to reuse the `list()` query shape
+ * without the page/size baggage:
+ *
+ *     return this.http.get(`${this.base}/export.csv`, {
+ *       params: this.buildParams(stripPaginationKeys(query)),
+ *       responseType: 'blob',
+ *     });
+ */
+export function stripPaginationKeys<T extends object>(query: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const [k, v] of Object.entries(query)) {
+    if (!PAGINATION_KEYS.has(k)) (out as Record<string, unknown>)[k] = v;
+  }
+  return out;
+}
+
+/**
  * Helper for the dynamic-custom-fields filter convention: turn a flat
  * `{ key: value }` record into a `{ 'custom.key': value }` record so it
  * can be spread into a `buildHttpParams({ ... })` call. Returns an
