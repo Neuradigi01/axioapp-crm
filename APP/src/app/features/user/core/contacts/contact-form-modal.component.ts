@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 import { RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
@@ -21,6 +21,7 @@ import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.compon
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import type { StandardFieldRendered } from '../standard-fields/types';
+import { commonValidators, withRequiredIf } from '../shared/validators';
 import { nullableTrim } from '@core/services/form.util';
 import {
   Contact,
@@ -83,59 +84,55 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
   readonly isEdit = computed(() => this._contact() !== null);
 
   readonly standard = this.fb.group({
-    full_name: ['', [Validators.required, Validators.maxLength(255)]],
-    phone: ['', [Validators.maxLength(32)]],
-    email: ['', [Validators.email, Validators.maxLength(255)]],
-    source: ['', [Validators.maxLength(64)]],
+    full_name: ['', [commonValidators.required, commonValidators.maxLength(255)]],
+    phone: ['', [commonValidators.maxLength(32)]],
+    email: ['', [commonValidators.email, commonValidators.maxLength(255)]],
+    source: ['', [commonValidators.maxLength(64)]],
     tags_csv: [''],
     assigned_to_id: [''],
   });
 
   /** Override-driven validators on the standard FormGroup.
    *
-   * The static "shape" validators (`Validators.email`, `Validators.maxLength`)
-   * are always present — they're not overridable. We layer `Validators.required`
-   * on top per the org's override choice. `full_name` stays required always
-   * (registry locks it).
+   * The static "shape" validators (`commonValidators.email`, `commonValidators.maxLength`)
+   * are always present — they're not overridable. `withRequiredIf` layers
+   * `Validators.required` on top per the org's override choice. `full_name`
+   * stays required always (registry locks it).
    */
   protected applyStandardValidators(
     map: Record<string, StandardFieldRendered>,
   ): void {
     // full_name — always required + max 255 (backend enforces NOT NULL).
     this.standard.controls.full_name.setValidators([
-      Validators.required,
-      Validators.maxLength(255),
+      commonValidators.required,
+      commonValidators.maxLength(255),
     ]);
     this.standard.controls.full_name.updateValueAndValidity({
       emitEvent: false,
     });
 
-    const phoneRow = map['phone'];
-    const phoneV: ValidatorFn[] = [Validators.maxLength(32)];
-    if (phoneRow?.is_required) phoneV.push(Validators.required);
-    this.standard.controls.phone.setValidators(phoneV);
+    this.standard.controls.phone.setValidators(
+      withRequiredIf([commonValidators.maxLength(32)], map['phone']),
+    );
     this.standard.controls.phone.updateValueAndValidity({ emitEvent: false });
 
-    const emailRow = map['email'];
-    const emailV: ValidatorFn[] = [
-      Validators.email,
-      Validators.maxLength(255),
-    ];
-    if (emailRow?.is_required) emailV.push(Validators.required);
-    this.standard.controls.email.setValidators(emailV);
+    this.standard.controls.email.setValidators(
+      withRequiredIf(
+        [commonValidators.email, commonValidators.maxLength(255)],
+        map['email'],
+      ),
+    );
     this.standard.controls.email.updateValueAndValidity({ emitEvent: false });
 
-    const sourceRow = map['source'];
-    const sourceV: ValidatorFn[] = [Validators.maxLength(64)];
-    if (sourceRow?.is_required) sourceV.push(Validators.required);
-    this.standard.controls.source.setValidators(sourceV);
+    this.standard.controls.source.setValidators(
+      withRequiredIf([commonValidators.maxLength(64)], map['source']),
+    );
     this.standard.controls.source.updateValueAndValidity({ emitEvent: false });
 
     // tags has no static validators; only required if the override sets it.
-    const tagsRow = map['tags'];
-    const tagsV: ValidatorFn[] = [];
-    if (tagsRow?.is_required) tagsV.push(Validators.required);
-    this.standard.controls.tags_csv.setValidators(tagsV);
+    this.standard.controls.tags_csv.setValidators(
+      withRequiredIf([], map['tags']),
+    );
     this.standard.controls.tags_csv.updateValueAndValidity({
       emitEvent: false,
     });

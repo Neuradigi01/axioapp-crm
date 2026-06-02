@@ -26,6 +26,7 @@ import {
 } from '../pipelines/pipelines-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
+import { commonValidators } from '../shared/validators';
 import { Lead, LeadCreate, LeadUpdate, LeadsApiService } from './leads-api.service';
 import { nullableTrim } from '@core/services/form.util';
 
@@ -94,7 +95,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
   /** Apply the override-driven validators to the standard FormGroup.
    *
    * Pipeline-stage stays required at all times (registry locks `required`).
-   * Budget + expected_close_date pick up `Validators.required` if the
+   * Budget + expected_close_date pick up `commonValidators.required` if the
    * org marked them required. Budget additionally picks up min/max from
    * the override row when present.
    */
@@ -105,14 +106,14 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     const closeRow = map['expected_close_date'];
 
     // pipeline_stage — always required.
-    this.standard.controls.pipeline_stage.setValidators([Validators.required]);
+    this.standard.controls.pipeline_stage.setValidators([commonValidators.required]);
     this.standard.controls.pipeline_stage.updateValueAndValidity({
       emitEvent: false,
     });
 
     // budget — required if override says so; min/max if numeric bounds set.
     const budgetValidators: ValidatorFn[] = [];
-    if (budgetRow?.is_required) budgetValidators.push(Validators.required);
+    if (budgetRow?.is_required) budgetValidators.push(commonValidators.required);
     if (budgetRow?.min_value !== null && budgetRow?.min_value !== undefined) {
       budgetValidators.push(Validators.min(budgetRow.min_value));
     }
@@ -124,7 +125,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
 
     // expected_close_date — required if override says so.
     const closeValidators: ValidatorFn[] = [];
-    if (closeRow?.is_required) closeValidators.push(Validators.required);
+    if (closeRow?.is_required) closeValidators.push(commonValidators.required);
     this.standard.controls.expected_close_date.setValidators(closeValidators);
     this.standard.controls.expected_close_date.updateValueAndValidity({
       emitEvent: false,

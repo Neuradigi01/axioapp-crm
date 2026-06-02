@@ -14,8 +14,6 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   FormBuilder,
   ReactiveFormsModule,
-  ValidatorFn,
-  Validators,
 } from '@angular/forms';
 import { Observable, of } from 'rxjs';
 
@@ -23,6 +21,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import { FieldDef } from '../shared/dynamic-form/types';
 import type { StandardFieldRendered } from '../standard-fields/types';
+import { commonValidators, withRequiredIf } from '../shared/validators';
 
 import {
   Task,
@@ -69,20 +68,18 @@ export class TaskFormModalComponent extends BaseFormModalComponent {
     map: Record<string, StandardFieldRendered>,
   ): void {
     this.form.controls.title.setValidators([
-      Validators.required,
-      Validators.maxLength(255),
+      commonValidators.required,
+      commonValidators.maxLength(255),
     ]);
     this.form.controls.title.updateValueAndValidity({ emitEvent: false });
-    this.form.controls.priority.setValidators([Validators.required]);
+    this.form.controls.priority.setValidators([commonValidators.required]);
     this.form.controls.priority.updateValueAndValidity({ emitEvent: false });
 
     const setReq = (
       ctrl: 'description' | 'due_at' | 'assigned_to_id',
       row: StandardFieldRendered | undefined,
     ): void => {
-      const v: ValidatorFn[] = [];
-      if (row?.is_required) v.push(Validators.required);
-      this.form.controls[ctrl].setValidators(v);
+      this.form.controls[ctrl].setValidators(withRequiredIf([], row));
       this.form.controls[ctrl].updateValueAndValidity({ emitEvent: false });
     };
     setReq('description', map['description']);
@@ -107,10 +104,10 @@ export class TaskFormModalComponent extends BaseFormModalComponent {
   protected readonly error = signal<string | null>(null);
 
   protected readonly form = this.fb.nonNullable.group({
-    title: ['', [Validators.required, Validators.maxLength(255)]],
+    title: ['', [commonValidators.required, commonValidators.maxLength(255)]],
     description: [''],
     due_at: [''],
-    priority: ['med' as TaskPriority, Validators.required],
+    priority: ['med' as TaskPriority, commonValidators.required],
     assigned_to_id: [''],
   });
 

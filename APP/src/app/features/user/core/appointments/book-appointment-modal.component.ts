@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
@@ -23,6 +23,7 @@ import {
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import { FieldDef } from '../shared/dynamic-form/types';
 import type { StandardFieldRendered } from '../standard-fields/types';
+import { commonValidators, withRequiredIf } from '../shared/validators';
 import {
   Appointment,
   AppointmentCreate,
@@ -71,29 +72,26 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     map: Record<string, StandardFieldRendered>,
   ): void {
     this.form.controls.title.setValidators([
-      Validators.required,
-      Validators.maxLength(255),
+      commonValidators.required,
+      commonValidators.maxLength(255),
     ]);
     this.form.controls.title.updateValueAndValidity({ emitEvent: false });
-    this.form.controls.scheduled_at.setValidators([Validators.required]);
+    this.form.controls.scheduled_at.setValidators([commonValidators.required]);
     this.form.controls.scheduled_at.updateValueAndValidity({ emitEvent: false });
 
     const durRow = map['duration_min'];
-    const durV: ValidatorFn[] = [
-      Validators.required,
+    this.form.controls.duration_min.setValidators([
+      commonValidators.required,
       Validators.min(durRow?.min_value ?? 1),
       Validators.max(durRow?.max_value ?? 1440),
-    ];
-    this.form.controls.duration_min.setValidators(durV);
+    ]);
     this.form.controls.duration_min.updateValueAndValidity({ emitEvent: false });
 
     const setReq = (
       ctrl: 'purpose' | 'location',
       row: StandardFieldRendered | undefined,
     ): void => {
-      const v: ValidatorFn[] = [];
-      if (row?.is_required) v.push(Validators.required);
-      this.form.controls[ctrl].setValidators(v);
+      this.form.controls[ctrl].setValidators(withRequiredIf([], row));
       this.form.controls[ctrl].updateValueAndValidity({ emitEvent: false });
     };
     setReq('purpose', map['purpose']);
@@ -124,19 +122,19 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
 
   protected readonly scheduledAtControl = this.fb.control('', {
     nonNullable: true,
-    validators: [Validators.required],
+    validators: [commonValidators.required],
   });
 
   protected readonly form = this.fb.group({
     title: this.fb.control('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(255)],
+      validators: [commonValidators.required, commonValidators.maxLength(255)],
     }),
     purpose: this.fb.control('', { nonNullable: true }),
     scheduled_at: this.scheduledAtControl,
     duration_min: this.fb.control<number>(60, {
       nonNullable: true,
-      validators: [Validators.required, Validators.min(1), Validators.max(24 * 60)],
+      validators: [commonValidators.required, Validators.min(1), Validators.max(24 * 60)],
     }),
     location: this.fb.control('', { nonNullable: true }),
   });
