@@ -16,7 +16,14 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.app.core.leads.models import LeadSource, LeadStatus
-from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
+from src.app.shared.schemas import (
+    BulkDelete,
+    BulkDeleteResult,
+    BulkReassign,
+    BulkReassignResult,
+    ORMModel,
+    TimestampedOrgScopedOut,
+)
 
 
 # Picklist for the lost-reason field. Pinned both here (Pydantic
@@ -161,24 +168,11 @@ class LeadReassign(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class LeadBulkReassign(BaseModel):
-    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
-    assigned_to_id: uuid.UUID | None = None
-    note: str | None = Field(default=None, max_length=500)
+LeadBulkReassign = BulkReassign
+LeadBulkDelete = BulkDelete
 
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-
-class LeadBulkDelete(BaseModel):
-    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
-
-
-class LeadBulkReassignResult(BaseModel):
-    reassigned: int
-
-
-class LeadBulkDeleteResult(BaseModel):
-    deleted: int
+LeadBulkReassignResult = BulkReassignResult
+LeadBulkDeleteResult = BulkDeleteResult
 
 
 # --- Scoring rule schemas ---------------------------------------------------

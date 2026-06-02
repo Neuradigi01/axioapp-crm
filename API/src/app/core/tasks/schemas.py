@@ -14,7 +14,15 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.app.core.tasks.models import TaskPriority, TaskStatus
-from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
+from src.app.shared.schemas import (
+    BulkDelete,
+    BulkDeleteResult,
+    BulkReassign,
+    BulkReassignResult,
+    ORMModel,
+    PaginatedResponse,
+    TimestampedOrgScopedOut,
+)
 
 
 class TaskCreate(BaseModel):
@@ -71,17 +79,10 @@ TaskListResponse = PaginatedResponse[TaskOut]
 # --- Bulk action shapes -----------------------------------------------------
 
 
-class TaskBulkReassign(BaseModel):
-    """Bulk reassign. Tasks require an owner (`assigned_to_id NOT NULL`)
-    so the service rejects `None`; the type stays optional here to
-    match the cross-module schema shape but the service raises 422 if
-    the caller actually sends null."""
-
-    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
-    assigned_to_id: Optional[uuid.UUID] = None
-    note: Optional[str] = Field(default=None, max_length=500)
-
-    model_config = ConfigDict(str_strip_whitespace=True)
+# `TaskBulkReassign.assigned_to_id` is optional in the wire shape (the
+# shared `BulkReassign` matches every entity) but tasks require an owner
+# at the DB level — the service layer raises 422 if the caller sends null.
+TaskBulkReassign = BulkReassign
 
 
 class TaskBulkMarkDone(BaseModel):
@@ -92,12 +93,9 @@ class TaskBulkMarkDone(BaseModel):
     ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
 
 
-class TaskBulkDelete(BaseModel):
-    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+TaskBulkDelete = BulkDelete
 
-
-class TaskBulkReassignResult(BaseModel):
-    reassigned: int
+TaskBulkReassignResult = BulkReassignResult
 
 
 class TaskBulkMarkDoneResult(BaseModel):
@@ -108,5 +106,4 @@ class TaskBulkMarkDoneResult(BaseModel):
     skipped: int
 
 
-class TaskBulkDeleteResult(BaseModel):
-    deleted: int
+TaskBulkDeleteResult = BulkDeleteResult

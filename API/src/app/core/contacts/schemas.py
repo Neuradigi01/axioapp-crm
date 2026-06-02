@@ -15,7 +15,17 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
+from src.app.shared.schemas import (
+    BulkAddTag,
+    BulkAddTagResult,
+    BulkDelete,
+    BulkDeleteResult,
+    BulkReassign,
+    BulkReassignResult,
+    ORMModel,
+    PaginatedResponse,
+    TimestampedOrgScopedOut,
+)
 
 
 _TAG_MAX = 64
@@ -107,35 +117,13 @@ class ContactReassign(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class ContactBulkReassign(BaseModel):
-    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
-    assigned_to_id: uuid.UUID | None = None
-    note: str | None = Field(default=None, max_length=500)
+ContactBulkReassign = BulkReassign
+ContactBulkDelete = BulkDelete
+ContactBulkAddTag = BulkAddTag
 
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-
-class ContactBulkDelete(BaseModel):
-    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
-
-
-class ContactBulkAddTag(BaseModel):
-    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
-    tag: str = Field(min_length=1, max_length=_TAG_MAX)
-
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-
-class ContactBulkReassignResult(BaseModel):
-    reassigned: int
-
-
-class ContactBulkDeleteResult(BaseModel):
-    deleted: int
-
-
-class ContactBulkAddTagResult(BaseModel):
-    updated: int
+ContactBulkReassignResult = BulkReassignResult
+ContactBulkDeleteResult = BulkDeleteResult
+ContactBulkAddTagResult = BulkAddTagResult
 
 
 # --- Duplicate-check response shape -----------------------------------------
