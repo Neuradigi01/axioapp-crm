@@ -42,6 +42,7 @@ from src.app.core.calls.schemas import (
     CallTranscriptUpsert,
     CallUpdate,
 )
+from src.app.shared.audit import log_entity_change
 from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import get_or_404
 
@@ -79,8 +80,8 @@ async def create_outcome(
             detail=f"call outcome '{payload.key}' already exists for this org",
         )
     await session.refresh(outcome)
-    await audit.log(
-        "calls.outcome_created",
+    await log_entity_change(
+        action="calls.outcome_created",
         entity_type="call_outcome",
         entity_id=outcome.id,
         after=_outcome_snapshot(outcome),
@@ -109,8 +110,8 @@ async def update_outcome(
     if changed:
         await session.commit()
         await session.refresh(outcome)
-        await audit.log(
-            "calls.outcome_updated",
+        await log_entity_change(
+            action="calls.outcome_updated",
             entity_type="call_outcome",
             entity_id=outcome.id,
             before=before,
@@ -126,8 +127,8 @@ async def delete_outcome(
     before = _outcome_snapshot(outcome)
     await session.delete(outcome)
     await session.commit()
-    await audit.log(
-        "calls.outcome_deleted",
+    await log_entity_change(
+        action="calls.outcome_deleted",
         entity_type="call_outcome",
         entity_id=outcome_id,
         before=before,
@@ -196,8 +197,8 @@ async def create_call(
     await session.commit()
     await session.refresh(call)
 
-    await audit.log(
-        "calls.created",
+    await log_entity_change(
+        action="calls.created",
         entity_type="call",
         entity_id=call.id,
         after=_call_snapshot(call),
@@ -251,8 +252,8 @@ async def update_call(
     if changed:
         await session.commit()
         await session.refresh(call)
-        await audit.log(
-            "calls.updated",
+        await log_entity_change(
+            action="calls.updated",
             entity_type="call",
             entity_id=call.id,
             before=before,
@@ -266,8 +267,8 @@ async def delete_call(session: AsyncSession, *, call_id: uuid.UUID) -> None:
     before = _call_snapshot(call)
     await session.delete(call)
     await session.commit()
-    await audit.log(
-        "calls.deleted",
+    await log_entity_change(
+        action="calls.deleted",
         entity_type="call",
         entity_id=call_id,
         before=before,

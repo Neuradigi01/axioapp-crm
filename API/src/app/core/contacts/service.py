@@ -31,6 +31,7 @@ from src.app.core.contacts.models import Contact
 from src.app.core.contacts.schemas import ContactCreate, ContactUpdate
 from src.app.core.custom_fields.models import CustomFieldDefinition, FieldType
 from src.app.core.users.models import OrganizationMember, User
+from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 
@@ -48,23 +49,22 @@ _SORT_COLUMNS = {
 }
 
 
+_SNAPSHOT_FIELDS = (
+    "id",
+    "full_name",
+    "phone",
+    "email",
+    "source",
+    "tags",
+    "notes",
+    "custom_data",
+    "assigned_to_id",
+)
+
+
 def _snapshot(contact: Contact) -> dict[str, Any]:
     """JSONB-friendly snapshot for audit `before`/`after`."""
-    return {
-        "id": str(contact.id),
-        "full_name": contact.full_name,
-        "phone": contact.phone,
-        "email": contact.email,
-        "source": contact.source,
-        "tags": list(contact.tags),
-        "notes": contact.notes,
-        "custom_data": contact.custom_data,
-        "assigned_to_id": (
-            str(contact.assigned_to_id)
-            if contact.assigned_to_id is not None
-            else None
-        ),
-    }
+    return snapshot(contact, fields=_SNAPSHOT_FIELDS)
 
 
 async def _load_field_defs(session: AsyncSession) -> dict[str, CustomFieldDefinition]:
@@ -242,8 +242,8 @@ async def create_contact(
     await session.commit()
     await session.refresh(contact)
 
-    await audit.log(
-        "contacts.created",
+    await log_entity_change(
+        action="contacts.created",
         entity_type="contact",
         entity_id=contact.id,
         after=_snapshot(contact),
@@ -282,8 +282,8 @@ async def update_contact(
     await session.commit()
     await session.refresh(contact)
 
-    await audit.log(
-        "contacts.updated",
+    await log_entity_change(
+        action="contacts.updated",
         entity_type="contact",
         entity_id=contact.id,
         before=before,
@@ -301,8 +301,8 @@ async def delete_contact(
     await session.delete(contact)
     await session.commit()
 
-    await audit.log(
-        "contacts.deleted",
+    await log_entity_change(
+        action="contacts.deleted",
         entity_type="contact",
         entity_id=contact_uuid,
         before=before,

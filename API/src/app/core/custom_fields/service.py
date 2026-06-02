@@ -20,6 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.shared.audit import log_entity_change
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldSource,
@@ -132,8 +133,8 @@ async def create_user_field(
         ) from exc
     await session.refresh(field)
 
-    await audit.log(
-        "custom_fields.created",
+    await log_entity_change(
+        action="custom_fields.created",
         entity_type="custom_field_definition",
         entity_id=field.id,
         after=_snapshot(field),
@@ -201,8 +202,8 @@ async def create_managed_field(
         ) from exc
     await session.refresh(field)
 
-    await audit.log(
-        "custom_fields.created",
+    await log_entity_change(
+        action="custom_fields.created",
         entity_type="custom_field_definition",
         entity_id=field.id,
         after=_snapshot(field),
@@ -278,8 +279,8 @@ async def update_field(
     await session.commit()
     await session.refresh(field)
 
-    await audit.log(
-        "custom_fields.updated",
+    await log_entity_change(
+        action="custom_fields.updated",
         entity_type="custom_field_definition",
         entity_id=field.id,
         before=before,
@@ -313,8 +314,8 @@ async def delete_field(
     await session.delete(field)
     await session.commit()
 
-    await audit.log(
-        "custom_fields.deleted",
+    await log_entity_change(
+        action="custom_fields.deleted",
         entity_type="custom_field_definition",
         entity_id=field_uuid,
         before=before,

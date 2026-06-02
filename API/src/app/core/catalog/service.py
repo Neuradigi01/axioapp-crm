@@ -32,6 +32,7 @@ from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldType,
 )
+from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 
@@ -39,17 +40,20 @@ from src.app.shared.db.queries import ensure_found
 _CATALOG_ENTITY = "catalog_item"
 
 
+_SNAPSHOT_FIELDS = (
+    "id",
+    "sku",
+    "name",
+    "category",
+    "price",
+    "currency",
+    "is_active",
+    "custom_data",
+)
+
+
 def _snapshot(item: CatalogItem) -> dict[str, Any]:
-    return {
-        "id": str(item.id),
-        "sku": item.sku,
-        "name": item.name,
-        "category": item.category,
-        "price": str(item.price),
-        "currency": item.currency,
-        "is_active": item.is_active,
-        "custom_data": item.custom_data,
-    }
+    return snapshot(item, fields=_SNAPSHOT_FIELDS)
 
 
 # --- custom_data validation (same engine as contacts/leads/appointments) ---
@@ -209,8 +213,8 @@ async def create_item(
         ) from exc
     await session.refresh(item)
 
-    await audit.log(
-        "catalog.created",
+    await log_entity_change(
+        action="catalog.created",
         entity_type="catalog_item",
         entity_id=item.id,
         after=_snapshot(item),
@@ -239,8 +243,8 @@ async def update_item(
     await session.commit()
     await session.refresh(item)
 
-    await audit.log(
-        "catalog.updated",
+    await log_entity_change(
+        action="catalog.updated",
         entity_type="catalog_item",
         entity_id=item.id,
         before=before,
@@ -256,8 +260,8 @@ async def delete_item(session: AsyncSession, *, item_id: uuid.UUID) -> None:
     await session.delete(item)
     await session.commit()
 
-    await audit.log(
-        "catalog.deleted",
+    await log_entity_change(
+        action="catalog.deleted",
         entity_type="catalog_item",
         entity_id=item_uuid,
         before=before,

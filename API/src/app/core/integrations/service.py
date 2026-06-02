@@ -21,6 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.shared.audit import log_entity_change
 from src.app.core.integrations.crypto import (
     decrypt_optional,
     encrypt,
@@ -395,8 +396,8 @@ async def create_subscription(
             ),
         )
     await session.refresh(row)
-    await audit.log(
-        "integration.subscription.created",
+    await log_entity_change(
+        action="integration.subscription.created",
         entity_type="integration_subscription",
         entity_id=row.id,
         after={
@@ -431,8 +432,8 @@ async def update_subscription(
         setattr(row, field, value)
     await session.commit()
     await session.refresh(row)
-    await audit.log(
-        "integration.subscription.updated",
+    await log_entity_change(
+        action="integration.subscription.updated",
         entity_type="integration_subscription",
         entity_id=row.id,
         after=changes,
@@ -459,8 +460,8 @@ async def delete_subscription(
         return False
     await session.delete(row)
     await session.commit()
-    await audit.log(
-        "integration.subscription.deleted",
+    await log_entity_change(
+        action="integration.subscription.deleted",
         entity_type="integration_subscription",
         entity_id=subscription_id,
     )

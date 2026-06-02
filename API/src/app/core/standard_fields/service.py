@@ -28,6 +28,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.shared.audit import log_entity_change
 from src.app.core.standard_fields import registry as field_registry
 from src.app.core.standard_fields.models import StandardFieldOverride
 from src.app.core.standard_fields.schemas import (
@@ -212,8 +213,8 @@ async def upsert(
         )
     ).scalar_one()
 
-    await audit.log(
-        "settings.standard_field_override.updated",
+    await log_entity_change(
+        action="settings.standard_field_override.updated",
         entity_type="standard_field_override",
         entity_id=row.id,
         before=before,

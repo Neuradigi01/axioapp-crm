@@ -21,6 +21,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.shared.audit import log_entity_change
 from src.app.core.auth.models import AuthSession
 from src.app.core.permissions.models import Role
 from src.app.core.users.models import OrganizationMember, User, UserInfo
@@ -194,8 +195,8 @@ async def create_user(
     await session.commit()
     await session.refresh(login)
 
-    await audit.log(
-        "users.created",
+    await log_entity_change(
+        action="users.created",
         entity_type="user",
         entity_id=new_uuid,
         after={
@@ -287,8 +288,8 @@ async def update_user(
         "phone": profile.mobile_no,
         "role_id": str(membership.role_id),
     }
-    await audit.log(
-        "users.updated",
+    await log_entity_change(
+        action="users.updated",
         entity_type="user",
         entity_id=user_id,
         before=before,

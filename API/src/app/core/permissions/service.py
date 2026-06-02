@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.shared.audit import log_entity_change
 from src.app.core.permissions.models import Permission, Role, RolePermission
 from src.app.core.permissions.schemas import RoleCreate, RoleUpdate
 from src.app.core.users.models import OrganizationMember
@@ -259,8 +260,8 @@ async def create_role(
     await session.commit()
     await session.refresh(role)
 
-    await audit.log(
-        "roles.created",
+    await log_entity_change(
+        action="roles.created",
         entity_type="role",
         entity_id=role.id,
         after={
@@ -348,8 +349,8 @@ async def update_role(
             p.key for p in await list_permissions_for_role(session, role.id)
         ],
     }
-    await audit.log(
-        "roles.updated",
+    await log_entity_change(
+        action="roles.updated",
         entity_type="role",
         entity_id=role.id,
         before=before,
@@ -405,8 +406,8 @@ async def delete_role(
     await session.execute(delete(Role).where(Role.id == role.id))
     await session.commit()
 
-    await audit.log(
-        "roles.deleted",
+    await log_entity_change(
+        action="roles.deleted",
         entity_type="role",
         entity_id=role_id,
         before={"name": snapshot_name},

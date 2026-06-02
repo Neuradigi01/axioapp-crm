@@ -38,6 +38,7 @@ from src.app.core.reviews.schemas import (
     ReviewReplyPayload,
     ReviewUpdate,
 )
+from src.app.shared.audit import log_entity_change
 from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import get_or_404
 
@@ -98,8 +99,8 @@ async def create_review(
     await session.commit()
     await session.refresh(review)
 
-    await audit.log(
-        "reviews.created",
+    await log_entity_change(
+        action="reviews.created",
         entity_type="review",
         entity_id=review.id,
         after=_snapshot(review),
@@ -152,8 +153,8 @@ async def update_review(
     if changed:
         await session.commit()
         await session.refresh(review)
-        await audit.log(
-            "reviews.updated",
+        await log_entity_change(
+            action="reviews.updated",
             entity_type="review",
             entity_id=review.id,
             before=before,
@@ -169,8 +170,8 @@ async def delete_review(
     before = _snapshot(review)
     await session.delete(review)
     await session.commit()
-    await audit.log(
-        "reviews.deleted",
+    await log_entity_change(
+        action="reviews.deleted",
         entity_type="review",
         entity_id=review_id,
         before=before,

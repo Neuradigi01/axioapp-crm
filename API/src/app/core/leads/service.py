@@ -66,6 +66,7 @@ from src.app.core.leads.schemas import (
 from src.app.core.pipelines import move_card
 from src.app.core.pipelines.service import get_pipeline_by_key
 from src.app.core.users.models import OrganizationMember, User
+from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.db.queries import ensure_found
 
 
@@ -94,29 +95,24 @@ _LEADS_PIPELINE_KEY = "leads"
 _LEADS_CARD_TABLE = "leads"
 
 
+_SNAPSHOT_FIELDS = (
+    "id",
+    "contact_id",
+    "pipeline_stage",
+    "status",
+    "source",
+    "assigned_to_id",
+    "budget",
+    "expected_close_date",
+    "custom_data",
+    "attribution",
+    "lost_reason",
+    "lost_reason_other",
+)
+
+
 def _snapshot(lead: Lead) -> dict[str, Any]:
-    return {
-        "id": str(lead.id),
-        "contact_id": str(lead.contact_id),
-        "pipeline_stage": lead.pipeline_stage,
-        "status": lead.status.value,
-        "source": lead.source.value,
-        "assigned_to_id": (
-            str(lead.assigned_to_id)
-            if lead.assigned_to_id is not None
-            else None
-        ),
-        "budget": str(lead.budget) if lead.budget is not None else None,
-        "expected_close_date": (
-            lead.expected_close_date.isoformat()
-            if lead.expected_close_date is not None
-            else None
-        ),
-        "custom_data": lead.custom_data,
-        "attribution": lead.attribution,
-        "lost_reason": lead.lost_reason,
-        "lost_reason_other": lead.lost_reason_other,
-    }
+    return snapshot(lead, fields=_SNAPSHOT_FIELDS)
 
 
 # --- custom_data validation (mirrors `contacts.service` — intentionally
@@ -345,8 +341,8 @@ async def create_lead(
     await session.commit()
     await session.refresh(lead)
 
-    await audit.log(
-        "leads.created",
+    await log_entity_change(
+        action="leads.created",
         entity_type="lead",
         entity_id=lead.id,
         after=_snapshot(lead),
@@ -390,8 +386,8 @@ async def update_lead(
     await session.commit()
     await session.refresh(lead)
 
-    await audit.log(
-        "leads.updated",
+    await log_entity_change(
+        action="leads.updated",
         entity_type="lead",
         entity_id=lead.id,
         before=before,
@@ -407,8 +403,8 @@ async def delete_lead(session: AsyncSession, *, lead_id: uuid.UUID) -> None:
     await session.delete(lead)
     await session.commit()
 
-    await audit.log(
-        "leads.deleted",
+    await log_entity_change(
+        action="leads.deleted",
         entity_type="lead",
         entity_id=lead_uuid,
         before=before,
@@ -1041,8 +1037,8 @@ async def create_scoring_rule(
     await session.refresh(rule)
 
     scoring.invalidate_rule_field_cache(org_id)
-    await audit.log(
-        "leads.scoring_rule.created",
+    await log_entity_change(
+        action="leads.scoring_rule.created",
         entity_type="lead_scoring_rule",
         entity_id=rule.id,
         after=_scoring_snapshot(rule),
@@ -1067,8 +1063,8 @@ async def update_scoring_rule(
     await session.refresh(rule)
 
     scoring.invalidate_rule_field_cache(rule.org_id)
-    await audit.log(
-        "leads.scoring_rule.updated",
+    await log_entity_change(
+        action="leads.scoring_rule.updated",
         entity_type="lead_scoring_rule",
         entity_id=rule.id,
         before=before,
@@ -1088,8 +1084,8 @@ async def delete_scoring_rule(
     await session.commit()
 
     scoring.invalidate_rule_field_cache(org_id)
-    await audit.log(
-        "leads.scoring_rule.deleted",
+    await log_entity_change(
+        action="leads.scoring_rule.deleted",
         entity_type="lead_scoring_rule",
         entity_id=rule_uuid,
         before=before,

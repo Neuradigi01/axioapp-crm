@@ -27,6 +27,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.shared.audit import log_entity_change
 from src.app.core.appointments.models import Appointment, AppointmentStatus
 from src.app.core.appointments.service import (
     create_appointment as core_create_appointment,
@@ -180,8 +181,8 @@ async def create_visit(
     await session.commit()
     await session.refresh(visit)
 
-    await audit.log(
-        "field_visits.created",
+    await log_entity_change(
+        action="field_visits.created",
         entity_type="field_visit",
         entity_id=visit.id,
         after={

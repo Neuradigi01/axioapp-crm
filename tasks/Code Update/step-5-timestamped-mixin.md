@@ -19,7 +19,9 @@
 - Every output schema in `app/core/` and `app/packs/furniture/` that currently declares the three fields.
 
 ## Plan
-1. Define `class TimestampedOrgScopedOut(ORMModel): org_id: UUID; created_at: datetime; updated_at: datetime`.
+1. Define `class TimestampedOrgScopedOut(ORMM
+
+odel): org_id: UUID; created_at: datetime; updated_at: datetime`.
 2. Grep for `org_id: uuid\.UUID` in `schemas.py` files → 98 hits. For each output schema that declares all three:
    - Change parent class to `TimestampedOrgScopedOut`.
    - Delete the three field declarations.

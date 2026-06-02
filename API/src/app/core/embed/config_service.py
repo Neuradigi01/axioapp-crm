@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.shared.audit import log_entity_change
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldType,
@@ -169,8 +170,8 @@ async def update(
     await session.commit()
     await session.refresh(row)
 
-    await audit.log(
-        "embed.config.updated",
+    await log_entity_change(
+        action="embed.config.updated",
         entity_type="widget_config",
         entity_id=row.id,
         after={

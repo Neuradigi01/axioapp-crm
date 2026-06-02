@@ -44,6 +44,7 @@ from src.app.core.custom_fields.models import (
     FieldType,
 )
 from src.app.core.users.models import OrganizationMember, User
+from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.db.queries import ensure_found
 
 
@@ -65,19 +66,22 @@ _NON_BLOCKING_STATUSES = (
 )
 
 
+_SNAPSHOT_FIELDS = (
+    "id",
+    "contact_id",
+    "title",
+    "purpose",
+    "scheduled_at",
+    "duration_min",
+    "location",
+    "status",
+    "assigned_to_id",
+    "custom_data",
+)
+
+
 def _snapshot(a: Appointment) -> dict[str, Any]:
-    return {
-        "id": str(a.id),
-        "contact_id": str(a.contact_id),
-        "title": a.title,
-        "purpose": a.purpose,
-        "scheduled_at": a.scheduled_at.isoformat(),
-        "duration_min": a.duration_min,
-        "location": a.location,
-        "status": a.status.value,
-        "assigned_to_id": str(a.assigned_to_id),
-        "custom_data": a.custom_data,
-    }
+    return snapshot(a, fields=_SNAPSHOT_FIELDS)
 
 
 # --- custom_data validation (mirrors contacts/leads — same engine) ---
@@ -331,8 +335,8 @@ async def create_appointment(
     await session.commit()
     await session.refresh(appt)
 
-    await audit.log(
-        "appointments.created",
+    await log_entity_change(
+        action="appointments.created",
         entity_type="appointment",
         entity_id=appt.id,
         after=_snapshot(appt),
@@ -429,8 +433,8 @@ async def update_appointment(
     await session.commit()
     await session.refresh(appt)
 
-    await audit.log(
-        "appointments.updated",
+    await log_entity_change(
+        action="appointments.updated",
         entity_type="appointment",
         entity_id=appt.id,
         before=before,
@@ -461,8 +465,8 @@ async def delete_appointment(
     await session.delete(appt)
     await session.commit()
 
-    await audit.log(
-        "appointments.deleted",
+    await log_entity_change(
+        action="appointments.deleted",
         entity_type="appointment",
         entity_id=appt_uuid,
         before=before,

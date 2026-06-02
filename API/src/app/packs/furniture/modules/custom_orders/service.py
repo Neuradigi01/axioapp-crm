@@ -22,6 +22,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.shared.audit import log_entity_change
 from src.app.core.pipelines.service import move_card as pipeline_move_card
 from src.app.packs.furniture.modules.custom_orders.models import (
     CustomOrder,
@@ -133,8 +134,8 @@ async def create_order(
     )
     await session.commit()
 
-    await audit.log(
-        "custom_orders.created",
+    await log_entity_change(
+        action="custom_orders.created",
         entity_type="custom_order",
         entity_id=order.id,
         after={"title": order.title, "stage": order.pipeline_stage},

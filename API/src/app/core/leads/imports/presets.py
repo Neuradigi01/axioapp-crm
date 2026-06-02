@@ -30,6 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.shared.audit import log_entity_change
 from src.app.core.leads.imports.models import ImportPreset
 from src.app.core.leads.imports.schemas import SourcePlatform
 from src.app.core.leads.imports.targets import list_target_keys
@@ -120,8 +121,8 @@ async def create_preset(
         ) from exc
     await session.refresh(row)
 
-    await audit.log(
-        "import_presets.created",
+    await log_entity_change(
+        action="import_presets.created",
         entity_type="import_preset",
         entity_id=row.id,
         after={
@@ -176,8 +177,8 @@ async def delete_preset(
     await session.delete(row)
     await session.commit()
 
-    await audit.log(
-        "import_presets.deleted",
+    await log_entity_change(
+        action="import_presets.deleted",
         entity_type="import_preset",
         entity_id=preset_id_snapshot,
         before={

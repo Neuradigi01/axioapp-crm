@@ -28,6 +28,7 @@ from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.tasks.models import Task, TaskPriority, TaskStatus
 from src.app.core.tasks.schemas import TaskCreate, TaskUpdate
 from src.app.core.users.models import OrganizationMember, User
+from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 
@@ -115,20 +116,21 @@ def _apply_task_filters(
     return stmt.order_by(ordered, Task.created_at.desc())
 
 
+_SNAPSHOT_FIELDS = (
+    "id",
+    "title",
+    "description",
+    "due_at",
+    "assigned_to_id",
+    "related_entity_type",
+    "related_entity_id",
+    "status",
+    "priority",
+)
+
+
 def _snapshot(t: Task) -> dict[str, Any]:
-    return {
-        "id": str(t.id),
-        "title": t.title,
-        "description": t.description,
-        "due_at": t.due_at.isoformat() if t.due_at is not None else None,
-        "assigned_to_id": str(t.assigned_to_id),
-        "related_entity_type": t.related_entity_type,
-        "related_entity_id": (
-            str(t.related_entity_id) if t.related_entity_id is not None else None
-        ),
-        "status": t.status.value,
-        "priority": t.priority.value,
-    }
+    return snapshot(t, fields=_SNAPSHOT_FIELDS)
 
 
 async def get_task(session: AsyncSession, task_id: uuid.UUID) -> Optional[Task]:
@@ -159,8 +161,8 @@ async def create_task(
     await session.commit()
     await session.refresh(task)
 
-    await audit.log(
-        "tasks.created",
+    await log_entity_change(
+        action="tasks.created",
         entity_type="task",
         entity_id=task.id,
         after=_snapshot(task),
@@ -188,8 +190,8 @@ async def update_task(
     await session.commit()
     await session.refresh(task)
 
-    await audit.log(
-        "tasks.updated",
+    await log_entity_change(
+        action="tasks.updated",
         entity_type="task",
         entity_id=task.id,
         before=before,
@@ -205,8 +207,8 @@ async def delete_task(session: AsyncSession, *, task_id: uuid.UUID) -> None:
     await session.delete(task)
     await session.commit()
 
-    await audit.log(
-        "tasks.deleted",
+    await log_entity_change(
+        action="tasks.deleted",
         entity_type="task",
         entity_id=task_uuid,
         before=before,

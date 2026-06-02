@@ -61,6 +61,7 @@ from src.app.core.conversations.registry import (
     resolve as resolve_channel,
 )
 from src.app.core.integrations.whatsapp.models import WhatsAppTemplate
+from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.db.queries import ensure_found, get_or_404
 
 logger = logging.getLogger(__name__)
@@ -128,8 +129,8 @@ async def create_campaign(
     session.add(campaign)
     await session.commit()
     await session.refresh(campaign)
-    await audit.log(
-        "campaigns.created",
+    await log_entity_change(
+        action="campaigns.created",
         entity_type="campaign",
         entity_id=campaign.id,
         after=_snapshot(campaign),
@@ -182,8 +183,8 @@ async def update_campaign(
     if changed:
         await session.commit()
         await session.refresh(campaign)
-        await audit.log(
-            "campaigns.updated",
+        await log_entity_change(
+            action="campaigns.updated",
             entity_type="campaign",
             entity_id=campaign.id,
             before=before,
@@ -204,8 +205,8 @@ async def delete_campaign(
     before = _snapshot(campaign)
     await session.delete(campaign)
     await session.commit()
-    await audit.log(
-        "campaigns.deleted",
+    await log_entity_change(
+        action="campaigns.deleted",
         entity_type="campaign",
         entity_id=campaign_id,
         before=before,
@@ -1021,14 +1022,17 @@ async def stats(
 # --- snapshots ----------------------------------------------------------
 
 
+_SNAPSHOT_FIELDS = (
+    "id",
+    "name",
+    "channel",
+    "status",
+    "audience_filter",
+)
+
+
 def _snapshot(c: Campaign) -> dict[str, Any]:
-    return {
-        "id": str(c.id),
-        "name": c.name,
-        "channel": c.channel.value,
-        "status": c.status.value,
-        "audience_filter": c.audience_filter,
-    }
+    return snapshot(c, fields=_SNAPSHOT_FIELDS)
 
 
 __all__ = [

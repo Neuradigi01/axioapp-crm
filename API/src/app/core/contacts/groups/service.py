@@ -32,6 +32,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.shared.audit import log_entity_change
 from src.app.core.contacts.groups.models import (
     ContactGroup,
     ContactGroupMember,
@@ -169,8 +170,8 @@ async def create_group(
     await session.commit()
     await session.refresh(group)
 
-    await audit.log(
-        "contacts.group.created",
+    await log_entity_change(
+        action="contacts.group.created",
         entity_type="contact_group",
         entity_id=group.id,
         after={
@@ -245,8 +246,8 @@ async def update_group(
             detail="Update conflict — name may already be in use.",
         )
     await session.refresh(group)
-    await audit.log(
-        "contacts.group.updated",
+    await log_entity_change(
+        action="contacts.group.updated",
         entity_type="contact_group",
         entity_id=group_id,
         after={"name": group.name},
@@ -267,8 +268,8 @@ async def delete_group(
     name = group.name
     await session.delete(group)
     await session.commit()
-    await audit.log(
-        "contacts.group.deleted",
+    await log_entity_change(
+        action="contacts.group.deleted",
         entity_type="contact_group",
         entity_id=group_id,
         before={"name": name},

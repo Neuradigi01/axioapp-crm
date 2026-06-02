@@ -40,6 +40,7 @@ from src.app.core.walk_ins.schemas import (
     WalkInUpdate,
 )
 from src.app.core.walk_ins.status_workflow import ALLOWED_TRANSITIONS
+from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 
@@ -57,21 +58,22 @@ _SORT_COLUMNS = {
 }
 
 
+_SNAPSHOT_FIELDS = (
+    "id",
+    "contact_id",
+    "time_in",
+    "time_out",
+    "requirement",
+    "budget",
+    "assigned_to_id",
+    "status",
+    "notes",
+    "custom_data",
+)
+
+
 def _snapshot(w: WalkIn) -> dict[str, Any]:
-    return {
-        "id": str(w.id),
-        "contact_id": str(w.contact_id),
-        "time_in": w.time_in.isoformat(),
-        "time_out": w.time_out.isoformat() if w.time_out is not None else None,
-        "requirement": w.requirement,
-        "budget": str(w.budget) if w.budget is not None else None,
-        "assigned_to_id": (
-            str(w.assigned_to_id) if w.assigned_to_id is not None else None
-        ),
-        "status": w.status.value,
-        "notes": w.notes,
-        "custom_data": w.custom_data,
-    }
+    return snapshot(w, fields=_SNAPSHOT_FIELDS)
 
 
 # --- custom_data validation (mirrors contacts / leads / appointments) ---
@@ -256,8 +258,8 @@ async def create_walk_in(
     await session.commit()
     await session.refresh(walk_in)
 
-    await audit.log(
-        "walk_ins.created",
+    await log_entity_change(
+        action="walk_ins.created",
         entity_type="walk_in",
         entity_id=walk_in.id,
         after=_snapshot(walk_in),
@@ -312,8 +314,8 @@ async def update_walk_in(
     await session.commit()
     await session.refresh(walk_in)
 
-    await audit.log(
-        "walk_ins.updated",
+    await log_entity_change(
+        action="walk_ins.updated",
         entity_type="walk_in",
         entity_id=walk_in.id,
         before=before,
@@ -329,8 +331,8 @@ async def delete_walk_in(session: AsyncSession, *, walk_in_id: uuid.UUID) -> Non
     await session.delete(walk_in)
     await session.commit()
 
-    await audit.log(
-        "walk_ins.deleted",
+    await log_entity_change(
+        action="walk_ins.deleted",
         entity_type="walk_in",
         entity_id=walk_in_uuid,
         before=before,
