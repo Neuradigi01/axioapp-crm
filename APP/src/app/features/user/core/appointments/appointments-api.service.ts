@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { buildHttpParams } from '../shared/services/query-builder';
 
 export type AppointmentStatus =
   | 'scheduled'
@@ -81,13 +82,14 @@ export class AppointmentsApiService {
   /** Listing — works for both calendar (passes from/to) and list view
    * (omits from/to, applies sort/order/status/assignee). */
   list(query: AppointmentListQuery = {}): Observable<Appointment[]> {
-    let params = new HttpParams();
-    if (query.scheduledFrom) params = params.set('from', query.scheduledFrom);
-    if (query.scheduledTo) params = params.set('to', query.scheduledTo);
-    if (query.assignedTo) params = params.set('assigned_to', query.assignedTo);
-    if (query.status) params = params.set('status', query.status);
-    if (query.sort) params = params.set('sort', query.sort);
-    if (query.order) params = params.set('order', query.order);
+    const params = buildHttpParams({
+      from: query.scheduledFrom,
+      to: query.scheduledTo,
+      assigned_to: query.assignedTo,
+      status: query.status,
+      sort: query.sort,
+      order: query.order,
+    });
     return this.http.get<Appointment[]>(this.base, { params });
   }
 

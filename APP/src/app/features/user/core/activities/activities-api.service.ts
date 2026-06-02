@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { buildHttpParams } from '../shared/services/query-builder';
 
 /**
  * Activity types mirror `ActivityType` from
@@ -47,11 +48,12 @@ export class ActivitiesApiService {
     page = 1,
     size = 50,
   ): Observable<ActivityListResponse> {
-    const params = new HttpParams()
-      .set('entity_type', entityType)
-      .set('entity_id', entityId)
-      .set('page', String(page))
-      .set('size', String(size));
+    const params = buildHttpParams({
+      entity_type: entityType,
+      entity_id: entityId,
+      page,
+      size,
+    });
     return this.http.get<ActivityListResponse>(this.base, { params });
   }
 

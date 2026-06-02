@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
+import { buildHttpParams } from '../../shared/services/query-builder';
 
 /**
  * Typed Angular wrapper for the backend bulk-import endpoints
@@ -132,12 +133,12 @@ export class ImportsApiService {
       size?: number;
     } = {},
   ): Observable<LeadImportListResponse> {
-    let params = new HttpParams();
-    if (opts.status) params = params.set('status_filter', opts.status);
-    if (opts.sourcePlatform)
-      params = params.set('source_platform', opts.sourcePlatform);
-    if (opts.page) params = params.set('page', String(opts.page));
-    if (opts.size) params = params.set('size', String(opts.size));
+    const params = buildHttpParams({
+      status_filter: opts.status,
+      source_platform: opts.sourcePlatform,
+      page: opts.page,
+      size: opts.size,
+    });
     return this.http.get<LeadImportListResponse>(this.base, { params });
   }
 
@@ -146,7 +147,7 @@ export class ImportsApiService {
   }
 
   preview(importId: string, limit = 5): Observable<PreviewResponse> {
-    const params = new HttpParams().set('limit', String(limit));
+    const params = buildHttpParams({ limit });
     return this.http.get<PreviewResponse>(
       `${this.base}/${importId}/preview`,
       { params },
@@ -185,7 +186,7 @@ export class ImportsApiService {
   }
 
   listPresets(sourcePlatform: SourcePlatform): Observable<ImportPreset[]> {
-    const params = new HttpParams().set('source_platform', sourcePlatform);
+    const params = buildHttpParams({ source_platform: sourcePlatform });
     return this.http.get<ImportPreset[]>(`${this.base}/presets`, { params });
   }
 

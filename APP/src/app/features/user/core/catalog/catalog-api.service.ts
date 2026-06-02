@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { buildHttpParams } from '../shared/services/query-builder';
 
 export interface CatalogItem {
   id: string;
@@ -58,14 +59,13 @@ export class CatalogApiService {
   private readonly base = `${environment.apiBaseUrl}/catalog`;
 
   list(query: CatalogListQuery = {}): Observable<CatalogListResponse> {
-    let params = new HttpParams();
-    if (query.q) params = params.set('q', query.q);
-    if (query.category) params = params.set('category', query.category);
-    if (query.active_only) {
-      params = params.set('active_only', String(query.active_only));
-    }
-    if (query.page) params = params.set('page', String(query.page));
-    if (query.size) params = params.set('size', String(query.size));
+    const params = buildHttpParams({
+      q: query.q,
+      category: query.category,
+      active_only: query.active_only ? query.active_only : undefined,
+      page: query.page,
+      size: query.size,
+    });
     return this.http.get<CatalogListResponse>(this.base, { params });
   }
 

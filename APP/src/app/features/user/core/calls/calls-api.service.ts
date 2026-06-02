@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { buildHttpParams } from '../shared/services/query-builder';
 
 export type CallDirection = 'in' | 'out';
 
@@ -114,12 +115,13 @@ export class CallsApiService {
     page?: number;
     size?: number;
   } = {}): Observable<CallListResponse> {
-    let params = new HttpParams();
-    if (opts.contact_id) params = params.set('contact_id', opts.contact_id);
-    if (opts.direction) params = params.set('direction', opts.direction);
-    if (opts.assigned_to) params = params.set('assigned_to', opts.assigned_to);
-    if (opts.page) params = params.set('page', String(opts.page));
-    if (opts.size) params = params.set('size', String(opts.size));
+    const params = buildHttpParams({
+      contact_id: opts.contact_id,
+      direction: opts.direction,
+      assigned_to: opts.assigned_to,
+      page: opts.page,
+      size: opts.size,
+    });
     return this.http.get<CallListResponse>(`${this.base}/calls`, { params });
   }
 
@@ -166,7 +168,7 @@ export class CallsApiService {
   // --- Analytics ---
 
   analytics(from: string, to: string): Observable<CallAnalytics> {
-    const params = new HttpParams().set('from', from).set('to', to);
+    const params = buildHttpParams({ from, to });
     return this.http.get<CallAnalytics>(`${this.base}/calls/analytics`, {
       params,
     });

@@ -20,11 +20,12 @@
  * (defence in depth — a curious user typing the URL directly hits
  * the same 403).
  */
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
+import { buildHttpParams } from '../../shared/services/query-builder';
 
 
 // --- Shared shapes (mirror backend `core/integrations/schemas.py`) ----
@@ -356,7 +357,7 @@ export class IntegrationsApiService {
    *  one integration. The Settings cards filter client-side. */
   listSubscriptions(integrationId?: string): Observable<IntegrationSubscription[]> {
     const params = integrationId
-      ? new HttpParams().set('integration_id', integrationId)
+      ? buildHttpParams({ integration_id: integrationId })
       : undefined;
     return this.http.get<IntegrationSubscription[]>(
       `${this.base}/subscriptions`,
@@ -395,15 +396,13 @@ export class IntegrationsApiService {
    *  filters so the dashboard can show "open failures only" while
    *  Step 7's summary card just needs the unfiltered total. */
   listDlq(filters: DlqListFilters = {}): Observable<IntegrationDLQListResponse> {
-    let params = new HttpParams()
-      .set('page', String(filters.page ?? 1))
-      .set('size', String(filters.size ?? 50));
-    if (filters.provider) {
-      params = params.set('provider', filters.provider);
-    }
-    if (filters.include_replayed === false) {
-      params = params.set('include_replayed', 'false');
-    }
+    const params = buildHttpParams({
+      page: filters.page ?? 1,
+      size: filters.size ?? 50,
+      provider: filters.provider,
+      include_replayed:
+        filters.include_replayed === false ? false : undefined,
+    });
     return this.http.get<IntegrationDLQListResponse>(`${this.base}/dlq`, {
       params,
     });
@@ -515,9 +514,10 @@ export class IntegrationsApiService {
     status?: string;
     category?: string;
   }): Observable<WhatsAppTemplate[]> {
-    let params = new HttpParams();
-    if (filters?.status) params = params.set('status', filters.status);
-    if (filters?.category) params = params.set('category', filters.category);
+    const params = buildHttpParams({
+      status: filters?.status,
+      category: filters?.category,
+    });
     return this.http.get<WhatsAppTemplate[]>(
       `${this.base}/whatsapp/templates`,
       { params },

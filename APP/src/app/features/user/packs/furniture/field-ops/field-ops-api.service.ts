@@ -1,9 +1,10 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
 import { AppointmentCreate } from '../../../core/appointments/appointments-api.service';
+import { buildHttpParams } from '../../../core/shared/services/query-builder';
 
 export type FieldVisitPurpose = 'measurement' | 'installation' | 'inspection';
 
@@ -84,16 +85,14 @@ export class FieldOpsApiService {
   private readonly base = `${environment.apiBaseUrl}/field-visits`;
 
   list(query: FieldVisitListQuery = {}): Observable<FieldVisitListResponse> {
-    let params = new HttpParams();
-    if (query.assigned_to_id)
-      params = params.set('assigned_to_id', query.assigned_to_id);
-    if (query.purpose) params = params.set('purpose', query.purpose);
-    if (query.completed !== undefined)
-      params = params.set('completed', String(query.completed));
-    if (query.custom_order_id)
-      params = params.set('custom_order_id', query.custom_order_id);
-    if (query.page) params = params.set('page', String(query.page));
-    if (query.size) params = params.set('size', String(query.size));
+    const params = buildHttpParams({
+      assigned_to_id: query.assigned_to_id,
+      purpose: query.purpose,
+      completed: query.completed,
+      custom_order_id: query.custom_order_id,
+      page: query.page,
+      size: query.size,
+    });
     return this.http.get<FieldVisitListResponse>(this.base, { params });
   }
 

@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { buildHttpParams } from '../shared/services/query-builder';
 
 /**
  * Mirrors `TaskStatus` / `TaskPriority` from the backend. Keep these
@@ -74,19 +75,18 @@ export type TaskUpdate = Partial<{
   priority: TaskPriority;
 }>;
 
-function toParams(filters: TaskListFilters): HttpParams {
-  let params = new HttpParams();
-  if (filters.status) params = params.set('status', filters.status);
-  if (filters.priority) params = params.set('priority', filters.priority);
-  if (filters.q) params = params.set('q', filters.q);
-  if (filters.due_filter) params = params.set('due_filter', filters.due_filter);
-  if (filters.sort_by) params = params.set('sort_by', filters.sort_by);
-  if (filters.sort_dir) params = params.set('sort_dir', filters.sort_dir);
-  if (filters.assigned_to_id)
-    params = params.set('assigned_to_id', filters.assigned_to_id);
-  if (filters.page) params = params.set('page', String(filters.page));
-  if (filters.size) params = params.set('size', String(filters.size));
-  return params;
+function toParams(filters: TaskListFilters) {
+  return buildHttpParams({
+    status: filters.status,
+    priority: filters.priority,
+    q: filters.q,
+    due_filter: filters.due_filter,
+    sort_by: filters.sort_by,
+    sort_dir: filters.sort_dir,
+    assigned_to_id: filters.assigned_to_id,
+    page: filters.page,
+    size: filters.size,
+  });
 }
 
 @Injectable({ providedIn: 'root' })
@@ -100,10 +100,11 @@ export class TasksApiService {
     entityId: string,
     status?: TaskStatus,
   ): Observable<TaskListResponse> {
-    let params = new HttpParams()
-      .set('related_entity_type', entityType)
-      .set('related_entity_id', entityId);
-    if (status) params = params.set('status', status);
+    const params = buildHttpParams({
+      related_entity_type: entityType,
+      related_entity_id: entityId,
+      status,
+    });
     return this.http.get<TaskListResponse>(this.base, { params });
   }
 

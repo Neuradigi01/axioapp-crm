@@ -1,10 +1,11 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { ColumnDef } from '../shared/column-prefs.service';
 import { FilterDsl } from '../shared/filter-dsl.types';
+import { buildHttpParams } from '../shared/services/query-builder';
 
 /** Entities the saved-views API will accept. Widen as future list pages
  * (contacts, walk-ins, tasks) wire up their menus. Keep aligned with the
@@ -67,7 +68,7 @@ export class SavedViewsApiService {
   private readonly base = `${environment.apiBaseUrl}/saved-views`;
 
   list(entity: SavedViewEntity): Observable<SavedView[]> {
-    const params = new HttpParams().set('entity', entity);
+    const params = buildHttpParams({ entity });
     return this.http.get<SavedView[]>(this.base, { params });
   }
 

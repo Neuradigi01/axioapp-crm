@@ -11,11 +11,12 @@
  * buttons for users without the write permission; the API still
  * enforces it (defence in depth).
  */
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
+import { buildHttpParams } from '../../shared/services/query-builder';
 
 
 export interface GroupFilter {
@@ -103,9 +104,7 @@ export class ContactGroupsApiService {
     page: number = 1,
     size: number = 50,
   ): Observable<ContactGroupListResponse> {
-    const params = new HttpParams()
-      .set('page', String(page))
-      .set('size', String(size));
+    const params = buildHttpParams({ page, size });
     return this.http.get<ContactGroupListResponse>(this.base, { params });
   }
 

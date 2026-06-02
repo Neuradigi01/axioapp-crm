@@ -1,10 +1,11 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { Contact } from '../contacts/contacts-api.service';
 import { FieldDef } from '../shared/dynamic-form/types';
+import { buildHttpParams } from '../shared/services/query-builder';
 
 export type WalkInStatus =
   | 'browsing'
@@ -81,16 +82,17 @@ export class WalkInsApiService {
   private readonly renderUrl = `${environment.apiBaseUrl}/custom-fields/walk_in/render`;
 
   list(query: WalkInListQuery = {}): Observable<WalkIn[]> {
-    let params = new HttpParams();
-    if (query.status) params = params.set('status', query.status);
-    if (query.assigned_to) params = params.set('assigned_to', query.assigned_to);
-    if (query.open_only) params = params.set('open_only', String(query.open_only));
-    if (query.date_from) params = params.set('date_from', query.date_from);
-    if (query.date_to) params = params.set('date_to', query.date_to);
-    if (query.sort) params = params.set('sort', query.sort);
-    if (query.order) params = params.set('order', query.order);
-    if (query.page) params = params.set('page', String(query.page));
-    if (query.size) params = params.set('size', String(query.size));
+    const params = buildHttpParams({
+      status: query.status,
+      assigned_to: query.assigned_to,
+      open_only: query.open_only ? query.open_only : undefined,
+      date_from: query.date_from,
+      date_to: query.date_to,
+      sort: query.sort,
+      order: query.order,
+      page: query.page,
+      size: query.size,
+    });
     return this.http.get<WalkIn[]>(this.base, { params });
   }
 

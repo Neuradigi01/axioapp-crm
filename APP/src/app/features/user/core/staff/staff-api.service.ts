@@ -1,9 +1,10 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, forkJoin } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 import { environment } from '../../../../../environments/environment';
+import { buildHttpParams } from '../shared/services/query-builder';
 
 /** Joined `users` + optional `staff_profiles` row (GET /staff item). */
 export interface StaffListItem {
@@ -106,9 +107,7 @@ export class StaffApiService {
     from?: string,
     to?: string,
   ): Observable<AttendanceOut[]> {
-    let params = new HttpParams();
-    if (from) params = params.set('from', from);
-    if (to) params = params.set('to', to);
+    const params = buildHttpParams({ from, to });
     return this.http.get<AttendanceOut[]>(
       `${this.base}/${userId}/attendance`,
       { params },
@@ -116,7 +115,7 @@ export class StaffApiService {
   }
 
   activity(userId: string, limit = 100): Observable<StaffActivity[]> {
-    const params = new HttpParams().set('limit', String(limit));
+    const params = buildHttpParams({ limit });
     return this.http.get<StaffActivity[]>(
       `${this.base}/${userId}/activity`,
       { params },

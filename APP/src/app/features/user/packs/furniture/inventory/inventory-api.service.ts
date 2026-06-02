@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
+import { buildHttpParams } from '../../../core/shared/services/query-builder';
 
 export type MovementType = 'receipt' | 'dispatch' | 'adjust' | 'transfer';
 export type AlertSeverity = 'low' | 'out';
@@ -123,13 +124,14 @@ export class InventoryApiService {
 
   // --- Items ---
   listItems(query: InventoryItemQuery = {}): Observable<InventoryItemListResponse> {
-    let params = new HttpParams();
-    if (query.warehouse_id) params = params.set('warehouse_id', query.warehouse_id);
-    if (query.category) params = params.set('category', query.category);
-    if (query.q) params = params.set('q', query.q);
-    if (query.active_only) params = params.set('active_only', 'true');
-    if (query.page) params = params.set('page', String(query.page));
-    if (query.size) params = params.set('size', String(query.size));
+    const params = buildHttpParams({
+      warehouse_id: query.warehouse_id,
+      category: query.category,
+      q: query.q,
+      active_only: query.active_only ? true : undefined,
+      page: query.page,
+      size: query.size,
+    });
     return this.http.get<InventoryItemListResponse>(`${this.base}/items`, { params });
   }
 
@@ -154,7 +156,7 @@ export class InventoryApiService {
 
   // --- Movements ---
   listMovements(itemId: string, limit = 100): Observable<Movement[]> {
-    const params = new HttpParams().set('limit', String(limit));
+    const params = buildHttpParams({ limit });
     return this.http.get<Movement[]>(
       `${this.base}/items/${itemId}/movements`,
       { params },
@@ -170,9 +172,10 @@ export class InventoryApiService {
 
   // --- Alerts ---
   listAlerts(opts: { severity?: AlertSeverity; status?: AlertStatus } = {}): Observable<StockAlert[]> {
-    let params = new HttpParams();
-    if (opts.severity) params = params.set('severity', opts.severity);
-    if (opts.status) params = params.set('status', opts.status);
+    const params = buildHttpParams({
+      severity: opts.severity,
+      status: opts.status,
+    });
     return this.http.get<StockAlert[]>(`${this.base}/alerts`, { params });
   }
 

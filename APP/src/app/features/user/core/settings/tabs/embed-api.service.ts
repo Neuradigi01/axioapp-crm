@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
+import { buildHttpParams } from '../../shared/services/query-builder';
 
 /**
  * Typed Angular wrapper for the admin embed-widget endpoints
@@ -175,12 +176,13 @@ export class EmbedApiService {
   listSubmissions(
     filters: EmbedSubmissionListFilters,
   ): Observable<EmbedSubmissionListResponse> {
-    let params = new HttpParams()
-      .set('page', String(filters.page ?? 1))
-      .set('page_size', String(filters.page_size ?? 25));
-    if (filters.outcome) params = params.set('outcome', filters.outcome);
-    if (filters.from) params = params.set('from', filters.from);
-    if (filters.to) params = params.set('to', filters.to);
+    const params = buildHttpParams({
+      page: filters.page ?? 1,
+      page_size: filters.page_size ?? 25,
+      outcome: filters.outcome,
+      from: filters.from,
+      to: filters.to,
+    });
     return this.http.get<EmbedSubmissionListResponse>(
       `${this.base}/submissions`,
       { params },
@@ -190,9 +192,10 @@ export class EmbedApiService {
   getSubmissionSummary(
     range: EmbedSubmissionRange,
   ): Observable<EmbedSubmissionSummary> {
-    let params = new HttpParams();
-    if (range.from) params = params.set('from', range.from);
-    if (range.to) params = params.set('to', range.to);
+    const params = buildHttpParams({
+      from: range.from,
+      to: range.to,
+    });
     return this.http.get<EmbedSubmissionSummary>(
       `${this.base}/submissions/summary`,
       { params },

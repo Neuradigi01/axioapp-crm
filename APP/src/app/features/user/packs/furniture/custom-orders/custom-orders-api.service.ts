@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
+import { buildHttpParams } from '../../../core/shared/services/query-builder';
 
 export interface CustomOrder {
   id: string;
@@ -104,13 +105,13 @@ export class CustomOrdersApiService {
   private readonly base = `${environment.apiBaseUrl}/custom-orders`;
 
   list(query: CustomOrderListQuery = {}): Observable<CustomOrderListResponse> {
-    let params = new HttpParams();
-    if (query.stage) params = params.set('stage', query.stage);
-    if (query.assigned_to_id)
-      params = params.set('assigned_to_id', query.assigned_to_id);
-    if (query.contact_id) params = params.set('contact_id', query.contact_id);
-    if (query.page) params = params.set('page', String(query.page));
-    if (query.size) params = params.set('size', String(query.size));
+    const params = buildHttpParams({
+      stage: query.stage,
+      assigned_to_id: query.assigned_to_id,
+      contact_id: query.contact_id,
+      page: query.page,
+      size: query.size,
+    });
     return this.http.get<CustomOrderListResponse>(this.base, { params });
   }
 

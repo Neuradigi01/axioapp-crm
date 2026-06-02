@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { buildHttpParams } from '../shared/services/query-builder';
 
 export type ReviewStatus = 'pending_reply' | 'replied' | 'escalated';
 
@@ -57,12 +58,13 @@ export class ReviewsApiService {
   private readonly base = `${environment.apiBaseUrl}/reviews`;
 
   list(query: ReviewListQuery = {}): Observable<ReviewListResponse> {
-    let params = new HttpParams();
-    if (query.source) params = params.set('source', query.source);
-    if (query.rating) params = params.set('rating', String(query.rating));
-    if (query.status) params = params.set('status', query.status);
-    if (query.page) params = params.set('page', String(query.page));
-    if (query.size) params = params.set('size', String(query.size));
+    const params = buildHttpParams({
+      source: query.source,
+      rating: query.rating ? query.rating : undefined,
+      status: query.status,
+      page: query.page,
+      size: query.size,
+    });
     return this.http.get<ReviewListResponse>(this.base, { params });
   }
 

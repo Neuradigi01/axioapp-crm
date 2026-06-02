@@ -1,10 +1,11 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { FieldDef } from '../shared/dynamic-form/types';
 import { FilterDsl, isEmptyFilter } from '../shared/filter-dsl.types';
+import { buildHttpParams, prefixCustomFilters } from '../shared/services/query-builder';
 
 export type LeadStatus = 'active' | 'won' | 'lost';
 
@@ -289,36 +290,27 @@ export class LeadsApiService {
     );
   }
 
-  private buildParams(query: LeadListQuery): HttpParams {
-    let params = new HttpParams();
-    if (query.stage) params = params.set('stage', query.stage);
-    if (query.status) params = params.set('status', query.status);
-    if (query.assigned_to) params = params.set('assigned_to', query.assigned_to);
-    if (query.q) params = params.set('q', query.q);
-    if (query.source) params = params.set('source', query.source);
-    if (query.last_activity_lt) {
-      params = params.set('last_activity_lt', query.last_activity_lt);
-    }
-    if (query.last_activity_gt) {
-      params = params.set('last_activity_gt', query.last_activity_gt);
-    }
-    if (query.sort) params = params.set('sort', query.sort);
-    if (query.order) params = params.set('order', query.order);
-    if (query.page !== undefined) params = params.set('page', String(query.page));
-    if (query.size !== undefined) params = params.set('size', String(query.size));
-    if (query.cursor) params = params.set('cursor', query.cursor);
-    if (query.limit !== undefined) params = params.set('limit', String(query.limit));
-    if (query.with_total !== undefined) {
-      params = params.set('with_total', String(query.with_total));
-    }
-    if (query.filter && !isEmptyFilter(query.filter)) {
-      params = params.set('filter', JSON.stringify(query.filter));
-    }
-    if (query.customFilters) {
-      for (const [k, v] of Object.entries(query.customFilters)) {
-        if (v) params = params.set(`custom.${k}`, v);
-      }
-    }
-    return params;
+  private buildParams(query: LeadListQuery) {
+    return buildHttpParams({
+      stage: query.stage,
+      status: query.status,
+      assigned_to: query.assigned_to,
+      q: query.q,
+      source: query.source,
+      last_activity_lt: query.last_activity_lt,
+      last_activity_gt: query.last_activity_gt,
+      sort: query.sort,
+      order: query.order,
+      page: query.page,
+      size: query.size,
+      cursor: query.cursor,
+      limit: query.limit,
+      with_total: query.with_total,
+      filter:
+        query.filter && !isEmptyFilter(query.filter)
+          ? JSON.stringify(query.filter)
+          : undefined,
+      ...prefixCustomFilters(query.customFilters),
+    });
   }
 }

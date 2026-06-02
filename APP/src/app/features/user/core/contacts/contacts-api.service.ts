@@ -1,9 +1,10 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { FieldDef } from '../shared/dynamic-form/types';
+import { buildHttpParams, prefixCustomFilters } from '../shared/services/query-builder';
 
 /**
  * Wire shape for `GET /api/v1/contacts`. Mirrors `ContactListResponse`
@@ -144,24 +145,17 @@ export class ContactsApiService {
   private readonly renderUrl = `${environment.apiBaseUrl}/custom-fields/contact/render`;
 
   list(query: ContactListQuery = {}): Observable<ContactListResponse> {
-    let params = new HttpParams();
-    if (query.q) params = params.set('q', query.q);
-    if (query.source) params = params.set('source', query.source);
-    if (query.tag) params = params.set('tag', query.tag);
-    if (query.assigned_to_id) {
-      params = params.set('assigned_to_id', query.assigned_to_id);
-    }
-    if (query.sort) params = params.set('sort', query.sort);
-    if (query.order) params = params.set('order', query.order);
-    if (query.page) params = params.set('page', String(query.page));
-    if (query.size) params = params.set('size', String(query.size));
-    if (query.customFilters) {
-      for (const [key, value] of Object.entries(query.customFilters)) {
-        if (value !== undefined && value !== '') {
-          params = params.set(`custom.${key}`, value);
-        }
-      }
-    }
+    const params = buildHttpParams({
+      q: query.q,
+      source: query.source,
+      tag: query.tag,
+      assigned_to_id: query.assigned_to_id,
+      sort: query.sort,
+      order: query.order,
+      page: query.page,
+      size: query.size,
+      ...prefixCustomFilters(query.customFilters),
+    });
     return this.http.get<ContactListResponse>(this.base, { params });
   }
 
@@ -224,10 +218,11 @@ export class ContactsApiService {
     email?: string | null;
     excludeId?: string | null;
   }): Observable<{ matches: ContactDuplicateMatch[] }> {
-    let params = new HttpParams();
-    if (query.phone) params = params.set('phone', query.phone);
-    if (query.email) params = params.set('email', query.email);
-    if (query.excludeId) params = params.set('exclude_id', query.excludeId);
+    const params = buildHttpParams({
+      phone: query.phone,
+      email: query.email,
+      exclude_id: query.excludeId,
+    });
     return this.http.get<{ matches: ContactDuplicateMatch[] }>(
       `${this.base}/check-duplicate`,
       { params },
@@ -238,20 +233,13 @@ export class ContactsApiService {
    * rows (returns 422). The caller is responsible for triggering the
    * browser download via the returned Blob. */
   exportCsv(query: ContactListQuery = {}): Observable<Blob> {
-    let params = new HttpParams();
-    if (query.q) params = params.set('q', query.q);
-    if (query.source) params = params.set('source', query.source);
-    if (query.tag) params = params.set('tag', query.tag);
-    if (query.assigned_to_id) {
-      params = params.set('assigned_to_id', query.assigned_to_id);
-    }
-    if (query.customFilters) {
-      for (const [key, value] of Object.entries(query.customFilters)) {
-        if (value !== undefined && value !== '') {
-          params = params.set(`custom.${key}`, value);
-        }
-      }
-    }
+    const params = buildHttpParams({
+      q: query.q,
+      source: query.source,
+      tag: query.tag,
+      assigned_to_id: query.assigned_to_id,
+      ...prefixCustomFilters(query.customFilters),
+    });
     return this.http.get(`${this.base}/export.csv`, {
       params,
       responseType: 'blob',

@@ -1,9 +1,10 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { ConversationChannel } from '../conversations/conversations-api.service';
+import { buildHttpParams } from '../shared/services/query-builder';
 
 export type CampaignStatus =
   | 'draft'
@@ -118,7 +119,7 @@ export class CampaignsApiService {
   private readonly base = `${environment.apiBaseUrl}/campaigns`;
 
   list(page = 1, size = 50): Observable<CampaignListResponse> {
-    const params = new HttpParams().set('page', page).set('size', size);
+    const params = buildHttpParams({ page, size });
     return this.http.get<CampaignListResponse>(this.base, { params });
   }
 
@@ -153,8 +154,7 @@ export class CampaignsApiService {
     id: string,
     status?: CampaignMessageStatus,
   ): Observable<CampaignMessage[]> {
-    let params = new HttpParams();
-    if (status) params = params.set('status', status);
+    const params = buildHttpParams({ status });
     return this.http.get<CampaignMessage[]>(
       `${this.base}/${id}/messages`,
       { params },

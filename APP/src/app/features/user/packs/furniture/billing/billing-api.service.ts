@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
+import { buildHttpParams } from '../../../core/shared/services/query-builder';
 
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'void';
 export type PaymentMethod =
@@ -124,11 +125,12 @@ export class BillingApiService {
   private readonly posBase = `${environment.apiBaseUrl}/pos`;
 
   list(query: InvoiceListQuery = {}): Observable<InvoiceListResponse> {
-    let params = new HttpParams();
-    if (query.status) params = params.set('status', query.status);
-    if (query.contact_id) params = params.set('contact_id', query.contact_id);
-    if (query.page) params = params.set('page', String(query.page));
-    if (query.size) params = params.set('size', String(query.size));
+    const params = buildHttpParams({
+      status: query.status,
+      contact_id: query.contact_id,
+      page: query.page,
+      size: query.size,
+    });
     return this.http.get<InvoiceListResponse>(this.base, { params });
   }
 

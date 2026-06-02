@@ -1,8 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { buildHttpParams } from '../shared/services/query-builder';
 
 export type ConversationChannel =
   | 'whatsapp'
@@ -78,13 +79,14 @@ export class ConversationsApiService {
   private readonly base = `${environment.apiBaseUrl}/conversations`;
 
   list(query: ConversationListQuery = {}): Observable<ConversationListResponse> {
-    let params = new HttpParams();
-    if (query.channel) params = params.set('channel', query.channel);
-    if (query.status) params = params.set('status', query.status);
-    if (query.assigned_to) params = params.set('assigned_to', query.assigned_to);
-    if (query.q) params = params.set('q', query.q);
-    if (query.page) params = params.set('page', String(query.page));
-    if (query.size) params = params.set('size', String(query.size));
+    const params = buildHttpParams({
+      channel: query.channel,
+      status: query.status,
+      assigned_to: query.assigned_to,
+      q: query.q,
+      page: query.page,
+      size: query.size,
+    });
     return this.http.get<ConversationListResponse>(this.base, { params });
   }
 
