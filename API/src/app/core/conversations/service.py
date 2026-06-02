@@ -52,6 +52,7 @@ from src.app.core.conversations.adapters.whatsapp import (
 from src.app.core.conversations.registry import resolve
 from src.app.core.conversations.schemas import ConversationPatch
 from src.app.core.notifications.service import notify
+from src.app.shared.db.queries import get_or_404
 
 
 # Channels whose `external_id` is a phone number; the webhook intake
@@ -109,17 +110,7 @@ async def list_conversations(
 async def get_conversation(
     session: AsyncSession, conversation_id: uuid.UUID
 ) -> Conversation:
-    conv = (
-        await session.execute(
-            select(Conversation).where(Conversation.id == conversation_id)
-        )
-    ).scalar_one_or_none()
-    if conv is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="conversation not found",
-        )
-    return conv
+    return await get_or_404(session, Conversation, conversation_id, entity="conversation")
 
 
 async def list_messages(

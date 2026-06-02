@@ -40,6 +40,7 @@ from src.app.core.walk_ins.schemas import (
     WalkInUpdate,
 )
 from src.app.core.walk_ins.status_workflow import ALLOWED_TRANSITIONS
+from src.app.shared.db.queries import ensure_found
 
 
 _WALK_IN_ENTITY = "walk_in"
@@ -269,11 +270,7 @@ async def update_walk_in(
     walk_in_id: uuid.UUID,
     payload: WalkInUpdate,
 ) -> WalkIn:
-    walk_in = await get_walk_in(session, walk_in_id)
-    if walk_in is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found"
-        )
+    walk_in = ensure_found(await get_walk_in(session, walk_in_id), entity="walk-in")
 
     before = _snapshot(walk_in)
     changes = payload.model_dump(exclude_unset=True)
@@ -325,11 +322,7 @@ async def update_walk_in(
 
 
 async def delete_walk_in(session: AsyncSession, *, walk_in_id: uuid.UUID) -> None:
-    walk_in = await get_walk_in(session, walk_in_id)
-    if walk_in is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found"
-        )
+    walk_in = ensure_found(await get_walk_in(session, walk_in_id), entity="walk-in")
     before = _snapshot(walk_in)
     walk_in_uuid = walk_in.id
     await session.delete(walk_in)
@@ -474,11 +467,7 @@ async def checkout(
 ) -> WalkIn:
     """Stamp `time_out=now()` on a walk-in. Idempotent — if already
     checked out, leaves the existing `time_out` in place."""
-    walk_in = await get_walk_in(session, walk_in_id)
-    if walk_in is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found"
-        )
+    walk_in = ensure_found(await get_walk_in(session, walk_in_id), entity="walk-in")
     if walk_in.time_out is None:
         before = _snapshot(walk_in)
         walk_in.time_out = datetime.now(timezone.utc)
@@ -540,11 +529,7 @@ async def reassign_walk_in(
     note: str | None,
     actor_user_id: uuid.UUID | None,
 ) -> WalkIn:
-    walk_in = await get_walk_in(session, walk_in_id)
-    if walk_in is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found"
-        )
+    walk_in = ensure_found(await get_walk_in(session, walk_in_id), entity="walk-in")
     if assigned_to_id is not None:
         await _assert_user_in_org(
             session, org_id=org_id, user_uuid=assigned_to_id
@@ -693,11 +678,7 @@ async def convert_walk_in_to_lead(
     from src.app.core.leads.schemas import LeadCreate
     from src.app.core.leads.service import create_lead as create_lead_service
 
-    walk_in = await get_walk_in(session, walk_in_id)
-    if walk_in is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found"
-        )
+    walk_in = ensure_found(await get_walk_in(session, walk_in_id), entity="walk-in")
     if walk_in.linked_lead_id is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

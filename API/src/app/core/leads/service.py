@@ -66,6 +66,7 @@ from src.app.core.leads.schemas import (
 from src.app.core.pipelines import move_card
 from src.app.core.pipelines.service import get_pipeline_by_key
 from src.app.core.users.models import OrganizationMember, User
+from src.app.shared.db.queries import ensure_found
 
 
 # Server-side whitelist for `?sort=` on the list endpoint. Anything
@@ -359,11 +360,7 @@ async def update_lead(
     lead_id: uuid.UUID,
     payload: LeadUpdate,
 ) -> Lead:
-    lead = await get_lead(session, lead_id)
-    if lead is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
-        )
+    lead = ensure_found(await get_lead(session, lead_id), entity="lead")
 
     before = _snapshot(lead)
     changes = payload.model_dump(exclude_unset=True)
@@ -404,11 +401,7 @@ async def update_lead(
 
 
 async def delete_lead(session: AsyncSession, *, lead_id: uuid.UUID) -> None:
-    lead = await get_lead(session, lead_id)
-    if lead is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
-        )
+    lead = ensure_found(await get_lead(session, lead_id), entity="lead")
     before = _snapshot(lead)
     lead_uuid = lead.id
     await session.delete(lead)
@@ -762,11 +755,7 @@ async def move_stage_for_lead(
     single API call, so the timeline shows "moved to <stage> with
     reason=<x>" instead of two disconnected events.
     """
-    lead = await get_lead(session, lead_id)
-    if lead is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
-        )
+    lead = ensure_found(await get_lead(session, lead_id), entity="lead")
 
     # Resolve the destination stage's flags up-front so we can reject
     # an incomplete move-to-Lost call before any DB mutation.
@@ -888,11 +877,7 @@ async def reassign_lead(
 ) -> Lead:
     """Single-row reassign. Writes an `Activity(type=reassign)` on the
     same session so the lead update + the timeline row commit atomically."""
-    lead = await get_lead(session, lead_id)
-    if lead is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
-        )
+    lead = ensure_found(await get_lead(session, lead_id), entity="lead")
     if assigned_to_id is not None:
         await _assert_user_in_org(
             session, org_id=org_id, user_uuid=assigned_to_id
@@ -1071,12 +1056,7 @@ async def update_scoring_rule(
     rule_id: uuid.UUID,
     payload: LeadScoringRuleUpdate,
 ) -> LeadScoringRule:
-    rule = await get_scoring_rule(session, rule_id=rule_id)
-    if rule is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="scoring rule not found",
-        )
+    rule = ensure_found(await get_scoring_rule(session, rule_id=rule_id), entity="scoring rule")
     before = _scoring_snapshot(rule)
     changes = payload.model_dump(exclude_unset=True)
     if "condition" in changes and changes["condition"] is not None:
@@ -1100,12 +1080,7 @@ async def update_scoring_rule(
 async def delete_scoring_rule(
     session: AsyncSession, *, rule_id: uuid.UUID
 ) -> None:
-    rule = await get_scoring_rule(session, rule_id=rule_id)
-    if rule is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="scoring rule not found",
-        )
+    rule = ensure_found(await get_scoring_rule(session, rule_id=rule_id), entity="scoring rule")
     before = _scoring_snapshot(rule)
     org_id = rule.org_id
     rule_uuid = rule.id

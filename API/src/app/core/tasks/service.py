@@ -28,6 +28,7 @@ from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.tasks.models import Task, TaskPriority, TaskStatus
 from src.app.core.tasks.schemas import TaskCreate, TaskUpdate
 from src.app.core.users.models import OrganizationMember, User
+from src.app.shared.db.queries import ensure_found
 
 
 DueFilter = Literal["today", "overdue", "upcoming"]
@@ -172,11 +173,7 @@ async def update_task(
     task_id: uuid.UUID,
     payload: TaskUpdate,
 ) -> Task:
-    task = await get_task(session, task_id)
-    if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="task not found"
-        )
+    task = ensure_found(await get_task(session, task_id), entity="task")
 
     before = _snapshot(task)
     changes = payload.model_dump(exclude_unset=True)
@@ -201,11 +198,7 @@ async def update_task(
 
 
 async def delete_task(session: AsyncSession, *, task_id: uuid.UUID) -> None:
-    task = await get_task(session, task_id)
-    if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="task not found"
-        )
+    task = ensure_found(await get_task(session, task_id), entity="task")
     before = _snapshot(task)
     task_uuid = task.id
     await session.delete(task)

@@ -61,6 +61,7 @@ from src.app.core.conversations.registry import (
     resolve as resolve_channel,
 )
 from src.app.core.integrations.whatsapp.models import WhatsAppTemplate
+from src.app.shared.db.queries import ensure_found, get_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -95,17 +96,7 @@ async def list_campaigns(
 async def get_campaign(
     session: AsyncSession, campaign_id: uuid.UUID
 ) -> Campaign:
-    row = (
-        await session.execute(
-            select(Campaign).where(Campaign.id == campaign_id)
-        )
-    ).scalar_one_or_none()
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="campaign not found",
-        )
-    return row
+    return await get_or_404(session, Campaign, campaign_id, entity="campaign")
 
 
 # --- writes --------------------------------------------------------------
@@ -976,18 +967,16 @@ async def retry_message(
     runs the single-contact dispatch inline."""
     await get_campaign(session, campaign_id)
 
-    msg = (
-        await session.execute(
-            select(CampaignMessage)
-            .where(CampaignMessage.id == message_id)
-            .where(CampaignMessage.campaign_id == campaign_id)
-        )
-    ).scalar_one_or_none()
-    if msg is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="campaign message not found",
-        )
+    msg = ensure_found(
+        (
+            await session.execute(
+                select(CampaignMessage)
+                .where(CampaignMessage.id == message_id)
+                .where(CampaignMessage.campaign_id == campaign_id)
+            )
+        ).scalar_one_or_none(),
+        entity="campaign message",
+    )
     if msg.status != CampaignMessageStatus.failed:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

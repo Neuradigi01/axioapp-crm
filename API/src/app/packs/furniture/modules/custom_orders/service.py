@@ -34,6 +34,7 @@ from src.app.packs.furniture.modules.custom_orders.schemas import (
     CustomOrderUpdate,
     MeasurementCreate,
 )
+from src.app.shared.db.queries import get_or_404
 from src.app.shared.storage import get_storage
 
 
@@ -85,17 +86,7 @@ async def list_orders(
 async def get_order(
     session: AsyncSession, order_id: uuid.UUID
 ) -> CustomOrder:
-    row = (
-        await session.execute(
-            select(CustomOrder).where(CustomOrder.id == order_id)
-        )
-    ).scalar_one_or_none()
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="custom order not found",
-        )
-    return row
+    return await get_or_404(session, CustomOrder, order_id, entity="custom order")
 
 
 # --- writes ---------------------------------------------------------------

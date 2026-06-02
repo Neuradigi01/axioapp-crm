@@ -42,6 +42,7 @@ from src.app.core.calls.schemas import (
     CallTranscriptUpsert,
     CallUpdate,
 )
+from src.app.shared.db.queries import get_or_404
 
 
 # --- Outcomes -------------------------------------------------------------
@@ -135,17 +136,7 @@ async def delete_outcome(
 async def _get_outcome(
     session: AsyncSession, outcome_id: uuid.UUID
 ) -> CallOutcome:
-    outcome = (
-        await session.execute(
-            select(CallOutcome).where(CallOutcome.id == outcome_id)
-        )
-    ).scalar_one_or_none()
-    if outcome is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="call outcome not found",
-        )
-    return outcome
+    return await get_or_404(session, CallOutcome, outcome_id, entity="call outcome")
 
 
 # --- Calls CRUD ------------------------------------------------------------
@@ -189,14 +180,7 @@ async def list_calls(
 
 
 async def get_call(session: AsyncSession, call_id: uuid.UUID) -> Call:
-    call = (
-        await session.execute(select(Call).where(Call.id == call_id))
-    ).scalar_one_or_none()
-    if call is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="call not found"
-        )
-    return call
+    return await get_or_404(session, Call, call_id, entity="call")
 
 
 async def create_call(

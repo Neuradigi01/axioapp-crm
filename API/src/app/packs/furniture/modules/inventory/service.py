@@ -48,6 +48,7 @@ from src.app.packs.furniture.modules.inventory.schemas import (
     WarehouseCreate,
     WarehouseUpdate,
 )
+from src.app.shared.db.queries import get_or_404
 
 
 # --- warehouses ---------------------------------------------------------
@@ -63,16 +64,7 @@ async def list_warehouses(session: AsyncSession) -> list[Warehouse]:
 async def get_warehouse(
     session: AsyncSession, warehouse_id: uuid.UUID
 ) -> Warehouse:
-    w = (
-        await session.execute(
-            select(Warehouse).where(Warehouse.id == warehouse_id)
-        )
-    ).scalar_one_or_none()
-    if w is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="warehouse not found"
-        )
-    return w
+    return await get_or_404(session, Warehouse, warehouse_id, entity="warehouse")
 
 
 async def create_warehouse(
@@ -211,16 +203,7 @@ async def list_items(
 async def get_item(
     session: AsyncSession, item_id: uuid.UUID
 ) -> InventoryItem:
-    item = (
-        await session.execute(
-            select(InventoryItem).where(InventoryItem.id == item_id)
-        )
-    ).scalar_one_or_none()
-    if item is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="item not found"
-        )
-    return item
+    return await get_or_404(session, InventoryItem, item_id, entity="item")
 
 
 async def create_item(
@@ -233,16 +216,9 @@ async def create_item(
     # but a 404 is friendlier than a generic 500).
     await get_warehouse(session, payload.warehouse_id)
     if payload.catalog_item_id is not None:
-        catalog = (
-            await session.execute(
-                select(CatalogItem).where(CatalogItem.id == payload.catalog_item_id)
-            )
-        ).scalar_one_or_none()
-        if catalog is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="catalog_item_id not found",
-            )
+        await get_or_404(
+            session, CatalogItem, payload.catalog_item_id, entity="catalog_item_id"
+        )
 
     item = InventoryItem(
         org_id=org_id,
@@ -563,15 +539,7 @@ async def update_alert_status(
     alert_id: uuid.UUID,
     new_status: AlertStatus,
 ) -> StockAlert:
-    alert = (
-        await session.execute(
-            select(StockAlert).where(StockAlert.id == alert_id)
-        )
-    ).scalar_one_or_none()
-    if alert is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="alert not found"
-        )
+    alert = await get_or_404(session, StockAlert, alert_id, entity="alert")
     alert.status = new_status
     if new_status == AlertStatus.closed and alert.closed_at is None:
         alert.closed_at = datetime.now(timezone.utc)

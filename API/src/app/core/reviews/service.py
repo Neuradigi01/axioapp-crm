@@ -38,6 +38,7 @@ from src.app.core.reviews.schemas import (
     ReviewReplyPayload,
     ReviewUpdate,
 )
+from src.app.shared.db.queries import get_or_404
 
 
 # --- reads ----------------------------------------------------------------
@@ -81,14 +82,7 @@ async def list_reviews(
 
 
 async def get_review(session: AsyncSession, review_id: uuid.UUID) -> Review:
-    review = (
-        await session.execute(select(Review).where(Review.id == review_id))
-    ).scalar_one_or_none()
-    if review is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="review not found"
-        )
-    return review
+    return await get_or_404(session, Review, review_id, entity="review")
 
 
 # --- writes ---------------------------------------------------------------

@@ -32,6 +32,7 @@ from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldType,
 )
+from src.app.shared.db.queries import ensure_found
 
 
 _CATALOG_ENTITY = "catalog_item"
@@ -222,12 +223,7 @@ async def update_item(
     item_id: uuid.UUID,
     payload: CatalogItemUpdate,
 ) -> CatalogItem:
-    item = await get_item(session, item_id)
-    if item is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="catalog item not found",
-        )
+    item = ensure_found(await get_item(session, item_id), entity="catalog item")
 
     before = _snapshot(item)
     changes = payload.model_dump(exclude_unset=True)
@@ -253,12 +249,7 @@ async def update_item(
 
 
 async def delete_item(session: AsyncSession, *, item_id: uuid.UUID) -> None:
-    item = await get_item(session, item_id)
-    if item is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="catalog item not found",
-        )
+    item = ensure_found(await get_item(session, item_id), entity="catalog item")
     before = _snapshot(item)
     item_uuid = item.id
     await session.delete(item)

@@ -31,6 +31,7 @@ from src.app.core.contacts.models import Contact
 from src.app.core.contacts.schemas import ContactCreate, ContactUpdate
 from src.app.core.custom_fields.models import CustomFieldDefinition, FieldType
 from src.app.core.users.models import OrganizationMember, User
+from src.app.shared.db.queries import ensure_found
 
 
 _CONTACT_ENTITY = "contact"
@@ -255,11 +256,7 @@ async def update_contact(
     contact_id: uuid.UUID,
     payload: ContactUpdate,
 ) -> Contact:
-    contact = await get_contact(session, contact_id)
-    if contact is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
-        )
+    contact = ensure_found(await get_contact(session, contact_id), entity="contact")
 
     before = _snapshot(contact)
     changes = payload.model_dump(exclude_unset=True)
@@ -297,11 +294,7 @@ async def update_contact(
 async def delete_contact(
     session: AsyncSession, *, contact_id: uuid.UUID
 ) -> None:
-    contact = await get_contact(session, contact_id)
-    if contact is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
-        )
+    contact = ensure_found(await get_contact(session, contact_id), entity="contact")
     before = _snapshot(contact)
     contact_uuid = contact.id
     await session.delete(contact)
@@ -445,11 +438,7 @@ async def reassign_contact(
     `commit=False` lets `bulk_reassign_contacts` batch many reassigns into
     one transaction without N intermediate commits.
     """
-    contact = await get_contact(session, contact_id)
-    if contact is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
-        )
+    contact = ensure_found(await get_contact(session, contact_id), entity="contact")
 
     if assigned_to_id is not None:
         await _assert_user_in_org(

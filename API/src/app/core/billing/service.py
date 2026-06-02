@@ -48,6 +48,7 @@ from src.app.core.billing.schemas import (
     PaymentCreate,
 )
 from src.app.core.settings.service import get_or_create as get_org_settings
+from src.app.shared.db.queries import ensure_found, get_or_404
 
 
 # --- reads ----------------------------------------------------------------
@@ -87,16 +88,7 @@ async def list_invoices(
 async def get_invoice(
     session: AsyncSession, invoice_id: uuid.UUID
 ) -> Invoice:
-    row = (
-        await session.execute(
-            select(Invoice).where(Invoice.id == invoice_id)
-        )
-    ).scalar_one_or_none()
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="invoice not found"
-        )
-    return row
+    return await get_or_404(session, Invoice, invoice_id, entity="invoice")
 
 
 async def get_invoice_with_lines(
@@ -264,10 +256,7 @@ async def remove_line(
             )
         )
     ).scalar_one_or_none()
-    if line is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="line not found"
-        )
+    line = ensure_found(line, entity="line")
     await session.delete(line)
     await session.flush()
     lines = await _load_lines(session, inv.id)

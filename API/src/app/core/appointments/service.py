@@ -44,6 +44,7 @@ from src.app.core.custom_fields.models import (
     FieldType,
 )
 from src.app.core.users.models import OrganizationMember, User
+from src.app.shared.db.queries import ensure_found
 
 
 # Server-side sort whitelist. Router validates via FastAPI Literal; the
@@ -359,12 +360,7 @@ async def update_appointment(
     current_user_id: uuid.UUID,
     payload: AppointmentUpdate,
 ) -> Appointment:
-    appt = await get_appointment(session, appointment_id)
-    if appt is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="appointment not found",
-        )
+    appt = ensure_found(await get_appointment(session, appointment_id), entity="appointment")
 
     before = _snapshot(appt)
     changes = payload.model_dump(exclude_unset=True)
@@ -459,12 +455,7 @@ async def update_appointment(
 async def delete_appointment(
     session: AsyncSession, *, appointment_id: uuid.UUID
 ) -> None:
-    appt = await get_appointment(session, appointment_id)
-    if appt is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="appointment not found",
-        )
+    appt = ensure_found(await get_appointment(session, appointment_id), entity="appointment")
     before = _snapshot(appt)
     appt_uuid = appt.id
     await session.delete(appt)
@@ -588,12 +579,7 @@ async def reschedule_appointment(
 
     404 if not found. 422 if status is terminal (`completed`) or if
     the new slot collides. 409 on conflict via `find_conflicts`."""
-    appt = await get_appointment(session, appointment_id)
-    if appt is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="appointment not found",
-        )
+    appt = ensure_found(await get_appointment(session, appointment_id), entity="appointment")
 
     # Don't allow rescheduling a completed appointment — it's terminal.
     # Cancelled / no_show are still reschedulable (rebook the slot;
@@ -669,12 +655,7 @@ async def reassign_appointment(
     upstream by the Pydantic schema's required-ness check at the
     router. We still accept Optional here so the type signature
     matches the bulk variant; the router enforces non-null."""
-    appt = await get_appointment(session, appointment_id)
-    if appt is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="appointment not found",
-        )
+    appt = ensure_found(await get_appointment(session, appointment_id), entity="appointment")
     if assigned_to_id is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
