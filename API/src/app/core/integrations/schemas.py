@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from config import API_BASE_URL
 
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 
 # Mirrors the SQLAlchemy `IntegrationProvider` / `IntegrationStatus`
@@ -30,7 +30,7 @@ IntegrationStatusLiteral = Literal[
 ]
 
 
-class IntegrationRead(BaseModel):
+class IntegrationRead(ORMModel):
     """Row projection for `GET /api/v1/integrations`. Encrypted-token
     columns (`*_enc`) are intentionally absent — they aren't declared,
     so a router accidentally returning the raw ORM row can't leak
@@ -40,8 +40,6 @@ class IntegrationRead(BaseModel):
     the ad platform's webhook config, so they need to see it; tokens
     are different (the admin never types them anywhere). The Settings
     UI displays it inside the constructed `webhook_url`."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -99,12 +97,10 @@ class IntegrationUpsert(BaseModel):
     scopes: list[str] = Field(default_factory=list)
 
 
-class IntegrationSubscriptionRead(BaseModel):
+class IntegrationSubscriptionRead(ORMModel):
     """Subscription row projection — what the Settings UI shows in the
     form-picker list. `field_mapping` is exposed in full so the editor
     in Step 8 can drive its UI without a second fetch."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -142,13 +138,11 @@ class IntegrationSubscriptionUpdate(BaseModel):
     enabled: Optional[bool] = None
 
 
-class IntegrationDLQRead(BaseModel):
+class IntegrationDLQRead(ORMModel):
     """DLQ row projection. The Settings page lists these with a
     "Replay" button per row; `replayed_at` populates once the row has
     been re-enqueued (and stays populated forever so an Owner can see
     which payloads have already been retried)."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     org_id: uuid.UUID

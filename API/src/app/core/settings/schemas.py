@@ -13,10 +13,10 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.app.shared.schemas import ORMModel
 
-class OrgSettingsOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
 
+class OrgSettingsOut(ORMModel):
     id: uuid.UUID
     org_id: uuid.UUID
 

@@ -14,7 +14,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.app.core.tasks.models import TaskPriority, TaskStatus
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 
 class TaskCreate(BaseModel):
@@ -51,8 +51,7 @@ class TaskUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class TaskOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class TaskOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

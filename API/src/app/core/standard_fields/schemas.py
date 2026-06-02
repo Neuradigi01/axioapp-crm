@@ -10,7 +10,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
+
+from src.app.shared.schemas import ORMModel
 
 
 class StandardFieldOverrideIn(BaseModel):
@@ -32,10 +34,8 @@ class StandardFieldOverrideIn(BaseModel):
     display_order: int | None = Field(default=None, ge=0, le=999)
 
 
-class StandardFieldOverrideOut(BaseModel):
+class StandardFieldOverrideOut(ORMModel):
     """List / detail row. Mirrors the DB columns, plus identity fields."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     entity: str

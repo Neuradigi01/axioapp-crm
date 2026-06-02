@@ -6,10 +6,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from src.app.core.billing.models import InvoiceStatus, PaymentMethod
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 
 # --- Invoices -------------------------------------------------------------
@@ -36,8 +36,7 @@ class InvoiceLineCreate(BaseModel):
     tax_pct: Optional[Decimal] = Field(default=None, ge=0, le=100)
 
 
-class InvoiceLineOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class InvoiceLineOut(ORMModel):
 
     id: uuid.UUID
     invoice_id: uuid.UUID
@@ -51,8 +50,7 @@ class InvoiceLineOut(BaseModel):
     created_at: datetime
 
 
-class InvoiceOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class InvoiceOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -98,8 +96,7 @@ class PaymentCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class PaymentOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class PaymentOut(ORMModel):
 
     id: uuid.UUID
     invoice_id: uuid.UUID

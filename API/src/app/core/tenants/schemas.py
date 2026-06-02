@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import uuid
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
+
+from src.app.shared.schemas import ORMModel
 
 
 class OwnershipTransferRequest(BaseModel):
@@ -18,8 +20,7 @@ class OwnershipTransferRequest(BaseModel):
     demote_to_role_id: uuid.UUID | None = Field(default=None)
 
 
-class OrganizationMemberOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class OrganizationMemberOut(ORMModel):
 
     id: int
     organization_id: uuid.UUID

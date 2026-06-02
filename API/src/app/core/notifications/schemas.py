@@ -14,10 +14,10 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.notifications.models import NotificationChannel
+from src.app.shared.schemas import ORMModel
 
 
-class NotificationOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class NotificationOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -30,8 +30,7 @@ class NotificationOut(BaseModel):
     created_at: datetime
 
 
-class NotificationPreferenceOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class NotificationPreferenceOut(ORMModel):
 
     type: str
     channel: NotificationChannel

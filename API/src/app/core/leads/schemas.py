@@ -16,6 +16,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.app.core.leads.models import LeadSource, LeadStatus
+from src.app.shared.schemas import ORMModel
 
 
 # Picklist for the lost-reason field. Pinned both here (Pydantic
@@ -106,8 +107,7 @@ class MoveStageRequest(BaseModel):
         return self
 
 
-class LeadOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class LeadOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -216,8 +216,7 @@ class LeadScoringRuleUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class LeadScoringRuleOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class LeadScoringRuleOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

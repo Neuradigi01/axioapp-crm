@@ -15,6 +15,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.appointments.models import AppointmentStatus
+from src.app.shared.schemas import ORMModel
 
 
 class AppointmentCreate(BaseModel):
@@ -47,9 +48,7 @@ class AppointmentUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class AppointmentOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class AppointmentOut(ORMModel):
     id: uuid.UUID
     org_id: uuid.UUID
     contact_id: uuid.UUID

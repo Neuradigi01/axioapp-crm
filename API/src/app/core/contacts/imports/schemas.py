@@ -7,6 +7,8 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.app.shared.schemas import ORMModel
+
 
 # Contact-field targets the operator can map a column to. Mirrors
 # the Contact model's settable fields. `custom_data.<key>` is a
@@ -22,12 +24,10 @@ ContactFieldTarget = Literal[
 ]
 
 
-class ImportUploadOut(BaseModel):
+class ImportUploadOut(ORMModel):
     """Returned by `POST /upload` — gives the frontend everything it
     needs to render the column-mapping step without re-reading the
     file."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     filename: str

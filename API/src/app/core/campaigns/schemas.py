@@ -5,11 +5,11 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from src.app.core.campaigns.models import CampaignMessageStatus, CampaignStatus
 from src.app.core.conversations.models import ConversationChannel
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 
 class AudienceFilter(BaseModel):
@@ -95,8 +95,7 @@ class CampaignUpdate(BaseModel):
     schedule_at: Optional[datetime] = None
 
 
-class CampaignOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class CampaignOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -115,8 +114,7 @@ class CampaignOut(BaseModel):
 CampaignListResponse = PaginatedResponse[CampaignOut]
 
 
-class CampaignMessageOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class CampaignMessageOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

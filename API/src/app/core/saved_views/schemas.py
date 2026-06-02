@@ -14,6 +14,8 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.app.shared.schemas import ORMModel
+
 
 class SavedViewConfig(BaseModel):
     """Configuration bundle a saved view restores.
@@ -59,9 +61,7 @@ class SavedViewUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class SavedViewOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class SavedViewOut(ORMModel):
     id: uuid.UUID
     org_id: uuid.UUID
     owner_user_id: uuid.UUID

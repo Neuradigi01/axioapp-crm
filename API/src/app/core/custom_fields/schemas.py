@@ -13,9 +13,10 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.app.core.custom_fields.models import FieldSource, FieldType
+from src.app.shared.schemas import ORMModel
 
 
 FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{1,49}$")
@@ -93,9 +94,7 @@ class CustomFieldUpdate(BaseModel):
     validation: dict[str, Any] | None = None
 
 
-class CustomFieldOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class CustomFieldOut(ORMModel):
     id: uuid.UUID
     org_id: uuid.UUID
     entity_type: str
@@ -113,10 +112,8 @@ class CustomFieldOut(BaseModel):
     updated_at: datetime
 
 
-class CustomFieldRenderItem(BaseModel):
+class CustomFieldRenderItem(ORMModel):
     """Slim shape for the `/render` endpoint — what the form needs, no more."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     field_key: str
     field_label: str

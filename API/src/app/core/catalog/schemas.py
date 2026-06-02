@@ -14,7 +14,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 
 _SKU_MAX = 64
@@ -64,8 +64,7 @@ class CatalogItemUpdate(BaseModel):
         return value.strip().upper() if value is not None else None
 
 
-class CatalogItemOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class CatalogItemOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

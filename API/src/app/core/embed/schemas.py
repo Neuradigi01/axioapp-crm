@@ -14,6 +14,8 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal, Optional
 
+from src.app.shared.schemas import ORMModel
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -33,11 +35,9 @@ class EmbedKeyIssue(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class EmbedKeyRead(BaseModel):
+class EmbedKeyRead(ORMModel):
     """Row projection. Never includes the plaintext secret — only
     the 11-char prefix so the Owner can identify which key is which."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -51,12 +51,10 @@ class EmbedKeyRead(BaseModel):
     created_at: datetime
 
 
-class EmbedKeyIssueResponse(BaseModel):
+class EmbedKeyIssueResponse(ORMModel):
     """Response for `POST /embed/keys` only. The `secret` field
     appears here once and is never retrievable again — the Owner
     must copy it before navigating away."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     name: Optional[str]
@@ -443,15 +441,13 @@ EmbedSubmissionOutcomeLiteral = Literal[
 ]
 
 
-class EmbedSubmissionRead(BaseModel):
+class EmbedSubmissionRead(ORMModel):
     """One row in the paginated list. `lead_id` is set only for
     `outcome='accepted'` rows; the UI surfaces a "View lead" link
     in that column. `ip_hash` is the same 16-hex-char SHA-256
     truncation used everywhere else in the embed module — never
     a raw IP.
     """
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     key_id: Optional[uuid.UUID]

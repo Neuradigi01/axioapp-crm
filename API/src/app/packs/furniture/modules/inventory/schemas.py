@@ -6,8 +6,9 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
+from src.app.shared.schemas import ORMModel
 from src.app.packs.furniture.modules.inventory.models import (
     AlertPriority,
     AlertSeverity,
@@ -33,8 +34,7 @@ class WarehouseUpdate(BaseModel):
     is_default: Optional[bool] = None
 
 
-class WarehouseOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class WarehouseOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -76,8 +76,7 @@ class InventoryItemUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
-class InventoryItemOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class InventoryItemOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -153,8 +152,7 @@ class MovementCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class MovementOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class MovementOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -171,8 +169,7 @@ class MovementOut(BaseModel):
 # --- Alerts --------------------------------------------------------------
 
 
-class StockAlertOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class StockAlertOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

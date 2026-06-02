@@ -5,10 +5,10 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from src.app.core.reviews.models import ReviewStatus
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 
 class ReviewCreate(BaseModel):
@@ -37,8 +37,7 @@ class ReviewEscalatePayload(BaseModel):
     reason: Optional[str] = Field(default=None, max_length=512)
 
 
-class ReviewOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class ReviewOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

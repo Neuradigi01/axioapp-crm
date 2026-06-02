@@ -8,7 +8,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.calls.models import CallDirection
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 
 # --- Outcomes (config) ----------------------------------------------------
@@ -27,8 +27,7 @@ class CallOutcomeUpdate(BaseModel):
     display_order: Optional[int] = Field(default=None, ge=0)
 
 
-class CallOutcomeOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class CallOutcomeOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -64,8 +63,7 @@ class CallUpdate(BaseModel):
     custom_data: Optional[dict[str, Any]] = None
 
 
-class CallOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class CallOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -94,8 +92,7 @@ class CallTranscriptUpsert(BaseModel):
     language: Optional[str] = Field(default=None, max_length=16)
 
 
-class CallTranscriptOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class CallTranscriptOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

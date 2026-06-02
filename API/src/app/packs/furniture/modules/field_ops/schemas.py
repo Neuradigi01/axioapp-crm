@@ -6,10 +6,11 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from src.app.core.appointments.schemas import AppointmentCreate
 from src.app.packs.furniture.modules.field_ops.models import FieldVisitPurpose
+from src.app.shared.schemas import ORMModel
 
 
 # --- Field visits ---------------------------------------------------------
@@ -36,8 +37,7 @@ class FieldVisitUpdate(BaseModel):
     custom_data: Optional[dict[str, Any]] = None
 
 
-class FieldVisitOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class FieldVisitOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -85,8 +85,7 @@ class FieldVisitCompletePayload(BaseModel):
 # --- Photos --------------------------------------------------------------
 
 
-class FieldVisitPhotoOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class FieldVisitPhotoOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

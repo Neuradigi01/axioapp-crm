@@ -25,7 +25,7 @@ from decimal import Decimal
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,6 +39,7 @@ from src.app.core.billing.schemas import (
     InvoiceLineOut,
     PaymentCreate,
 )
+from src.app.shared.schemas import ORMModel
 from src.app.core.billing.service import (
     add_line,
     create_draft,
@@ -80,9 +81,7 @@ class CheckoutPayload(BaseModel):
     notes: Optional[str] = None
 
 
-class CheckoutResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class CheckoutResponse(ORMModel):
     invoice: InvoiceWithLines
     pdf_url: str
     inventory_decrements: list[dict[str, Any]] = Field(default_factory=list)

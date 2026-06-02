@@ -11,7 +11,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
+
+from src.app.shared.schemas import ORMModel
 
 from src.app.core.staff.models import EmploymentStatus
 
@@ -26,8 +28,7 @@ class StaffProfileUpsert(BaseModel):
     joined_at: Optional[date] = None
 
 
-class StaffProfileOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class StaffProfileOut(ORMModel):
 
     user_id: uuid.UUID
     org_id: uuid.UUID
@@ -59,8 +60,7 @@ class StaffListItem(BaseModel):
     joined_at: Optional[date] = None
 
 
-class AttendanceOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class AttendanceOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

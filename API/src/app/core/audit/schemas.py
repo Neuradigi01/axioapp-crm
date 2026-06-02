@@ -5,12 +5,12 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
+
+from src.app.shared.schemas import ORMModel
 
 
-class AuditLogOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class AuditLogOut(ORMModel):
     id: uuid.UUID
     org_id: uuid.UUID
     user_id: uuid.UUID | None

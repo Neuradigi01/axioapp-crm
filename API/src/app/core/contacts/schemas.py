@@ -15,7 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 
 _TAG_MAX = 64
@@ -63,8 +63,7 @@ class ContactUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class ContactOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class ContactOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -81,10 +80,8 @@ class ContactOut(BaseModel):
     updated_at: datetime
 
 
-class ContactListItem(BaseModel):
+class ContactListItem(ORMModel):
     """Slim shape for list endpoints — no notes, no custom_data."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     full_name: str
@@ -147,14 +144,12 @@ class ContactBulkAddTagResult(BaseModel):
 # --- Duplicate-check response shape -----------------------------------------
 
 
-class ContactDuplicateMatch(BaseModel):
+class ContactDuplicateMatch(ORMModel):
     """One existing row that matched the create-modal's dup check.
 
     Slim shape (`id` + name + phone + email) so the FE can render a
     yellow banner with a "view" link without an extra round-trip.
     """
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     full_name: str

@@ -13,6 +13,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal, Optional
 
+from src.app.shared.schemas import ORMModel
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from src.app.core.contacts.schemas import ContactOut
@@ -59,9 +61,7 @@ class QuickRegisterPayload(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class WalkInOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class WalkInOut(ORMModel):
     id: uuid.UUID
     org_id: uuid.UUID
     contact_id: uuid.UUID

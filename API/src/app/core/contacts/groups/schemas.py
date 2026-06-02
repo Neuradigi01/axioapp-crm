@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 
 class GroupFilter(BaseModel):
@@ -89,12 +89,10 @@ class GroupUpdate(BaseModel):
     contact_ids: Optional[list[uuid.UUID]] = None
 
 
-class GroupRead(BaseModel):
+class GroupRead(ORMModel):
     """List + read projection. `member_count` is computed by the
     service (cheap COUNT for static; filter-eval COUNT for dynamic)
     so the UI can show "82 contacts" without a second round-trip."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     name: str

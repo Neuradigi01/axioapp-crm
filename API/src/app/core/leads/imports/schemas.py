@@ -19,7 +19,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 from src.app.core.leads.imports.models import LeadImportStatus
 
@@ -34,8 +34,7 @@ SourcePlatform = Literal[
 ]
 
 
-class LeadImportRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class LeadImportRead(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -89,8 +88,7 @@ class PresetCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class PresetRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class PresetRead(ORMModel):
 
     id: uuid.UUID
     org_id: Optional[uuid.UUID]            # None for system presets

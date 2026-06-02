@@ -12,10 +12,10 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.app.core.activities.models import ActivityType
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 
 _ENTITY_TYPE_MIN = 1
@@ -52,8 +52,7 @@ class ActivityCreate(BaseModel):
         return {"text": text.strip()}
 
 
-class ActivityOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class ActivityOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

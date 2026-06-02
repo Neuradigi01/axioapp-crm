@@ -17,6 +17,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.app.shared.schemas import ORMModel
+
 
 WhatsAppIntegrationStatus = Literal[
     "connected", "disconnected", "expired", "error"
@@ -43,13 +45,11 @@ class WhatsAppConnectIn(BaseModel):
     rate_limit_per_sec: int = Field(default=50, ge=1, le=1000)
 
 
-class WhatsAppStatusOut(BaseModel):
+class WhatsAppStatusOut(ORMModel):
     """Projection returned by `connect`, `test`, and `GET /status`.
 
     NEVER includes `access_token` or `app_secret` — those are encrypted
     at rest and decrypted only inside the dispatch / webhook paths."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     status: WhatsAppIntegrationStatus
     phone_id: Optional[str] = None
@@ -73,15 +73,13 @@ WhatsAppTemplateHeaderType = Literal[
 ]
 
 
-class WhatsAppTemplateRead(BaseModel):
+class WhatsAppTemplateRead(ORMModel):
     """Row projection for `GET /api/v1/integrations/whatsapp/templates`.
 
     Used by the Settings UI template list (Step 3.5.4) and the campaign
     create-modal picker (Step 3.5.5). `variable_count` lets the picker
     render the right number of variable-binding inputs without parsing
     the body."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     name: str

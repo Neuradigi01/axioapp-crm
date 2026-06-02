@@ -16,7 +16,6 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter
-from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
@@ -25,14 +24,13 @@ from src.app.core.dev.models import DemoCredential
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.shared.db import get_db
+from src.app.shared.schemas import ORMModel
 
 
 router = APIRouter(prefix="/_dev", tags=["Dev"])
 
 
-class DemoLogin(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class DemoLogin(ORMModel):
     label: str
     identifier: str
     password: str

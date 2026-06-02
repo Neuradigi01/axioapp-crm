@@ -6,7 +6,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
+
+from src.app.shared.schemas import ORMModel
 
 
 # --- Custom Orders --------------------------------------------------------
@@ -42,8 +44,7 @@ class CustomOrderUpdate(BaseModel):
     custom_data: Optional[dict[str, Any]] = None
 
 
-class CustomOrderOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class CustomOrderOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -87,8 +88,7 @@ class MeasurementCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class MeasurementOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class MeasurementOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -104,8 +104,7 @@ class MeasurementOut(BaseModel):
 # --- Photos --------------------------------------------------------------
 
 
-class PhotoOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class PhotoOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -119,8 +118,7 @@ class PhotoOut(BaseModel):
 # --- Stage history -------------------------------------------------------
 
 
-class StageHistoryOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class StageHistoryOut(ORMModel):
 
     id: uuid.UUID
     order_id: uuid.UUID

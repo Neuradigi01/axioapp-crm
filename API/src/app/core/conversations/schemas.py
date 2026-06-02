@@ -15,9 +15,9 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-from src.app.shared.schemas import PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 from src.app.core.conversations.models import (
     ConversationChannel,
     ConversationStatus,
@@ -36,8 +36,7 @@ class ConversationPatch(BaseModel):
     ai_handling: Optional[bool] = None
 
 
-class ConversationOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class ConversationOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
@@ -55,8 +54,7 @@ class ConversationOut(BaseModel):
 ConversationListResponse = PaginatedResponse[ConversationOut]
 
 
-class MessageOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class MessageOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

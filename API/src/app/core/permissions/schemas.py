@@ -4,11 +4,12 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
+
+from src.app.shared.schemas import ORMModel
 
 
-class PermissionOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class PermissionOut(ORMModel):
 
     id: uuid.UUID
     key: str
@@ -16,8 +17,7 @@ class PermissionOut(BaseModel):
     module: str
 
 
-class RoleOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class RoleOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

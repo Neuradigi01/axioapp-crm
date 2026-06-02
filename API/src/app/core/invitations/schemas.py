@@ -4,7 +4,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
+
+from src.app.shared.schemas import ORMModel
 
 
 class InvitationCreate(BaseModel):
@@ -14,10 +16,8 @@ class InvitationCreate(BaseModel):
     role_id: uuid.UUID
 
 
-class InvitationOut(BaseModel):
+class InvitationOut(ORMModel):
     """Admin-side read shape — never includes the raw token."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     email: str

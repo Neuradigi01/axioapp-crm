@@ -9,13 +9,13 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
+
+from src.app.shared.schemas import ORMModel
 
 
-class StaffPickerUser(BaseModel):
+class StaffPickerUser(ORMModel):
     """One row in the login picker. Only safe-to-show fields."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     full_name: str

@@ -20,9 +20,10 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.app.shared.schemas import ORMModel
 
-class PipelineStageOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+
+class PipelineStageOut(ORMModel):
 
     id: uuid.UUID
     pipeline_id: uuid.UUID
@@ -34,8 +35,7 @@ class PipelineStageOut(BaseModel):
     is_lost: bool
 
 
-class PipelineOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class PipelineOut(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID

@@ -5,7 +5,9 @@ import uuid
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
+
+from src.app.shared.schemas import ORMModel
 
 
 Format = Literal["number", "currency", "percent", "text", "leaderboard"]
@@ -51,8 +53,7 @@ class ActivityItem(BaseModel):
     at: datetime
 
 
-class UpcomingAppointment(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class UpcomingAppointment(ORMModel):
     id: uuid.UUID
     title: str
     starts_at: datetime
