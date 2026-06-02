@@ -94,6 +94,10 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     "conversations.read", "conversations.write",
     "calls.read", "calls.write",
     "pipelines.read",
+    # Read-only so the dynamic forms on contacts / leads / walk-ins
+    # can render their `custom_data` inputs. Mutation of the schema
+    # stays Admin+Owner only via `custom_fields.write`.
+    "custom_fields.read",
     "saved_views.use",
 ]
 
@@ -118,6 +122,7 @@ _CORE_SALES_MANAGER_KEYS: list[str] = [
     "catalog.read",
     "staff.read",
     "users.read",
+    "custom_fields.read",
     "saved_views.use",
 ]
 
@@ -133,6 +138,7 @@ _CORE_SUPPORT_AGENT_KEYS: list[str] = [
     "walkins.read",
     "walk_ins.read",
     "leads.read",
+    "custom_fields.read",
     "saved_views.use",
 ]
 
