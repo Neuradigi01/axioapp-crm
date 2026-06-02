@@ -1,20 +1,17 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   EventEmitter,
   Input,
-  OnInit,
   Output,
   computed,
-  effect,
   inject,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Subject } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
@@ -23,8 +20,8 @@ import {
   ContactListItem,
   ContactsApiService,
 } from '../contacts/contacts-api.service';
-import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
-import { StandardFieldsSignalsService } from '../standard-fields/standard-fields-signals.service';
+import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
+import { FieldDef } from '../shared/dynamic-form/types';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import {
   Appointment,
@@ -55,52 +52,22 @@ import {
   imports: [ReactiveFormsModule],
   templateUrl: './book-appointment-modal.component.html',
 })
-export class BookAppointmentModalComponent implements OnInit {
+export class BookAppointmentModalComponent extends BaseFormModalComponent {
+  protected readonly entityType = 'appointment';
+
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(AppointmentsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly auth = inject(FurnitureAuthService);
-  private readonly stdApi = inject(StandardFieldsApiService);
-  private readonly stdSignals = inject(StandardFieldsSignalsService);
-  private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
-    {},
-  );
-
-  protected stdField(key: string): StandardFieldRendered | undefined {
-    return this.stdFields()[key];
-  }
-
-  protected isHidden(key: string): boolean {
-    return this.stdField(key)?.is_hidden === true;
-  }
-
-  constructor() {
-    effect(() => {
-      this.stdSignals.changedAt();
-      this.refreshStdFields();
-    });
-  }
-
-  private refreshStdFields(): void {
-    this.stdApi.render('appointment').subscribe({
-      next: (resp) => {
-        const map: Record<string, StandardFieldRendered> = {};
-        for (const f of resp.items) map[f.field_key] = f;
-        this.stdFields.set(map);
-        this.applyStandardValidators(map);
-      },
-      error: () => {
-        /* fallbacks keep the form usable */
-      },
-    });
+  protected renderCustomFields$(): Observable<FieldDef[]> {
+    return this.api.renderFields();
   }
 
   /** `title` + `scheduled_at` + `duration_min` are backend-required (locked).
    *  `purpose` / `location` accept the `required` override.
    *  `duration_min` additionally accepts `min`/`max` (default 1–1440). */
-  private applyStandardValidators(
+  protected applyStandardValidators(
     map: Record<string, StandardFieldRendered>,
   ): void {
     this.form.controls.title.setValidators([
@@ -144,11 +111,8 @@ export class BookAppointmentModalComponent implements OnInit {
   @Input() conflictTitleFor: (id: string) => string | null = () => null;
 
   @Output() readonly created = new EventEmitter<Appointment>();
-  @Output() readonly cancel = new EventEmitter<void>();
 
   protected readonly me = signal<MeResponse | null>(null);
-  protected readonly submitting = signal(false);
-  protected readonly submitError = signal<string | null>(null);
   protected readonly conflicts = signal<string[]>([]);
 
   protected readonly selectedContact = signal<ContactListItem | null>(null);
@@ -178,10 +142,12 @@ export class BookAppointmentModalComponent implements OnInit {
   });
 
   readonly canSubmit = computed(
-    () => this.me() !== null && !this.submitting(),
+    () => this.me() !== null && !this.submitting$(),
   );
 
-  ngOnInit(): void {
+  override ngOnInit(): void {
+    super.ngOnInit();
+
     this.auth
       .me()
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -217,7 +183,7 @@ export class BookAppointmentModalComponent implements OnInit {
     this.contactSearchOpen.set(false);
     this.contactQuery.set('');
     this.contactResults.set([]);
-    this.submitError.set(null);
+    this._submitError.set(null);
   }
 
   protected clearContact(): void {
@@ -234,17 +200,17 @@ export class BookAppointmentModalComponent implements OnInit {
     }
     const contact = this.selectedContact();
     if (!contact) {
-      this.submitError.set('Please pick a contact.');
+      this._submitError.set('Please pick a contact.');
       return;
     }
     const user = this.me();
     if (!user) {
-      this.submitError.set('Could not resolve the current user.');
+      this._submitError.set('Could not resolve the current user.');
       return;
     }
-    this.submitError.set(null);
+    this._submitError.set(null);
     this.conflicts.set([]);
-    this.submitting.set(true);
+    this._submitting.set(true);
 
     const raw = this.form.getRawValue();
     const payload: AppointmentCreate = {
@@ -262,20 +228,20 @@ export class BookAppointmentModalComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (appt) => {
-          this.submitting.set(false);
+          this._submitting.set(false);
           this.created.emit(appt);
         },
         error: (err: HttpErrorResponse) => {
-          this.submitting.set(false);
+          this._submitting.set(false);
           if (err.status === 409) {
             const body = err.error as Partial<ConflictBody>;
             this.conflicts.set(body?.conflicts ?? []);
-            this.submitError.set(
+            this._submitError.set(
               body?.message
                 ?? 'Time conflict: this slot is already booked.',
             );
           } else {
-            this.submitError.set(
+            this._submitError.set(
               extractApiError(err) ?? 'Could not create appointment.',
             );
           }

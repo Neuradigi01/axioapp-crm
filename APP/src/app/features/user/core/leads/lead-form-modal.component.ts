@@ -1,21 +1,17 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   EventEmitter,
   Input,
-  OnInit,
   Output,
   computed,
-  effect,
   inject,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
-import { Subject } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import {
@@ -28,11 +24,9 @@ import {
   Pipeline,
   PipelinesApiService,
 } from '../pipelines/pipelines-api.service';
-import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
-import { StandardFieldsSignalsService } from '../standard-fields/standard-fields-signals.service';
+import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { Lead, LeadCreate, LeadUpdate, LeadsApiService } from './leads-api.service';
-import { extractApiError } from '@core/services/api-error.util';
 import { nullableTrim } from '@core/services/form.util';
 
 /**
@@ -55,41 +49,17 @@ import { nullableTrim } from '@core/services/form.util';
   imports: [ReactiveFormsModule, RouterLink, DynamicFormComponent],
   templateUrl: './lead-form-modal.component.html',
 })
-export class LeadFormModalComponent implements OnInit {
+export class LeadFormModalComponent extends BaseFormModalComponent {
+  protected readonly entityType = 'lead';
+
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(LeadsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly pipelinesApi = inject(PipelinesApiService);
-  private readonly stdApi = inject(StandardFieldsApiService);
-  private readonly stdSignals = inject(StandardFieldsSignalsService);
-  private readonly destroyRef = inject(DestroyRef);
-
-  // Standard fields registered for the `lead` entity. Render once on
-  // open and again whenever the signal bus fires (Settings save / reset).
-  // Keys are field_key — e.g. `stdFields()['budget']`.
-  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
-    {},
-  );
-
-  protected stdField(key: string): StandardFieldRendered | undefined {
-    return this.stdFields()[key];
-  }
-
-  protected isHidden(key: string): boolean {
-    return this.stdField(key)?.is_hidden === true;
-  }
 
   @Input() set lead(value: Lead | null) {
     this._lead.set(value);
     if (value !== null) this.resetForm(value);
-  }
-
-  @Input() set submitting(value: boolean) {
-    this._submitting.set(value);
-  }
-
-  @Input() set submitError(value: string | null) {
-    this._submitError.set(value);
   }
 
   @Output() readonly save = new EventEmitter<{
@@ -97,20 +67,10 @@ export class LeadFormModalComponent implements OnInit {
     update?: LeadUpdate;
     moveStageTo?: string;
   }>();
-  @Output() readonly cancel = new EventEmitter<void>();
 
   protected readonly _lead = signal<Lead | null>(null);
-  protected readonly _submitting = signal(false);
-  protected readonly _submitError = signal<string | null>(null);
-
-  protected readonly fields = signal<FieldDef[]>([]);
-  protected readonly fieldsLoading = signal(true);
-  protected readonly fieldsError = signal<string | null>(null);
 
   protected readonly pipeline = signal<Pipeline | null>(null);
-
-  protected readonly customValue = signal<FormValue>({});
-  protected readonly customValid = signal(true);
 
   protected readonly selectedContact = signal<ContactListItem | null>(null);
   protected readonly contactQuery = signal('');
@@ -120,8 +80,6 @@ export class LeadFormModalComponent implements OnInit {
   private readonly contactQuery$ = new Subject<string>();
 
   readonly isEdit = computed(() => this._lead() !== null);
-  readonly submitting$ = this._submitting.asReadonly();
-  readonly submitError$ = this._submitError.asReadonly();
 
   readonly standard = this.fb.group({
     pipeline_stage: this.fb.control<string>('', { nonNullable: true }),
@@ -129,31 +87,8 @@ export class LeadFormModalComponent implements OnInit {
     expected_close_date: this.fb.control<string>('', { nonNullable: true }),
   });
 
-  constructor() {
-    // Refetch the override-merged defs whenever the Settings page bumps
-    // the signal bus (a save or reset). On first mount the effect runs
-    // once and kicks off the initial fetch, so `ngOnInit` doesn't need
-    // to call render() again.
-    effect(() => {
-      this.stdSignals.changedAt();
-      this.refreshStdFields();
-    });
-  }
-
-  private refreshStdFields(): void {
-    this.stdApi.render('lead').subscribe({
-      next: (resp) => {
-        const map: Record<string, StandardFieldRendered> = {};
-        for (const f of resp.items) map[f.field_key] = f;
-        this.stdFields.set(map);
-        this.applyStandardValidators(map);
-      },
-      error: () => {
-        // Render is best-effort — the modal still works with the
-        // hardcoded fallbacks below. Logging would be noisy; the auth
-        // case (401) is already redirected by the interceptor.
-      },
-    });
+  protected renderCustomFields$(): Observable<FieldDef[]> {
+    return this.api.renderFields();
   }
 
   /** Apply the override-driven validators to the standard FormGroup.
@@ -163,10 +98,9 @@ export class LeadFormModalComponent implements OnInit {
    * org marked them required. Budget additionally picks up min/max from
    * the override row when present.
    */
-  private applyStandardValidators(
+  protected applyStandardValidators(
     map: Record<string, StandardFieldRendered>,
   ): void {
-    const pipelineRow = map['pipeline_stage'];
     const budgetRow = map['budget'];
     const closeRow = map['expected_close_date'];
 
@@ -197,25 +131,10 @@ export class LeadFormModalComponent implements OnInit {
     });
   }
 
-  ngOnInit(): void {
-    // 1) lead custom field defs
-    this.api
-      .renderFields()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (defs) => {
-          this.fields.set(defs);
-          this.fieldsLoading.set(false);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.fieldsError.set(
-            extractApiError(err) ?? 'Could not load custom field definitions.',
-          );
-          this.fieldsLoading.set(false);
-        },
-      });
+  override ngOnInit(): void {
+    super.ngOnInit();
 
-    // 2) pipeline stages (drives the stage dropdown)
+    // pipeline stages (drives the stage dropdown)
     this.pipelinesApi
       .getByKey('leads')
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -230,7 +149,7 @@ export class LeadFormModalComponent implements OnInit {
         error: () => this.pipeline.set(null),
       });
 
-    // 3) contact search stream
+    // contact search stream
     this.contactQuery$
       .pipe(
         debounceTime(200),
@@ -356,6 +275,4 @@ export class LeadFormModalComponent implements OnInit {
         },
       });
   }
-
-
 }

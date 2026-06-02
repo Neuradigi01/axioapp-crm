@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { FieldDef } from '../shared/dynamic-form/types';
 import { BaseCrudApiService } from '../shared/services/base-crud-api.service';
 import { buildHttpParams } from '../shared/services/query-builder';
 
@@ -81,6 +82,12 @@ export class AppointmentsApiService extends BaseCrudApiService<
   AppointmentUpdate
 > {
   protected readonly base = `${environment.apiBaseUrl}/appointments`;
+  private readonly renderUrl = `${environment.apiBaseUrl}/custom-fields/appointment/render`;
+
+  /** Field defs for `entity_type='appointment'` — feeds the dynamic form. */
+  renderFields(): Observable<FieldDef[]> {
+    return this.http.get<FieldDef[]>(this.renderUrl);
+  }
 
   /** Listing — works for both calendar (passes from/to) and list view
    * (omits from/to, applies sort/order/status/assignee). */
