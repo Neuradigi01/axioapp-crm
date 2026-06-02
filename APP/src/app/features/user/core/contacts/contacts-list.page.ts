@@ -24,7 +24,7 @@ import {
 } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
 import { FurnitureAuthService } from '../auth/auth.service';
-import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { MailLinkDirective } from '../shared/directives/mail-link.directive';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
@@ -128,13 +128,6 @@ export class ContactsListPageComponent {
 
   // --- Multi-select + bulk actions -------------------------------------------
 
-  /** Bulk-action menu. Each action is hide-don't-disable gated by permission. */
-  readonly bulkActions = computed<BulkAction[]>(() => [
-    { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'contacts.reassign' },
-    { key: 'tag', label: 'Add tag', icon: 'tag', permissionKey: 'contacts.write' },
-    { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'contacts.write' },
-  ]);
-
   readonly tagInputControl = new FormControl<string>('', { nonNullable: true });
 
   /** CSV export progress (single in-flight at a time). */
@@ -213,6 +206,11 @@ export class ContactsListPageComponent {
   readonly formError = signal<string | null>(null);
 
   constructor() {
+    this.state.bulkActions.set([
+      { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'contacts.reassign' },
+      { key: 'tag', label: 'Add tag', icon: 'tag', permissionKey: 'contacts.write' },
+      { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'contacts.write' },
+    ]);
     // Initial load â€” runs after the effect below subscribes to the filter signals.
     this.reload();
 

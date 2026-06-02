@@ -667,7 +667,7 @@
 <!-- Bulk action bar: visible whenever rows are selected on list view. -->
 <app-bulk-action-bar
   [selectedCount]="state.selectedCount()"
-  [actions]="bulkActions()"
+  [actions]="state.bulkActions()"
   (action)="onBulkAction($event)"
   (clear)="clearSelection()"
 />

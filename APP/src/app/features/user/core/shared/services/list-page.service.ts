@@ -1,5 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 
+import type { BulkAction } from '../types/bulk-action';
+
 /**
  * Component-scoped state holder for a paginated list page.
  *
@@ -81,6 +83,12 @@ export class ListPageState<T extends { id: string }> {
   });
 
   // --- Bulk-modal state ----------------------------------------------
+
+  /** Per-entity action set, set once by the page in its constructor.
+   * Surfaced to the template so `<app-bulk-action-bar>` can render
+   * (and permission-gate) the buttons without each page declaring its
+   * own computed. */
+  readonly bulkActions = signal<BulkAction[]>([]);
 
   /** Which bulk modal is open (keyed by string — page defines the set
    * e.g. `'reassign' | 'tag' | 'delete'`). `null` means closed. */

@@ -16,10 +16,7 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { environment } from '../../../../../environments/environment';
 import { FurnitureAuthService } from '../auth/auth.service';
-import {
-  BulkAction,
-  BulkActionBarComponent,
-} from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import {
   UrlFilterStateConfig,
@@ -134,14 +131,6 @@ export class TasksPageComponent {
    * so this is cheap to read across the page. */
   readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
 
-  // --- Selection + bulk (Step 2) -----------------------------------------
-
-  readonly bulkActions = computed<BulkAction[]>(() => [
-    { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'tasks.write' },
-    { key: 'done', label: 'Mark done', icon: 'check-circle-2', permissionKey: 'tasks.write' },
-    { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'tasks.write' },
-  ]);
-
   // --- URL state (Step 2) ------------------------------------------------
 
   readonly urlState: UrlFilterStateConfig = {
@@ -234,6 +223,11 @@ export class TasksPageComponent {
   });
 
   constructor() {
+    this.state.bulkActions.set([
+      { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'tasks.write' },
+      { key: 'done', label: 'Mark done', icon: 'check-circle-2', permissionKey: 'tasks.write' },
+      { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'tasks.write' },
+    ]);
     // Decide scope branch from /me, then load assignees + first page.
     this.auth
       .me()

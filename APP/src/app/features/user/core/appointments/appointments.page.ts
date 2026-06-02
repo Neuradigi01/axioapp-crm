@@ -25,10 +25,7 @@ import { catchError, distinctUntilChanged } from 'rxjs/operators';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { FurnitureAuthService } from '../auth/auth.service';
-import {
-  BulkAction,
-  BulkActionBarComponent,
-} from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import {
   CalendarComponent,
   CalendarEvent,
@@ -195,22 +192,6 @@ export class AppointmentsPageComponent {
 
   // --- Selection + bulk --------------------------------------------------
 
-  readonly bulkActions = computed<BulkAction[]>(() => [
-    {
-      key: 'reassign',
-      label: 'Reassign to…',
-      icon: 'user-cog',
-      permissionKey: 'appointments.reassign',
-    },
-    {
-      key: 'cancel',
-      label: 'Cancel',
-      icon: 'x-circle',
-      danger: true,
-      permissionKey: 'appointments.write',
-    },
-  ]);
-
   // --- Single-row actions (popover-driven) -------------------------------
 
   /** Appointment currently shown in the popover (`null` = closed). */
@@ -295,6 +276,21 @@ export class AppointmentsPageComponent {
   };
 
   constructor() {
+    this.state.bulkActions.set([
+      {
+        key: 'reassign',
+        label: 'Reassign to…',
+        icon: 'user-cog',
+        permissionKey: 'appointments.reassign',
+      },
+      {
+        key: 'cancel',
+        label: 'Cancel',
+        icon: 'x-circle',
+        danger: true,
+        permissionKey: 'appointments.write',
+      },
+    ]);
     effect(() => {
       // Track every filter signal so reload runs on any change.
       this.viewMonth();

@@ -23,7 +23,7 @@ import {
   PipelineItem,
 } from '../pipelines/pipelines-api.service';
 import { PipelineBoardComponent } from '../pipelines/pipeline-board.component';
-import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ColumnDef, ColumnPrefsService } from '../shared/column-prefs.service';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
@@ -356,12 +356,6 @@ export class LeadsPageComponent {
    * single-click-pencil reassign; bulk select only runs on list. Lives
    * on `state.selectedIds` (with `state.selectedCount` derived). */
 
-  /** Bulk action menu — hide-don't-disable gated. */
-  readonly bulkActions = computed<BulkAction[]>(() => [
-    { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'leads.reassign' },
-    { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'leads.write' },
-  ]);
-
   /** Which bulk-action modal is open (one at a time). Lives on
    * `state.bulkModal`; values are still `'reassign' | 'delete' | null`. */
 
@@ -460,6 +454,10 @@ export class LeadsPageComponent {
   );
 
   constructor() {
+    this.state.bulkActions.set([
+      { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'leads.reassign' },
+      { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'leads.write' },
+    ]);
     // Leads list defaults to 50 rows; shared service defaults to 25.
     this.state.pageSize.set(50);
     this.reload();

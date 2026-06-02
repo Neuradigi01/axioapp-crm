@@ -16,7 +16,7 @@ import { catchError, distinctUntilChanged } from 'rxjs/operators';
 
 import { FurnitureAuthService } from '../auth/auth.service';
 import { ContactsApiService } from '../contacts/contacts-api.service';
-import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
 import {
@@ -154,12 +154,6 @@ export class WalkInsPageComponent {
 
   // --- Step 3: selection + bulk + single reassign + convert ---------------
 
-  readonly bulkActions = computed<BulkAction[]>(() => [
-    { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'walkins.reassign' },
-    { key: 'checkout', label: 'Check out', icon: 'log-out', permissionKey: 'walkins.write' },
-    { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'walkins.write' },
-  ]);
-
   /** Single-row reassign (from the pencil — added in Step 3 as a future
    * polish on row hover). Same component as bulk. */
   readonly singleReassignWalkIn = signal<WalkIn | null>(null);
@@ -281,6 +275,11 @@ export class WalkInsPageComponent {
   });
 
   constructor() {
+    this.state.bulkActions.set([
+      { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'walkins.reassign' },
+      { key: 'checkout', label: 'Check out', icon: 'log-out', permissionKey: 'walkins.write' },
+      { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'walkins.write' },
+    ]);
     this.reload();
     effect(() => {
       // Fetch missing contact summaries whenever the visible list changes.
