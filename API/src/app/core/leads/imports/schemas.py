@@ -19,7 +19,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.app.shared.schemas import ORMModel, PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
 
 from src.app.core.leads.imports.models import LeadImportStatus
 
@@ -34,10 +34,9 @@ SourcePlatform = Literal[
 ]
 
 
-class LeadImportRead(ORMModel):
+class LeadImportRead(TimestampedOrgScopedOut):
 
     id: uuid.UUID
-    org_id: uuid.UUID
     uploaded_by: uuid.UUID
     name: str
     source_platform: str
@@ -50,8 +49,6 @@ class LeadImportRead(ORMModel):
     mapping: Optional[dict[str, Any]] = None
     counts: Optional[dict[str, Any]] = None
     error_report_path: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
 
 
 LeadImportListResponse = PaginatedResponse[LeadImportRead]

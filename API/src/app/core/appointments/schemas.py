@@ -15,7 +15,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.appointments.models import AppointmentStatus
-from src.app.shared.schemas import ORMModel
+from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
 
 
 class AppointmentCreate(BaseModel):
@@ -48,9 +48,8 @@ class AppointmentUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class AppointmentOut(ORMModel):
+class AppointmentOut(TimestampedOrgScopedOut):
     id: uuid.UUID
-    org_id: uuid.UUID
     contact_id: uuid.UUID
     title: str
     purpose: Optional[str]
@@ -61,8 +60,6 @@ class AppointmentOut(ORMModel):
     assigned_to_id: uuid.UUID
     custom_data: dict[str, Any]
     last_activity_at: Optional[datetime]
-    created_at: datetime
-    updated_at: datetime
 
 
 # --- Reschedule / reassign / bulk-action shapes ----------------------------

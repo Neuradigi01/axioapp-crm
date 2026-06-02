@@ -13,12 +13,11 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.app.shared.schemas import ORMModel
+from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
 
 
-class OrgSettingsOut(ORMModel):
+class OrgSettingsOut(TimestampedOrgScopedOut):
     id: uuid.UUID
-    org_id: uuid.UUID
 
     store_name: Optional[str]
     logo_url: Optional[str]
@@ -50,9 +49,6 @@ class OrgSettingsOut(ORMModel):
     # settings PATCH, so the Settings UI can render a specialised
     # editor while still surfacing the value in the read-only profile.
     lead_routing_config: dict[str, Any]
-
-    created_at: datetime
-    updated_at: datetime
 
 
 class LeadRoutingConfigOut(BaseModel):

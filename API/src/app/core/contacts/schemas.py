@@ -15,7 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from src.app.shared.schemas import ORMModel, PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
 
 
 _TAG_MAX = 64
@@ -63,10 +63,9 @@ class ContactUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class ContactOut(ORMModel):
+class ContactOut(TimestampedOrgScopedOut):
 
     id: uuid.UUID
-    org_id: uuid.UUID
     full_name: str
     phone: str | None
     email: str | None
@@ -76,8 +75,6 @@ class ContactOut(ORMModel):
     custom_data: dict[str, Any]
     assigned_to_id: uuid.UUID | None
     last_activity_at: datetime | None
-    created_at: datetime
-    updated_at: datetime
 
 
 class ContactListItem(ORMModel):

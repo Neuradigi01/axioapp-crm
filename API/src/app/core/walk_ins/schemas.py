@@ -13,7 +13,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal, Optional
 
-from src.app.shared.schemas import ORMModel
+from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -61,9 +61,8 @@ class QuickRegisterPayload(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class WalkInOut(ORMModel):
+class WalkInOut(TimestampedOrgScopedOut):
     id: uuid.UUID
-    org_id: uuid.UUID
     contact_id: uuid.UUID
     time_in: datetime
     time_out: Optional[datetime]
@@ -76,8 +75,6 @@ class WalkInOut(ORMModel):
     custom_data: dict[str, Any]
     last_activity_at: Optional[datetime]
     linked_lead_id: Optional[uuid.UUID]
-    created_at: datetime
-    updated_at: datetime
 
 
 class QuickRegisterResponse(BaseModel):

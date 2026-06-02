@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from config import API_BASE_URL
 
-from src.app.shared.schemas import ORMModel, PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
 
 
 # Mirrors the SQLAlchemy `IntegrationProvider` / `IntegrationStatus`
@@ -97,20 +97,17 @@ class IntegrationUpsert(BaseModel):
     scopes: list[str] = Field(default_factory=list)
 
 
-class IntegrationSubscriptionRead(ORMModel):
+class IntegrationSubscriptionRead(TimestampedOrgScopedOut):
     """Subscription row projection — what the Settings UI shows in the
     form-picker list. `field_mapping` is exposed in full so the editor
     in Step 8 can drive its UI without a second fetch."""
 
     id: uuid.UUID
-    org_id: uuid.UUID
     integration_id: uuid.UUID
     external_form_id: str
     external_form_label: Optional[str]
     field_mapping: dict
     enabled: bool
-    created_at: datetime
-    updated_at: datetime
 
 
 class IntegrationSubscriptionCreate(BaseModel):

@@ -9,7 +9,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 from src.app.core.billing.models import InvoiceStatus, PaymentMethod
-from src.app.shared.schemas import ORMModel, PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
 
 
 # --- Invoices -------------------------------------------------------------
@@ -50,10 +50,9 @@ class InvoiceLineOut(ORMModel):
     created_at: datetime
 
 
-class InvoiceOut(ORMModel):
+class InvoiceOut(TimestampedOrgScopedOut):
 
     id: uuid.UUID
-    org_id: uuid.UUID
     number: Optional[int]
     contact_id: Optional[uuid.UUID]
     status: InvoiceStatus
@@ -69,8 +68,6 @@ class InvoiceOut(ORMModel):
     payment_method: Optional[PaymentMethod]
     notes: Optional[str]
     custom_data: dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
 
 
 class InvoiceWithLines(InvoiceOut):

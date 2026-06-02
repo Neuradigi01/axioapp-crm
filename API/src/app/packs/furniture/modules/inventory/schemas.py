@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from src.app.shared.schemas import ORMModel
+from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
 from src.app.packs.furniture.modules.inventory.models import (
     AlertPriority,
     AlertSeverity,
@@ -34,16 +34,13 @@ class WarehouseUpdate(BaseModel):
     is_default: Optional[bool] = None
 
 
-class WarehouseOut(ORMModel):
+class WarehouseOut(TimestampedOrgScopedOut):
 
     id: uuid.UUID
-    org_id: uuid.UUID
     name: str
     address: Optional[str]
     contact_phone: Optional[str]
     is_default: bool
-    created_at: datetime
-    updated_at: datetime
 
 
 # --- Items ----------------------------------------------------------------
@@ -76,10 +73,9 @@ class InventoryItemUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
-class InventoryItemOut(ORMModel):
+class InventoryItemOut(TimestampedOrgScopedOut):
 
     id: uuid.UUID
-    org_id: uuid.UUID
     catalog_item_id: Optional[uuid.UUID]
     warehouse_id: uuid.UUID
     sku: str
@@ -95,8 +91,6 @@ class InventoryItemOut(ORMModel):
     cover_url: Optional[str]
     is_best_seller: bool
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
 
 
 class InventoryItemFullCreate(BaseModel):

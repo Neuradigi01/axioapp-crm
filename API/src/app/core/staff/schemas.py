@@ -13,7 +13,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from src.app.shared.schemas import ORMModel
+from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
 
 from src.app.core.staff.models import EmploymentStatus
 
@@ -28,17 +28,14 @@ class StaffProfileUpsert(BaseModel):
     joined_at: Optional[date] = None
 
 
-class StaffProfileOut(ORMModel):
+class StaffProfileOut(TimestampedOrgScopedOut):
 
     user_id: uuid.UUID
-    org_id: uuid.UUID
     commission_rate: Decimal
     monthly_target: Decimal
     rating: Decimal
     employment_status: EmploymentStatus
     joined_at: date
-    created_at: datetime
-    updated_at: datetime
 
 
 class StaffListItem(BaseModel):
@@ -60,18 +57,15 @@ class StaffListItem(BaseModel):
     joined_at: Optional[date] = None
 
 
-class AttendanceOut(ORMModel):
+class AttendanceOut(TimestampedOrgScopedOut):
 
     id: uuid.UUID
-    org_id: uuid.UUID
     user_id: uuid.UUID
     clock_in_at: datetime
     clock_out_at: Optional[datetime]
     hours: Optional[Decimal]
     date: date
     notes: Optional[str]
-    created_at: datetime
-    updated_at: datetime
 
 
 class ClockInPayload(BaseModel):

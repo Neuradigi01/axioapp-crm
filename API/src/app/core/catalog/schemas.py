@@ -14,7 +14,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from src.app.shared.schemas import ORMModel, PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
 
 
 _SKU_MAX = 64
@@ -64,10 +64,9 @@ class CatalogItemUpdate(BaseModel):
         return value.strip().upper() if value is not None else None
 
 
-class CatalogItemOut(ORMModel):
+class CatalogItemOut(TimestampedOrgScopedOut):
 
     id: uuid.UUID
-    org_id: uuid.UUID
     sku: str
     name: str
     category: Optional[str]
@@ -75,8 +74,6 @@ class CatalogItemOut(ORMModel):
     currency: str
     is_active: bool
     custom_data: dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
 
 
 CatalogListResponse = PaginatedResponse[CatalogItemOut]

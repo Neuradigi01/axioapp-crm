@@ -14,7 +14,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.app.shared.schemas import ORMModel
+from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
 
 
 class SavedViewConfig(BaseModel):
@@ -61,13 +61,10 @@ class SavedViewUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class SavedViewOut(ORMModel):
+class SavedViewOut(TimestampedOrgScopedOut):
     id: uuid.UUID
-    org_id: uuid.UUID
     owner_user_id: uuid.UUID
     entity: str
     name: str
     config: dict[str, Any]
     shared: bool
-    created_at: datetime
-    updated_at: datetime

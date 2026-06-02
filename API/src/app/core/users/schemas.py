@@ -12,17 +12,16 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.app.shared.schemas import ORMModel
+from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
 
 
-class UserOut(ORMModel):
+class UserOut(TimestampedOrgScopedOut):
     # `populate_by_name=True` (inherited from ORMModel) lets callers pass
     # `id=...` explicitly alongside the `validation_alias` below, which
     # pulls from `User.legacy_uuid` when `model_validate(user)` reads off
     # the ORM instance. (After DR.6.3 `User.id` is the bigint storage PK;
     # the UUID identity exposed to API consumers is `User.legacy_uuid`.)
     id: uuid.UUID = Field(validation_alias="legacy_uuid")
-    org_id: uuid.UUID
     # Plain str (not EmailStr): seed uses `admin@demo.local`, which RFC 6761
     # reserves and EmailStr rejects on serialise. Strict email validation
     # lives at create/update boundaries, not on read.
@@ -31,8 +30,6 @@ class UserOut(ORMModel):
     phone: str | None
     role_id: uuid.UUID
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
 
 
 class OrgSummary(ORMModel):

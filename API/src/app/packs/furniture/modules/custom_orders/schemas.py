@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from src.app.shared.schemas import ORMModel
+from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
 
 
 # --- Custom Orders --------------------------------------------------------
@@ -44,10 +44,9 @@ class CustomOrderUpdate(BaseModel):
     custom_data: Optional[dict[str, Any]] = None
 
 
-class CustomOrderOut(ORMModel):
+class CustomOrderOut(TimestampedOrgScopedOut):
 
     id: uuid.UUID
-    org_id: uuid.UUID
     contact_id: Optional[uuid.UUID]
     lead_id: Optional[uuid.UUID]
     title: str
@@ -61,8 +60,6 @@ class CustomOrderOut(ORMModel):
     total_amount: Decimal
     advance_paid: Decimal
     custom_data: dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
 
 
 class CustomOrderListResponse(BaseModel):

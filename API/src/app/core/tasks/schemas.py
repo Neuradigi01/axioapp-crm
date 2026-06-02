@@ -14,7 +14,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.app.core.tasks.models import TaskPriority, TaskStatus
-from src.app.shared.schemas import ORMModel, PaginatedResponse
+from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
 
 
 class TaskCreate(BaseModel):
@@ -51,10 +51,9 @@ class TaskUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class TaskOut(ORMModel):
+class TaskOut(TimestampedOrgScopedOut):
 
     id: uuid.UUID
-    org_id: uuid.UUID
     title: str
     description: Optional[str]
     due_at: Optional[datetime]
@@ -64,8 +63,6 @@ class TaskOut(ORMModel):
     status: TaskStatus
     priority: TaskPriority
     last_activity_at: Optional[datetime]
-    created_at: datetime
-    updated_at: datetime
 
 
 TaskListResponse = PaginatedResponse[TaskOut]

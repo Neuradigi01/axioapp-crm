@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from src.app.core.appointments.schemas import AppointmentCreate
 from src.app.packs.furniture.modules.field_ops.models import FieldVisitPurpose
-from src.app.shared.schemas import ORMModel
+from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
 
 
 # --- Field visits ---------------------------------------------------------
@@ -37,10 +37,9 @@ class FieldVisitUpdate(BaseModel):
     custom_data: Optional[dict[str, Any]] = None
 
 
-class FieldVisitOut(ORMModel):
+class FieldVisitOut(TimestampedOrgScopedOut):
 
     id: uuid.UUID
-    org_id: uuid.UUID
     appointment_id: uuid.UUID
     purpose: FieldVisitPurpose
     custom_order_id: Optional[uuid.UUID]
@@ -48,8 +47,6 @@ class FieldVisitOut(ORMModel):
     completed_at: Optional[datetime]
     signature_url: Optional[str]
     custom_data: dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
 
 
 class FieldVisitListResponse(BaseModel):
