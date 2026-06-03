@@ -3,6 +3,7 @@ import { Routes } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { furnitureAuthGuard } from './core/auth/auth.guard';
 import { permissionGuard } from './core/auth/permission.guard';
+import { noOrgGuard } from './core/shared/guards/no-org.guard';
 
 // Dev-only routes are spread into the shell's children when not building
 // for production. The guard on the shell still applies, so the route is
@@ -30,6 +31,12 @@ export const userRoutes: Routes = [
   {
     path: '',
     canActivate: [furnitureAuthGuard],
+    // Runs on every child navigation under `/user/*`. Redirects users
+    // whose org is still in `pack_id="pending"` back to `/onboarding`.
+    // Composes with the existing `furnitureAuthGuard` (token check)
+    // and the per-route `permissionGuard` (RBAC) — order is:
+    // furnitureAuthGuard → noOrgGuard → permissionGuard.
+    canActivateChild: [noOrgGuard],
     loadComponent: () =>
       import('./core/layout/shell.component').then((m) => m.ShellComponent),
     children: [

@@ -105,6 +105,17 @@ export class FurnitureAuthService {
    * / "Mine" preset on list filters. Null before first /me. */
   readonly currentUserId = signal<string | null>(null);
 
+  /** `true` once a `/users/me` response has been bound to the signals
+   * above. The no-org route guard reads this to know whether it can
+   * trust `needsOnboarding()` or has to fetch first. */
+  readonly userLoaded = signal<boolean>(false);
+
+  /** Mirror of `MeResponse.needs_onboarding` — true while the user's
+   * org is still in `pack_id="pending"` (self-signup not yet finished
+   * on `/onboarding`). The no-org route guard reads this on every
+   * `/user/**` navigation to redirect back to `/onboarding`. */
+  readonly needsOnboarding = signal<boolean>(false);
+
   hasPermission(key: string): boolean {
     return this.currentPermissions().includes(key);
   }
@@ -160,6 +171,8 @@ export class FurnitureAuthService {
           this.currentOrg.set(null);
           this.currentPermissions.set([]);
           this.currentUserId.set(null);
+          this.userLoaded.set(false);
+          this.needsOnboarding.set(false);
         }),
       );
   }
@@ -173,6 +186,8 @@ export class FurnitureAuthService {
           this.currentPermissions.set(res.permission_keys);
           this.currentRoleName.set(res.role_name);
           this.currentUserId.set(res.id);
+          this.needsOnboarding.set(res.needs_onboarding);
+          this.userLoaded.set(true);
         }),
       );
   }
@@ -187,5 +202,7 @@ export class FurnitureAuthService {
     this.currentPermissions.set([]);
     this.currentRoleName.set('');
     this.currentUserId.set(null);
+    this.userLoaded.set(false);
+    this.needsOnboarding.set(false);
   }
 }

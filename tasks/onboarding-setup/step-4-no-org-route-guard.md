@@ -3,7 +3,7 @@
 **Goal:** Add an Angular functional route guard on `/user/**` that catches any authenticated user who reaches a user-area URL without having completed onboarding (no organization membership), and redirects them to `/onboarding`. Closes the "user closed the tab mid-onboarding" loophole.
 
 **Track:** Onboarding & Pack Picker Setup
-**Status:** Pending
+**Status:** COMPLETED — `noOrgGuard` (functional `CanActivateChildFn`) added on the `/user` parent; `userLoaded` + `needsOnboarding` signals exposed on `FurnitureAuthService`. One refinement vs the spec sketch: the guard lazy-loads `/users/me` itself if `userLoaded()` is false (the shell's `header.component.ts` is the only existing caller of `me()` and it only mounts *after* guards approve — pure await-on-signal would deadlock). 3 files shipped (auth.service.ts modified, no-org.guard.ts created, user.routes.ts modified). Skipped the optional `no-org.guard.spec.ts` for the same reason as Step 3's onboarding-component spec.
 **Depends on:** Step 2 (`/users/me` returns `needs_onboarding`), Step 3 (`/onboarding` route exists).
 
 ---
