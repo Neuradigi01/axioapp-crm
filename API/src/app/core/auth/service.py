@@ -25,6 +25,8 @@ from src.app.core import audit
 from src.app.core.auth.models import AuthSession
 from src.app.core.auth.schemas import (
     LoginResponse,
+    OnboardingCompleteRequest,
+    OnboardingCompleteResponse,
     RefreshResponse,
     RegisterRequest,
     RegisterResponse,
@@ -32,7 +34,9 @@ from src.app.core.auth.schemas import (
 from src.app.core.auth.tokens import ACCESS_TOKEN_TTL, TokenClaims, encode_token
 from src.app.core.packs.installer import install as install_pack
 from src.app.core.packs.loader import PackLoadError, load_pack
+from src.app.core.packs.service import get_catalog
 from src.app.core.permissions import role_templates
+from src.app.core.permissions.models import Role
 from src.app.core.tenants.models import Organization
 from src.app.core.tenants.service import create_organization
 from src.app.core.users.models import OrganizationMember, User, UserInfo
@@ -392,4 +396,342 @@ async def register_with_new_org(
         organization_id=org.id,
         organization_slug=org.slug,
         role_name=owner_role.name,
+        # Legacy single-step signup ships a fully-set-up org with the
+        # base pack installed — onboarding is already done.
+        needs_onboarding=False,
+    )
+
+
+# --- Step 2: split signup + onboarding -----------------------------------
+#
+# `register_user_only` and `complete_onboarding` together implement the
+# two-stage flow the onboarding picker needs. They share the user-create
+# primitives with `register_with_new_org` above but defer pack selection
+# (and the matching pack install) to the onboarding endpoint.
+#
+# Architectural note: the spec called for a JWT carrying
+# `needs_onboarding=true` and *no* org. But `AuthSession` is TenantScoped
+# (RLS-enforced) and `encode_token` requires `org_id` — issuing a
+# tokenless flow would require schema + RLS changes well outside Step 2.
+# Pivot: create the org during register with `pack_id="pending"`,
+# install role templates so a real Owner role + membership exist, issue
+# a normal JWT. The onboarding endpoint then *finalizes* the org
+# (rename, set pack_id, run pack installer) and rotates the JWT.
+# `needs_onboarding` derives server-side from `org.pack_id == "pending"`
+# in `/users/me` — same UX, no JWT schema change.
+
+PENDING_PACK_ID = "pending"
+
+
+async def register_user_only(
+    db: AsyncSession,
+    *,
+    req: RegisterRequest,
+    ip: str | None = None,
+    ua: str | None = None,
+) -> RegisterResponse:
+    """Self-signup stage 1: create the user + a pending-pack org.
+
+    Inserts a placeholder organization with `pack_id="pending"` (no
+    pack data seeded). Role templates land so an Owner role + active
+    membership exist; the resulting JWT is a normal admin token. The
+    user is expected to call `complete_onboarding` next, which renames
+    the org, sets a real `pack_id`, and runs the matching pack installer.
+    """
+    if await _email_taken(db, req.email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists.",
+        )
+
+    # Placeholder workspace name — the onboarding page renames it
+    # immediately, so the user never sees this string.
+    workspace_name = f"{req.first_name.strip()}'s Workspace"
+
+    org = await create_organization(
+        db,
+        name=workspace_name,
+        created_via="normal_signup",
+        pack_id=PENDING_PACK_ID,
+    )
+
+    token = set_context(RequestContext(org_id=org.id))
+    try:
+        installed = await role_templates.install(db, org_id=org.id)
+    except role_templates.UnknownPermissionKey as exc:
+        await db.rollback()
+        reset_context(token)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"role template install failed: {exc}",
+        )
+    reset_context(token)
+
+    owner_role = installed.get("owner")
+    if owner_role is None:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="role template install did not produce an Owner role",
+        )
+
+    user_uuid = uuid.uuid4()
+    await db.execute(
+        pg_insert(User).values(
+            {
+                "legacy_uuid": user_uuid,
+                "user_id": f"usr_{user_uuid.hex}",
+                "password": hash_password(req.password),
+                "is_active": True,
+                "two_factor_enabled": False,
+            }
+        )
+    )
+    bigint_id = (
+        await db.execute(
+            select(User.id).where(User.legacy_uuid == user_uuid)
+        )
+    ).scalar_one()
+
+    db.add(
+        UserInfo(
+            member_id=bigint_id,
+            first_name=req.first_name.strip(),
+            last_name=req.last_name.strip(),
+            email=req.email,
+            mobile_no=req.phone,
+            is_email_verified=False,
+            is_mobile_verified=False,
+        )
+    )
+    db.add(
+        OrganizationMember(
+            organization_id=org.id,
+            user_member_id=bigint_id,
+            role_id=owner_role.id,
+            status="active",
+            is_active=True,
+            is_demo=False,
+        )
+    )
+
+    token_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+    expires_at = now + ACCESS_TOKEN_TTL
+    db.add(
+        AuthSession(
+            id=token_id,
+            org_id=org.id,
+            user_id=user_uuid,
+            expires_at=expires_at,
+            ip=ip,
+            ua=ua,
+        )
+    )
+
+    await db.commit()
+
+    await audit.log(
+        "auth.signup",
+        org_id=org.id,
+        user_id=user_uuid,
+        after={
+            "email": req.email,
+            "organization_name": org.name,
+            "organization_slug": org.slug,
+            "role": owner_role.name,
+            "pending_onboarding": True,
+        },
+        ip=ip,
+        ua=ua,
+    )
+
+    encoded, exp = encode_token(
+        user_id=user_uuid, org_id=org.id, token_id=token_id, now=now
+    )
+    return RegisterResponse(
+        access_token=encoded,
+        expires_at=exp,
+        organization_id=org.id,
+        organization_slug=org.slug,
+        role_name=owner_role.name,
+        needs_onboarding=True,
+    )
+
+
+def _validate_pack_choice(pack_id: str) -> dict:
+    """Resolve `pack_id` against the catalog. Returns the tile dict on
+    success. Raises HTTPException 400 for unknown or coming-soon packs.
+    """
+    catalog = get_catalog()
+    for tile in catalog.packs:
+        if tile.pack_id == pack_id:
+            if tile.status != "available":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "error": "pack_not_available",
+                        "message": f"{tile.name} is coming soon.",
+                    },
+                )
+            return tile.model_dump()
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail={"error": "pack_not_found", "pack_id": pack_id},
+    )
+
+
+async def complete_onboarding(
+    db: AsyncSession,
+    *,
+    user: User,
+    current_token_id: uuid.UUID,
+    req: OnboardingCompleteRequest,
+    ip: str | None = None,
+    ua: str | None = None,
+) -> OnboardingCompleteResponse:
+    """Self-signup stage 2: finalize the pending-pack org.
+
+    Renames the org, sets `pack_id` from the user's pick, applies pack
+    defaults (currency, tax_rate) unless the request overrides them,
+    and runs `packs.installer.install` so the chosen vertical's
+    pipelines / custom fields / lead sources / call outcomes / org
+    settings land. Rotates the JWT so the next response is a normal
+    onboarding-complete token. Idempotent: a user whose org is no
+    longer in `pack_id="pending"` gets 409 (already onboarded).
+    """
+    tile = _validate_pack_choice(req.pack_id)
+
+    org = (
+        await db.execute(
+            select(Organization).where(Organization.id == user.org_id)
+        )
+    ).scalar_one_or_none()
+    if org is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="organization not found",
+        )
+
+    if org.pack_id != PENDING_PACK_ID:
+        # Already onboarded — single org per signup; second call is a
+        # conflict, not a re-install.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": "already_onboarded"},
+        )
+
+    # Apply user-supplied overrides, else fall back to the pack tile's
+    # defaults. `default_tax_rate` from the catalog is a float; the org
+    # column is Numeric — SQLAlchemy coerces on write.
+    org.name = req.organization_name.strip()
+    org.pack_id = req.pack_id
+    org.currency = req.currency or tile["default_currency"]
+    org.tax_rate = tile["default_tax_rate"]
+
+    # Pack install runs in the same transaction; the installer wraps
+    # each section in its own try/except internally and reports errors
+    # via `InstallReport.errors` rather than raising — so a partial
+    # seed is loud but does not roll back the org rename. (Matching
+    # the existing `register_with_new_org` policy.)
+    manifest_path = Path(f"src/app/packs/{req.pack_id}/pack.yaml")
+    try:
+        manifest = load_pack(manifest_path)
+    except PackLoadError as exc:
+        # Catalog said this pack was `available` but its manifest is
+        # unreadable — fall back to 500 so the user can retry.
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"pack manifest unreadable: {exc}",
+        )
+
+    ctx_token = set_context(RequestContext(org_id=org.id))
+    try:
+        report = await install_pack(db, org_id=org.id, manifest=manifest)
+        if report.errors:
+            logger.warning(
+                "pack install reported errors for org %s pack %s: %s",
+                org.id,
+                req.pack_id,
+                report.errors,
+            )
+    finally:
+        reset_context(ctx_token)
+
+    # Rotate JWT: revoke the current session, issue a new one. The new
+    # token reflects the onboarded state so the frontend route guard
+    # passes on next navigation.
+    now = datetime.now(timezone.utc)
+    await db.execute(
+        update(AuthSession)
+        .where(
+            AuthSession.id == current_token_id,
+            AuthSession.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+    )
+
+    new_token_id = uuid.uuid4()
+    new_expires_at = now + ACCESS_TOKEN_TTL
+    db.add(
+        AuthSession(
+            id=new_token_id,
+            org_id=org.id,
+            user_id=user.legacy_uuid,
+            expires_at=new_expires_at,
+            ip=ip,
+            ua=ua,
+        )
+    )
+
+    await db.commit()
+
+    await audit.log(
+        "org.created_via_onboarding",
+        org_id=org.id,
+        user_id=user.legacy_uuid,
+        after={
+            "org_name": org.name,
+            "pack_id": req.pack_id,
+            "country": req.country,
+            "currency": org.currency,
+            "team_size": req.team_size,
+        },
+        ip=ip,
+        ua=ua,
+    )
+    await audit.log(
+        "pack.installed_via_onboarding",
+        org_id=org.id,
+        user_id=user.legacy_uuid,
+        after={
+            "pack_id": manifest.pack_id,
+            "pack_version": manifest.version,
+            "pipelines_created": report.pipelines_created,
+            "custom_fields_created": report.custom_fields_created,
+            "roles_created": report.roles_created,
+            "errors": report.errors,
+        },
+        ip=ip,
+        ua=ua,
+    )
+
+    encoded, exp = encode_token(
+        user_id=user.legacy_uuid,
+        org_id=org.id,
+        token_id=new_token_id,
+        now=now,
+    )
+    role_name = (
+        await db.execute(
+            select(Role.name).where(Role.id == user.role_id)
+        )
+    ).scalar_one_or_none() or ""
+    return OnboardingCompleteResponse(
+        access_token=encoded,
+        expires_at=exp,
+        organization_id=org.id,
+        organization_slug=org.slug,
+        role_name=role_name,
     )

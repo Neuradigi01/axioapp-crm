@@ -62,8 +62,8 @@ All without any DB-level intervention or CLI installer step.
 
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
-| 1 | [Pack catalog endpoint + static config](step-1-pack-catalog-endpoint.md) | Pending | ~½ day |
-| 2 | [Backend: split signup, defer org creation, add onboarding endpoint](step-2-backend-split-signup.md) | Pending | ~1 day |
+| 1 | [Pack catalog endpoint + static config](step-1-pack-catalog-endpoint.md) | COMPLETED | ~½ day |
+| 2 | [Backend: split signup, defer org creation, add onboarding endpoint](step-2-backend-split-signup.md) | COMPLETED | ~1 day |
 | 3 | [Frontend: simplified register + onboarding page + tiles UI](step-3-frontend-onboarding-page.md) | Pending | ~1 day |
 | 4 | [Route guard: no-org → onboarding](step-4-no-org-route-guard.md) | Pending | ~½ day |
 

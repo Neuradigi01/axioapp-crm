@@ -15,15 +15,20 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth import service as auth_service
+from src.app.core.auth.dependencies import get_current_user
 from src.app.core.auth.schemas import (
     LoginRequest,
     LoginResponse,
     LogoutResponse,
+    OnboardingCompleteRequest,
+    OnboardingCompleteResponse,
     RefreshResponse,
     RegisterRequest,
     RegisterResponse,
 )
 from src.app.core.auth.tokens import InvalidToken, TokenClaims, decode_token
+from src.app.core.users.models import User
+from src.app.shared.context import get_context
 from src.app.shared.db import get_db
 from src.app.shared.rate_limit import login_limiter
 
@@ -86,9 +91,47 @@ async def register(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> RegisterResponse:
-    """Self-signup: creates a new org, makes the visitor its Owner, returns a JWT."""
-    return await auth_service.register_with_new_org(
+    """Self-signup stage 1: create the user + a pending-pack org.
+
+    The org is a placeholder (`pack_id="pending"`, name
+    `"<First Name>'s Workspace"`). The returned JWT is a normal admin
+    token; the response carries `needs_onboarding=true` so the
+    frontend routes the user to `/onboarding` to pick a template.
+    """
+    return await auth_service.register_user_only(
         db,
+        req=req,
+        ip=_client_ip(request),
+        ua=request.headers.get("user-agent"),
+    )
+
+
+@router.post(
+    "/onboarding/complete",
+    response_model=OnboardingCompleteResponse,
+)
+async def onboarding_complete(
+    req: OnboardingCompleteRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> OnboardingCompleteResponse:
+    """Self-signup stage 2: finalize the pending-pack org.
+
+    Renames the org, sets the chosen `pack_id`, runs the pack
+    installer, and rotates the JWT. Caller's org must still be in
+    `pack_id="pending"` — already-onboarded users get 409.
+    """
+    ctx = get_context()
+    if ctx.token_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing token context",
+        )
+    return await auth_service.complete_onboarding(
+        db,
+        user=user,
+        current_token_id=ctx.token_id,
         req=req,
         ip=_client_ip(request),
         ua=request.headers.get("user-agent"),

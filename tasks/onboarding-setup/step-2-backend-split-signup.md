@@ -3,7 +3,7 @@
 **Goal:** Change `POST /api/v1/auth/register` to create *only* the user (no org), issue a JWT carrying `needs_onboarding: true`, and add `POST /api/v1/auth/onboarding/complete` to create the organization + run the pack installer + assign Owner role + issue a fresh JWT.
 
 **Track:** Onboarding & Pack Picker Setup
-**Status:** Pending
+**Status:** COMPLETED — backend + tests landed. One spec pivot during implementation: the org is created during register with `pack_id="pending"` (not deferred entirely), because `AuthSession` is TenantScoped + RLS-enforced and `encode_token` requires a real `org_id`. `needs_onboarding` is derived server-side from `org.pack_id == "pending"` in `/users/me` instead of riding as a JWT claim. Same UX outcome; no JWT schema change. The legacy `register_with_new_org` is kept but has zero in-code callers — eligible for follow-up removal.
 **Depends on:** Step 1 (catalog endpoint — used to validate submitted `pack_id`).
 
 ---
