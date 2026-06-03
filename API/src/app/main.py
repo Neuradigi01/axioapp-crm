@@ -51,6 +51,7 @@ from src.app.core.leads.router import router as leads_router
 from src.app.core.leads.imports.router import router as lead_imports_router
 from src.app.core.notifications.router import router as notifications_router
 from src.app.core.notifications.ws import ws_router as notifications_ws_router
+from src.app.core.packs.router import router as packs_router
 from src.app.core.pipelines.router import router as pipelines_router
 from src.app.core.reviews.router import router as reviews_router
 from src.app.core.saved_views.router import router as saved_views_router
@@ -159,6 +160,7 @@ app.include_router(users_router, prefix="/api/v1")
 app.include_router(roles_router, prefix="/api/v1")
 app.include_router(permissions_router, prefix="/api/v1")
 app.include_router(role_templates_router, prefix="/api/v1")
+app.include_router(packs_router, prefix="/api/v1")
 app.include_router(ownership_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(reporting_router, prefix="/api/v1")
