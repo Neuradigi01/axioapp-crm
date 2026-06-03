@@ -2,26 +2,19 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import type { components } from '../shared/api-types';
 import { FieldDef } from '../shared/dynamic-form/types';
 import { BaseCrudApiService } from '../shared/services/base-crud-api.service';
 import { buildHttpParams, prefixCustomFilters } from '../shared/services/query-builder';
 
 /**
- * Wire shape for `GET /api/v1/contacts`. Mirrors `ContactListResponse`
- * from the backend. `items` use the slim `ContactListItem` schema —
- * notes/custom_data are omitted to keep list payloads light.
+ * Slim wire shape for `GET /api/v1/contacts` list items.
+ *
+ * Sourced from the backend-generated OpenAPI types. Any backend
+ * change to `ContactListItem` now surfaces here at TS compile time
+ * after running `npm run generate:api-types` (see `docs/codegen.md`).
  */
-export interface ContactListItem {
-  id: string;
-  full_name: string;
-  phone: string | null;
-  email: string | null;
-  source: string | null;
-  tags: string[];
-  assigned_to_id: string | null;
-  last_activity_at: string | null;
-  created_at: string;
-}
+export type ContactListItem = components['schemas']['ContactListItem'];
 
 export interface ContactListResponse {
   items: ContactListItem[];

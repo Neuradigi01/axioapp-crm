@@ -6,7 +6,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "generate:api-types": "openapi-typescript http://localhost:8000/openapi.json -o src/app/features/user/core/shared/api-types/index.ts"
   },
   "private": true,
   "packageManager": "npm@11.9.0",
@@ -38,6 +39,7 @@
     "@angular/cli": "^21.2.2",
     "@angular/compiler-cli": "^21.2.0",
     "autoprefixer": "^10.5.0",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.14",
     "prettier": "^3.8.1",
     "tailwindcss": "^3.4.19",
