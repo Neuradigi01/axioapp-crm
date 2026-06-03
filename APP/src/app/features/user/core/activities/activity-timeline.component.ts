@@ -18,6 +18,7 @@ import {
   ActivitiesApiService,
 } from './activities-api.service';
 import { RelativeTimePipe } from './relative-time.pipe';
+import type { LucideIconName } from '../shared/icons';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
@@ -33,7 +34,7 @@ import { extractApiError } from '@core/services/api-error.util';
  * `reload()` is exposed so a parent (e.g. the add-note button) can
  * tell the timeline to re-pull after it adds a row optimistically.
  */
-type TypeMeta = { icon: string; label: string; ringClass: string };
+type TypeMeta = { icon: LucideIconName; label: string; ringClass: string };
 
 const TYPE_META: Record<ActivityType, TypeMeta> = {
   note: {

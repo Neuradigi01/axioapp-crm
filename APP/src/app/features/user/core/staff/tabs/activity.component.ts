@@ -13,6 +13,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { RelativeTimePipe } from '../../activities/relative-time.pipe';
+import type { LucideIconName } from '../../shared/icons';
 import { extractApiError } from '@core/services/api-error.util';
 import {
   StaffActivity,
@@ -21,7 +22,7 @@ import {
 } from '../staff-api.service';
 
 interface TypeMeta {
-  icon: string;
+  icon: LucideIconName;
   label: string;
   ring: string;
 }

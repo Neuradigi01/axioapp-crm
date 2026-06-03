@@ -1,3 +1,5 @@
+import type { LucideIconName } from '../icons';
+
 /**
  * One row in the floating bulk-action toolbar.
  *
@@ -10,10 +12,10 @@
  *                       parent dispatches to a handler (open reassign
  *                       modal, open confirm dialog, etc.).
  *   - `label`         — button text.
- *   - `icon`          — lucide icon name (must be registered in
- *                       `app.config.ts::LucideAngularModule.pick(...)` —
- *                       missing icons render as empty boxes and silently
- *                       break click handlers further down the template).
+ *   - `icon`          — lucide icon name, typed as `LucideIconName` so
+ *                       missing-registration mistakes fail at TS compile
+ *                       instead of throwing mid-render and silently
+ *                       breaking click handlers further down the template.
  *   - `danger?`       — when `true`, button renders red. Used for
  *                       destructive actions like Delete.
  *   - `permissionKey?` — checked against the signed-in user's
@@ -25,7 +27,7 @@
 export interface BulkAction {
   key: string;
   label: string;
-  icon: string;
+  icon: LucideIconName;
   danger?: boolean;
   permissionKey?: string;
 }

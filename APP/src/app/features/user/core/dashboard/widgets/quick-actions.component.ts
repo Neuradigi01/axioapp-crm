@@ -8,11 +8,12 @@ import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../../auth/auth.service';
+import type { LucideIconName } from '../../shared/icons';
 
 interface QuickAction {
   key: 'new_lead' | 'log_call' | 'schedule_meeting' | 'add_contact';
   label: string;
-  icon: string;
+  icon: LucideIconName;
   permission: string;
   routerLink: string;
   queryParams: Record<string, string>;
