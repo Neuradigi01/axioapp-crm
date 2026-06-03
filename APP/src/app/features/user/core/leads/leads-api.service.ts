@@ -5,7 +5,11 @@ import { environment } from '../../../../../environments/environment';
 import { FieldDef } from '../shared/dynamic-form/types';
 import { FilterDsl, isEmptyFilter } from '../shared/filter-dsl.types';
 import { BaseCrudApiService } from '../shared/services/base-crud-api.service';
-import { buildHttpParams, prefixCustomFilters } from '../shared/services/query-builder';
+import {
+  buildHttpParams,
+  prefixCustomFilters,
+  stripPaginationKeys,
+} from '../shared/services/query-builder';
 
 export type LeadStatus = 'active' | 'won' | 'lost';
 
@@ -171,14 +175,8 @@ export class LeadsApiService extends BaseCrudApiService<
    * the CSV endpoint always returns the full filtered set up to the
    * server cap. */
   exportCsv(query: LeadListQuery = {}): Observable<Blob> {
-    const exportQuery: LeadListQuery = { ...query };
-    delete exportQuery.page;
-    delete exportQuery.size;
-    delete exportQuery.cursor;
-    delete exportQuery.limit;
-    delete exportQuery.with_total;
     return this.http.get(`${this.base}/export.csv`, {
-      params: this.buildParams(exportQuery),
+      params: this.buildParams(stripPaginationKeys(query)),
       responseType: 'blob',
     });
   }

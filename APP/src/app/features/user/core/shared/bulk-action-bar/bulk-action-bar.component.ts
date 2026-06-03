@@ -12,24 +12,11 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../../auth/auth.service';
 
-/**
- * One row in the floating bulk-action toolbar.
- *
- * `permissionKey` filters the action against the signed-in user's
- * permissions — actions the user can't perform are hidden, not
- * disabled, to avoid confusion. Pass `undefined` for actions
- * everyone with list access can take (e.g. "Clear selection").
- *
- * `danger` styles the button red — used for destructive actions
- * like Delete.
- */
-export interface BulkAction {
-  key: string;
-  label: string;
-  icon: string;
-  danger?: boolean;
-  permissionKey?: string;
-}
+// Re-export so existing importers (`import { BulkAction } from
+// '.../bulk-action-bar/bulk-action-bar.component'`) keep working. The
+// canonical home is `core/shared/types/bulk-action.ts`.
+export type { BulkAction } from '../types/bulk-action';
+import type { BulkAction } from '../types/bulk-action';
 
 /**
  * Floating bar at the bottom of a list page, visible whenever the user

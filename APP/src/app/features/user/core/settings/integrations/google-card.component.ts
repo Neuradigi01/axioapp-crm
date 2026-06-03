@@ -272,9 +272,10 @@ export class GoogleCardComponent {
   }
 
   /** Google's lead-form field vocabulary. Backend `_apply_mapping`
-   *  matches against `column_name` (snake or screaming-snake; the
-   *  worker accepts both). v1 surfaces a fixed list; per-form
-   *  precision is a follow-on. */
+   *  matches against the payload's `column_id` (which is screaming-
+   *  snake-case like "FULL_NAME"), falling back to `column_name` if
+   *  the id is absent. v1 surfaces a fixed list; per-form precision
+   *  is a follow-on. */
   protected readonly googleFormFields: ReadonlyArray<string> = [
     'FULL_NAME',
     'FIRST_NAME',

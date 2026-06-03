@@ -16,10 +16,7 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { environment } from '../../../../../environments/environment';
 import { FurnitureAuthService } from '../auth/auth.service';
-import {
-  BulkAction,
-  BulkActionBarComponent,
-} from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import {
   UrlFilterStateConfig,
@@ -30,6 +27,7 @@ import {
   ReassignConfirm,
   ReassignModalComponent,
 } from '../shared/reassign-modal/reassign-modal.component';
+import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -47,6 +45,8 @@ import {
   TaskAssignee,
   TaskFormModalComponent,
 } from './task-form-modal.component';
+
+class TasksListState extends ListPageState<Task> {}
 
 type Scope = 'all' | 'mine';
 type Chip = 'all' | 'mine' | 'overdue' | 'today' | 'done';
@@ -82,6 +82,7 @@ interface ChipDef {
     UrlFilterStateDirective,
     RelativeTimePipe,
   ],
+  providers: [TasksListState],
   templateUrl: './tasks.page.html',
 })
 export class TasksPageComponent {
@@ -91,10 +92,8 @@ export class TasksPageComponent {
   private readonly auth = inject(FurnitureAuthService);
   private readonly usersDir = inject(UsersDirectoryService);
 
-  protected readonly items = signal<Task[]>([]);
-  protected readonly total = signal<number>(0);
-  protected readonly loading = signal(false);
-  protected readonly loadError = signal<string | null>(null);
+  protected readonly state = inject(TasksListState);
+
   protected readonly canViewAll = signal(false);
   protected readonly callerUuid = signal<string | null>(null);
 
@@ -131,21 +130,6 @@ export class TasksPageComponent {
   /** Directory of org users for the dropdown. Cached by `UsersDirectoryService`,
    * so this is cheap to read across the page. */
   readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
-
-  // --- Selection + bulk (Step 2) -----------------------------------------
-
-  readonly selectedIds = signal<Set<string>>(new Set());
-  readonly selectedCount = computed(() => this.selectedIds().size);
-
-  readonly bulkActions = computed<BulkAction[]>(() => [
-    { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'tasks.write' },
-    { key: 'done', label: 'Mark done', icon: 'check-circle-2', permissionKey: 'tasks.write' },
-    { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'tasks.write' },
-  ]);
-
-  readonly bulkModal = signal<'reassign' | 'done' | 'delete' | null>(null);
-  readonly bulkSubmitting = signal(false);
-  readonly bulkError = signal<string | null>(null);
 
   // --- URL state (Step 2) ------------------------------------------------
 
@@ -221,7 +205,7 @@ export class TasksPageComponent {
     let open = 0;
     let overdue = 0;
     let dueToday = 0;
-    for (const t of this.items()) {
+    for (const t of this.state.items()) {
       if (t.status === 'open') open += 1;
       if (t.due_at) {
         const due = new Date(t.due_at).getTime();
@@ -239,6 +223,11 @@ export class TasksPageComponent {
   });
 
   constructor() {
+    this.state.bulkActions.set([
+      { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'tasks.write' },
+      { key: 'done', label: 'Mark done', icon: 'check-circle-2', permissionKey: 'tasks.write' },
+      { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'tasks.write' },
+    ]);
     // Decide scope branch from /me, then load assignees + first page.
     this.auth
       .me()
@@ -254,7 +243,7 @@ export class TasksPageComponent {
           this.fetch();
         },
         error: () => {
-          this.loadError.set('Could not load your profile.');
+          this.state.loadError.set('Could not load your profile.');
         },
       });
 
@@ -343,7 +332,7 @@ export class TasksPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.togglingId.set(null);
-          this.loadError.set(
+          this.state.loadError.set(
             extractApiError(err) ?? 'Could not update the task.',
           );
         },
@@ -428,8 +417,8 @@ export class TasksPageComponent {
   }
 
   private fetch(): void {
-    this.loading.set(true);
-    this.loadError.set(null);
+    this.state.loading.set(true);
+    this.state.loadError.set(null);
 
     const filters: TaskListFilters = {
       status: this.status(),
@@ -451,17 +440,17 @@ export class TasksPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res: TaskListResponse) => {
-          this.items.set(res.items);
-          this.total.set(res.total);
-          this.loading.set(false);
+          this.state.items.set(res.items);
+          this.state.total.set(res.total);
+          this.state.loading.set(false);
           this.chipBusy.set(null);
         },
         error: (err: HttpErrorResponse) => {
-          this.items.set([]);
-          this.total.set(0);
-          this.loading.set(false);
+          this.state.items.set([]);
+          this.state.total.set(0);
+          this.state.loading.set(false);
           this.chipBusy.set(null);
-          this.loadError.set(extractApiError(err) ?? 'Could not load tasks.');
+          this.state.loadError.set(extractApiError(err) ?? 'Could not load tasks.');
         },
       });
   }
@@ -482,7 +471,7 @@ export class TasksPageComponent {
 
   protected toggleRow(id: string, event: Event): void {
     event.stopPropagation();
-    this.selectedIds.update((set) => {
+    this.state.selectedIds.update((set) => {
       const next = new Set(set);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -491,77 +480,77 @@ export class TasksPageComponent {
   }
 
   protected isSelected(id: string): boolean {
-    return this.selectedIds().has(id);
+    return this.state.selectedIds().has(id);
   }
 
   protected clearSelection(): void {
-    this.selectedIds.set(new Set());
+    this.state.selectedIds.set(new Set());
   }
 
   // --- Bulk handlers (Step 2) -------------------------------------------
 
   protected onBulkAction(key: string): void {
-    this.bulkError.set(null);
-    if (key === 'reassign') this.bulkModal.set('reassign');
-    else if (key === 'done') this.bulkModal.set('done');
-    else if (key === 'delete') this.bulkModal.set('delete');
+    this.state.bulkError.set(null);
+    if (key === 'reassign') this.state.bulkModal.set('reassign');
+    else if (key === 'done') this.state.bulkModal.set('done');
+    else if (key === 'delete') this.state.bulkModal.set('delete');
   }
 
   protected closeBulkModal(): void {
-    this.bulkModal.set(null);
-    this.bulkSubmitting.set(false);
-    this.bulkError.set(null);
+    this.state.bulkModal.set(null);
+    this.state.bulkSubmitting.set(false);
+    this.state.bulkError.set(null);
   }
 
   protected onBulkReassign(payload: ReassignConfirm): void {
-    const ids = [...this.selectedIds()];
+    const ids = [...this.state.selectedIds()];
     if (ids.length === 0) return;
     if (!payload.userId) {
-      this.bulkError.set('Tasks require an owner — pick a user.');
+      this.state.bulkError.set('Tasks require an owner — pick a user.');
       return;
     }
-    this.bulkSubmitting.set(true);
-    this.bulkError.set(null);
+    this.state.bulkSubmitting.set(true);
+    this.state.bulkError.set(null);
     this.api
       .bulkReassign(ids, { userId: payload.userId, note: payload.note })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.bulkSubmitting.set(false);
+          this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
           this.fetch();
         },
         error: (err: HttpErrorResponse) => {
-          this.bulkSubmitting.set(false);
-          this.bulkError.set(extractApiError(err) ?? 'Could not reassign tasks.');
+          this.state.bulkSubmitting.set(false);
+          this.state.bulkError.set(extractApiError(err) ?? 'Could not reassign tasks.');
         },
       });
   }
 
   protected onBulkMarkDone(): void {
-    const ids = [...this.selectedIds()];
+    const ids = [...this.state.selectedIds()];
     if (ids.length === 0) return;
-    this.bulkSubmitting.set(true);
-    this.bulkError.set(null);
+    this.state.bulkSubmitting.set(true);
+    this.state.bulkError.set(null);
     this.api
       .bulkMarkDone(ids)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (result) => {
-          this.bulkSubmitting.set(false);
+          this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
           if (result.skipped > 0) {
-            this.loadError.set(
+            this.state.loadError.set(
               `${result.done} marked done; ${result.skipped} skipped (already done).`,
             );
           }
           this.fetch();
         },
         error: (err: HttpErrorResponse) => {
-          this.bulkSubmitting.set(false);
-          this.bulkError.set(
+          this.state.bulkSubmitting.set(false);
+          this.state.bulkError.set(
             extractApiError(err) ?? 'Could not mark tasks done.',
           );
         },
@@ -569,23 +558,23 @@ export class TasksPageComponent {
   }
 
   protected onBulkDelete(): void {
-    const ids = [...this.selectedIds()];
+    const ids = [...this.state.selectedIds()];
     if (ids.length === 0) return;
-    this.bulkSubmitting.set(true);
-    this.bulkError.set(null);
+    this.state.bulkSubmitting.set(true);
+    this.state.bulkError.set(null);
     this.api
       .bulkDelete(ids)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.bulkSubmitting.set(false);
+          this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
           this.fetch();
         },
         error: (err: HttpErrorResponse) => {
-          this.bulkSubmitting.set(false);
-          this.bulkError.set(extractApiError(err) ?? 'Could not delete tasks.');
+          this.state.bulkSubmitting.set(false);
+          this.state.bulkError.set(extractApiError(err) ?? 'Could not delete tasks.');
         },
       });
   }

@@ -1,12 +1,10 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   EventEmitter,
   Input,
   Output,
   computed,
-  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -16,14 +14,14 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   FormBuilder,
   ReactiveFormsModule,
-  ValidatorFn,
-  Validators,
 } from '@angular/forms';
+import { Observable, of } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
-import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
-import { StandardFieldsSignalsService } from '../standard-fields/standard-fields-signals.service';
+import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
+import { FieldDef } from '../shared/dynamic-form/types';
 import type { StandardFieldRendered } from '../standard-fields/types';
+import { commonValidators, withRequiredIf } from '../shared/validators';
 
 import {
   Task,
@@ -52,66 +50,36 @@ export interface TaskAssignee {
   imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './task-form-modal.component.html',
 })
-export class TaskFormModalComponent {
+export class TaskFormModalComponent extends BaseFormModalComponent {
+  protected readonly entityType = 'task';
+
   private readonly api = inject(TasksApiService);
   private readonly fb = inject(FormBuilder);
-  private readonly stdApi = inject(StandardFieldsApiService);
-  private readonly stdSignals = inject(StandardFieldsSignalsService);
-  private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
-    {},
-  );
-
-  protected stdField(key: string): StandardFieldRendered | undefined {
-    return this.stdFields()[key];
-  }
-
-  protected isHidden(key: string): boolean {
-    return this.stdField(key)?.is_hidden === true;
-  }
-
-  constructor() {
-    effect(() => {
-      this.stdSignals.changedAt();
-      this.refreshStdFields();
-    });
-  }
-
-  private refreshStdFields(): void {
-    this.stdApi.render('task').subscribe({
-      next: (resp) => {
-        const map: Record<string, StandardFieldRendered> = {};
-        for (const f of resp.items) map[f.field_key] = f;
-        this.stdFields.set(map);
-        this.applyStandardValidators(map);
-      },
-      error: () => {
-        /* fallbacks keep the form usable */
-      },
-    });
+  /** Tasks have no custom-fields endpoint today; emit an empty defs
+   *  list so the base's `ngOnInit` completes without a 404. */
+  protected renderCustomFields$(): Observable<FieldDef[]> {
+    return of([]);
   }
 
   /** `title` + `priority` stay always-required (registry locks both).
    *  `description` / `due_at` / `assigned_to_id` accept the `required` override. */
-  private applyStandardValidators(
+  protected applyStandardValidators(
     map: Record<string, StandardFieldRendered>,
   ): void {
     this.form.controls.title.setValidators([
-      Validators.required,
-      Validators.maxLength(255),
+      commonValidators.required,
+      commonValidators.maxLength(255),
     ]);
     this.form.controls.title.updateValueAndValidity({ emitEvent: false });
-    this.form.controls.priority.setValidators([Validators.required]);
+    this.form.controls.priority.setValidators([commonValidators.required]);
     this.form.controls.priority.updateValueAndValidity({ emitEvent: false });
 
     const setReq = (
       ctrl: 'description' | 'due_at' | 'assigned_to_id',
       row: StandardFieldRendered | undefined,
     ): void => {
-      const v: ValidatorFn[] = [];
-      if (row?.is_required) v.push(Validators.required);
-      this.form.controls[ctrl].setValidators(v);
+      this.form.controls[ctrl].setValidators(withRequiredIf([], row));
       this.form.controls[ctrl].updateValueAndValidity({ emitEvent: false });
     };
     setReq('description', map['description']);
@@ -136,10 +104,10 @@ export class TaskFormModalComponent {
   protected readonly error = signal<string | null>(null);
 
   protected readonly form = this.fb.nonNullable.group({
-    title: ['', [Validators.required, Validators.maxLength(255)]],
+    title: ['', [commonValidators.required, commonValidators.maxLength(255)]],
     description: [''],
     due_at: [''],
-    priority: ['med' as TaskPriority, Validators.required],
+    priority: ['med' as TaskPriority, commonValidators.required],
     assigned_to_id: [''],
   });
 

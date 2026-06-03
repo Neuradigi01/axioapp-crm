@@ -3,7 +3,7 @@
     <div>
       <h1 class="text-lg font-semibold text-zinc-900">Contacts</h1>
       <p class="mt-0.5 text-xs text-zinc-500">
-        Showroom walk-ins, leads, returning customers. {{ total() }} total.
+        Showroom walk-ins, leads, returning customers. {{ state.total() }} total.
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -111,9 +111,9 @@
 
   <!-- Body -->
   <div class="mt-6 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-zinc-200">
-    @if (loadError(); as err) {
+    @if (state.loadError(); as err) {
       <div class="px-6 py-4 text-sm text-red-700">{{ err }}</div>
-    } @else if (loading()) {
+    } @else if (state.loading()) {
       <div class="divide-y divide-zinc-200">
         @for (i of [0, 1, 2, 3, 4]; track i) {
           <div class="flex items-center gap-4 px-6 py-4">
@@ -126,7 +126,7 @@
           </div>
         }
       </div>
-    } @else if (items().length === 0) {
+    } @else if (state.items().length === 0) {
       <div class="px-6 py-12 text-center text-sm text-zinc-500">
         No contacts found.
         <span class="block text-xs text-zinc-400">Try a different search or clear filters.</span>
@@ -139,7 +139,7 @@
               <input
                 type="checkbox"
                 class="h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
-                [checked]="allOnPageSelected()"
+                [checked]="state.allOnPageSelected()"
                 (change)="toggleAllOnPage()"
                 aria-label="Select all on this page"
               />
@@ -182,19 +182,19 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-100 bg-white">
-          @for (item of items(); track item.id) {
+          @for (item of state.items(); track item.id) {
             <tr
               tabindex="0"
               (click)="onRowClick(item)"
               (keydown.enter)="onRowClick(item)"
               class="cursor-pointer transition hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-none"
-              [class.bg-zinc-50]="selectedIds().has(item.id)"
+              [class.bg-zinc-50]="state.selectedIds().has(item.id)"
             >
               <td class="w-10 px-3 py-3" (click)="$event.stopPropagation()">
                 <input
                   type="checkbox"
                   class="h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
-                  [checked]="selectedIds().has(item.id)"
+                  [checked]="state.selectedIds().has(item.id)"
                   (click)="toggleRow(item.id, $event)"
                   [attr.aria-label]="'Select ' + item.full_name"
                 />
@@ -276,17 +276,17 @@
   </div>
 
   <!-- Pagination -->
-  @if (!loading() && total() > 0) {
+  @if (!state.loading() && state.total() > 0) {
     <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-600">
       <span>
-        Page {{ page() }} of {{ totalPages() }} · {{ total() }} contact(s)
+        Page {{ state.page() }} of {{ state.totalPages() }} · {{ state.total() }} contact(s)
       </span>
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-1.5">
           <label for="contacts_pagesize" class="text-zinc-500">Rows</label>
           <select
             id="contacts_pagesize"
-            [value]="pageSize()"
+            [value]="state.pageSize()"
             (change)="setPageSize(+($any($event.target).value))"
             class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           >
@@ -295,21 +295,21 @@
             <option [value]="100">100</option>
           </select>
         </div>
-        @if (total() > pageSize()) {
+        @if (state.total() > state.pageSize()) {
           <div class="flex items-center gap-1">
             <button
               type="button"
               class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
-              [disabled]="page() <= 1"
-              (click)="goToPage(page() - 1)"
+              [disabled]="state.page() <= 1"
+              (click)="goToPage(state.page() - 1)"
             >
               Previous
             </button>
             <button
               type="button"
               class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
-              [disabled]="page() >= totalPages()"
-              (click)="goToPage(page() + 1)"
+              [disabled]="state.page() >= state.totalPages()"
+              (click)="goToPage(state.page() + 1)"
             >
               Next
             </button>
@@ -331,41 +331,41 @@
 }
 
 <app-bulk-action-bar
-  [selectedCount]="selectedCount()"
-  [actions]="bulkActions()"
+  [selectedCount]="state.selectedCount()"
+  [actions]="state.bulkActions()"
   (action)="onBulkAction($event)"
   (clear)="clearSelection()"
 />
 
-@if (bulkModal() === 'reassign') {
+@if (state.bulkModal() === 'reassign') {
   <app-reassign-modal
     [entityLabel]="'contact'"
-    [count]="selectedCount()"
-    [submitting]="bulkSubmitting()"
-    [error]="bulkError()"
+    [count]="state.selectedCount()"
+    [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
     (confirm)="onBulkReassign($event)"
     (cancel)="closeBulkModal()"
   />
 }
 
-@if (bulkModal() === 'delete') {
+@if (state.bulkModal() === 'delete') {
   <app-confirm-dialog
-    [title]="'Delete ' + selectedCount() + ' contact' + (selectedCount() === 1 ? '' : 's') + '?'"
+    [title]="'Delete ' + state.selectedCount() + ' contact' + (state.selectedCount() === 1 ? '' : 's') + '?'"
     [body]="'This cannot be undone. Activities and tasks on these contacts remain in the timeline.'"
     [confirmLabel]="'Delete'"
     [danger]="true"
-    [submitting]="bulkSubmitting()"
+    [submitting]="state.bulkSubmitting()"
     (confirm)="onBulkDelete()"
     (cancel)="closeBulkModal()"
   />
 }
 
-@if (bulkModal() === 'tag') {
+@if (state.bulkModal() === 'tag') {
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
     <div class="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
       <header class="border-b border-zinc-200 px-5 py-3">
         <h2 class="text-sm font-semibold text-zinc-900">
-          Add tag to {{ selectedCount() }} contact{{ selectedCount() === 1 ? '' : 's' }}
+          Add tag to {{ state.selectedCount() }} contact{{ state.selectedCount() === 1 ? '' : 's' }}
         </h2>
       </header>
       <div class="px-5 py-4">
@@ -378,7 +378,7 @@
           placeholder="e.g. vip"
           maxlength="64"
         />
-        @if (bulkError(); as err) {
+        @if (state.bulkError(); as err) {
           <p class="mt-2 text-xs text-red-700">{{ err }}</p>
         }
       </div>
@@ -386,7 +386,7 @@
         <button
           type="button"
           class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-          [disabled]="bulkSubmitting()"
+          [disabled]="state.bulkSubmitting()"
           (click)="closeBulkModal()"
         >
           Cancel
@@ -394,7 +394,7 @@
         <button
           type="button"
           class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
-          [disabled]="bulkSubmitting()"
+          [disabled]="state.bulkSubmitting()"
           (click)="onBulkAddTag()"
         >
           Add tag

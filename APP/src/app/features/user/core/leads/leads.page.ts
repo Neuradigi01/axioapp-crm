@@ -23,7 +23,7 @@ import {
   PipelineItem,
 } from '../pipelines/pipelines-api.service';
 import { PipelineBoardComponent } from '../pipelines/pipeline-board.component';
-import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ColumnDef, ColumnPrefsService } from '../shared/column-prefs.service';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
@@ -36,6 +36,7 @@ import { FieldDef } from '../shared/dynamic-form/types';
 import { clauseCount, FilterDsl } from '../shared/filter-dsl.types';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
+import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { AdvancedFilterModalComponent } from './advanced-filter-modal.component';
 import { ColumnCustomizationMenuComponent } from './column-customization-menu.component';
@@ -107,6 +108,8 @@ const DEFAULT_LEAD_COLUMNS: ColumnDef[] = [
 /** Pagination sizes the footer dropdown offers. 200 is the server cap. */
 const PAGE_SIZES = [25, 50, 100, 200] as const;
 
+class LeadsListState extends ListPageState<Lead> {}
+
 @Component({
   selector: 'app-leads-page',
   standalone: true,
@@ -129,6 +132,7 @@ const PAGE_SIZES = [25, 50, 100, 200] as const;
     ColumnCustomizationMenuComponent,
     AdvancedFilterModalComponent,
   ],
+  providers: [LeadsListState],
   templateUrl: './leads.page.html',
 })
 export class LeadsPageComponent {
@@ -142,6 +146,8 @@ export class LeadsPageComponent {
   private readonly columnPrefs = inject(ColumnPrefsService);
   private readonly savedViewsApi = inject(SavedViewsApiService);
 
+  protected readonly state = inject(LeadsListState);
+
   /** Gates the "Import" header button; backend enforces too. */
   protected readonly canImport = computed(() =>
     this.auth.currentPermissions().includes('leads.import'),
@@ -151,10 +157,6 @@ export class LeadsPageComponent {
   protected readonly canExport = computed(() =>
     this.auth.currentPermissions().includes('leads.export'),
   );
-
-  readonly leads = signal<Lead[]>([]);
-  readonly loading = signal(false);
-  readonly loadError = signal<string | null>(null);
 
   readonly view = signal<View>('pipeline');
   readonly searchControl = new FormControl('', { nonNullable: true });
@@ -194,8 +196,8 @@ export class LeadsPageComponent {
 
   /** Cursor-mode page size. List view only — pipeline view fetches
    * size=200 (its kanban needs the union across stages and tops out
-   * at the same server cap). */
-  readonly pageSize = signal<number>(50);
+   * at the same server cap). Reuses `state.pageSize` from the shared
+   * list-page service; default overridden to 50 for the leads list. */
   protected readonly pageSizeOptions = PAGE_SIZES;
 
   /** Current opaque cursor. `null` = first page. */
@@ -218,11 +220,11 @@ export class LeadsPageComponent {
 
   /** "Showing X–Y of N" — built from page index + page size + total. */
   readonly pageRangeStart = computed(() => {
-    if (this.leads().length === 0) return 0;
-    return (this.currentPage() - 1) * this.pageSize() + 1;
+    if (this.state.items().length === 0) return 0;
+    return (this.currentPage() - 1) * this.state.pageSize() + 1;
   });
   readonly pageRangeEnd = computed(
-    () => this.pageRangeStart() + this.leads().length - 1,
+    () => this.pageRangeStart() + this.state.items().length - 1,
   );
 
   /** Customized columns for the list-view table. */
@@ -321,10 +323,10 @@ export class LeadsPageComponent {
 
   /** Header subtitle counts: `loadedCount` is what's on screen now,
    * `totalCount` is server-reported for the active filter. */
-  readonly loadedCount = computed(() => this.leads().length);
+  readonly loadedCount = computed(() => this.state.items().length);
   readonly newTodayCount = computed(() => {
     const todayKey = this.todayKey();
-    return this.leads().filter(
+    return this.state.items().filter(
       (l) => this.dateKey(l.created_at) === todayKey,
     ).length;
   });
@@ -351,20 +353,11 @@ export class LeadsPageComponent {
   // --- Multi-select + bulk + reassign state -------------------------------
 
   /** Row ids selected on the list view. Pipeline board has its own
-   * single-click-pencil reassign; bulk select only runs on list. */
-  readonly selectedIds = signal<Set<string>>(new Set());
-  readonly selectedCount = computed(() => this.selectedIds().size);
+   * single-click-pencil reassign; bulk select only runs on list. Lives
+   * on `state.selectedIds` (with `state.selectedCount` derived). */
 
-  /** Bulk action menu — hide-don't-disable gated. */
-  readonly bulkActions = computed<BulkAction[]>(() => [
-    { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'leads.reassign' },
-    { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'leads.write' },
-  ]);
-
-  /** Which bulk-action modal is open (one at a time). */
-  readonly bulkModal = signal<'reassign' | 'delete' | null>(null);
-  readonly bulkSubmitting = signal(false);
-  readonly bulkError = signal<string | null>(null);
+  /** Which bulk-action modal is open (one at a time). Lives on
+   * `state.bulkModal`; values are still `'reassign' | 'delete' | null`. */
 
   /** Single-row reassign (from the pencil on a card or list row). */
   readonly singleReassignLead = signal<Lead | null>(null);
@@ -457,10 +450,16 @@ export class LeadsPageComponent {
 
   /** Cast Lead[] to PipelineItem[] for the board/list inputs. */
   readonly pipelineItems = computed<PipelineItem[]>(
-    () => this.leads() as PipelineItem[],
+    () => this.state.items() as PipelineItem[],
   );
 
   constructor() {
+    this.state.bulkActions.set([
+      { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'leads.reassign' },
+      { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'leads.write' },
+    ]);
+    // Leads list defaults to 50 rows; shared service defaults to 25.
+    this.state.pageSize.set(50);
     this.reload();
     this.loadCustomFields();
     this.reloadSavedViews();
@@ -481,7 +480,7 @@ export class LeadsPageComponent {
 
     // Whenever leads change, fetch any contacts we don't already have cached.
     effect(() => {
-      const ids = new Set(this.leads().map((l) => l.contact_id));
+      const ids = new Set(this.state.items().map((l) => l.contact_id));
       const cache = this.contactsById();
       const missing = [...ids].filter((id) => !cache[id]);
       if (missing.length === 0) return;
@@ -529,7 +528,7 @@ export class LeadsPageComponent {
       base.filter = this.advancedFilter();
     }
     if (this.view() === 'list') {
-      base.limit = this.pageSize();
+      base.limit = this.state.pageSize();
       base.cursor = this.cursor();
       // Only ask for the count on the first page so the COUNT(*) hit
       // is amortised across the whole walk. The server returns `null`
@@ -544,25 +543,25 @@ export class LeadsPageComponent {
   }
 
   protected reload(): void {
-    this.loading.set(true);
-    this.loadError.set(null);
+    this.state.loading.set(true);
+    this.state.loadError.set(null);
     this.api
       .list(this.buildQuery())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
-          this.leads.set(resp.items);
+          this.state.items.set(resp.items);
           this.nextCursor.set(resp.next_cursor);
           if (resp.total !== null && resp.total !== undefined) {
             this.totalCount.set(resp.total);
           }
-          this.loading.set(false);
+          this.state.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
-          this.leads.set([]);
+          this.state.items.set([]);
           this.nextCursor.set(null);
-          this.loading.set(false);
-          this.loadError.set(extractApiError(err) ?? 'Could not load leads.');
+          this.state.loading.set(false);
+          this.state.loadError.set(extractApiError(err) ?? 'Could not load leads.');
         },
       });
   }
@@ -599,7 +598,7 @@ export class LeadsPageComponent {
     const n = Number(value);
     if (!Number.isFinite(n) || n <= 0) return;
     if (!PAGE_SIZES.includes(n as (typeof PAGE_SIZES)[number])) return;
-    this.pageSize.set(n);
+    this.state.pageSize.set(n);
     this.resetCursorAndReload();
   }
 
@@ -832,7 +831,7 @@ export class LeadsPageComponent {
           this.viewsMenuOpen.set(false);
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(
+          this.state.loadError.set(
             extractApiError(err) ?? 'Could not update view.',
           );
         },
@@ -854,7 +853,7 @@ export class LeadsPageComponent {
           );
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(
+          this.state.loadError.set(
             extractApiError(err) ?? 'Could not change sharing.',
           );
         },
@@ -889,7 +888,7 @@ export class LeadsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.deleteViewSubmitting.set(false);
-          this.loadError.set(
+          this.state.loadError.set(
             extractApiError(err) ?? 'Could not delete view.',
           );
         },
@@ -1019,9 +1018,9 @@ export class LeadsPageComponent {
   }
 
   protected onItemMoved(event: ItemMovedEvent): void {
-    const before = this.leads();
+    const before = this.state.items();
     // Optimistic local update so the kanban doesn't flicker.
-    this.leads.update((rows) =>
+    this.state.items.update((rows) =>
       rows.map((r) =>
         r.id === event.itemId ? { ...r, pipeline_stage: event.toStage } : r,
       ),
@@ -1031,7 +1030,7 @@ export class LeadsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.leads.update((rows) =>
+          this.state.items.update((rows) =>
             rows.map((r) => (r.id === updated.id ? updated : r)),
           );
         },
@@ -1046,8 +1045,8 @@ export class LeadsPageComponent {
             this.lostReasonError.set(null);
             return;
           }
-          this.leads.set(before);
-          this.loadError.set(detail || 'Could not move lead.');
+          this.state.items.set(before);
+          this.state.loadError.set(detail || 'Could not move lead.');
         },
       });
   }
@@ -1065,7 +1064,7 @@ export class LeadsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.leads.update((rows) =>
+          this.state.items.update((rows) =>
             rows.map((r) => (r.id === updated.id ? updated : r)),
           );
           this.lostReasonSubmitting.set(false);
@@ -1196,7 +1195,7 @@ export class LeadsPageComponent {
           this.singleReassignSubmitting.set(false);
           // Replace just the touched row in place so the kanban doesn't
           // flicker its full re-layout for a single owner change.
-          this.leads.update((rows) =>
+          this.state.items.update((rows) =>
             rows.map((r) => (r.id === updated.id ? updated : r)),
           );
           this.closeSingleReassign();
@@ -1214,7 +1213,7 @@ export class LeadsPageComponent {
 
   protected toggleRow(id: string, event: Event): void {
     event.stopPropagation();
-    this.selectedIds.update((set) => {
+    this.state.selectedIds.update((set) => {
       const next = new Set(set);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -1223,65 +1222,65 @@ export class LeadsPageComponent {
   }
 
   protected isSelected(id: string): boolean {
-    return this.selectedIds().has(id);
+    return this.state.selectedIds().has(id);
   }
 
   protected clearSelection(): void {
-    this.selectedIds.set(new Set());
+    this.state.selectedIds.set(new Set());
   }
 
   protected onBulkAction(key: string): void {
-    this.bulkError.set(null);
-    if (key === 'reassign') this.bulkModal.set('reassign');
-    else if (key === 'delete') this.bulkModal.set('delete');
+    this.state.bulkError.set(null);
+    if (key === 'reassign') this.state.bulkModal.set('reassign');
+    else if (key === 'delete') this.state.bulkModal.set('delete');
   }
 
   protected closeBulkModal(): void {
-    this.bulkModal.set(null);
-    this.bulkSubmitting.set(false);
-    this.bulkError.set(null);
+    this.state.bulkModal.set(null);
+    this.state.bulkSubmitting.set(false);
+    this.state.bulkError.set(null);
   }
 
   protected onBulkReassign(payload: ReassignConfirm): void {
-    const ids = [...this.selectedIds()];
+    const ids = [...this.state.selectedIds()];
     if (ids.length === 0) return;
-    this.bulkSubmitting.set(true);
-    this.bulkError.set(null);
+    this.state.bulkSubmitting.set(true);
+    this.state.bulkError.set(null);
     this.api
       .bulkReassign(ids, { userId: payload.userId, note: payload.note })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.bulkSubmitting.set(false);
+          this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
         },
         error: (err: HttpErrorResponse) => {
-          this.bulkSubmitting.set(false);
-          this.bulkError.set(extractApiError(err) ?? 'Could not reassign.');
+          this.state.bulkSubmitting.set(false);
+          this.state.bulkError.set(extractApiError(err) ?? 'Could not reassign.');
         },
       });
   }
 
   protected onBulkDelete(): void {
-    const ids = [...this.selectedIds()];
+    const ids = [...this.state.selectedIds()];
     if (ids.length === 0) return;
-    this.bulkSubmitting.set(true);
-    this.bulkError.set(null);
+    this.state.bulkSubmitting.set(true);
+    this.state.bulkError.set(null);
     this.api
       .bulkDelete(ids)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.bulkSubmitting.set(false);
+          this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
         },
         error: (err: HttpErrorResponse) => {
-          this.bulkSubmitting.set(false);
-          this.bulkError.set(extractApiError(err) ?? 'Could not delete.');
+          this.state.bulkSubmitting.set(false);
+          this.state.bulkError.set(extractApiError(err) ?? 'Could not delete.');
         },
       });
   }

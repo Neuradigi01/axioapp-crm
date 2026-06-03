@@ -182,7 +182,7 @@
       @if (conflicts().length > 0) {
         <div class="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
           <p class="font-semibold">Time conflict</p>
-          <p class="mt-1">{{ submitError() ?? 'Conflicts with the following appointments:' }}</p>
+          <p class="mt-1">{{ submitError$() ?? 'Conflicts with the following appointments:' }}</p>
           <ul class="mt-1.5 list-inside list-disc">
             @for (cid of conflicts(); track cid) {
               <li>{{ conflictLabel(cid) }}</li>
@@ -192,7 +192,7 @@
             Pick a different time or cancel the conflicting appointment first.
           </p>
         </div>
-      } @else if (submitError(); as err) {
+      } @else if (submitError$(); as err) {
         <div class="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
           {{ err }}
         </div>

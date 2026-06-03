@@ -1,29 +1,25 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   EventEmitter,
-  OnInit,
   Output,
   computed,
-  effect,
   inject,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Subject } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import {
   ContactListItem,
   ContactsApiService,
 } from '../contacts/contacts-api.service';
+import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
-import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
-import { StandardFieldsSignalsService } from '../standard-fields/standard-fields-signals.service';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { extractApiError } from '@core/services/api-error.util';
 import { nullableTrim } from '@core/services/form.util';
@@ -51,39 +47,16 @@ import {
   imports: [ReactiveFormsModule, DynamicFormComponent],
   templateUrl: './register-walkin-modal.component.html',
 })
-export class RegisterWalkinModalComponent implements OnInit {
+export class RegisterWalkinModalComponent extends BaseFormModalComponent {
+  protected readonly entityType = 'walk_in';
+
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(WalkInsApiService);
   private readonly contactsApi = inject(ContactsApiService);
-  private readonly stdApi = inject(StandardFieldsApiService);
-  private readonly stdSignals = inject(StandardFieldsSignalsService);
-  private readonly destroyRef = inject(DestroyRef);
-
-  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
-    {},
-  );
-
-  protected stdField(key: string): StandardFieldRendered | undefined {
-    return this.stdFields()[key];
-  }
-
-  protected isHidden(key: string): boolean {
-    return this.stdField(key)?.is_hidden === true;
-  }
 
   @Output() readonly registered = new EventEmitter<QuickRegisterResponse>();
-  @Output() readonly cancel = new EventEmitter<void>();
-
-  protected readonly submitting = signal(false);
-  protected readonly submitError = signal<string | null>(null);
 
   protected readonly matchedContact = signal<ContactListItem | null>(null);
-
-  protected readonly fields = signal<FieldDef[]>([]);
-  protected readonly fieldsLoading = signal(true);
-  protected readonly fieldsError = signal<string | null>(null);
-  protected readonly customValue = signal<FormValue>({});
-  protected readonly customValid = signal(true);
 
   protected readonly form = this.fb.group({
     phone: this.fb.control('', {
@@ -104,25 +77,8 @@ export class RegisterWalkinModalComponent implements OnInit {
 
   private readonly phoneInput$ = new Subject<string>();
 
-  constructor() {
-    effect(() => {
-      this.stdSignals.changedAt();
-      this.refreshStdFields();
-    });
-  }
-
-  private refreshStdFields(): void {
-    this.stdApi.render('walk_in').subscribe({
-      next: (resp) => {
-        const map: Record<string, StandardFieldRendered> = {};
-        for (const f of resp.items) map[f.field_key] = f;
-        this.stdFields.set(map);
-        this.applyStandardValidators(map);
-      },
-      error: () => {
-        /* fallbacks keep the form usable */
-      },
-    });
+  protected renderCustomFields$(): Observable<FieldDef[]> {
+    return this.api.renderFields();
   }
 
   /** Layer override-driven validators on top of static shape validators.
@@ -131,7 +87,7 @@ export class RegisterWalkinModalComponent implements OnInit {
    * other four (email, source, requirement, budget) accept `required`
    * overrides; `budget` additionally accepts `min`/`max`.
    */
-  private applyStandardValidators(
+  protected applyStandardValidators(
     map: Record<string, StandardFieldRendered>,
   ): void {
     this.form.controls.phone.setValidators([
@@ -170,22 +126,8 @@ export class RegisterWalkinModalComponent implements OnInit {
     this.form.controls.budget.updateValueAndValidity({ emitEvent: false });
   }
 
-  ngOnInit(): void {
-    this.api
-      .renderFields()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (defs) => {
-          this.fields.set(defs);
-          this.fieldsLoading.set(false);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.fieldsError.set(
-            extractApiError(err) ?? 'Could not load custom field definitions.',
-          );
-          this.fieldsLoading.set(false);
-        },
-      });
+  override ngOnInit(): void {
+    super.ngOnInit();
 
     // Phone-match lookup. Debounced so we don't flood as the user types.
     this.phoneInput$
@@ -242,11 +184,11 @@ export class RegisterWalkinModalComponent implements OnInit {
       return;
     }
     if (!this.customValid()) {
-      this.submitError.set('Please fix the highlighted custom fields.');
+      this._submitError.set('Please fix the highlighted custom fields.');
       return;
     }
-    this.submitError.set(null);
-    this.submitting.set(true);
+    this._submitError.set(null);
+    this._submitting.set(true);
 
     const raw = this.form.getRawValue();
     this.api
@@ -262,17 +204,15 @@ export class RegisterWalkinModalComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (result) => {
-          this.submitting.set(false);
+          this._submitting.set(false);
           this.registered.emit(result);
         },
         error: (err: HttpErrorResponse) => {
-          this.submitting.set(false);
-          this.submitError.set(
+          this._submitting.set(false);
+          this._submitError.set(
             extractApiError(err) ?? 'Could not register walk-in.',
           );
         },
       });
   }
-
-
 }

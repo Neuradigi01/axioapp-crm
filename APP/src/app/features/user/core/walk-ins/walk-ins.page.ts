@@ -16,7 +16,7 @@ import { catchError, distinctUntilChanged } from 'rxjs/operators';
 
 import { FurnitureAuthService } from '../auth/auth.service';
 import { ContactsApiService } from '../contacts/contacts-api.service';
-import { BulkAction, BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
+import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
 import {
@@ -27,6 +27,7 @@ import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.direct
 import { InrPipe } from '../shared/pipes/inr.pipe';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
+import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import {
   QuickRegisterResponse,
@@ -74,6 +75,8 @@ const FILTER_CHIPS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
   { id: 'left', label: 'Left' },
 ];
 
+class WalkInsListState extends ListPageState<WalkIn> {}
+
 @Component({
   selector: 'app-walk-ins-page',
   standalone: true,
@@ -92,6 +95,7 @@ const FILTER_CHIPS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
     WhatsappLinkDirective,
     UrlFilterStateDirective,
   ],
+  providers: [WalkInsListState],
   templateUrl: './walk-ins.page.html',
 })
 export class WalkInsPageComponent {
@@ -104,9 +108,7 @@ export class WalkInsPageComponent {
   private readonly usersDir = inject(UsersDirectoryService);
   private readonly router = inject(Router);
 
-  readonly all = signal<WalkIn[]>([]);
-  readonly loading = signal(false);
-  readonly loadError = signal<string | null>(null);
+  protected readonly state = inject(WalkInsListState);
 
   readonly statusFilter = signal<StatusFilter>('all');
   readonly chips = FILTER_CHIPS;
@@ -148,22 +150,9 @@ export class WalkInsPageComponent {
   });
 
   /** Items as fetched from the server — server already sorts + filters. */
-  readonly visible = computed<WalkIn[]>(() => this.all());
+  readonly visible = computed<WalkIn[]>(() => this.state.items());
 
   // --- Step 3: selection + bulk + single reassign + convert ---------------
-
-  readonly selectedIds = signal<Set<string>>(new Set());
-  readonly selectedCount = computed(() => this.selectedIds().size);
-
-  readonly bulkActions = computed<BulkAction[]>(() => [
-    { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'walkins.reassign' },
-    { key: 'checkout', label: 'Check out', icon: 'log-out', permissionKey: 'walkins.write' },
-    { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'walkins.write' },
-  ]);
-
-  readonly bulkModal = signal<'reassign' | 'checkout' | 'delete' | null>(null);
-  readonly bulkSubmitting = signal(false);
-  readonly bulkError = signal<string | null>(null);
 
   /** Single-row reassign (from the pencil — added in Step 3 as a future
    * polish on row hover). Same component as bulk. */
@@ -255,17 +244,17 @@ export class WalkInsPageComponent {
   // --- KPI cards (computed from `all`) ---
 
   readonly todayCount = computed(() =>
-    this.all().filter((w) => this.isToday(w.time_in)).length,
+    this.state.items().filter((w) => this.isToday(w.time_in)).length,
   );
   readonly convertedTodayCount = computed(() =>
-    this.all().filter(
+    this.state.items().filter(
       (w) => w.status === 'converted' && this.isToday(w.updated_at),
     ).length,
   );
   /** Combined "warm leads" count â€” interested + follow_up across all loaded rows. */
   readonly interestedOrFollowUpCount = computed(
     () =>
-      this.all().filter(
+      this.state.items().filter(
         (w) => w.status === 'interested' || w.status === 'follow_up',
       ).length,
   );
@@ -277,7 +266,7 @@ export class WalkInsPageComponent {
   });
   /** Average visit duration in minutes, across all checked-out walk-ins. */
   readonly avgVisitDuration = computed<number | null>(() => {
-    const completed = this.all()
+    const completed = this.state.items()
       .map((w) => (w.duration_min !== null ? Number(w.duration_min) : null))
       .filter((n): n is number => n !== null && Number.isFinite(n));
     if (completed.length === 0) return null;
@@ -286,10 +275,15 @@ export class WalkInsPageComponent {
   });
 
   constructor() {
+    this.state.bulkActions.set([
+      { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'walkins.reassign' },
+      { key: 'checkout', label: 'Check out', icon: 'log-out', permissionKey: 'walkins.write' },
+      { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'walkins.write' },
+    ]);
     this.reload();
     effect(() => {
       // Fetch missing contact summaries whenever the visible list changes.
-      const ids = new Set(this.all().map((w) => w.contact_id));
+      const ids = new Set(this.state.items().map((w) => w.contact_id));
       const cache = this.contactsById();
       const missing = [...ids].filter((id) => !cache[id]);
       if (missing.length === 0) return;
@@ -376,7 +370,7 @@ export class WalkInsPageComponent {
 
   protected toggleRow(id: string, event: Event): void {
     event.stopPropagation();
-    this.selectedIds.update((set) => {
+    this.state.selectedIds.update((set) => {
       const next = new Set(set);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -385,84 +379,84 @@ export class WalkInsPageComponent {
   }
 
   protected isSelected(id: string): boolean {
-    return this.selectedIds().has(id);
+    return this.state.selectedIds().has(id);
   }
 
   protected clearSelection(): void {
-    this.selectedIds.set(new Set());
+    this.state.selectedIds.set(new Set());
   }
 
   protected onBulkAction(key: string): void {
-    this.bulkError.set(null);
-    if (key === 'reassign') this.bulkModal.set('reassign');
-    else if (key === 'checkout') this.bulkModal.set('checkout');
-    else if (key === 'delete') this.bulkModal.set('delete');
+    this.state.bulkError.set(null);
+    if (key === 'reassign') this.state.bulkModal.set('reassign');
+    else if (key === 'checkout') this.state.bulkModal.set('checkout');
+    else if (key === 'delete') this.state.bulkModal.set('delete');
   }
 
   protected closeBulkModal(): void {
-    this.bulkModal.set(null);
-    this.bulkSubmitting.set(false);
-    this.bulkError.set(null);
+    this.state.bulkModal.set(null);
+    this.state.bulkSubmitting.set(false);
+    this.state.bulkError.set(null);
   }
 
   protected onBulkReassign(payload: ReassignConfirm): void {
-    const ids = [...this.selectedIds()];
+    const ids = [...this.state.selectedIds()];
     if (ids.length === 0) return;
-    this.bulkSubmitting.set(true);
-    this.bulkError.set(null);
+    this.state.bulkSubmitting.set(true);
+    this.state.bulkError.set(null);
     this.api
       .bulkReassign(ids, { userId: payload.userId, note: payload.note })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.bulkSubmitting.set(false);
+          this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
         },
         error: (err: HttpErrorResponse) => {
-          this.bulkSubmitting.set(false);
-          this.bulkError.set(extractApiError(err) ?? 'Could not reassign.');
+          this.state.bulkSubmitting.set(false);
+          this.state.bulkError.set(extractApiError(err) ?? 'Could not reassign.');
         },
       });
   }
 
   protected onBulkCheckout(): void {
-    const ids = [...this.selectedIds()];
+    const ids = [...this.state.selectedIds()];
     if (ids.length === 0) return;
-    this.bulkSubmitting.set(true);
-    this.bulkError.set(null);
+    this.state.bulkSubmitting.set(true);
+    this.state.bulkError.set(null);
     this.api
       .bulkCheckout(ids)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.bulkSubmitting.set(false);
+          this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
         },
         error: (err: HttpErrorResponse) => {
-          this.bulkSubmitting.set(false);
-          this.bulkError.set(extractApiError(err) ?? 'Could not check out.');
+          this.state.bulkSubmitting.set(false);
+          this.state.bulkError.set(extractApiError(err) ?? 'Could not check out.');
         },
       });
   }
 
   protected onBulkDelete(): void {
-    const ids = [...this.selectedIds()];
+    const ids = [...this.state.selectedIds()];
     if (ids.length === 0) return;
-    this.bulkSubmitting.set(true);
-    this.bulkError.set(null);
+    this.state.bulkSubmitting.set(true);
+    this.state.bulkError.set(null);
     // walk_ins has no batched delete endpoint — call per row. v2: add one.
     let done = 0;
     let failed = 0;
     const finish = () => {
-      this.bulkSubmitting.set(false);
+      this.state.bulkSubmitting.set(false);
       this.clearSelection();
       this.closeBulkModal();
       if (failed > 0) {
-        this.loadError.set(`${failed} delete(s) failed; ${done} succeeded.`);
+        this.state.loadError.set(`${failed} delete(s) failed; ${done} succeeded.`);
       }
       this.reload();
     };
@@ -509,7 +503,7 @@ export class WalkInsPageComponent {
       .subscribe({
         next: (updated) => {
           this.singleReassignSubmitting.set(false);
-          this.all.update((rows) =>
+          this.state.items.update((rows) =>
             rows.map((r) => (r.id === updated.id ? updated : r)),
           );
           this.closeSingleReassign();
@@ -549,7 +543,7 @@ export class WalkInsPageComponent {
           this.convertSubmitting.set(false);
           // Update the local row's linked_lead_id so the "→ Lead" badge
           // appears immediately.
-          this.all.update((rows) =>
+          this.state.items.update((rows) =>
             rows.map((r) =>
               r.id === resp.walk_in_id ? { ...r, linked_lead_id: resp.lead_id } : r,
             ),
@@ -572,9 +566,9 @@ export class WalkInsPageComponent {
   /** Advance a walk-in to a new state. Optimistic — replaces the row
    * on success, reverts on error. */
   protected advanceStatus(walkIn: WalkIn, target: WalkInStatus): void {
-    const before = this.all();
+    const before = this.state.items();
     // Optimistic update.
-    this.all.update((rows) =>
+    this.state.items.update((rows) =>
       rows.map((w) => (w.id === walkIn.id ? { ...w, status: target } : w)),
     );
     this.api
@@ -582,13 +576,13 @@ export class WalkInsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.all.update((rows) =>
+          this.state.items.update((rows) =>
             rows.map((w) => (w.id === updated.id ? updated : w)),
           );
         },
         error: (err: HttpErrorResponse) => {
-          this.all.set(before);
-          this.loadError.set(
+          this.state.items.set(before);
+          this.state.loadError.set(
             extractApiError(err) ?? 'Could not update walk-in status.',
           );
         },
@@ -612,8 +606,8 @@ export class WalkInsPageComponent {
     // Optimistic: stamp time_out locally to a near-now ISO so the
     // duration column populates immediately. Replaced by server value.
     const optimisticNow = new Date().toISOString();
-    const before = this.all();
-    this.all.update((rows) =>
+    const before = this.state.items();
+    this.state.items.update((rows) =>
       rows.map((w) =>
         w.id === walkIn.id ? { ...w, time_out: optimisticNow } : w,
       ),
@@ -623,13 +617,13 @@ export class WalkInsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.all.update((rows) =>
+          this.state.items.update((rows) =>
             rows.map((w) => (w.id === updated.id ? updated : w)),
           );
         },
         error: (err: HttpErrorResponse) => {
-          this.all.set(before);
-          this.loadError.set(
+          this.state.items.set(before);
+          this.state.loadError.set(
             extractApiError(err) ?? 'Could not check out walk-in.',
           );
         },
@@ -694,8 +688,8 @@ export class WalkInsPageComponent {
   }
 
   private reload(): void {
-    this.loading.set(true);
-    this.loadError.set(null);
+    this.state.loading.set(true);
+    this.state.loadError.set(null);
     const filter = this.statusFilter();
     this.api
       .list({
@@ -709,13 +703,13 @@ export class WalkInsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {
-          this.all.set(rows);
-          this.loading.set(false);
+          this.state.items.set(rows);
+          this.state.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
-          this.all.set([]);
-          this.loading.set(false);
-          this.loadError.set(
+          this.state.items.set([]);
+          this.state.loading.set(false);
+          this.state.loadError.set(
             extractApiError(err) ?? 'Could not load walk-ins.',
           );
         },
