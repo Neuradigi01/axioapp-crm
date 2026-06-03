@@ -39,6 +39,13 @@ export interface Lead {
   last_activity_at: string | null;
   lost_reason: string | null;
   lost_reason_other: string | null;
+  /** Origin-channel attribution metadata. Populated by the ingest layer
+   * for `widget`, `google_ads`, `meta_ads` sources; null for `manual`
+   * and `bulk_import`. Keys vary by channel — Google Ads sends
+   * `external_form_id`, `external_lead_id`, `campaign_id`, `gclid`;
+   * Meta sends `external_form_id`, `external_lead_id`, `page_id`;
+   * widget sends `utm_source`, `utm_medium`, `utm_campaign`, `referrer`. */
+  attribution: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
   /** Index signature so `Lead` is structurally compatible with `PipelineItem`. */

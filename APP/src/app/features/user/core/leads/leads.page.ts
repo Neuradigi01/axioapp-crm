@@ -1097,8 +1097,11 @@ export class LeadsPageComponent {
   }
 
   protected openEdit(lead: Lead): void {
-    this.formError.set(null);
-    this.modalState.set(lead);
+    // Click on a lead row/card navigates to the dedicated detail page
+    // (which hosts the full timeline, contact panel, and source
+    // attribution). The Edit modal still lives on the detail page
+    // itself for in-place field edits.
+    this.router.navigate(['/user/leads', lead.id]);
   }
 
   protected closeModal(): void {

@@ -171,6 +171,16 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // MUST come after every literal `leads/...` path above —
+        // otherwise `:id` swallows `leads/import`, `leads/import-history`,
+        // etc. and the import flow never resolves.
+        path: 'leads/:id',
+        loadComponent: () =>
+          import('./core/leads/lead-detail.page').then(
+            (m) => m.LeadDetailPageComponent,
+          ),
+      },
+      {
         path: 'appointments',
         loadComponent: () =>
           import('./core/appointments/appointments.page').then(
