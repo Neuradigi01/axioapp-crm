@@ -381,7 +381,17 @@ def _apply_mapping(
         crm_key = field_mapping.get(name)
         if not crm_key:
             continue
-        result[crm_key] = values[0]
+        value = values[0]
+        # Meta's Lead Ads Testing Tool returns synthetic submissions whose
+        # field values are literally "<test lead: dummy data for {name}>" —
+        # not real user input. Those strings never pass downstream Pydantic
+        # validation (e.g. phone-format), so skip them and let the lead fall
+        # back to the existing email/phone/"Meta Ads lead" defaults.
+        if isinstance(value, str) and value.startswith(
+            "<test lead: dummy data"
+        ):
+            continue
+        result[crm_key] = value
     return result
 
 
