@@ -15,23 +15,35 @@ services:
     command: ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "-m", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   celery:
+    volumes:
+      - .:/app
     environment:
       - ENV=development
       - REDIS_HOST=redis
+      - MASTER_KEY=${MASTER_KEY:-}
+      - DB_NULL_POOL=1
     depends_on:
       - redis
 
   celery-beat:
+    volumes:
+      - .:/app
     environment:
       - ENV=development
       - REDIS_HOST=redis
+      - MASTER_KEY=${MASTER_KEY:-}
+      - DB_NULL_POOL=1
     depends_on:
       - redis
 
   flower:
+    volumes:
+      - .:/app
     environment:
       - ENV=development
       - REDIS_HOST=redis
+      - MASTER_KEY=${MASTER_KEY:-}
+      - DB_NULL_POOL=1
     depends_on:
       - redis
 

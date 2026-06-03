@@ -16,6 +16,10 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.core.logger import logger
+# Bind the configured Celery app at API startup so @shared_task tasks
+# (e.g. process_meta_lead, process_google_lead, campaign senders) route
+# .delay() calls to the right Redis broker rather than Celery's default.
+from src.celery.worker import celery as _celery_app  # noqa: F401
 from src.routers import router as legacy_router
 from src.providers.route_provider import generate_routes_json
 from src.providers.firebase_provider import initialize_firebase
