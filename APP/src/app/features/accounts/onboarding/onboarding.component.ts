@@ -120,7 +120,7 @@ export class OnboardingComponent implements OnInit {
         typeof detail === 'object' &&
         'message' in (detail as Record<string, unknown>)
       ) {
-        msg = String((detail as Record<string, unknown>).message);
+        msg = String((detail as Record<string, unknown>)['message']);
       }
       this.snackBar.open(msg, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
     } finally {

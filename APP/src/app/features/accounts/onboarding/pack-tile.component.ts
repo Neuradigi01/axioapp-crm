@@ -30,7 +30,7 @@ import { CatalogTile } from './onboarding.types';
     >
       @if (tile().status === 'coming_soon') {
         <span
-          class="absolute top-2 right-2 text-[10px] font-medium uppercase tracking-wide bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full"
+          class="absolute top-2 right-2 text-[10px] font-medium uppercase tracking-wide bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 px-2 py-0.5 rounded-full"
         >
           Coming soon
         </span>
@@ -43,14 +43,14 @@ import { CatalogTile } from './onboarding.types';
         </span>
       }
 
-      <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-blue-50 text-blue-600 mb-3">
+      <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 mb-3">
         <lucide-icon [name]="tile().icon" class="w-6 h-6"></lucide-icon>
       </div>
 
-      <div class="text-base font-semibold text-gray-900 mb-1">
+      <div class="text-base font-semibold text-gray-900 dark:text-slate-100 mb-1">
         {{ tile().name }}
       </div>
-      <div class="text-sm text-gray-500 leading-snug line-clamp-2">
+      <div class="text-sm text-gray-500 dark:text-slate-400 leading-snug line-clamp-2">
         {{ tile().description }}
       </div>
     </button>
@@ -63,15 +63,15 @@ export class PackTileComponent {
 
   protected readonly rootClasses = computed(() => {
     const base =
-      'relative flex flex-col items-start text-left rounded-xl border bg-white p-5 transition w-full h-full';
+      'relative flex flex-col items-start text-left rounded-xl border bg-white dark:bg-slate-800 p-5 transition w-full h-full';
     const t = this.tile();
     if (t.status !== 'available') {
-      return `${base} border-gray-200 opacity-60 cursor-not-allowed`;
+      return `${base} border-gray-200 dark:border-slate-700 opacity-60 cursor-not-allowed`;
     }
     if (this.selected()) {
       return `${base} border-blue-600 ring-2 ring-blue-500 shadow-md`;
     }
-    return `${base} border-gray-200 cursor-pointer hover:border-blue-400 hover:shadow-md`;
+    return `${base} border-gray-200 dark:border-slate-700 cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md`;
   });
 
   protected onClick(): void {
