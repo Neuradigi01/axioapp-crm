@@ -356,10 +356,16 @@ def _safe_org_from_payload(payload: dict[str, Any]) -> Optional[uuid.UUID]:
 def _apply_mapping(
     field_mapping: dict[str, str], payload: dict[str, Any]
 ) -> dict[str, Any]:
-    """Translate Google's `user_column_data: [{column_name, string_value},
-    ...]` array through the subscription's field mapping.
+    """Translate Google's `user_column_data: [{column_id, column_name,
+    string_value}, ...]` array through the subscription's field mapping.
 
-    `field_mapping` maps `column_name → crm_field_key`, e.g.
+    Google's payload carries both `column_id` (the stable canonical key
+    like "FULL_NAME") and `column_name` (the form's display label like
+    "Full Name"). The Settings mapping editor stores subscriptions with
+    `column_id`s as keys, so we read `column_id` first and only fall
+    back to `column_name` for payloads that omit the id field.
+
+    `field_mapping` maps `column_id → crm_field_key`, e.g.
     `{"FULL_NAME": "contact.full_name", "PHONE_NUMBER": "contact.phone"}`.
     Columns absent from the mapping are dropped — keep the surface small."""
     rows = payload.get("user_column_data") or []
@@ -367,7 +373,12 @@ def _apply_mapping(
     for entry in rows:
         if not isinstance(entry, dict):
             continue
-        column = entry.get("column_name") or entry.get("columnName")
+        column = (
+            entry.get("column_id")
+            or entry.get("columnId")
+            or entry.get("column_name")
+            or entry.get("columnName")
+        )
         value = entry.get("string_value") or entry.get("stringValue")
         if not column:
             continue

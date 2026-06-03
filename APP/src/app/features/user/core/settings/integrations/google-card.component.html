@@ -17,7 +17,7 @@
           Lead Form Extensions → CRM. Reads `extension_feed_item` Lead Forms;
           paste the webhook URL into each form in Google Ads.
         </p>
-        @if (integration()?.account_label) {
+        @if (integration()?.status === 'connected' && integration()?.account_label) {
           <p class="mt-1 text-xs text-zinc-500">
             Connected as
             <span class="font-mono">{{ integration()?.account_label }}</span>
