@@ -21,10 +21,7 @@ services:
       - ENV=development
       - REDIS_HOST=redis
       - MASTER_KEY=${MASTER_KEY:-}
-<<<<<<< HEAD
       - DB_NULL_POOL=1
-=======
->>>>>>> 012e13d6865d28696bba1d8118ff9e3b190441a7
     depends_on:
       - redis
 
@@ -35,10 +32,7 @@ services:
       - ENV=development
       - REDIS_HOST=redis
       - MASTER_KEY=${MASTER_KEY:-}
-<<<<<<< HEAD
       - DB_NULL_POOL=1
-=======
->>>>>>> 012e13d6865d28696bba1d8118ff9e3b190441a7
     depends_on:
       - redis
 
@@ -49,10 +43,7 @@ services:
       - ENV=development
       - REDIS_HOST=redis
       - MASTER_KEY=${MASTER_KEY:-}
-<<<<<<< HEAD
       - DB_NULL_POOL=1
-=======
->>>>>>> 012e13d6865d28696bba1d8118ff9e3b190441a7
     depends_on:
       - redis
 
