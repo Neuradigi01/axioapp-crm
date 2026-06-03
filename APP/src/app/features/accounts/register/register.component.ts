@@ -80,6 +80,11 @@ export class RegisterComponent implements OnInit, OnDestroy {
   readonly smsTimer = createCountdownTimer();
 
   // ── Registration form ────────────────────────────────────────────────
+  //
+  // After the onboarding-setup track, `/auth/register` collects user
+  // identity only. The workspace name and vertical-pack choice move to
+  // `/onboarding` (a dedicated step the new user lands on after this
+  // form submits with `needs_onboarding=true`).
   readonly registerForm: FormGroup = this.fb.group({
     password: ['', [Validators.required, Validators.minLength(8)]],
     confirm_password: ['', [Validators.required, matchFieldValidator('password')]],
@@ -87,7 +92,6 @@ export class RegisterComponent implements OnInit, OnDestroy {
     last_name: ['', Validators.required],
     email: ['', [Validators.required, Validators.email]],
     mobile_no: [''],
-    organization_name: [''],
     country_id: [null as number | null],
     state_id: [{ value: null as number | null, disabled: true }],
     referral_id: [''],
@@ -282,15 +286,23 @@ export class RegisterComponent implements OnInit, OnDestroy {
           first_name: payload.first_name,
           last_name: payload.last_name,
           phone: payload.mobile_no || null,
-          organization_name: payload.organization_name || null,
         }),
       );
-      this.snackBar.open(
-        `Welcome to ${res.organization_slug}! You're signed in as ${res.role_name}.`,
-        SNACKBAR_ACTION,
-        { duration: SNACKBAR_DURATION_LONG },
-      );
-      await this.router.navigateByUrl('/user');
+      if (res.needs_onboarding) {
+        // Self-signup: user lands on the onboarding picker to choose
+        // an org name + CRM template. Welcome message stays on that
+        // page (it has full context to brand it).
+        await this.router.navigateByUrl('/onboarding');
+      } else {
+        // Legacy path (kept for any existing flow that ships a
+        // fully-set-up org synchronously). Goes straight to dashboard.
+        this.snackBar.open(
+          `Welcome to ${res.organization_slug}! You're signed in as ${res.role_name}.`,
+          SNACKBAR_ACTION,
+          { duration: SNACKBAR_DURATION_LONG },
+        );
+        await this.router.navigateByUrl('/user');
+      }
     } catch (err: unknown) {
       const msg =
         (err as { error?: { detail?: string; message?: string } })?.error?.detail ??

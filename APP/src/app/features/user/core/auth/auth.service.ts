@@ -23,7 +23,6 @@ export interface RegisterRequest {
   first_name: string;
   last_name: string;
   phone?: string | null;
-  organization_name?: string | null;
 }
 
 export interface RegisterResponse {
@@ -33,6 +32,9 @@ export interface RegisterResponse {
   organization_id: string;
   organization_slug: string;
   role_name: string;
+  /** `true` for self-signup — the org is in `pack_id="pending"` state
+   * and the user must finish onboarding before reaching `/user`. */
+  needs_onboarding: boolean;
 }
 
 export interface OrgSummary {
@@ -55,6 +57,28 @@ export interface MeResponse {
   created_at: string;
   updated_at: string;
   org: OrgSummary;
+  /** Derived server-side from `org.pack_id === "pending"`. Step 4's
+   * route guard reads this to redirect users with unfinished
+   * onboarding back to `/onboarding`. */
+  needs_onboarding: boolean;
+}
+
+export interface OnboardingCompleteRequest {
+  organization_name: string;
+  pack_id: string;
+  country?: string | null;
+  currency?: string | null;
+  team_size?: string | null;
+}
+
+export interface OnboardingCompleteResponse {
+  access_token: string;
+  token_type: string;
+  expires_at: string;
+  organization_id: string;
+  organization_slug: string;
+  role_name: string;
+  needs_onboarding: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -99,6 +123,22 @@ export class FurnitureAuthService {
     return this.http
       .post<RegisterResponse>(`${environment.apiBaseUrl}/auth/register`, req)
       .pipe(
+        tap((res) => this.storage.setTokens(res.access_token, res.access_token)),
+      );
+  }
+
+  completeOnboarding(
+    req: OnboardingCompleteRequest,
+  ): Observable<OnboardingCompleteResponse> {
+    return this.http
+      .post<OnboardingCompleteResponse>(
+        `${environment.apiBaseUrl}/auth/onboarding/complete`,
+        req,
+      )
+      .pipe(
+        // Backend rotates the JWT and revokes the previous session, so
+        // we MUST replace the stored token with the new one — otherwise
+        // the next request goes out under a revoked session and 401s.
         tap((res) => this.storage.setTokens(res.access_token, res.access_token)),
       );
   }
