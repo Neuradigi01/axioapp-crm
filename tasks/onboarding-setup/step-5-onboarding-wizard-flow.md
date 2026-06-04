@@ -8,7 +8,7 @@
 Each step has its own panel, a progress indicator, and Continue / Back / Finish-setup buttons. Same backend endpoint, same dark mode, same tile component — only the panel layout and navigation are new.
 
 **Track:** Onboarding & Pack Picker Setup
-**Status:** Pending
+**Status:** COMPLETED — 2-file frontend refactor shipped. Same backend, same dark mode, same pack-tile component. Single page split into 3 sequential panels driven by a `currentStep` signal. Progress indicator (`Step N of 3` + 3 dots). Continue / ← Back / Finish setup buttons. Form state and tile selection persist across step navigation. Skipped the optional `onboarding.component.spec.ts` per Step 3/4 convention. Smoke-verifiable in the browser per the 13 acceptance criteria.
 **Depends on:** Step 3 (existing onboarding page + form) — COMPLETED.
 
 ---

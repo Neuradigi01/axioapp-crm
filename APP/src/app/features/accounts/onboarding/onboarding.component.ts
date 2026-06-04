@@ -47,6 +47,15 @@ export class OnboardingComponent implements OnInit {
     return this.tiles().find((t) => t.pack_id === id) ?? null;
   });
 
+  // ── Wizard step state ──────────────────────────────────────────────
+  // Zero-indexed: 0 = pick template, 1 = type org name, 2 = country /
+  // currency / team size + submit. Form values + tile selection are
+  // signals/FormGroup on the component instance, so going back and
+  // forward between steps preserves everything the user already typed.
+  readonly currentStep = signal<number>(0);
+  readonly totalSteps = 3;
+  protected readonly stepIndices = [0, 1, 2];
+
   readonly form = this.fb.group({
     organization_name: ['', [Validators.required, Validators.maxLength(100)]],
     country: ['India'],
@@ -56,6 +65,24 @@ export class OnboardingComponent implements OnInit {
 
   protected readonly canSubmit = computed<boolean>(() => {
     return !!this.selectedPackId() && this.form.valid;
+  });
+
+  // Per-step validity. Each step's Continue button is gated on its own
+  // computed so the user can't advance until the relevant input is
+  // filled. Driven from the same FormGroup as the final submit, so no
+  // state lives outside the wizard.
+  protected readonly canAdvanceStep1 = computed<boolean>(() => {
+    return !!this.selectedPackId();
+  });
+  protected readonly canAdvanceStep2 = computed<boolean>(() => {
+    const v = (this.form.controls.organization_name.value ?? '').toString().trim();
+    return v.length > 0 && v.length <= 100;
+  });
+  protected readonly canAdvanceCurrent = computed<boolean>(() => {
+    const step = this.currentStep();
+    if (step === 0) return this.canAdvanceStep1();
+    if (step === 1) return this.canAdvanceStep2();
+    return this.canSubmit();
   });
 
   async ngOnInit(): Promise<void> {
@@ -89,7 +116,28 @@ export class OnboardingComponent implements OnInit {
     }
   }
 
+  protected back(): void {
+    const step = this.currentStep();
+    if (step > 0) this.currentStep.set(step - 1);
+  }
+
   async onSubmit(): Promise<void> {
+    const step = this.currentStep();
+
+    // Steps 1 and 2: the submit button is a "Continue →" that just
+    // advances the wizard. The actual API call only fires on step 3.
+    // Pressing Enter in an input on step 1 or 2 also hits ngSubmit —
+    // which is the user expectation (Enter = advance). Gating by the
+    // per-step validity here matches the button's disabled state.
+    if (step === 0) {
+      if (this.canAdvanceStep1()) this.currentStep.set(1);
+      return;
+    }
+    if (step === 1) {
+      if (this.canAdvanceStep2()) this.currentStep.set(2);
+      return;
+    }
+
     if (!this.canSubmit() || this.isSubmitting()) {
       this.form.markAllAsTouched();
       return;
