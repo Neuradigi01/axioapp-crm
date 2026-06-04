@@ -3,7 +3,7 @@
 **Goal:** Rename `pack_id` to `template_id` throughout the Angular frontend (auth service interfaces, onboarding types, component variables, HTML bindings). After this step the wire format matches Step 1's renamed backend and the onboarding wizard works end-to-end again.
 
 **Track:** Template ID Rename
-**Status:** Pending
+**Status:** COMPLETED — 9 files touched (auth.service.ts, onboarding.types.ts, onboarding.component.ts, onboarding.component.html, pack-tile.component.ts, sidebar.component.html, store-profile-tab.component.html, app.routes.ts, user.routes.ts, api-types/index.ts → 10 actually). Wider than spec's 5 because the sidebar's "PENDING PACK" badge and the store-profile-tab both read `org.pack_id` (caught and renamed), plus three comment-only doc updates (app.routes/user.routes/auth.service JSDoc) and the auto-generated `api-types/index.ts` OrgSummary field (manually updated; the next OpenAPI regen from the backend will produce the same output). `selectedPackId` signal renamed to `selectedTemplateId`. Bundle rebuilt clean in ~1s, HTTP 200 on http://localhost:4200, end-to-end smoke from Step 1 already confirmed wire format works. CustomFieldDefinition.pack_id (separate concept) intentionally NOT renamed.
 **Depends on:** Step 1 (backend rename) — must already be deployed. Onboarding is broken until this step ships.
 
 ---

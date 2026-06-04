@@ -13,7 +13,7 @@ import { CatalogTile } from './onboarding.types';
  * One pack tile in the onboarding picker grid.
  *
  * Renders icon + name + description + (optional) "Coming soon" badge.
- * Emits `select` with the pack_id when the user clicks an *available*
+ * Emits `select` with the template_id when the user clicks an *available*
  * tile. Coming-soon tiles are visually dimmed and not clickable.
  */
 @Component({
@@ -76,7 +76,7 @@ export class PackTileComponent {
 
   protected onClick(): void {
     if (this.tile().status === 'available') {
-      this.select.emit(this.tile().pack_id);
+      this.select.emit(this.tile().template_id);
     }
   }
 }

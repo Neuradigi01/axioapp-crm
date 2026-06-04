@@ -40,11 +40,11 @@ export class OnboardingComponent implements OnInit {
   readonly catalogError = signal<string | null>(null);
   readonly isSubmitting = signal<boolean>(false);
 
-  readonly selectedPackId = signal<string | null>(null);
+  readonly selectedTemplateId = signal<string | null>(null);
   protected readonly selectedTile = computed<CatalogTile | null>(() => {
-    const id = this.selectedPackId();
+    const id = this.selectedTemplateId();
     if (!id) return null;
-    return this.tiles().find((t) => t.pack_id === id) ?? null;
+    return this.tiles().find((t) => t.template_id === id) ?? null;
   });
 
   // ── Wizard step state ──────────────────────────────────────────────
@@ -64,7 +64,7 @@ export class OnboardingComponent implements OnInit {
   });
 
   protected readonly canSubmit = computed<boolean>(() => {
-    return !!this.selectedPackId() && this.form.valid;
+    return !!this.selectedTemplateId() && this.form.valid;
   });
 
   // Per-step validity. Each step's Continue button is gated on its own
@@ -72,7 +72,7 @@ export class OnboardingComponent implements OnInit {
   // filled. Driven from the same FormGroup as the final submit, so no
   // state lives outside the wizard.
   protected readonly canAdvanceStep1 = computed<boolean>(() => {
-    return !!this.selectedPackId();
+    return !!this.selectedTemplateId();
   });
   protected readonly canAdvanceStep2 = computed<boolean>(() => {
     const v = (this.form.controls.organization_name.value ?? '').toString().trim();
@@ -106,9 +106,9 @@ export class OnboardingComponent implements OnInit {
     }
   }
 
-  protected onTileSelect(packId: string): void {
-    this.selectedPackId.set(packId);
-    const tile = this.tiles().find((t) => t.pack_id === packId);
+  protected onTileSelect(templateId: string): void {
+    this.selectedTemplateId.set(templateId);
+    const tile = this.tiles().find((t) => t.template_id === templateId);
     if (tile) {
       // Pre-fill currency from the tile's pack default; user can still
       // override before submitting.
@@ -142,8 +142,8 @@ export class OnboardingComponent implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    const packId = this.selectedPackId();
-    if (!packId) return;
+    const templateId = this.selectedTemplateId();
+    if (!templateId) return;
 
     this.isSubmitting.set(true);
     const raw = this.form.getRawValue();
@@ -151,7 +151,7 @@ export class OnboardingComponent implements OnInit {
       await firstValueFrom(
         this.auth.completeOnboarding({
           organization_name: (raw.organization_name ?? '').trim(),
-          pack_id: packId,
+          template_id: templateId,
           country: raw.country || null,
           currency: raw.currency || null,
           team_size: raw.team_size || null,

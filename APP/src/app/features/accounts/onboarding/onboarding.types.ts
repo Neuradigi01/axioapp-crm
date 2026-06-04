@@ -10,7 +10,7 @@
 export type PackStatus = 'available' | 'coming_soon';
 
 export interface CatalogTile {
-  pack_id: string;
+  template_id: string;
   name: string;
   description: string;
   icon: string;

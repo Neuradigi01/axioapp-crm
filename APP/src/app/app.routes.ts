@@ -18,7 +18,7 @@ export const appRoutes: Routes = [
   },
   {
     // Onboarding picker — landed on after self-signup, while the
-    // user's org is still in `pack_id="pending"`. Top-level (not under
+    // user's org is still in `template_id="pending"`. Top-level (not under
     // `/user`) because the user has no fully-set-up org yet, so any
     // `/user/...` query would 404 or render a broken shell. The
     // component bounces unauthenticated visitors to `/accounts/login`.

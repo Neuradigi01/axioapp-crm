@@ -8429,8 +8429,8 @@ export interface components {
             name: string;
             /** Slug */
             slug: string;
-            /** Pack Id */
-            pack_id: string;
+            /** Template Id */
+            template_id: string;
         };
         /** OrganizationMemberOut */
         OrganizationMemberOut: {

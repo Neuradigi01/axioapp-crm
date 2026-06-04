@@ -32,8 +32,9 @@ export interface RegisterResponse {
   organization_id: string;
   organization_slug: string;
   role_name: string;
-  /** `true` for self-signup — the org is in `pack_id="pending"` state
-   * and the user must finish onboarding before reaching `/user`. */
+  /** `true` for self-signup — the org is in `template_id="pending"`
+   * state and the user must finish onboarding before reaching
+   * `/user`. */
   needs_onboarding: boolean;
 }
 
@@ -41,7 +42,7 @@ export interface OrgSummary {
   id: string;
   name: string;
   slug: string;
-  pack_id: string;
+  template_id: string;
 }
 
 export interface MeResponse {
@@ -57,15 +58,15 @@ export interface MeResponse {
   created_at: string;
   updated_at: string;
   org: OrgSummary;
-  /** Derived server-side from `org.pack_id === "pending"`. Step 4's
-   * route guard reads this to redirect users with unfinished
+  /** Derived server-side from `org.template_id === "pending"`. Step
+   * 4's route guard reads this to redirect users with unfinished
    * onboarding back to `/onboarding`. */
   needs_onboarding: boolean;
 }
 
 export interface OnboardingCompleteRequest {
   organization_name: string;
-  pack_id: string;
+  template_id: string;
   country?: string | null;
   currency?: string | null;
   team_size?: string | null;
@@ -111,8 +112,8 @@ export class FurnitureAuthService {
   readonly userLoaded = signal<boolean>(false);
 
   /** Mirror of `MeResponse.needs_onboarding` — true while the user's
-   * org is still in `pack_id="pending"` (self-signup not yet finished
-   * on `/onboarding`). The no-org route guard reads this on every
+   * org is still in `template_id="pending"` (self-signup not yet
+   * finished on `/onboarding`). The no-org route guard reads this on every
    * `/user/**` navigation to redirect back to `/onboarding`. */
   readonly needsOnboarding = signal<boolean>(false);
 

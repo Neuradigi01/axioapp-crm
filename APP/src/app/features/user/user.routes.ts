@@ -32,7 +32,7 @@ export const userRoutes: Routes = [
     path: '',
     canActivate: [furnitureAuthGuard],
     // Runs on every child navigation under `/user/*`. Redirects users
-    // whose org is still in `pack_id="pending"` back to `/onboarding`.
+    // whose org is still in `template_id="pending"` back to `/onboarding`.
     // Composes with the existing `furnitureAuthGuard` (token check)
     // and the per-route `permissionGuard` (RBAC) — order is:
     // furnitureAuthGuard → noOrgGuard → permissionGuard.

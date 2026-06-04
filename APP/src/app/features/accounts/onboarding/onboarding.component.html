@@ -59,10 +59,10 @@
             </div>
           } @else {
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              @for (tile of tiles(); track tile.pack_id) {
+              @for (tile of tiles(); track tile.template_id) {
                 <app-pack-tile
                   [tile]="tile"
-                  [selected]="selectedPackId() === tile.pack_id"
+                  [selected]="selectedTemplateId() === tile.template_id"
                   (select)="onTileSelect($event)"
                 />
               }
