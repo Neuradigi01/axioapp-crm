@@ -59,7 +59,7 @@ A Store Manager on `/user/appointments`:
 | 2 | Frontend list + calendar: Owner / Status / Last activity + owner-color + scope toggle | Pending | ~½ day |
 | 3 | Reschedule modal + bulk reassign + row ergonomics | Pending | ~½ day |
 | 4 | [Assignee picker in Book Appointment modal](step-4-assignee-picker-book-modal.md) (users-list API wire-up) | COMPLETED | ~½ day |
-| 5 | [In-app notifications on appointment events](step-5-in-app-notifications.md) (`appointment.assigned`/`rescheduled`/`cancelled`) | Pending | ~½ day |
+| 5 | [In-app notifications on appointment events](step-5-in-app-notifications.md) (`appointment.assigned`/`rescheduled`/`cancelled`) | COMPLETED | ~½ day |
 | 6 | [Email channel opt-in](step-6-email-channel-opt-in.md) + Settings UI toggles | Pending | ~½ day |
 
 **Total: ~3 working days.** Stop and report after each per Rule 9.

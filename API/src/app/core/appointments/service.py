@@ -39,8 +39,10 @@ from src.app.core.appointments.schemas import (
 )
 from src.app.core.appointments.status_workflow import ALLOWED_TRANSITIONS
 from src.app.core.contacts.models import Contact
+from src.app.core.notifications import service as notifications
 from src.app.core.users.models import OrganizationMember, User
 from src.app.shared.audit import log_entity_change, snapshot
+from src.app.shared.context import get_context
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.queries import ensure_found
 
@@ -79,6 +81,93 @@ _SNAPSHOT_FIELDS = (
 
 def _snapshot(a: Appointment) -> dict[str, Any]:
     return snapshot(a, fields=_SNAPSHOT_FIELDS)
+
+
+# --- Notification helpers --------------------------------------------------
+#
+# Three notification types fire from this module:
+#   - appointment.assigned    — new appointment OR reassign
+#   - appointment.rescheduled — slot moved
+#   - appointment.cancelled   — status flipped to cancelled
+#
+# The notifications service opens its own session and is non-raising, so
+# these helpers are safe to call after the main transaction commits.
+# A failure to deliver never rolls back the appointment write.
+
+
+async def _resolve_contact_name(
+    session: AsyncSession, contact_id: uuid.UUID | None
+) -> str | None:
+    if contact_id is None:
+        return None
+    row = (
+        await session.execute(
+            select(Contact.full_name).where(Contact.id == contact_id)
+        )
+    ).scalar_one_or_none()
+    return row
+
+
+def _human_scheduled_at(when: datetime) -> str:
+    # `Fri Jun 06, 10:00 AM` — readable in any locale we currently
+    # serve, short enough for a notification body.
+    return when.strftime("%a %b %d, %I:%M %p")
+
+
+async def _notify_appointment_event(
+    *,
+    session: AsyncSession,
+    appt: Appointment,
+    org_id: uuid.UUID,
+    recipient_user_id: uuid.UUID,
+    actor_user_id: uuid.UUID | None,
+    event_type: str,
+) -> None:
+    """Build the (title, body, payload) for an appointment event and
+    forward to `notifications.notify`. Safe to call after commit; any
+    DB/socket failure is swallowed by `notify` itself.
+    """
+    contact_name = await _resolve_contact_name(session, appt.contact_id)
+    when_human = _human_scheduled_at(appt.scheduled_at)
+
+    if event_type == "appointment.assigned":
+        title = f"New appointment: {appt.title}"
+        parts = [f"Scheduled {when_human}"]
+        if contact_name:
+            parts.append(f"with {contact_name}")
+        if appt.location:
+            parts.append(f"at {appt.location}")
+        body = " ".join(parts)
+    elif event_type == "appointment.rescheduled":
+        title = f"Appointment rescheduled: {appt.title}"
+        body = f"Moved to {when_human}"
+    elif event_type == "appointment.cancelled":
+        title = f"Appointment cancelled: {appt.title}"
+        if contact_name:
+            body = f"{contact_name} on {when_human} was cancelled"
+        else:
+            body = f"{when_human} was cancelled"
+    else:
+        return  # unknown type, nothing to send
+
+    payload: dict[str, Any] = {
+        "appointment_id": str(appt.id),
+        "contact_id": str(appt.contact_id) if appt.contact_id else None,
+        "contact_name": contact_name,
+        "scheduled_at": appt.scheduled_at.isoformat(),
+        "title": appt.title,
+        "location": appt.location,
+        "actor_user_id": str(actor_user_id) if actor_user_id else None,
+    }
+
+    await notifications.notify(
+        org_id=org_id,
+        user_id=recipient_user_id,
+        type=event_type,
+        title=title,
+        body=body,
+        payload=payload,
+    )
 
 
 # --- in-scope existence helpers ---
@@ -232,6 +321,19 @@ async def create_appointment(
         },
         user_id=current_user_id,
     )
+
+    # Notify the assignee — only when someone else booked for them.
+    # Suppression avoids self-spam when a user books their own slot.
+    if appt.assigned_to_id != current_user_id:
+        await _notify_appointment_event(
+            session=session,
+            appt=appt,
+            org_id=org_id,
+            recipient_user_id=appt.assigned_to_id,
+            actor_user_id=current_user_id,
+            event_type="appointment.assigned",
+        )
+
     return appt
 
 
@@ -332,6 +434,30 @@ async def update_appointment(
             },
             user_id=current_user_id,
         )
+
+    # Notify on a status-flip to `cancelled`. Suppressed when the
+    # canceller is the owner themselves — they don't need to hear
+    # about their own action.
+    if (
+        "status" in changes
+        and changes["status"] is not None
+        and appt.status == AppointmentStatus.cancelled
+        and appt.assigned_to_id != current_user_id
+    ):
+        # `org_id` isn't a parameter to this function — pull it from the
+        # request context (the auth dependency populates it on every
+        # /user route).
+        ctx = get_context()
+        if ctx.org_id is not None:
+            await _notify_appointment_event(
+                session=session,
+                appt=appt,
+                org_id=ctx.org_id,
+                recipient_user_id=appt.assigned_to_id,
+                actor_user_id=current_user_id,
+                event_type="appointment.cancelled",
+            )
+
     return appt
 
 
@@ -520,6 +646,18 @@ async def reschedule_appointment(
         before=before,
         after=_snapshot(appt),
     )
+
+    # Reschedule notifies the assignee regardless of who acted — even
+    # a self-reschedule lands in their inbox as a paper trail.
+    await _notify_appointment_event(
+        session=session,
+        appt=appt,
+        org_id=org_id,
+        recipient_user_id=appt.assigned_to_id,
+        actor_user_id=actor_user_id,
+        event_type="appointment.rescheduled",
+    )
+
     return appt
 
 
@@ -574,6 +712,19 @@ async def reassign_appointment(
         before=before,
         after=_snapshot(appt),
     )
+
+    # Notify the new owner — only when the reassign was done by
+    # someone else. (Self-reassign is rare but possible via the API.)
+    if assigned_to_id != actor_user_id:
+        await _notify_appointment_event(
+            session=session,
+            appt=appt,
+            org_id=org_id,
+            recipient_user_id=assigned_to_id,
+            actor_user_id=actor_user_id,
+            event_type="appointment.assigned",
+        )
+
     return appt
 
 
@@ -598,6 +749,10 @@ async def bulk_reassign_appointments(
     await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
     reassigned = 0
+    # Collect the appts we actually moved so we can fan out
+    # notifications after the commit lands. Keeping the list in memory
+    # is fine — bulk reassigns are typically <100 rows.
+    moved: list[Appointment] = []
     for aid in ids:
         appt = await get_appointment(session, aid)
         if appt is None:
@@ -619,8 +774,23 @@ async def bulk_reassign_appointments(
             )
         )
         reassigned += 1
+        moved.append(appt)
 
     await session.commit()
+
+    # One notification per moved row for the new owner. Same
+    # self-spam suppression as the single reassign path.
+    if assigned_to_id != actor_user_id:
+        for appt in moved:
+            await _notify_appointment_event(
+                session=session,
+                appt=appt,
+                org_id=org_id,
+                recipient_user_id=assigned_to_id,
+                actor_user_id=actor_user_id,
+                event_type="appointment.assigned",
+            )
+
     return reassigned
 
 
