@@ -22,10 +22,22 @@ interface PrefRow {
 
 interface PrefMatrixRow {
   type: string;
+  label: string;
   in_app: boolean;
   email: boolean;
   push: boolean;
 }
+
+/**
+ * Display labels for known notification types. Unknown types fall back
+ * to the raw key so a new module-emitted type isn't invisible until we
+ * remember to add a label.
+ */
+const TYPE_LABELS: Readonly<Record<string, string>> = {
+  'appointment.assigned': 'New appointment assigned to me',
+  'appointment.rescheduled': 'Appointment I own was rescheduled',
+  'appointment.cancelled': 'Appointment I own was cancelled',
+};
 
 /**
  * Notifications tab â€” per-type toggles for in-app / email / push.
@@ -50,17 +62,40 @@ export class NotificationsTabComponent {
   protected readonly loadError = signal<string | null>(null);
   protected readonly saveError = signal<string | null>(null);
 
+  /**
+   * Known appointment.* types are surfaced even when the user has no
+   * preference rows yet (default in-app ON, email OFF). The matrix
+   * therefore always renders the three appointment rows + whatever
+   * other types the backend has emitted for this user.
+   */
   protected readonly matrix = computed<PrefMatrixRow[]>(() => {
     const byType = new Map<string, PrefMatrixRow>();
+    for (const t of Object.keys(TYPE_LABELS)) {
+      byType.set(t, {
+        type: t,
+        label: TYPE_LABELS[t],
+        in_app: true,
+        email: false,
+        push: false,
+      });
+    }
     for (const r of this.rows()) {
       let row = byType.get(r.type);
       if (!row) {
-        row = { type: r.type, in_app: true, email: true, push: true };
+        row = {
+          type: r.type,
+          label: TYPE_LABELS[r.type] ?? r.type,
+          in_app: true,
+          email: false,
+          push: false,
+        };
         byType.set(r.type, row);
       }
       row[r.channel] = r.enabled;
     }
-    return [...byType.values()].sort((a, b) => a.type.localeCompare(b.type));
+    return [...byType.values()].sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
   });
 
   constructor() {
