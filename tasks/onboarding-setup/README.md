@@ -66,8 +66,9 @@ All without any DB-level intervention or CLI installer step.
 | 2 | [Backend: split signup, defer org creation, add onboarding endpoint](step-2-backend-split-signup.md) | COMPLETED | ~1 day |
 | 3 | [Frontend: simplified register + onboarding page + tiles UI](step-3-frontend-onboarding-page.md) | COMPLETED | ~1 day |
 | 4 | [Route guard: no-org → onboarding](step-4-no-org-route-guard.md) | COMPLETED | ~½ day |
+| 5 | [Onboarding wizard: 3-step guided flow](step-5-onboarding-wizard-flow.md) | Pending | ~½ day |
 
-**Total: ~3 working days.** Each step independently verifiable; pause and report after each per rule 9.
+**Total: ~3½ working days** (Steps 1–4 shipped; Step 5 refines Step 3's layout from a single page into a 3-panel wizard — same backend, same dark mode, same tile component). Each step independently verifiable; pause and report after each per rule 9.
 
 ## Dependencies
 
