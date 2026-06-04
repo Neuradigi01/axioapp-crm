@@ -13,4 +13,3 @@ router.include_router(app_config_router)
 router.include_router(routes_router)
 router.include_router(common_router)
 router.include_router(location_router)
-++
