@@ -10,9 +10,11 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+
+import { environment } from '../../../../../environments/environment';
 
 import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
 import { extractApiError } from '@core/services/api-error.util';
@@ -37,15 +39,22 @@ import {
  * Three sections:
  *   - Contact picker (debounced search via contacts API).
  *   - Standard fields (title, purpose, scheduled_at, duration_min,
- *     location). `assigned_to_id` defaults to the current user; there's
- *     no users-list API yet so we keep it implicit.
- *   - Conflict banner â€” when the create call returns 409 with a
+ *     location, **assignee**). The Assignee dropdown lists every
+ *     active org user (`GET /api/v1/users`) and defaults to the
+ *     current user — solo users see no extra friction; Owner/Admin
+ *     can pick another staff member to delegate.
+ *   - Conflict banner — when the create call returns 409 with a
  *     `conflicts: [...]` array we surface the conflicting appointment
  *     ids and let the parent map them to titles via `conflictTitleFor`.
  *
  * `defaultDate` lets the parent pre-fill the scheduled_at from the
  * currently-selected day on the calendar.
  */
+interface OrgUser {
+  id: string;
+  full_name: string;
+  is_active: boolean;
+}
 @Component({
   selector: 'app-book-appointment-modal',
   standalone: true,
@@ -57,6 +66,7 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
   protected readonly entityType = 'appointment';
 
   private readonly fb = inject(FormBuilder);
+  private readonly http = inject(HttpClient);
   private readonly api = inject(AppointmentsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly auth = inject(FurnitureAuthService);
@@ -118,9 +128,22 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
   protected readonly contactResults = signal<ContactListItem[]>([]);
   protected readonly contactSearchOpen = signal(false);
 
+  /** Active org users for the Assignee dropdown. Loaded once on
+   * ngOnInit via `GET /api/v1/users`; inactive users filtered out
+   * client-side. Empty until the request lands. */
+  protected readonly users = signal<OrgUser[]>([]);
+
   private readonly contactQuery$ = new Subject<string>();
 
   protected readonly scheduledAtControl = this.fb.control('', {
+    nonNullable: true,
+    validators: [commonValidators.required],
+  });
+
+  /** Assigned user id. Initialised to the current user's id once
+   * `/users/me` lands, so solo users see no extra friction. Owner /
+   * Admin override by picking another option in the dropdown. */
+  protected readonly assigneeControl = this.fb.control('', {
     nonNullable: true,
     validators: [commonValidators.required],
   });
@@ -137,6 +160,7 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
       validators: [commonValidators.required, Validators.min(1), Validators.max(24 * 60)],
     }),
     location: this.fb.control('', { nonNullable: true }),
+    assigned_to_id: this.assigneeControl,
   });
 
   readonly canSubmit = computed(
@@ -150,8 +174,29 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
       .me()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (me) => this.me.set(me),
+        next: (me) => {
+          this.me.set(me);
+          // Default the assignee to the current user once we know who
+          // they are. Owner can override by picking another option.
+          if (!this.assigneeControl.value) {
+            this.assigneeControl.setValue(me.id);
+          }
+        },
         error: () => this.me.set(null),
+      });
+
+    // Load active org users for the Assignee dropdown. A `/users`
+    // failure must NOT block booking — fall back to a one-row list
+    // containing just the current user (which `me()` will populate
+    // above) so the modal remains submittable.
+    this.http
+      .get<OrgUser[]>(`${environment.apiBaseUrl}/users`)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (list) => {
+          this.users.set(list.filter((u) => u.is_active));
+        },
+        error: () => this.users.set([]),
       });
 
     this.contactQuery$
@@ -218,7 +263,10 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
       scheduled_at: this.toIsoFromLocal(raw.scheduled_at),
       duration_min: Number(raw.duration_min),
       location: raw.location.trim() || null,
-      assigned_to_id: user.id,
+      // Picked from the Assignee dropdown; falls back to the current
+      // user when the dropdown is empty (e.g. `/users` failed and the
+      // user just submits the form with the form's default).
+      assigned_to_id: (raw.assigned_to_id || '').trim() || user.id,
     };
 
     this.api

@@ -3,8 +3,8 @@
     <header class="border-b border-zinc-200 px-6 py-4">
       <h2 class="text-base font-semibold text-zinc-900">Book appointment</h2>
       <p class="mt-1 text-xs text-zinc-500">
-        Pick the contact this is for, then schedule a time and place. The
-        appointment is assigned to you by default.
+        Pick the contact, choose the team member it's for, then schedule a
+        time and place.
       </p>
     </header>
 
@@ -120,6 +120,38 @@
             </div>
           }
 
+          <!-- Assignee picker — backend requires `assigned_to_id`; the
+               dropdown defaults to the current user once `/users/me`
+               lands, so solo users see no extra friction. Owner /
+               Admin can delegate by picking another option. -->
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-medium text-zinc-700" for="ba_assignee">
+              Assigned to <span class="text-red-600">*</span>
+            </label>
+            <select
+              id="ba_assignee"
+              formControlName="assigned_to_id"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            >
+              @if (users().length === 0) {
+                <!-- /users hasn't loaded yet (or failed); render just
+                     the current user so the form stays submittable. -->
+                @if (me(); as m) {
+                  <option [value]="m.id">{{ m.full_name }} (you)</option>
+                }
+              } @else {
+                @for (u of users(); track u.id) {
+                  <option [value]="u.id">
+                    {{ u.full_name }}@if (u.id === me()?.id) { (you) }
+                  </option>
+                }
+              }
+            </select>
+            <p class="mt-1 text-[11px] text-zinc-500">
+              The assignee will see this appointment on their dashboard.
+            </p>
+          </div>
+
           @if (!isHidden('scheduled_at')) {
             <div>
               <label class="block text-xs font-medium text-zinc-700" for="ba_at">
@@ -173,9 +205,6 @@
           }
         </div>
 
-        <p class="mt-3 text-[11px] text-zinc-500">
-          Assigned to: <span class="font-medium text-zinc-700">{{ me()?.full_name ?? 'you' }}</span>
-        </p>
       </section>
 
       <!-- Errors / conflicts -->

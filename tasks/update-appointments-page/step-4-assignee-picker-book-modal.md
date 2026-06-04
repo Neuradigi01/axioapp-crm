@@ -1,5 +1,7 @@
 # Step 4 — Frontend: Assignee picker in Book Appointment modal (users-list API wire-up)
 
+**Status:** COMPLETED — `book-appointment-modal.component.ts` now injects `HttpClient`, fetches `GET ${apiBaseUrl}/users` in ngOnInit, filters by `is_active`, and exposes a `users` signal + `assigneeControl` FormControl. The form group has a new `assigned_to_id` field validated as required and pre-populated to the current user's id once `/users/me` lands. The HTML drops the stale "Assigned to: you" footer and renders a real `<select>` with `(you)` suffix on the current user; falls back to a single-row dropdown of just the current user when `/users` fails so the modal stays submittable. Header subtitle updated to reflect the multi-user flow. 2 files modified.
+
 **Goal:** Replace the hardcoded `assigned_to_id: user.id` in the Book Appointment modal with a real Assignee dropdown listing every active user in the org. Owner (or anyone with `appointments.write`) can pick the staff member the appointment is for. Default selection = current user (preserves today's behaviour for solo users).
 
 **Depends on:** Step 1 (`assigned_to_id` already required and validated on the backend). No backend changes — `GET /api/v1/users` already exists and returns the active org members.
