@@ -6,10 +6,12 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
+import { startWith } from 'rxjs/operators';
 
 import { FurnitureAuthService } from '@app/features/user/core/auth/auth.service';
 import { SNACKBAR_ACTION, SNACKBAR_DURATION } from '@core/constants/app.constants';
@@ -63,19 +65,33 @@ export class OnboardingComponent implements OnInit {
     team_size: [''],
   });
 
+  // The app runs zoneless change detection (provideZonelessChangeDetection
+  // in app.config.ts), so reading `this.form.controls.<x>.value` directly
+  // from a computed() does NOT subscribe the computed to form changes —
+  // signals only depend on other signals. Bridge each form value we need
+  // to gate UI on into a real signal via `toSignal` so the computeds
+  // recompute when the user types.
+  private readonly orgNameValue = toSignal(
+    this.form.controls.organization_name.valueChanges.pipe(startWith('')),
+    { initialValue: '' },
+  );
+  private readonly formStatusValue = toSignal(this.form.statusChanges, {
+    initialValue: this.form.status,
+  });
+
   protected readonly canSubmit = computed<boolean>(() => {
-    return !!this.selectedTemplateId() && this.form.valid;
+    return !!this.selectedTemplateId() && this.formStatusValue() === 'VALID';
   });
 
   // Per-step validity. Each step's Continue button is gated on its own
   // computed so the user can't advance until the relevant input is
-  // filled. Driven from the same FormGroup as the final submit, so no
-  // state lives outside the wizard.
+  // filled. Driven from the bridged form signals above, so no state
+  // lives outside the wizard.
   protected readonly canAdvanceStep1 = computed<boolean>(() => {
     return !!this.selectedTemplateId();
   });
   protected readonly canAdvanceStep2 = computed<boolean>(() => {
-    const v = (this.form.controls.organization_name.value ?? '').toString().trim();
+    const v = (this.orgNameValue() ?? '').toString().trim();
     return v.length > 0 && v.length <= 100;
   });
   protected readonly canAdvanceCurrent = computed<boolean>(() => {
