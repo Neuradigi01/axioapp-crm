@@ -40,14 +40,14 @@ class OrgSummary(ORMModel):
     id: uuid.UUID
     name: str
     slug: str
-    pack_id: str
+    template_id: str
 
 
 class UserMe(UserOut):
     role_name: str
     permission_keys: list[str]
     org: OrgSummary
-    # `True` while the user's org is in `pack_id="pending"` state —
+    # `True` while the user's org is in `template_id="pending"` state —
     # i.e. they registered but haven't completed the post-signup
     # onboarding picker. Frontend route guard reads this to redirect
     # to `/onboarding` until it flips to `False`.

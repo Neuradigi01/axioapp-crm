@@ -13,7 +13,7 @@
 # replaces the `leads` pipeline shape with its own funnel; everything
 # else here remains.
 
-pack_id: base
+template_id: base
 version: 1.0.0
 display_name: Core CRM
 

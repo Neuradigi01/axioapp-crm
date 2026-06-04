@@ -114,7 +114,7 @@ async def get_me(
         role_name=role.name if role else "",
         permission_keys=[p.key for p in permissions],
         org=OrgSummary.model_validate(org),
-        needs_onboarding=(org.pack_id == "pending"),
+        needs_onboarding=(org.template_id == "pending"),
     )
 
 

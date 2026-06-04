@@ -7,10 +7,11 @@ onboarding picker. It composes from two sources:
    icon, modules preview, display order) for every pack we want to
    show, real or placeholder.
 2. **`src/app/packs/*/pack.yaml`** — every subfolder containing a
-   `pack.yaml` is considered "real" (installable today). Its `pack_id`
-   matches the on-disk manifest's `pack_id` field, not the folder name.
+   `pack.yaml` is considered "real" (installable today). Its
+   `template_id` matches the on-disk manifest's `template_id` field,
+   not the folder name.
 
-A tile is marked `status="available"` if its `pack_id` matches a real
+A tile is marked `status="available"` if its `template_id` matches a real
 pack, else `status="coming_soon"`. The result is sorted ascending by
 `display_order`.
 """
@@ -29,12 +30,12 @@ from src.app.core.packs.schemas import CatalogResponse, CatalogTile
 _PACKS_DIR = Path(__file__).resolve().parents[2] / "packs"
 
 
-def _discover_real_pack_ids() -> set[str]:
-    """Scan `src/app/packs/*/pack.yaml` and return the set of pack_ids
-    found. Loader errors on a single manifest are skipped — one broken
-    pack must not hide the rest of the catalog. A pack that fails to
-    load is also un-installable, so its tile correctly stays out of the
-    "available" set.
+def _discover_real_template_ids() -> set[str]:
+    """Scan `src/app/packs/*/pack.yaml` and return the set of
+    `template_id` values found. Loader errors on a single manifest are
+    skipped — one broken pack must not hide the rest of the catalog. A
+    pack that fails to load is also un-installable, so its tile
+    correctly stays out of the "available" set.
     """
     found: set[str] = set()
     if not _PACKS_DIR.exists():
@@ -49,7 +50,7 @@ def _discover_real_pack_ids() -> set[str]:
             manifest = load_pack(manifest_path)
         except PackLoadError:
             continue
-        found.add(manifest.pack_id)
+        found.add(manifest.template_id)
     return found
 
 
@@ -61,15 +62,15 @@ def get_catalog() -> CatalogResponse:
     on-disk manifest set are both static at startup. Tests can call
     `get_catalog.cache_clear()` between cases.
     """
-    real_ids = _discover_real_pack_ids()
+    real_ids = _discover_real_template_ids()
     tiles = [
         CatalogTile(
-            pack_id=entry["pack_id"],
+            template_id=entry["template_id"],
             name=entry["name"],
             description=entry["description"],
             icon=entry["icon"],
             status=(
-                "available" if entry["pack_id"] in real_ids else "coming_soon"
+                "available" if entry["template_id"] in real_ids else "coming_soon"
             ),
             default_currency=entry["default_currency"],
             default_tax_rate=entry["default_tax_rate"],

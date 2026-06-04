@@ -1,7 +1,7 @@
 """Tests for `POST /api/v1/auth/register` after the Step 2 split.
 
 Register now creates the user + a placeholder organization with
-`pack_id="pending"`. No pack data is seeded; the response carries
+`template_id="pending"`. No pack data is seeded; the response carries
 `needs_onboarding=true`.
 
 Distinct from the legacy `register_with_new_org` covered by other
@@ -43,7 +43,7 @@ async def test_register_creates_user_and_pending_org(layered_client):
 
 
 @pytest.mark.asyncio
-async def test_register_org_is_pack_id_pending(layered_client):
+async def test_register_org_is_template_id_pending(layered_client):
     from tests.conftest import TestSession
 
     resp = await layered_client.post(
@@ -64,7 +64,7 @@ async def test_register_org_is_pack_id_pending(layered_client):
                 select(Organization).where(Organization.id == org_id)
             )
         ).scalar_one()
-        assert org.pack_id == "pending"
+        assert org.template_id == "pending"
         assert org.name == "Beta's Workspace"
         assert org.created_via == "normal_signup"
 
@@ -168,4 +168,4 @@ async def test_register_users_me_returns_needs_onboarding_true(layered_client):
     )
     assert me.status_code == 200, me.text
     assert me.json()["needs_onboarding"] is True
-    assert me.json()["org"]["pack_id"] == "pending"
+    assert me.json()["org"]["template_id"] == "pending"

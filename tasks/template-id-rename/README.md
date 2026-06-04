@@ -42,7 +42,7 @@ After this track:
 
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
-| 1 | [Backend rename — DB + Python + pack manifests + tests](step-1-backend-rename.md) | Pending | ~1 day |
+| 1 | [Backend rename — DB + Python + pack manifests + tests](step-1-backend-rename.md) | COMPLETED | ~1 day |
 | 2 | [Frontend rename — Angular types, services, components](step-2-frontend-rename.md) | Pending | ~½ day |
 
 **Total: ~1½ working days.** Each step independently verifiable; pause and report after each per rule 9. **Step 2 must ship close behind Step 1** — the onboarding flow is broken between them (frontend sends `pack_id`, backend expects `template_id`).

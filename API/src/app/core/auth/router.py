@@ -91,9 +91,9 @@ async def register(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> RegisterResponse:
-    """Self-signup stage 1: create the user + a pending-pack org.
+    """Self-signup stage 1: create the user + a pending-template org.
 
-    The org is a placeholder (`pack_id="pending"`, name
+    The org is a placeholder (`template_id="pending"`, name
     `"<First Name>'s Workspace"`). The returned JWT is a normal admin
     token; the response carries `needs_onboarding=true` so the
     frontend routes the user to `/onboarding` to pick a template.
@@ -116,11 +116,11 @@ async def onboarding_complete(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> OnboardingCompleteResponse:
-    """Self-signup stage 2: finalize the pending-pack org.
+    """Self-signup stage 2: finalize the pending-template org.
 
-    Renames the org, sets the chosen `pack_id`, runs the pack
+    Renames the org, sets the chosen `template_id`, runs the pack
     installer, and rotates the JWT. Caller's org must still be in
-    `pack_id="pending"` — already-onboarded users get 409.
+    `template_id="pending"` — already-onboarded users get 409.
     """
     ctx = get_context()
     if ctx.token_id is None:

@@ -8,7 +8,7 @@ Reads a `PackManifest` and upserts:
   5. `call_outcomes`                      (by `(org_id, key)`)
   6. `org_settings` defaults              (only for fields the admin
                                              hasn't customized yet)
-  7. `organizations.pack_id` + `pack_version`
+  7. `organizations.template_id` + `template_version`
 
 Every section runs in its own try/except. A section that throws is
 logged + audited but does NOT abort the whole install — partial seed
@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class InstallReport:
-    pack_id: str
+    template_id: str
     version: str
     pipelines_created: int = 0
     pipelines_skipped: int = 0
@@ -70,7 +70,7 @@ class InstallReport:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "pack_id": self.pack_id,
+            "template_id": self.template_id,
             "version": self.version,
             "pipelines_created": self.pipelines_created,
             "pipelines_skipped": self.pipelines_skipped,
@@ -101,7 +101,7 @@ async def install(
     other sections continue. The function never raises into the
     caller; it returns a report the caller can act on.
     """
-    report = InstallReport(pack_id=manifest.pack_id, version=manifest.version)
+    report = InstallReport(template_id=manifest.template_id, version=manifest.version)
 
     org = (
         await session.execute(
@@ -143,9 +143,9 @@ async def install(
         report,
     )
 
-    # Stamp the org with pack_id + pack_version.
-    org.pack_id = manifest.pack_id
-    org.pack_version = manifest.version
+    # Stamp the org with template_id + template_version.
+    org.template_id = manifest.template_id
+    org.template_version = manifest.version
     await session.commit()
 
     await audit.log(
@@ -262,7 +262,12 @@ async def _install_custom_fields(
                 is_hidden=cf.is_hidden,
                 display_order=cf.display_order,
                 source=FieldSource.pack,
-                pack_id=manifest.pack_id,
+                # CustomFieldDefinition.pack_id stays as-is in this
+                # rename scope — it's a separate column on a different
+                # table (`custom_field_definitions`) recording which
+                # template originated the field, distinct from the
+                # tenant's chosen template on `organizations`.
+                pack_id=manifest.template_id,
                 validation=cf.validation,
             )
         )

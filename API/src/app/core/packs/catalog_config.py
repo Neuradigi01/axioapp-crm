@@ -2,7 +2,7 @@
 
 Lists every CRM template the onboarding page shows as a selectable or
 "Coming soon" tile. A tile is rendered selectable (`status="available"`)
-when its `pack_id` matches an installable pack on disk
+when its `template_id` matches an installable pack on disk
 (`src/app/packs/<id>/pack.yaml`). Otherwise it is rendered with a
 "Coming soon" badge and is rejected by the onboarding endpoint.
 
@@ -20,7 +20,7 @@ from typing import Final, TypedDict
 
 
 class CatalogTileConfig(TypedDict):
-    pack_id: str
+    template_id: str
     name: str
     description: str
     icon: str
@@ -32,7 +32,7 @@ class CatalogTileConfig(TypedDict):
 
 CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
     {
-        "pack_id": "base",
+        "template_id": "base",
         "name": "Core CRM",
         "description": (
             "Universal CRM for any business — contacts, leads, "
@@ -51,7 +51,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
         "display_order": 0,
     },
     {
-        "pack_id": "furniture",
+        "template_id": "furniture",
         "name": "Furniture CRM",
         "description": (
             "Built for furniture retail — inventory, custom orders, "
@@ -69,7 +69,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
         "display_order": 100,
     },
     {
-        "pack_id": "real_estate",
+        "template_id": "real_estate",
         "name": "Real Estate CRM",
         "description": (
             "Site visits, RERA tracking, channel partners, brokerage."
@@ -86,7 +86,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
         "display_order": 200,
     },
     {
-        "pack_id": "clinic",
+        "template_id": "clinic",
         "name": "Clinic / Dental CRM",
         "description": (
             "Patient records, appointments, treatment plans, recalls."
@@ -103,7 +103,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
         "display_order": 300,
     },
     {
-        "pack_id": "sales",
+        "template_id": "sales",
         "name": "Sales CRM",
         "description": (
             "Generic B2B sales — deals, quotes, forecasting, territory."
@@ -120,7 +120,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
         "display_order": 400,
     },
     {
-        "pack_id": "automotive",
+        "template_id": "automotive",
         "name": "Automotive CRM",
         "description": (
             "Dealerships and service centers — test drives, service, AMC."
@@ -137,7 +137,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
         "display_order": 500,
     },
     {
-        "pack_id": "salon",
+        "template_id": "salon",
         "name": "Salon & Spa CRM",
         "description": "Stylist bookings, packages, loyalty points, retail.",
         "icon": "scissors",
@@ -152,7 +152,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
         "display_order": 600,
     },
     {
-        "pack_id": "fitness",
+        "template_id": "fitness",
         "name": "Fitness CRM",
         "description": (
             "Gym memberships, trainer schedules, attendance, diet plans."
@@ -169,7 +169,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
         "display_order": 700,
     },
     {
-        "pack_id": "education",
+        "template_id": "education",
         "name": "Education CRM",
         "description": (
             "Coaching and schools — admissions, batches, fees, parent comms."
@@ -186,7 +186,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
         "display_order": 800,
     },
     {
-        "pack_id": "hospitality",
+        "template_id": "hospitality",
         "name": "Hospitality CRM",
         "description": (
             "Hotels and restaurants — reservations, guests, loyalty, feedback."

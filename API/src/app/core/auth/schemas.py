@@ -60,7 +60,7 @@ class RegisterResponse(BaseModel):
     organization_id: uuid.UUID
     organization_slug: str
     role_name: str
-    # `True` for self-signup (org is in `pack_id="pending"` state and
+    # `True` for self-signup (org is in `template_id="pending"` state and
     # the user must finish the onboarding picker). `False` for the
     # legacy `register_with_new_org` path, which still ships an org
     # with a real pack installed (kept for seed scripts and any direct
@@ -71,13 +71,13 @@ class RegisterResponse(BaseModel):
 class OnboardingCompleteRequest(BaseModel):
     """Body for `POST /api/v1/auth/onboarding/complete`.
 
-    Sent by the onboarding page after self-signup. `pack_id` must
-    correspond to an `available` tile in the pack catalog (Step 1);
-    coming-soon tiles are rejected with 400.
+    Sent by the onboarding page after self-signup. `template_id` must
+    correspond to an `available` tile in the catalog (onboarding-setup
+    Step 1); coming-soon tiles are rejected with 400.
     """
 
     organization_name: str = Field(min_length=1, max_length=128)
-    pack_id: str = Field(min_length=1, max_length=32)
+    template_id: str = Field(min_length=1, max_length=32)
     country: str | None = Field(default=None, max_length=64)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     team_size: str | None = Field(default=None, max_length=32)

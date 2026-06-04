@@ -58,8 +58,8 @@ async def test_furniture_pack_seeds_expected_counts(
 
     # Stamp
     await test_db.refresh(org)
-    assert org.pack_id == "furniture"
-    assert org.pack_version == "1.0.0"
+    assert org.template_id == "furniture"
+    assert org.template_version == "1.0.0"
 
     # Pipelines: 2 total
     n_pipelines = (

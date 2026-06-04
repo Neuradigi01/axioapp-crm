@@ -18,7 +18,7 @@ from src.app.core.packs.loader import PackLoadError, load_pack_dict
 
 def _minimal() -> dict:
     return {
-        "pack_id": "tinypack",
+        "template_id": "tinypack",
         "version": "0.1.0",
         "display_name": "Tiny",
         "pipelines": [
@@ -41,15 +41,15 @@ def _minimal() -> dict:
 
 def test_minimal_manifest_parses():
     m = load_pack_dict(_minimal())
-    assert m.pack_id == "tinypack"
+    assert m.template_id == "tinypack"
     assert m.version == "0.1.0"
     assert len(m.pipelines) == 1
     assert len(m.pipelines[0].stages) == 2
 
 
-def test_invalid_pack_id_shape_rejected():
+def test_invalid_template_id_shape_rejected():
     data = _minimal()
-    data["pack_id"] = "Tiny-Pack"  # capital + dash
+    data["template_id"] = "Tiny-Pack"  # capital + dash, rejected by _validate_key
     with pytest.raises(PackLoadError):
         load_pack_dict(data)
 

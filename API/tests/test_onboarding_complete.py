@@ -1,7 +1,7 @@
 """Tests for `POST /api/v1/auth/onboarding/complete`.
 
 Finalizes the pending-pack org created by `POST /auth/register`:
-renames it, sets the chosen `pack_id`, runs the matching pack
+renames it, sets the chosen `template_id`, runs the matching pack
 installer, and rotates the JWT.
 """
 from __future__ import annotations
@@ -41,7 +41,7 @@ async def test_onboarding_complete_furniture_happy_path(layered_client):
         "/api/v1/auth/onboarding/complete",
         json={
             "organization_name": "Acme Furniture",
-            "pack_id": "furniture",
+            "template_id": "furniture",
             "country": "India",
             "team_size": "1-5",
         },
@@ -65,7 +65,7 @@ async def test_onboarding_complete_furniture_happy_path(layered_client):
             )
         ).scalar_one()
         assert org.name == "Acme Furniture"
-        assert org.pack_id == "furniture"
+        assert org.template_id == "furniture"
         # Pack tax_rate for furniture is 18%.
         assert float(org.tax_rate) == 18.0
 
@@ -92,7 +92,7 @@ async def test_onboarding_complete_base_happy_path(layered_client):
         "/api/v1/auth/onboarding/complete",
         json={
             "organization_name": "Base Workspace",
-            "pack_id": "base",
+            "template_id": "base",
         },
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -107,7 +107,7 @@ async def test_onboarding_complete_base_happy_path(layered_client):
                 )
             )
         ).scalar_one()
-        assert org.pack_id == "base"
+        assert org.template_id == "base"
 
         # Owner role still present after pack install (role_templates
         # installed during register; pack installer is additive).
@@ -131,12 +131,12 @@ async def test_onboarding_complete_rejects_coming_soon_pack(layered_client):
         "/api/v1/auth/onboarding/complete",
         json={
             "organization_name": "Real Estate Inc",
-            "pack_id": "real_estate",
+            "template_id": "real_estate",
         },
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 400, resp.text
-    assert resp.json()["detail"]["error"] == "pack_not_available"
+    assert resp.json()["detail"]["error"] == "template_not_available"
 
 
 @pytest.mark.asyncio
@@ -149,12 +149,12 @@ async def test_onboarding_complete_rejects_unknown_pack(layered_client):
         "/api/v1/auth/onboarding/complete",
         json={
             "organization_name": "Nope Inc",
-            "pack_id": "blockchain",
+            "template_id": "blockchain",
         },
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 400, resp.text
-    assert resp.json()["detail"]["error"] == "pack_not_found"
+    assert resp.json()["detail"]["error"] == "template_not_found"
 
 
 @pytest.mark.asyncio
@@ -165,7 +165,7 @@ async def test_onboarding_complete_rejects_empty_org_name(layered_client):
 
     resp = await layered_client.post(
         "/api/v1/auth/onboarding/complete",
-        json={"organization_name": "", "pack_id": "base"},
+        json={"organization_name": "", "template_id": "base"},
         headers={"Authorization": f"Bearer {token}"},
     )
     # min_length=1 → Pydantic 422.
@@ -180,7 +180,7 @@ async def test_onboarding_complete_409_after_already_onboarded(layered_client):
 
     first = await layered_client.post(
         "/api/v1/auth/onboarding/complete",
-        json={"organization_name": "First", "pack_id": "base"},
+        json={"organization_name": "First", "template_id": "base"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert first.status_code == 200, first.text
@@ -190,7 +190,7 @@ async def test_onboarding_complete_409_after_already_onboarded(layered_client):
     # to attempt a second onboarding.
     second = await layered_client.post(
         "/api/v1/auth/onboarding/complete",
-        json={"organization_name": "Second", "pack_id": "furniture"},
+        json={"organization_name": "Second", "template_id": "furniture"},
         headers={"Authorization": f"Bearer {new_token}"},
     )
     assert second.status_code == 409, second.text
@@ -204,7 +204,7 @@ async def test_users_me_flips_to_not_needs_onboarding(layered_client):
     )
     finish = await layered_client.post(
         "/api/v1/auth/onboarding/complete",
-        json={"organization_name": "Done Inc", "pack_id": "base"},
+        json={"organization_name": "Done Inc", "template_id": "base"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert finish.status_code == 200, finish.text
@@ -216,7 +216,7 @@ async def test_users_me_flips_to_not_needs_onboarding(layered_client):
     assert me.status_code == 200, me.text
     body = me.json()
     assert body["needs_onboarding"] is False
-    assert body["org"]["pack_id"] == "base"
+    assert body["org"]["template_id"] == "base"
     assert body["org"]["name"] == "Done Inc"
 
 
@@ -224,6 +224,6 @@ async def test_users_me_flips_to_not_needs_onboarding(layered_client):
 async def test_onboarding_complete_requires_auth(layered_client):
     resp = await layered_client.post(
         "/api/v1/auth/onboarding/complete",
-        json={"organization_name": "X", "pack_id": "base"},
+        json={"organization_name": "X", "template_id": "base"},
     )
     assert resp.status_code == 401

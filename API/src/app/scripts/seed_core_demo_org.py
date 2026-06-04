@@ -7,8 +7,9 @@ Field Ops / Billing & POS) and one without (sidebar shows only
 Layer-1 / core modules).
 
 Inserts:
-  - `core-demo` organization (pack_id='core' — a non-furniture marker;
-    `organizations.pack_id` is NOT NULL so we can't use NULL).
+  - `core-demo` organization (template_id='base' — the universal Core
+    CRM template; `organizations.template_id` is NOT NULL so we can't
+    use NULL).
   - Three system roles: Admin / Owner / Employee.
   - Role permissions: each role gets a curated subset of EXISTING
     permission keys. We resolve by `key` because the module registry
@@ -57,13 +58,13 @@ CORE_DEMO_ORG = {
     "id": CORE_DEMO_ORG_ID,
     "name": "Core CRM Demo",
     "slug": "core-demo",
-    # `organizations.pack_id` is NOT NULL with server_default='furniture'.
-    # We use 'core' as the marker for "no vertical pack installed". The
-    # value is informational — no code branches on it; the absence of
-    # pack-installed rows (no fp_* permissions on this org's roles) is
-    # what actually makes the sidebar show core-only.
-    "pack_id": "core",
-    "pack_version": None,
+    # `organizations.template_id` is NOT NULL. We use 'base' to match
+    # the on-disk `packs/base/pack.yaml` (Core CRM, the universal
+    # default). The value is informational — no code branches on it;
+    # the absence of pack-installed rows (no fp_* permissions on this
+    # org's roles) is what actually makes the sidebar show core-only.
+    "template_id": "base",
+    "template_version": None,
     "currency": "INR",
     "tax_rate": Decimal("0.00"),
     "timezone": "Asia/Kolkata",
@@ -318,7 +319,7 @@ async def seed_core_demo_org() -> None:
         reset_context(token)
 
     print()
-    print(f"Org:    {CORE_DEMO_ORG_ID}  slug='core-demo'  pack_id='core'")
+    print(f"Org:    {CORE_DEMO_ORG_ID}  slug='core-demo'  template_id='base'")
     print("Roles:")
     for (role_id, name, keys) in _ROLES:
         print(f"  {name:10s} {role_id}  perms={len(keys)}")

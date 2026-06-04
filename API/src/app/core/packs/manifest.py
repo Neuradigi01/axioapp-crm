@@ -191,11 +191,17 @@ class FollowUpManifest(BaseModel):
 
 
 class PackManifest(BaseModel):
-    """Top-level pack.yaml shape."""
+    """Top-level pack.yaml shape.
+
+    `template_id` identifies which CRM vertical this manifest defines
+    (`base`, `furniture`, future `real_estate`/`clinic`/...). The
+    `packs/` directory and `pack.yaml` filename are kept for legacy
+    naming — the *identifier inside* the file is the template id.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    pack_id: str = Field(min_length=1, max_length=32)
+    template_id: str = Field(min_length=1, max_length=32)
     version: str = Field(min_length=1, max_length=32)
     display_name: str = Field(min_length=1, max_length=128)
 
@@ -213,7 +219,7 @@ class PackManifest(BaseModel):
 
     @model_validator(mode="after")
     def _check(self) -> "PackManifest":
-        _validate_key(self.pack_id, field_name="pack_id")
+        _validate_key(self.template_id, field_name="template_id")
         _check_unique_keys(self.pipelines, key_attr="key", label="pipeline")
         _check_unique_keys(self.roles, key_attr="key", label="role")
         _check_unique_keys(

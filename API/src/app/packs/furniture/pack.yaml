@@ -9,7 +9,7 @@
 # and re-running adds new rows but leaves admin-customised rows alone
 # (e.g. renamed pipeline stages, edited org_settings fields).
 
-pack_id: furniture
+template_id: furniture
 version: 1.0.0
 display_name: Furniture Retail Pack
 

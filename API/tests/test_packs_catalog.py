@@ -31,12 +31,12 @@ async def test_catalog_returns_200_no_auth_required(layered_client):
 @pytest.mark.asyncio
 async def test_catalog_includes_real_packs_as_available(layered_client):
     resp = await layered_client.get("/api/v1/packs/catalog")
-    by_id = {t["pack_id"]: t for t in resp.json()["packs"]}
+    by_id = {t["template_id"]: t for t in resp.json()["packs"]}
     # Furniture pack ships with the repo (`packs/furniture/pack.yaml`).
     assert "furniture" in by_id
     assert by_id["furniture"]["status"] == "available"
     # The "Core CRM" tile is keyed by `base` because that is the on-disk
-    # pack_id at `packs/base/pack.yaml`. Display name is "Core CRM".
+    # template_id at `packs/base/pack.yaml`. Display name is "Core CRM".
     assert "base" in by_id
     assert by_id["base"]["status"] == "available"
     assert by_id["base"]["name"] == "Core CRM"
@@ -45,7 +45,7 @@ async def test_catalog_includes_real_packs_as_available(layered_client):
 @pytest.mark.asyncio
 async def test_catalog_marks_placeholders_coming_soon(layered_client):
     resp = await layered_client.get("/api/v1/packs/catalog")
-    by_id = {t["pack_id"]: t for t in resp.json()["packs"]}
+    by_id = {t["template_id"]: t for t in resp.json()["packs"]}
     for placeholder_id in (
         "real_estate",
         "clinic",
@@ -76,7 +76,7 @@ async def test_catalog_tile_shape_stable(layered_client):
     """Every tile carries the same keys."""
     resp = await layered_client.get("/api/v1/packs/catalog")
     expected_keys = {
-        "pack_id",
+        "template_id",
         "name",
         "description",
         "icon",
@@ -88,7 +88,7 @@ async def test_catalog_tile_shape_stable(layered_client):
     }
     for tile in resp.json()["packs"]:
         assert set(tile.keys()) == expected_keys, (
-            f"tile {tile.get('pack_id')!r} has unexpected key set: {set(tile.keys())}"
+            f"tile {tile.get('template_id')!r} has unexpected key set: {set(tile.keys())}"
         )
 
 
@@ -96,9 +96,9 @@ async def test_catalog_tile_shape_stable(layered_client):
 async def test_catalog_returns_all_configured_packs(layered_client):
     """Every entry in CATALOG_PACKS appears in the response exactly once."""
     resp = await layered_client.get("/api/v1/packs/catalog")
-    returned_ids = [t["pack_id"] for t in resp.json()["packs"]]
-    configured_ids = [entry["pack_id"] for entry in CATALOG_PACKS]
+    returned_ids = [t["template_id"] for t in resp.json()["packs"]]
+    configured_ids = [entry["template_id"] for entry in CATALOG_PACKS]
     assert sorted(returned_ids) == sorted(configured_ids)
     assert len(returned_ids) == len(set(returned_ids)), (
-        "no pack_id should appear twice in the catalog"
+        "no template_id should appear twice in the catalog"
     )

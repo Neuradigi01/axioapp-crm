@@ -28,8 +28,12 @@ class Organization(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
-    pack_id: Mapped[str] = mapped_column(String(32), nullable=False, server_default=text("'furniture'"))
-    pack_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # CRM template the org chose at onboarding ("base", "furniture",
+    # "real_estate", ...). The literal "pending" is a sentinel meaning
+    # "register completed, onboarding not yet finalized" — see the
+    # onboarding-setup track.
+    template_id: Mapped[str] = mapped_column(String(32), nullable=False, server_default=text("'pending'"))
+    template_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default=text("'INR'"))
     tax_rate: Mapped[Decimal] = mapped_column(
         Numeric(5, 2),

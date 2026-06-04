@@ -9,11 +9,11 @@ locked, Admin and Employee are `is_system=false` and Owner-editable.
 
 The permission lists below are **core-only** — they intentionally
 exclude pack-specific keys (`inventory.*`, `custom_orders.*`,
-`field_visits.*`, `pos.*`). Self-signup orgs are created with
-`pack_id='core'`, so granting pack permissions would surface pack
-modules in the sidebar even though the pack isn't installed. Pack
-permissions get added back if/when the pack is installed on the org
-(future Phase 4 work).
+`field_visits.*`, `pos.*`). Self-signup orgs start with
+`template_id='pending'` (finalized to a real template at onboarding),
+so granting pack permissions would surface pack modules in the
+sidebar even before a pack is installed. Pack permissions get added
+back if/when the pack is installed on the org (future Phase 4 work).
 
 `permission_keys` lists are resolved against the live `permissions`
 registry at install time. Unknown keys raise — better to break the
@@ -75,7 +75,8 @@ _CORE_ADMIN_KEYS: list[str] = [
 
 # Owner = Admin + the few keys only the workspace owner should hold.
 # Curated (not ALL_KEYS) so pack-specific permissions don't leak into
-# the sidebar of a `pack_id='core'` org.
+# the sidebar of a vertical-pack-free org (template_id='base' or
+# 'pending').
 _CORE_OWNER_KEYS: list[str] = _CORE_ADMIN_KEYS + [
     "billing.refund",
     "leads.scoring.manage",

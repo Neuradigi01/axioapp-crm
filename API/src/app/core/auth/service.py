@@ -267,7 +267,12 @@ async def register_with_new_org(
     )
 
     org = await create_organization(
-        db, name=workspace_name, created_via="normal_signup"
+        db,
+        name=workspace_name,
+        created_via="normal_signup",
+        # Legacy single-step flow: the org gets the base template
+        # immediately; the pack installer below seeds its defaults.
+        template_id="base",
     )
 
     # Role-template install + base-pack install are both tenant-scoped
@@ -413,14 +418,14 @@ async def register_with_new_org(
 # `needs_onboarding=true` and *no* org. But `AuthSession` is TenantScoped
 # (RLS-enforced) and `encode_token` requires `org_id` — issuing a
 # tokenless flow would require schema + RLS changes well outside Step 2.
-# Pivot: create the org during register with `pack_id="pending"`,
+# Pivot: create the org during register with `template_id="pending"`,
 # install role templates so a real Owner role + membership exist, issue
 # a normal JWT. The onboarding endpoint then *finalizes* the org
-# (rename, set pack_id, run pack installer) and rotates the JWT.
-# `needs_onboarding` derives server-side from `org.pack_id == "pending"`
+# (rename, set template_id, run pack installer) and rotates the JWT.
+# `needs_onboarding` derives server-side from `org.template_id == "pending"`
 # in `/users/me` — same UX, no JWT schema change.
 
-PENDING_PACK_ID = "pending"
+PENDING_TEMPLATE_ID = "pending"
 
 
 async def register_user_only(
@@ -430,13 +435,14 @@ async def register_user_only(
     ip: str | None = None,
     ua: str | None = None,
 ) -> RegisterResponse:
-    """Self-signup stage 1: create the user + a pending-pack org.
+    """Self-signup stage 1: create the user + a pending-template org.
 
-    Inserts a placeholder organization with `pack_id="pending"` (no
-    pack data seeded). Role templates land so an Owner role + active
-    membership exist; the resulting JWT is a normal admin token. The
-    user is expected to call `complete_onboarding` next, which renames
-    the org, sets a real `pack_id`, and runs the matching pack installer.
+    Inserts a placeholder organization with `template_id="pending"`
+    (no pack data seeded). Role templates land so an Owner role +
+    active membership exist; the resulting JWT is a normal admin
+    token. The user is expected to call `complete_onboarding` next,
+    which renames the org, sets a real `template_id`, and runs the
+    matching pack installer.
     """
     if await _email_taken(db, req.email):
         raise HTTPException(
@@ -452,7 +458,7 @@ async def register_user_only(
         db,
         name=workspace_name,
         created_via="normal_signup",
-        pack_id=PENDING_PACK_ID,
+        template_id=PENDING_TEMPLATE_ID,
     )
 
     token = set_context(RequestContext(org_id=org.id))
@@ -559,25 +565,26 @@ async def register_user_only(
     )
 
 
-def _validate_pack_choice(pack_id: str) -> dict:
-    """Resolve `pack_id` against the catalog. Returns the tile dict on
-    success. Raises HTTPException 400 for unknown or coming-soon packs.
+def _validate_template_choice(template_id: str) -> dict:
+    """Resolve `template_id` against the catalog. Returns the tile
+    dict on success. Raises HTTPException 400 for unknown or
+    coming-soon templates.
     """
     catalog = get_catalog()
     for tile in catalog.packs:
-        if tile.pack_id == pack_id:
+        if tile.template_id == template_id:
             if tile.status != "available":
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail={
-                        "error": "pack_not_available",
+                        "error": "template_not_available",
                         "message": f"{tile.name} is coming soon.",
                     },
                 )
             return tile.model_dump()
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail={"error": "pack_not_found", "pack_id": pack_id},
+        detail={"error": "template_not_found", "template_id": template_id},
     )
 
 
@@ -590,17 +597,17 @@ async def complete_onboarding(
     ip: str | None = None,
     ua: str | None = None,
 ) -> OnboardingCompleteResponse:
-    """Self-signup stage 2: finalize the pending-pack org.
+    """Self-signup stage 2: finalize the pending-template org.
 
-    Renames the org, sets `pack_id` from the user's pick, applies pack
-    defaults (currency, tax_rate) unless the request overrides them,
-    and runs `packs.installer.install` so the chosen vertical's
+    Renames the org, sets `template_id` from the user's pick, applies
+    pack defaults (currency, tax_rate) unless the request overrides
+    them, and runs `packs.installer.install` so the chosen vertical's
     pipelines / custom fields / lead sources / call outcomes / org
     settings land. Rotates the JWT so the next response is a normal
     onboarding-complete token. Idempotent: a user whose org is no
-    longer in `pack_id="pending"` gets 409 (already onboarded).
+    longer in `template_id="pending"` gets 409 (already onboarded).
     """
-    tile = _validate_pack_choice(req.pack_id)
+    tile = _validate_template_choice(req.template_id)
 
     org = (
         await db.execute(
@@ -613,7 +620,7 @@ async def complete_onboarding(
             detail="organization not found",
         )
 
-    if org.pack_id != PENDING_PACK_ID:
+    if org.template_id != PENDING_TEMPLATE_ID:
         # Already onboarded — single org per signup; second call is a
         # conflict, not a re-install.
         raise HTTPException(
@@ -621,11 +628,11 @@ async def complete_onboarding(
             detail={"error": "already_onboarded"},
         )
 
-    # Apply user-supplied overrides, else fall back to the pack tile's
-    # defaults. `default_tax_rate` from the catalog is a float; the org
-    # column is Numeric — SQLAlchemy coerces on write.
+    # Apply user-supplied overrides, else fall back to the catalog
+    # tile's defaults. `default_tax_rate` from the catalog is a float;
+    # the org column is Numeric — SQLAlchemy coerces on write.
     org.name = req.organization_name.strip()
-    org.pack_id = req.pack_id
+    org.template_id = req.template_id
     org.currency = req.currency or tile["default_currency"]
     org.tax_rate = tile["default_tax_rate"]
 
@@ -634,7 +641,7 @@ async def complete_onboarding(
     # via `InstallReport.errors` rather than raising — so a partial
     # seed is loud but does not roll back the org rename. (Matching
     # the existing `register_with_new_org` policy.)
-    manifest_path = Path(f"src/app/packs/{req.pack_id}/pack.yaml")
+    manifest_path = Path(f"src/app/packs/{req.template_id}/pack.yaml")
     try:
         manifest = load_pack(manifest_path)
     except PackLoadError as exc:
@@ -651,9 +658,9 @@ async def complete_onboarding(
         report = await install_pack(db, org_id=org.id, manifest=manifest)
         if report.errors:
             logger.warning(
-                "pack install reported errors for org %s pack %s: %s",
+                "pack install reported errors for org %s template %s: %s",
                 org.id,
-                req.pack_id,
+                req.template_id,
                 report.errors,
             )
     finally:
@@ -693,7 +700,7 @@ async def complete_onboarding(
         user_id=user.legacy_uuid,
         after={
             "org_name": org.name,
-            "pack_id": req.pack_id,
+            "template_id": req.template_id,
             "country": req.country,
             "currency": org.currency,
             "team_size": req.team_size,
@@ -706,8 +713,8 @@ async def complete_onboarding(
         org_id=org.id,
         user_id=user.legacy_uuid,
         after={
-            "pack_id": manifest.pack_id,
-            "pack_version": manifest.version,
+            "template_id": manifest.template_id,
+            "template_version": manifest.version,
             "pipelines_created": report.pipelines_created,
             "custom_fields_created": report.custom_fields_created,
             "roles_created": report.roles_created,

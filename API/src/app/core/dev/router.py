@@ -50,7 +50,7 @@ async def list_demo_logins(
     # After DR.7 the email / org / is_demo flag live on three
     # different tables. We JOIN through tbl_user_info (email),
     # tbl_organization_members (org membership + is_demo), and
-    # organizations (slug + name + pack_id).
+    # organizations (slug + name + template_id).
     stmt = (
         select(
             UserInfo.email.label("identifier"),
@@ -58,7 +58,7 @@ async def list_demo_logins(
             DemoCredential.label.label("label_db"),
             Organization.slug.label("org_slug"),
             Organization.name.label("org_name"),
-            Organization.pack_id.label("pack_id"),
+            Organization.template_id.label("template_id"),
         )
         .select_from(User)
         .join(UserInfo, UserInfo.member_id == User.id)
@@ -76,8 +76,8 @@ async def list_demo_logins(
         .join(DemoCredential, DemoCredential.user_id == User.legacy_uuid)
         .where(OrganizationMember.is_demo.is_(True))
         .where(OrganizationMember.is_active.is_(True))
-        # 'core' pack first, then 'furniture', then anything else.
-        .order_by(Organization.pack_id.asc(), UserInfo.first_name.asc())
+        # 'base' (Core CRM) first, then 'furniture', then anything else.
+        .order_by(Organization.template_id.asc(), UserInfo.first_name.asc())
     )
     rows = (await db.execute(stmt)).all()
 

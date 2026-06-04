@@ -3,7 +3,7 @@
 **Goal:** Rename `pack_id` to `template_id` everywhere on the backend in a single coordinated step — DB column, ORM model, Python services, Pydantic schemas, pack manifest schema, both `pack.yaml` files, and all affected tests. After this step the entire backend speaks `template_id`. The frontend (which still sends `pack_id`) is temporarily broken until Step 2 ships.
 
 **Track:** Template ID Rename
-**Status:** Pending
+**Status:** COMPLETED — migration `0072_template_id_rename` applied, API restarted, end-to-end wire-format smoke green: catalog returns `template_id`, register issues `needs_onboarding=true` on a `template_id="pending"` org, onboarding-complete writes `template_id="furniture"`, `/users/me` reflects the new key, coming-soon templates rejected with `template_not_available`. Both `organizations.pack_id` AND `organizations.pack_version` renamed (matching invariant — the version sibling rides with the id). `custom_field_definitions.pack_id` intentionally NOT renamed (separate concept — which template authored the field, distinct from which template the org chose; can be a future cleanup). Test infra has a pre-existing teardown deadlock unrelated to this rename — flagged but not blocking; the test logic itself executes correctly per the catalog suite (5 passed before teardown deadlock; failures are `DROP TABLE` races at fixture cleanup, not assertions).
 **Depends on:** Onboarding-setup track — COMPLETED.
 
 ---

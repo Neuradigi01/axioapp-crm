@@ -36,12 +36,16 @@ async def create_organization(
     *,
     name: str,
     created_via: str = "normal_signup",
-    pack_id: str = "core",
+    template_id: str = "pending",
 ) -> Organization:
     """Insert a new organization row.
 
     `slug` is derived from `name`; on collision a short random suffix is
     appended until unique. Caller owns the transaction (no commit here).
+    `template_id` defaults to the `"pending"` sentinel — callers that
+    finalize the org synchronously (e.g. the legacy
+    `register_with_new_org` path or seed scripts) override it with a
+    real template like `"base"` or `"furniture"`.
     """
     base_slug = _slugify(name)
     slug = base_slug
@@ -56,7 +60,7 @@ async def create_organization(
         id=uuid.uuid4(),
         name=name,
         slug=slug,
-        pack_id=pack_id,
+        template_id=template_id,
         created_via=created_via,
     )
     session.add(org)

@@ -10,11 +10,11 @@ PackStatus = Literal["available", "coming_soon"]
 
 
 class CatalogTile(BaseModel):
-    """One tile shown on the onboarding pack picker."""
+    """One tile shown on the onboarding template picker."""
 
     model_config = ConfigDict(extra="forbid")
 
-    pack_id: str = Field(min_length=1, max_length=32)
+    template_id: str = Field(min_length=1, max_length=32)
     name: str = Field(min_length=1, max_length=128)
     description: str = Field(min_length=1, max_length=512)
     icon: str = Field(min_length=1, max_length=64)
@@ -28,6 +28,11 @@ class CatalogTile(BaseModel):
 class CatalogResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # Kept as `packs` (not `templates`) because the catalog still
+    # serves a list of "packs" (the folder structure / module name)
+    # which now identify themselves by template_id. Renaming the JSON
+    # response key would force every frontend consumer to migrate; the
+    # value type itself carries the rename.
     packs: list[CatalogTile]
 
 

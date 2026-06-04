@@ -4,7 +4,7 @@ Builds a small in-memory manifest, runs the installer twice against
 the same org, then asserts:
   - row counts after the first run match the manifest
   - row counts after the second run are unchanged
-  - the org's `pack_id` + `pack_version` columns are stamped
+  - the org's `template_id` + `template_version` columns are stamped
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from src.app.core.tenants.models import Organization
 
 def _tiny_manifest() -> dict:
     return {
-        "pack_id": "tinypack",
+        "template_id": "tinypack",
         "version": "0.2.0",
         "display_name": "Tiny",
         "pipelines": [
@@ -102,8 +102,8 @@ async def test_install_creates_then_idempotent(test_db, seeded_admin):
 
     # Org stamped.
     await test_db.refresh(org)
-    assert org.pack_id == "tinypack"
-    assert org.pack_version == "0.2.0"
+    assert org.template_id == "tinypack"
+    assert org.template_version == "0.2.0"
 
     # Row counts in DB.
     n_pipelines = (
