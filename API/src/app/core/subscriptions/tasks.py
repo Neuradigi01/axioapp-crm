@@ -155,3 +155,45 @@ async def _reset_daily_counters_async() -> dict[str, Any]:
         orgs_processed, counters_inserted,
     )
     return {"orgs_processed": orgs_processed, "counters_inserted": counters_inserted}
+
+
+# ---------------------------------------------------------------------------
+# Step 6 — trial lifecycle advance
+# ---------------------------------------------------------------------------
+
+
+@shared_task(name="src.app.core.subscriptions.tasks.advance_trial_lifecycle")
+def advance_trial_lifecycle() -> dict[str, Any]:
+    """Hourly beat task — advance trial / read_only / archived states.
+
+    Combines two passes:
+      1. `fire_due_reminders` — queues `trial_ending_soon` emails for
+         subs whose `trial_ends_at` is within 3 days and that have
+         not been notified yet (dedup via
+         `subscriptions.reminders_sent`).
+      2. `scan_and_transition_due` — applies any due state transition
+         (`trialing → read_only`, `read_only → archived`,
+         `archived → row deleted`) with conditional UPDATEs that abort
+         silently on a concurrent paid upgrade.
+
+    Returns the summary dict so Celery's task-result store carries the
+    last sweep's counts for observability.
+    """
+    return asyncio.run(_advance_trial_lifecycle_async())
+
+
+async def _advance_trial_lifecycle_async() -> dict[str, Any]:
+    from src.app.core.subscriptions.lifecycle import (
+        fire_due_reminders,
+        scan_and_transition_due,
+    )
+    from src.app.shared.db import async_session
+
+    async with async_session() as session:
+        reminders_fired = await fire_due_reminders(session)
+        summary = await scan_and_transition_due(session)
+        await session.commit()
+
+    result = {**summary, "reminders_fired": reminders_fired}
+    log.info("advance_trial_lifecycle %s", result)
+    return result

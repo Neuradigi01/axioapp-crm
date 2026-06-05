@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from sqlalchemy import (
     BigInteger,
@@ -32,7 +32,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
@@ -176,6 +176,17 @@ class Subscription(Base, TenantScoped):
         nullable=False,
         server_default=text("now()"),
         onupdate=text("now()"),
+    )
+
+    # Dedup ledger for one-shot reminder emails the trial-lifecycle
+    # task emits (e.g. `trial_ending_soon`). Each entry is
+    # `{<reminder_key>: true}`; absence means "not sent." JSONB instead
+    # of a separate table because the taxonomy is tiny and lives 1:1
+    # with the subscription. See `lifecycle.fire_due_reminders`.
+    reminders_sent: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
     )
 
     def __repr__(self) -> str:  # pragma: no cover — debug aid

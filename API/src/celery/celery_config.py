@@ -58,4 +58,12 @@ beat_schedule = {
         'task': 'src.app.core.subscriptions.tasks.reset_daily_counters',
         'schedule': crontab(hour=0, minute=0),
     },
+    # Pricing-and-Billing Step 6 — advance trial / read_only / archived
+    # subscriptions past their deadlines and fire the 3-day "trial
+    # ending soon" reminder. Hourly at minute=10 to offset from the
+    # period-rollover (minute=5) and lead-score recompute (minute=0).
+    'subscriptions-advance-trial-lifecycle': {
+        'task': 'src.app.core.subscriptions.tasks.advance_trial_lifecycle',
+        'schedule': crontab(minute=10),
+    },
 }

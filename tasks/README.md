@@ -236,7 +236,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 3: Entitlement service](pricing-and-billing/step-3-entitlement-service.md) — Done
 - [Step 4: API entitlement decorators](pricing-and-billing/step-4-api-entitlement-decorators.md) — Pending
 - [Step 5: Usage metering](pricing-and-billing/step-5-usage-metering.md) — Done
-- [Step 6: Trial state machine + signup hook](pricing-and-billing/step-6-trial-state-machine.md) — Pending
+- [Step 6: Trial state machine + signup hook](pricing-and-billing/step-6-trial-state-machine.md) — Done
 - [Step 7: Subscription read API](pricing-and-billing/step-7-subscription-read-api.md) — Pending
 - [Step 8: Plan change API](pricing-and-billing/step-8-plan-change-api.md) — Pending
 - [Step 9: Seat management API](pricing-and-billing/step-9-seat-management-api.md) — Pending

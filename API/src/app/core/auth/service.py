@@ -448,6 +448,13 @@ async def register_with_new_org(
         )
     )
 
+    # Pricing-and-Billing Step 6 — every new org starts a 14-day trial.
+    # The subscription row lands inside this signup transaction so a
+    # later insert failure rolls back the trial too; orgs never exist
+    # without an active subscription.
+    from src.app.core.subscriptions.signup_hook import create_trial_subscription
+    await create_trial_subscription(db, org_id=org.id)
+
     token_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
     expires_at = now + ACCESS_TOKEN_TTL
@@ -606,6 +613,13 @@ async def register_user_only(
             is_demo=False,
         )
     )
+
+    # Pricing-and-Billing Step 6 — every new org starts a 14-day trial,
+    # including orgs in the two-stage onboarding flow. The subscription
+    # row lands inside this signup transaction so a later failure rolls
+    # the trial back along with the rest of the bootstrap.
+    from src.app.core.subscriptions.signup_hook import create_trial_subscription
+    await create_trial_subscription(db, org_id=org.id)
 
     token_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
