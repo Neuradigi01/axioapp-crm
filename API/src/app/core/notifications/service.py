@@ -176,16 +176,18 @@ async def _lookup_user_email(
 ) -> str | None:
     """Resolve the recipient's email by `legacy_uuid` -> tbl_user_info.email.
 
+    `legacy_uuid` lives on the layered `User` mapper (DR.6.1+); the
+    legacy `UserLogin` class only maps the bigint `id`. Both target the
+    same `tbl_user_login` table, so we join the layered `User` here.
     Returns None if the user/profile row is missing or the email field
     is empty.
     """
-    from src.app.core.users.models import UserInfo
-    from src.models.user import UserLogin
+    from src.app.core.users.models import User, UserInfo
 
     result = await session.execute(
         select(UserInfo.email)
-        .join(UserLogin, UserLogin.id == UserInfo.member_id)
-        .where(UserLogin.legacy_uuid == user_id)
+        .join(User, User.id == UserInfo.member_id)
+        .where(User.legacy_uuid == user_id)
     )
     email = result.scalar_one_or_none()
     if email is None or not str(email).strip():
