@@ -232,7 +232,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 
 ### Pricing and Billing (side track — subscription plans, trial lifecycle, entitlements, Stripe, in-app billing UI)
 - [Step 1: Plan registry + public `/plans` API](pricing-and-billing/step-1-plan-registry.md) — Done
-- [Step 2: Subscription model + migration](pricing-and-billing/step-2-subscription-model.md) — Pending
+- [Step 2: Subscription model + migration](pricing-and-billing/step-2-subscription-model.md) — Done
 - [Step 3: Entitlement service](pricing-and-billing/step-3-entitlement-service.md) — Pending
 - [Step 4: API entitlement decorators](pricing-and-billing/step-4-api-entitlement-decorators.md) — Pending
 - [Step 5: Usage metering](pricing-and-billing/step-5-usage-metering.md) — Pending

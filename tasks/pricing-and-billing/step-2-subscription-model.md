@@ -2,7 +2,7 @@
 
 **Goal:** Add a `subscriptions` table that stores exactly one active subscription per organization, with the columns needed for tier / status / trial timing / seat count / billing cycle / Stripe linkage — and backfill existing seeded orgs to a sensible default.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** COMPLETED — migration applied (revision `0074_subscriptions_table`), 16 organizations → 16 trialing subscription rows (incl. Ajay's Workspace), RLS enabled with `org_isolation` policy, 5 indexes present (pkey + ix_org_id + ix_stripe_customer_id + ix_stripe_subscription_id + partial unique `subscriptions_active_per_org_uq`), 15/15 unit tests green. Path diverged from spec: code lives under `core/subscriptions/` (Step 1 reason); revision number bumped from `0073` to `0074` because the DB held an orphan `0073_catalog_image_url` reference; that file was restored to its original content (adds `image_url` to `catalog_items`, which the DB already had applied) and my migration chains after it as `0074`. Test `billing_cycle` invalid-value uses `weekly` (6 chars) instead of `quarterly` (9 chars) so it hits the CHECK constraint rather than VARCHAR(8) truncation.
 **Depends on:** Step 1 (plan registry — `plan_code` foreign-key-like reference points to YAML codes). Phase 1.4 (multi-tenancy: `organizations` table must exist with `id UUID PK`).
 
 ---
