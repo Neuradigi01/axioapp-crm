@@ -25,3 +25,4 @@ openpyxl
 celery[redis]
 flower
 psycopg2-binary
+pyyaml

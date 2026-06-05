@@ -75,6 +75,7 @@ from src.app.packs.furniture.modules.field_ops.router import (
 )
 from src.app.core.billing.router import router as billing_router
 from src.app.core.dev.router import router as dev_router
+from src.app.core.subscriptions.router import router as plans_router
 from src.app.packs.furniture.modules.billing.router import (
     router as fp_pos_router,
 )
@@ -199,6 +200,7 @@ app.include_router(fp_field_ops_router, prefix="/api/v1")
 app.include_router(fp_field_ops_staff_portal_router, prefix="/api/v1")
 app.include_router(billing_router, prefix="/api/v1")
 app.include_router(fp_pos_router, prefix="/api/v1")
+app.include_router(plans_router, prefix="/api/v1")
 
 # Dev-only routes (test-login dropdown backing endpoint, etc). Mounted
 # only when IS_DEVELOPMENT=true on the API container — production never

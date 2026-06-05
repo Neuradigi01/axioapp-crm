@@ -2,10 +2,13 @@
 
 **Goal:** Define the four pricing tiers (Trial / Basic / Standard / Enterprise) as a YAML-backed plan registry, expose them via a public unauthenticated `GET /api/v1/plans` endpoint, and make this the single source of truth that downstream entitlement / billing code reads from.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** COMPLETED — registry loads at boot, `GET /api/v1/plans` returns 3 public plans (trial hidden), `GET /api/v1/plans/{code}` returns 4 plans including trial / 404 on unknown, CLI validate passes. 26 tests green. Path diverged from spec: code lives under `core/subscriptions/` instead of `core/billing/` to avoid colliding with the pre-existing customer-invoicing module of the same name; trial features set to mirror Basic per the founder decision (the spec text had `walkins.read: false` / `pipelines.read: false` for trial, which contradicted "trial = Basic features" — Basic's values won). PyYAML added to requirements.txt (was already present transitively in the running image).
 **Depends on:** Phase 1.2 (backend bootstrap) — needs FastAPI + Pydantic v2 + `core/` package in place. No subscription model yet (lands in Step 2).
 
----
+---\
+\
+
+
 
 ## Scope
 
