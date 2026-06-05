@@ -66,8 +66,9 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [Bulk Import](bulk-import/README.md) | 6 | Core (Lead Capture, 2/4) |
 | — | [Embeddable Widget](embeddable-widget/README.md) | 9 | Core (Lead Capture, 3/4) |
 | — | [Ad Integrations](ad-integrations/README.md) | 8 | Core (Lead Capture, 4/4) |
+| — | [Pricing and Billing](pricing-and-billing/README.md) | 20 | Core (side track) |
 
-**Total: 135 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides + Lead-Capture (4 tracks) side tracks).
+**Total: 155 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides + Lead-Capture (4 tracks) + Pricing-and-Billing side tracks).
 
 Phase 5 was restructured to gather **all core CRM v1 work** (features + polish + hardening) so the path to a shipped template is one phase. Phase 6 was reshaped to hold **all furniture-pack-specific work** that's irrelevant to a generic CRM template adopter.
 
@@ -228,6 +229,28 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 6: Backend cross-source dedup + lead routing (round-robin)](ad-integrations/step-6-backend-dedup-and-routing.md) — Pending
 - [Step 7: Frontend Settings Integrations page (connect/disconnect + form picker)](ad-integrations/step-7-frontend-settings-integrations-page.md) — Pending
 - [Step 8: Frontend field mapping editor + integration status + DLQ](ad-integrations/step-8-frontend-mapping-editor-and-status.md) — Pending
+
+### Pricing and Billing (side track — subscription plans, trial lifecycle, entitlements, Stripe, in-app billing UI)
+- [Step 1: Plan registry + public `/plans` API](pricing-and-billing/step-1-plan-registry.md) — Pending
+- [Step 2: Subscription model + migration](pricing-and-billing/step-2-subscription-model.md) — Pending
+- [Step 3: Entitlement service](pricing-and-billing/step-3-entitlement-service.md) — Pending
+- [Step 4: API entitlement decorators](pricing-and-billing/step-4-api-entitlement-decorators.md) — Pending
+- [Step 5: Usage metering](pricing-and-billing/step-5-usage-metering.md) — Pending
+- [Step 6: Trial state machine + signup hook](pricing-and-billing/step-6-trial-state-machine.md) — Pending
+- [Step 7: Subscription read API](pricing-and-billing/step-7-subscription-read-api.md) — Pending
+- [Step 8: Plan change API](pricing-and-billing/step-8-plan-change-api.md) — Pending
+- [Step 9: Seat management API](pricing-and-billing/step-9-seat-management-api.md) — Pending
+- [Step 10: Read-only / archived mode enforcement](pricing-and-billing/step-10-read-only-mode.md) — Pending
+- [Step 11: Payment provider abstraction (Stripe)](pricing-and-billing/step-11-payment-provider-stripe.md) — Pending
+- [Step 12: Checkout session endpoint](pricing-and-billing/step-12-checkout-session.md) — Pending
+- [Step 13: Stripe webhook handler + invoice records](pricing-and-billing/step-13-stripe-webhooks-invoices.md) — Pending
+- [Step 14: Public `/pricing` page](pricing-and-billing/step-14-public-pricing-page.md) — Pending
+- [Step 15: Trial banner + countdown component](pricing-and-billing/step-15-trial-banner.md) — Pending
+- [Step 16: Billing settings page (read view)](pricing-and-billing/step-16-billing-settings-page.md) — Pending
+- [Step 17: Plan upgrade flow (modal + Stripe redirect)](pricing-and-billing/step-17-plan-upgrade-flow.md) — Pending
+- [Step 18: Locked feature tile pattern](pricing-and-billing/step-18-locked-feature-tile.md) — Pending
+- [Step 19: Owner-only RBAC + billing audit events](pricing-and-billing/step-19-billing-rbac-audit.md) — Pending
+- [Step 20: Email notifications for billing](pricing-and-billing/step-20-billing-emails.md) — Pending
 
 ---
 
