@@ -46,6 +46,13 @@ class ModuleDescriptor:
     is what the SPA sidebar uses. `menu_position` orders the sidebar
     (lower = higher). `parent` lets a module nest under another
     module's id for grouped menus.
+
+    `always_visible=True` is for modules that contain at least one
+    sub-page reachable by every authenticated user (e.g. Settings hosts
+    the per-user Notifications preferences tab). The module's declared
+    permissions still get registered into the `permissions` table for
+    role seeding — `always_visible` only short-circuits the sidebar
+    visibility check.
     """
 
     id: str
@@ -57,6 +64,7 @@ class ModuleDescriptor:
     permissions: list[str] = field(default_factory=list)
     menu_position: int | None = 100
     parent: str | None = None
+    always_visible: bool = False
 
     def __post_init__(self) -> None:
         if not _ID_RE.match(self.id):
@@ -116,18 +124,22 @@ class ModuleRegistry:
     def list_for_user(self, granted: Iterable[str]) -> list[ModuleDescriptor]:
         """Return modules the user holds at least one declared permission for.
 
-        Modules that declare an empty permission list are public and
-        always returned. Modules with `menu_position=None` are excluded —
-        they exist in the registry for permission discovery only and do
-        not render in the sidebar (they surface from within other UIs,
-        e.g. Settings).
+        Modules that declare an empty permission list — or set
+        `always_visible=True` — are public and always returned. Modules
+        with `menu_position=None` are excluded — they exist in the
+        registry for permission discovery only and do not render in the
+        sidebar (they surface from within other UIs, e.g. Settings).
         """
         granted_set = set(granted)
         return [
             m
             for m in self.list()
             if m.menu_position is not None
-            and (not m.permissions or any(p in granted_set for p in m.permissions))
+            and (
+                m.always_visible
+                or not m.permissions
+                or any(p in granted_set for p in m.permissions)
+            )
         ]
 
     def clear(self) -> None:

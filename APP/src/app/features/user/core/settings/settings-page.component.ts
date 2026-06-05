@@ -30,10 +30,16 @@ interface TabDef {
   permission?: string;
 }
 
+/**
+ * Tabs that mutate org-wide state are gated by an explicit permission
+ * key. `Notifications` is a personal preference (per-user email opt-in
+ * etc.) so it stays open to every authenticated user — Employees land
+ * straight on it when they open `/user/settings`.
+ */
 const TABS: ReadonlyArray<TabDef> = [
-  { id: 'store', label: 'Store Profile' },
-  { id: 'team', label: 'Team' },
-  { id: 'roles', label: 'Roles' },
+  { id: 'store', label: 'Store Profile', permission: 'settings.write' },
+  { id: 'team', label: 'Team', permission: 'users.read' },
+  { id: 'roles', label: 'Roles', permission: 'roles.read' },
   {
     // Owner-only: Step 7 surfaces real OAuth + form-picker UI; the
     // gate keeps Employees from seeing the tab AND keeps non-Owner
@@ -44,8 +50,12 @@ const TABS: ReadonlyArray<TabDef> = [
     permission: 'settings.integrations.manage',
   },
   { id: 'notifications', label: 'Notifications' },
-  { id: 'ai', label: 'AI Settings' },
-  { id: 'custom-fields', label: 'Custom Fields' },
+  { id: 'ai', label: 'AI Settings', permission: 'settings.write' },
+  {
+    id: 'custom-fields',
+    label: 'Custom Fields',
+    permission: 'custom_fields.write',
+  },
   {
     id: 'standard-fields',
     label: 'Standard Fields',
