@@ -7,6 +7,7 @@ import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
 import { IntegrationsPageComponent } from './integrations/integrations-page.component';
+import { LoginHistoryTabComponent } from './tabs/login-history-tab.component';
 import { NotificationsTabComponent } from './tabs/notifications-tab.component';
 import { ProfileTabComponent } from './tabs/profile-tab.component';
 import { RolesTabComponent } from './tabs/roles-tab.component';
@@ -17,6 +18,7 @@ import { TeamTabComponent } from './tabs/team-tab.component';
 type SettingsTab =
   | 'profile'
   | 'appearance'
+  | 'login-history'
   | 'store'
   | 'team'
   | 'roles'
@@ -43,6 +45,8 @@ interface TabDef {
 const TABS: ReadonlyArray<TabDef> = [
   { id: 'profile', label: 'Profile' },
   { id: 'appearance', label: 'Appearance' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'login-history', label: 'Login history' },
   { id: 'store', label: 'Store Profile', permission: 'settings.write' },
   { id: 'team', label: 'Team', permission: 'users.read' },
   { id: 'roles', label: 'Roles', permission: 'roles.read' },
@@ -55,7 +59,6 @@ const TABS: ReadonlyArray<TabDef> = [
     label: 'Integrations',
     permission: 'settings.integrations.manage',
   },
-  { id: 'notifications', label: 'Notifications' },
   { id: 'ai', label: 'AI Settings', permission: 'settings.write' },
   {
     id: 'custom-fields',
@@ -81,6 +84,7 @@ const TABS: ReadonlyArray<TabDef> = [
   imports: [
     ProfileTabComponent,
     AppearanceTabComponent,
+    LoginHistoryTabComponent,
     StoreProfileTabComponent,
     TeamTabComponent,
     RolesTabComponent,

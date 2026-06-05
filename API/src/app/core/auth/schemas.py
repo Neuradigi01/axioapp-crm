@@ -91,3 +91,27 @@ class OnboardingCompleteResponse(BaseModel):
     organization_slug: str
     role_name: str
     needs_onboarding: bool = False
+
+
+class SessionOut(BaseModel):
+    """One `auth_sessions` row, scoped to the caller's own user_id.
+
+    `is_current` is `True` for the JWT making the request — the frontend
+    uses it to mark that row "This session" and hide the Sign-out button.
+    Used by the Settings → Login history tab.
+    """
+    id: uuid.UUID
+    created_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None
+    ip: str | None
+    ua: str | None
+    is_current: bool
+
+
+class SessionListResponse(BaseModel):
+    sessions: list[SessionOut]
+
+
+class SessionRevokeResponse(BaseModel):
+    success: bool = True

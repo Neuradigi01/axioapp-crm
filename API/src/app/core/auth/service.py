@@ -238,6 +238,68 @@ async def logout(db: AsyncSession, token_id: uuid.UUID) -> None:
     await db.commit()
 
 
+async def list_user_sessions(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    current_token_id: uuid.UUID,
+    limit: int = 50,
+) -> list[dict]:
+    """Most recent `auth_sessions` rows for one user (newest first).
+
+    Each row carries an `is_current` flag for the JWT making the request
+    so the Settings → Login history tab can hide the Sign-out button on
+    that row. RLS auto-scopes the underlying SELECT to the caller's org.
+    """
+    result = await db.execute(
+        select(AuthSession)
+        .where(AuthSession.user_id == user_id)
+        .order_by(AuthSession.created_at.desc())
+        .limit(limit)
+    )
+    rows = list(result.scalars().all())
+    return [
+        {
+            "id": row.id,
+            "created_at": row.created_at,
+            "expires_at": row.expires_at,
+            "revoked_at": row.revoked_at,
+            "ip": row.ip,
+            "ua": row.ua,
+            "is_current": row.id == current_token_id,
+        }
+        for row in rows
+    ]
+
+
+async def revoke_user_session(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    session_id: uuid.UUID,
+) -> bool:
+    """Revoke a specific session belonging to `user_id`.
+
+    Returns True if a row was updated (idempotent — already-revoked is
+    treated as a no-op success). 404 surfaced by the router when the
+    session id doesn't belong to the user (we don't leak existence —
+    same row check as `notifications.mark_read`).
+    """
+    result = await db.execute(
+        select(AuthSession).where(
+            AuthSession.id == session_id,
+            AuthSession.user_id == user_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        return False
+    if row.revoked_at is None:
+        row.revoked_at = datetime.now(timezone.utc)
+        await db.commit()
+    return True
+
+
 async def _email_taken(db: AsyncSession, email: str) -> bool:
     result = await db.execute(select(UserInfo.id).where(UserInfo.email == email))
     return result.scalar_one_or_none() is not None

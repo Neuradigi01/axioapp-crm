@@ -1,5 +1,7 @@
 # Step 3 — Login history tab: last N sessions + per-row revoke
 
+**Status:** COMPLETED — implementation deviated from the spec on the backend surface. The legacy `/login-history/*` routes are guarded by `AccessGuard([route_ids])` which checks a comma-separated `access_rights` claim that FurnitureCRM JWTs don't issue, so a FE call would 403 before reaching the handler. Built a native replacement instead: `GET /api/v1/auth/sessions` and `POST /api/v1/auth/sessions/{id}/revoke` against the existing `auth_sessions` table (the same source of truth the `get_current_user` dependency already checks for revocation). The frontend service points at the new endpoints; the rest of the tab matches the spec — table with "This session" badge, per-row Sign-out, Active/Signed-out/Expired status pills, refresh button. Backend rejects revoking the current session (must use `/auth/logout`). 7 files (4 new, 3 modified) — slightly over the spec's 5 because of the backend additions, still under Rule 8's 10-file limit.
+
 **Goal:** Surface the legacy `POST /login-history/list` and `POST /login-history/logout-session` endpoints as a Settings tab. Shows the last 50 sign-ins (time, IP, device / user-agent, current session marker) with a Sign-out button on every row except the current one. Gives every staff member a self-service way to spot a stolen session and kill it.
 
 **Depends on:** Step 2 (sits next to Appearance as the third personal tab).

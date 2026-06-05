@@ -10,6 +10,8 @@ Rate limit: 10 login attempts per IP per minute (in-memory bucket from
 """
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +27,9 @@ from src.app.core.auth.schemas import (
     RefreshResponse,
     RegisterRequest,
     RegisterResponse,
+    SessionListResponse,
+    SessionOut,
+    SessionRevokeResponse,
 )
 from src.app.core.auth.tokens import InvalidToken, TokenClaims, decode_token
 from src.app.core.users.models import User
@@ -155,3 +160,68 @@ async def logout(
     claims = _claims_from_bearer(creds)
     await auth_service.logout(db, claims.token_id)
     return LogoutResponse()
+
+
+@router.get("/sessions", response_model=SessionListResponse)
+async def list_sessions(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SessionListResponse:
+    """Last 50 sessions for the calling user, newest first.
+
+    The current JWT is marked with `is_current=true` so the Settings →
+    Login history tab can render the "This session" badge.
+    """
+    ctx = get_context()
+    if ctx.token_id is None or user.legacy_uuid is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing token context",
+        )
+    rows = await auth_service.list_user_sessions(
+        db,
+        user_id=user.legacy_uuid,
+        current_token_id=ctx.token_id,
+    )
+    return SessionListResponse(
+        sessions=[SessionOut(**row) for row in rows]
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/revoke", response_model=SessionRevokeResponse
+)
+async def revoke_session(
+    session_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SessionRevokeResponse:
+    """Revoke a single non-current session belonging to the caller.
+
+    To revoke the current session, the client should call
+    `POST /auth/logout` instead (this endpoint refuses to revoke it so a
+    "Sign out" button click can't accidentally log you out of the tab
+    you're using).
+    """
+    ctx = get_context()
+    if ctx.token_id is None or user.legacy_uuid is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing token context",
+        )
+    if session_id == ctx.token_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use POST /auth/logout to end the current session.",
+        )
+    ok = await auth_service.revoke_user_session(
+        db,
+        user_id=user.legacy_uuid,
+        session_id=session_id,
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found.",
+        )
+    return SessionRevokeResponse()
