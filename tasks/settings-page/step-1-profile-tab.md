@@ -1,5 +1,7 @@
 # Step 1 — Profile tab: fold the standalone `/user/profile` page into Settings
 
+**Status:** COMPLETED — `ProfileTabComponent` lifted byte-for-byte from `ProfilePageComponent` and registered as the first tab in `settings-page.component.ts::TABS` with no permission gate. Avatar dropdown's Profile link now routes to `/user/settings` with `queryParams: { tab: 'profile' }`. The old `/user/profile` route now redirects to `/user/settings?tab=profile` with `pathMatch: 'full'`. Standalone `profile-page.component.ts/html` deleted; `profile.service.ts` retained (consumed by the new tab). 6 files (2 new, 3 modified, 1 route redirect + 2 deletions).
+
 **Goal:** Move the working contents of `APP/src/app/features/user/core/profile/profile-page.component.ts` into a new `ProfileTabComponent` and surface it as the first tab in `/user/settings`. Closes the UX hole where Employees couldn't change their own name / phone / password because the Settings sidebar entry was hidden and the standalone Profile page wasn't discoverable.
 
 **Depends on:** the per-tab gates in `settings-page.component.ts` (already shipped in this track's prerequisite). No backend changes.

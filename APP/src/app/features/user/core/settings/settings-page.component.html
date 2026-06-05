@@ -22,6 +22,9 @@
   </nav>
 
   @switch (active()) {
+    @case ('profile') {
+      <app-settings-profile-tab />
+    }
     @case ('store') {
       <app-settings-store-profile-tab />
     }

@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -13,34 +13,30 @@ import {
 } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
-import { ProfileApiService } from './profile.service';
+import { FurnitureAuthService, MeResponse } from '../../auth/auth.service';
+import { ProfileApiService } from '../../profile/profile.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * `/user/profile` â€” self-service profile page.
+ * Settings → Profile tab — self-service profile + password management.
  *
- * Two independent sub-forms:
- *   - Profile  (full_name, phone)            â†’ PATCH /api/v1/users/me
- *   - Password (current, new, sign-out-others) â†’ POST  /api/v1/users/me/password
+ * Two independent sub-forms (lifted from the now-removed standalone
+ * `/user/profile` page):
+ *   - Profile  (full_name, phone)              → PATCH /api/v1/users/me
+ *   - Password (current, new, sign-out-others) → POST  /api/v1/users/me/password
  *
- * Each sub-form has its own submit button + success/error state. The
- * password sub-form is the only place a user can revoke other sessions
- * â€” if `sign_out_others` is ticked the backend revokes every open
- * `auth_sessions` row except the caller's own JWT.
- *
- * Email is intentionally shown read-only â€” changing email = inviting
- * a new account (step 2.5.6 wires that flow). Role / org membership
- * are admin-only and never exposed here.
+ * The password sub-form is the only place a user can revoke other
+ * sessions — `sign_out_others` revokes every open `auth_sessions` row
+ * except the caller's own JWT. Email is shown read-only.
  */
 @Component({
-  selector: 'app-profile-page',
+  selector: 'app-settings-profile-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule],
-  templateUrl: './profile-page.component.html',
+  templateUrl: './profile-tab.component.html',
 })
-export class ProfilePageComponent {
+export class ProfileTabComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(ProfileApiService);
   private readonly auth = inject(FurnitureAuthService);
@@ -168,5 +164,4 @@ export class ProfilePageComponent {
         },
       });
   }
-
 }

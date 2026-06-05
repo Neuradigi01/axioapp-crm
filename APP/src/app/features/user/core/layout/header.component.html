@@ -84,7 +84,8 @@
             </div>
           }
           <a
-            routerLink="/user/profile"
+            routerLink="/user/settings"
+            [queryParams]="{ tab: 'profile' }"
             class="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50"
             (click)="toggleUserMenu()"
           >

@@ -85,11 +85,12 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // Fold-in redirect: the standalone /user/profile page was
+        // removed when its UI moved into Settings → Profile tab.
+        // Existing bookmarks / deep links land on the same surface.
         path: 'profile',
-        loadComponent: () =>
-          import('./core/profile/profile-page.component').then(
-            (m) => m.ProfilePageComponent,
-          ),
+        redirectTo: '/user/settings?tab=profile',
+        pathMatch: 'full',
       },
       {
         path: 'contacts',

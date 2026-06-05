@@ -7,12 +7,14 @@ import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
 import { IntegrationsPageComponent } from './integrations/integrations-page.component';
 import { NotificationsTabComponent } from './tabs/notifications-tab.component';
+import { ProfileTabComponent } from './tabs/profile-tab.component';
 import { RolesTabComponent } from './tabs/roles-tab.component';
 import { StandardFieldsTabComponent } from './tabs/standard-fields-tab.component';
 import { StoreProfileTabComponent } from './tabs/store-profile-tab.component';
 import { TeamTabComponent } from './tabs/team-tab.component';
 
 type SettingsTab =
+  | 'profile'
   | 'store'
   | 'team'
   | 'roles'
@@ -37,6 +39,7 @@ interface TabDef {
  * straight on it when they open `/user/settings`.
  */
 const TABS: ReadonlyArray<TabDef> = [
+  { id: 'profile', label: 'Profile' },
   { id: 'store', label: 'Store Profile', permission: 'settings.write' },
   { id: 'team', label: 'Team', permission: 'users.read' },
   { id: 'roles', label: 'Roles', permission: 'roles.read' },
@@ -73,6 +76,7 @@ const TABS: ReadonlyArray<TabDef> = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ProfileTabComponent,
     StoreProfileTabComponent,
     TeamTabComponent,
     RolesTabComponent,
