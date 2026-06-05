@@ -2,7 +2,7 @@
 
 **Goal:** A small, well-tested Python service that answers two questions for any org: "does this org's plan grant feature X?" and "is this org under the cap for resource Y?" — backed by the plan registry (Step 1) and the active subscription row (Step 2). Used by every gated endpoint in the rest of this track.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** COMPLETED — `Entitlements` dataclass + `load_for_org` + `require_feature` + `require_capacity` landed under `core/subscriptions/` (path divergence per Steps 1-2). Read-only / past_due / archived / cancelled subscriptions short-circuit with 402 before the feature / cap check; `trial_expired` is the variant returned when `status='read_only' AND plan_code='trial'`. `_lowest_plan_granting_feature` and `_lowest_plan_with_higher_cap` populate `required_plan` on 402 detail so the frontend picks the right upgrade target. Unknown feature key → False (logged); unknown plan_code → RuntimeError (registry drift, loud). `EntitlementError(HTTPException, 402)` carries structured `detail` ({reason, required_plan, resource, cap, message}). FastAPI `get_entitlements` dep composes `get_db` + `get_current_user`. 25 tests written; pytest run pending user kick-off (test suite takes ~12 min per memory `feedback_pause_before_pytest`).
 **Depends on:** Step 1 (plan registry), Step 2 (subscription model). No HTTP yet.
 
 ---
