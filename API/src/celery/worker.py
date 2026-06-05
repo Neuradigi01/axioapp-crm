@@ -21,6 +21,8 @@ celery.autodiscover_tasks([
     "src.app.core.integrations.meta.tasks",
     # Step 3.5.14 — campaign chunk sender + scheduled-campaigns beat.
     "src.app.core.campaigns.tasks",
+    # Pricing-and-Billing Step 5 — usage-counter rollover + daily reset.
+    "src.app.core.subscriptions.tasks",
 ])
 
 if not CELERY_ENABLED:

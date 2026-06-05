@@ -23,11 +23,13 @@ from datetime import datetime
 from typing import ClassVar
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     DateTime,
     Index,
     Integer,
     String,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -180,4 +182,90 @@ class Subscription(Base, TenantScoped):
         return (
             f"<Subscription org={self.org_id} "
             f"plan={self.plan_code} status={self.status}>"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Usage counters
+# ---------------------------------------------------------------------------
+
+USAGE_PERIOD_KINDS: tuple[str, ...] = ("lifetime", "monthly", "daily")
+
+
+class UsageCounter(Base, TenantScoped):
+    """Denormalised per-org consumption counter for a single capped resource.
+
+    One row per `(org_id, resource, period_start)` tuple. The
+    `period_start` axis lets us bucket counts:
+
+      - `lifetime` resources (contacts, storage_mb) carry a single row
+        per org whose `period_start` is the subscription creation date
+        and whose `period_end` is the far-future sentinel
+        (`9999-12-31`).
+      - `monthly` resources (leads_per_month, automation_runs_per_month,
+        email_sends_per_month, etc.) carry one row per billing period.
+        The rollover Celery task inserts a fresh zeroed row at each
+        `current_period_end`.
+      - `daily` resources (`api_calls_per_day`) carry one row per UTC
+        day; the daily-reset task creates the next day's row at
+        midnight UTC.
+
+    The `value` column is `BIGINT` so a busy Enterprise org can do
+    100k+ API calls/day without overflow.
+
+    `increment` (in `usage_service.py`) is the only write path; it uses
+    a Postgres `INSERT ... ON CONFLICT DO UPDATE` against the
+    `(org_id, resource, period_start)` unique index, so concurrent
+    bumps remain race-safe.
+    """
+
+    __tablename__ = "usage_counters"
+    __table_args__ = (
+        CheckConstraint(
+            "period_kind IN ('lifetime', 'monthly', 'daily')",
+            name="usage_counters_period_kind_check",
+        ),
+        UniqueConstraint(
+            "org_id",
+            "resource",
+            "period_start",
+            name="usage_counters_org_resource_period_uq",
+        ),
+        Index(
+            "ix_usage_counters_lookup",
+            "org_id",
+            "resource",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+
+    # `org_id` comes from TenantScoped.
+
+    resource: Mapped[str] = mapped_column(String(64), nullable=False)
+    period_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    period_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    period_end: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    value: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, server_default=text("0")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=text("now()"),
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover — debug aid
+        return (
+            f"<UsageCounter org={self.org_id} "
+            f"resource={self.resource} value={self.value}>"
         )

@@ -42,4 +42,20 @@ beat_schedule = {
         'task': 'src.app.core.leads.scoring.recompute_all_lead_scores',
         'schedule': crontab(minute=0),
     },
+    # Pricing-and-Billing Step 5 — advance each subscription's billing
+    # window past its current_period_end and insert fresh zeroed
+    # `monthly` usage-counter rows for the new period. Hourly cadence
+    # at minute=5 to offset from the lead-score job at minute=0 so the
+    # two heavy sweeps don't contend on the DB pool.
+    'subscriptions-rollover-period-counters': {
+        'task': 'src.app.core.subscriptions.tasks.rollover_period_counters',
+        'schedule': crontab(minute=5),
+    },
+    # Pricing-and-Billing Step 5 — open the next UTC day's `daily`
+    # counter rows (today only `api_calls_per_day`). Runs once at
+    # 00:00 UTC.
+    'subscriptions-reset-daily-counters': {
+        'task': 'src.app.core.subscriptions.tasks.reset_daily_counters',
+        'schedule': crontab(hour=0, minute=0),
+    },
 }

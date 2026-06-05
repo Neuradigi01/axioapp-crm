@@ -34,6 +34,12 @@ from src.app.core.subscriptions.plans import (
     KNOWN_FEATURE_KEYS,
     UNLIMITED_SENTINEL,
 )
+from src.app.core.subscriptions.usage_service import (
+    RESOURCE_PERIOD_KIND,
+    get as usage_get,
+    increment as usage_increment,
+    snapshot as usage_snapshot,
+)
 
 __all__ = [
     "Cap",
@@ -47,10 +53,14 @@ __all__ = [
     "PlanPricing",
     "PlanRegistry",
     "KNOWN_FEATURE_KEYS",
+    "RESOURCE_PERIOD_KIND",
     "UNLIMITED_SENTINEL",
     "enforces_cap",
     "load_for_org",
     "require_capacity",
     "require_feature",
     "requires_feature",
+    "usage_get",
+    "usage_increment",
+    "usage_snapshot",
 ]
