@@ -73,6 +73,7 @@ class CatalogItemOut(TimestampedOrgScopedOut):
     price: Decimal
     currency: str
     is_active: bool
+    image_url: Optional[str] = None
     custom_data: dict[str, Any]
 
 

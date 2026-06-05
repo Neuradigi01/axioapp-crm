@@ -89,11 +89,22 @@
   } @else {
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       @for (item of items(); track item.id) {
-        <article class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200 transition hover:ring-zinc-300">
+        <article
+          class="cursor-pointer rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200 transition hover:ring-zinc-400"
+          (click)="openView(item)"
+        >
           <div class="flex items-start gap-3">
-            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-2xl" aria-hidden="true">
-              {{ emojiFor(item.category) }}
-            </span>
+            @if (imageHref(item); as src) {
+              <img
+                [src]="src"
+                [alt]="item.name"
+                class="h-12 w-12 shrink-0 rounded-md object-cover ring-1 ring-zinc-200"
+              />
+            } @else {
+              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-2xl" aria-hidden="true">
+                {{ emojiFor(item.category) }}
+              </span>
+            }
             <div class="min-w-0 flex-1">
               <p class="text-[11px] font-mono uppercase tracking-wider text-zinc-500">{{ item.sku }}</p>
               <h3 class="mt-0.5 truncate text-sm font-semibold text-zinc-900">{{ item.name }}</h3>
@@ -116,7 +127,7 @@
             <p class="text-base font-semibold text-zinc-900">
               {{ item.price | formatINR }}
             </p>
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-1" (click)="$event.stopPropagation()">
               <button
                 type="button"
                 (click)="openEdit(item)"
@@ -144,5 +155,13 @@
     [item]="editingItem()"
     (saved)="onSaved($event)"
     (cancel)="closeModal()"
+  />
+}
+
+@if (viewingItem(); as v) {
+  <app-view-item-modal
+    [item]="v"
+    (close)="closeView()"
+    (edit)="onEditFromView($event)"
   />
 }

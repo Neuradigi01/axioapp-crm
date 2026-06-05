@@ -31,6 +31,11 @@ from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
+from src.app.shared.files import (
+    ImageValidationError,
+    validate_image_upload,
+)
+from src.app.shared.storage import get_storage
 
 
 _CATALOG_ENTITY = "catalog_item"
@@ -44,6 +49,7 @@ _SNAPSHOT_FIELDS = (
     "price",
     "currency",
     "is_active",
+    "image_url",
     "custom_data",
 )
 
@@ -153,6 +159,50 @@ async def delete_item(session: AsyncSession, *, item_id: uuid.UUID) -> None:
     )
 
 
+async def set_item_image(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    item_id: uuid.UUID,
+    file_bytes: bytes,
+) -> CatalogItem:
+    """Validate + persist an uploaded image for `item_id`.
+
+    libmagic sniffs the real MIME from the bytes (filename ignored),
+    storage path is tenant-scoped `catalog/{org_id}/{item_id}.{ext}`,
+    and the resulting public URL lands on `image_url`. A re-upload
+    overwrites the file at the same path; the URL only changes if
+    the detected extension changes (e.g. JPEG → PNG).
+    """
+    item = ensure_found(await get_item(session, item_id), entity="catalog item")
+
+    try:
+        mime, ext = validate_image_upload(file_bytes)
+    except ImageValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    storage = get_storage()
+    storage_path = f"catalog/{org_id}/{item_id}.{ext}"
+    ref = storage.put(storage_path, file_bytes, content_type=mime)
+
+    before = _snapshot(item)
+    item.image_url = ref.url
+    await session.commit()
+    await session.refresh(item)
+
+    await log_entity_change(
+        action="catalog.image_uploaded",
+        entity_type="catalog_item",
+        entity_id=item.id,
+        before=before,
+        after=_snapshot(item),
+    )
+    return item
+
+
 async def list_items(
     session: AsyncSession,
     *,
@@ -188,5 +238,6 @@ __all__ = [
     "delete_item",
     "get_item",
     "list_items",
+    "set_item_image",
     "update_item",
 ]

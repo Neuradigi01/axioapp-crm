@@ -5,6 +5,7 @@
   GET    /api/v1/catalog/{id}
   PATCH  /api/v1/catalog/{id}
   DELETE /api/v1/catalog/{id}
+  POST   /api/v1/catalog/{id}/image   (multipart, JPEG/PNG/WebP, ≤5 MB)
 
 Reads need `catalog.read`; writes need `catalog.write`. Tenant scoping
 is automatic via the ORM filter on `TenantScoped`.
@@ -14,7 +15,16 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
@@ -29,6 +39,7 @@ from src.app.core.catalog.service import (
     delete_item,
     get_item,
     list_items,
+    set_item_image,
     update_item,
 )
 from src.app.core.users.models import User
@@ -110,3 +121,23 @@ async def delete_item_endpoint(
 ) -> Response:
     await delete_item(db, item_id=item_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{item_id}/image", response_model=CatalogItemOut)
+async def upload_item_image_endpoint(
+    item_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("catalog.write")),
+) -> CatalogItemOut:
+    """Upload (or replace) the cover image for a catalog item.
+
+    libmagic validates the real MIME — filename and Content-Type from
+    the client are not trusted. Re-uploading swaps the file at the
+    same storage path; the returned `image_url` may differ from a
+    prior URL only if the detected extension changed."""
+    file_bytes = await file.read()
+    item = await set_item_image(
+        db, org_id=user.org_id, item_id=item_id, file_bytes=file_bytes
+    )
+    return CatalogItemOut.model_validate(item)

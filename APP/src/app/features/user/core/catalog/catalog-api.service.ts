@@ -14,6 +14,7 @@ export interface CatalogItem {
   price: string;
   currency: string;
   is_active: boolean;
+  image_url: string | null;
   custom_data: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -70,5 +71,13 @@ export class CatalogApiService extends BaseCrudApiService<
       size: query.size,
     });
     return this.http.get<CatalogListResponse>(this.base, { params });
+  }
+
+  /** Upload (or replace) the cover image. Server is the source of
+   *  truth on size + MIME — client-side checks are UX hints only. */
+  uploadImage(itemId: string, file: File): Observable<CatalogItem> {
+    const fd = new FormData();
+    fd.append('file', file, file.name);
+    return this.http.post<CatalogItem>(`${this.base}/${itemId}/image`, fd);
   }
 }

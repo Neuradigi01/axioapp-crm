@@ -22,6 +22,7 @@ import {
   CatalogApiService,
   CatalogItem,
 } from './catalog-api.service';
+import { deriveApiOrigin } from '@core/services/url.util';
 
 /**
  * Add-or-edit modal for a catalog item.
@@ -64,6 +65,7 @@ export class AddItemModalComponent {
       this.stdSignals.changedAt();
       this.refreshStdFields();
     });
+    this.destroyRef.onDestroy(() => this.revokePreview());
   }
 
   private refreshStdFields(): void {
@@ -126,6 +128,34 @@ export class AddItemModalComponent {
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
 
+  // --- Image upload state ---
+  // Server is the source of truth on size + MIME; these client-side
+  // checks just block the obvious before we even hit the network.
+  private static readonly ALLOWED_IMAGE_MIME = new Set([
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+  ]);
+  private static readonly MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+  protected readonly selectedFile = signal<File | null>(null);
+  /** Local Object URL for a freshly picked file. Revoked on replace/clear. */
+  protected readonly previewUrl = signal<string | null>(null);
+  protected readonly imageError = signal<string | null>(null);
+
+  private readonly apiOrigin = deriveApiOrigin();
+
+  /** What the preview shows: freshly picked file > existing image_url > nothing.
+   *  Existing URLs from the backend are server-relative (`/files/...`)
+   *  and must be re-anchored to the API origin during dev (Angular dev
+   *  server runs on a different port). */
+  protected readonly displayImage = computed<string | null>(() => {
+    const preview = this.previewUrl();
+    if (preview) return preview;
+    const stored = this._item()?.image_url;
+    return stored ? `${this.apiOrigin}${stored}` : null;
+  });
+
   readonly isEdit = computed(() => this._item() !== null);
 
   protected readonly form = this.fb.group({
@@ -146,6 +176,52 @@ export class AddItemModalComponent {
     }),
     is_active: this.fb.control<boolean>(true, { nonNullable: true }),
   });
+
+  protected onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    if (!file) return;
+    this.acceptFile(file);
+  }
+
+  protected onFileDropped(event: DragEvent): void {
+    event.preventDefault();
+    const file = event.dataTransfer?.files?.[0] ?? null;
+    if (!file) return;
+    this.acceptFile(file);
+  }
+
+  protected onDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  protected clearImage(): void {
+    this.revokePreview();
+    this.selectedFile.set(null);
+    this.imageError.set(null);
+  }
+
+  private acceptFile(file: File): void {
+    if (!AddItemModalComponent.ALLOWED_IMAGE_MIME.has(file.type)) {
+      this.imageError.set('Pick a JPEG, PNG, or WebP image.');
+      return;
+    }
+    if (file.size > AddItemModalComponent.MAX_IMAGE_BYTES) {
+      this.imageError.set('Image exceeds the 5 MB cap.');
+      return;
+    }
+    this.revokePreview();
+    this.selectedFile.set(file);
+    this.previewUrl.set(URL.createObjectURL(file));
+    this.imageError.set(null);
+  }
+
+  private revokePreview(): void {
+    const url = this.previewUrl();
+    if (url) URL.revokeObjectURL(url);
+    this.previewUrl.set(null);
+  }
 
   protected onSubmit(): void {
     if (this.form.invalid) {
@@ -171,10 +247,7 @@ export class AddItemModalComponent {
         })
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
-          next: (item) => {
-            this.submitting.set(false);
-            this.saved.emit(item);
-          },
+          next: (item) => this.maybeUploadImage(item),
           error: (err: HttpErrorResponse) => {
             this.submitting.set(false);
             this.submitError.set(this.errorFor(err) ?? 'Could not save item.');
@@ -191,10 +264,7 @@ export class AddItemModalComponent {
         })
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
-          next: (item) => {
-            this.submitting.set(false);
-            this.saved.emit(item);
-          },
+          next: (item) => this.maybeUploadImage(item),
           error: (err: HttpErrorResponse) => {
             this.submitting.set(false);
             if (err.status === 409) {
@@ -207,6 +277,37 @@ export class AddItemModalComponent {
           },
         });
     }
+  }
+
+  /** Chain the image upload after a successful create/update. The
+   *  item row is already saved at this point; image-upload failure
+   *  surfaces an error but keeps the (image-less) row. */
+  private maybeUploadImage(item: CatalogItem): void {
+    const file = this.selectedFile();
+    if (!file) {
+      this.submitting.set(false);
+      this.revokePreview();
+      this.selectedFile.set(null);
+      this.saved.emit(item);
+      return;
+    }
+    this.api
+      .uploadImage(item.id, file)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.submitting.set(false);
+          this.revokePreview();
+          this.selectedFile.set(null);
+          this.saved.emit(updated);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.submitting.set(false);
+          this.submitError.set(
+            this.errorFor(err) ?? 'Saved, but the image upload failed.',
+          );
+        },
+      });
   }
 
   private resetForm(item: CatalogItem): void {

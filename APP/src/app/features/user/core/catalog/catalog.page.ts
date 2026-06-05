@@ -18,7 +18,9 @@ import {
   CatalogItem,
 } from './catalog-api.service';
 import { AddItemModalComponent } from './add-item-modal.component';
+import { ViewItemModalComponent } from './view-item-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { deriveApiOrigin } from '@core/services/url.util';
 
 /**
  * Catalog page â€” bare-minimum product table matching the reference
@@ -35,6 +37,7 @@ import { extractApiError } from '@core/services/api-error.util';
     LucideAngularModule,
     InrPipe,
     AddItemModalComponent,
+    ViewItemModalComponent,
   ],
   templateUrl: './catalog.page.html',
 })
@@ -66,6 +69,9 @@ export class CatalogPageComponent {
     const v = this.modalState();
     return v === undefined ? null : (v ?? null);
   });
+
+  /** View modal: read-only details, opens on card click. */
+  readonly viewingItem = signal<CatalogItem | null>(null);
 
   /** Category options derived from the loaded list. */
   readonly categoryOptions = computed(() => {
@@ -137,6 +143,20 @@ export class CatalogPageComponent {
     this.modalState.set(null);
   }
 
+  protected openView(item: CatalogItem): void {
+    this.viewingItem.set(item);
+  }
+
+  protected closeView(): void {
+    this.viewingItem.set(null);
+  }
+
+  /** "Edit" pressed from inside the view modal — hand off to the edit modal. */
+  protected onEditFromView(item: CatalogItem): void {
+    this.viewingItem.set(null);
+    this.modalState.set(item);
+  }
+
   protected onSaved(_item: CatalogItem): void {
     this.modalState.set(null);
     this.reload();
@@ -162,6 +182,12 @@ export class CatalogPageComponent {
           );
         },
       });
+  }
+
+  /** Absolute URL for the backend-served `/files/...` image path. */
+  private readonly apiOrigin = deriveApiOrigin();
+  protected imageHref(item: CatalogItem): string | null {
+    return item.image_url ? `${this.apiOrigin}${item.image_url}` : null;
   }
 
   /** Pick an emoji based on the category for the card icon. */

@@ -10,6 +10,52 @@
     </header>
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4 px-6 py-5">
+      <div>
+        <label class="block text-xs font-medium text-zinc-700">Product image</label>
+        <div class="mt-1 flex items-start gap-3">
+          @if (displayImage(); as src) {
+            <img
+              [src]="src"
+              alt="Product preview"
+              class="h-20 w-20 shrink-0 rounded-md object-cover ring-1 ring-zinc-200"
+            />
+          } @else {
+            <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-xs text-zinc-400 ring-1 ring-dashed ring-zinc-300">
+              No image
+            </div>
+          }
+          <div
+            class="flex-1 rounded-md border border-dashed border-zinc-300 px-3 py-3 text-center text-xs text-zinc-500 hover:border-zinc-400"
+            (drop)="onFileDropped($event)"
+            (dragover)="onDragOver($event)"
+          >
+            <label class="cursor-pointer">
+              <span class="font-medium text-zinc-700">Click to upload</span>
+              <span> or drag &amp; drop</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                class="hidden"
+                (change)="onFileSelected($event)"
+              />
+            </label>
+            <p class="mt-1 text-[11px] text-zinc-400">JPEG, PNG, or WebP · up to 5 MB</p>
+            @if (selectedFile(); as f) {
+              <button
+                type="button"
+                (click)="clearImage()"
+                class="mt-1 text-[11px] font-medium text-red-600 hover:underline"
+              >
+                Remove "{{ f.name }}"
+              </button>
+            }
+          </div>
+        </div>
+        @if (imageError(); as err) {
+          <p class="mt-1 text-xs text-red-600">{{ err }}</p>
+        }
+      </div>
+
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         @if (!isHidden('sku')) {
           <div>
