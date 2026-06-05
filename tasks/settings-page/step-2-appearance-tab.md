@@ -1,5 +1,7 @@
 # Step 2 — Appearance tab: light / dark / system theme picker
 
+**Status:** COMPLETED — `ThemeService` extended with a `ThemeChoice` type (`'light' | 'dark' | 'system'`), a `choice` signal, an explicit `set()` method, and a `matchMedia('(prefers-color-scheme: dark)')` listener that re-applies the theme live when the user has chosen `'system'` and flips their OS preference. Legacy `toggle()` / `isDark()` / `getTheme()` retained so the admin + accounts layout buttons keep working — `toggle()` now persists an explicit `'light'`/`'dark'` choice instead of letting `'system'` linger. New `AppearanceTabComponent` registers as the second tab (no permission gate); template renders three preview cards (Light = white swatch, Dark = zinc-900 swatch, System = white→zinc-900 gradient). 5 files (2 new + 3 modified).
+
 **Goal:** Surface the existing `ThemeService` as a Settings tab. Three-way radio: **Light · Dark · System**. Persists via the existing `localStorage` key (`STORAGE_KEY_THEME`). Pure frontend — no backend.
 
 **Depends on:** Step 1 (Profile tab; this sits next to it as the second personal tab).

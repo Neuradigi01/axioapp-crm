@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
+import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
 import { IntegrationsPageComponent } from './integrations/integrations-page.component';
 import { NotificationsTabComponent } from './tabs/notifications-tab.component';
@@ -15,6 +16,7 @@ import { TeamTabComponent } from './tabs/team-tab.component';
 
 type SettingsTab =
   | 'profile'
+  | 'appearance'
   | 'store'
   | 'team'
   | 'roles'
@@ -40,6 +42,7 @@ interface TabDef {
  */
 const TABS: ReadonlyArray<TabDef> = [
   { id: 'profile', label: 'Profile' },
+  { id: 'appearance', label: 'Appearance' },
   { id: 'store', label: 'Store Profile', permission: 'settings.write' },
   { id: 'team', label: 'Team', permission: 'users.read' },
   { id: 'roles', label: 'Roles', permission: 'roles.read' },
@@ -77,6 +80,7 @@ const TABS: ReadonlyArray<TabDef> = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ProfileTabComponent,
+    AppearanceTabComponent,
     StoreProfileTabComponent,
     TeamTabComponent,
     RolesTabComponent,

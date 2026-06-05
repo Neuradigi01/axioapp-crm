@@ -42,7 +42,7 @@ A logged-in **Employee** on `/user/settings`:
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
 | 1 | [Profile tab — fold standalone profile page into Settings](step-1-profile-tab.md) | COMPLETED | ~½ day |
-| 2 | [Appearance tab — light/dark/system theme picker](step-2-appearance-tab.md) | Pending | ~¼ day |
+| 2 | [Appearance tab — light/dark/system theme picker](step-2-appearance-tab.md) | COMPLETED | ~¼ day |
 | 3 | [Login history tab — last N sessions + per-row revoke](step-3-login-history-tab.md) | Pending | ~½ day |
 | 4 | [Two-factor tab — TOTP / Email OTP / SMS OTP enrol + disable](step-4-two-factor-tab.md) | Pending | ~½ day |
 
