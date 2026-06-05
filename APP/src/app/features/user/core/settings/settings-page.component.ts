@@ -14,10 +14,12 @@ import { RolesTabComponent } from './tabs/roles-tab.component';
 import { StandardFieldsTabComponent } from './tabs/standard-fields-tab.component';
 import { StoreProfileTabComponent } from './tabs/store-profile-tab.component';
 import { TeamTabComponent } from './tabs/team-tab.component';
+import { TwoFactorTabComponent } from './tabs/two-factor-tab.component';
 
 type SettingsTab =
   | 'profile'
   | 'appearance'
+  | 'two-factor'
   | 'login-history'
   | 'store'
   | 'team'
@@ -46,6 +48,7 @@ const TABS: ReadonlyArray<TabDef> = [
   { id: 'profile', label: 'Profile' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'notifications', label: 'Notifications' },
+  { id: 'two-factor', label: 'Two-factor' },
   { id: 'login-history', label: 'Login history' },
   { id: 'store', label: 'Store Profile', permission: 'settings.write' },
   { id: 'team', label: 'Team', permission: 'users.read' },
@@ -84,6 +87,7 @@ const TABS: ReadonlyArray<TabDef> = [
   imports: [
     ProfileTabComponent,
     AppearanceTabComponent,
+    TwoFactorTabComponent,
     LoginHistoryTabComponent,
     StoreProfileTabComponent,
     TeamTabComponent,

@@ -44,7 +44,7 @@ A logged-in **Employee** on `/user/settings`:
 | 1 | [Profile tab — fold standalone profile page into Settings](step-1-profile-tab.md) | COMPLETED | ~½ day |
 | 2 | [Appearance tab — light/dark/system theme picker](step-2-appearance-tab.md) | COMPLETED | ~¼ day |
 | 3 | [Login history tab — last N sessions + per-row revoke](step-3-login-history-tab.md) | COMPLETED | ~½ day |
-| 4 | [Two-factor tab — TOTP / Email OTP / SMS OTP enrol + disable](step-4-two-factor-tab.md) | Pending | ~½ day |
+| 4 | [Two-factor tab — read-only status (full enrol deferred)](step-4-two-factor-tab.md) | COMPLETED | ~¼ day |
 
 **Total: ~1¾ working days.** Stop and report after each per Rule 9.
 

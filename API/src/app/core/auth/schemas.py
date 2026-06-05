@@ -115,3 +115,17 @@ class SessionListResponse(BaseModel):
 
 class SessionRevokeResponse(BaseModel):
     success: bool = True
+
+
+class TwoFactorStatusResponse(BaseModel):
+    """Read-only 2FA state for the calling user.
+
+    Reads the legacy `tbl_user_login.two_factor_enabled` /
+    `two_factor_method` columns (the layered `User` mapper excludes
+    them, so we read via the legacy `UserLogin` mapping). The settings
+    page surfaces this for visibility; in-dashboard enrol / disable
+    lives in a dedicated future track since it needs ActionToken
+    re-auth and TOTP secret rotation.
+    """
+    enabled: bool
+    method: str | None

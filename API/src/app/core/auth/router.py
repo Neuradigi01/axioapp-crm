@@ -30,6 +30,7 @@ from src.app.core.auth.schemas import (
     SessionListResponse,
     SessionOut,
     SessionRevokeResponse,
+    TwoFactorStatusResponse,
 )
 from src.app.core.auth.tokens import InvalidToken, TokenClaims, decode_token
 from src.app.core.users.models import User
@@ -225,3 +226,21 @@ async def revoke_session(
             detail="Session not found.",
         )
     return SessionRevokeResponse()
+
+
+@router.get("/2fa/status", response_model=TwoFactorStatusResponse)
+async def two_factor_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TwoFactorStatusResponse:
+    """Current 2FA state of the caller (read-only).
+
+    In-dashboard enrol / disable lives in a dedicated future track
+    (`tasks/two-factor-self-service/`) — that needs ActionToken-style
+    re-auth proofs + TOTP secret rotation, which are out of scope here.
+    Today's enrol path is "log out → sign in → 2FA enforcement screen."
+    """
+    enabled, method = await auth_service.get_user_two_factor_status(
+        db, member_id=user.id
+    )
+    return TwoFactorStatusResponse(enabled=enabled, method=method)

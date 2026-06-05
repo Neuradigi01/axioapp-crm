@@ -272,6 +272,30 @@ async def list_user_sessions(
     ]
 
 
+async def get_user_two_factor_status(
+    db: AsyncSession, *, member_id: int
+) -> tuple[bool, str | None]:
+    """Read `(enabled, method)` from `tbl_user_login` for the given user.
+
+    Goes through the legacy `UserLogin` mapping because the layered
+    `User` mapper excludes the `two_factor_*` columns. `member_id` is
+    `User.id` (the `tbl_user_login.id` bigint PK).
+    """
+    from src.models.user import UserLogin
+
+    row = (
+        await db.execute(
+            select(
+                UserLogin.two_factor_enabled,
+                UserLogin.two_factor_method,
+            ).where(UserLogin.id == member_id)
+        )
+    ).one_or_none()
+    if row is None:
+        return False, None
+    return bool(row[0]), row[1]
+
+
 async def revoke_user_session(
     db: AsyncSession,
     *,
