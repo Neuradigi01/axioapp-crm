@@ -9,6 +9,11 @@ Step 1 exposes the plan registry over a public `/plans` API.
 Later steps add the per-org subscription state, entitlement checks,
 Stripe integration, and the in-app billing UI surface.
 """
+from src.app.core.subscriptions.decorators import (
+    CapCountProvider,
+    enforces_cap,
+    requires_feature,
+)
 from src.app.core.subscriptions.entitlements import (
     Entitlements,
     load_for_org,
@@ -32,6 +37,7 @@ from src.app.core.subscriptions.plans import (
 
 __all__ = [
     "Cap",
+    "CapCountProvider",
     "Entitlements",
     "EntitlementError",
     "EntitlementReason",
@@ -42,7 +48,9 @@ __all__ = [
     "PlanRegistry",
     "KNOWN_FEATURE_KEYS",
     "UNLIMITED_SENTINEL",
+    "enforces_cap",
     "load_for_org",
     "require_capacity",
     "require_feature",
+    "requires_feature",
 ]

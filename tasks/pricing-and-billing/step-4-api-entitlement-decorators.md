@@ -2,7 +2,7 @@
 
 **Goal:** Wrap any FastAPI route with `@requires_feature("...")` or `@enforces_cap("...")` to declaratively gate that route by the caller's plan. Calls into Step 3's `Entitlements` service, returns HTTP 402 with structured detail when the gate fails.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** COMPLETED — `requires_feature` / `enforces_cap` shipped under `core/subscriptions/decorators.py` (path divergence per Step 3) alongside a `FEATURE_*` constants module at `core/subscriptions/feature_keys.py`. Decorators inject `Entitlements` via FastAPI's dep system using a sentinel kwarg name; stacking works because each decorator picks a distinct sentinel and FastAPI dedupes the underlying `Depends(get_entitlements)` to a single bundle per request. Unlimited caps short-circuit BEFORE invoking `current_provider` — verified with a smoke-test "exploding provider" that never ran. `enforces_cap` accepts both sync and async providers. Sync handlers raise `TypeError` at decoration time. `main.py` exception handler unchanged: the existing generic `http_exception_handler` at lines 227–237 already passes `dict` details verbatim, so `EntitlementError` lands with the spec'd shape without a new handler. 16 decorator tests + 3 mutual-check tests written; in-container smoke for 5 critical paths (feature blocked / passed / cap blocked / stacked / unlimited skip) verified live before stop-and-report.
 **Depends on:** Step 3 (entitlement service). Phase 1.6 (auth) — needs `get_current_org_id` to know whose entitlements to load.
 
 ---

@@ -98,7 +98,7 @@ All without any DB-level intervention.
 | 1 | [Plan registry + public `/plans` API](step-1-plan-registry.md) | Pending | ~½ day |
 | 2 | [Subscription model + migration](step-2-subscription-model.md) | Pending | ~1 day |
 | 3 | [Entitlement service](step-3-entitlement-service.md) | Pending | ~1 day |
-| 4 | [API entitlement decorators](step-4-api-entitlement-decorators.md) | Pending | ~½ day |
+| 4 | [API entitlement decorators](step-4-api-entitlement-decorators.md) | COMPLETED | ~½ day |
 | 5 | [Usage metering](step-5-usage-metering.md) | Pending | ~1 day |
 | 6 | [Trial state machine + signup hook](step-6-trial-state-machine.md) | Pending | ~1 day |
 | 7 | [Subscription read API](step-7-subscription-read-api.md) | Pending | ~½ day |
