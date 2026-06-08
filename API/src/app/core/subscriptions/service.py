@@ -33,6 +33,7 @@ from src.app.core.subscriptions.models import ACTIVE_STATUSES, Subscription
 from src.app.core.subscriptions.plans import Plan
 from src.app.core.subscriptions.schemas import (
     BillingCycle,
+    CancelSubscriptionResponse,
     NeedsPaymentPreview,
     NeedsPaymentResponse,
     NoChangeResponse,
@@ -580,4 +581,90 @@ def _compute_seat_preview(
         next_renewal_at=sub.current_period_end,
         monthly_cost_after_change_usd=monthly_cost,
         annual_cost_after_change_usd=annual_cost,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Cancellation — Step 10
+# ---------------------------------------------------------------------------
+
+
+async def cancel_subscription(
+    session: AsyncSession, org_id: uuid.UUID,
+) -> CancelSubscriptionResponse:
+    """Mark the org's subscription cancelled. Idempotent.
+
+    Looks up the most-recent subscription row regardless of status —
+    `get_active_subscription` filters out `cancelled`, but the
+    idempotent path needs to see a cancelled row to short-circuit.
+
+    The Stripe-side cancellation lands in Step 13's webhook (the local
+    status flip here is enough to invalidate write access via Step 10's
+    middleware — Stripe will follow when the webhook fires from the
+    operator-side cancel).
+
+    Raises 404 only if the org has *no* subscription rows at all — a
+    pathological state that shouldn't happen post Step 2's backfill.
+    """
+    latest = (
+        await session.execute(
+            select(Subscription)
+            .where(Subscription.org_id == org_id)
+            .order_by(Subscription.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if latest is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "no_subscription"},
+        )
+
+    if latest.status == "cancelled":
+        # Idempotent path. `cancelled_at` is guaranteed non-null
+        # whenever `status == 'cancelled'` because the only writer
+        # (this function) sets them together.
+        return CancelSubscriptionResponse(
+            status="cancelled",
+            cancelled_at=latest.cancelled_at,  # type: ignore[arg-type]
+            already_cancelled=True,
+        )
+
+    now = datetime.now(tz=timezone.utc)
+    # Conditional UPDATE on status so a concurrent webhook flip to
+    # `cancelled` (Step 13) cannot produce a double `cancelled_at`.
+    result = await session.execute(
+        update(Subscription)
+        .where(
+            Subscription.id == latest.id,
+            Subscription.status != "cancelled",
+        )
+        .values(status="cancelled", cancelled_at=now)
+    )
+    await session.commit()
+
+    if (result.rowcount or 0) == 0:
+        # Lost the race — re-read for the canonical `cancelled_at`.
+        refreshed = (
+            await session.execute(
+                select(Subscription).where(Subscription.id == latest.id)
+            )
+        ).scalar_one()
+        return CancelSubscriptionResponse(
+            status="cancelled",
+            cancelled_at=refreshed.cancelled_at,  # type: ignore[arg-type]
+            already_cancelled=True,
+        )
+
+    await audit.log(
+        "subscription.cancelled",
+        entity_type="subscription",
+        entity_id=latest.id,
+        before={"status": latest.status},
+        after={"status": "cancelled", "cancelled_at": now.isoformat()},
+    )
+    return CancelSubscriptionResponse(
+        status="cancelled",
+        cancelled_at=now,
+        already_cancelled=False,
     )

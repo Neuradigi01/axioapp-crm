@@ -2,7 +2,7 @@
 
 **Goal:** A FastAPI middleware that, when the caller's org has `status IN ('read_only', 'past_due', 'archived', 'cancelled')`, blocks every mutating HTTP verb (POST / PUT / PATCH / DELETE) with a 402, except a tight allow-list of endpoints (subscription change, logout, GDPR export). Read endpoints (GET) are never blocked.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 3 (entitlement service — provides `is_read_only` flag), Step 6 (lifecycle — sets statuses correctly), Phase 1.6 (auth — middleware needs `org_id` resolved).
 
 ---

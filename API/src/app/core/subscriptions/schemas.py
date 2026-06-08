@@ -392,3 +392,26 @@ SeatChangeResponse = Annotated[
     ],
     Field(discriminator="outcome"),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Cancellation — `POST /api/v1/subscriptions/cancel` (Step 10)
+# ---------------------------------------------------------------------------
+
+
+class CancelSubscriptionResponse(BaseModel):
+    """Response from `POST /subscriptions/cancel`.
+
+    `already_cancelled` lets the frontend distinguish "you just
+    cancelled now" (toast: "Subscription cancelled") from "this is a
+    no-op because it was already cancelled" (toast: "Your subscription
+    was already cancelled"). The status is always the literal
+    `"cancelled"` — the endpoint never returns a different status,
+    since cancellation is one-way for v1 (no reactivate flow yet).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["cancelled"]
+    cancelled_at: datetime
+    already_cancelled: bool

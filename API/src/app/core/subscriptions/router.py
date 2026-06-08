@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.auth.dependencies import get_current_user
 from src.app.core.subscriptions import plans, service as subscription_service
 from src.app.core.subscriptions.schemas import (
+    CancelSubscriptionResponse,
     PlanChangeRequest,
     PlanChangeResponse,
     SeatChangeRequest,
@@ -151,4 +152,29 @@ async def change_seats(
     """
     return await subscription_service.change_seats(
         db, user.org_id, total_seats=payload.total_seats,
+    )
+
+
+@router.post(
+    "/subscriptions/cancel",
+    response_model=CancelSubscriptionResponse,
+)
+async def cancel_subscription_endpoint(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> CancelSubscriptionResponse:
+    """Mark the caller's org subscription cancelled.
+
+    Idempotent — calling twice returns the same `cancelled_at` with
+    `already_cancelled=true`. The local row flip is enough to revoke
+    write access via the SubscriptionStateMiddleware; the Stripe-side
+    sub is cancelled by Step 13's webhook.
+
+    Owner-only RBAC arrives in Step 19 (`billing.manage` permission
+    key); for now any authenticated org member can call it. The
+    middleware passes this path through even on already-cancelled subs
+    so the idempotent contract holds end-to-end.
+    """
+    return await subscription_service.cancel_subscription(
+        db, user.org_id,
     )

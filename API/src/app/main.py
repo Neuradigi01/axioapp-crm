@@ -142,6 +142,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Order matters: Starlette's `add_middleware` puts the most recently
+# added middleware OUTERMOST (it runs first on the request path). We
+# want the request path to be:
+#
+#     TenantContextMiddleware  (sets RequestContext.org_id from JWT)
+#       → SubscriptionStateMiddleware  (reads org_id, blocks writes on
+#                                       read_only / past_due / archived /
+#                                       cancelled subs)
+#         → CORSMiddleware  (response-side header injection)
+#           → route handler
+#
+# So `SubscriptionStateMiddleware` must be added BEFORE
+# `TenantContextMiddleware` in code (which makes it INNER relative to
+# the context-setter, so context is populated by the time it runs).
+from src.app.core.subscriptions.middleware import SubscriptionStateMiddleware  # noqa: E402
+
+app.add_middleware(SubscriptionStateMiddleware)
 app.add_middleware(TenantContextMiddleware)
 
 os.makedirs(STATIC_DIR, exist_ok=True)
