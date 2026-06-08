@@ -1,6 +1,7 @@
 """Subscription service — read helpers used by downstream billing code.
 
-This step delivers only `get_active_subscription`. Write paths land in
+This step delivers `get_active_subscription` plus the composed read used
+by `GET /api/v1/subscriptions/current` (Step 7). Write paths land in
 later steps:
   - Step 6: `create_trial_subscription` (signup hook)
   - Step 8: `change_plan`
@@ -15,10 +16,14 @@ from __future__ import annotations
 
 import uuid
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.subscriptions import plans
 from src.app.core.subscriptions.models import ACTIVE_STATUSES, Subscription
+from src.app.core.subscriptions.schemas import SubscriptionCurrentResponse
+from src.app.core.users.service import count_active_members
 
 
 async def get_active_subscription(
@@ -45,3 +50,51 @@ async def get_active_subscription(
     )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def compose_current_subscription_response(
+    session: AsyncSession, org_id: uuid.UUID
+) -> SubscriptionCurrentResponse:
+    """Compose the read response for `GET /api/v1/subscriptions/current`.
+
+    Folds together the four facets the billing page needs:
+      1. the active subscription row,
+      2. its plan from the registry,
+      3. the count of active org members (= `seats.in_use`),
+      4. the metered-resource usage snapshot.
+
+    Raises 404 when no active subscription exists — the frontend treats
+    that as "needs to pick a plan." Post the Step 2 backfill this should
+    not happen for a real org, but the endpoint is defensive.
+
+    A subscription pointing at a plan code the YAML registry no longer
+    carries is a hard data error and raises ``RuntimeError`` — mirrors
+    the entitlement service's behaviour on the same condition so the
+    surfaces are consistent.
+    """
+    # Local import: `usage_service` imports `get_active_subscription`
+    # from this module, so a top-level import would deadlock the loader.
+    from src.app.core.subscriptions import usage_service
+    from src.app.core.subscriptions.usage_service import RESOURCE_PERIOD_KIND
+
+    sub = await get_active_subscription(session, org_id)
+    if sub is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active subscription",
+        )
+    plan = plans.get(sub.plan_code)
+    if plan is None:
+        raise RuntimeError(
+            f"subscription {sub.id} references unknown plan {sub.plan_code!r}"
+        )
+    seats_in_use = await count_active_members(session, org_id)
+    usage_snap = await usage_service.snapshot(
+        session, org_id, list(RESOURCE_PERIOD_KIND.keys())
+    )
+    return SubscriptionCurrentResponse.from_components(
+        sub=sub,
+        plan=plan,
+        seats_in_use=seats_in_use,
+        usage_snapshot=usage_snap,
+    )

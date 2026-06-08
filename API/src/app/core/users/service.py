@@ -60,6 +60,26 @@ async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     return result.scalar_one_or_none()
 
 
+async def count_active_members(
+    session: AsyncSession, org_id: uuid.UUID
+) -> int:
+    """Number of active members in the org — feeds `seats.in_use` on the
+    subscription read API (Step 7).
+
+    Counts `tbl_organization_members` rows with `is_active=True` for the
+    given org. Paused / archived memberships do not consume a seat.
+    """
+    result = await session.execute(
+        select(func.count())
+        .select_from(OrganizationMember)
+        .where(
+            OrganizationMember.organization_id == org_id,
+            OrganizationMember.is_active.is_(True),
+        )
+    )
+    return int(result.scalar_one())
+
+
 async def list_users(
     session: AsyncSession,
     *,
