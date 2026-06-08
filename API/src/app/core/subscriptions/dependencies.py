@@ -46,16 +46,18 @@ async def get_entitlements(
 
 
 @lru_cache(maxsize=1)
-def get_payment_provider() -> PaymentProvider:
-    """Process-wide singleton `PaymentProvider` instance.
+def get_payment_provider() -> PaymentProvider | None:
+    """Process-wide singleton `PaymentProvider` instance, or `None`.
 
     Constructed lazily on first injection so the Stripe price-map YAML
-    read does not run at import time (matters for tests of unrelated
-    modules that import this file transitively). Cached so re-injection
-    is free.
+    read does not run at import time. Cached so re-injection is free.
 
-    Raises `RuntimeError` if `STRIPE_SECRET_KEY` is unset — fail loud
-    rather than ship a half-configured payment path.
+    Returns `None` when `STRIPE_SECRET_KEY` is unset, so unrelated
+    test environments (and the pre-Step-11 dev workflow) can run the
+    plan-change / seat-change endpoints without a Stripe account. The
+    route handlers treat `None` as "no augmentation" and emit the
+    stub `checkout_url=null` response that Steps 8 / 9 originally
+    shipped.
     """
     # Local imports keep `config` and the Stripe adapter out of the
     # module's top-level dependency graph — the entitlement service
@@ -66,10 +68,7 @@ def get_payment_provider() -> PaymentProvider:
     )
 
     if not STRIPE_SECRET_KEY:
-        raise RuntimeError(
-            "STRIPE_SECRET_KEY is not configured; cannot construct the "
-            "payment provider."
-        )
+        return None
     return StripeProvider(
         secret_key=STRIPE_SECRET_KEY,
         webhook_secret=STRIPE_WEBHOOK_SECRET or "",

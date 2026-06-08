@@ -395,6 +395,45 @@ SeatChangeResponse = Annotated[
 
 
 # ---------------------------------------------------------------------------
+# Direct checkout — `POST /api/v1/subscriptions/checkout` (Step 12)
+# ---------------------------------------------------------------------------
+
+
+class CheckoutRequest(BaseModel):
+    """Payload for the direct-checkout upgrade flow.
+
+    `success_url` / `cancel_url` are validated server-side against the
+    app's own host allow-list to prevent the endpoint from being used
+    as an open redirect (Stripe will gladly redirect anywhere).
+    Omitted URLs fall back to `/user/settings/billing` on the request's
+    origin.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    to_plan: str = Field(min_length=1, max_length=32)
+    billing_cycle: BillingCycle
+    seats: int = Field(ge=1)
+    success_url: str | None = Field(default=None, max_length=512)
+    cancel_url: str | None = Field(default=None, max_length=512)
+
+
+class CheckoutResponse(BaseModel):
+    """Wire shape for `POST /subscriptions/checkout`.
+
+    `checkout_url` is the Stripe-hosted page the frontend redirects to.
+    `session_id` is persisted on the subscription row so Step 13's
+    webhook can reconcile by checkout-session id even if the metadata
+    matching loses.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    checkout_url: str
+    session_id: str
+
+
+# ---------------------------------------------------------------------------
 # Cancellation — `POST /api/v1/subscriptions/cancel` (Step 10)
 # ---------------------------------------------------------------------------
 

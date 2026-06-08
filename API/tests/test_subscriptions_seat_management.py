@@ -27,12 +27,30 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import select
 
+from src.app.core.subscriptions.dependencies import get_payment_provider
 from src.app.core.subscriptions.lifecycle import scan_and_transition_due
 from src.app.core.subscriptions.models import Subscription
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import OrganizationMember
 from src.app.shared.security.password import hash_password
 from src.models.user import UserInfo as LegacyUserInfo, UserLogin
+
+
+@pytest.fixture(autouse=True)
+def _disable_payment_provider():
+    """Step 12 wired `get_payment_provider` into `/subscriptions/seats`.
+    These tests assert `checkout_url=null`, so we force the override to
+    return None and skip the Stripe round-trip.
+    """
+    from src.app.main import app
+
+    app.dependency_overrides[get_payment_provider] = lambda: None
+    get_payment_provider.cache_clear()
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(get_payment_provider, None)
+        get_payment_provider.cache_clear()
 
 
 # ---------------------------------------------------------------------------

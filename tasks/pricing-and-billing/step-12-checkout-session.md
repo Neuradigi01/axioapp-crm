@@ -2,7 +2,7 @@
 
 **Goal:** Wire the Step 11 `PaymentProvider` into the Step 8 (plan change) and Step 9 (seat change) flows so that "needs_payment" outcomes return a real Stripe Checkout URL. Also add `POST /api/v1/subscriptions/checkout` as a dedicated endpoint for the upgrade-from-banner flow that just needs a checkout URL for a chosen plan, no prior state-change required.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 8 (plan change API), Step 9 (seat management API), Step 11 (Stripe provider).
 
 ---

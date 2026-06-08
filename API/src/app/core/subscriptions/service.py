@@ -34,6 +34,7 @@ from src.app.core.subscriptions.plans import Plan
 from src.app.core.subscriptions.schemas import (
     BillingCycle,
     CancelSubscriptionResponse,
+    CheckoutResponse,
     NeedsPaymentPreview,
     NeedsPaymentResponse,
     NoChangeResponse,
@@ -667,4 +668,246 @@ async def cancel_subscription(
         status="cancelled",
         cancelled_at=now,
         already_cancelled=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Checkout integration — Step 12
+# ---------------------------------------------------------------------------
+
+
+async def ensure_stripe_customer(
+    session: AsyncSession,
+    sub: Subscription,
+    *,
+    email: str,
+    name: str,
+    payment_provider,
+) -> str:
+    """Return the org's Stripe customer ID, creating one if absent.
+
+    Idempotent — once `stripe_customer_id` is populated on the
+    subscription row, subsequent calls short-circuit without touching
+    Stripe. The row is updated via a conditional UPDATE that only
+    fires when the column is still NULL, so a concurrent webhook flip
+    (Step 13) cannot collide with this write.
+    """
+    if sub.stripe_customer_id:
+        return sub.stripe_customer_id
+
+    customer_id = await payment_provider.create_customer(
+        org_id=sub.org_id, email=email, name=name,
+    )
+    result = await session.execute(
+        update(Subscription)
+        .where(
+            Subscription.id == sub.id,
+            Subscription.stripe_customer_id.is_(None),
+        )
+        .values(stripe_customer_id=customer_id)
+    )
+    await session.commit()
+    if (result.rowcount or 0) == 0:
+        # A concurrent flow filled the column in. Re-read so we return
+        # the canonical value rather than the one we just minted.
+        refreshed = (
+            await session.execute(
+                select(Subscription).where(Subscription.id == sub.id)
+            )
+        ).scalar_one()
+        return refreshed.stripe_customer_id or customer_id
+    return customer_id
+
+
+async def create_direct_checkout(
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    *,
+    to_plan: str,
+    billing_cycle: BillingCycle,
+    seats: int,
+    success_url: str,
+    cancel_url: str,
+    user_email: str,
+    user_full_name: str,
+    payment_provider,
+) -> CheckoutResponse:
+    """Validate the requested upgrade and open a Stripe Checkout session.
+
+    Shares the plan-change rule set (`_validate_change`) so the
+    trial-banner upgrade flow refuses the same edge cases as
+    `change_plan`. Persists the resulting Checkout Session ID on the
+    subscription row for Step 13's webhook to correlate.
+
+    Raises 400 for rule violations, 404 for unknown plan codes, and
+    `RuntimeError` for a stale `plan_code` on the subscription row
+    (mirrors `compose_current_subscription_response`).
+    """
+    sub = await get_active_subscription(session, org_id)
+    if sub is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "no_active_subscription"},
+        )
+    if sub.status == "cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "cannot_change_cancelled"},
+        )
+
+    target_plan = plans.get(to_plan)
+    if target_plan is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "unknown_plan", "to_plan": to_plan},
+        )
+
+    seats_in_use = await count_active_members(session, org_id)
+    _validate_change(target_plan, seats, seats_in_use)
+
+    customer_id = await ensure_stripe_customer(
+        session, sub,
+        email=user_email, name=user_full_name,
+        payment_provider=payment_provider,
+    )
+
+    checkout = await payment_provider.create_checkout_session(
+        org_id=org_id,
+        customer_id=customer_id,
+        plan_code=to_plan,
+        billing_cycle=billing_cycle,
+        seats=seats,
+        success_url=success_url,
+        cancel_url=cancel_url,
+    )
+
+    await session.execute(
+        update(Subscription)
+        .where(Subscription.id == sub.id)
+        .values(pending_checkout_session_id=checkout.session_id)
+    )
+    await session.commit()
+    await audit.log(
+        "subscription.checkout_started",
+        entity_type="subscription",
+        entity_id=sub.id,
+        after={
+            "to_plan": to_plan,
+            "billing_cycle": billing_cycle,
+            "seats": seats,
+            "checkout_session_id": checkout.session_id,
+        },
+    )
+
+    return CheckoutResponse(
+        checkout_url=checkout.url,
+        session_id=checkout.session_id,
+    )
+
+
+async def attach_checkout_to_needs_payment(
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    response: NeedsPaymentResponse,
+    *,
+    success_url: str,
+    cancel_url: str,
+    user_email: str,
+    user_full_name: str,
+    payment_provider,
+) -> NeedsPaymentResponse:
+    """Augment a `NeedsPaymentResponse` with a real Stripe checkout URL.
+
+    Returns a new response object with `checkout_url` and
+    `checkout_session_id` filled. Used by the plan-change and
+    seat-change routes when the provider is configured.
+
+    The preview block from the original response is preserved
+    verbatim — it's already correct and the Stripe URL is purely
+    additive.
+    """
+    sub = await get_active_subscription(session, org_id)
+    if sub is None:
+        # Cannot happen post the inner change_plan call that produced
+        # the needs_payment response — defensive.
+        return response
+
+    customer_id = await ensure_stripe_customer(
+        session, sub,
+        email=user_email, name=user_full_name,
+        payment_provider=payment_provider,
+    )
+    checkout = await payment_provider.create_checkout_session(
+        org_id=org_id,
+        customer_id=customer_id,
+        plan_code=response.preview.to_plan,
+        billing_cycle=response.preview.billing_cycle,
+        seats=response.preview.seats,
+        success_url=success_url,
+        cancel_url=cancel_url,
+    )
+    await session.execute(
+        update(Subscription)
+        .where(Subscription.id == sub.id)
+        .values(pending_checkout_session_id=checkout.session_id)
+    )
+    await session.commit()
+
+    return NeedsPaymentResponse(
+        outcome="needs_payment",
+        checkout_url=checkout.url,
+        checkout_session_id=checkout.session_id,
+        preview=response.preview,
+    )
+
+
+async def attach_checkout_to_seats_needs_payment(
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    response: SeatChangeNeedsPaymentResponse,
+    *,
+    success_url: str,
+    cancel_url: str,
+    user_email: str,
+    user_full_name: str,
+    payment_provider,
+) -> SeatChangeNeedsPaymentResponse:
+    """Augment a seat-change needs_payment response with a checkout URL.
+
+    Mirrors `attach_checkout_to_needs_payment` for the seat-change
+    response shape — the two share the underlying flow but carry
+    different preview models so the augment functions stay separate.
+    """
+    sub = await get_active_subscription(session, org_id)
+    if sub is None:
+        return response
+
+    customer_id = await ensure_stripe_customer(
+        session, sub,
+        email=user_email, name=user_full_name,
+        payment_provider=payment_provider,
+    )
+    # For a seat-only change the plan stays the same; only quantity
+    # moves. Stripe still expects a Price ID so we pass the live plan.
+    checkout = await payment_provider.create_checkout_session(
+        org_id=org_id,
+        customer_id=customer_id,
+        plan_code=sub.plan_code,
+        billing_cycle=sub.billing_cycle,
+        seats=response.preview.to_seats,
+        success_url=success_url,
+        cancel_url=cancel_url,
+    )
+    await session.execute(
+        update(Subscription)
+        .where(Subscription.id == sub.id)
+        .values(pending_checkout_session_id=checkout.session_id)
+    )
+    await session.commit()
+
+    return SeatChangeNeedsPaymentResponse(
+        outcome="needs_payment",
+        checkout_url=checkout.url,
+        checkout_session_id=checkout.session_id,
+        preview=response.preview,
     )

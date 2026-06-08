@@ -29,6 +29,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -180,6 +181,15 @@ class Subscription(Base, TenantScoped):
     )
     next_seats: Mapped[int | None] = mapped_column(
         Integer, nullable=True
+    )
+
+    # Step 12 — most recent Stripe Checkout Session ID created for the
+    # org. Set when an upgrade flow opens hosted checkout; cleared by
+    # the Step 13 webhook on `checkout.session.completed` or
+    # `checkout.session.expired`. A non-null value means there is a
+    # pending payment intent the operator can re-share with the user.
+    pending_checkout_session_id: Mapped[str | None] = mapped_column(
+        Text, nullable=True
     )
 
     created_at: Mapped[datetime] = mapped_column(
