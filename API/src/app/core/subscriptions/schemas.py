@@ -15,9 +15,9 @@ from __future__ import annotations
 import math
 import uuid
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.subscriptions.models import Subscription
 from src.app.core.subscriptions.plans import Plan
@@ -239,3 +239,83 @@ class SubscriptionCurrentResponse(BaseModel):
             stripe_customer_id=sub.stripe_customer_id,
             stripe_subscription_id=sub.stripe_subscription_id,
         )
+
+
+# ---------------------------------------------------------------------------
+# Plan change — `POST /api/v1/subscriptions/change` (Step 8)
+# ---------------------------------------------------------------------------
+
+
+class PlanChangeRequest(BaseModel):
+    """Payload for `POST /subscriptions/change`.
+
+    `seats` is optional — when omitted the existing `seats_purchased`
+    on the subscription row is reused, which lets the frontend send a
+    pure plan-or-cycle change without re-asserting the seat count.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    to_plan: str = Field(min_length=1, max_length=32)
+    billing_cycle: BillingCycle
+    seats: int | None = Field(default=None, ge=1)
+
+
+class NeedsPaymentPreview(BaseModel):
+    """Best-effort estimate for the upgrade path before Stripe quotes it.
+
+    `amount_due_usd` is the full new-period bundle + extra-seat math.
+    Stripe's checkout will return the exact prorated number in Step 12;
+    until then the frontend renders this preview verbatim with a "final
+    amount confirmed at checkout" disclaimer.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    to_plan: str
+    billing_cycle: BillingCycle
+    seats: int
+    amount_due_usd: int
+    first_renewal_at: datetime
+
+
+class NeedsPaymentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: Literal["needs_payment"]
+    checkout_url: str | None
+    checkout_session_id: str | None
+    preview: NeedsPaymentPreview
+
+
+class ScheduledPreview(BaseModel):
+    """Constant fixture for the downgrade path — no money moves now."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amount_due_usd: int
+    remaining_period_credit: str
+
+
+class ScheduledResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: Literal["scheduled"]
+    effective_at: datetime
+    from_plan: str
+    to_plan: str
+    preview: ScheduledPreview
+
+
+class NoChangeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: Literal["no_change"]
+
+
+# FastAPI handles this Annotated-discriminated-union as a `oneOf` in
+# OpenAPI and routes the right shape on the wire by `outcome`.
+PlanChangeResponse = Annotated[
+    Union[NeedsPaymentResponse, ScheduledResponse, NoChangeResponse],
+    Field(discriminator="outcome"),
+]

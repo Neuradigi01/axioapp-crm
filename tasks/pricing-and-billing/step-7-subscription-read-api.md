@@ -2,7 +2,7 @@
 
 **Goal:** Expose `GET /api/v1/subscriptions/current` that returns the caller's org's active subscription with all the context the billing settings page (Step 16) needs: plan code + name, status, trial days remaining, seats included vs purchased vs used, current period dates, and per-resource usage snapshot.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 1 (plan registry), Step 2 (subscription model), Step 5 (usage counters), Phase 1.6 (auth — needs `get_current_org_id`).
 
 ---

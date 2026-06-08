@@ -166,6 +166,22 @@ class Subscription(Base, TenantScoped):
         String(64), nullable=True, index=True
     )
 
+    # Step 8 — scheduled change at next period boundary.
+    # Populated by the plan-change API when an Owner requests a
+    # downgrade (lower tier, annual→monthly, or seat reduction) so the
+    # lifecycle task can flip the row at `current_period_end`. All three
+    # stay NULL until a downgrade is scheduled and clear back to NULL
+    # once `apply_scheduled_change_if_due` lands the change.
+    next_plan_code: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )
+    next_billing_cycle: Mapped[str | None] = mapped_column(
+        String(8), nullable=True
+    )
+    next_seats: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

@@ -2,7 +2,7 @@
 
 **Goal:** `POST /api/v1/subscriptions/change` — the server-side state transition for a plan change (upgrade, downgrade, or billing-cycle switch). **Does not handle payment yet** — that's Steps 11–13. This endpoint computes the intended new state and either applies it directly (when no charge required, e.g. downgrade-at-renewal) or returns a Stripe Checkout intent (when a charge is required, e.g. upgrade).
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 2 (subscription model), Step 7 (read API for "before" state). Step 11 (Stripe provider) is wired in Step 12 — until then, this endpoint returns a stub `{ "checkout_url": null, "status": "pending_payment_provider" }` for upgrade cases.
 
 ---

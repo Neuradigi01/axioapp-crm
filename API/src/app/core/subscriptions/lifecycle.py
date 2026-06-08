@@ -31,7 +31,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.subscriptions.models import Subscription
+from src.app.core.subscriptions.models import ACTIVE_STATUSES, Subscription
 from src.app.core.subscriptions.notifications import send_billing_email
 
 log = logging.getLogger(__name__)
@@ -45,6 +45,14 @@ ARCHIVED_TO_DELETED = timedelta(days=90)
 
 # How early to send the "trial ending in N days" reminder.
 TRIAL_REMINDER_LEAD = timedelta(days=3)
+
+# Cycle lengths used when projecting a fresh period after applying a
+# scheduled plan change. Mirrors `tasks._CYCLE_LENGTHS` but kept local
+# so the lifecycle module has no upward dependency on Celery code.
+_CYCLE_LENGTHS: dict[str, timedelta] = {
+    "monthly": timedelta(days=30),
+    "annual": timedelta(days=365),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +187,12 @@ async def _delete_archived(
 async def scan_and_transition_due(session: AsyncSession) -> dict[str, int]:
     """Walk every subscription that might be due for transition.
 
+    Two passes per call:
+      1. End-of-life advances — trial → read_only → archived → delete.
+      2. Scheduled-change applications — flip `plan_code` /
+         `billing_cycle` / `seats_purchased` from the `next_*` columns
+         at period boundary (Step 8).
+
     Beat task has no tenant context, so the auto-org-filter listener
     is a no-op and this scan sees every org's row.
 
@@ -189,6 +203,8 @@ async def scan_and_transition_due(session: AsyncSession) -> dict[str, int]:
         "read_only_to_archived": 0,
         "archived_to_deleted": 0,
         "skipped_due_to_race": 0,
+        "scheduled_change_applied": 0,
+        "scheduled_change_skipped_due_to_race": 0,
     }
     now = datetime.now(tz=timezone.utc)
 
@@ -215,6 +231,28 @@ async def scan_and_transition_due(session: AsyncSession) -> dict[str, int]:
             summary["read_only_to_archived"] += 1
         elif new_status == "deleted":
             summary["archived_to_deleted"] += 1
+
+    # Scheduled-change pass — every active sub with a parked `next_*`
+    # row whose period just ended. The filter is the same shape as the
+    # row-level conditional UPDATE inside `apply_scheduled_change_if_due`
+    # so the cheap-prefilter is also a correctness statement.
+    pending = (
+        await session.execute(
+            select(Subscription).where(
+                Subscription.next_plan_code.is_not(None),
+                Subscription.current_period_end <= now,
+                Subscription.status.in_(ACTIVE_STATUSES),
+            )
+        )
+    ).scalars().all()
+
+    for sub in pending:
+        applied = await apply_scheduled_change_if_due(session, sub)
+        if applied is None:
+            summary["scheduled_change_skipped_due_to_race"] += 1
+        else:
+            summary["scheduled_change_applied"] += 1
+
     return summary
 
 
@@ -232,6 +270,108 @@ def _is_due(sub: Subscription, now: datetime) -> bool:
             and now > sub.archived_at + ARCHIVED_TO_DELETED
         )
     return False
+
+
+# ---------------------------------------------------------------------------
+# Scheduled-change application (Step 8)
+# ---------------------------------------------------------------------------
+
+
+async def apply_scheduled_change_if_due(
+    session: AsyncSession, sub: Subscription
+) -> dict[str, str] | None:
+    """Flip the live plan / cycle / seats from the `next_*` columns
+    when the current period has ended.
+
+    Returns a small summary dict on success; `None` if there was
+    nothing to apply or the conditional UPDATE lost a race (a
+    concurrent operator-driven plan change cleared `next_*` first).
+
+    Race-safety: the UPDATE conditions on `next_plan_code IS NOT NULL`
+    AND `current_period_end <= now()` AND the original status — so a
+    concurrent change_plan call that overwrote `next_*` (rescheduling)
+    or a webhook flip to `cancelled` aborts this transition silently.
+
+    Catch-up: if multiple period boundaries have elapsed (beat
+    outage), the period is advanced past every elapsed window so the
+    counter-rollover task does not need to re-rollover.
+    """
+    now = datetime.now(tz=timezone.utc)
+    if sub.next_plan_code is None or sub.current_period_end > now:
+        return None
+    if sub.status not in ACTIVE_STATUSES:
+        return None
+
+    new_cycle = sub.next_billing_cycle or sub.billing_cycle
+    cycle_length = _CYCLE_LENGTHS.get(new_cycle)
+    if cycle_length is None:
+        log.warning(
+            "scheduled-change on subscription %s has unknown cycle %r",
+            sub.id, new_cycle,
+        )
+        return None
+
+    new_start = sub.current_period_end
+    new_end = new_start + cycle_length
+    while new_end <= now:
+        new_start = new_end
+        new_end = new_start + cycle_length
+
+    new_seats = sub.next_seats if sub.next_seats is not None else sub.seats_purchased
+
+    result = await session.execute(
+        text(
+            """
+            UPDATE subscriptions
+            SET
+                plan_code = :plan_code,
+                billing_cycle = :cycle,
+                seats_purchased = :seats,
+                current_period_start = :period_start,
+                current_period_end = :period_end,
+                next_plan_code = NULL,
+                next_billing_cycle = NULL,
+                next_seats = NULL
+            WHERE id = :id
+              AND next_plan_code IS NOT NULL
+              AND current_period_end <= :now
+              AND status = :status
+            """
+        ),
+        {
+            "plan_code": sub.next_plan_code,
+            "cycle": new_cycle,
+            "seats": new_seats,
+            "period_start": new_start,
+            "period_end": new_end,
+            "id": sub.id,
+            "now": now,
+            "status": sub.status,
+        },
+    )
+    if (result.rowcount or 0) == 0:
+        return None
+
+    await audit.log(
+        "subscription.scheduled_change_applied",
+        org_id=sub.org_id,
+        entity_type="subscription",
+        entity_id=sub.id,
+        before={
+            "plan_code": sub.plan_code,
+            "billing_cycle": sub.billing_cycle,
+            "seats_purchased": sub.seats_purchased,
+        },
+        after={
+            "plan_code": sub.next_plan_code,
+            "billing_cycle": new_cycle,
+            "seats_purchased": new_seats,
+            "current_period_start": new_start.isoformat(),
+            "current_period_end": new_end.isoformat(),
+        },
+        user_id=None,  # system actor
+    )
+    return {"from_plan": sub.plan_code, "to_plan": sub.next_plan_code}
 
 
 # ---------------------------------------------------------------------------
