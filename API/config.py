@@ -168,3 +168,11 @@ REDIS_PORT = os.getenv("REDIS_PORT", "6379")
 REDIS_DB_BROKER = int(os.getenv("REDIS_DB_BROKER", "0"))
 REDIS_DB_RESULT = int(os.getenv("REDIS_DB_RESULT", "1"))
 REDIS_PASSWORD = _env("REDIS_PASSWORD", "")
+
+# Stripe (Track 4 Pricing & Billing, Step 11)
+# `sk_test_...` / `pk_test_...` for dev, `sk_live_...` / `pk_live_...` for prod.
+# `STRIPE_WEBHOOK_SECRET` (`whsec_...`) comes from the Stripe Dashboard
+# after registering the FurnitureCRM webhook endpoint.
+STRIPE_SECRET_KEY = _env("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_WEBHOOK_SECRET = _env("STRIPE_WEBHOOK_SECRET", "")

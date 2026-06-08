@@ -2,7 +2,7 @@
 
 **Goal:** A `PaymentProvider` Python protocol with a concrete `StripeProvider` implementation. Step 12 (checkout) and Step 13 (webhooks) consume this abstraction. The interface is designed so Razorpay can be slotted in as `RazorpayProvider` later without touching call sites.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 2 (subscription model — the provider stores `stripe_customer_id` / `stripe_subscription_id`). Step 1 (plan registry — provider needs plan prices to map to Stripe price IDs).
 
 ---

@@ -1,18 +1,23 @@
-"""FastAPI dependencies for the subscription / entitlement layer.
+"""FastAPI dependencies for the subscription / entitlement / payment layer.
 
-`get_entitlements` is the per-request injector that downstream code
-(Step 4's `requires_feature` / `enforces_cap` decorators, Step 10's
-read-only middleware, Step 7's billing read API) depends on so the
-bundle is loaded exactly once per request.
+Three injectors live here:
+
+  - `get_entitlements` (Step 3 / 7) — per-request plan + subscription
+    bundle, consumed by the decorators and the read-only middleware.
+  - `get_payment_provider` (Step 11) — process-wide singleton for the
+    Stripe SDK adapter; Steps 12 (Checkout) and 13 (webhooks) inject
+    this rather than constructing `StripeProvider` themselves.
 
 Caching:
-  - The `Entitlements` bundle itself is request-scoped — `get_entitlements`
-    is a normal FastAPI dependency, so FastAPI memoises its return value
-    inside one request's dependency graph.
+  - The `Entitlements` bundle is request-scoped — FastAPI memoises the
+    dependency once per request graph.
   - The plan registry under `plans.py` is process-cached at import.
-  - The `subscriptions` row is read once via `load_for_org`.
+  - The Stripe provider is process-cached via `@lru_cache` so the YAML
+    price map is read once at boot, not per request.
 """
 from __future__ import annotations
+
+from functools import lru_cache
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.auth.dependencies import get_current_user
 from src.app.core.subscriptions import entitlements as _entitlements
 from src.app.core.subscriptions.entitlements import Entitlements
+from src.app.core.subscriptions.payment_provider import PaymentProvider
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -37,3 +43,34 @@ async def get_entitlements(
     short-circuit with 402.
     """
     return await _entitlements.load_for_org(db, user.org_id)
+
+
+@lru_cache(maxsize=1)
+def get_payment_provider() -> PaymentProvider:
+    """Process-wide singleton `PaymentProvider` instance.
+
+    Constructed lazily on first injection so the Stripe price-map YAML
+    read does not run at import time (matters for tests of unrelated
+    modules that import this file transitively). Cached so re-injection
+    is free.
+
+    Raises `RuntimeError` if `STRIPE_SECRET_KEY` is unset — fail loud
+    rather than ship a half-configured payment path.
+    """
+    # Local imports keep `config` and the Stripe adapter out of the
+    # module's top-level dependency graph — the entitlement service
+    # path does not touch them.
+    from config import STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+    from src.app.core.subscriptions.providers.stripe_provider import (
+        StripeProvider,
+    )
+
+    if not STRIPE_SECRET_KEY:
+        raise RuntimeError(
+            "STRIPE_SECRET_KEY is not configured; cannot construct the "
+            "payment provider."
+        )
+    return StripeProvider(
+        secret_key=STRIPE_SECRET_KEY,
+        webhook_secret=STRIPE_WEBHOOK_SECRET or "",
+    )
