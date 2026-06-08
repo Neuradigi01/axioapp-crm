@@ -169,16 +169,35 @@ async def _no_op(
     )
 
 
-# Mapping event type → async handler. Sub-step 13.b extends this.
-# Keeping the table at module scope lets tests assert on it and lets
-# the future handlers import it cleanly.
+from src.app.core.subscriptions.webhooks.handlers.checkout_completed import (
+    on_checkout_completed,
+)
+from src.app.core.subscriptions.webhooks.handlers.invoice_failed import (
+    on_invoice_failed,
+)
+from src.app.core.subscriptions.webhooks.handlers.invoice_paid import (
+    on_invoice_finalized,
+    on_invoice_paid,
+)
+from src.app.core.subscriptions.webhooks.handlers.subscription_cancelled import (
+    on_subscription_cancelled,
+)
+from src.app.core.subscriptions.webhooks.handlers.subscription_updated import (
+    on_subscription_updated,
+)
+
+
+# Mapping event type → async handler. Each handler accepts
+# `(db, event_dict)` and returns `None`. Tests assert on this table
+# directly to verify wiring, and `monkeypatch.setitem` is the
+# preferred way to override a handler in a single test.
 _HANDLERS: dict[str, Any] = {
-    # "checkout.session.completed": on_checkout_completed,  # 13.b
-    # "invoice.paid": on_invoice_paid,                      # 13.b
-    # "invoice.payment_failed": on_invoice_failed,          # 13.b
-    # "invoice.finalized": on_invoice_finalized,            # 13.b
-    # "customer.subscription.updated": on_subscription_updated,    # 13.b
-    # "customer.subscription.deleted": on_subscription_cancelled,  # 13.b
+    "checkout.session.completed": on_checkout_completed,
+    "invoice.paid": on_invoice_paid,
+    "invoice.finalized": on_invoice_finalized,
+    "invoice.payment_failed": on_invoice_failed,
+    "customer.subscription.updated": on_subscription_updated,
+    "customer.subscription.deleted": on_subscription_cancelled,
 }
 
 
