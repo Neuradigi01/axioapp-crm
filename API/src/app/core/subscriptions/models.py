@@ -306,3 +306,127 @@ class UsageCounter(Base, TenantScoped):
             f"<UsageCounter org={self.org_id} "
             f"resource={self.resource} value={self.value}>"
         )
+
+
+# ---------------------------------------------------------------------------
+# Step 13 — Stripe webhook ledger + invoice mirror
+# ---------------------------------------------------------------------------
+
+
+INVOICE_STATUSES: tuple[str, ...] = (
+    "paid", "open", "void", "uncollectible", "draft",
+)
+
+
+class SubscriptionInvoice(Base, TenantScoped):
+    """Local mirror of a Stripe invoice.
+
+    Step 13's `invoice.*` webhook handlers upsert into this table on
+    `stripe_invoice_id`. The billing-settings page (Step 16) reads
+    this list to render invoice history; clicking through to
+    `hosted_invoice_url` or `pdf_url` hands the user back to
+    Stripe-hosted UI for the actual document.
+
+    `subscription_id` is FK-enforced so an invoice cannot exist for a
+    purged subscription row; if `checkout.session.completed` and
+    `invoice.paid` arrive out of order, the invoice handler returns
+    500 (Stripe retries) until the checkout handler has run first.
+    """
+
+    __tablename__ = "subscription_invoices"
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN ({_in_clause(INVOICE_STATUSES)})",
+            name="subscription_invoices_status_check",
+        ),
+        UniqueConstraint(
+            "stripe_invoice_id",
+            name="subscription_invoices_stripe_id_uq",
+        ),
+        Index(
+            "ix_subscription_invoices_subscription_id",
+            "subscription_id",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+
+    # `org_id` comes from TenantScoped.
+
+    subscription_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=False,
+    )
+    stripe_invoice_id: Mapped[str] = mapped_column(
+        String(64), nullable=False
+    )
+    number: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    amount_due_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount_paid_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(
+        String(8), nullable=False, server_default=text("'USD'"),
+    )
+    period_start: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    period_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    hosted_invoice_url: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    pdf_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    paid_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class StripeWebhookEvent(Base):
+    """Idempotency ledger for Stripe webhook delivery.
+
+    Primary key = `stripe_event_id` so an `INSERT … ON CONFLICT DO
+    NOTHING` is the dedup primitive — if the row already exists, the
+    handler short-circuits and the route returns 200 so Stripe stops
+    retrying.
+
+    `payload` stores the raw event for replay / debug. `error` is
+    populated when the handler raises; the row stays unprocessed
+    (processed_at = NULL) so a future retry can re-run the handler.
+
+    No `org_id` — events may arrive before we have resolved the
+    target org (e.g. raw account-level events). This table is
+    administrative, not tenant-scoped, so RLS is off.
+    """
+
+    __tablename__ = "stripe_webhook_events"
+
+    stripe_event_id: Mapped[str] = mapped_column(
+        Text, primary_key=True
+    )
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    def __repr__(self) -> str:  # pragma: no cover — debug aid
+        return (
+            f"<StripeWebhookEvent id={self.stripe_event_id} "
+            f"type={self.event_type} processed={self.processed_at is not None}>"
+        )
