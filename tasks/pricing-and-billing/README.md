@@ -103,7 +103,7 @@ All without any DB-level intervention.
 | 6 | [Trial state machine + signup hook](step-6-trial-state-machine.md) | Pending | ~1 day |
 | 7 | [Subscription read API](step-7-subscription-read-api.md) | Completed | ~½ day |
 | 8 | [Plan change API](step-8-plan-change-api.md) | Completed | ~½ day |
-| 9 | [Seat management API](step-9-seat-management-api.md) | Pending | ~½ day |
+| 9 | [Seat management API](step-9-seat-management-api.md) | Completed | ~½ day |
 | 10 | [Read-only / archived mode enforcement](step-10-read-only-mode.md) | Pending | ~½ day |
 | 11 | [Payment provider abstraction (Stripe)](step-11-payment-provider-stripe.md) | Pending | ~1 day |
 | 12 | [Checkout session endpoint](step-12-checkout-session.md) | Pending | ~½ day |

@@ -319,3 +319,76 @@ PlanChangeResponse = Annotated[
     Union[NeedsPaymentResponse, ScheduledResponse, NoChangeResponse],
     Field(discriminator="outcome"),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Seat management — `POST /api/v1/subscriptions/seats` (Step 9)
+# ---------------------------------------------------------------------------
+
+
+class SeatChangeRequest(BaseModel):
+    """`total_seats` is the *target* count, not a delta.
+
+    The endpoint diffs against the live `seats_purchased` to decide
+    whether the request is an add (charge), a reduction (schedule), or
+    a no-op.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    total_seats: int = Field(ge=1)
+
+
+class SeatPreview(BaseModel):
+    """What the seat-management modal renders before the user commits.
+
+    `monthly_cost_after_change_usd` / `annual_cost_after_change_usd` —
+    exactly one is filled with the projected bundle + extras cost; the
+    other is `None`. Which side is filled reflects the subscription's
+    current cycle, so the UI can show "you'll pay $X per <cycle>".
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    from_seats: int
+    to_seats: int
+    delta: int
+    outcome_if_committed: Literal["no_change", "needs_payment", "scheduled"]
+    amount_due_usd: int
+    next_renewal_at: datetime
+    monthly_cost_after_change_usd: int | None
+    annual_cost_after_change_usd: int | None
+
+
+class SeatChangeNeedsPaymentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: Literal["needs_payment"]
+    checkout_url: str | None
+    checkout_session_id: str | None
+    preview: SeatPreview
+
+
+class SeatChangeScheduledResponse(BaseModel):
+    """Seat reductions never refund mid-period — the customer keeps the
+    extra seat until renewal, then the new count takes effect."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: Literal["scheduled"]
+    effective_at: datetime
+    from_seats: int
+    to_seats: int
+    refund_due_usd: int
+
+
+# Three-shape discriminated union for the POST response. Reuses
+# `NoChangeResponse` from the plan-change endpoint — same wire shape.
+SeatChangeResponse = Annotated[
+    Union[
+        SeatChangeNeedsPaymentResponse,
+        SeatChangeScheduledResponse,
+        NoChangeResponse,
+    ],
+    Field(discriminator="outcome"),
+]

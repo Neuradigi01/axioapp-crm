@@ -232,14 +232,19 @@ async def scan_and_transition_due(session: AsyncSession) -> dict[str, int]:
         elif new_status == "deleted":
             summary["archived_to_deleted"] += 1
 
-    # Scheduled-change pass — every active sub with a parked `next_*`
-    # row whose period just ended. The filter is the same shape as the
-    # row-level conditional UPDATE inside `apply_scheduled_change_if_due`
-    # so the cheap-prefilter is also a correctness statement.
+    # Scheduled-change pass — every active sub with any parked
+    # `next_*` value (plan, cycle, or seats) whose period just ended.
+    # The filter is the same shape as the row-level conditional UPDATE
+    # inside `apply_scheduled_change_if_due`, so the cheap-prefilter is
+    # also a correctness statement.
     pending = (
         await session.execute(
             select(Subscription).where(
-                Subscription.next_plan_code.is_not(None),
+                (
+                    Subscription.next_plan_code.is_not(None)
+                    | Subscription.next_billing_cycle.is_not(None)
+                    | Subscription.next_seats.is_not(None)
+                ),
                 Subscription.current_period_end <= now,
                 Subscription.status.in_(ACTIVE_STATUSES),
             )
@@ -297,12 +302,21 @@ async def apply_scheduled_change_if_due(
     counter-rollover task does not need to re-rollover.
     """
     now = datetime.now(tz=timezone.utc)
-    if sub.next_plan_code is None or sub.current_period_end > now:
+    has_pending = (
+        sub.next_plan_code is not None
+        or sub.next_billing_cycle is not None
+        or sub.next_seats is not None
+    )
+    if not has_pending or sub.current_period_end > now:
         return None
     if sub.status not in ACTIVE_STATUSES:
         return None
 
+    new_plan = sub.next_plan_code or sub.plan_code
     new_cycle = sub.next_billing_cycle or sub.billing_cycle
+    new_seats = (
+        sub.next_seats if sub.next_seats is not None else sub.seats_purchased
+    )
     cycle_length = _CYCLE_LENGTHS.get(new_cycle)
     if cycle_length is None:
         log.warning(
@@ -317,8 +331,9 @@ async def apply_scheduled_change_if_due(
         new_start = new_end
         new_end = new_start + cycle_length
 
-    new_seats = sub.next_seats if sub.next_seats is not None else sub.seats_purchased
-
+    # The WHERE filter mirrors the in-memory `has_pending` check so a
+    # concurrent operator-driven flip that cleared `next_*` aborts
+    # this transition silently.
     result = await session.execute(
         text(
             """
@@ -333,13 +348,17 @@ async def apply_scheduled_change_if_due(
                 next_billing_cycle = NULL,
                 next_seats = NULL
             WHERE id = :id
-              AND next_plan_code IS NOT NULL
+              AND (
+                next_plan_code IS NOT NULL
+                OR next_billing_cycle IS NOT NULL
+                OR next_seats IS NOT NULL
+              )
               AND current_period_end <= :now
               AND status = :status
             """
         ),
         {
-            "plan_code": sub.next_plan_code,
+            "plan_code": new_plan,
             "cycle": new_cycle,
             "seats": new_seats,
             "period_start": new_start,
@@ -363,7 +382,7 @@ async def apply_scheduled_change_if_due(
             "seats_purchased": sub.seats_purchased,
         },
         after={
-            "plan_code": sub.next_plan_code,
+            "plan_code": new_plan,
             "billing_cycle": new_cycle,
             "seats_purchased": new_seats,
             "current_period_start": new_start.isoformat(),
@@ -371,7 +390,7 @@ async def apply_scheduled_change_if_due(
         },
         user_id=None,  # system actor
     )
-    return {"from_plan": sub.plan_code, "to_plan": sub.next_plan_code}
+    return {"from_plan": sub.plan_code, "to_plan": new_plan}
 
 
 # ---------------------------------------------------------------------------

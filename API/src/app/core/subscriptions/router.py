@@ -1,25 +1,27 @@
 """Subscription / plan routes.
 
-Four endpoints live here:
+Six endpoints live here:
 
-  GET  /api/v1/plans                 — public list (trial excluded)
-  GET  /api/v1/plans/{code}          — single plan, includes trial
-  GET  /api/v1/subscriptions/current — authenticated, composed read of
-                                       the caller's org's subscription
-  POST /api/v1/subscriptions/change  — authenticated, request a plan /
-                                       cycle / seat change
+  GET  /api/v1/plans                          — public list (trial excluded)
+  GET  /api/v1/plans/{code}                   — single plan, includes trial
+  GET  /api/v1/subscriptions/current          — composed read of the
+                                                caller's org's subscription
+  POST /api/v1/subscriptions/change           — request a plan / cycle /
+                                                seat change
+  GET  /api/v1/subscriptions/seats/preview    — see the cost impact of a
+                                                proposed seat change
+  POST /api/v1/subscriptions/seats            — apply or schedule a seat
+                                                change
 
 The first two are unauthenticated — the marketing `/pricing` page and
-the signup flow consume them before the visitor is logged in. The
-third feeds the in-app billing settings page (Step 16) and the trial
-banner (Step 15). The fourth is the Owner-only write path; the
-Owner-only gate itself lands in Step 19 via the `billing.manage`
-permission key — until then any authenticated org member can call it.
-Write paths for seat change and cancellation land in Steps 9 and 10.
+the signup flow consume them before the visitor is logged in. The rest
+require auth; cancellation lands in Step 10. The Owner-only RBAC gate
+arrives in Step 19 via the `billing.manage` permission key — until
+then any authenticated org member can call the write paths.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import get_current_user
@@ -27,6 +29,9 @@ from src.app.core.subscriptions import plans, service as subscription_service
 from src.app.core.subscriptions.schemas import (
     PlanChangeRequest,
     PlanChangeResponse,
+    SeatChangeRequest,
+    SeatChangeResponse,
+    SeatPreview,
     SubscriptionCurrentResponse,
 )
 from src.app.core.users.models import User
@@ -102,4 +107,48 @@ async def change_subscription(
         to_plan=payload.to_plan,
         billing_cycle=payload.billing_cycle,
         seats=payload.seats,
+    )
+
+
+@router.get(
+    "/subscriptions/seats/preview",
+    response_model=SeatPreview,
+)
+async def preview_seat_change(
+    total_seats: int = Query(..., ge=1),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SeatPreview:
+    """Read-only cost projection for the seat-management modal.
+
+    Does not commit anything; the UI calls this on input change and
+    renders `amount_due_usd` + the projected per-cycle cost. The
+    commit path (POST) does its own validation and may reject the
+    request, so `outcome_if_committed` is informational, not a
+    promise.
+    """
+    return await subscription_service.preview_seat_change(
+        db, user.org_id, total_seats
+    )
+
+
+@router.post(
+    "/subscriptions/seats",
+    response_model=SeatChangeResponse,
+)
+async def change_seats(
+    payload: SeatChangeRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Apply or schedule a seat-count change.
+
+    `total_seats` is the desired *total*, not a delta. Adding seats
+    on a paid plan returns `needs_payment` (Step 12 fills the
+    `checkout_url`); removing seats schedules at the next period
+    boundary; no_change returns immediately. Trial subs cannot add
+    seats (use upgrade instead).
+    """
+    return await subscription_service.change_seats(
+        db, user.org_id, total_seats=payload.total_seats,
     )

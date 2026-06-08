@@ -2,7 +2,7 @@
 
 **Goal:** Two endpoints — `POST /api/v1/subscriptions/seats` to add or set the total seat count, `GET /api/v1/subscriptions/seats/preview` to see the cost impact before committing. Enforces bundle minimums, in-use floors, and integrates with Stripe (Step 12) for the prorated charge.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 2 (subscription model — `seats_purchased`), Step 7 (read API for seat context), Step 8 (plan change shares the validation patterns). Step 12 (Stripe checkout) for the paid-add-seats flow; until then, the "needs payment" path returns the stub like Step 8.
 
 ---
