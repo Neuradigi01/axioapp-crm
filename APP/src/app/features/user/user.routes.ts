@@ -77,6 +77,18 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // Deep-link target for the trial banner's "Upgrade" CTA
+        // (Step 15) and Stripe Checkout's `success_url` /
+        // `cancel_url`. Mirrors the integrations alias above: same
+        // page, `route.data.tab` selects the Billing tab on mount.
+        path: 'settings/billing',
+        data: { tab: 'billing' },
+        loadComponent: () =>
+          import('./core/settings/settings-page.component').then(
+            (m) => m.SettingsPageComponent,
+          ),
+      },
+      {
         path: 'settings/lead-scoring',
         canActivate: [permissionGuard('leads.scoring.manage')],
         loadComponent: () =>

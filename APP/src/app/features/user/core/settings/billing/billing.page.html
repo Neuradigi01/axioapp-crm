@@ -1,0 +1,41 @@
+<div class="space-y-6">
+  @if (isLoading()) {
+    <!-- Skeleton placeholders matching the section sizes so the layout
+         does not jump when data resolves. -->
+    @for (i of [0, 1]; track i) {
+      <div
+        class="h-44 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm animate-pulse dark:border-slate-700 dark:bg-slate-800"
+      >
+        <div class="h-4 w-32 bg-zinc-200 rounded mb-4 dark:bg-slate-700"></div>
+        <div class="h-6 w-48 bg-zinc-200 rounded mb-3 dark:bg-slate-700"></div>
+        <div class="h-3 w-64 bg-zinc-200 rounded dark:bg-slate-700"></div>
+      </div>
+    }
+  } @else if (loadError()) {
+    <div
+      class="rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800"
+    >
+      <p class="text-sm text-zinc-700 dark:text-slate-300">
+        Failed to load billing details.
+      </p>
+      <button
+        type="button"
+        (click)="retry()"
+        class="mt-4 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+      >
+        Retry
+      </button>
+    </div>
+  } @else if (subscription(); as sub) {
+    <crm-current-plan-card [subscription]="sub" />
+    <crm-seats-card [subscription]="sub" />
+
+    <!-- Sub-step 16.b will replace this placeholder with the Usage
+         bars and the Invoices table. -->
+    <section
+      class="rounded-2xl border border-dashed border-zinc-300 bg-white p-6 text-sm text-zinc-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400"
+    >
+      Usage breakdown and invoice history land in sub-step 16.b.
+    </section>
+  }
+</div>
