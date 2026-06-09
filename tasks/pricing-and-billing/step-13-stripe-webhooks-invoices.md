@@ -2,7 +2,7 @@
 
 **Goal:** A `POST /api/v1/webhooks/stripe` endpoint that receives Stripe events, verifies the signature, dedupes by event ID, and applies them to our local subscription + invoice state. Plus a `subscription_invoices` table that mirrors Stripe invoices for in-app history.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 11 (Stripe provider — `verify_webhook`), Step 12 (checkout sessions — populates `pending_checkout_session_id`).
 
 ---

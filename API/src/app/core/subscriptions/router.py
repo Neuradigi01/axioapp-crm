@@ -32,6 +32,7 @@ from src.app.core.subscriptions.schemas import (
     CancelSubscriptionResponse,
     CheckoutRequest,
     CheckoutResponse,
+    InvoiceRead,
     NeedsPaymentResponse,
     PlanChangeRequest,
     PlanChangeResponse,
@@ -295,6 +296,29 @@ async def open_checkout(
         user_full_name=user.full_name or "",
         payment_provider=payment_provider,
     )
+
+
+@router.get(
+    "/subscriptions/invoices",
+    response_model=list[InvoiceRead],
+)
+async def list_subscription_invoices(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[InvoiceRead]:
+    """Return the org's Stripe invoices, newest first.
+
+    Populated by Step 13.b's `invoice.*` webhook handlers; rows here
+    are the local mirror of Stripe's invoice objects with the
+    `hosted_invoice_url` / `pdf_url` links the customer clicks
+    through to view the document.
+
+    No pagination — v1 orgs collect at most ~24 invoices a year and
+    the billing-settings page renders the list inline. Read access
+    is open to any authenticated org member; managing payment is
+    Owner-only via Step 19's RBAC.
+    """
+    return await subscription_service.list_invoices(db, user.org_id)
 
 
 @router.post(

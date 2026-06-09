@@ -29,12 +29,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.subscriptions import plans
-from src.app.core.subscriptions.models import ACTIVE_STATUSES, Subscription
+from src.app.core.subscriptions.models import (
+    ACTIVE_STATUSES,
+    Subscription,
+    SubscriptionInvoice,
+)
 from src.app.core.subscriptions.plans import Plan
 from src.app.core.subscriptions.schemas import (
     BillingCycle,
     CancelSubscriptionResponse,
     CheckoutResponse,
+    InvoiceRead,
     NeedsPaymentPreview,
     NeedsPaymentResponse,
     NoChangeResponse,
@@ -911,3 +916,33 @@ async def attach_checkout_to_seats_needs_payment(
         checkout_session_id=checkout.session_id,
         preview=response.preview,
     )
+
+
+# ---------------------------------------------------------------------------
+# Invoice list — Step 13.c
+# ---------------------------------------------------------------------------
+
+
+async def list_invoices(
+    session: AsyncSession, org_id: uuid.UUID,
+) -> list[InvoiceRead]:
+    """Return every Stripe invoice mirrored for the org, newest first.
+
+    The list is materialised end-to-end (no pagination) because v1
+    orgs collect ≤ 24 invoices per year; the billing-settings page
+    renders them inline and a paged list would add UX cost for no
+    real benefit at this scale. Step 19's audit-log view is the
+    pattern to follow if pagination becomes warranted later.
+
+    `org_id` is passed explicitly so the query is self-scoping; the
+    `TenantScoped` ORM listener also auto-injects the predicate when
+    the request context is set, so this is belt-and-suspenders.
+    """
+    rows = (
+        await session.execute(
+            select(SubscriptionInvoice)
+            .where(SubscriptionInvoice.org_id == org_id)
+            .order_by(SubscriptionInvoice.created_at.desc())
+        )
+    ).scalars().all()
+    return [InvoiceRead.model_validate(row) for row in rows]

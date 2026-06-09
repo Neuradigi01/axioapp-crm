@@ -107,7 +107,7 @@ All without any DB-level intervention.
 | 10 | [Read-only / archived mode enforcement](step-10-read-only-mode.md) | Completed | ~½ day |
 | 11 | [Payment provider abstraction (Stripe)](step-11-payment-provider-stripe.md) | Completed | ~1 day |
 | 12 | [Checkout session endpoint](step-12-checkout-session.md) | Completed | ~½ day |
-| 13 | [Stripe webhook handler + invoice records](step-13-stripe-webhooks-invoices.md) | Pending | ~1 day |
+| 13 | [Stripe webhook handler + invoice records](step-13-stripe-webhooks-invoices.md) | Completed | ~1 day |
 | 14 | [Public `/pricing` page](step-14-public-pricing-page.md) | Pending | ~1 day |
 | 15 | [Trial banner + countdown component](step-15-trial-banner.md) | Pending | ~½ day |
 | 16 | [Billing settings page (read view)](step-16-billing-settings-page.md) | Pending | ~1 day |

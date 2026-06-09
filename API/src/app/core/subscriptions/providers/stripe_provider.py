@@ -208,7 +208,7 @@ class StripeProvider:
         self, payload: bytes, signature: str,
     ) -> dict[str, Any]:
         try:
-            event = await asyncio.to_thread(
+            await asyncio.to_thread(
                 self._stripe.Webhook.construct_event,
                 payload,
                 signature,
@@ -221,4 +221,12 @@ class StripeProvider:
                 "Stripe webhook signature verification failed: %s", exc,
             )
             raise InvalidWebhookSignature("invalid signature") from exc
-        return dict(event)
+        # `construct_event` returns a `StripeObject` whose iteration is
+        # broken under `dict(...)` and whose `.get()` is shadowed by a
+        # custom `__getattr__`. Since the payload IS JSON and we've
+        # verified the signature, parse the raw bytes directly — gives
+        # us a plain `dict` for handlers to use with normal Python
+        # idioms.
+        import json  # noqa: PLC0415 — keeps the import close to the call
+
+        return json.loads(payload)

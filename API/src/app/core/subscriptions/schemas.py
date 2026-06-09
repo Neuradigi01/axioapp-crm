@@ -438,6 +438,46 @@ class CheckoutResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Invoice list — `GET /api/v1/subscriptions/invoices` (Step 13.c)
+# ---------------------------------------------------------------------------
+
+
+InvoiceStatus = Literal[
+    "paid", "open", "void", "uncollectible", "draft",
+]
+
+
+class InvoiceRead(BaseModel):
+    """One Stripe invoice mirrored locally, as the in-app billing
+    settings page renders it.
+
+    `hosted_invoice_url` and `pdf_url` are the customer-facing links
+    that Stripe hosts; clicking either takes the user back to a
+    Stripe-rendered document (no in-app PDF generation).
+
+    The response intentionally omits `org_id` and `subscription_id` —
+    the caller is the org's user and there is only ever one active
+    subscription per org, so those fields would be noise on the wire.
+    """
+
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    id: uuid.UUID
+    stripe_invoice_id: str
+    number: str | None
+    status: InvoiceStatus
+    amount_due_cents: int
+    amount_paid_cents: int
+    currency: str
+    period_start: datetime | None
+    period_end: datetime | None
+    hosted_invoice_url: str | None
+    pdf_url: str | None
+    paid_at: datetime | None
+    created_at: datetime
+
+
 class CancelSubscriptionResponse(BaseModel):
     """Response from `POST /subscriptions/cancel`.
 
