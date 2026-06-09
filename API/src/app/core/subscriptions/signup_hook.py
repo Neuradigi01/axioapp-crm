@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core import audit
 from src.app.core.subscriptions.models import Subscription
 
 
@@ -61,4 +62,23 @@ async def create_trial_subscription(
         current_period_end=trial_end,
     )
     session.add(sub)
+
+    # Step 19 — audit-log the trial creation. `audit.log` opens its
+    # own session, so if the parent signup transaction rolls back the
+    # subscription row, the audit row may be orphaned (org_id pointing
+    # at a no-longer-existent org). That is the documented best-effort
+    # contract — append-only history beats coupling the lifecycle of
+    # a status event to the lifecycle of the entity.
+    await audit.log(
+        "subscription.created",
+        org_id=org_id,
+        entity_type="subscription",
+        after={
+            "plan_code": "trial",
+            "status": "trialing",
+            "seats_purchased": TRIAL_SEATS,
+            "trial_ends_at": trial_end.isoformat(),
+        },
+        user_id=None,  # signup is a system action
+    )
     return sub

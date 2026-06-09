@@ -5,9 +5,20 @@ public `/pricing` page is the marketing surface, not a logged-in user
 tab. The Billing settings tab (Step 16) is registered separately
 under the Settings module.
 
-`permissions=[]` because Step 1's endpoints are public. Later steps
-(Step 19) introduce `subscriptions.read` / `subscriptions.manage`
-keys, which are registered then via this same module descriptor.
+Permissions
+-----------
+Step 19 registers two keys via this descriptor:
+
+  - ``billing.read``   — read the current subscription, usage,
+    invoices. Reuses the existing key already granted to Owner
+    (and Admin, via the legacy core/billing module).
+  - ``billing.manage`` — change plan, change seats, cancel,
+    checkout. NEW key, granted to Owner only via Step 19's
+    role-template edit.
+
+The legacy ``core/billing`` module (invoice-PDF surface, unrelated to
+subscriptions) registers ``billing.write`` / ``billing.refund`` of its
+own; deliberately not reused here so that surface stays orthogonal.
 """
 from src.app.core.module_registry import ModuleDescriptor
 
@@ -20,5 +31,5 @@ MODULE = ModuleDescriptor(
     route="/api/v1/plans",
     frontend_route="/pricing",
     menu_position=None,
-    permissions=[],
+    permissions=["billing.read", "billing.manage"],
 )

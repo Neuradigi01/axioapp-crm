@@ -79,6 +79,10 @@ _CORE_ADMIN_KEYS: list[str] = [
 # 'pending').
 _CORE_OWNER_KEYS: list[str] = _CORE_ADMIN_KEYS + [
     "billing.refund",
+    # Step 19 — subscription change / seats / cancel / checkout flows.
+    # Granted to Owner only; Admin keeps `billing.read` for the legacy
+    # invoice surface but cannot mutate plan / payment state.
+    "billing.manage",
     "leads.scoring.manage",
 ]
 

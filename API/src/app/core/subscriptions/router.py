@@ -15,16 +15,19 @@ Six endpoints live here:
 
 The first two are unauthenticated — the marketing `/pricing` page and
 the signup flow consume them before the visitor is logged in. The rest
-require auth; cancellation lands in Step 10. The Owner-only RBAC gate
-arrives in Step 19 via the `billing.manage` permission key — until
-then any authenticated org member can call the write paths.
+require auth + permission (Step 19):
+
+  - Reads (`/current`, `/invoices`) → `billing.read`.
+  - Writes (`/change`, `/seats`, `/seats/preview`, `/checkout`,
+    `/cancel`) → `billing.manage`. Owner-only by default; custom roles
+    can be granted it via the roles UI.
 """
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.auth.dependencies import get_current_user
+from src.app.core.auth.dependencies import require_permissions
 from src.app.core.subscriptions import plans, service as subscription_service
 from src.app.core.subscriptions.dependencies import get_payment_provider
 from src.app.core.subscriptions.payment_provider import PaymentProvider
@@ -122,14 +125,14 @@ async def get_plan(code: str) -> dict:
     response_model=SubscriptionCurrentResponse,
 )
 async def get_current_subscription(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permissions("billing.read")),
     db: AsyncSession = Depends(get_db),
 ) -> SubscriptionCurrentResponse:
     """Return the caller's org's active subscription with plan + usage.
 
-    Read is open to any authenticated user in the org — managing the
-    plan / seats / cancellation lives behind the Owner role gate in
-    Steps 8-10 (RBAC keys registered in Step 19).
+    Gated on `billing.read` (Owner + Admin by default — the existing
+    legacy invoice surface also reuses this key). Mutating actions
+    live behind `billing.manage` (Owner only).
     """
     return await subscription_service.compose_current_subscription_response(
         db, user.org_id
@@ -143,7 +146,7 @@ async def get_current_subscription(
 async def change_subscription(
     payload: PlanChangeRequest,
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permissions("billing.manage")),
     db: AsyncSession = Depends(get_db),
     payment_provider: PaymentProvider | None = Depends(get_payment_provider),
 ):
@@ -191,7 +194,7 @@ async def change_subscription(
 )
 async def preview_seat_change(
     total_seats: int = Query(..., ge=1),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permissions("billing.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> SeatPreview:
     """Read-only cost projection for the seat-management modal.
@@ -214,7 +217,7 @@ async def preview_seat_change(
 async def change_seats(
     payload: SeatChangeRequest,
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permissions("billing.manage")),
     db: AsyncSession = Depends(get_db),
     payment_provider: PaymentProvider | None = Depends(get_payment_provider),
 ):
@@ -253,7 +256,7 @@ async def change_seats(
 async def open_checkout(
     payload: CheckoutRequest,
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permissions("billing.manage")),
     db: AsyncSession = Depends(get_db),
     payment_provider: PaymentProvider | None = Depends(get_payment_provider),
 ) -> CheckoutResponse:
@@ -303,7 +306,7 @@ async def open_checkout(
     response_model=list[InvoiceRead],
 )
 async def list_subscription_invoices(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permissions("billing.read")),
     db: AsyncSession = Depends(get_db),
 ) -> list[InvoiceRead]:
     """Return the org's Stripe invoices, newest first.
@@ -326,7 +329,7 @@ async def list_subscription_invoices(
     response_model=CancelSubscriptionResponse,
 )
 async def cancel_subscription_endpoint(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permissions("billing.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> CancelSubscriptionResponse:
     """Mark the caller's org subscription cancelled.

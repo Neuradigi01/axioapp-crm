@@ -2,7 +2,7 @@
 
 **Goal:** Register `billing.read` and `billing.manage` permission keys in the core RBAC registry, assign both to Owner by default (and Owner only), gate every mutating billing endpoint server-side with the manage permission, and emit audit events on every billing state change.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Phase 1.5 (RBAC infrastructure — `roles`, `role_permissions`, `permissions`), Phase 1.7 (`audit_logs`), Steps 7–13 (the endpoints to gate and audit).
 
 ---
