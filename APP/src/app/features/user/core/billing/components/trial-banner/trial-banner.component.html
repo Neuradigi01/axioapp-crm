@@ -19,8 +19,9 @@
       </span>
     </div>
 
-    <a
-      [routerLink]="banner.ctaTarget"
+    <button
+      type="button"
+      (click)="onCta()"
       [class]="
         'inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-semibold transition-colors shrink-0 ' +
         ctaClasses()
@@ -28,6 +29,6 @@
     >
       {{ banner.ctaLabel }}
       <lucide-icon name="arrow-right" class="w-4 h-4"></lucide-icon>
-    </a>
+    </button>
   </div>
 }

@@ -54,6 +54,56 @@ export interface UsageRow {
 }
 
 /**
+ * Wire shape of `GET /api/v1/plans` — the public plan catalogue used
+ * by the upgrade modal (Step 17). Mirrors `Plan.serialize()` on the
+ * backend; the modal only reads `code`, `name`, `pricing` and
+ * implicit "is public" filtering done by the API.
+ */
+export interface PlanCatalogEntry {
+  code: string;
+  name: string;
+  display_order: number;
+  is_public: boolean;
+  trial_duration_days: number;
+  pricing: {
+    monthly_bundle_usd: number;
+    annual_bundle_usd: number;
+    included_seats: number;
+    extra_seat_monthly_usd: number;
+    extra_seat_annual_usd: number;
+  };
+  caps: Record<string, number>;
+  features: Record<string, boolean>;
+}
+
+export interface PlansResponse {
+  plans: PlanCatalogEntry[];
+  currency: string;
+  annual_discount_pct: number;
+}
+
+
+/**
+ * Request / response for `POST /api/v1/subscriptions/checkout`
+ * (Step 12). The modal POSTs a `CheckoutRequest` and either
+ * receives a `CheckoutResponse` to redirect into, or a 4xx with a
+ * `{error, ...}` shape the modal renders inline.
+ */
+export interface CheckoutRequest {
+  to_plan: string;
+  billing_cycle: BillingCycle;
+  seats: number;
+  success_url?: string;
+  cancel_url?: string;
+}
+
+export interface CheckoutResponse {
+  checkout_url: string;
+  session_id: string;
+}
+
+
+/**
  * Mirror of the backend's `InvoiceRead` schema (Step 13.c).
  *
  * `null` is the wire-side default for optional fields — Stripe does

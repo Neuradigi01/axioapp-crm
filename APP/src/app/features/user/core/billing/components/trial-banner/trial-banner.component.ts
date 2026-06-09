@@ -4,21 +4,29 @@ import {
   computed,
   inject,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { SubscriptionStateService } from '../../services/subscription-state.service';
+import { UpgradeModalService } from '../../services/upgrade-modal.service';
 import {
   SubscriptionCurrent,
   SubscriptionStatus,
 } from '../../types/subscription.types';
 
-/** What the template renders for a given subscription state. */
+/** What the template renders for a given subscription state.
+ *
+ *  `ctaAction` decides what the button does:
+ *    - `'upgrade'` opens the Step 17 upgrade modal (trial / read_only)
+ *    - `'billing'` navigates to the in-app billing page (past_due
+ *      needs payment-method management; archived / cancelled need
+ *      operator contact via the page's footer copy)
+ */
 interface BannerViewModel {
   tone: 'info' | 'warning' | 'urgent';
   message: string;
   ctaLabel: string;
-  ctaTarget: string;
+  ctaAction: 'upgrade' | 'billing';
 }
 
 /** Days-remaining threshold below which the trial banner flips from
@@ -48,18 +56,30 @@ const TRIAL_WARNING_THRESHOLD_DAYS = 3;
 @Component({
   selector: 'crm-trial-banner',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, RouterLink],
+  imports: [LucideAngularModule],
   templateUrl: './trial-banner.component.html',
   styleUrl: './trial-banner.component.css',
 })
 export class TrialBannerComponent {
   private readonly subscription = inject(SubscriptionStateService);
+  private readonly upgradeModal = inject(UpgradeModalService);
+  private readonly router = inject(Router);
 
   protected readonly vm = computed<BannerViewModel | null>(() => {
     const sub = this.subscription.current();
     if (sub === null) return null;
     return buildViewModel(sub);
   });
+
+  protected onCta(): void {
+    const banner = this.vm();
+    if (banner === null) return;
+    if (banner.ctaAction === 'upgrade') {
+      this.upgradeModal.open();
+      return;
+    }
+    this.router.navigateByUrl('/user/settings/billing');
+  }
 
   /** Container classes per tone — kept in the component (not the
    *  template) so the colour palette is greppable in one place. */
@@ -132,7 +152,7 @@ function makeTrialVM(sub: SubscriptionCurrent): BannerViewModel {
       ? `Only ${daysRemaining} ${dayWord} left on your trial.`
       : `You're on a 14-day trial. ${daysRemaining} ${dayWord} left.`,
     ctaLabel: 'Upgrade',
-    ctaTarget: '/user/settings/billing',
+    ctaAction: 'upgrade',
   };
 }
 
@@ -142,7 +162,7 @@ function makeExpiredVM(): BannerViewModel {
     tone: 'urgent',
     message: 'Your trial has ended. Upgrade to continue using CRM.',
     ctaLabel: 'Upgrade',
-    ctaTarget: '/user/settings/billing',
+    ctaAction: 'upgrade',
   };
 }
 
@@ -152,7 +172,7 @@ function makePaymentFailedVM(): BannerViewModel {
     tone: 'urgent',
     message: 'Payment failed. Update your card to keep your subscription.',
     ctaLabel: 'Update payment',
-    ctaTarget: '/user/settings/billing',
+    ctaAction: 'billing',
   };
 }
 
@@ -164,6 +184,6 @@ function makeFinalStateVM(
     tone: 'urgent',
     message: `Your account is ${state}.`,
     ctaLabel: 'Contact support',
-    ctaTarget: '/user/settings/billing',
+    ctaAction: 'billing',
   };
 }

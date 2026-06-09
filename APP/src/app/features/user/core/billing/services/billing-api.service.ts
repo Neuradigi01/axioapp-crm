@@ -3,7 +3,13 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
-import { Invoice, SubscriptionCurrent } from '../types/subscription.types';
+import {
+  CheckoutRequest,
+  CheckoutResponse,
+  Invoice,
+  PlansResponse,
+  SubscriptionCurrent,
+} from '../types/subscription.types';
 
 /**
  * Thin wrapper over the authenticated billing endpoints.
@@ -28,6 +34,28 @@ export class BillingApiService {
   listInvoices(): Observable<Invoice[]> {
     return this.http.get<Invoice[]>(
       `${environment.apiBaseUrl}/subscriptions/invoices`,
+    );
+  }
+
+  /** Step 14 — public plan catalogue. Used by the upgrade modal
+   *  (Step 17) to render the radio cards. Unauthenticated on the
+   *  server side; the auth interceptor still attaches the JWT but
+   *  the endpoint ignores it. */
+  getPlans(): Observable<PlansResponse> {
+    return this.http.get<PlansResponse>(
+      `${environment.apiBaseUrl}/plans`,
+    );
+  }
+
+  /** Step 12 — request a Stripe Checkout Session for an upgrade.
+   *  Returns the hosted URL the frontend redirects into via
+   *  `window.location.href`. */
+  createCheckoutSession(
+    payload: CheckoutRequest,
+  ): Observable<CheckoutResponse> {
+    return this.http.post<CheckoutResponse>(
+      `${environment.apiBaseUrl}/subscriptions/checkout`,
+      payload,
     );
   }
 }
