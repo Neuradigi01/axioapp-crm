@@ -109,7 +109,7 @@ All without any DB-level intervention.
 | 12 | [Checkout session endpoint](step-12-checkout-session.md) | Completed | ~½ day |
 | 13 | [Stripe webhook handler + invoice records](step-13-stripe-webhooks-invoices.md) | Completed | ~1 day |
 | 14 | [Public `/pricing` page](step-14-public-pricing-page.md) | Completed | ~1 day |
-| 15 | [Trial banner + countdown component](step-15-trial-banner.md) | Pending | ~½ day |
+| 15 | [Trial banner + countdown component](step-15-trial-banner.md) | Completed | ~½ day |
 | 16 | [Billing settings page (read view)](step-16-billing-settings-page.md) | Pending | ~1 day |
 | 17 | [Plan upgrade flow (modal + Stripe redirect)](step-17-plan-upgrade-flow.md) | Pending | ~1 day |
 | 18 | [Locked feature tile pattern](step-18-locked-feature-tile.md) | Pending | ~½ day |

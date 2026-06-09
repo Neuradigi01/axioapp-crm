@@ -2,7 +2,7 @@
 
 **Goal:** A persistent banner across `/user/...` routes (top of the layout shell, below the header) that, for orgs whose subscription is `trialing` or `read_only`, shows a clear "N days left in trial" / "Trial ended — upgrade now" message with a prominent Upgrade CTA. Hidden for `active` and `cancelled`.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 7 (`GET /subscriptions/current` — the banner data source). RBAC-Ownership (the new-signup flow that creates the trial subscription).
 
 ---

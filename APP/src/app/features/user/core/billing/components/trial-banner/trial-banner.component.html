@@ -1,0 +1,33 @@
+@if (vm(); as banner) {
+  <div
+    [class]="
+      'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b ' +
+      toneClasses()
+    "
+    role="status"
+    aria-live="polite"
+  >
+    <div class="flex items-start sm:items-center gap-2">
+      @if (banner.tone !== 'info') {
+        <lucide-icon
+          name="alert-triangle"
+          class="w-5 h-5 mt-0.5 sm:mt-0 shrink-0"
+        ></lucide-icon>
+      }
+      <span class="text-sm font-medium leading-snug">
+        {{ banner.message }}
+      </span>
+    </div>
+
+    <a
+      [routerLink]="banner.ctaTarget"
+      [class]="
+        'inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-semibold transition-colors shrink-0 ' +
+        ctaClasses()
+      "
+    >
+      {{ banner.ctaLabel }}
+      <lucide-icon name="arrow-right" class="w-4 h-4"></lucide-icon>
+    </a>
+  </div>
+}
