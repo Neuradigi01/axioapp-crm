@@ -17,6 +17,18 @@ export const appRoutes: Routes = [
       ),
   },
   {
+    // Public marketing pricing page. Reachable without auth (peer of
+    // `/accounts/...` and `/user/...`, not nested in either). Step 14
+    // of the pricing-and-billing track ships the page itself; the
+    // "Start free trial" CTA forwards `plan` + `cycle` query params
+    // into the signup flow.
+    path: 'pricing',
+    loadComponent: () =>
+      import('./features/pricing/pricing.page').then(
+        (m) => m.PricingPage,
+      ),
+  },
+  {
     // Onboarding picker — landed on after self-signup, while the
     // user's org is still in `template_id="pending"`. Top-level (not under
     // `/user`) because the user has no fully-set-up org yet, so any

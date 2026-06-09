@@ -2,7 +2,7 @@
 
 **Goal:** A standalone Angular route at `/pricing` (outside `/accounts` and `/user` — accessible without auth) that renders the three public plans (Basic / Standard / Enterprise) in a comparison-card layout, with monthly/annual toggle and a "Start free trial" CTA that lands in `/accounts/register`.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 1 (public `/api/v1/plans` endpoint). No auth dependency.
 
 ---
