@@ -2,7 +2,7 @@
 
 **Goal:** A reusable Angular component that wraps any "this is a Standard / Enterprise feature you don't have" surface and renders a consistent upgrade overlay. Used by the Automation builder, Conversations inbox, Reports builder, Campaigns, and any other Standard-gated UI to render an in-app upsell instead of a 402 error or a missing menu entry.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 15 (`SubscriptionStateService` — to know what plan the user is on), Step 17 (`UpgradeModalService` — clicking the CTA opens the modal). Step 1 (plan registry — to render "Standard" / "Enterprise" tier label).
 
 ---
