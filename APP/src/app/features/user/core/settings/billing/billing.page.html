@@ -29,13 +29,10 @@
   } @else if (subscription(); as sub) {
     <crm-current-plan-card [subscription]="sub" />
     <crm-seats-card [subscription]="sub" />
-
-    <!-- Sub-step 16.b will replace this placeholder with the Usage
-         bars and the Invoices table. -->
-    <section
-      class="rounded-2xl border border-dashed border-zinc-300 bg-white p-6 text-sm text-zinc-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400"
-    >
-      Usage breakdown and invoice history land in sub-step 16.b.
-    </section>
+    <crm-usage-bars [usage]="sub.usage" />
+    <crm-invoices-table
+      [invoices]="invoices()"
+      [isLoading]="invoicesLoading()"
+    />
   }
 </div>

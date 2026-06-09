@@ -1,13 +1,19 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  OnInit,
   computed,
   inject,
+  signal,
 } from '@angular/core';
 
+import { BillingApiService } from '../../billing/services/billing-api.service';
 import { SubscriptionStateService } from '../../billing/services/subscription-state.service';
+import { Invoice } from '../../billing/types/subscription.types';
 import { CurrentPlanCardComponent } from './components/current-plan-card.component';
+import { InvoicesTableComponent } from './components/invoices-table.component';
 import { SeatsCardComponent } from './components/seats-card.component';
+import { UsageBarsComponent } from './components/usage-bars.component';
 
 /**
  * Billing settings tab.
@@ -29,12 +35,18 @@ import { SeatsCardComponent } from './components/seats-card.component';
 @Component({
   selector: 'crm-billing-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CurrentPlanCardComponent, SeatsCardComponent],
+  imports: [
+    CurrentPlanCardComponent,
+    SeatsCardComponent,
+    UsageBarsComponent,
+    InvoicesTableComponent,
+  ],
   templateUrl: './billing.page.html',
   styleUrl: './billing.page.css',
 })
-export class BillingPage {
+export class BillingPage implements OnInit {
   private readonly state = inject(SubscriptionStateService);
+  private readonly api = inject(BillingApiService);
 
   protected readonly subscription = this.state.current;
   protected readonly isLoading = computed(
@@ -44,7 +56,31 @@ export class BillingPage {
     () => this.state.loadError() && this.subscription() === null,
   );
 
+  protected readonly invoices = signal<Invoice[]>([]);
+  protected readonly invoicesLoading = signal<boolean>(true);
+
+  ngOnInit(): void {
+    this.loadInvoices();
+  }
+
   protected retry(): void {
     this.state.refresh();
+    this.loadInvoices();
+  }
+
+  private loadInvoices(): void {
+    this.invoicesLoading.set(true);
+    this.api.listInvoices().subscribe({
+      next: (rows) => {
+        this.invoices.set(rows);
+        this.invoicesLoading.set(false);
+      },
+      error: () => {
+        // Empty list + "no invoices yet" copy is the right UX when the
+        // call fails — better than an error toast on a settings page.
+        this.invoices.set([]);
+        this.invoicesLoading.set(false);
+      },
+    });
   }
 }

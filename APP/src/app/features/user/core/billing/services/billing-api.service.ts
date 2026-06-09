@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
-import { SubscriptionCurrent } from '../types/subscription.types';
+import { Invoice, SubscriptionCurrent } from '../types/subscription.types';
 
 /**
  * Thin wrapper over the authenticated billing endpoints.
@@ -20,6 +20,14 @@ export class BillingApiService {
   getCurrent(): Observable<SubscriptionCurrent> {
     return this.http.get<SubscriptionCurrent>(
       `${environment.apiBaseUrl}/subscriptions/current`,
+    );
+  }
+
+  /** Step 13.c — Stripe-mirrored invoice list, newest first. Empty
+   *  array during trial (no Stripe activity yet). */
+  listInvoices(): Observable<Invoice[]> {
+    return this.http.get<Invoice[]>(
+      `${environment.apiBaseUrl}/subscriptions/invoices`,
     );
   }
 }

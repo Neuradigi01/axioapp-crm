@@ -53,6 +53,37 @@ export interface UsageRow {
   is_unlimited: boolean;
 }
 
+/**
+ * Mirror of the backend's `InvoiceRead` schema (Step 13.c).
+ *
+ * `null` is the wire-side default for optional fields — Stripe does
+ * not always supply `number` or `pdf_url` (e.g. drafts), and the
+ * billing UI degrades gracefully when those are absent.
+ */
+export type InvoiceStatus =
+  | 'paid'
+  | 'open'
+  | 'void'
+  | 'uncollectible'
+  | 'draft';
+
+export interface Invoice {
+  id: string;
+  stripe_invoice_id: string;
+  number: string | null;
+  status: InvoiceStatus;
+  amount_due_cents: number;
+  amount_paid_cents: number;
+  currency: string;
+  period_start: string | null;
+  period_end: string | null;
+  hosted_invoice_url: string | null;
+  pdf_url: string | null;
+  paid_at: string | null;
+  created_at: string;
+}
+
+
 export interface SubscriptionCurrent {
   id: string;
   plan: PlanShort;

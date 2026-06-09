@@ -2,7 +2,7 @@
 
 **Goal:** A page at `/user/settings/billing` that shows the current plan, trial countdown (if applicable), seat usage, billing cycle, next renewal date, and a list of past invoices with download links. **Read-only in this step** — plan upgrade and seat management UI controls land in Step 17.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 7 (subscription read API), Step 13 sub-step 13.c (invoice list API), Step 15 (the `SubscriptionStateService`).
 
 ---
