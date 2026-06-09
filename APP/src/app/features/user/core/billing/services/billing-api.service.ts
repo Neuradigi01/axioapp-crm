@@ -8,6 +8,8 @@ import {
   CheckoutResponse,
   Invoice,
   PlansResponse,
+  SeatChangeResponse,
+  SeatPreview,
   SubscriptionCurrent,
 } from '../types/subscription.types';
 
@@ -56,6 +58,25 @@ export class BillingApiService {
     return this.http.post<CheckoutResponse>(
       `${environment.apiBaseUrl}/subscriptions/checkout`,
       payload,
+    );
+  }
+
+  /** Step 9 — preview the cost impact of a seat change without
+   *  committing. The seat-management modal calls this on every
+   *  +/− click so the displayed estimate stays in sync. */
+  previewSeats(totalSeats: number): Observable<SeatPreview> {
+    return this.http.get<SeatPreview>(
+      `${environment.apiBaseUrl}/subscriptions/seats/preview`,
+      { params: { total_seats: totalSeats } },
+    );
+  }
+
+  /** Step 9 — apply or schedule a seat change. The response shape is
+   *  a discriminated union; the modal switches on `outcome`. */
+  changeSeats(totalSeats: number): Observable<SeatChangeResponse> {
+    return this.http.post<SeatChangeResponse>(
+      `${environment.apiBaseUrl}/subscriptions/seats`,
+      { total_seats: totalSeats },
     );
   }
 }

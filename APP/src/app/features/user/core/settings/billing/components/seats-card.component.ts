@@ -2,9 +2,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  inject,
   input,
 } from '@angular/core';
 
+import { SeatModalService } from '../../../billing/services/seat-modal.service';
 import { SubscriptionCurrent } from '../../../billing/types/subscription.types';
 
 /**
@@ -38,6 +40,7 @@ import { SubscriptionCurrent } from '../../../billing/types/subscription.types';
 
         <button
           type="button"
+          (click)="onManage()"
           class="rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
           [class.bg-zinc-100]="manageDisabled()"
           [class.text-zinc-500]="manageDisabled()"
@@ -85,21 +88,40 @@ import { SubscriptionCurrent } from '../../../billing/types/subscription.types';
   `,
 })
 export class SeatsCardComponent {
+  private readonly seatModal = inject(SeatModalService);
+
   readonly subscription = input.required<SubscriptionCurrent>();
 
-  /** Trial subs cannot buy seats; cancelled / archived are terminal.
-   *  Active and read_only are the only states where the manage flow
-   *  is meaningful — but Step 17 owns the wiring, so for now the
-   *  button is universally disabled with a context-aware tooltip. */
-  protected readonly manageDisabled = computed(() => true);
+  /** Trial subs cannot buy seats (server rejects); cancelled /
+   *  archived are terminal. Active / past_due / read_only let the
+   *  Owner adjust seats — past_due in particular because reducing
+   *  seats to the in-use floor can be a cost-recovery move. */
+  protected readonly manageDisabled = computed(() => {
+    const status = this.subscription().status;
+    return (
+      status === 'trialing' ||
+      status === 'cancelled' ||
+      status === 'archived'
+    );
+  });
 
   protected readonly manageTooltip = computed(() => {
     const sub = this.subscription();
-    if (sub.status === 'trialing') {
-      return 'Seats can only be managed after upgrading from trial';
+    switch (sub.status) {
+      case 'trialing':
+        return 'Seats can only be managed after upgrading from trial';
+      case 'cancelled':
+        return 'Subscription is cancelled — contact support to reactivate';
+      case 'archived':
+        return 'Account is archived';
+      default:
+        return '';
     }
-    return 'Seat management lands in Step 17';
   });
+
+  protected onManage(): void {
+    this.seatModal.open();
+  }
 
   protected readonly helperLine = computed(() => {
     const sub = this.subscription();

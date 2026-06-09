@@ -2,7 +2,7 @@
 
 **Goal:** A reusable upgrade modal triggered by the trial banner (Step 15) and the Billing settings page's "Upgrade plan" / "Manage seats" buttons (Step 16). User picks plan + cycle + seats → confirms → frontend hits `POST /subscriptions/checkout` (Step 12) → redirected into Stripe Checkout → on return, success page polls `GET /subscriptions/current` until status flips to `active`.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Step 12 (`/checkout` endpoint), Step 14 (plan data via public `/plans`), Step 15 (state service + banner CTA), Step 16 (billing settings buttons).
 
 ---

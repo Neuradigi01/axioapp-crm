@@ -89,6 +89,26 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // Stripe Checkout `success_url` lands here with `session_id`
+        // in the query string. The page polls `/subscriptions/current`
+        // until the Step 13.b webhook flips the row to active, then
+        // bounces to `/user/settings/billing?upgraded=true`.
+        path: 'settings/billing/upgrade-success',
+        loadComponent: () =>
+          import('./core/settings/billing/upgrade-success.page').then(
+            (m) => m.UpgradeSuccessPage,
+          ),
+      },
+      {
+        // Stripe Checkout `cancel_url` lands here. Brief page with
+        // "Back to Billing" / "Try again" buttons.
+        path: 'settings/billing/upgrade-cancel',
+        loadComponent: () =>
+          import('./core/settings/billing/upgrade-cancel.page').then(
+            (m) => m.UpgradeCancelPage,
+          ),
+      },
+      {
         path: 'settings/lead-scoring',
         canActivate: [permissionGuard('leads.scoring.manage')],
         loadComponent: () =>

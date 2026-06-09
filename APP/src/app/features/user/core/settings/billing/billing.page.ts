@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 
+import { SeatModalComponent } from '../../billing/components/seat-modal/seat-modal.component';
 import { BillingApiService } from '../../billing/services/billing-api.service';
 import { SubscriptionStateService } from '../../billing/services/subscription-state.service';
 import { Invoice } from '../../billing/types/subscription.types';
@@ -40,6 +41,7 @@ import { UsageBarsComponent } from './components/usage-bars.component';
     SeatsCardComponent,
     UsageBarsComponent,
     InvoicesTableComponent,
+    SeatModalComponent,
   ],
   templateUrl: './billing.page.html',
   styleUrl: './billing.page.css',

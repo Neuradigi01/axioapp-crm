@@ -104,6 +104,52 @@ export interface CheckoutResponse {
 
 
 /**
+ * Wire types for the seat-management endpoints (Step 9 backend) used
+ * by the seat-management modal (Step 17.b).
+ *
+ * `outcome_if_committed` on the preview is the same enum as the
+ * commit-time `outcome` so the frontend can use one switch.
+ */
+
+export type SeatChangeOutcome = 'no_change' | 'needs_payment' | 'scheduled';
+
+export interface SeatPreview {
+  from_seats: number;
+  to_seats: number;
+  delta: number;
+  outcome_if_committed: SeatChangeOutcome;
+  amount_due_usd: number;
+  next_renewal_at: string;
+  monthly_cost_after_change_usd: number | null;
+  annual_cost_after_change_usd: number | null;
+}
+
+export interface SeatChangeNeedsPaymentResponse {
+  outcome: 'needs_payment';
+  checkout_url: string | null;
+  checkout_session_id: string | null;
+  preview: SeatPreview;
+}
+
+export interface SeatChangeScheduledResponse {
+  outcome: 'scheduled';
+  effective_at: string;
+  from_seats: number;
+  to_seats: number;
+  refund_due_usd: number;
+}
+
+export interface SeatChangeNoChangeResponse {
+  outcome: 'no_change';
+}
+
+export type SeatChangeResponse =
+  | SeatChangeNeedsPaymentResponse
+  | SeatChangeScheduledResponse
+  | SeatChangeNoChangeResponse;
+
+
+/**
  * Mirror of the backend's `InvoiceRead` schema (Step 13.c).
  *
  * `null` is the wire-side default for optional fields — Stripe does
