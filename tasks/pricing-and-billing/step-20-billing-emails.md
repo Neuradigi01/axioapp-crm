@@ -2,7 +2,7 @@
 
 **Goal:** Implement the six billing-related email templates and SMTP delivery wiring, replacing the stub introduced in Step 6. Owners receive: trial-ending-in-3-days, trial-expired, payment-succeeded, payment-failed, seat-overage-charged, plan-changed.
 **Track:** Pricing and Billing
-**Status:** Pending
+**Status:** Completed
 **Depends on:** `core/notifications` module (Phase 3.x) — must provide an SMTP backend with template rendering. Step 6 (lifecycle — calls into the email send function). Step 13 (webhook handlers — call into the email send for payment events).
 
 ---

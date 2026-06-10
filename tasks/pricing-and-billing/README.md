@@ -114,7 +114,7 @@ All without any DB-level intervention.
 | 17 | [Plan upgrade flow (modal + Stripe redirect)](step-17-plan-upgrade-flow.md) | Completed | ~1 day |
 | 18 | [Locked feature tile pattern](step-18-locked-feature-tile.md) | Completed | ~½ day |
 | 19 | [Owner-only RBAC + billing audit events](step-19-billing-rbac-audit.md) | Completed | ~½ day |
-| 20 | [Email notifications for billing](step-20-billing-emails.md) | Pending | ~½ day |
+| 20 | [Email notifications for billing](step-20-billing-emails.md) | Completed | ~½ day |
 
 **Total: ~12–14 working days.** Each step independently verifiable; pause and report after each per rule 9.
 

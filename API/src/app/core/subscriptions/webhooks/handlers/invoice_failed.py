@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.subscriptions.models import Subscription
+from src.app.core.subscriptions.notifications import send_billing_email
 from src.app.core.subscriptions.webhooks.handlers.invoice_paid import (
     _upsert_invoice,
 )
@@ -57,3 +58,12 @@ async def on_invoice_failed(
             "invoice.payment_failed → org %s flipped to past_due",
             sub.org_id,
         )
+
+    # Step 20 — best-effort email regardless of whether the status
+    # actually flipped: customer needs to know their card was declined
+    # even if the sub was already in `past_due` from an earlier event.
+    await send_billing_email(
+        org_id=sub.org_id,
+        template_key="payment_failed",
+        context={},
+    )

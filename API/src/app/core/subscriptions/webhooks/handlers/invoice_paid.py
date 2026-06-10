@@ -24,6 +24,7 @@ from src.app.core.subscriptions.models import (
     Subscription,
     SubscriptionInvoice,
 )
+from src.app.core.subscriptions.notifications import send_billing_email
 from src.app.core.subscriptions.webhooks.handlers import (
     find_subscription_by_stripe_id,
     parse_unix_ts,
@@ -74,6 +75,19 @@ async def on_invoice_paid(
             "invoice.paid → org %s resumed from past_due to active",
             sub.org_id,
         )
+
+    # Step 20 — receipt-style email. Sent on EVERY paid invoice (initial
+    # checkout, renewal, prorated seat add), not just the past_due
+    # recovery path above. Best-effort; never raises.
+    await send_billing_email(
+        org_id=sub.org_id,
+        template_key="payment_succeeded",
+        context={
+            "amount_paid_usd": (invoice.get("amount_paid") or 0) // 100,
+            "invoice_pdf_url": invoice.get("invoice_pdf")
+            or invoice.get("hosted_invoice_url"),
+        },
+    )
 
 
 async def on_invoice_finalized(

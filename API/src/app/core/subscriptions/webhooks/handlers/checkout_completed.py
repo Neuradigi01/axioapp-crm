@@ -32,7 +32,9 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.subscriptions import plans
 from src.app.core.subscriptions.models import Subscription
+from src.app.core.subscriptions.notifications import send_billing_email
 
 log = logging.getLogger(__name__)
 
@@ -125,4 +127,20 @@ async def on_checkout_completed(
         "Stripe Checkout completed → org %s flipped to active on plan %s/%s "
         "(seats=%d)",
         org_id, plan_code, billing_cycle, seats,
+    )
+
+    # Step 20 — welcome / upgrade email. `plan_changed` is the same
+    # template for "trial → first paid plan" and "paid → different
+    # paid plan"; both surfaces are best served by the same congratu-
+    # latory copy plus a deep link into Billing settings. The
+    # `payment_succeeded` email fires separately when Stripe's
+    # `invoice.paid` lands, so the customer gets exactly two messages
+    # for one upgrade (welcome + receipt).
+    plan = plans.get(plan_code)
+    await send_billing_email(
+        org_id=org_id,
+        template_key="plan_changed",
+        context={
+            "plan_name": plan.name if plan is not None else plan_code.title(),
+        },
     )
