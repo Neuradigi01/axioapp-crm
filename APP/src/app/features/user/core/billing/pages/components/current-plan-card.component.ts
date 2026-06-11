@@ -136,7 +136,7 @@ export class CurrentPlanCardComponent {
 
   protected readonly statusTone = computed<StatusTone>(() => {
     const s = this.subscription().status;
-    return STATUS_TONES[s] ?? STATUS_TONES.archived;
+    return STATUS_TONES[s] ?? STATUS_TONES['archived'];
   });
 
   /** Headline price block. Hidden for trial / cancelled / archived

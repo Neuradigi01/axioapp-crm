@@ -26,6 +26,8 @@ celery.autodiscover_tasks([
     # App-updates Email Step 4 — mailbox sync daemon (backfill,
     # incremental, renewal, poll fallback, daily counter reset).
     "src.app.core.email.tasks",
+    # App-updates Email Step 7 — sequence scheduler tick (every 60s).
+    "src.app.core.email_sequences.tasks",
 ])
 
 if not CELERY_ENABLED:

@@ -53,7 +53,7 @@ A sales rep on a fresh org can:
 | 4 | [Backend: mailbox sync daemon (Celery beat + push webhooks)](step-4-backend-mailbox-sync-daemon.md) | COMPLETED | ~1 day |
 | 5 | [Backend: Conversations Email channel adapter (compose + reply threading)](step-5-backend-conversations-email-adapter.md) | COMPLETED | ~1 day |
 | 6 | [Backend: `email_templates` table + variable substitution engine](step-6-backend-email-templates.md) | COMPLETED | ~1 day |
-| 7 | [Backend: `email_sequences` + enrollment engine + reply detection](step-7-backend-email-sequences.md) | Pending | ~2 days |
+| 7 | [Backend: `email_sequences` + enrollment engine + reply detection](step-7-backend-email-sequences.md) | COMPLETED | ~2 days |
 | 8 | [Backend: open pixel + link rewriting + delivery state](step-8-backend-open-click-tracking.md) | Pending | ~1 day |
 | 9 | [Frontend (Settings): Email Accounts tab — connect/disconnect + per-account dashboard](step-9-frontend-email-accounts-tab.md) | Pending | ~1 day |
 | 10 | [Frontend: Template editor (Settings) + compose-from-template in contacts/leads](step-10-frontend-template-editor.md) | Pending | ~1.5 days |
