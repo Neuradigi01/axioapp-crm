@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { EmailAccountsTabComponent } from './email-accounts/email-accounts-tab.component';
+import { EmailTemplatesListComponent } from './email-templates/template-list.component';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
@@ -27,6 +28,7 @@ type SettingsTab =
   | 'roles'
   | 'integrations'
   | 'email-accounts'
+  | 'email-templates'
   | 'notifications'
   | 'ai'
   | 'custom-fields'
@@ -74,6 +76,16 @@ const TABS: ReadonlyArray<TabDef> = [
     label: 'Email Accounts',
     permission: 'email.accounts.manage',
   },
+  {
+    // App-updates Email Step 10 — template library. Anyone with
+    // `email.read` (every role per Step 6 grants) sees the tab to
+    // browse and use templates; `email.templates.manage` (Owner /
+    // Admin / Sales Manager) is required for the Edit / Delete
+    // affordances — gated inside the list component.
+    id: 'email-templates',
+    label: 'Email Templates',
+    permission: 'email.read',
+  },
   { id: 'ai', label: 'AI Settings', permission: 'settings.write' },
   {
     id: 'custom-fields',
@@ -111,6 +123,7 @@ const TABS: ReadonlyArray<TabDef> = [
     StandardFieldsTabComponent,
     EmbedIntegrationsTabComponent,
     EmailAccountsTabComponent,
+    EmailTemplatesListComponent,
   ],
   templateUrl: './settings-page.component.html',
 })

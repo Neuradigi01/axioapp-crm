@@ -45,6 +45,8 @@
         />
         <app-compose-bar
           [aiHandling]="conv.ai_handling"
+          [channel]="conv.channel"
+          [contactId]="conv.contact_id"
           (send)="onSendText($event)"
           (toggleAi)="onToggleAi($event)"
         />

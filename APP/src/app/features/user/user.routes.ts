@@ -89,6 +89,32 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // App-updates Email Step 10 — Settings tab for the email
+        // template library. The list lives inside the settings page
+        // (tab=email-templates); /new + /:id/edit route to standalone
+        // editor pages.
+        path: 'settings/email-templates',
+        data: { tab: 'email-templates' },
+        loadComponent: () =>
+          import('./core/settings/settings-page.component').then(
+            (m) => m.SettingsPageComponent,
+          ),
+      },
+      {
+        path: 'settings/email-templates/new',
+        loadComponent: () =>
+          import(
+            './core/settings/email-templates/template-editor.page'
+          ).then((m) => m.EmailTemplateEditorPageComponent),
+      },
+      {
+        path: 'settings/email-templates/:id/edit',
+        loadComponent: () =>
+          import(
+            './core/settings/email-templates/template-editor.page'
+          ).then((m) => m.EmailTemplateEditorPageComponent),
+      },
+      {
         // SaaS subscription billing — promoted to a top-level sidebar
         // module (manager spec 2026-06-11). Owner-only via the
         // `billing.manage` permission key (Step 19). Stripe Checkout
