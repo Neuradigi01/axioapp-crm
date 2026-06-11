@@ -77,6 +77,18 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // App-updates Email Step 9 — alias so the Gmail + Microsoft
+        // OAuth `/callback` handlers can redirect users straight onto
+        // the Email Accounts tab with `?status=…` for the success /
+        // denied toast. Backend `_SETTINGS_RETURN_PATH` points here.
+        path: 'settings/email-accounts',
+        data: { tab: 'email-accounts' },
+        loadComponent: () =>
+          import('./core/settings/settings-page.component').then(
+            (m) => m.SettingsPageComponent,
+          ),
+      },
+      {
         // SaaS subscription billing — promoted to a top-level sidebar
         // module (manager spec 2026-06-11). Owner-only via the
         // `billing.manage` permission key (Step 19). Stripe Checkout

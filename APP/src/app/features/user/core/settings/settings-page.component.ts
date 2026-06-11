@@ -3,6 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
+import { EmailAccountsTabComponent } from './email-accounts/email-accounts-tab.component';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
@@ -25,6 +26,7 @@ type SettingsTab =
   | 'team'
   | 'roles'
   | 'integrations'
+  | 'email-accounts'
   | 'notifications'
   | 'ai'
   | 'custom-fields'
@@ -62,6 +64,16 @@ const TABS: ReadonlyArray<TabDef> = [
     label: 'Integrations',
     permission: 'settings.integrations.manage',
   },
+  {
+    // App-updates Email Step 9 — per-user mailbox management. Every
+    // role with `email.accounts.manage` (Owner/Admin/Employee/
+    // SalesManager/SupportAgent per Step 1's role-template grants)
+    // sees this tab; the backend list endpoint returns own-only for
+    // reps and all-org for Owner/Admin holding `email.accounts.admin`.
+    id: 'email-accounts',
+    label: 'Email Accounts',
+    permission: 'email.accounts.manage',
+  },
   { id: 'ai', label: 'AI Settings', permission: 'settings.write' },
   {
     id: 'custom-fields',
@@ -98,6 +110,7 @@ const TABS: ReadonlyArray<TabDef> = [
     CustomFieldsPageComponent,
     StandardFieldsTabComponent,
     EmbedIntegrationsTabComponent,
+    EmailAccountsTabComponent,
   ],
   templateUrl: './settings-page.component.html',
 })
