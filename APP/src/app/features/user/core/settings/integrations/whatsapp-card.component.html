@@ -237,6 +237,186 @@
         </dd>
       </div>
     </dl>
+
+    <!-- Synced templates — collapsible. Auto-loads on connect so the
+         status badges render without an explicit expand. -->
+    <div class="mt-4 overflow-hidden rounded-md border border-zinc-200">
+      <button
+        type="button"
+        class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        (click)="toggleTemplates()"
+        [attr.aria-expanded]="templatesExpanded()"
+        data-testid="whatsapp-templates-toggle"
+      >
+        <span class="flex items-center gap-2">
+          <lucide-icon
+            [name]="templatesExpanded() ? 'chevron-down' : 'chevron-right'"
+            size="16"
+            aria-hidden="true"
+          ></lucide-icon>
+          Synced templates
+          @if (templatesLoaded()) {
+            <span class="text-xs font-normal text-zinc-500">
+              ({{ templates().length }})
+            </span>
+          }
+        </span>
+        @if (templatesLoading() && !templatesLoaded()) {
+          <lucide-icon
+            name="loader-2"
+            size="14"
+            class="animate-spin text-zinc-400"
+            aria-hidden="true"
+          ></lucide-icon>
+        } @else if (templatesLoaded() && templates().length > 0) {
+          <span class="flex flex-wrap items-center gap-1.5 text-xs">
+            @if (templateCounts().APPROVED > 0) {
+              <span
+                class="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700 ring-1 ring-emerald-200"
+              >
+                {{ templateCounts().APPROVED }} approved
+              </span>
+            }
+            @if (templateCounts().PENDING > 0) {
+              <span
+                class="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700 ring-1 ring-amber-200"
+              >
+                {{ templateCounts().PENDING }} pending
+              </span>
+            }
+            @if (templateCounts().REJECTED > 0) {
+              <span
+                class="rounded-full bg-rose-50 px-2 py-0.5 font-medium text-rose-700 ring-1 ring-rose-200"
+              >
+                {{ templateCounts().REJECTED }} rejected
+              </span>
+            }
+          </span>
+        }
+      </button>
+
+      @if (templatesExpanded()) {
+        <div class="border-t border-zinc-200">
+          @if (templatesError(); as err) {
+            <div
+              class="flex items-start gap-2 border-b border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800"
+            >
+              <lucide-icon
+                name="alert-triangle"
+                size="14"
+                class="mt-0.5 shrink-0"
+                aria-hidden="true"
+              ></lucide-icon>
+              <span>{{ err }}</span>
+            </div>
+          }
+
+          @if (templatesLoading()) {
+            <div class="flex items-center gap-2 px-3 py-4 text-sm text-zinc-500">
+              <lucide-icon
+                name="loader-2"
+                size="14"
+                class="animate-spin"
+                aria-hidden="true"
+              ></lucide-icon>
+              Loading templates…
+            </div>
+          } @else if (templatesLoaded() && templates().length === 0) {
+            <div class="px-3 py-4 text-sm text-zinc-500">
+              No templates cached yet. Click
+              <span class="font-medium text-zinc-700">Sync templates</span>
+              above to pull from Meta.
+            </div>
+          } @else if (templates().length > 0) {
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead
+                  class="bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500"
+                >
+                  <tr>
+                    <th class="px-3 py-2 text-left">Name</th>
+                    <th class="px-3 py-2 text-left">Language</th>
+                    <th class="px-3 py-2 text-left">Category</th>
+                    <th class="px-3 py-2 text-left">Status</th>
+                    <th class="px-3 py-2 text-right">Vars</th>
+                    <th class="px-3 py-2 text-left">Last synced</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100">
+                  @for (t of templates(); track t.id) {
+                    <tr>
+                      <td class="px-3 py-2 font-mono text-xs text-zinc-800">
+                        {{ t.name }}
+                      </td>
+                      <td class="px-3 py-2 font-mono text-xs text-zinc-700">
+                        {{ t.language }}
+                      </td>
+                      <td class="px-3 py-2 text-xs text-zinc-700">
+                        {{ t.category }}
+                      </td>
+                      <td class="px-3 py-2">
+                        @switch (t.status) {
+                          @case ('APPROVED') {
+                            <span
+                              class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+                            >
+                              APPROVED
+                            </span>
+                          }
+                          @case ('PENDING') {
+                            <span
+                              class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200"
+                            >
+                              PENDING
+                            </span>
+                          }
+                          @case ('REJECTED') {
+                            <span
+                              class="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
+                            >
+                              REJECTED
+                            </span>
+                          }
+                          @case ('PAUSED') {
+                            <span
+                              class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                            >
+                              PAUSED
+                            </span>
+                          }
+                          @case ('DISABLED') {
+                            <span
+                              class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                            >
+                              DISABLED
+                            </span>
+                          }
+                          @default {
+                            <span
+                              class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                            >
+                              {{ t.status }}
+                            </span>
+                          }
+                        }
+                      </td>
+                      <td
+                        class="px-3 py-2 text-right font-mono text-xs text-zinc-700"
+                      >
+                        {{ t.variable_count }}
+                      </td>
+                      <td class="px-3 py-2 text-xs text-zinc-600">
+                        {{ t.last_synced_at | date: 'medium' }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+    </div>
   }
 
   <!-- Inline connect form. -->

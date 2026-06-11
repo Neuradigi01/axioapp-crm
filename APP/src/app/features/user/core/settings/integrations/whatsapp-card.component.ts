@@ -48,6 +48,7 @@
  * operator shouldn't have to retype identifiers when only the token
  * was rotated). Tokens NEVER prefill (backend doesn't expose them).
  */
+import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -74,6 +75,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import {
   IntegrationsApiService,
   WhatsAppStatus,
+  WhatsAppTemplate,
 } from './integrations-api.service';
 
 
@@ -92,7 +94,7 @@ interface WhatsAppConnectForm {
   selector: 'app-whatsapp-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, ReactiveFormsModule],
+  imports: [DatePipe, LucideAngularModule, ReactiveFormsModule],
   templateUrl: './whatsapp-card.component.html',
 })
 export class WhatsAppCardComponent {
@@ -127,6 +129,26 @@ export class WhatsAppCardComponent {
     updated: number;
     removed: number;
   } | null>(null);
+
+  /** Cached templates for the connected org. Surfaces every status
+   *  (APPROVED / PENDING / REJECTED / PAUSED / DISABLED) so the
+   *  operator can see what's waiting on Meta's review — the campaign
+   *  picker only shows APPROVED, so without this surface the operator
+   *  has to leave the app for WhatsApp Manager to check approval state. */
+  protected readonly templates = signal<WhatsAppTemplate[]>([]);
+  protected readonly templatesExpanded = signal(false);
+  protected readonly templatesLoading = signal(false);
+  protected readonly templatesLoaded = signal(false);
+  protected readonly templatesError = signal<string | null>(null);
+
+  protected readonly templateCounts = computed(() => {
+    const counts = { APPROVED: 0, PENDING: 0, REJECTED: 0, PAUSED: 0, DISABLED: 0 };
+    for (const t of this.templates()) {
+      const k = (t.status ?? '').toUpperCase() as keyof typeof counts;
+      if (k in counts) counts[k] += 1;
+    }
+    return counts;
+  });
 
   protected readonly form: FormGroup<WhatsAppConnectForm> = this.fb.nonNullable.group({
     phone_id: this.fb.nonNullable.control('', Validators.required),
@@ -182,6 +204,23 @@ export class WhatsAppCardComponent {
       }
       if (Object.keys(patch).length > 0) {
         this.form.patchValue(patch);
+      }
+    });
+
+    // Templates auto-load when the card is connected so the count
+    // pills render without requiring an explicit expand. On
+    // disconnect/error transitions we wipe the cache so a reconnect
+    // refetches with the new credentials.
+    effect(() => {
+      if (this.isConnected()) {
+        if (!this.templatesLoaded() && !this.templatesLoading()) {
+          this.refreshTemplates();
+        }
+      } else if (this.templatesLoaded() || this.templates().length > 0) {
+        this.templates.set([]);
+        this.templatesLoaded.set(false);
+        this.templatesExpanded.set(false);
+        this.templatesError.set(null);
       }
     });
   }
@@ -302,10 +341,38 @@ export class WhatsAppCardComponent {
             updated: result.updated,
             removed: result.removed,
           });
+          this.refreshTemplates();
         },
         error: (err: HttpErrorResponse) => {
           this.syncing.set(false);
           this.inlineError.set(extractApiError(err));
+        },
+      });
+  }
+
+  toggleTemplates(): void {
+    this.templatesExpanded.update((v) => !v);
+  }
+
+  /** Re-fetch the cached templates list. Called automatically on
+   *  first connect and after each successful sync; safe to invoke
+   *  repeatedly (the loading guard suppresses overlapping requests). */
+  refreshTemplates(): void {
+    if (this.templatesLoading()) return;
+    this.templatesLoading.set(true);
+    this.templatesError.set(null);
+    this.api
+      .listWhatsAppTemplates()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          this.templates.set(rows);
+          this.templatesLoading.set(false);
+          this.templatesLoaded.set(true);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.templatesLoading.set(false);
+          this.templatesError.set(extractApiError(err));
         },
       });
   }
