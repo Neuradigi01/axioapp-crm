@@ -405,7 +405,7 @@ class CheckoutRequest(BaseModel):
     `success_url` / `cancel_url` are validated server-side against the
     app's own host allow-list to prevent the endpoint from being used
     as an open redirect (Stripe will gladly redirect anywhere).
-    Omitted URLs fall back to `/user/settings/billing` on the request's
+    Omitted URLs fall back to `/user/subscription` on the request's
     origin.
     """
 

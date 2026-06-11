@@ -7,31 +7,22 @@ import {
   signal,
 } from '@angular/core';
 
-import { SeatModalComponent } from '../../billing/components/seat-modal/seat-modal.component';
-import { BillingApiService } from '../../billing/services/billing-api.service';
-import { SubscriptionStateService } from '../../billing/services/subscription-state.service';
-import { Invoice } from '../../billing/types/subscription.types';
+import { SeatModalComponent } from '../components/seat-modal/seat-modal.component';
+import { BillingApiService } from '../services/billing-api.service';
+import { SubscriptionStateService } from '../services/subscription-state.service';
+import { Invoice } from '../types/subscription.types';
 import { CurrentPlanCardComponent } from './components/current-plan-card.component';
 import { InvoicesTableComponent } from './components/invoices-table.component';
 import { SeatsCardComponent } from './components/seats-card.component';
 import { UsageBarsComponent } from './components/usage-bars.component';
 
 /**
- * Billing settings tab.
+ * Billing page — Owner-only sidebar module, mounted at `/user/subscription`.
  *
- * Sub-step 16.a (this commit) ships the Current plan + Seats cards.
- * Sub-step 16.b adds the Usage bars and Invoices table; Step 17
- * wires the Upgrade modal that the disabled CTAs here open.
- *
- * Data comes from the shared `SubscriptionStateService` (Step 15) —
- * the same instance that drives the trial banner. No new HTTP call
- * is made by this page in 16.a; the service already polled on app
- * load.
- *
- * Permission gating: the tab's parent (`settings-page.component`)
- * filters by `settings.write` for now. Step 19 introduces the
- * dedicated `billing.read` / `billing.manage` keys and swaps the
- * filter.
+ * Renders the Current plan + Seats + Usage bars + Invoices table.
+ * Data comes from the shared `SubscriptionStateService` — the same
+ * instance that drives the trial banner. Permission gating is at the
+ * route level (`billing.manage`).
  */
 @Component({
   selector: 'crm-billing-page',

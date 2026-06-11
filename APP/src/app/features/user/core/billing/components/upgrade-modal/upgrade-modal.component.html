@@ -150,7 +150,7 @@
               </button>
             </div>
             <p class="mt-1.5 text-xs text-zinc-500 dark:text-slate-400">
-              Minimum {{ minSeats() }} seats for this plan.
+              Minimum {{ minSeats() }} seat{{ minSeats() === 1 ? '' : 's' }}.
             </p>
           </fieldset>
 

@@ -6,8 +6,8 @@ import {
   input,
 } from '@angular/core';
 
-import { SeatModalService } from '../../../billing/services/seat-modal.service';
-import { SubscriptionCurrent } from '../../../billing/types/subscription.types';
+import { SeatModalService } from '../../services/seat-modal.service';
+import { SubscriptionCurrent } from '../../types/subscription.types';
 
 /**
  * Second card on the Billing settings page.

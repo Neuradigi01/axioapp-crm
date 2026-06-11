@@ -209,11 +209,10 @@ export class SeatModalComponent {
   protected readonly submitError = signal<string | null>(null);
   protected readonly scheduledMessage = signal<string | null>(null);
 
-  protected readonly minSeats = computed<number>(() => {
-    const sub = this.subscriptionState.current();
-    if (sub === null) return 1;
-    return Math.max(sub.seats.included, sub.seats.in_use);
-  });
+  // Manager spec 2026-06-11: minimum is 1 seat for any plan, with no
+  // active-member floor — orgs may run over-subscribed (more members
+  // than paid seats) and the manager owns that trade-off.
+  protected readonly minSeats = computed<number>(() => 1);
 
   protected readonly isTrial = computed<boolean>(
     () => this.subscriptionState.current()?.status === 'trialing',
@@ -387,7 +386,7 @@ function extractErrorMessage(err: unknown): string {
     case 'seats_below_in_use':
       return `You have ${e.error?.seats_in_use ?? 'too many'} active users — at least ${e.error?.min_allowed ?? 'enough'} seats are required.`;
     case 'seats_below_minimum':
-      return `This plan requires at least ${e.error?.min_allowed ?? 5} seats.`;
+      return `This plan requires at least ${e.error?.min_allowed ?? 1} seat${(e.error?.min_allowed ?? 1) === 1 ? '' : 's'}.`;
     case 'trial_cannot_add_seats':
       return 'Trial plans cannot add seats — upgrade first.';
     case 'cannot_change_cancelled':

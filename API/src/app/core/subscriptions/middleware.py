@@ -23,7 +23,7 @@ Response shape for a blocked write (HTTP 402):
       "subscription_status": "read_only",
       "since": "2026-06-19T10:00:00Z",          # nullable for past_due
       "message": "Your trial has ended. Upgrade to continue using FurnitureCRM.",
-      "upgrade_url": "/user/settings/billing"
+      "upgrade_url": "/user/subscription"
     }
 """
 from __future__ import annotations
@@ -89,7 +89,7 @@ _BLOCK_MESSAGES: dict[str, str] = {
 
 # Frontend route the 402 redirects to via the `upgrade_url` field.
 # Constant rather than configurable because the SPA's routing is fixed.
-_UPGRADE_URL = "/user/settings/billing"
+_UPGRADE_URL = "/user/subscription"
 
 
 def _allowlisted(path: str) -> bool:

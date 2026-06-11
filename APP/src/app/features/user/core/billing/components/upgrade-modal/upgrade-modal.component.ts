@@ -79,13 +79,12 @@ export class UpgradeModalComponent {
     () => this.plans().find((p) => p.code === this.selectedPlan()) ?? null,
   );
 
-  /** Bundle floor for the selected plan; the seat counter clamps to it. */
-  protected readonly minSeats = computed<number>(() => {
-    const plan = this.selectedPlanEntry();
-    if (plan === null) return 1;
-    const inUse = this.subscriptionState.current()?.seats.in_use ?? 0;
-    return Math.max(plan.pricing.included_seats, inUse);
-  });
+  /** Minimum-purchase floor — always 1. Manager spec 2026-06-11:
+   *  any plan can be purchased with as few as 1 seat regardless of
+   *  current member count. Orgs may temporarily run "over-subscribed"
+   *  (more active members than paid seats); the modules + RBAC layers
+   *  are independent of seat count so existing members keep working. */
+  protected readonly minSeats = computed<number>(() => 1);
 
   /** Best-effort estimate matching Step 9's preview math — Stripe's
    *  proration may differ by a few cents (documented in the spec). */
@@ -143,9 +142,11 @@ export class UpgradeModalComponent {
       const fallbackCycle: BillingCycle = sub?.billing_cycle ?? 'monthly';
       this.selectedCycle.set(state.initialCycle ?? fallbackCycle);
 
-      const fallbackSeats =
-        state.initialSeats ??
-        Math.max(sub?.seats.purchased ?? 1, sub?.seats.in_use ?? 1);
+      // Manager spec 2026-06-11: open at the minimum (1 seat) for any
+      // plan. The clamp effect below pushes us up to `minSeats()` if the
+      // active-member floor is higher, so users with active teammates
+      // still land on a valid count without manual nudging.
+      const fallbackSeats = state.initialSeats ?? 1;
       this.selectedSeats.set(fallbackSeats);
     });
 
@@ -210,9 +211,9 @@ export class UpgradeModalComponent {
         seats: this.selectedSeats(),
         success_url:
           origin +
-          '/user/settings/billing/upgrade-success?session_id={CHECKOUT_SESSION_ID}',
+          '/user/subscription/upgrade-success?session_id={CHECKOUT_SESSION_ID}',
         cancel_url:
-          origin + '/user/settings/billing/upgrade-cancel',
+          origin + '/user/subscription/upgrade-cancel',
       })
       .subscribe({
         next: (response) => {
@@ -258,7 +259,7 @@ function extractErrorMessage(err: unknown): string {
     case 'seats_below_in_use':
       return `You have ${e.error?.in_use ?? 'too many'} active users — at least ${e.error?.min_allowed ?? 'enough'} seats are required.`;
     case 'seats_below_minimum':
-      return `This plan requires at least ${e.error?.min_allowed ?? 5} seats.`;
+      return `This plan requires at least ${e.error?.min_allowed ?? 1} seat${(e.error?.min_allowed ?? 1) === 1 ? '' : 's'}.`;
     case 'cannot_change_to_trial':
       return 'Cannot downgrade to the trial plan.';
     case 'cannot_change_cancelled':

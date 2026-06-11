@@ -6,8 +6,8 @@ import {
   input,
 } from '@angular/core';
 
-import { UpgradeModalService } from '../../../billing/services/upgrade-modal.service';
-import { SubscriptionCurrent } from '../../../billing/types/subscription.types';
+import { UpgradeModalService } from '../../services/upgrade-modal.service';
+import { SubscriptionCurrent } from '../../types/subscription.types';
 
 /**
  * Top card on the Billing settings page.

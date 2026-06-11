@@ -299,18 +299,15 @@ def _validate_change(
             detail={"error": "cannot_change_to_trial"},
         )
 
-    bundle_min = target_plan.pricing.included_seats
-    min_allowed = max(seats_in_use, bundle_min)
-
-    if effective_seats < seats_in_use:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "seats_below_in_use",
-                "in_use": seats_in_use,
-                "min_allowed": min_allowed,
-            },
-        )
+    # Manager spec 2026-06-11: minimum is 1 seat for any plan, with no
+    # active-member floor. `included_seats` still drives bundle pricing
+    # — buy below the bundle and you pay the bundle price for fewer
+    # included seats — but the customer is allowed to do it. Orgs may
+    # legitimately run "over-subscribed" (more active members than paid
+    # seats) and the manager owns that trade-off. `seats_in_use` stays
+    # on the signature so the read response can still surface it, but
+    # this validator no longer consults it.
+    bundle_min = 1
     if effective_seats < bundle_min:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -454,17 +451,10 @@ async def change_seats(
     seats_in_use = await count_active_members(session, org_id)
 
     if total_seats < sub.seats_purchased:
-        # Reducing — validate floors.
-        bundle_min = plan.pricing.included_seats
-        if total_seats < seats_in_use:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "error": "seats_below_in_use",
-                    "seats_in_use": seats_in_use,
-                    "min_allowed": max(seats_in_use, bundle_min),
-                },
-            )
+        # Reducing — only the bundle floor (1) applies. Per manager spec
+        # 2026-06-11 the active-member floor was dropped; orgs may run
+        # over-subscribed and the manager owns that trade-off.
+        bundle_min = 1
         if total_seats < bundle_min:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

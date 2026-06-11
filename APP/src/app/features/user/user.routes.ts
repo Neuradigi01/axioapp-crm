@@ -77,36 +77,56 @@ export const userRoutes: Routes = [
           ),
       },
       {
-        // Deep-link target for the trial banner's "Upgrade" CTA
-        // (Step 15) and Stripe Checkout's `success_url` /
-        // `cancel_url`. Mirrors the integrations alias above: same
-        // page, `route.data.tab` selects the Billing tab on mount.
-        path: 'settings/billing',
-        data: { tab: 'billing' },
+        // SaaS subscription billing — promoted to a top-level sidebar
+        // module (manager spec 2026-06-11). Owner-only via the
+        // `billing.manage` permission key (Step 19). Stripe Checkout
+        // `success_url` / `cancel_url` land on the children below.
+        path: 'subscription',
+        canActivate: [permissionGuard('billing.manage')],
         loadComponent: () =>
-          import('./core/settings/settings-page.component').then(
-            (m) => m.SettingsPageComponent,
+          import('./core/billing/pages/billing.page').then(
+            (m) => m.BillingPage,
           ),
       },
       {
-        // Stripe Checkout `success_url` lands here with `session_id`
-        // in the query string. The page polls `/subscriptions/current`
-        // until the Step 13.b webhook flips the row to active, then
-        // bounces to `/user/settings/billing?upgraded=true`.
-        path: 'settings/billing/upgrade-success',
+        // Stripe Checkout `success_url`. Polls `/subscriptions/current`
+        // until the webhook flips the row to active, then bounces to
+        // `/user/subscription?upgraded=true`.
+        path: 'subscription/upgrade-success',
+        canActivate: [permissionGuard('billing.manage')],
         loadComponent: () =>
-          import('./core/settings/billing/upgrade-success.page').then(
+          import('./core/billing/pages/upgrade-success.page').then(
             (m) => m.UpgradeSuccessPage,
           ),
       },
       {
-        // Stripe Checkout `cancel_url` lands here. Brief page with
+        // Stripe Checkout `cancel_url`. Brief page with
         // "Back to Billing" / "Try again" buttons.
-        path: 'settings/billing/upgrade-cancel',
+        path: 'subscription/upgrade-cancel',
+        canActivate: [permissionGuard('billing.manage')],
         loadComponent: () =>
-          import('./core/settings/billing/upgrade-cancel.page').then(
+          import('./core/billing/pages/upgrade-cancel.page').then(
             (m) => m.UpgradeCancelPage,
           ),
+      },
+      {
+        // Legacy redirects — Billing used to live as a tab in
+        // /user/settings. Old bookmarks and in-flight Stripe Checkout
+        // sessions still land on these paths until the next cycle
+        // boundary; bounce them to the new home.
+        path: 'settings/billing',
+        redirectTo: '/user/subscription',
+        pathMatch: 'full',
+      },
+      {
+        path: 'settings/billing/upgrade-success',
+        redirectTo: '/user/subscription/upgrade-success',
+        pathMatch: 'full',
+      },
+      {
+        path: 'settings/billing/upgrade-cancel',
+        redirectTo: '/user/subscription/upgrade-cancel',
+        pathMatch: 'full',
       },
       {
         path: 'settings/lead-scoring',

@@ -49,9 +49,10 @@ const TRIAL_WARNING_THRESHOLD_DAYS = 3;
  *                                  the template omits the DOM so the
  *                                  layout has zero banner height)
  *
- * The Upgrade CTA targets the in-app billing page at
- * `/user/settings/billing` for now. Step 17 will swap this for an
- * `(click)` that opens the upgrade modal.
+ * The Upgrade CTA either opens the upgrade modal directly (trial /
+ * read_only) or navigates to the Billing page at `/user/subscription`
+ * (past_due needs payment-method management; archived / cancelled
+ * need operator contact via the page footer copy).
  */
 @Component({
   selector: 'crm-trial-banner',
@@ -78,7 +79,7 @@ export class TrialBannerComponent {
       this.upgradeModal.open();
       return;
     }
-    this.router.navigateByUrl('/user/settings/billing');
+    this.router.navigateByUrl('/user/subscription');
   }
 
   /** Container classes per tone — kept in the component (not the

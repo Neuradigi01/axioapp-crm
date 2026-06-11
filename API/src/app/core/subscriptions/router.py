@@ -86,15 +86,15 @@ def _default_redirect(request: Request, kind: str) -> str:
     """Origin-aware fallback when the client omits a URL.
 
     `kind` is `"success"` or `"cancel"`. Both default to the in-app
-    billing settings page; the query string distinguishes them so the
-    Angular route can swap a toast.
+    Billing page; the query string distinguishes them so the Angular
+    route can swap a toast.
     """
     origin = (
         request.headers.get("origin")
         or f"{request.url.scheme}://{request.url.netloc}"
     )
     suffix = "?upgraded=true" if kind == "success" else ""
-    return f"{origin}/user/settings/billing{suffix}"
+    return f"{origin}/user/subscription{suffix}"
 
 
 router = APIRouter(tags=["Subscriptions"])

@@ -5,7 +5,7 @@ import {
   input,
 } from '@angular/core';
 
-import { UsageRow } from '../../../billing/types/subscription.types';
+import { UsageRow } from '../../types/subscription.types';
 
 /** Human-readable labels for the metered resources surfaced by
  *  `GET /subscriptions/current`. Resources not in this map fall back

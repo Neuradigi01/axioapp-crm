@@ -3,7 +3,6 @@ import { ActivatedRoute } from '@angular/router';
 
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
-import { BillingPage } from './billing/billing.page';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
@@ -30,8 +29,7 @@ type SettingsTab =
   | 'ai'
   | 'custom-fields'
   | 'standard-fields'
-  | 'embed'
-  | 'billing';
+  | 'embed';
 
 interface TabDef {
   id: SettingsTab;
@@ -80,14 +78,6 @@ const TABS: ReadonlyArray<TabDef> = [
     label: 'Embed Widget',
     permission: 'settings.integrations.embed.manage',
   },
-  {
-    // Pricing-and-billing track Step 16. `settings.write` is the
-    // Owner-level umbrella today; Step 19 introduces the dedicated
-    // `billing.read` / `billing.manage` keys and swaps this filter.
-    id: 'billing',
-    label: 'Billing',
-    permission: 'settings.write',
-  },
 ];
 
 @Component({
@@ -108,7 +98,6 @@ const TABS: ReadonlyArray<TabDef> = [
     CustomFieldsPageComponent,
     StandardFieldsTabComponent,
     EmbedIntegrationsTabComponent,
-    BillingPage,
   ],
   templateUrl: './settings-page.component.html',
 })

@@ -8,7 +8,7 @@ import {
 import {
   Invoice,
   InvoiceStatus,
-} from '../../../billing/types/subscription.types';
+} from '../../types/subscription.types';
 
 interface InvoiceRowVM {
   id: string;

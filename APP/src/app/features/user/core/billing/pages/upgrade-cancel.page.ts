@@ -5,7 +5,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { UpgradeModalService } from '../../billing/services/upgrade-modal.service';
+import { UpgradeModalService } from '../services/upgrade-modal.service';
 
 /**
  * Brief landing page Stripe Checkout redirects to when the user
@@ -13,10 +13,10 @@ import { UpgradeModalService } from '../../billing/services/upgrade-modal.servic
  * the round-trip feels intentional rather than a 404 bounce.
  *
  * "Try again" re-opens the upgrade modal from this same page — the
- * user lands on `/user/settings/billing/upgrade-cancel` with the
- * modal already surfaced and can adjust their picks. Hitting Cancel
- * inside the modal returns them to this page; hitting Back navigates
- * to Billing settings.
+ * user lands on `/user/subscription/upgrade-cancel` with the modal
+ * already surfaced and can adjust their picks. Hitting Cancel inside
+ * the modal returns them to this page; hitting Back navigates to the
+ * Billing page.
  */
 @Component({
   selector: 'crm-upgrade-cancel-page',
@@ -42,7 +42,7 @@ import { UpgradeModalService } from '../../billing/services/upgrade-modal.servic
         </p>
         <div class="mt-5 flex items-center justify-center gap-2">
           <a
-            routerLink="/user/settings/billing"
+            routerLink="/user/subscription"
             class="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 dark:text-slate-300 dark:hover:bg-slate-700"
           >
             Back to Billing

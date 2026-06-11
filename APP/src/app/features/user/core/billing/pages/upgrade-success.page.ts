@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
-import { SubscriptionStateService } from '../../billing/services/subscription-state.service';
+import { SubscriptionStateService } from '../services/subscription-state.service';
 
 /** How often to re-fetch `/subscriptions/current`. */
 const POLL_INTERVAL_MS = 2_000;
@@ -28,7 +28,7 @@ type PageStatus = 'polling' | 'completed' | 'timeout';
  * `checkout.session.completed`. That takes 1-5 seconds usually. We
  * poll `GET /subscriptions/current` every 2 s for up to 30 s; on the
  * first response with `status === 'active'`, we navigate the user
- * back to `/user/settings/billing?upgraded=true` so the billing page
+ * back to `/user/subscription?upgraded=true` so the billing page
  * can render the success toast.
  *
  * Timeout copy points the user at a manual refresh in case the
@@ -75,7 +75,7 @@ export class UpgradeSuccessPage implements OnInit {
       this.stopPolling();
       setTimeout(() => {
         this.router.navigateByUrl(
-          '/user/settings/billing?upgraded=true',
+          '/user/subscription?upgraded=true',
         );
       }, SUCCESS_NAVIGATE_DELAY_MS);
       return;
