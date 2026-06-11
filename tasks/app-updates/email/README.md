@@ -51,7 +51,7 @@ A sales rep on a fresh org can:
 | 2 | [Backend: Gmail adapter (OAuth + history-based sync + send)](step-2-backend-gmail-adapter.md) | COMPLETED | ~2 days |
 | 3 | [Backend: Microsoft Graph adapter (OAuth + delta sync + send)](step-3-backend-outlook-adapter.md) | COMPLETED | ~2 days |
 | 4 | [Backend: mailbox sync daemon (Celery beat + push webhooks)](step-4-backend-mailbox-sync-daemon.md) | COMPLETED | ~1 day |
-| 5 | [Backend: Conversations Email channel adapter (compose + reply threading)](step-5-backend-conversations-email-adapter.md) | Pending | ~1 day |
+| 5 | [Backend: Conversations Email channel adapter (compose + reply threading)](step-5-backend-conversations-email-adapter.md) | COMPLETED | ~1 day |
 | 6 | [Backend: `email_templates` table + variable substitution engine](step-6-backend-email-templates.md) | Pending | ~1 day |
 | 7 | [Backend: `email_sequences` + enrollment engine + reply detection](step-7-backend-email-sequences.md) | Pending | ~2 days |
 | 8 | [Backend: open pixel + link rewriting + delivery state](step-8-backend-open-click-tracking.md) | Pending | ~1 day |
