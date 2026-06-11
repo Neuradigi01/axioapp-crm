@@ -67,6 +67,7 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [Embeddable Widget](embeddable-widget/README.md) | 9 | Core (Lead Capture, 3/4) |
 | — | [Ad Integrations](ad-integrations/README.md) | 8 | Core (Lead Capture, 4/4) |
 | — | [Pricing and Billing](pricing-and-billing/README.md) | 20 | Core (side track) |
+| — | [App Updates — Email + Reporting](app-updates/README.md) | 19 | Core (side track — closes 2 biggest gaps vs standard CRM) |
 
 **Total: 155 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides + Lead-Capture (4 tracks) + Pricing-and-Billing side tracks).
 
