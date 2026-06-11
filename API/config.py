@@ -127,6 +127,23 @@ GOOGLE_OAUTH_REDIRECT_URI = os.getenv(
     "GOOGLE_OAUTH_REDIRECT_URI",
     "http://localhost:8000/api/v1/integrations/google/callback",
 )
+# Gmail uses the SAME OAuth client (same `GOOGLE_OAUTH_CLIENT_ID` /
+# `GOOGLE_OAUTH_CLIENT_SECRET`) but a separate redirect URI so the
+# callback path is unambiguous. The Gmail consent screen requests
+# different scopes (gmail.modify) than the Ads flow (adwords).
+GOOGLE_GMAIL_REDIRECT_URI = os.getenv(
+    "GOOGLE_GMAIL_REDIRECT_URI",
+    "http://localhost:8000/api/v1/email/gmail/callback",
+)
+# Gmail push notifications — fully-qualified Pub/Sub topic name
+# (e.g. `projects/your-gcp-project/topics/gmail-events`). Optional.
+# When unset, Step 2's connect flow skips the `users.watch` call and
+# the mailbox is synced via Step 4's 60-second poll fallback.
+GOOGLE_GMAIL_PUBSUB_TOPIC = os.getenv("GOOGLE_GMAIL_PUBSUB_TOPIC", "")
+# Email address of the Pub/Sub-push service account configured to
+# invoke our webhook. The push handler verifies the inbound OIDC JWT
+# was signed by this identity. Required when the topic is set.
+GOOGLE_GMAIL_PUBSUB_SA_EMAIL = os.getenv("GOOGLE_GMAIL_PUBSUB_SA_EMAIL", "")
 # Developer Token — separate from OAuth, attached to Google Ads
 # Manager (MCC) account. See Stage 4 of the manual checklist.
 GOOGLE_ADS_DEVELOPER_TOKEN = _env("GOOGLE_ADS_DEVELOPER_TOKEN", "")

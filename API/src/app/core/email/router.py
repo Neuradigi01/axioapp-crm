@@ -26,6 +26,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.email.gmail.router import router as gmail_router
 from src.app.core.email.schemas import EmailAccountRead
 from src.app.core.email.service import (
     disconnect as disconnect_account,
@@ -38,6 +39,13 @@ from src.app.shared.db import get_db
 
 
 router = APIRouter(prefix="/email", tags=["Email Accounts"])
+
+# Gmail sub-router (Step 2) — full paths become
+# `/api/v1/email/gmail/authorize | /callback | /push`. Importing
+# `gmail.router` chains through `gmail.__init__` which registers
+# `GmailProvider` into the OAuth registry — so the registration
+# happens before any request hits.
+router.include_router(gmail_router)
 
 
 async def _has_admin(db: AsyncSession, user: User) -> bool:
@@ -94,7 +102,22 @@ async def disconnect_email_account_endpoint(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only disconnect your own email accounts.",
         )
+    # Best-effort provider tear-down BEFORE we null the tokens —
+    # otherwise the watch call cannot authenticate. Failures are
+    # logged and ignored: the local disconnect must always succeed.
+    await _teardown_provider_watch(row, db)
     await disconnect_account(
         db, account_id=account_id, actor_id=user.legacy_uuid
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+async def _teardown_provider_watch(row, db: AsyncSession) -> None:
+    """Dispatch to the provider-specific teardown (e.g. Gmail's
+    `users.stop`). New providers add a branch here when they ship.
+    Centralised so Step 1's generic router doesn't import every
+    provider sub-package at module-load time."""
+    if row.provider.value == "gmail":
+        from src.app.core.email.gmail import push as gmail_push
+
+        await gmail_push.stop_watch_quiet(row, db)
