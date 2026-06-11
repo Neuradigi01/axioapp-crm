@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { EmailAccountsTabComponent } from './email-accounts/email-accounts-tab.component';
+import { EmailSequencesListComponent } from './email-sequences/sequence-list.component';
 import { EmailTemplatesListComponent } from './email-templates/template-list.component';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
@@ -29,6 +30,7 @@ type SettingsTab =
   | 'integrations'
   | 'email-accounts'
   | 'email-templates'
+  | 'email-sequences'
   | 'notifications'
   | 'ai'
   | 'custom-fields'
@@ -86,6 +88,14 @@ const TABS: ReadonlyArray<TabDef> = [
     label: 'Email Templates',
     permission: 'email.read',
   },
+  {
+    // App-updates Email Step 11a — sequence library. Visible to
+    // anyone with `email.read`; Create / Edit / Delete affordances
+    // gate on `email.sequences.manage` inside the list component.
+    id: 'email-sequences',
+    label: 'Email Sequences',
+    permission: 'email.read',
+  },
   { id: 'ai', label: 'AI Settings', permission: 'settings.write' },
   {
     id: 'custom-fields',
@@ -124,6 +134,7 @@ const TABS: ReadonlyArray<TabDef> = [
     EmbedIntegrationsTabComponent,
     EmailAccountsTabComponent,
     EmailTemplatesListComponent,
+    EmailSequencesListComponent,
   ],
   templateUrl: './settings-page.component.html',
 })

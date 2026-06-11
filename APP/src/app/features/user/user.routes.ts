@@ -115,6 +115,38 @@ export const userRoutes: Routes = [
           ).then((m) => m.EmailTemplateEditorPageComponent),
       },
       {
+        // App-updates Email Step 11a — sequence library list lives
+        // inside the settings page (tab=email-sequences); builder +
+        // detail are standalone routes.
+        path: 'settings/email-sequences',
+        data: { tab: 'email-sequences' },
+        loadComponent: () =>
+          import('./core/settings/settings-page.component').then(
+            (m) => m.SettingsPageComponent,
+          ),
+      },
+      {
+        path: 'settings/email-sequences/new',
+        loadComponent: () =>
+          import(
+            './core/settings/email-sequences/sequence-builder.page'
+          ).then((m) => m.SequenceBuilderPageComponent),
+      },
+      {
+        path: 'settings/email-sequences/:id/edit',
+        loadComponent: () =>
+          import(
+            './core/settings/email-sequences/sequence-builder.page'
+          ).then((m) => m.SequenceBuilderPageComponent),
+      },
+      {
+        path: 'settings/email-sequences/:id',
+        loadComponent: () =>
+          import(
+            './core/settings/email-sequences/sequence-detail.component'
+          ).then((m) => m.SequenceDetailComponent),
+      },
+      {
         // SaaS subscription billing — promoted to a top-level sidebar
         // module (manager spec 2026-06-11). Owner-only via the
         // `billing.manage` permission key (Step 19). Stripe Checkout
