@@ -47,7 +47,7 @@ A sales rep on a fresh org can:
 
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
-| 1 | [Backend: `email_accounts` table + OAuth foundation (shared)](step-1-backend-email-accounts-and-oauth.md) | Pending | ~1 day |
+| 1 | [Backend: `email_accounts` table + OAuth foundation (shared)](step-1-backend-email-accounts-and-oauth.md) | COMPLETED | ~1 day |
 | 2 | [Backend: Gmail adapter (OAuth + history-based sync + send)](step-2-backend-gmail-adapter.md) | Pending | ~2 days |
 | 3 | [Backend: Microsoft Graph adapter (OAuth + delta sync + send)](step-3-backend-outlook-adapter.md) | Pending | ~2 days |
 | 4 | [Backend: mailbox sync daemon (Celery beat + push webhooks)](step-4-backend-mailbox-sync-daemon.md) | Pending | ~1 day |

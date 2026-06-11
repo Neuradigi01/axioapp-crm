@@ -70,6 +70,10 @@ _CORE_ADMIN_KEYS: list[str] = [
     "attendance.write",
     "billing.read", "billing.write",
     "saved_views.use",
+    # Reps connect their own mailbox; Admin also holds the org-wide
+    # admin scope so they can see + disconnect any rep's account.
+    "email.accounts.manage",
+    "email.accounts.admin",
 ]
 
 
@@ -104,6 +108,10 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     # stays Admin+Owner only via `custom_fields.write`.
     "custom_fields.read",
     "saved_views.use",
+    # Employee can connect + disconnect their OWN mailbox; the
+    # org-wide admin view is gated separately on `email.accounts.admin`
+    # which Employee does not hold.
+    "email.accounts.manage",
 ]
 
 
@@ -129,6 +137,7 @@ _CORE_SALES_MANAGER_KEYS: list[str] = [
     "users.read",
     "custom_fields.read",
     "saved_views.use",
+    "email.accounts.manage",
 ]
 
 
@@ -145,6 +154,7 @@ _CORE_SUPPORT_AGENT_KEYS: list[str] = [
     "leads.read",
     "custom_fields.read",
     "saved_views.use",
+    "email.accounts.manage",
 ]
 
 
