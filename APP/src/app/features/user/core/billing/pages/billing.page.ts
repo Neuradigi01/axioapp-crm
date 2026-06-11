@@ -6,6 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { LucideAngularModule } from 'lucide-angular';
 
 import { SeatModalComponent } from '../components/seat-modal/seat-modal.component';
 import { BillingApiService } from '../services/billing-api.service';
@@ -28,6 +29,7 @@ import { UsageBarsComponent } from './components/usage-bars.component';
   selector: 'crm-billing-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LucideAngularModule,
     CurrentPlanCardComponent,
     SeatsCardComponent,
     UsageBarsComponent,

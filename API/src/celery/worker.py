@@ -23,6 +23,9 @@ celery.autodiscover_tasks([
     "src.app.core.campaigns.tasks",
     # Pricing-and-Billing Step 5 — usage-counter rollover + daily reset.
     "src.app.core.subscriptions.tasks",
+    # App-updates Email Step 4 — mailbox sync daemon (backfill,
+    # incremental, renewal, poll fallback, daily counter reset).
+    "src.app.core.email.tasks",
 ])
 
 if not CELERY_ENABLED:

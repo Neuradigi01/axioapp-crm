@@ -79,6 +79,72 @@ async def get_account(
     ).scalar_one_or_none()
 
 
+async def get_account_unscoped(
+    session: AsyncSession, *, account_id: uuid.UUID
+) -> Optional[EmailAccount]:
+    """Load an account by id BYPASSING the tenant filter — used by
+    Step 4's Celery tasks which have no JWT and need to learn the
+    org from the row itself before setting context.
+
+    Uses raw SQL to defeat the `do_orm_execute` auto-filter (which
+    is a no-op when `RequestContext.org_id is None` anyway, but
+    being explicit defends against a future tightening that would
+    deny rows in the unscoped case).
+
+    Mirrors the same pattern as `core.integrations.service.
+    get_by_webhook_secret` and `core.email.gmail.push.
+    find_account_by_email` — both load cross-tenant for webhook /
+    daemon entry points that have no JWT to derive context from.
+    """
+    from sqlalchemy import text
+
+    sql = text(
+        """
+        SELECT id, org_id, user_id, provider, external_account_id,
+               email_address, display_name, access_token_enc,
+               refresh_token_enc, token_expires_at, scopes_granted,
+               sync_cursor, sync_state, last_sync_at, last_sync_error,
+               daily_sent_count, daily_sent_reset_at, connected_at,
+               disconnected_at, disconnected_by
+        FROM email_accounts
+        WHERE id = :account_id
+        LIMIT 1
+        """
+    )
+    row = (
+        await session.execute(sql, {"account_id": str(account_id)})
+    ).mappings().first()
+    if row is None:
+        return None
+    from src.app.core.email.models import (
+        EmailAccountProvider,
+        EmailAccountSyncState,
+    )
+
+    return EmailAccount(
+        id=row["id"],
+        org_id=row["org_id"],
+        user_id=row["user_id"],
+        provider=EmailAccountProvider(row["provider"]),
+        external_account_id=row["external_account_id"],
+        email_address=row["email_address"],
+        display_name=row["display_name"],
+        access_token_enc=row["access_token_enc"],
+        refresh_token_enc=row["refresh_token_enc"],
+        token_expires_at=row["token_expires_at"],
+        scopes_granted=row["scopes_granted"] or [],
+        sync_cursor=row["sync_cursor"],
+        sync_state=EmailAccountSyncState(row["sync_state"]),
+        last_sync_at=row["last_sync_at"],
+        last_sync_error=row["last_sync_error"],
+        daily_sent_count=row["daily_sent_count"],
+        daily_sent_reset_at=row["daily_sent_reset_at"],
+        connected_at=row["connected_at"],
+        disconnected_at=row["disconnected_at"],
+        disconnected_by=row["disconnected_by"],
+    )
+
+
 # --- Writes --------------------------------------------------------------
 
 
@@ -355,6 +421,7 @@ __all__ = [
     "decrypt_tokens",
     "disconnect",
     "get_account",
+    "get_account_unscoped",
     "list_accounts",
     "refresh_if_expired",
     "update_sync_state",

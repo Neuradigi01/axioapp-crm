@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import API_BASE_URL, FRONTEND_URL
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.email import service as email_service
+from src.app.core.email import sync_daemon as email_sync_daemon
 from src.app.core.email.gmail import oauth as gmail_oauth
 from src.app.core.email.gmail import push as gmail_push
 from src.app.core.email.gmail.client import GmailClient, GmailHTTPError
@@ -186,9 +187,16 @@ async def callback_endpoint(
                 account.sync_state = EmailAccountSyncState.backfilling
                 await session.commit()
                 await session.refresh(account)
+
+            # Step 4 — kick off the initial 30-day backfill. The task
+            # transitions sync_state pending/backfilling → live on
+            # completion. Failure to enqueue is logged but doesn't
+            # break the connect flow (`enqueue_backfill` swallows).
+            account_id_for_enqueue = account.id
     finally:
         reset_context(ctx_token)
 
+    email_sync_daemon.enqueue_backfill(account_id_for_enqueue)
     return _settings_redirect(status="gmail_connected")
 
 
@@ -241,14 +249,15 @@ async def push_endpoint(
             # cause Pub/Sub to keep redelivering.)
             return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-        # We have the org. Step 4 will enqueue a Celery sync task
-        # here; for Step 2 we just log + acknowledge.
+        # Step 4 — enqueue an incremental sync. The task's Redis
+        # lock dedupes against the 60-second poll fallback.
         logger.info(
             "Gmail push: account=%s history_id=%s message_id=%s",
             account.id,
             payload["history_id"],
             payload["message_id"],
         )
+        email_sync_daemon.enqueue_incremental(account.id)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

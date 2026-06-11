@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import FRONTEND_URL
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.email import service as email_service
+from src.app.core.email import sync_daemon as email_sync_daemon
 from src.app.core.email.microsoft import oauth as ms_oauth
 from src.app.core.email.microsoft import webhook as ms_webhook
 from src.app.core.email.models import EmailAccountSyncState
@@ -185,9 +186,13 @@ async def callback_endpoint(
                 account.sync_state = EmailAccountSyncState.backfilling
                 await session.commit()
                 await session.refresh(account)
+
+            # Step 4 — kick off the initial 30-day backfill.
+            account_id_for_enqueue = account.id
     finally:
         reset_context(ctx_token)
 
+    email_sync_daemon.enqueue_backfill(account_id_for_enqueue)
     return _settings_redirect(status="microsoft_connected")
 
 
@@ -268,7 +273,10 @@ async def webhook_notification_endpoint(
                 sub_id,
                 notif.get("changeType"),
             )
-            # Step 4 will enqueue the actual sync task here.
+            # Step 4 — enqueue incremental sync. Dedupe by
+            # subscription id (above) means one enqueue per account
+            # per notification batch.
+            email_sync_daemon.enqueue_incremental(account.id)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

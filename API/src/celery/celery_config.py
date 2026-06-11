@@ -66,4 +66,26 @@ beat_schedule = {
         'task': 'src.app.core.subscriptions.tasks.advance_trial_lifecycle',
         'schedule': crontab(minute=10),
     },
+    # App-updates Email Step 4 — every 60s, sweep for live accounts
+    # whose last_sync_at is older than 5 minutes and enqueue an
+    # incremental sync. Covers accounts without push configured AND
+    # accounts whose push briefly dropped notifications.
+    'email-poll-fallback': {
+        'task': 'src.app.core.email.tasks.poll_fallback',
+        'schedule': 60.0,
+    },
+    # App-updates Email Step 4 — every 30 min, enqueue watch /
+    # subscription renewals for accounts that haven't synced in
+    # 2 days (Microsoft) / 5 days (Gmail). Cheap idempotent calls;
+    # better to over-renew than to let a watch expire silently.
+    'email-scan-renewals': {
+        'task': 'src.app.core.email.tasks.scan_renewals',
+        'schedule': crontab(minute='*/30'),
+    },
+    # App-updates Email Step 4 — midnight UTC, zero every account's
+    # daily_sent_count + stamp daily_sent_reset_at. Idempotent.
+    'email-reset-daily-sent-counters': {
+        'task': 'src.app.core.email.tasks.reset_daily_sent_counters',
+        'schedule': crontab(hour=0, minute=0),
+    },
 }

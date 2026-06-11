@@ -5,34 +5,91 @@ import {
   inject,
   input,
 } from '@angular/core';
+import { LucideAngularModule } from 'lucide-angular';
 
 import { UpgradeModalService } from '../../services/upgrade-modal.service';
 import { SubscriptionCurrent } from '../../types/subscription.types';
 
+interface StatusTone {
+  readonly label: string;
+  readonly pillClasses: string;
+}
+
+const STATUS_TONES: Record<string, StatusTone> = {
+  active: {
+    label: 'Active',
+    pillClasses:
+      'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:ring-emerald-900',
+  },
+  trialing: {
+    label: 'Trial',
+    pillClasses:
+      'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-900',
+  },
+  past_due: {
+    label: 'Past due',
+    pillClasses:
+      'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-900',
+  },
+  read_only: {
+    label: 'Read only',
+    pillClasses:
+      'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-900',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    pillClasses:
+      'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:ring-rose-900',
+  },
+  archived: {
+    label: 'Archived',
+    pillClasses:
+      'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600',
+  },
+};
+
 /**
- * Top card on the Billing settings page.
+ * Hero card on the Billing settings page.
  *
- * Renders plan name + per-status context (trial countdown / cycle
- * cost / renewal date) plus the primary "Upgrade plan" CTA. The CTA
- * is currently disabled — Step 17 will wire the upgrade modal and
- * enable it.
+ * Renders plan name + status pill + headline price + per-status
+ * context (trial countdown / renewal date) plus the primary "Upgrade
+ * plan" CTA. Detail grid summarises billing cycle and period dates.
  */
 @Component({
   selector: 'crm-current-plan-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [LucideAngularModule],
   template: `
     <section
-      class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
     >
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400">
-            Current plan
-          </p>
-          <h2 class="mt-1 text-xl font-semibold text-zinc-900 dark:text-slate-100">
+      <div class="flex flex-wrap items-start justify-between gap-4 p-6">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+              Current plan
+            </p>
+            <span
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1"
+              [class]="statusTone().pillClasses"
+            >
+              {{ statusTone().label }}
+            </span>
+          </div>
+          <h2 class="mt-2 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-slate-100">
             {{ subscription().plan.name }}
           </h2>
-          <p class="mt-1 text-sm text-zinc-500 dark:text-slate-400">
+          @if (priceHeadline(); as price) {
+            <div class="mt-2 flex items-baseline gap-1.5">
+              <span class="text-3xl font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
+                {{ '$' + price.amount }}
+              </span>
+              <span class="text-sm text-zinc-500 dark:text-slate-400">
+                {{ '/' + price.cycleLabel }}
+              </span>
+            </div>
+          }
+          <p class="mt-2 text-sm text-zinc-600 dark:text-slate-400">
             {{ contextLine() }}
           </p>
         </div>
@@ -40,19 +97,22 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
         <button
           type="button"
           (click)="onUpgrade()"
-          class="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800"
+          class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
         >
           Upgrade plan
+          <lucide-icon name="arrow-right" size="14" aria-hidden="true"></lucide-icon>
         </button>
       </div>
 
-      <dl class="mt-6 grid gap-4 sm:grid-cols-2">
+      <dl
+        class="grid gap-px border-t border-zinc-200 bg-zinc-200 sm:grid-cols-2 dark:border-slate-700 dark:bg-slate-700"
+      >
         @for (row of detailRows(); track row.label) {
-          <div>
+          <div class="bg-zinc-50 px-6 py-4 dark:bg-slate-800/60">
             <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400">
               {{ row.label }}
             </dt>
-            <dd class="mt-1 text-sm font-medium text-zinc-900 dark:text-slate-100">
+            <dd class="mt-1 text-sm font-medium tabular-nums text-zinc-900 dark:text-slate-100">
               {{ row.value }}
             </dd>
           </div>
@@ -74,9 +134,27 @@ export class CurrentPlanCardComponent {
     this.upgradeModal.open({ cycle: sub.billing_cycle });
   }
 
-  /** Headline copy under the plan name. Differs by status:
+  protected readonly statusTone = computed<StatusTone>(() => {
+    const s = this.subscription().status;
+    return STATUS_TONES[s] ?? STATUS_TONES.archived;
+  });
+
+  /** Headline price block. Hidden for trial / cancelled / archived
+   *  where a price isn't meaningful — the context line covers those. */
+  protected readonly priceHeadline = computed<{ amount: number; cycleLabel: string } | null>(() => {
+    const sub = this.subscription();
+    if (sub.status === 'trialing' || sub.status === 'cancelled' || sub.status === 'archived') {
+      return null;
+    }
+    return {
+      amount: this.cyclePrice(sub),
+      cycleLabel: sub.billing_cycle === 'annual' ? 'yr' : 'mo',
+    };
+  });
+
+  /** Subhead copy. Differs by status:
    *   - trialing → "N days left in trial"
-   *   - active → "$X/mo, renews on YYYY-MM-DD"
+   *   - active → "Renews on YYYY-MM-DD"
    *   - read_only / past_due / archived / cancelled → human-readable
    *     state description; the trial banner (Step 15) carries the
    *     urgent CTA so this card stays informational.
@@ -88,12 +166,8 @@ export class CurrentPlanCardComponent {
         const days = sub.trial?.days_remaining ?? 0;
         return `${days} day${days === 1 ? '' : 's'} remaining in your trial`;
       }
-      case 'active': {
-        const price = this.cyclePrice(sub);
-        const cycleLabel = sub.billing_cycle === 'annual' ? 'yr' : 'mo';
-        const renews = formatDate(sub.period.renews_at);
-        return `$${price}/${cycleLabel}, renews on ${renews}`;
-      }
+      case 'active':
+        return `Renews on ${formatDate(sub.period.renews_at)}`;
       case 'past_due':
         return 'Payment failed — update your card to continue';
       case 'read_only':

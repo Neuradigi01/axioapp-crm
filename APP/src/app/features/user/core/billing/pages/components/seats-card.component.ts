@@ -5,6 +5,7 @@ import {
   inject,
   input,
 } from '@angular/core';
+import { LucideAngularModule } from 'lucide-angular';
 
 import { SeatModalService } from '../../services/seat-modal.service';
 import { SubscriptionCurrent } from '../../types/subscription.types';
@@ -12,75 +13,109 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
 /**
  * Second card on the Billing settings page.
  *
- * Renders seat utilisation (`in_use / purchased`), the bundle floor,
- * the per-seat overage cost, and the "Manage seats" CTA. CTA is
- * disabled on trial (cannot buy extra seats) and on every plan in
- * 16.a — Step 17 wires the seat-management modal.
+ * Renders seat utilisation (`in_use / purchased`) with a visual
+ * progress bar, the bundle floor, the per-seat overage cost, and the
+ * "Manage seats" CTA. CTA is disabled on trial (cannot buy extra
+ * seats) and on cancelled / archived (terminal states).
  */
 @Component({
   selector: 'crm-seats-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [LucideAngularModule],
   template: `
     <section
-      class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      class="flex h-full flex-col rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
     >
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400">
-            Seats
-          </p>
-          <h2 class="mt-1 text-xl font-semibold text-zinc-900 dark:text-slate-100">
-            Using {{ subscription().seats.in_use }} of
-            {{ subscription().seats.purchased }} seats
-          </h2>
-          <p class="mt-1 text-sm text-zinc-500 dark:text-slate-400">
-            {{ helperLine() }}
-          </p>
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div
+            class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-900"
+          >
+            <lucide-icon name="users" size="18" aria-hidden="true"></lucide-icon>
+          </div>
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+              Seats
+            </p>
+            <h2 class="text-base font-semibold text-zinc-900 dark:text-slate-100">
+              Team seats
+            </h2>
+          </div>
         </div>
 
         <button
           type="button"
           (click)="onManage()"
-          class="rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
-          [class.bg-zinc-100]="manageDisabled()"
-          [class.text-zinc-500]="manageDisabled()"
+          class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
           [class.cursor-not-allowed]="manageDisabled()"
-          [class.dark:bg-slate-700]="manageDisabled()"
-          [class.dark:text-slate-400]="manageDisabled()"
-          [class.bg-zinc-900]="!manageDisabled()"
-          [class.text-white]="!manageDisabled()"
-          [class.hover:bg-zinc-800]="!manageDisabled()"
+          [class.border-zinc-200]="manageDisabled()"
+          [class.text-zinc-400]="manageDisabled()"
+          [class.dark:border-slate-700]="manageDisabled()"
+          [class.dark:text-slate-500]="manageDisabled()"
+          [class.border-zinc-300]="!manageDisabled()"
+          [class.bg-white]="!manageDisabled()"
+          [class.text-zinc-700]="!manageDisabled()"
+          [class.hover:bg-zinc-50]="!manageDisabled()"
+          [class.dark:border-slate-600]="!manageDisabled()"
+          [class.dark:bg-slate-700]="!manageDisabled()"
+          [class.dark:text-slate-200]="!manageDisabled()"
+          [class.dark:hover:bg-slate-600]="!manageDisabled()"
           [disabled]="manageDisabled()"
           [title]="manageTooltip()"
         >
-          Manage seats
+          Manage
         </button>
       </div>
 
-      <dl class="mt-6 grid gap-4 sm:grid-cols-3">
+      <div class="mt-5">
+        <div class="flex items-baseline justify-between">
+          <p class="text-sm text-zinc-600 dark:text-slate-400">In use</p>
+          <p class="text-sm font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
+            {{ subscription().seats.in_use }} / {{ subscription().seats.purchased }}
+          </p>
+        </div>
+        <div
+          class="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-slate-700"
+        >
+          <div
+            class="h-full rounded-full transition-all"
+            [class.bg-emerald-500]="seatTone() === 'green'"
+            [class.bg-amber-500]="seatTone() === 'yellow'"
+            [class.bg-rose-500]="seatTone() === 'red'"
+            [style.width.%]="seatPercent()"
+          ></div>
+        </div>
+        <p class="mt-2 text-xs text-zinc-500 dark:text-slate-400">
+          {{ helperLine() }}
+        </p>
+      </div>
+
+      <dl class="mt-6 grid flex-1 gap-4 sm:grid-cols-3">
         <div>
-          <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400">
-            Included with plan
+          <dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+            Included
           </dt>
-          <dd class="mt-1 text-sm font-medium text-zinc-900 dark:text-slate-100">
-            {{ subscription().seats.included }} seats
+          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
+            {{ subscription().seats.included }}
           </dd>
         </div>
         <div>
-          <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400">
-            Active members
+          <dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+            Active
           </dt>
-          <dd class="mt-1 text-sm font-medium text-zinc-900 dark:text-slate-100">
+          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
             {{ subscription().seats.in_use }}
           </dd>
         </div>
         <div>
-          <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+          <dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400">
             Extra seat
           </dt>
-          <dd class="mt-1 text-sm font-medium text-zinc-900 dark:text-slate-100">
-            \${{ subscription().seats.extra_seat_cost_per_period_usd }} per
-            {{ subscription().billing_cycle === 'annual' ? 'year' : 'month' }}
+          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
+            {{ '$' + subscription().seats.extra_seat_cost_per_period_usd }}
+            <span class="text-xs font-normal text-zinc-500 dark:text-slate-400">
+              /{{ subscription().billing_cycle === 'annual' ? 'yr' : 'mo' }}
+            </span>
           </dd>
         </div>
       </dl>
@@ -123,6 +158,19 @@ export class SeatsCardComponent {
     this.seatModal.open();
   }
 
+  protected readonly seatPercent = computed(() => {
+    const seats = this.subscription().seats;
+    if (seats.purchased <= 0) return 0;
+    return Math.min(100, Math.round((seats.in_use / seats.purchased) * 100));
+  });
+
+  protected readonly seatTone = computed<'green' | 'yellow' | 'red'>(() => {
+    const pct = this.seatPercent();
+    if (pct >= 90) return 'red';
+    if (pct >= 70) return 'yellow';
+    return 'green';
+  });
+
   protected readonly helperLine = computed(() => {
     const sub = this.subscription();
     if (sub.status === 'trialing') {
@@ -133,6 +181,6 @@ export class SeatsCardComponent {
       return `Your plan includes ${sub.seats.included} seats.`;
     }
     const period = sub.billing_cycle === 'annual' ? 'yr' : 'mo';
-    return `Your plan includes ${sub.seats.included} seats. ${extra} extra at $${sub.seats.extra_seat_cost_per_period_usd}/${period}.`;
+    return `${extra} extra at $${sub.seats.extra_seat_cost_per_period_usd}/${period} on top of the ${sub.seats.included} included.`;
   });
 }
