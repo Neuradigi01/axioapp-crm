@@ -90,7 +90,9 @@ export class ConnectAccountCardComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.redirecting.set(null);
-          this.error.emit(extractApiError(err));
+          this.error.emit(
+            extractApiError(err) ?? 'Connection failed. Please try again.',
+          );
         },
       });
   }
@@ -107,7 +109,9 @@ export class ConnectAccountCardComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.redirecting.set(null);
-          this.error.emit(extractApiError(err));
+          this.error.emit(
+            extractApiError(err) ?? 'Connection failed. Please try again.',
+          );
         },
       });
   }

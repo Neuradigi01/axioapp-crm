@@ -123,7 +123,9 @@ export class EmailTemplatePickerComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.rendering.set(null);
-          this.errored.emit(extractApiError(err));
+          this.errored.emit(
+            extractApiError(err) ?? 'Failed to load template.',
+          );
         },
       });
   }
