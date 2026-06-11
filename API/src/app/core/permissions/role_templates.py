@@ -74,6 +74,11 @@ _CORE_ADMIN_KEYS: list[str] = [
     # admin scope so they can see + disconnect any rep's account.
     "email.accounts.manage",
     "email.accounts.admin",
+    # Step 6 — template library. Admin/Owner can author + edit;
+    # `email.read` is also granted so they can use templates from
+    # compose.
+    "email.read",
+    "email.templates.manage",
 ]
 
 
@@ -112,6 +117,10 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     # org-wide admin view is gated separately on `email.accounts.admin`
     # which Employee does not hold.
     "email.accounts.manage",
+    # Step 6 — Employees CAN use saved templates from compose but
+    # cannot author or edit them; `email.templates.manage` stays
+    # Admin-only.
+    "email.read",
 ]
 
 
@@ -138,6 +147,10 @@ _CORE_SALES_MANAGER_KEYS: list[str] = [
     "custom_fields.read",
     "saved_views.use",
     "email.accounts.manage",
+    # Step 6 — Sales Manager runs the sales motion; authoring
+    # outreach templates is squarely within scope.
+    "email.read",
+    "email.templates.manage",
 ]
 
 
@@ -155,6 +168,9 @@ _CORE_SUPPORT_AGENT_KEYS: list[str] = [
     "custom_fields.read",
     "saved_views.use",
     "email.accounts.manage",
+    # Step 6 — Support agents talk to customers; reading templates
+    # to use from compose is in scope. Authoring is not.
+    "email.read",
 ]
 
 

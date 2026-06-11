@@ -4,9 +4,11 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "prebuild": "node scripts/check-lucide-icons.mjs",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "check:icons": "node scripts/check-lucide-icons.mjs",
     "generate:api-types": "openapi-typescript http://localhost:8000/openapi.json -o src/app/features/user/core/shared/api-types/index.ts"
   },
   "private": true,
