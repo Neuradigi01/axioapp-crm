@@ -24,8 +24,6 @@ services:
     depends_on:
       - api
     restart: unless-stopped
-    profiles:
-      - celery
 
   celery-beat:
     build: .
@@ -35,8 +33,6 @@ services:
     depends_on:
       - celery
     restart: unless-stopped
-    profiles:
-      - celery
 
   flower:
     build: .
@@ -51,5 +47,3 @@ services:
     depends_on:
       - celery
     restart: unless-stopped
-    profiles:
-      - celery
