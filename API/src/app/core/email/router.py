@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.email.gmail.router import router as gmail_router
+from src.app.core.email.microsoft.router import router as microsoft_router
 from src.app.core.email.schemas import EmailAccountRead
 from src.app.core.email.service import (
     disconnect as disconnect_account,
@@ -46,6 +47,11 @@ router = APIRouter(prefix="/email", tags=["Email Accounts"])
 # `GmailProvider` into the OAuth registry — so the registration
 # happens before any request hits.
 router.include_router(gmail_router)
+# Microsoft Graph sub-router (Step 3) — full paths become
+# `/api/v1/email/microsoft/authorize | /callback | /webhook`.
+# Same side-effect chain as Gmail: importing `microsoft.router`
+# triggers `microsoft.__init__` which registers `MicrosoftProvider`.
+router.include_router(microsoft_router)
 
 
 async def _has_admin(db: AsyncSession, user: User) -> bool:
@@ -114,10 +120,20 @@ async def disconnect_email_account_endpoint(
 
 async def _teardown_provider_watch(row, db: AsyncSession) -> None:
     """Dispatch to the provider-specific teardown (e.g. Gmail's
-    `users.stop`). New providers add a branch here when they ship.
-    Centralised so Step 1's generic router doesn't import every
-    provider sub-package at module-load time."""
+    `users.stop` or Microsoft's `subscriptions.delete`). New
+    providers add a branch here when they ship. Centralised so
+    Step 1's generic router doesn't import every provider
+    sub-package at module-load time."""
     if row.provider.value == "gmail":
         from src.app.core.email.gmail import push as gmail_push
 
         await gmail_push.stop_watch_quiet(row, db)
+    elif row.provider.value == "microsoft":
+        from src.app.core.email.microsoft import webhook as ms_webhook
+
+        # Microsoft subscriptions are tracked in `sync_cursor` for
+        # Step 3's v1 (see webhook.py docstring); pass it through
+        # so the unsubscribe call can hit the right id.
+        await ms_webhook.unsubscribe_quiet(
+            row, db, subscription_id=row.sync_cursor
+        )

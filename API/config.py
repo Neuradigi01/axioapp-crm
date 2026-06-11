@@ -144,6 +144,29 @@ GOOGLE_GMAIL_PUBSUB_TOPIC = os.getenv("GOOGLE_GMAIL_PUBSUB_TOPIC", "")
 # invoke our webhook. The push handler verifies the inbound OIDC JWT
 # was signed by this identity. Required when the topic is set.
 GOOGLE_GMAIL_PUBSUB_SA_EMAIL = os.getenv("GOOGLE_GMAIL_PUBSUB_SA_EMAIL", "")
+
+# Microsoft 365 / Outlook OAuth (Track app-updates/email Step 3).
+# Provision from an Azure App Registration. Multi-tenant works with
+# `common`; single-tenant uses the tenant id. Reuses the same
+# Fernet token storage (INTEGRATIONS_ENCRYPTION_KEY) as Gmail.
+MICROSOFT_CLIENT_ID = os.getenv("MICROSOFT_CLIENT_ID", "")
+MICROSOFT_CLIENT_SECRET = _env("MICROSOFT_CLIENT_SECRET", "")
+# `common` = any work/school/personal MS account. Override to a
+# specific tenant GUID for single-tenant production.
+MICROSOFT_TENANT = os.getenv("MICROSOFT_TENANT", "common")
+MICROSOFT_GRAPH_REDIRECT_URI = os.getenv(
+    "MICROSOFT_GRAPH_REDIRECT_URI",
+    "http://localhost:8000/api/v1/email/microsoft/callback",
+)
+# Public HTTPS URL Graph will POST change notifications to. Must be
+# reachable from the internet (localhost won't work — Graph rejects
+# subscription creation with a non-public URL). For dev, tunnel via
+# ngrok and set this to the public ngrok URL. Leave empty to disable
+# subscriptions; sync falls back to Step 4's 60-second poll.
+MICROSOFT_GRAPH_WEBHOOK_URL = os.getenv(
+    "MICROSOFT_GRAPH_WEBHOOK_URL", ""
+)
+
 # Developer Token — separate from OAuth, attached to Google Ads
 # Manager (MCC) account. See Stage 4 of the manual checklist.
 GOOGLE_ADS_DEVELOPER_TOKEN = _env("GOOGLE_ADS_DEVELOPER_TOKEN", "")
