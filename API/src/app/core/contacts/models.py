@@ -23,7 +23,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, String, Text, text
+from sqlalchemy import Boolean, DateTime, String, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -67,6 +67,19 @@ class Contact(Base, TenantScoped):
     # the `activities` table; this is a fast-path read for the
     # list page's default sort.
     last_activity_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    # Email tracking opt-out (Step 8). Set by the public
+    # `/api/v1/track/unsubscribe/{token}` endpoint and respected by
+    # `send_email` (raises OptedOut) + the sequence scheduler (cancels
+    # active enrollments). CAN-SPAM (US) + DPDP (IN) compliance.
+    email_opt_out: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    )
+    email_opt_out_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

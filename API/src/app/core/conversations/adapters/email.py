@@ -64,12 +64,20 @@ from src.app.core.conversations.models import (
     MessageDirection,
 )
 from src.app.core.email import service as email_service
+from src.app.core.email.tracking import (
+    footer as tracking_footer,
+    link_rewriter as tracking_links,
+    pixel as tracking_pixel,
+    tokens as tracking_tokens,
+)
 from src.app.core.email.models import (
     EmailAccount,
     EmailAccountProvider,
     EmailAccountSyncState,
 )
 from src.app.core.notifications.service import notify
+from src.app.core.settings.models import OrgSettings
+from src.app.core.tenants.models import Organization
 
 
 logger = logging.getLogger(__name__)
@@ -87,6 +95,20 @@ _SUBJECT_THREADING_WINDOW = timedelta(days=30)
 import os
 
 _MESSAGE_ID_DOMAIN = os.getenv("EMAIL_MESSAGE_ID_DOMAIN", "furnicrm.app")
+
+# Step 8 — public tracking base URL. Defaults to local in dev; in
+# prod set via env. No trailing slash — pixel/link helpers append the
+# full `/api/v1/track/...` path themselves.
+_TRACKING_BASE_URL = os.getenv(
+    "TRACKING_BASE_URL", "http://localhost:8000"
+).rstrip("/")
+
+# `mailto:` target for the `List-Unsubscribe` header. The MIME
+# headers carry both the URL and a mailto so RFC 8058 one-click
+# unsubscribe works in Gmail / Outlook / Apple Mail.
+_LIST_UNSUB_MAILTO = os.getenv(
+    "LIST_UNSUBSCRIBE_MAILTO", "unsubscribe@furnicrm.app"
+)
 
 
 class EmailUseSendEmailEndpoint(HTTPException):
@@ -117,6 +139,44 @@ class HardCapExceeded(HTTPException):
             detail=(
                 f"Daily email send cap reached for this account "
                 f"({sent}/{cap}). Try again tomorrow."
+            ),
+        )
+
+
+class OptedOut(HTTPException):
+    """451 — recipient previously unsubscribed via the public tracking
+    endpoint. Adapters never send to opted-out contacts; Step 7's
+    sequence scheduler treats this as a permanent skip and cancels the
+    enrollment.
+
+    451 ("Unavailable For Legal Reasons") is the RFC-aligned choice
+    for compliance-driven refusals — CAN-SPAM (US) and DPDP (IN)
+    both make sending to an unsubscribed contact illegal.
+    """
+
+    def __init__(self, *, contact_id: uuid.UUID) -> None:
+        super().__init__(
+            status_code=451,
+            detail=(
+                f"Contact {contact_id} has opted out of marketing "
+                "emails. Send blocked for compliance."
+            ),
+        )
+
+
+class MissingCompanyAddress(HTTPException):
+    """400 — CAN-SPAM requires a physical sender address on every
+    commercial email. Adapter refuses the send when the org hasn't
+    configured one in Settings → Store profile."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Your organisation has no physical address configured. "
+                "Add one in Settings → Store profile before sending — "
+                "CAN-SPAM and DPDP both require it on every marketing "
+                "email."
             ),
         )
 
@@ -237,6 +297,27 @@ async def send_email(
                 "Recipient contact missing or has no email address."
             ),
         )
+    # Step 8 — opt-out compliance gate. Any prior unsubscribe blocks
+    # every future send to this contact. Sequence scheduler maps the
+    # 451 to a permanent skip + cancels the enrollment.
+    if getattr(contact, "email_opt_out", False):
+        raise OptedOut(contact_id=contact.id)
+
+    # Step 8 — CAN-SPAM physical-address gate. Load the org's settings
+    # row so we can both (a) refuse the send when no address is set
+    # and (b) compose the footer from the structured fields below.
+    org_settings = (
+        await session.execute(
+            select(OrgSettings).where(OrgSettings.org_id == org_id)
+        )
+    ).scalar_one_or_none()
+    if not tracking_footer.has_required_address(org_settings):
+        raise MissingCompanyAddress()
+    org_row = (
+        await session.execute(
+            select(Organization).where(Organization.id == org_id)
+        )
+    ).scalar_one_or_none()
 
     # Resolve conversation: explicit id wins; else find-or-create by
     # (contact, email channel). Multiple email threads with the same
@@ -269,6 +350,53 @@ async def send_email(
     # echo it back into our threading detector.
     own_msg_id_raw = make_msgid(domain=_MESSAGE_ID_DOMAIN)
     own_msg_id_bare = own_msg_id_raw.strip("<>")
+
+    # Step 8 — pre-allocate the messages.id so the tracking tokens
+    # encode a stable per-send identifier. Without this we'd have a
+    # chicken-and-egg between the token (needs id) and the row (needs
+    # token-decorated HTML to commit). The Message constructor accepts
+    # an explicit `id` so this is a clean swap.
+    pre_message_id = uuid.uuid4()
+
+    # Build the tracking tokens. Each kind carries the same message_id
+    # but a different kind char so the public router can route /o vs
+    # /c vs /unsubscribe with one decoder.
+    open_token = tracking_tokens.encode(
+        message_id=pre_message_id, kind="o"
+    )
+    click_token = tracking_tokens.encode(
+        message_id=pre_message_id, kind="c"
+    )
+    unsub_token = tracking_tokens.encode(
+        message_id=pre_message_id, kind="u"
+    )
+    unsub_url = (
+        f"{_TRACKING_BASE_URL}/api/v1/track/unsubscribe/{unsub_token}"
+    )
+
+    # Apply pixel + link rewriting + footer to the HTML body. The
+    # plain-text alternative is left untouched — tracking only makes
+    # sense in the HTML branch where the recipient's client can
+    # fetch an `<img>` and follow a wrapped `<a href>`.
+    tracked_body_html: Optional[str] = body_html
+    if body_html is not None:
+        tracked_body_html = tracking_pixel.inject(
+            body_html, token=open_token, base_url=_TRACKING_BASE_URL
+        )
+        tracked_body_html = tracking_links.rewrite(
+            tracked_body_html,
+            token=click_token,
+            base_url=_TRACKING_BASE_URL,
+        )
+        footer_html = tracking_footer.build(
+            org_name=getattr(org_row, "name", "") or "",
+            org_settings=org_settings,
+            unsubscribe_url=unsub_url,
+        )
+        tracked_body_html = tracking_footer.append(
+            tracked_body_html, footer_html=footer_html
+        )
+
     mime = _build_outbound_mime(
         from_email=account.email_address,
         from_name=account.display_name,
@@ -276,9 +404,11 @@ async def send_email(
         to_name=contact.full_name,
         subject=subject,
         body_text=body_text,
-        body_html=body_html,
+        body_html=tracked_body_html,
         message_id=own_msg_id_raw,
         in_reply_to=parent_msg_id,
+        list_unsubscribe_url=unsub_url,
+        list_unsubscribe_mailto=_LIST_UNSUB_MAILTO,
     )
     raw_bytes = mime.as_bytes()
 
@@ -334,8 +464,11 @@ async def send_email(
     # (the RFC 5322 token) — the threading detector matches on it
     # when the recipient's reply lands. Provider-side ids go into
     # payload for forensics; threading does NOT depend on them.
+    # `id` is pre-allocated above so the tracking tokens we already
+    # baked into the HTML reference this exact row.
     now = datetime.now(timezone.utc)
     msg = Message(
+        id=pre_message_id,
         org_id=org_id,
         conversation_id=conversation.id,
         direction=MessageDirection.out,
@@ -551,11 +684,19 @@ def _build_outbound_mime(
     body_html: Optional[str],
     message_id: str,
     in_reply_to: Optional[str],
+    list_unsubscribe_url: Optional[str] = None,
+    list_unsubscribe_mailto: Optional[str] = None,
 ) -> EmailMessage:
     """Assemble a multipart/alternative MIME message via stdlib
     `email.message.EmailMessage`. Sets threading headers when
     `in_reply_to` is provided. The MIME bytes from `.as_bytes()`
-    are what we hand to the provider's send."""
+    are what we hand to the provider's send.
+
+    When `list_unsubscribe_url` is provided, the `List-Unsubscribe`
+    and `List-Unsubscribe-Post` headers are set per RFC 8058 (Gmail /
+    Outlook / Apple Mail show a one-click unsubscribe button in the
+    UI). Both header forms are concatenated — Gmail prefers the URL,
+    Outlook the mailto, so providing both maximises the surface."""
     msg = EmailMessage()
     msg["From"] = (
         f'"{from_name}" <{from_email}>' if from_name else from_email
@@ -565,6 +706,15 @@ def _build_outbound_mime(
     )
     msg["Subject"] = subject
     msg["Message-ID"] = message_id
+    # Step 8 — RFC 8058 one-click unsubscribe. Mailto first so an
+    # MUA without web-fetch support still has a working path.
+    if list_unsubscribe_url:
+        parts: list[str] = []
+        if list_unsubscribe_mailto:
+            parts.append(f"<mailto:{list_unsubscribe_mailto}>")
+        parts.append(f"<{list_unsubscribe_url}>")
+        msg["List-Unsubscribe"] = ", ".join(parts)
+        msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     if in_reply_to:
         # Both headers carry the prior message id in angle brackets.
         # Servers expect `<id@host>` form even though our column
@@ -785,6 +935,8 @@ __all__ = [
     "EmailAdapter",
     "EmailUseSendEmailEndpoint",
     "HardCapExceeded",
+    "MissingCompanyAddress",
+    "OptedOut",
     "SendEmailResult",
     "receive_email",
     "send_email",
