@@ -150,7 +150,7 @@ async def _next_round_robin_index(
         VALUES (:org_id, 1)
         ON CONFLICT (org_id) DO UPDATE
             SET next_assignee_index =
-                  lead_routing_state.next_assignee_index + 1,
+                  tbl_lead_routing_state.next_assignee_index + 1,
                 updated_at = now()
         RETURNING next_assignee_index - 1 AS picked_index
         """

@@ -160,7 +160,7 @@ _UPSERT_SQL = text(
     )
     VALUES (:org_id, :resource, :period_kind, :period_start, :period_end, :delta, now())
     ON CONFLICT (org_id, resource, period_start)
-    DO UPDATE SET value = usage_counters.value + EXCLUDED.value, updated_at = now()
+    DO UPDATE SET value = tbl_usage_counters.value + EXCLUDED.value, updated_at = now()
     RETURNING value
     """
 )
