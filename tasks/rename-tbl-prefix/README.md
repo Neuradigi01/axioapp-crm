@@ -55,7 +55,7 @@ After all 5 steps land:
 |---|-------|--------|--------|
 | 1 | [Inventory + naming-map decision](step-1-inventory-and-naming-map.md) | **COMPLETED** — `naming-map.md` landed; user picked Option A | ~½ day |
 | 2 | [Models + FK + relationship-string rewrite (Python source)](step-2-models-and-fk-rewrite.md) | **COMPLETED** — 44 files, 118 substitutions, compile clean | ~1 day |
-| 3 | [Alembic rename migration + RLS policy rebuild](step-3-alembic-rename-migration.md) | Pending | ~1 day |
+| 3 | [Alembic rename migration + RLS policy rebuild](step-3-alembic-rename-migration.md) | **COMPLETED** — `0087_rename_to_tbl_prefix` applied; 101 `tbl_*` tables, 73 RLS policies, app boots, ORM round-trips real data | ~1 day |
 | 4 | [Raw-SQL, seed, and `text(…)` sweep](step-4-raw-sql-and-seed-sweep.md) | Pending | ~½ day |
 | 5 | [Full test pass + frontend sweep + Ajay's Workspace smoke](step-5-test-pass-and-smoke.md) | Pending | ~1 day |
 
