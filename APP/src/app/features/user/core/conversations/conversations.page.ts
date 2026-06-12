@@ -26,6 +26,7 @@ import {
   ReassignConfirm,
   ReassignModalComponent,
 } from '../shared/reassign-modal/reassign-modal.component';
+import { FurnitureAuthService } from '../auth/auth.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
@@ -58,7 +59,16 @@ export class ConversationsPageComponent {
   private readonly api = inject(ConversationsApiService);
   private readonly notifications = inject(NotificationsApiService);
   private readonly staffApi = inject(StaffApiService);
+  private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** Logged-in user id — drives the list component's "Mine" chip. */
+  protected readonly currentUserId = this.auth.currentUserId;
+
+  /** Wire value to hydrate the list's assignee chip with on first
+   * render. Read from `sessionStorage` once; keyed by `org_id` so two
+   * orgs the same user belongs to don't leak filters between sessions. */
+  protected readonly initialAssignee = this.readPersistedAssignee();
 
   protected readonly items = signal<Conversation[]>([]);
   protected readonly loading = signal(false);
@@ -93,6 +103,11 @@ export class ConversationsPageComponent {
   private lastSeenNotificationId: string | null = null;
 
   constructor() {
+    // Seed the filter from the persisted assignee BEFORE the first
+    // list call so the request goes out with the right `?assigned_to=…`.
+    if (this.initialAssignee) {
+      this.filters.set({ assigned_to: this.initialAssignee });
+    }
     this.reloadList();
     this.loadStaff();
 
@@ -128,8 +143,44 @@ export class ConversationsPageComponent {
   }
 
   protected onFiltersChange(next: ConversationListQuery): void {
-    this.filters.set(next);
+    // Preserve assigned_to across channel/status/q updates.
+    const assigned_to = this.filters().assigned_to;
+    this.filters.set({ ...next, ...(assigned_to ? { assigned_to } : {}) });
     this.reloadList();
+  }
+
+  protected onAssigneeFilterChange(value: string | undefined): void {
+    this.filters.update((prev) => {
+      const { assigned_to: _omit, ...rest } = prev;
+      return value ? { ...rest, assigned_to: value } : rest;
+    });
+    this.persistAssignee(value);
+    this.reloadList();
+  }
+
+  // --- sessionStorage helpers (org-prefixed) ------------------------------
+
+  private storageKey(): string {
+    const orgId = this.auth.currentOrg()?.id ?? 'anon';
+    return `conversations:assignee:${orgId}`;
+  }
+
+  private readPersistedAssignee(): string {
+    try {
+      return sessionStorage.getItem(this.storageKey()) ?? '';
+    } catch {
+      // Private-mode browsers throw on sessionStorage access.
+      return '';
+    }
+  }
+
+  private persistAssignee(value: string | undefined): void {
+    try {
+      if (value) sessionStorage.setItem(this.storageKey(), value);
+      else sessionStorage.removeItem(this.storageKey());
+    } catch {
+      // Best-effort; failure is silent.
+    }
   }
 
   protected onSelect(id: string): void {

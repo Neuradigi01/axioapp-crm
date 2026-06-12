@@ -58,7 +58,11 @@ router = APIRouter(prefix="/conversations", tags=["Conversations"])
 async def list_endpoint(
     channel: Optional[ConversationChannel] = Query(default=None),
     status_: Optional[ConversationStatus] = Query(default=None, alias="status"),
-    assigned_to: Optional[uuid.UUID] = Query(default=None),
+    # Widened to `str` so the sentinel value `'unassigned'` can pass
+    # through (matches the leads / contacts convention). The service
+    # parses the value: a UUID maps to equality; `'unassigned'` maps
+    # to `IS NULL`; anything else is rejected with a 422-style error.
+    assigned_to: Optional[str] = Query(default=None, max_length=64),
     q: Optional[str] = Query(default=None, max_length=255),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
@@ -69,7 +73,7 @@ async def list_endpoint(
         db,
         channel=channel,
         status_filter=status_,
-        assigned_to_id=assigned_to,
+        assigned_to=assigned_to,
         q=q,
         page=page,
         size=size,

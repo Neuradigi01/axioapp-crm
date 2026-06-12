@@ -7,6 +7,7 @@ import {
   computed,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
 import {
@@ -82,11 +83,20 @@ const CHANNEL_OPTIONS: Array<{ value: ConversationChannel | ''; label: string }>
   { value: 'web', label: 'Web' },
 ];
 
+type AssigneeMode = 'all' | 'mine' | 'unassigned' | 'specific';
+
+const ASSIGNEE_MODES: Array<{ value: AssigneeMode; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'mine', label: 'Mine' },
+  { value: 'unassigned', label: 'Unassigned' },
+  { value: 'specific', label: 'Specific…' },
+];
+
 @Component({
   selector: 'app-conversation-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [FormsModule, LucideAngularModule],
   templateUrl: './conversation-list.component.html',
 })
 export class ConversationListComponent {
@@ -94,16 +104,38 @@ export class ConversationListComponent {
   @Input() loading = false;
   @Input() selectedId: string | null = null;
   @Input() staffById: Map<string, StaffListItem> = new Map();
+  /** UUID of the logged-in user — drives the "Mine" assignee chip.
+   * Empty string means we don't yet know (auth still loading);
+   * the "Mine" chip simply emits `undefined` in that case. */
+  @Input() currentUserId: string = '';
+  /** Hydrated by the parent from `sessionStorage` so a refresh keeps
+   * the previously-active filter. `''` is treated as "All". */
+  @Input() set initialAssignee(value: string) {
+    this.applyHydratedAssignee(value);
+  }
 
   @Output() readonly filtersChange = new EventEmitter<ConversationListQuery>();
   @Output() readonly select = new EventEmitter<string>();
+  /** Emits the value that should be sent as `?assigned_to=…` on the
+   * conversations list endpoint. `undefined` means "no filter" ("All"). */
+  @Output() readonly assigneeChange = new EventEmitter<string | undefined>();
 
   protected readonly statusOptions = STATUS_OPTIONS;
   protected readonly channelOptions = CHANNEL_OPTIONS;
+  protected readonly assigneeModes = ASSIGNEE_MODES;
 
   protected readonly channelFilter = signal<ConversationChannel | ''>('');
   protected readonly statusFilter = signal<ConversationStatus | ''>('');
   protected readonly searchTerm = signal<string>('');
+  protected readonly assigneeMode = signal<AssigneeMode>('all');
+  protected readonly specificUserId = signal<string | null>(null);
+
+  /** Sorted list of staff names for the "Specific…" dropdown. */
+  protected readonly staffOptions = computed<StaffListItem[]>(() =>
+    Array.from(this.staffById.values()).sort((a, b) =>
+      a.full_name.localeCompare(b.full_name),
+    ),
+  );
 
   protected readonly displayItems = computed(() => this.items);
 
@@ -163,6 +195,64 @@ export class ConversationListComponent {
 
   protected pick(id: string): void {
     this.select.emit(id);
+  }
+
+  // --- Assignee chip --------------------------------------------------------
+
+  protected setAssigneeMode(mode: AssigneeMode): void {
+    this.assigneeMode.set(mode);
+    if (mode !== 'specific') {
+      this.specificUserId.set(null);
+    }
+    this.emitAssignee();
+  }
+
+  protected onSpecificUserChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value || null;
+    this.specificUserId.set(value);
+    this.emitAssignee();
+  }
+
+  /** Compute the wire value for `?assigned_to=…` and emit it. */
+  private emitAssignee(): void {
+    const mode = this.assigneeMode();
+    let value: string | undefined;
+    switch (mode) {
+      case 'mine':
+        value = this.currentUserId || undefined;
+        break;
+      case 'unassigned':
+        value = 'unassigned';
+        break;
+      case 'specific':
+        value = this.specificUserId() ?? undefined;
+        break;
+      case 'all':
+      default:
+        value = undefined;
+    }
+    this.assigneeChange.emit(value);
+  }
+
+  /** Restore mode + specific id from a previously-persisted wire value. */
+  private applyHydratedAssignee(value: string): void {
+    if (!value) {
+      this.assigneeMode.set('all');
+      this.specificUserId.set(null);
+      return;
+    }
+    if (value === 'unassigned') {
+      this.assigneeMode.set('unassigned');
+      this.specificUserId.set(null);
+      return;
+    }
+    if (this.currentUserId && value === this.currentUserId) {
+      this.assigneeMode.set('mine');
+      this.specificUserId.set(null);
+      return;
+    }
+    this.assigneeMode.set('specific');
+    this.specificUserId.set(value);
   }
 
   private emit(): void {

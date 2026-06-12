@@ -42,7 +42,10 @@
         [loading]="loading()"
         [selectedId]="selectedId()"
         [staffById]="staffById()"
+        [currentUserId]="currentUserId() ?? ''"
+        [initialAssignee]="initialAssignee"
         (filtersChange)="onFiltersChange($event)"
+        (assigneeChange)="onAssigneeFilterChange($event)"
         (select)="onSelect($event)"
       />
     </aside>

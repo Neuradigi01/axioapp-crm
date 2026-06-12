@@ -70,7 +70,7 @@ async def list_conversations(
     *,
     channel: Optional[ConversationChannel] = None,
     status_filter: Optional[ConversationStatus] = None,
-    assigned_to_id: Optional[uuid.UUID] = None,
+    assigned_to: Optional[str] = None,
     q: Optional[str] = None,
     page: int = 1,
     size: int = 50,
@@ -80,8 +80,21 @@ async def list_conversations(
         filters.append(Conversation.channel == channel)
     if status_filter is not None:
         filters.append(Conversation.status == status_filter)
-    if assigned_to_id is not None:
-        filters.append(Conversation.assigned_to_id == assigned_to_id)
+    # `assigned_to` may be a UUID string (filter to that owner),
+    # the sentinel `'unassigned'` (rows with `assigned_to_id IS NULL`),
+    # or absent (no filter). Anything else raises 422.
+    if assigned_to is not None:
+        if assigned_to == "unassigned":
+            filters.append(Conversation.assigned_to_id.is_(None))
+        else:
+            try:
+                owner_uuid = uuid.UUID(assigned_to)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="assigned_to must be a UUID or 'unassigned'",
+                ) from exc
+            filters.append(Conversation.assigned_to_id == owner_uuid)
     if q:
         filters.append(Conversation.external_id.ilike(f"%{q}%"))
 
