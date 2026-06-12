@@ -53,7 +53,7 @@ task_priority_enum = ENUM(
 
 
 class Task(Base, TenantScoped):
-    __tablename__ = "tasks"
+    __tablename__ = "tbl_tasks"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

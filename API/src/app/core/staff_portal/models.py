@@ -22,7 +22,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class StaffSession(Base, TenantScoped):
-    __tablename__ = "staff_sessions"
+    __tablename__ = "tbl_staff_sessions"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

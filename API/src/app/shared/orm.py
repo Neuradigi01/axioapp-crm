@@ -31,7 +31,7 @@ class TenantScoped:
 
     org_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="RESTRICT"),
+        ForeignKey("tbl_organizations.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )

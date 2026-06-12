@@ -80,7 +80,7 @@ message_direction_enum = ENUM(
 
 
 class Conversation(Base, TenantScoped):
-    __tablename__ = "conversations"
+    __tablename__ = "tbl_conversations"
     __table_args__ = (
         Index(
             "ix_conversations_org_last_message",
@@ -105,7 +105,7 @@ class Conversation(Base, TenantScoped):
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     contact_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contacts.id", ondelete="SET NULL"),
+        ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
         nullable=True,
     )
     assigned_to_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -134,7 +134,7 @@ class Conversation(Base, TenantScoped):
 
 
 class Message(Base, TenantScoped):
-    __tablename__ = "messages"
+    __tablename__ = "tbl_messages"
     __table_args__ = (
         Index(
             "ix_messages_conversation_created",
@@ -150,7 +150,7 @@ class Message(Base, TenantScoped):
     )
     conversation_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("conversations.id", ondelete="CASCADE"),
+        ForeignKey("tbl_conversations.id", ondelete="CASCADE"),
         nullable=False,
     )
     direction: Mapped[MessageDirection] = mapped_column(

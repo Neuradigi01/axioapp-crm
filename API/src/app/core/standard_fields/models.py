@@ -34,7 +34,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class StandardFieldOverride(Base, TenantScoped):
-    __tablename__ = "standard_field_overrides"
+    __tablename__ = "tbl_standard_field_overrides"
     __table_args__ = (
         UniqueConstraint(
             "org_id",

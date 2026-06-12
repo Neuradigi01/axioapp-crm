@@ -77,7 +77,7 @@ lead_source_enum = ENUM(
 
 
 class Lead(Base, TenantScoped):
-    __tablename__ = "leads"
+    __tablename__ = "tbl_leads"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -86,7 +86,7 @@ class Lead(Base, TenantScoped):
     )
     contact_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contacts.id", ondelete="RESTRICT"),
+        ForeignKey("tbl_contacts.id", ondelete="RESTRICT"),
         nullable=False,
     )
     pipeline_stage: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -171,7 +171,7 @@ class LeadScoringRule(Base, TenantScoped):
     score is clamped to ``[0, 100]`` after summing matching rules.
     """
 
-    __tablename__ = "lead_scoring_rules"
+    __tablename__ = "tbl_lead_scoring_rules"
     __table_args__ = (
         CheckConstraint(
             "points BETWEEN -100 AND 100",

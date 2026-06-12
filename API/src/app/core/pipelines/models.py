@@ -39,7 +39,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class Pipeline(Base, TenantScoped):
-    __tablename__ = "pipelines"
+    __tablename__ = "tbl_pipelines"
     __table_args__ = (
         UniqueConstraint("org_id", "key", name="uq_pipelines_org_key"),
     )
@@ -66,7 +66,7 @@ class Pipeline(Base, TenantScoped):
 
 
 class PipelineStage(Base, TenantScoped):
-    __tablename__ = "pipeline_stages"
+    __tablename__ = "tbl_pipeline_stages"
     __table_args__ = (
         UniqueConstraint(
             "pipeline_id",
@@ -97,7 +97,7 @@ class PipelineStage(Base, TenantScoped):
     )
     pipeline_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("pipelines.id", ondelete="CASCADE"),
+        ForeignKey("tbl_pipelines.id", ondelete="CASCADE"),
         nullable=False,
     )
     key: Mapped[str] = mapped_column(String(64), nullable=False)

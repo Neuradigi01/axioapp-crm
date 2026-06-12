@@ -69,7 +69,7 @@ class EmailAccount(Base, TenantScoped):
     Gmail accounts — the UNIQUE constraint only stops reconnecting
     the *same* external account twice."""
 
-    __tablename__ = "email_accounts"
+    __tablename__ = "tbl_email_accounts"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

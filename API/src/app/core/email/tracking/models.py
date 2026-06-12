@@ -26,7 +26,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class EmailMessageOpen(Base, TenantScoped):
-    __tablename__ = "email_message_opens"
+    __tablename__ = "tbl_email_message_opens"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -48,7 +48,7 @@ class EmailMessageOpen(Base, TenantScoped):
 
 
 class EmailMessageClick(Base, TenantScoped):
-    __tablename__ = "email_message_clicks"
+    __tablename__ = "tbl_email_message_clicks"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

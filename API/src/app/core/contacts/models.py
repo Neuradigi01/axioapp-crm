@@ -32,7 +32,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class Contact(Base, TenantScoped):
-    __tablename__ = "contacts"
+    __tablename__ = "tbl_contacts"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

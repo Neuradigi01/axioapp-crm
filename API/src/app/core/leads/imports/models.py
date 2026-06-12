@@ -55,7 +55,7 @@ lead_import_status_enum = ENUM(
 
 
 class LeadImport(Base, TenantScoped):
-    __tablename__ = "lead_imports"
+    __tablename__ = "tbl_lead_imports"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -106,7 +106,7 @@ class ImportPreset(Base):
     migration) backs that up.
     """
 
-    __tablename__ = "import_presets"
+    __tablename__ = "tbl_import_presets"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -116,7 +116,7 @@ class ImportPreset(Base):
     # NULL = system preset (visible to every org).
     org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="CASCADE"),
+        ForeignKey("tbl_organizations.id", ondelete="CASCADE"),
         nullable=True,
     )
     source_platform: Mapped[str] = mapped_column(String(32), nullable=False)

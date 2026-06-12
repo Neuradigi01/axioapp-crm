@@ -19,7 +19,7 @@ from src.app.shared.db import Base
 
 
 class Organization(Base):
-    __tablename__ = "organizations"
+    __tablename__ = "tbl_organizations"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

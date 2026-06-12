@@ -24,7 +24,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class Invitation(Base, TenantScoped):
-    __tablename__ = "invitations"
+    __tablename__ = "tbl_invitations"
     __table_args__ = (
         UniqueConstraint("token_hash", name="uq_invitations_token_hash"),
     )
@@ -37,7 +37,7 @@ class Invitation(Base, TenantScoped):
     email: Mapped[str] = mapped_column(CITEXT(), nullable=False)
     role_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("roles.id", ondelete="RESTRICT"),
+        ForeignKey("tbl_roles.id", ondelete="RESTRICT"),
         nullable=False,
     )
     invited_by: Mapped[uuid.UUID] = mapped_column(

@@ -94,7 +94,7 @@ fp_alert_status_enum = ENUM(
 
 
 class Warehouse(Base, TenantScoped):
-    __tablename__ = "fp_warehouses"
+    __tablename__ = "tbl_fp_warehouses"
     __table_args__ = (
         UniqueConstraint("org_id", "name", name="uq_fp_warehouses_org_name"),
     )
@@ -124,7 +124,7 @@ class Warehouse(Base, TenantScoped):
 
 
 class InventoryItem(Base, TenantScoped):
-    __tablename__ = "fp_inventory_items"
+    __tablename__ = "tbl_fp_inventory_items"
     __table_args__ = (
         CheckConstraint(
             "qty_on_hand >= 0",
@@ -157,12 +157,12 @@ class InventoryItem(Base, TenantScoped):
     )
     catalog_item_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("catalog_items.id", ondelete="SET NULL"),
+        ForeignKey("tbl_catalog_items.id", ondelete="SET NULL"),
         nullable=True,
     )
     warehouse_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("fp_warehouses.id", ondelete="RESTRICT"),
+        ForeignKey("tbl_fp_warehouses.id", ondelete="RESTRICT"),
         nullable=False,
     )
     sku: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -212,7 +212,7 @@ class InventoryItem(Base, TenantScoped):
 
 
 class InventoryMovement(Base, TenantScoped):
-    __tablename__ = "fp_inventory_movements"
+    __tablename__ = "tbl_fp_inventory_movements"
     __table_args__ = (
         Index(
             "ix_fp_inventory_movements_item_created",
@@ -228,7 +228,7 @@ class InventoryMovement(Base, TenantScoped):
     )
     item_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("fp_inventory_items.id", ondelete="CASCADE"),
+        ForeignKey("tbl_fp_inventory_items.id", ondelete="CASCADE"),
         nullable=False,
     )
     type: Mapped[MovementType] = mapped_column(
@@ -257,7 +257,7 @@ class InventoryMovement(Base, TenantScoped):
 
 
 class StockAlert(Base, TenantScoped):
-    __tablename__ = "fp_inventory_alerts"
+    __tablename__ = "tbl_fp_inventory_alerts"
     __table_args__ = (
         Index(
             "ix_fp_inventory_alerts_item_status",
@@ -273,7 +273,7 @@ class StockAlert(Base, TenantScoped):
     )
     item_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("fp_inventory_items.id", ondelete="CASCADE"),
+        ForeignKey("tbl_fp_inventory_items.id", ondelete="CASCADE"),
         nullable=False,
     )
     severity: Mapped[AlertSeverity] = mapped_column(

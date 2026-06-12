@@ -27,7 +27,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class EmailTemplate(Base, TenantScoped):
-    __tablename__ = "email_templates"
+    __tablename__ = "tbl_email_templates"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

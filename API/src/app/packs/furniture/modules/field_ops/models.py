@@ -41,7 +41,7 @@ field_visit_purpose_enum = ENUM(
 
 
 class FieldVisit(Base, TenantScoped):
-    __tablename__ = "fp_field_visits"
+    __tablename__ = "tbl_fp_field_visits"
     __table_args__ = (
         Index("ix_fp_field_visits_appointment", "appointment_id"),
         Index("ix_fp_field_visits_custom_order", "custom_order_id"),
@@ -55,7 +55,7 @@ class FieldVisit(Base, TenantScoped):
     )
     appointment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("appointments.id", ondelete="CASCADE"),
+        ForeignKey("tbl_appointments.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
     )
@@ -64,7 +64,7 @@ class FieldVisit(Base, TenantScoped):
     )
     custom_order_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("fp_custom_orders.id", ondelete="SET NULL"),
+        ForeignKey("tbl_fp_custom_orders.id", ondelete="SET NULL"),
         nullable=True,
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -89,7 +89,7 @@ class FieldVisit(Base, TenantScoped):
 
 
 class FieldVisitPhoto(Base, TenantScoped):
-    __tablename__ = "fp_field_visit_photos"
+    __tablename__ = "tbl_fp_field_visit_photos"
     __table_args__ = (
         Index("ix_fp_field_visit_photos_visit", "visit_id"),
     )
@@ -101,7 +101,7 @@ class FieldVisitPhoto(Base, TenantScoped):
     )
     visit_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("fp_field_visits.id", ondelete="CASCADE"),
+        ForeignKey("tbl_fp_field_visits.id", ondelete="CASCADE"),
         nullable=False,
     )
     url: Mapped[str] = mapped_column(String(512), nullable=False)

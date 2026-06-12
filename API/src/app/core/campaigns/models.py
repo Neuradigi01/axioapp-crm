@@ -74,7 +74,7 @@ campaign_message_status_enum = ENUM(
 
 
 class Campaign(Base, TenantScoped):
-    __tablename__ = "campaigns"
+    __tablename__ = "tbl_campaigns"
     __table_args__ = (
         Index("ix_campaigns_org_status", "org_id", "status"),
         Index("ix_campaigns_org_schedule_at", "org_id", "schedule_at"),
@@ -108,7 +108,7 @@ class Campaign(Base, TenantScoped):
     # will then fail with a clear "template no longer exists" error.
     template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("whatsapp_templates.id", ondelete="SET NULL"),
+        ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
         nullable=True,
     )
     # Operator's variable bindings — shape:
@@ -140,7 +140,7 @@ class Campaign(Base, TenantScoped):
 
 
 class CampaignMessage(Base, TenantScoped):
-    __tablename__ = "campaign_messages"
+    __tablename__ = "tbl_campaign_messages"
     __table_args__ = (
         Index(
             "ix_campaign_messages_campaign_status",
@@ -162,12 +162,12 @@ class CampaignMessage(Base, TenantScoped):
     )
     campaign_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("campaigns.id", ondelete="CASCADE"),
+        ForeignKey("tbl_campaigns.id", ondelete="CASCADE"),
         nullable=False,
     )
     contact_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contacts.id", ondelete="CASCADE"),
+        ForeignKey("tbl_contacts.id", ondelete="CASCADE"),
         nullable=False,
     )
     channel_message_id: Mapped[str | None] = mapped_column(

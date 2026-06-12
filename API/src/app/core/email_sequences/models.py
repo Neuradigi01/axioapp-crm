@@ -66,7 +66,7 @@ class EnrollmentState(str, enum.Enum):
 
 
 class EmailSequence(Base, TenantScoped):
-    __tablename__ = "email_sequences"
+    __tablename__ = "tbl_email_sequences"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -101,7 +101,7 @@ class EmailSequence(Base, TenantScoped):
 
 
 class EmailSequenceStep(Base, TenantScoped):
-    __tablename__ = "email_sequence_steps"
+    __tablename__ = "tbl_email_sequence_steps"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -126,7 +126,7 @@ class EmailSequenceStep(Base, TenantScoped):
 
 
 class EmailSequenceEnrollment(Base, TenantScoped):
-    __tablename__ = "email_sequence_enrollments"
+    __tablename__ = "tbl_email_sequence_enrollments"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -181,7 +181,7 @@ class EmailSequenceEnrollment(Base, TenantScoped):
 
 
 class EmailSequenceEnrollmentStep(Base, TenantScoped):
-    __tablename__ = "email_sequence_enrollment_steps"
+    __tablename__ = "tbl_email_sequence_enrollment_steps"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

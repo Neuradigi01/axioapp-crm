@@ -2,7 +2,7 @@
 
 **Goal:** Walk the naming map from Step 1 and rewrite **every** `__tablename__` string and **every** `ForeignKey("<old_name>.<col>")` string in `api/src/app/` to the new `tbl_*` names. No DB change yet — this step only touches Python source. The application will not boot against the unmigrated DB after this step; that's expected and resolved when Step 3 runs.
 **Track:** Rename to `tbl_` Prefix
-**Status:** Pending
+**Status:** COMPLETED — 2026-06-12. User picked Option A (unify `fp_*` → `tbl_fp_*`). 44 model files modified across `api/src/app/core/*`, `api/src/app/packs/furniture/*`, and `api/src/app/shared/orm.py`. 118 substitutions total: every `__tablename__ = "<plain>"` → `tbl_<plain>` (with collision fix `notifications` → `tbl_crm_notifications`); every `ForeignKey("<plain>.<col>")` updated to the new target; the two parked `ForeignKey("users.id")` strings in `audit/models.py` and `auth/models.py` left untouched per §8 of the naming map; the `Table("users", ...)` metadata shim in `users/models.py` left untouched. `python -c "import compileall; compileall.compile_dir('src/app', quiet=1)"` reports `compile OK`. App will NOT boot against the un-migrated DB until Step 3 lands the rename migration — expected.
 **Depends on:** Step 1 — naming map approved (user replied "proceed with A" or "B").
 
 ---

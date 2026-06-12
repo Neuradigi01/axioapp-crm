@@ -25,7 +25,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class EmbedKey(Base, TenantScoped):
-    __tablename__ = "embed_keys"
+    __tablename__ = "tbl_embed_keys"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -74,7 +74,7 @@ class WidgetConfig(Base, TenantScoped):
     `updated_by` is a plain UUID (post-0037 convention).
     """
 
-    __tablename__ = "widget_configs"
+    __tablename__ = "tbl_widget_configs"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -130,7 +130,7 @@ class EmbedSubmissionLog(Base, TenantScoped):
     table is `embed_submissions` per the migration.
     """
 
-    __tablename__ = "embed_submissions"
+    __tablename__ = "tbl_embed_submissions"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

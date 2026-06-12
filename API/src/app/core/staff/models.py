@@ -51,7 +51,7 @@ employment_status_enum = ENUM(
 
 
 class StaffProfile(Base, TenantScoped):
-    __tablename__ = "staff_profiles"
+    __tablename__ = "tbl_staff_profiles"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -88,7 +88,7 @@ class StaffProfile(Base, TenantScoped):
 
 
 class Attendance(Base, TenantScoped):
-    __tablename__ = "attendance"
+    __tablename__ = "tbl_attendance"
     __table_args__ = (
         Index("ix_attendance_user_date", "user_id", "date"),
     )

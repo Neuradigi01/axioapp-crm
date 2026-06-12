@@ -26,7 +26,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class Role(Base, TenantScoped):
-    __tablename__ = "roles"
+    __tablename__ = "tbl_roles"
     __table_args__ = (
         UniqueConstraint("org_id", "name", name="uq_roles_org_id_name"),
     )
@@ -46,7 +46,7 @@ class Role(Base, TenantScoped):
 
 
 class Permission(Base):
-    __tablename__ = "permissions"
+    __tablename__ = "tbl_permissions"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -62,15 +62,15 @@ class Permission(Base):
 
 
 class RolePermission(Base):
-    __tablename__ = "role_permissions"
+    __tablename__ = "tbl_role_permissions"
 
     role_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("roles.id", ondelete="CASCADE"),
+        ForeignKey("tbl_roles.id", ondelete="CASCADE"),
         primary_key=True,
     )
     permission_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("permissions.id", ondelete="CASCADE"),
+        ForeignKey("tbl_permissions.id", ondelete="CASCADE"),
         primary_key=True,
     )

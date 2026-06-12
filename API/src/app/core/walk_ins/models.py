@@ -56,7 +56,7 @@ walk_in_status_enum = ENUM(
 
 
 class WalkIn(Base, TenantScoped):
-    __tablename__ = "walk_ins"
+    __tablename__ = "tbl_walk_ins"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -65,7 +65,7 @@ class WalkIn(Base, TenantScoped):
     )
     contact_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contacts.id", ondelete="RESTRICT"),
+        ForeignKey("tbl_contacts.id", ondelete="RESTRICT"),
         nullable=False,
     )
     time_in: Mapped[datetime] = mapped_column(
@@ -117,7 +117,7 @@ class WalkIn(Base, TenantScoped):
     # analytics.
     linked_lead_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("leads.id", ondelete="SET NULL"),
+        ForeignKey("tbl_leads.id", ondelete="SET NULL"),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
