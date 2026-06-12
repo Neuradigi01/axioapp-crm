@@ -291,7 +291,7 @@ async def test_transition_aborts_on_concurrent_status_change(test_db, fresh_org)
     # Simulate a concurrent payment success.
     await test_db.execute(
         text(
-            "UPDATE subscriptions SET status='active', plan_code='basic' WHERE id=:id"
+            "UPDATE tbl_subscriptions SET status='active', plan_code='basic' WHERE id=:id"
         ),
         {"id": sub.id},
     )

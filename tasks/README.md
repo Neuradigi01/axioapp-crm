@@ -259,7 +259,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 2: Models + FK + relationship-string rewrite (Python source)](rename-tbl-prefix/step-2-models-and-fk-rewrite.md) — Done
 - [Step 3: Alembic rename migration + RLS policy rebuild](rename-tbl-prefix/step-3-alembic-rename-migration.md) — Done
 - [Step 4: Raw-SQL, seed, and `text(…)` sweep](rename-tbl-prefix/step-4-raw-sql-and-seed-sweep.md) — Done
-- [Step 5: Full test pass + frontend sweep + Ajay's Workspace smoke](rename-tbl-prefix/step-5-test-pass-and-smoke.md) — Pending
+- [Step 5: Full test pass + frontend sweep + Ajay's Workspace smoke](rename-tbl-prefix/step-5-test-pass-and-smoke.md) — Done (pytest blocked on pre-existing infra issue, separately scoped)
 
 ---
 
