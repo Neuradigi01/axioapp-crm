@@ -22,6 +22,10 @@ import { ComposeBarComponent } from './compose-bar.component';
 import { ConversationListComponent } from './conversation-list.component';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
 import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
+import {
+  ReassignConfirm,
+  ReassignModalComponent,
+} from '../shared/reassign-modal/reassign-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
@@ -42,7 +46,12 @@ import { extractApiError } from '@core/services/api-error.util';
   selector: 'app-conversations-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ConversationListComponent, ChatThreadComponent, ComposeBarComponent],
+  imports: [
+    ConversationListComponent,
+    ChatThreadComponent,
+    ComposeBarComponent,
+    ReassignModalComponent,
+  ],
   templateUrl: './conversations.page.html',
 })
 export class ConversationsPageComponent {
@@ -66,6 +75,12 @@ export class ConversationsPageComponent {
    * via `GET /api/v1/staff`; the list is small (org-wide staff) and
    * rarely changes within a session. */
   protected readonly staffById = signal<Map<string, StaffListItem>>(new Map());
+
+  /** When `true`, the reassign modal is rendered inline and bound to
+   * `selectedConversation()`. Cancel/confirm flip it back to `false`. */
+  protected readonly reassignOpen = signal(false);
+  protected readonly reassignSubmitting = signal(false);
+  protected readonly reassignError = signal<string | null>(null);
 
   protected readonly selectedConversation = computed<Conversation | null>(() => {
     const id = this.selectedId();
@@ -175,6 +190,50 @@ export class ConversationsPageComponent {
           );
           this.loadError.set(
             extractApiError(err) ?? 'Could not send message.',
+          );
+        },
+      });
+  }
+
+  // --- Reassign (assignee pill on the thread header) ----------------------
+
+  protected openReassign(): void {
+    if (!this.selectedConversation()) return;
+    this.reassignError.set(null);
+    this.reassignSubmitting.set(false);
+    this.reassignOpen.set(true);
+  }
+
+  protected closeReassign(): void {
+    this.reassignOpen.set(false);
+    this.reassignSubmitting.set(false);
+    this.reassignError.set(null);
+  }
+
+  protected onReassignConfirm(payload: ReassignConfirm): void {
+    const conv = this.selectedConversation();
+    if (!conv) return;
+    this.reassignSubmitting.set(true);
+    this.reassignError.set(null);
+    this.api
+      .patch(conv.id, { assigned_to_id: payload.userId })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          // Authoritative write-back — overrides any stale WS-driven
+          // refresh that arrived during the PATCH round-trip.
+          this.items.update((rows) =>
+            rows.map((r) => (r.id === updated.id ? updated : r)),
+          );
+          this.detail.update((d) =>
+            d ? { ...d, conversation: updated } : d,
+          );
+          this.closeReassign();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.reassignSubmitting.set(false);
+          this.reassignError.set(
+            extractApiError(err) ?? 'Could not update assignee.',
           );
         },
       });

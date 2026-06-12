@@ -11,20 +11,39 @@
     </div>
     <div class="flex items-center gap-2">
       @let ownerHeader = staffColorFor(conversation.assigned_to_id);
-      <span
-        [class]="
-          'inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-xs font-medium ring-1 ' +
-          ownerHeader.bg + ' ' + ownerHeader.text + ' ' + ownerHeader.ring
-        "
-        [title]="staffNameFor(conversation.assigned_to_id)"
-      >
-        <span
-          class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/50 text-[10px] font-semibold"
+      @if (canReassign()) {
+        <button
+          type="button"
+          (click)="reassign.emit()"
+          [class]="
+            'inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-xs font-medium ring-1 transition hover:opacity-90 ' +
+            ownerHeader.bg + ' ' + ownerHeader.text + ' ' + ownerHeader.ring
+          "
+          [title]="'Reassign — ' + staffNameFor(conversation.assigned_to_id)"
         >
-          {{ staffInitialsFor(conversation.assigned_to_id) }}
+          <span
+            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/50 text-[10px] font-semibold"
+          >
+            {{ staffInitialsFor(conversation.assigned_to_id) }}
+          </span>
+          {{ staffNameFor(conversation.assigned_to_id) }}
+        </button>
+      } @else {
+        <span
+          [class]="
+            'inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-xs font-medium ring-1 ' +
+            ownerHeader.bg + ' ' + ownerHeader.text + ' ' + ownerHeader.ring
+          "
+          [title]="staffNameFor(conversation.assigned_to_id)"
+        >
+          <span
+            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/50 text-[10px] font-semibold"
+          >
+            {{ staffInitialsFor(conversation.assigned_to_id) }}
+          </span>
+          {{ staffNameFor(conversation.assigned_to_id) }}
         </span>
-        {{ staffNameFor(conversation.assigned_to_id) }}
-      </span>
+      }
       <button
         type="button"
         (click)="toggle()"

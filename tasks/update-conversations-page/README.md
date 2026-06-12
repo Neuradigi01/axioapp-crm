@@ -64,7 +64,7 @@ Reusing these means each step in this track stays small and visually consistent 
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
 | 1 | [Display-only: assignee badge on list + sender pill on outbound messages](step-1-assignee-badge-and-sender-pill.md) | **COMPLETED** — 6 files, reuses `shared/owner-color.util.ts` palette, app auto-reloads | ~3 hrs |
-| 2 | [Assign / reassign from the thread header (reuse `shared/reassign-modal`)](step-2-assign-button-thread-header.md) | Pending | ~3 hrs |
+| 2 | [Assign / reassign from the thread header (reuse `shared/reassign-modal`)](step-2-assign-button-thread-header.md) | **COMPLETED** — 4 files, modal reused as-is, FurnitureAuthService permission gate | ~3 hrs |
 | 3 | [Assignee filter chip — Mine / Unassigned / Specific staff (reuse leads convention)](step-3-assignee-filter-chip.md) | Pending | ~3 hrs |
 
 **Total: ~1 day end-to-end.** Each step independently verifiable; pause and report after each per rule 9.

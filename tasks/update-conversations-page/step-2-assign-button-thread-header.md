@@ -2,7 +2,7 @@
 
 **Goal:** Make the assignee pill in the thread header (built in Step 1) **clickable**. Clicking opens the existing `shared/reassign-modal` component, which lets the user pick a staff member (or "Unassign") and PATCHes `assigned_to_id` on the conversation. After the PATCH succeeds the page updates without reload.
 **Track:** Update Conversations Page
-**Status:** Pending
+**Status:** COMPLETED — 2026-06-12. 4 files modified, 0 created, 0 backend changes. **`shared/reassign-modal` already had `allowUnassign` semantics built in** — its FormControl treats an empty string as "Unassigned" and emits `userId: null`, so no upstream contract change was needed. The chat-thread component now injects `FurnitureAuthService`, exposes a `canReassign = computed(() => hasPermission('conversations.write'))` gate, and emits a `(reassign)` output when the header pill is clicked. Template conditionally renders the pill as a `<button>` (permission-granted, click → emit) or a `<span>` (read-only). The page wires `(reassign)="openReassign()"` and renders `<app-reassign-modal>` inline when `reassignOpen() && selectedConversation()` are truthy — same embed pattern used by `leads.page.html`. `onReassignConfirm(payload)` PATCHes `assigned_to_id` via the existing `conversationsApi.patch()` method, then authoritatively writes the server response back to both `items` and `detail` signals (overrides any stale WS-driven refresh during the round-trip). Errors surface through the modal's own `error` input, not the page-level `loadError` — the modal stays open with the error visible until the user retries or cancels.
 **Depends on:** Step 1 — assignee badge already renders read-only in the thread header.
 
 ---
