@@ -15,6 +15,12 @@ import {
   ConversationListQuery,
   ConversationStatus,
 } from './conversations-api.service';
+import { StaffListItem } from '../staff/staff-api.service';
+import {
+  OwnerColor,
+  ownerColor,
+  staffInitials,
+} from '../shared/owner-color.util';
 
 interface ChannelBadgeStyle {
   label: string;
@@ -87,6 +93,7 @@ export class ConversationListComponent {
   @Input() items: Conversation[] = [];
   @Input() loading = false;
   @Input() selectedId: string | null = null;
+  @Input() staffById: Map<string, StaffListItem> = new Map();
 
   @Output() readonly filtersChange = new EventEmitter<ConversationListQuery>();
   @Output() readonly select = new EventEmitter<string>();
@@ -102,6 +109,20 @@ export class ConversationListComponent {
 
   protected channelStyle(channel: ConversationChannel): ChannelBadgeStyle {
     return CHANNEL_STYLES[channel];
+  }
+
+  /** Two-letter initials for the staff member that owns this thread,
+   * or `·` if the thread is unassigned. */
+  protected assigneeInitials(userId: string | null): string {
+    if (!userId) return '·';
+    const staff = this.staffById.get(userId);
+    return staff ? staffInitials(staff.full_name) : '?';
+  }
+
+  /** Deterministic colour triple matching the same user id everywhere
+   * else in the UI (leads kanban, appointments calendar, etc.). */
+  protected assigneeColor(userId: string | null): OwnerColor {
+    return ownerColor(userId);
   }
 
   protected formatTime(iso: string | null): string {

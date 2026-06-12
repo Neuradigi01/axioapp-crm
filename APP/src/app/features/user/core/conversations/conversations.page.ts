@@ -21,6 +21,7 @@ import { ChatThreadComponent } from './chat-thread.component';
 import { ComposeBarComponent } from './compose-bar.component';
 import { ConversationListComponent } from './conversation-list.component';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
+import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
@@ -47,6 +48,7 @@ import { extractApiError } from '@core/services/api-error.util';
 export class ConversationsPageComponent {
   private readonly api = inject(ConversationsApiService);
   private readonly notifications = inject(NotificationsApiService);
+  private readonly staffApi = inject(StaffApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly items = signal<Conversation[]>([]);
@@ -58,6 +60,12 @@ export class ConversationsPageComponent {
   protected readonly threadLoading = signal(false);
 
   protected readonly filters = signal<ConversationListQuery>({});
+
+  /** Staff list indexed by user id — resolves `assigned_to_id` and
+   * `sender_user_id` to display names. Loaded once at page construct
+   * via `GET /api/v1/staff`; the list is small (org-wide staff) and
+   * rarely changes within a session. */
+  protected readonly staffById = signal<Map<string, StaffListItem>>(new Map());
 
   protected readonly selectedConversation = computed<Conversation | null>(() => {
     const id = this.selectedId();
@@ -71,6 +79,7 @@ export class ConversationsPageComponent {
 
   constructor() {
     this.reloadList();
+    this.loadStaff();
 
     // WS hook: react to the notifications signal. The notifications
     // service prepends new rows; we only care about `conversation.message`.
@@ -82,6 +91,25 @@ export class ConversationsPageComponent {
       if (head.type !== 'conversation.message') return;
       this.onIncomingNotification(head.payload);
     });
+  }
+
+  /** One-shot staff load at page mount. Failure is non-fatal — badges
+   * fall back to "?" initials and the neutral grey palette. */
+  private loadStaff(): void {
+    this.staffApi
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          const map = new Map<string, StaffListItem>();
+          for (const r of rows) map.set(r.id, r);
+          this.staffById.set(map);
+        },
+        error: () => {
+          // Intentionally silent — page remains usable; the badge
+          // markup degrades gracefully when the map is empty.
+        },
+      });
   }
 
   protected onFiltersChange(next: ConversationListQuery): void {

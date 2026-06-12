@@ -2,7 +2,7 @@
 
 **Goal:** Surface the two pieces of accountability information the backend already records — *who owns this thread* and *who sent each outbound message* — as read-only visual elements in the Conversations page. No PATCH calls in this step; just display.
 **Track:** Update Conversations Page
-**Status:** Pending
+**Status:** COMPLETED — 2026-06-12. 6 files modified (5 spec'd + 1 shared util). Conversations page now loads the staff list once at construct (`StaffApiService.list()` → `Map<string, StaffListItem>`); the map is exposed as a `staffById` signal and plumbed to both children. List rows render an assignee avatar (initials in the deterministic palette from `shared/owner-color.util.ts`) next to the channel chip — unassigned threads show `·` in grey. Thread header carries the same avatar + full name in a pill (read-only — Step 2 will make it clickable). Outbound message bubbles get a small sender avatar in the bottom-right corner (`absolute -bottom-1 -right-1`) showing the rep's initials, with the full name + timestamp in a hover tooltip; bot-emitted messages (sender_user_id = NULL) render a `lucide:bot` icon instead. Reused `ownerColor(userId)` from `shared/owner-color.util.ts` so the same staff member gets the same colour across leads kanban / appointments calendar / conversations — no palette duplication. Added a sibling `staffInitials(fullName)` helper to the same util for consistency. The staff load failure is non-fatal — badges degrade to `?` + grey palette so the page stays usable if `/api/v1/staff` is down.
 **Depends on:** None (backend already provides `assigned_to_id` on conversations and `sender_user_id` on messages).
 
 ---

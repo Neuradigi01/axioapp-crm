@@ -263,7 +263,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 5: Full test pass + frontend sweep + Ajay's Workspace smoke](rename-tbl-prefix/step-5-test-pass-and-smoke.md) — Done (pytest blocked on pre-existing infra issue, separately scoped)
 
 ### Update Conversations Page (side track — surface the assignee + sender signals the backend already records)
-- [Step 1: Display-only — assignee badge on list + sender pill on outbound messages](update-conversations-page/step-1-assignee-badge-and-sender-pill.md) — Pending
+- [Step 1: Display-only — assignee badge on list + sender pill on outbound messages](update-conversations-page/step-1-assignee-badge-and-sender-pill.md) — Done
 - [Step 2: Assign / reassign from the thread header (reuse `shared/reassign-modal`)](update-conversations-page/step-2-assign-button-thread-header.md) — Pending
 - [Step 3: Assignee filter chip — Mine / Unassigned / Specific staff](update-conversations-page/step-3-assignee-filter-chip.md) — Pending
 

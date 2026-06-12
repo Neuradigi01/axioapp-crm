@@ -29,6 +29,7 @@
         [items]="items()"
         [loading]="loading()"
         [selectedId]="selectedId()"
+        [staffById]="staffById()"
         (filtersChange)="onFiltersChange($event)"
         (select)="onSelect($event)"
       />
@@ -41,6 +42,7 @@
           [conversation]="conv"
           [detail]="detail()"
           [loading]="threadLoading()"
+          [staffById]="staffById()"
           (toggleAi)="onToggleAi($event)"
         />
         <app-compose-bar

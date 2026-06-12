@@ -43,3 +43,19 @@ export function ownerColor(userId: string | null | undefined): OwnerColor {
   }
   return PALETTE[Math.abs(h) % PALETTE.length];
 }
+
+/**
+ * Two-letter initials from a full name. Returns the first letter of
+ * the first two whitespace-separated words, uppercased. Falls back to
+ * `?` when the name is empty / nullish. Use alongside `ownerColor` to
+ * render a staff avatar circle anywhere in the UI.
+ */
+export function staffInitials(fullName: string | null | undefined): string {
+  if (!fullName) return '?';
+  const parts = fullName.trim().split(/\s+/).filter((p) => p.length > 0);
+  if (parts.length === 0) return '?';
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join('');
+}
