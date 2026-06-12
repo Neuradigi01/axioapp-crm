@@ -10,7 +10,8 @@
  * show a toast and refresh the list.
  *
  * The DPDP / GDPR consent callout is a one-time acknowledgment kept
- * per-user in `localStorage` — this is acknowledgment, not consent-
+ * per-user in `localStorage` —
+ *  this is acknowledgment, not consent-
  * of-record. The OAuth grant itself is the legal consent record;
  * the banner just makes the privacy implications visible before the
  * redirect kicks off.
