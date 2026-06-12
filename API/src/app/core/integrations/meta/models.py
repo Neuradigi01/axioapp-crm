@@ -30,7 +30,7 @@ class MetaPageToken(Base, TenantScoped):
     """One row per (integration_id, page_id). UNIQUE constraint enforces
     one row per pair; re-subscribing a Page replaces the cached token."""
 
-    __tablename__ = "meta_page_tokens"
+    __tablename__ = "tbl_meta_page_tokens"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -39,7 +39,7 @@ class MetaPageToken(Base, TenantScoped):
     )
     integration_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("integrations.id", ondelete="CASCADE"),
+        ForeignKey("tbl_integrations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

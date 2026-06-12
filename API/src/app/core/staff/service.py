@@ -7,7 +7,7 @@ Five concerns:
    yet. Tenant scoping is automatic via the ORM filter.
 2. `upsert_profile` — `PUT /staff/{id}` semantics. Replaces the
    profile row if one exists, otherwise inserts.
-3. `performance` — composes a `PerformanceOut` from leads (won count,
+3. `performance` — composes a `PerformanceOut` from tbl_leads (won count,
    active count) and the user's profile. Sales is `Decimal('0')`
    today (placeholder until invoices ship in Phase 5); the spec
    explicitly calls this out.

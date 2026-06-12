@@ -381,7 +381,7 @@ async def test_owner_deactivation_refused(layered_client, seeded_admin):
     async with TestSession() as session:
         await session.execute(
             sql_text(
-                "UPDATE roles SET name='Owner', is_system=true WHERE id=:i"
+                "UPDATE tbl_roles SET name='Owner', is_system=true WHERE id=:i"
             ),
             {"i": seeded_admin["role"].id},
         )

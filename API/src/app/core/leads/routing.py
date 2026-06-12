@@ -102,8 +102,8 @@ async def _list_eligible_users(
           ON m.user_member_id = u.id
          AND m.is_active = true
          AND m.organization_id = :org_id
-        JOIN role_permissions rp ON rp.role_id = m.role_id
-        JOIN permissions p
+        JOIN tbl_role_permissions rp ON rp.role_id = m.role_id
+        JOIN tbl_permissions p
           ON p.id = rp.permission_id
          AND p.key = :perm
         WHERE u.is_active = true
@@ -146,11 +146,11 @@ async def _next_round_robin_index(
     """
     sql = text(
         """
-        INSERT INTO lead_routing_state (org_id, next_assignee_index)
+        INSERT INTO tbl_lead_routing_state (org_id, next_assignee_index)
         VALUES (:org_id, 1)
         ON CONFLICT (org_id) DO UPDATE
             SET next_assignee_index =
-                  lead_routing_state.next_assignee_index + 1,
+                  tbl_lead_routing_state.next_assignee_index + 1,
                 updated_at = now()
         RETURNING next_assignee_index - 1 AS picked_index
         """

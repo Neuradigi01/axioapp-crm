@@ -34,7 +34,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class OrgSettings(Base, TenantScoped):
-    __tablename__ = "org_settings"
+    __tablename__ = "tbl_org_settings"
     __table_args__ = (
         UniqueConstraint("org_id", name="uq_org_settings_org_id"),
     )

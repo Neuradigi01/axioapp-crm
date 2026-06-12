@@ -21,6 +21,11 @@ import { ChatThreadComponent } from './chat-thread.component';
 import { ComposeBarComponent } from './compose-bar.component';
 import { ConversationListComponent } from './conversation-list.component';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
+import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
+import {
+  ReassignConfirm,
+  ReassignModalComponent,
+} from '../shared/reassign-modal/reassign-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
@@ -41,12 +46,18 @@ import { extractApiError } from '@core/services/api-error.util';
   selector: 'app-conversations-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ConversationListComponent, ChatThreadComponent, ComposeBarComponent],
+  imports: [
+    ConversationListComponent,
+    ChatThreadComponent,
+    ComposeBarComponent,
+    ReassignModalComponent,
+  ],
   templateUrl: './conversations.page.html',
 })
 export class ConversationsPageComponent {
   private readonly api = inject(ConversationsApiService);
   private readonly notifications = inject(NotificationsApiService);
+  private readonly staffApi = inject(StaffApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly items = signal<Conversation[]>([]);
@@ -58,6 +69,18 @@ export class ConversationsPageComponent {
   protected readonly threadLoading = signal(false);
 
   protected readonly filters = signal<ConversationListQuery>({});
+
+  /** Staff list indexed by user id — resolves `assigned_to_id` and
+   * `sender_user_id` to display names. Loaded once at page construct
+   * via `GET /api/v1/staff`; the list is small (org-wide staff) and
+   * rarely changes within a session. */
+  protected readonly staffById = signal<Map<string, StaffListItem>>(new Map());
+
+  /** When `true`, the reassign modal is rendered inline and bound to
+   * `selectedConversation()`. Cancel/confirm flip it back to `false`. */
+  protected readonly reassignOpen = signal(false);
+  protected readonly reassignSubmitting = signal(false);
+  protected readonly reassignError = signal<string | null>(null);
 
   protected readonly selectedConversation = computed<Conversation | null>(() => {
     const id = this.selectedId();
@@ -71,6 +94,7 @@ export class ConversationsPageComponent {
 
   constructor() {
     this.reloadList();
+    this.loadStaff();
 
     // WS hook: react to the notifications signal. The notifications
     // service prepends new rows; we only care about `conversation.message`.
@@ -82,6 +106,25 @@ export class ConversationsPageComponent {
       if (head.type !== 'conversation.message') return;
       this.onIncomingNotification(head.payload);
     });
+  }
+
+  /** One-shot staff load at page mount. Failure is non-fatal — badges
+   * fall back to "?" initials and the neutral grey palette. */
+  private loadStaff(): void {
+    this.staffApi
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          const map = new Map<string, StaffListItem>();
+          for (const r of rows) map.set(r.id, r);
+          this.staffById.set(map);
+        },
+        error: () => {
+          // Intentionally silent — page remains usable; the badge
+          // markup degrades gracefully when the map is empty.
+        },
+      });
   }
 
   protected onFiltersChange(next: ConversationListQuery): void {
@@ -147,6 +190,50 @@ export class ConversationsPageComponent {
           );
           this.loadError.set(
             extractApiError(err) ?? 'Could not send message.',
+          );
+        },
+      });
+  }
+
+  // --- Reassign (assignee pill on the thread header) ----------------------
+
+  protected openReassign(): void {
+    if (!this.selectedConversation()) return;
+    this.reassignError.set(null);
+    this.reassignSubmitting.set(false);
+    this.reassignOpen.set(true);
+  }
+
+  protected closeReassign(): void {
+    this.reassignOpen.set(false);
+    this.reassignSubmitting.set(false);
+    this.reassignError.set(null);
+  }
+
+  protected onReassignConfirm(payload: ReassignConfirm): void {
+    const conv = this.selectedConversation();
+    if (!conv) return;
+    this.reassignSubmitting.set(true);
+    this.reassignError.set(null);
+    this.api
+      .patch(conv.id, { assigned_to_id: payload.userId })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          // Authoritative write-back — overrides any stale WS-driven
+          // refresh that arrived during the PATCH round-trip.
+          this.items.update((rows) =>
+            rows.map((r) => (r.id === updated.id ? updated : r)),
+          );
+          this.detail.update((d) =>
+            d ? { ...d, conversation: updated } : d,
+          );
+          this.closeReassign();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.reassignSubmitting.set(false);
+          this.reassignError.set(
+            extractApiError(err) ?? 'Could not update assignee.',
           );
         },
       });

@@ -76,7 +76,7 @@ payment_method_enum = ENUM(
 
 
 class Invoice(Base, TenantScoped):
-    __tablename__ = "invoices"
+    __tablename__ = "tbl_invoices"
     __table_args__ = (
         Index("ix_invoices_org_status", "org_id", "status"),
         Index("ix_invoices_contact", "contact_id"),
@@ -97,7 +97,7 @@ class Invoice(Base, TenantScoped):
     number: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     contact_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contacts.id", ondelete="SET NULL"),
+        ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
         nullable=True,
     )
     status: Mapped[InvoiceStatus] = mapped_column(
@@ -152,7 +152,7 @@ class Invoice(Base, TenantScoped):
 
 
 class InvoiceLine(Base, TenantScoped):
-    __tablename__ = "invoice_lines"
+    __tablename__ = "tbl_invoice_lines"
     __table_args__ = (
         Index("ix_invoice_lines_invoice", "invoice_id"),
     )
@@ -164,12 +164,12 @@ class InvoiceLine(Base, TenantScoped):
     )
     invoice_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("invoices.id", ondelete="CASCADE"),
+        ForeignKey("tbl_invoices.id", ondelete="CASCADE"),
         nullable=False,
     )
     catalog_item_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("catalog_items.id", ondelete="SET NULL"),
+        ForeignKey("tbl_catalog_items.id", ondelete="SET NULL"),
         nullable=True,
     )
     description: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -192,7 +192,7 @@ class InvoiceLine(Base, TenantScoped):
 
 
 class Payment(Base, TenantScoped):
-    __tablename__ = "payments"
+    __tablename__ = "tbl_payments"
     __table_args__ = (
         Index("ix_payments_invoice", "invoice_id"),
     )
@@ -204,7 +204,7 @@ class Payment(Base, TenantScoped):
     )
     invoice_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("invoices.id", ondelete="CASCADE"),
+        ForeignKey("tbl_invoices.id", ondelete="CASCADE"),
         nullable=False,
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
@@ -238,11 +238,11 @@ class OrgInvoiceSeq(Base):
     tenant key, and RLS is applied at the migration level instead.
     """
 
-    __tablename__ = "org_invoice_seq"
+    __tablename__ = "tbl_org_invoice_seq"
 
     org_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="CASCADE"),
+        ForeignKey("tbl_organizations.id", ondelete="CASCADE"),
         primary_key=True,
     )
     last_number: Mapped[int] = mapped_column(

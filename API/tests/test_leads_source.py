@@ -250,7 +250,7 @@ async def test_db_level_not_null_on_source(seeded_admin):
             with pytest.raises(IntegrityError):
                 await session.execute(
                     text(
-                        "INSERT INTO leads "
+                        "INSERT INTO tbl_leads "
                         "(org_id, contact_id, pipeline_stage, source) "
                         "VALUES (:org, :contact, 'new', NULL)"
                     ),

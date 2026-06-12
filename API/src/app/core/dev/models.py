@@ -19,7 +19,7 @@ class DemoCredential(Base):
     the row IS the secret, identified solely by the user it pairs with.
     """
 
-    __tablename__ = "demo_credentials"
+    __tablename__ = "tbl_demo_credentials"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

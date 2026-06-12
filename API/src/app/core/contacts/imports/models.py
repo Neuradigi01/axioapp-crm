@@ -30,7 +30,7 @@ class ContactImport(Base, TenantScoped):
     don't delete the uploaded file post-commit — useful for forensics
     when a row import looks wrong weeks later)."""
 
-    __tablename__ = "contact_imports"
+    __tablename__ = "tbl_contact_imports"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -72,7 +72,7 @@ class ContactImport(Base, TenantScoped):
     )
     created_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contact_groups.id", ondelete="SET NULL"),
+        ForeignKey("tbl_contact_groups.id", ondelete="SET NULL"),
         nullable=True,
     )
     status: Mapped[ContactImportStatus] = mapped_column(

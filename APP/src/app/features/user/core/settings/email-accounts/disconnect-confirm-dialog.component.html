@@ -1,0 +1,72 @@
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4"
+  (click)="onBackdropClick($event)"
+  data-testid="disconnect-dialog-backdrop"
+>
+  <div
+    class="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-xl"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="disconnect-dialog-title"
+  >
+    <div class="flex items-start gap-3">
+      <div
+        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600 ring-1 ring-rose-200"
+        aria-hidden="true"
+      >
+        <lucide-icon name="mail-x" size="20"></lucide-icon>
+      </div>
+      <div class="min-w-0">
+        <h2
+          id="disconnect-dialog-title"
+          class="text-base font-semibold text-zinc-900"
+        >
+          Disconnect this mailbox?
+        </h2>
+        <p class="mt-1 text-sm text-zinc-600">
+          <span class="font-mono text-xs">{{ account().email_address }}</span>
+        </p>
+      </div>
+    </div>
+
+    <ul class="mt-4 space-y-2 text-sm text-zinc-700">
+      <li class="flex items-start gap-2">
+        <span class="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-400" aria-hidden="true"></span>
+        <span>Inbox sync stops immediately — no new messages will flow into the CRM from this mailbox.</span>
+      </li>
+      <li class="flex items-start gap-2">
+        <span class="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-400" aria-hidden="true"></span>
+        <span>Sequences and compose actions that target this mailbox will skip until you reconnect.</span>
+      </li>
+      <li class="flex items-start gap-2">
+        <span class="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-400" aria-hidden="true"></span>
+        <span>All existing conversation history stays intact — you can reconnect any time without losing it.</span>
+      </li>
+    </ul>
+
+    <div class="mt-6 flex items-center justify-end gap-2">
+      <button
+        type="button"
+        class="inline-flex items-center rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+        [disabled]="disconnecting()"
+        (click)="cancelled.emit()"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
+        [disabled]="disconnecting()"
+        (click)="confirmed.emit()"
+      >
+        @if (disconnecting()) {
+          <lucide-icon name="loader-2" size="14" class="animate-spin"></lucide-icon>
+          Disconnecting…
+        } @else {
+          <lucide-icon name="trash-2" size="14"></lucide-icon>
+          Disconnect
+        }
+      </button>
+    </div>
+  </div>
+</div>

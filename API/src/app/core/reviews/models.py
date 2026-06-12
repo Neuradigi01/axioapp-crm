@@ -50,7 +50,7 @@ review_status_enum = ENUM(
 
 
 class Review(Base, TenantScoped):
-    __tablename__ = "reviews"
+    __tablename__ = "tbl_reviews"
     __table_args__ = (
         Index("ix_reviews_org_rating", "org_id", "rating"),
         Index("ix_reviews_org_source", "org_id", "source"),
@@ -70,7 +70,7 @@ class Review(Base, TenantScoped):
     )
     contact_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contacts.id", ondelete="SET NULL"),
+        ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
         nullable=True,
     )
     rating: Mapped[int] = mapped_column(Integer, nullable=False)

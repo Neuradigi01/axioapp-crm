@@ -271,7 +271,7 @@ async def get_by_webhook_secret(
                scopes, last_error, connected_at, connected_by,
                disconnected_at, disconnected_by, updated_at,
                webhook_secret
-        FROM integrations
+        FROM tbl_integrations
         WHERE webhook_secret = :secret
         LIMIT 1
         """

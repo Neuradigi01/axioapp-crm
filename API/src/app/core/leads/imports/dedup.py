@@ -71,7 +71,7 @@ async def find_existing_contact(
 
     sql = text(
         """
-        SELECT id FROM contacts
+        SELECT id FROM tbl_contacts
         WHERE org_id = :org_id
           AND (
               (:phone_norm <> '' AND regexp_replace(coalesce(phone, ''), '\\D', '', 'g') = :phone_norm)

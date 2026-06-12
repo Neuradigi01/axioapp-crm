@@ -29,7 +29,7 @@ class ContactGroup(Base, TenantScoped):
     """One saved audience. Targeted by campaigns via
     `audience_filter.group_id` (Step 3.5.9)."""
 
-    __tablename__ = "contact_groups"
+    __tablename__ = "tbl_contact_groups"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -67,7 +67,7 @@ class ContactGroupMember(Base, TenantScoped):
     """Bridge for STATIC groups only. Dynamic groups leave this empty
     and resolve through the contacts query builder on demand."""
 
-    __tablename__ = "contact_group_members"
+    __tablename__ = "tbl_contact_group_members"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -76,12 +76,12 @@ class ContactGroupMember(Base, TenantScoped):
     )
     group_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contact_groups.id", ondelete="CASCADE"),
+        ForeignKey("tbl_contact_groups.id", ondelete="CASCADE"),
         nullable=False,
     )
     contact_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contacts.id", ondelete="CASCADE"),
+        ForeignKey("tbl_contacts.id", ondelete="CASCADE"),
         nullable=False,
     )
     added_at: Mapped[datetime] = mapped_column(

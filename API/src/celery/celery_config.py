@@ -88,4 +88,14 @@ beat_schedule = {
         'task': 'src.app.core.email.tasks.reset_daily_sent_counters',
         'schedule': crontab(hour=0, minute=0),
     },
+    # App-updates Email Step 7 — every 60s, sweep due
+    # `email_sequence_enrollment_steps` rows, render their templates,
+    # and dispatch via the Step 5 send_email entry point. Reply
+    # detection auto-pauses enrollments where the contact replied;
+    # 200-rows/tick cap bounds wall-clock and stays well within
+    # Gmail/Microsoft rate limits.
+    'email-sequences-tick': {
+        'task': 'src.app.core.email_sequences.tasks.tick_email_sequences',
+        'schedule': 60.0,
+    },
 }

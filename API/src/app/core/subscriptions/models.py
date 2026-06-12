@@ -75,7 +75,7 @@ class Subscription(Base, TenantScoped):
     advances rows through it.
     """
 
-    __tablename__ = "subscriptions"
+    __tablename__ = "tbl_subscriptions"
 
     # SQLAlchemy-level constraints. The Alembic migration *also* declares
     # the partial unique index as raw SQL so production gets it; this
@@ -256,7 +256,7 @@ class UsageCounter(Base, TenantScoped):
     bumps remain race-safe.
     """
 
-    __tablename__ = "usage_counters"
+    __tablename__ = "tbl_usage_counters"
     __table_args__ = (
         CheckConstraint(
             "period_kind IN ('lifetime', 'monthly', 'daily')",
@@ -333,7 +333,7 @@ class SubscriptionInvoice(Base, TenantScoped):
     500 (Stripe retries) until the checkout handler has run first.
     """
 
-    __tablename__ = "subscription_invoices"
+    __tablename__ = "tbl_subscription_invoices"
     __table_args__ = (
         CheckConstraint(
             f"status IN ({_in_clause(INVOICE_STATUSES)})",
@@ -408,7 +408,7 @@ class StripeWebhookEvent(Base):
     administrative, not tenant-scoped, so RLS is off.
     """
 
-    __tablename__ = "stripe_webhook_events"
+    __tablename__ = "tbl_stripe_webhook_events"
 
     stripe_event_id: Mapped[str] = mapped_column(
         Text, primary_key=True

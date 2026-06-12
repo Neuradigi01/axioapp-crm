@@ -41,7 +41,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class CustomOrder(Base, TenantScoped):
-    __tablename__ = "fp_custom_orders"
+    __tablename__ = "tbl_fp_custom_orders"
     __table_args__ = (
         Index("ix_fp_custom_orders_org_stage", "org_id", "pipeline_stage"),
         Index("ix_fp_custom_orders_contact", "contact_id"),
@@ -55,12 +55,12 @@ class CustomOrder(Base, TenantScoped):
     )
     contact_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contacts.id", ondelete="SET NULL"),
+        ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
         nullable=True,
     )
     lead_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("leads.id", ondelete="SET NULL"),
+        ForeignKey("tbl_leads.id", ondelete="SET NULL"),
         nullable=True,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -106,7 +106,7 @@ class CustomOrder(Base, TenantScoped):
 
 
 class CustomOrderMeasurement(Base, TenantScoped):
-    __tablename__ = "fp_custom_order_measurements"
+    __tablename__ = "tbl_fp_custom_order_measurements"
     __table_args__ = (
         Index("ix_fp_custom_order_measurements_order", "order_id"),
     )
@@ -118,7 +118,7 @@ class CustomOrderMeasurement(Base, TenantScoped):
     )
     order_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("fp_custom_orders.id", ondelete="CASCADE"),
+        ForeignKey("tbl_fp_custom_orders.id", ondelete="CASCADE"),
         nullable=False,
     )
     item_label: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -140,7 +140,7 @@ class CustomOrderMeasurement(Base, TenantScoped):
 
 
 class CustomOrderPhoto(Base, TenantScoped):
-    __tablename__ = "fp_custom_order_photos"
+    __tablename__ = "tbl_fp_custom_order_photos"
     __table_args__ = (
         Index("ix_fp_custom_order_photos_order", "order_id"),
     )
@@ -152,7 +152,7 @@ class CustomOrderPhoto(Base, TenantScoped):
     )
     order_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("fp_custom_orders.id", ondelete="CASCADE"),
+        ForeignKey("tbl_fp_custom_orders.id", ondelete="CASCADE"),
         nullable=False,
     )
     url: Mapped[str] = mapped_column(String(512), nullable=False)
@@ -168,7 +168,7 @@ class CustomOrderPhoto(Base, TenantScoped):
 
 
 class CustomOrderStageHistory(Base, TenantScoped):
-    __tablename__ = "fp_custom_order_stages"
+    __tablename__ = "tbl_fp_custom_order_stages"
     __table_args__ = (
         Index(
             "ix_fp_custom_order_stages_order_changed",
@@ -184,7 +184,7 @@ class CustomOrderStageHistory(Base, TenantScoped):
     )
     order_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("fp_custom_orders.id", ondelete="CASCADE"),
+        ForeignKey("tbl_fp_custom_orders.id", ondelete="CASCADE"),
         nullable=False,
     )
     from_stage: Mapped[str | None] = mapped_column(

@@ -29,7 +29,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class LeadSource(Base, TenantScoped):
-    __tablename__ = "lead_sources"
+    __tablename__ = "tbl_lead_sources"
     __table_args__ = (
         UniqueConstraint("org_id", "key", name="uq_lead_sources_org_key"),
     )

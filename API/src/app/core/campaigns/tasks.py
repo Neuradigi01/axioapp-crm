@@ -119,7 +119,7 @@ async def _send_campaign_chunk_async(
 
         row = (
             await session.execute(
-                sql_text("SELECT org_id FROM campaigns WHERE id = :cid"),
+                sql_text("SELECT org_id FROM tbl_campaigns WHERE id = :cid"),
                 {"cid": campaign_id},
             )
         ).mappings().first()
@@ -183,7 +183,7 @@ async def _dispatch_scheduled_campaigns_async() -> dict[str, Any]:
                 sql_text(
                     """
                     SELECT id, org_id
-                    FROM campaigns
+                    FROM tbl_campaigns
                     WHERE status = 'scheduled'
                       AND schedule_at IS NOT NULL
                       AND schedule_at <= :now

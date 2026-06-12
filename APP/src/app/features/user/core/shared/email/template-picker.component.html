@@ -1,0 +1,91 @@
+<div class="relative inline-block">
+  <button
+    type="button"
+    class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+    [disabled]="!canPick()"
+    [title]="!canPick() ? 'Connect to a contact to use templates' : null"
+    (click)="toggle()"
+  >
+    <lucide-icon name="mail" size="12" aria-hidden="true"></lucide-icon>
+    Use template
+    <lucide-icon
+      [name]="open() ? 'chevron-up' : 'chevron-down'"
+      size="12"
+      aria-hidden="true"
+    ></lucide-icon>
+  </button>
+
+  @if (open()) {
+    <div
+      class="absolute bottom-full right-0 z-30 mb-2 w-80 rounded-lg border border-zinc-200 bg-white shadow-xl"
+      role="dialog"
+      aria-label="Pick a template"
+    >
+      <div class="border-b border-zinc-200 p-2">
+        <label class="relative block">
+          <span class="sr-only">Search templates</span>
+          <lucide-icon
+            name="search"
+            size="12"
+            class="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400"
+            aria-hidden="true"
+          ></lucide-icon>
+          <input
+            type="text"
+            [formControl]="searchCtrl"
+            placeholder="Search…"
+            class="block w-full rounded-md border border-zinc-300 bg-white py-1 pl-6 pr-2 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            autofocus
+          />
+        </label>
+      </div>
+
+      <div class="max-h-72 overflow-y-auto">
+        @if (loading() && templates().length === 0) {
+          <p class="flex items-center gap-1 px-3 py-4 text-xs text-zinc-500">
+            <lucide-icon name="loader-2" size="12" class="animate-spin" aria-hidden="true"></lucide-icon>
+            Loading…
+          </p>
+        } @else if (templates().length === 0) {
+          <p class="px-3 py-4 text-xs text-zinc-500">
+            No templates match. Create one in
+            <span class="font-medium">Settings → Email Templates</span>.
+          </p>
+        } @else {
+          <ul class="divide-y divide-zinc-100">
+            @for (t of templates(); track t.id) {
+              <li>
+                <button
+                  type="button"
+                  class="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-zinc-50 disabled:opacity-50"
+                  [disabled]="rendering() !== null"
+                  (click)="pick(t)"
+                >
+                  <div class="flex-1 min-w-0">
+                    <p class="truncate text-sm font-medium text-zinc-900">{{ t.name }}</p>
+                    <p class="truncate text-xs text-zinc-500">{{ t.subject }}</p>
+                  </div>
+                  @if (rendering() === t.id) {
+                    <lucide-icon
+                      name="loader-2"
+                      size="14"
+                      class="mt-0.5 shrink-0 animate-spin text-zinc-400"
+                      aria-hidden="true"
+                    ></lucide-icon>
+                  } @else {
+                    <lucide-icon
+                      name="arrow-right"
+                      size="14"
+                      class="mt-0.5 shrink-0 text-zinc-300"
+                      aria-hidden="true"
+                    ></lucide-icon>
+                  }
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    </div>
+  }
+</div>

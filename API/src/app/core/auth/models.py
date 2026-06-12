@@ -24,7 +24,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class AuthSession(Base, TenantScoped):
-    __tablename__ = "auth_sessions"
+    __tablename__ = "tbl_auth_sessions"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

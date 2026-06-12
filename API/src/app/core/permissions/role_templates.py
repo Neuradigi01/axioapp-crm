@@ -79,6 +79,9 @@ _CORE_ADMIN_KEYS: list[str] = [
     # compose.
     "email.read",
     "email.templates.manage",
+    # Step 7 — sequence library + enroll. Admin authors and enrolls.
+    "email.sequences.manage",
+    "email.sequences.enroll",
 ]
 
 
@@ -121,6 +124,9 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     # cannot author or edit them; `email.templates.manage` stays
     # Admin-only.
     "email.read",
+    # Step 7 — Employees enroll their own leads into manager-built
+    # sequences but cannot author/edit the sequence definitions.
+    "email.sequences.enroll",
 ]
 
 
@@ -151,6 +157,9 @@ _CORE_SALES_MANAGER_KEYS: list[str] = [
     # outreach templates is squarely within scope.
     "email.read",
     "email.templates.manage",
+    # Step 7 — Sales Manager authors sequences and enrolls leads.
+    "email.sequences.manage",
+    "email.sequences.enroll",
 ]
 
 

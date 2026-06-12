@@ -39,7 +39,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class SavedView(Base, TenantScoped):
-    __tablename__ = "saved_views"
+    __tablename__ = "tbl_saved_views"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

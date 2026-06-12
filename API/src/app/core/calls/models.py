@@ -55,7 +55,7 @@ call_direction_enum = ENUM(
 
 
 class CallOutcome(Base, TenantScoped):
-    __tablename__ = "call_outcomes"
+    __tablename__ = "tbl_call_outcomes"
     __table_args__ = (
         UniqueConstraint("org_id", "key", name="uq_call_outcomes_org_key"),
     )
@@ -81,7 +81,7 @@ class CallOutcome(Base, TenantScoped):
 
 
 class Call(Base, TenantScoped):
-    __tablename__ = "calls"
+    __tablename__ = "tbl_calls"
     __table_args__ = (
         Index("ix_calls_org_started_at", "org_id", "started_at"),
         Index("ix_calls_contact_id", "contact_id"),
@@ -95,7 +95,7 @@ class Call(Base, TenantScoped):
     )
     contact_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contacts.id", ondelete="SET NULL"),
+        ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
         nullable=True,
     )
     direction: Mapped[CallDirection] = mapped_column(
@@ -109,7 +109,7 @@ class Call(Base, TenantScoped):
     )
     outcome_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("call_outcomes.id", ondelete="SET NULL"),
+        ForeignKey("tbl_call_outcomes.id", ondelete="SET NULL"),
         nullable=True,
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -133,7 +133,7 @@ class Call(Base, TenantScoped):
 
 
 class CallTranscript(Base, TenantScoped):
-    __tablename__ = "call_transcripts"
+    __tablename__ = "tbl_call_transcripts"
     __table_args__ = (
         Index("ix_call_transcripts_call_id", "call_id"),
     )
@@ -145,7 +145,7 @@ class CallTranscript(Base, TenantScoped):
     )
     call_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("calls.id", ondelete="CASCADE"),
+        ForeignKey("tbl_calls.id", ondelete="CASCADE"),
         nullable=False,
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)

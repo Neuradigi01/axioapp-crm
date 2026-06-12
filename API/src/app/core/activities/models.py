@@ -53,7 +53,7 @@ activity_type_enum = ENUM(
 
 
 class Activity(Base, TenantScoped):
-    __tablename__ = "activities"
+    __tablename__ = "tbl_activities"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

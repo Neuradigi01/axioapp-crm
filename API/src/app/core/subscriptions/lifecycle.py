@@ -125,7 +125,7 @@ async def _transition(
     """Run the conditional UPDATE; emit side effects only on a real change."""
     result = await session.execute(
         text(
-            f"UPDATE subscriptions SET {set_sql} "
+            f"UPDATE tbl_subscriptions SET {set_sql} "
             "WHERE id = :id AND status = :from_status"
         ),
         {"id": subscription.id, "from_status": from_status},
@@ -162,7 +162,7 @@ async def _delete_archived(
     """
     result = await session.execute(
         text(
-            "DELETE FROM subscriptions WHERE id = :id AND status = 'archived'"
+            "DELETE FROM tbl_subscriptions WHERE id = :id AND status = 'archived'"
         ),
         {"id": subscription.id},
     )
@@ -337,7 +337,7 @@ async def apply_scheduled_change_if_due(
     result = await session.execute(
         text(
             """
-            UPDATE subscriptions
+            UPDATE tbl_subscriptions
             SET
                 plan_code = :plan_code,
                 billing_cycle = :cycle,
@@ -428,7 +428,7 @@ async def fire_due_reminders(session: AsyncSession) -> int:
         # produces silence rather than a duplicate.
         update = await session.execute(
             text(
-                "UPDATE subscriptions "
+                "UPDATE tbl_subscriptions "
                 "SET reminders_sent = reminders_sent || '{\"trial_ending_soon\": true}'::jsonb "
                 "WHERE id = :id "
                 "AND status = 'trialing' "

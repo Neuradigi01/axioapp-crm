@@ -22,6 +22,18 @@
     }
   </header>
 
+  @if (reassignOpen() && selectedConversation(); as conv) {
+    <app-reassign-modal
+      [entityLabel]="'conversation'"
+      [count]="1"
+      [currentOwnerId]="conv.assigned_to_id"
+      [submitting]="reassignSubmitting()"
+      [error]="reassignError()"
+      (confirm)="onReassignConfirm($event)"
+      (cancel)="closeReassign()"
+    />
+  }
+
   <div class="flex min-h-0 flex-1">
     <!-- Left: list -->
     <aside class="flex w-80 min-w-[18rem] flex-col border-r border-zinc-200 bg-white">
@@ -29,6 +41,7 @@
         [items]="items()"
         [loading]="loading()"
         [selectedId]="selectedId()"
+        [staffById]="staffById()"
         (filtersChange)="onFiltersChange($event)"
         (select)="onSelect($event)"
       />
@@ -41,10 +54,14 @@
           [conversation]="conv"
           [detail]="detail()"
           [loading]="threadLoading()"
+          [staffById]="staffById()"
           (toggleAi)="onToggleAi($event)"
+          (reassign)="openReassign()"
         />
         <app-compose-bar
           [aiHandling]="conv.ai_handling"
+          [channel]="conv.channel"
+          [contactId]="conv.contact_id"
           (send)="onSendText($event)"
           (toggleAi)="onToggleAi($event)"
         />

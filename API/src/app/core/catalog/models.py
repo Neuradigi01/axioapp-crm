@@ -34,7 +34,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class CatalogItem(Base, TenantScoped):
-    __tablename__ = "catalog_items"
+    __tablename__ = "tbl_catalog_items"
     __table_args__ = (
         UniqueConstraint("org_id", "sku", name="uq_catalog_items_org_sku"),
         Index("ix_catalog_items_org_category", "org_id", "category"),

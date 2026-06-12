@@ -38,7 +38,7 @@ DEFAULT_OUTCOMES: list[dict[str, Any]] = [
 
 def _render_insert_sql(org_id: uuid.UUID, row: dict[str, Any]) -> str:
     return (
-        "INSERT INTO call_outcomes "
+        "INSERT INTO tbl_call_outcomes "
         "(org_id, key, label, color, display_order) "
         "VALUES ("
         f"'{org_id}', "

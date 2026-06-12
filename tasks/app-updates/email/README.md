@@ -53,11 +53,11 @@ A sales rep on a fresh org can:
 | 4 | [Backend: mailbox sync daemon (Celery beat + push webhooks)](step-4-backend-mailbox-sync-daemon.md) | COMPLETED | ~1 day |
 | 5 | [Backend: Conversations Email channel adapter (compose + reply threading)](step-5-backend-conversations-email-adapter.md) | COMPLETED | ~1 day |
 | 6 | [Backend: `email_templates` table + variable substitution engine](step-6-backend-email-templates.md) | COMPLETED | ~1 day |
-| 7 | [Backend: `email_sequences` + enrollment engine + reply detection](step-7-backend-email-sequences.md) | Pending | ~2 days |
-| 8 | [Backend: open pixel + link rewriting + delivery state](step-8-backend-open-click-tracking.md) | Pending | ~1 day |
-| 9 | [Frontend (Settings): Email Accounts tab — connect/disconnect + per-account dashboard](step-9-frontend-email-accounts-tab.md) | Pending | ~1 day |
-| 10 | [Frontend: Template editor (Settings) + compose-from-template in contacts/leads](step-10-frontend-template-editor.md) | Pending | ~1.5 days |
-| 11 | [Frontend: Sequence builder + enrollment UI from leads/contacts list](step-11-frontend-sequence-builder.md) | Pending | ~2 days |
+| 7 | [Backend: `email_sequences` + enrollment engine + reply detection](step-7-backend-email-sequences.md) | COMPLETED | ~2 days |
+| 8 | [Backend: open pixel + link rewriting + delivery state](step-8-backend-open-click-tracking.md) | COMPLETED | ~1 day |
+| 9 | [Frontend (Settings): Email Accounts tab — connect/disconnect + per-account dashboard](step-9-frontend-email-accounts-tab.md) | COMPLETED | ~1 day |
+| 10 | [Frontend: Template editor (Settings) + compose-from-template in contacts/leads](step-10-frontend-template-editor.md) | COMPLETED | ~1.5 days |
+| 11 | [Frontend: Sequence builder + enrollment UI from leads/contacts list](step-11-frontend-sequence-builder.md) | 11a COMPLETED · 11b Pending | ~2 days |
 
 **Total: ~15.5 working days.** Add 1–4 weeks of external OAuth verification clock on top — both Gmail (Google OAuth verification for `gmail.modify` scope) and Microsoft Graph (publisher verification for tenant-wide install) require app review with restricted scopes. **Kick the OAuth applications off the day this track is approved.**
 

@@ -77,6 +77,76 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // App-updates Email Step 9 — alias so the Gmail + Microsoft
+        // OAuth `/callback` handlers can redirect users straight onto
+        // the Email Accounts tab with `?status=…` for the success /
+        // denied toast. Backend `_SETTINGS_RETURN_PATH` points here.
+        path: 'settings/email-accounts',
+        data: { tab: 'email-accounts' },
+        loadComponent: () =>
+          import('./core/settings/settings-page.component').then(
+            (m) => m.SettingsPageComponent,
+          ),
+      },
+      {
+        // App-updates Email Step 10 — Settings tab for the email
+        // template library. The list lives inside the settings page
+        // (tab=email-templates); /new + /:id/edit route to standalone
+        // editor pages.
+        path: 'settings/email-templates',
+        data: { tab: 'email-templates' },
+        loadComponent: () =>
+          import('./core/settings/settings-page.component').then(
+            (m) => m.SettingsPageComponent,
+          ),
+      },
+      {
+        path: 'settings/email-templates/new',
+        loadComponent: () =>
+          import(
+            './core/settings/email-templates/template-editor.page'
+          ).then((m) => m.EmailTemplateEditorPageComponent),
+      },
+      {
+        path: 'settings/email-templates/:id/edit',
+        loadComponent: () =>
+          import(
+            './core/settings/email-templates/template-editor.page'
+          ).then((m) => m.EmailTemplateEditorPageComponent),
+      },
+      {
+        // App-updates Email Step 11a — sequence library list lives
+        // inside the settings page (tab=email-sequences); builder +
+        // detail are standalone routes.
+        path: 'settings/email-sequences',
+        data: { tab: 'email-sequences' },
+        loadComponent: () =>
+          import('./core/settings/settings-page.component').then(
+            (m) => m.SettingsPageComponent,
+          ),
+      },
+      {
+        path: 'settings/email-sequences/new',
+        loadComponent: () =>
+          import(
+            './core/settings/email-sequences/sequence-builder.page'
+          ).then((m) => m.SequenceBuilderPageComponent),
+      },
+      {
+        path: 'settings/email-sequences/:id/edit',
+        loadComponent: () =>
+          import(
+            './core/settings/email-sequences/sequence-builder.page'
+          ).then((m) => m.SequenceBuilderPageComponent),
+      },
+      {
+        path: 'settings/email-sequences/:id',
+        loadComponent: () =>
+          import(
+            './core/settings/email-sequences/sequence-detail.component'
+          ).then((m) => m.SequenceDetailComponent),
+      },
+      {
         // SaaS subscription billing — promoted to a top-level sidebar
         // module (manager spec 2026-06-11). Owner-only via the
         // `billing.manage` permission key (Step 19). Stripe Checkout

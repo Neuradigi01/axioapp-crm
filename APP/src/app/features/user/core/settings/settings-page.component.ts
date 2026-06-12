@@ -3,6 +3,9 @@ import { ActivatedRoute } from '@angular/router';
 
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
+import { EmailAccountsTabComponent } from './email-accounts/email-accounts-tab.component';
+import { EmailSequencesListComponent } from './email-sequences/sequence-list.component';
+import { EmailTemplatesListComponent } from './email-templates/template-list.component';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
@@ -25,6 +28,9 @@ type SettingsTab =
   | 'team'
   | 'roles'
   | 'integrations'
+  | 'email-accounts'
+  | 'email-templates'
+  | 'email-sequences'
   | 'notifications'
   | 'ai'
   | 'custom-fields'
@@ -62,6 +68,34 @@ const TABS: ReadonlyArray<TabDef> = [
     label: 'Integrations',
     permission: 'settings.integrations.manage',
   },
+  {
+    // App-updates Email Step 9 — per-user mailbox management. Every
+    // role with `email.accounts.manage` (Owner/Admin/Employee/
+    // SalesManager/SupportAgent per Step 1's role-template grants)
+    // sees this tab; the backend list endpoint returns own-only for
+    // reps and all-org for Owner/Admin holding `email.accounts.admin`.
+    id: 'email-accounts',
+    label: 'Email Accounts',
+    permission: 'email.accounts.manage',
+  },
+  {
+    // App-updates Email Step 10 — template library. Anyone with
+    // `email.read` (every role per Step 6 grants) sees the tab to
+    // browse and use templates; `email.templates.manage` (Owner /
+    // Admin / Sales Manager) is required for the Edit / Delete
+    // affordances — gated inside the list component.
+    id: 'email-templates',
+    label: 'Email Templates',
+    permission: 'email.read',
+  },
+  {
+    // App-updates Email Step 11a — sequence library. Visible to
+    // anyone with `email.read`; Create / Edit / Delete affordances
+    // gate on `email.sequences.manage` inside the list component.
+    id: 'email-sequences',
+    label: 'Email Sequences',
+    permission: 'email.read',
+  },
   { id: 'ai', label: 'AI Settings', permission: 'settings.write' },
   {
     id: 'custom-fields',
@@ -98,6 +132,9 @@ const TABS: ReadonlyArray<TabDef> = [
     CustomFieldsPageComponent,
     StandardFieldsTabComponent,
     EmbedIntegrationsTabComponent,
+    EmailAccountsTabComponent,
+    EmailTemplatesListComponent,
+    EmailSequencesListComponent,
   ],
   templateUrl: './settings-page.component.html',
 })

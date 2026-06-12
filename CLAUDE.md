@@ -82,7 +82,7 @@ furniture-crm/
 ## The 10 non-negotiable rules
 
 1. **`/core` never imports from `/packs`.** If something needs to, it belongs in `/core`. Stop and reorganize.
-2. **Every database table has `org_id`** (UUID FK to organizations). Every query filters by `org_id`. **Postgres Row-Level Security from day one.**
+2. **Every database table has `org_id`** (UUID FK to organizations) **and is named `tbl_<snake_name>`** (per [`API/docs/DATABASE_RULES.md`](API/docs/DATABASE_RULES.md) and [`tasks/rename-tbl-prefix/naming-map.md`](tasks/rename-tbl-prefix/naming-map.md); furniture-pack tables use `tbl_fp_<name>`). Every query filters by `org_id`. **Postgres Row-Level Security from day one.** New tables follow the `tbl_` convention from the first commit; no plain-named tables ever land again. The pin-test [`API/tests/test_table_name_convention.py`](API/tests/test_table_name_convention.py) fails CI on drift.
 3. **Custom fields use the layered model:** every entity that supports them has a `custom_data` JSONB column; `custom_field_definitions` has a `source` column (`system` | `pack` | `user`).
 4. **Forms render dynamically from field definitions.** Frontend asks `GET /api/{entity}/fields` and renders. Never hardcode form fields.
 5. **The sidebar/menu is a registry.** Modules register themselves; core does not know about furniture-specific menu items at compile time.

@@ -47,6 +47,8 @@ from src.app.core.embed.router import (
     router as embed_keys_router,
 )
 from src.app.core.email.router import router as email_router
+from src.app.core.email.tracking.router import router as email_tracking_router
+from src.app.core.email_sequences.router import router as email_sequences_router
 from src.app.core.email_templates.router import router as email_templates_router
 from src.app.core.integrations.router import router as integrations_router
 from src.app.core.leads.router import router as leads_router
@@ -202,6 +204,12 @@ app.include_router(embed_keys_router, prefix="/api/v1")
 app.include_router(embed_public_router, prefix="/api/v1")
 app.include_router(email_router, prefix="/api/v1")
 app.include_router(email_templates_router, prefix="/api/v1")
+app.include_router(email_sequences_router, prefix="/api/v1")
+# Step 8 — public tracking endpoints (open pixel, click redirect,
+# unsubscribe landing). Intentionally unauthenticated — the recipient's
+# email client fetches them with no JWT. Rate limiting is inside the
+# router (100 req/min/IP).
+app.include_router(email_tracking_router, prefix="/api/v1")
 app.include_router(integrations_router, prefix="/api/v1")
 app.include_router(appointments_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")

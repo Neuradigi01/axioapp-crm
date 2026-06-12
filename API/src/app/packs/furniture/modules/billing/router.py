@@ -6,7 +6,7 @@
     Effect — all in one transaction:
       1. Find-or-create the contact (lookup `(org_id, phone)`).
       2. Create a draft invoice, push each cart line.
-      3. Issue the invoice (snapshots tax + GST from org_settings,
+      3. Issue the invoice (snapshots tax + GST from tbl_org_settings,
          assigns the next per-org invoice number).
       4. Record a single payment for the full total → invoice flips
          to `status='paid'`.

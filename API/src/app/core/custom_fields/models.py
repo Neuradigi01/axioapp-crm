@@ -76,7 +76,7 @@ field_source_enum = ENUM(
 
 
 class CustomFieldDefinition(Base, TenantScoped):
-    __tablename__ = "custom_field_definitions"
+    __tablename__ = "tbl_custom_field_definitions"
     __table_args__ = (
         UniqueConstraint(
             "org_id",

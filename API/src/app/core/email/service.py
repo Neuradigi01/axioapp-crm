@@ -106,7 +106,7 @@ async def get_account_unscoped(
                sync_cursor, sync_state, last_sync_at, last_sync_error,
                daily_sent_count, daily_sent_reset_at, connected_at,
                disconnected_at, disconnected_by
-        FROM email_accounts
+        FROM tbl_email_accounts
         WHERE id = :account_id
         LIMIT 1
         """

@@ -61,7 +61,7 @@ class Integration(Base, TenantScoped):
     one-account-per-provider-per-org rule for v1 — multi-account is a
     future surface."""
 
-    __tablename__ = "integrations"
+    __tablename__ = "tbl_integrations"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -153,7 +153,7 @@ class IntegrationSubscription(Base, TenantScoped):
     disabled subscriptions instead of silently dropping them, so a
     later re-enable + replay catches up the missed deliveries."""
 
-    __tablename__ = "integration_subscriptions"
+    __tablename__ = "tbl_integration_subscriptions"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -162,7 +162,7 @@ class IntegrationSubscription(Base, TenantScoped):
     )
     integration_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("integrations.id", ondelete="CASCADE"),
+        ForeignKey("tbl_integrations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -202,7 +202,7 @@ class IntegrationDLQ(Base, TenantScoped):
     we add an "archive integration" surface, and we don't want DLQ to
     cascade away in that case (`ON DELETE SET NULL`)."""
 
-    __tablename__ = "integration_dlq"
+    __tablename__ = "tbl_integration_dlq"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -211,7 +211,7 @@ class IntegrationDLQ(Base, TenantScoped):
     )
     integration_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("integrations.id", ondelete="SET NULL"),
+        ForeignKey("tbl_integrations.id", ondelete="SET NULL"),
         nullable=True,
     )
     provider: Mapped[IntegrationProvider] = mapped_column(

@@ -7,6 +7,8 @@ import {
   Input,
   Output,
   ViewChild,
+  computed,
+  inject,
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -15,6 +17,13 @@ import {
   ConversationDetail,
   ConversationMessage,
 } from './conversations-api.service';
+import { StaffListItem } from '../staff/staff-api.service';
+import {
+  OwnerColor,
+  ownerColor,
+  staffInitials,
+} from '../shared/owner-color.util';
+import { FurnitureAuthService } from '../auth/auth.service';
 
 /**
  * Chat thread — renders bubbles, auto-scrolls to bottom on new
@@ -32,11 +41,25 @@ import {
   templateUrl: './chat-thread.component.html',
 })
 export class ChatThreadComponent implements AfterViewChecked {
+  private readonly auth = inject(FurnitureAuthService);
+
   @Input({ required: true }) conversation!: Conversation;
   @Input() detail: ConversationDetail | null = null;
   @Input() loading = false;
+  @Input() staffById: Map<string, StaffListItem> = new Map();
 
   @Output() readonly toggleAi = new EventEmitter<boolean>();
+
+  /** Fires when the user clicks the assignee pill. The page parent owns
+   * the modal + PATCH. We emit a bare event because the parent already
+   * knows which conversation is selected via `selectedConversation()`. */
+  @Output() readonly reassign = new EventEmitter<void>();
+
+  /** Permission gate for the reassign click target — same key the
+   * backend enforces on `PATCH /api/v1/conversations/{id}`. */
+  protected readonly canReassign = computed(() =>
+    this.auth.hasPermission('conversations.write'),
+  );
 
   @ViewChild('scrollHost') protected scrollHost?: ElementRef<HTMLDivElement>;
 
@@ -89,5 +112,26 @@ export class ChatThreadComponent implements AfterViewChecked {
 
   protected toggle(): void {
     this.toggleAi.emit(!this.conversation.ai_handling);
+  }
+
+  /** Two-letter initials for a staff member referenced by user id.
+   * Returns `·` for null (unassigned thread header) and `?` when the
+   * id doesn't resolve (e.g. soft-deleted user). */
+  protected staffInitialsFor(userId: string | null): string {
+    if (!userId) return '·';
+    const staff = this.staffById.get(userId);
+    return staff ? staffInitials(staff.full_name) : '?';
+  }
+
+  /** Full display name for the tooltip / pill label. */
+  protected staffNameFor(userId: string | null): string {
+    if (!userId) return 'Unassigned';
+    return this.staffById.get(userId)?.full_name ?? 'Unknown user';
+  }
+
+  /** Deterministic colour triple — same user always gets the same
+   * colour across leads, appointments, conversations. */
+  protected staffColorFor(userId: string | null): OwnerColor {
+    return ownerColor(userId);
   }
 }

@@ -42,7 +42,7 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     it lives only inside the parent `Integration.access_token_enc`,
     which the parent's `disconnect` nulls."""
 
-    __tablename__ = "whatsapp_account_configs"
+    __tablename__ = "tbl_whatsapp_account_configs"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -51,7 +51,7 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     )
     integration_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("integrations.id", ondelete="CASCADE"),
+        ForeignKey("tbl_integrations.id", ondelete="CASCADE"),
         nullable=False,
     )
     phone_id: Mapped[str] = mapped_column(Text, nullable=False)
@@ -98,7 +98,7 @@ class WhatsAppTemplate(Base, TenantScoped):
     `(integration_id, name, language)` because Meta's id can change
     when a template is edited."""
 
-    __tablename__ = "whatsapp_templates"
+    __tablename__ = "tbl_whatsapp_templates"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -107,7 +107,7 @@ class WhatsAppTemplate(Base, TenantScoped):
     )
     integration_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("integrations.id", ondelete="CASCADE"),
+        ForeignKey("tbl_integrations.id", ondelete="CASCADE"),
         nullable=False,
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)

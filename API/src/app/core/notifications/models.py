@@ -51,7 +51,7 @@ notification_channel_enum = ENUM(
 
 
 class Notification(Base, TenantScoped):
-    __tablename__ = "notifications"
+    __tablename__ = "tbl_crm_notifications"
     __table_args__ = (
         Index(
             "ix_notifications_user_read",
@@ -89,7 +89,7 @@ class Notification(Base, TenantScoped):
 
 
 class NotificationPreference(Base, TenantScoped):
-    __tablename__ = "notification_preferences"
+    __tablename__ = "tbl_notification_preferences"
     __table_args__ = (
         UniqueConstraint(
             "org_id",

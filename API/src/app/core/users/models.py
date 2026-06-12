@@ -248,7 +248,7 @@ class OrganizationMember(Base):
     )
     organization_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="RESTRICT"),
+        ForeignKey("tbl_organizations.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )
@@ -260,7 +260,7 @@ class OrganizationMember(Base):
     )
     role_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("roles.id", ondelete="RESTRICT"),
+        ForeignKey("tbl_roles.id", ondelete="RESTRICT"),
         nullable=False,
     )
     status: Mapped[str] = mapped_column(

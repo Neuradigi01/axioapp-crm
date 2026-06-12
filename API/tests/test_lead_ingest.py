@@ -307,7 +307,7 @@ class _RoutingSession:
                     return rows
 
             return _R()
-        if "INSERT INTO lead_routing_state" in text_sql:
+        if "INSERT INTO tbl_lead_routing_state" in text_sql:
             # Atomic counter — return current value then increment.
             value = self._counter
             self._counter += 1

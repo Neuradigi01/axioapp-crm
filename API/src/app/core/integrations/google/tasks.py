@@ -436,7 +436,7 @@ async def _load_integration_unscoped(
                scopes, last_error, connected_at, connected_by,
                disconnected_at, disconnected_by, updated_at,
                webhook_secret
-        FROM integrations WHERE id = :id LIMIT 1
+        FROM tbl_integrations WHERE id = :id LIMIT 1
         """
     )
     row = (
@@ -478,7 +478,7 @@ async def _find_lead_by_external_id(
     UNIQUE index from 0049 for the lookup."""
     sql = text(
         """
-        SELECT id FROM leads
+        SELECT id FROM tbl_leads
         WHERE org_id = :org_id
           AND attribution->>'external_lead_id' = :ext_id
         LIMIT 1
