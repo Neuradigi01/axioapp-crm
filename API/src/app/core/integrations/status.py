@@ -121,7 +121,7 @@ async def _provider_counts(
             MAX(created_at) FILTER (
                 WHERE action = 'integration.webhook.received'
             ) AS last_accepted_at
-        FROM audit_logs
+        FROM tbl_audit_logs
         WHERE created_at >= :since
           AND action IN (
               'integration.webhook.received',
@@ -149,7 +149,7 @@ async def _open_dlq_count(session: AsyncSession) -> int:
     """
     sql = text(
         """
-        SELECT COUNT(*) FROM integration_dlq
+        SELECT COUNT(*) FROM tbl_integration_dlq
         WHERE replayed_at IS NULL
         """
     )

@@ -45,7 +45,7 @@ def _render_insert_sql(org_id: uuid.UUID, row: dict[str, Any]) -> str:
     wrapped in $$...$$ to avoid escaping any embedded quotes in labels.
     """
     return (
-        "INSERT INTO custom_field_definitions "
+        "INSERT INTO tbl_custom_field_definitions "
         "(org_id, entity_type, field_key, field_label, field_type, "
         "is_required, is_hidden, display_order, source) "
         "VALUES ("

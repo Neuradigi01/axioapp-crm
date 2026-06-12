@@ -353,7 +353,7 @@ def _extract_form_id(payload: dict[str, Any]) -> Optional[str]:
 def _fallback_org() -> uuid.UUID:
     """For DLQ-on-page-token-missing — we have no real org_id. Use a
     deterministic-ish synthetic so the row lands SOMEWHERE for an
-    operator to inspect via `select * from integration_dlq` directly
+    operator to inspect via `select * from tbl_integration_dlq` directly
     (no org's UI shows it because no org owns it)."""
     return uuid.UUID("00000000-0000-0000-0000-000000000000")
 
@@ -440,7 +440,7 @@ async def _load_page_token_unscoped(
     sql = text(
         """
         SELECT org_id, integration_id, page_token_enc
-        FROM meta_page_tokens
+        FROM tbl_meta_page_tokens
         WHERE page_id = :page_id
         LIMIT 1
         """
@@ -465,7 +465,7 @@ async def _find_lead_by_external_id(
     UNIQUE index from 0049."""
     sql = text(
         """
-        SELECT id FROM leads
+        SELECT id FROM tbl_leads
         WHERE org_id = :org_id
           AND attribution->>'external_lead_id' = :ext_id
         LIMIT 1

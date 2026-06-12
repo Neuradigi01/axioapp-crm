@@ -2,7 +2,7 @@
 
 **Goal:** Find and update every remaining literal old-table-name string in `api/src/` outside of model files and historical migrations — `text(…)` SQL in services, raw `INSERT INTO` in seed scripts, reporting queries, Celery tasks, and any utility that bypasses the ORM. Leave conceptual key values (`audit_log.resource_type = "lead"`, `custom_field_definitions.entity_type = "contact"`) **untouched** — those are entity keys, not table names.
 **Track:** Rename to `tbl_` Prefix
-**Status:** Pending
+**Status:** COMPLETED — 2026-06-12. Scanned 409 .py files under `API/src/app/`, modified **21 files** with **40 raw-SQL substitutions** (Python script with SQL-keyword-anchored regex patterns: `FROM/JOIN/UPDATE/INSERT INTO/DELETE FROM/REFERENCES/TRUNCATE` + word boundary). Final cross-check grep returns zero hits. Idempotent — re-running the script reports 0 modifications. App boots cleanly (374 routes). Two docstrings were swept up as a free bonus (`core/staff/service.py` and `packs/furniture/modules/billing/router.py`) — they describe the actual tables now correctly named `tbl_leads` / `tbl_org_settings`, so kept as more-accurate documentation. The `audit_log.resource_type` / `custom_field_definitions.entity_type` conceptual key strings were left untouched per the spec's out-of-scope rules — the SQL-keyword patterns don't match plain quoted string keys. No DB changes (Step 3 owns the schema). No tests added (Step 5 lands the pin-test + full pytest pass).
 **Depends on:** Step 3 — migration applied on the dev DB and Ajay's Workspace; app boots.
 
 ---

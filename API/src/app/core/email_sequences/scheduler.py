@@ -120,7 +120,7 @@ async def _pick_due_step_ids(
                 sql_text(
                     """
                     SELECT id, org_id
-                    FROM email_sequence_enrollment_steps
+                    FROM tbl_email_sequence_enrollment_steps
                     WHERE sent_at IS NULL
                       AND skipped = false
                       AND scheduled_at <= :now

@@ -138,7 +138,7 @@ async def _resolve_message_org(
 
     row = (
         await session.execute(
-            sql_text("SELECT org_id FROM messages WHERE id = :mid"),
+            sql_text("SELECT org_id FROM tbl_messages WHERE id = :mid"),
             {"mid": str(message_id)},
         )
     ).mappings().first()
@@ -229,8 +229,8 @@ async def _resolve_contact_from_message(
             sql_text(
                 """
                 SELECT c.org_id, c.contact_id, c.id AS conversation_id
-                FROM messages m
-                JOIN conversations c ON c.id = m.conversation_id
+                FROM tbl_messages m
+                JOIN tbl_conversations c ON c.id = m.conversation_id
                 WHERE m.id = :mid
                   AND c.channel = 'email'
                   AND c.contact_id IS NOT NULL

@@ -379,7 +379,7 @@ async def _poll_fallback_async() -> dict[str, Any]:
                 text(
                     """
                     SELECT id
-                    FROM email_accounts
+                    FROM tbl_email_accounts
                     WHERE sync_state = 'live'
                       AND sync_cursor IS NOT NULL
                       AND (last_sync_at IS NULL OR last_sync_at < :cutoff)
@@ -427,7 +427,7 @@ async def _scan_renewals_async() -> dict[str, Any]:
             await session.execute(
                 text(
                     """
-                    SELECT id, provider FROM email_accounts
+                    SELECT id, provider FROM tbl_email_accounts
                     WHERE sync_state = 'live'
                       AND sync_cursor IS NOT NULL
                       AND (
@@ -469,7 +469,7 @@ async def _reset_daily_sent_counters_async() -> dict[str, Any]:
         result = await session.execute(
             text(
                 """
-                UPDATE email_accounts
+                UPDATE tbl_email_accounts
                 SET daily_sent_count = 0,
                     daily_sent_reset_at = now()
                 WHERE sync_state != 'disconnected'

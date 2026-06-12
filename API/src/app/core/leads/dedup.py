@@ -64,7 +64,7 @@ async def find_open_lead_for_contact(
     """
     sql = text(
         """
-        SELECT id FROM leads
+        SELECT id FROM tbl_leads
         WHERE org_id = :org_id
           AND contact_id = :contact_id
           AND status = 'active'

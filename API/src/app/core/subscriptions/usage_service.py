@@ -155,7 +155,7 @@ async def snapshot(
 
 _UPSERT_SQL = text(
     """
-    INSERT INTO usage_counters (
+    INSERT INTO tbl_usage_counters (
         org_id, resource, period_kind, period_start, period_end, value, updated_at
     )
     VALUES (:org_id, :resource, :period_kind, :period_start, :period_end, :delta, now())
@@ -229,7 +229,7 @@ async def reset_monthly_counters(
         result = await session.execute(
             text(
                 """
-                INSERT INTO usage_counters (
+                INSERT INTO tbl_usage_counters (
                     org_id, resource, period_kind, period_start, period_end, value, updated_at
                 )
                 VALUES (:org_id, :resource, 'monthly', :period_start, :period_end, 0, now())
@@ -264,7 +264,7 @@ async def reset_daily_counter_rows(
         result = await session.execute(
             text(
                 """
-                INSERT INTO usage_counters (
+                INSERT INTO tbl_usage_counters (
                     org_id, resource, period_kind, period_start, period_end, value, updated_at
                 )
                 VALUES (:org_id, :resource, 'daily', :period_start, :period_end, 0, now())

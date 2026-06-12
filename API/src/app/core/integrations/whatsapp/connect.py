@@ -521,8 +521,8 @@ async def find_org_by_phone_id(
             c.verified_name, c.app_secret_enc, c.verify_token,
             c.api_version, c.created_at AS c_created_at,
             c.updated_at AS c_updated_at
-        FROM whatsapp_account_configs c
-        JOIN integrations i ON i.id = c.integration_id
+        FROM tbl_whatsapp_account_configs c
+        JOIN tbl_integrations i ON i.id = c.integration_id
         WHERE c.phone_id = :phone_id
         LIMIT 1
         """
@@ -587,7 +587,7 @@ async def find_org_by_verify_token(
     sql = sql_text(
         """
         SELECT c.phone_id
-        FROM whatsapp_account_configs c
+        FROM tbl_whatsapp_account_configs c
         WHERE c.verify_token = :vt
         LIMIT 1
         """

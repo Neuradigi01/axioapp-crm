@@ -148,7 +148,7 @@ async def find_account_by_email(
                sync_cursor, sync_state, last_sync_at, last_sync_error,
                daily_sent_count, daily_sent_reset_at, connected_at,
                disconnected_at, disconnected_by
-        FROM email_accounts
+        FROM tbl_email_accounts
         WHERE provider = 'gmail'
           AND lower(email_address) = lower(:email)
           AND sync_state != 'disconnected'
