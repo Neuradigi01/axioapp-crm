@@ -50,7 +50,7 @@ appointment_status_enum = ENUM(
 
 
 class Appointment(Base, TenantScoped):
-    __tablename__ = "appointments"
+    __tablename__ = "tbl_appointments"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -59,7 +59,7 @@ class Appointment(Base, TenantScoped):
     )
     contact_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("contacts.id", ondelete="RESTRICT"),
+        ForeignKey("tbl_contacts.id", ondelete="RESTRICT"),
         nullable=False,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)

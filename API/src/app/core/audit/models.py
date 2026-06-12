@@ -21,7 +21,7 @@ from src.app.shared.orm import TenantScoped
 
 
 class AuditLog(Base, TenantScoped):
-    __tablename__ = "audit_logs"
+    __tablename__ = "tbl_audit_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

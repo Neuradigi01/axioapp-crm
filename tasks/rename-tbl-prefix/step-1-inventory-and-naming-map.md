@@ -2,7 +2,7 @@
 
 **Goal:** Produce a single, committed `naming-map.md` document under `tasks/rename-tbl-prefix/` listing **every** application table in the repo, its current name, its proposed new name, and the impact surface (FK references, RLS policies, raw-SQL call sites). Surface the one open decision — what to do with the 10 `fp_*` furniture-pack tables — and **stop for the user to pick option A or B** before any code change.
 **Track:** Rename to `tbl_` Prefix
-**Status:** Pending
+**Status:** COMPLETED — `tasks/rename-tbl-prefix/naming-map.md` landed 2026-06-12. Inventory totals: 22 legacy `tbl_*` (no rename), 2 already-canonical core `tbl_*` (no rename), **67 plain-name core tables → rename**, 10 `fp_*` pack tables awaiting A/B decision, 2 test-sandbox tables excluded. One name collision surfaced (`notifications` vs legacy `tbl_notifications`) and resolved as `tbl_crm_notifications`. One pre-existing tech-debt flag (`users` shim — physical table dropped by migration 0037; FK strings parked, see §8 of the map). Recommendation in §10: **Option A — unify `fp_*` to `tbl_fp_*`**. Step 2 starts after the user replies "proceed with A" or "proceed with B".
 **Depends on:** None. This step is purely read-only auditing.
 
 ---
