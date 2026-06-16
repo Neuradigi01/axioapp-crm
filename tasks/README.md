@@ -70,6 +70,7 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [App Updates — Email + Reporting](app-updates/README.md) | 19 | Core (side track — closes 2 biggest gaps vs standard CRM) |
 | — | [Rename to `tbl_` Prefix](rename-tbl-prefix/README.md) | 5 | Core (side track — schema-wide convention alignment) |
 | — | [Update Conversations Page](update-conversations-page/README.md) | 3 | Core (side track — surface assignee + sender) |
+| — | [Promote Integrations to Sidebar](promote-integrations-to-sidebar/README.md) | 1 | Core (side track — sidebar promotion) |
 
 **Total: 155 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides + Lead-Capture (4 tracks) + Pricing-and-Billing side tracks).
 
@@ -266,6 +267,9 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 1: Display-only — assignee badge on list + sender pill on outbound messages](update-conversations-page/step-1-assignee-badge-and-sender-pill.md) — Done
 - [Step 2: Assign / reassign from the thread header (reuse `shared/reassign-modal`)](update-conversations-page/step-2-assign-button-thread-header.md) — Done
 - [Step 3: Assignee filter chip — Mine / Unassigned / Specific staff](update-conversations-page/step-3-assignee-filter-chip.md) — Done
+
+### Promote Integrations to Sidebar (side track — registry flip + route + tab cleanup)
+- [Step 1: Promote Integrations module — backend descriptor + frontend route + tab cleanup + redirect](promote-integrations-to-sidebar/step-1-promote-and-cleanup.md) — Done
 
 ---
 

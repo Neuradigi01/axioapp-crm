@@ -9,7 +9,6 @@ import { EmailTemplatesListComponent } from './email-templates/template-list.com
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
-import { IntegrationsPageComponent } from './integrations/integrations-page.component';
 import { LoginHistoryTabComponent } from './tabs/login-history-tab.component';
 import { NotificationsTabComponent } from './tabs/notifications-tab.component';
 import { ProfileTabComponent } from './tabs/profile-tab.component';
@@ -27,7 +26,6 @@ type SettingsTab =
   | 'store'
   | 'team'
   | 'roles'
-  | 'integrations'
   | 'email-accounts'
   | 'email-templates'
   | 'email-sequences'
@@ -59,15 +57,6 @@ const TABS: ReadonlyArray<TabDef> = [
   { id: 'store', label: 'Store Profile', permission: 'settings.write' },
   { id: 'team', label: 'Team', permission: 'users.read' },
   { id: 'roles', label: 'Roles', permission: 'roles.read' },
-  {
-    // Owner-only: Step 7 surfaces real OAuth + form-picker UI; the
-    // gate keeps Employees from seeing the tab AND keeps non-Owner
-    // direct-URL visits to /user/settings?tab=integrations from
-    // displaying the panel content (the backend gates the API too).
-    id: 'integrations',
-    label: 'Integrations',
-    permission: 'settings.integrations.manage',
-  },
   {
     // App-updates Email Step 9 — per-user mailbox management. Every
     // role with `email.accounts.manage` (Owner/Admin/Employee/
@@ -126,7 +115,6 @@ const TABS: ReadonlyArray<TabDef> = [
     StoreProfileTabComponent,
     TeamTabComponent,
     RolesTabComponent,
-    IntegrationsPageComponent,
     NotificationsTabComponent,
     AiSettingsTabComponent,
     CustomFieldsPageComponent,

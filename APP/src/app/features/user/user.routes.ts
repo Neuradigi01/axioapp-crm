@@ -65,16 +65,24 @@ export const userRoutes: Routes = [
           ),
       },
       {
-        // Alias so OAuth callbacks (Google + Meta) can bounce
-        // straight to the Integrations tab. The component reads
-        // `route.data.tab` to pre-select; existing /user/settings
-        // stays on its first-visible tab.
-        path: 'settings/integrations',
-        data: { tab: 'integrations' },
+        // Integrations — promoted to a top-level sidebar module.
+        // Owner-only via the `settings.integrations.manage` permission
+        // key. OAuth callbacks (Google + Meta) and the redirect from
+        // the legacy /user/settings/integrations URL both land here.
+        path: 'integrations',
+        canActivate: [permissionGuard('settings.integrations.manage')],
         loadComponent: () =>
-          import('./core/settings/settings-page.component').then(
-            (m) => m.SettingsPageComponent,
-          ),
+          import(
+            './core/settings/integrations/integrations-page.component'
+          ).then((m) => m.IntegrationsPageComponent),
+      },
+      {
+        // Legacy redirect — Integrations used to live as a tab in
+        // /user/settings. OAuth callbacks and old bookmarks still hit
+        // this path; bounce them to the new home.
+        path: 'settings/integrations',
+        redirectTo: '/user/integrations',
+        pathMatch: 'full',
       },
       {
         // App-updates Email Step 9 — alias so the Gmail + Microsoft

@@ -1,4 +1,14 @@
-<div class="space-y-4">
+<div class="flex h-[calc(100vh-4rem)] flex-col">
+  <header class="border-b border-zinc-200 bg-white px-6 py-3">
+    <h1 class="text-xl font-semibold text-zinc-900">Integrations</h1>
+    <p class="text-xs text-zinc-500">
+      Connect ad platforms (Google Ads, Meta Ads) and messaging channels
+      (WhatsApp) to your CRM. Lead form submissions land in Leads;
+      inbound messages land in Conversations.
+    </p>
+  </header>
+
+  <div class="flex-1 space-y-4 overflow-y-auto p-6">
   <!-- OAuth callback banner (dismissible). -->
   @if (callbackBanner(); as b) {
     <div
@@ -160,4 +170,5 @@
       (saved)="onMappingSaved()"
     ></app-field-mapping-editor>
   }
+  </div>
 </div>
