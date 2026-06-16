@@ -70,6 +70,17 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     rate_limit_per_sec: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("50")
     )
+    # Step 3.5.16 — cache of Meta's `messaging_limit_tier` (TIER_50,
+    # TIER_250, TIER_1K, TIER_10K, TIER_100K, TIER_UNLIMITED). NULL
+    # until the first capacity lookup populates it. Refreshed when
+    # `tier_synced_at` is older than 1 hour to keep the Graph API call
+    # rate well under Meta's per-token throttle.
+    messaging_limit_tier: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
+    tier_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

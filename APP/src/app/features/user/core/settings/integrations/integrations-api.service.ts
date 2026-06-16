@@ -245,6 +245,24 @@ export interface WhatsAppTemplateSyncResult {
 }
 
 
+/** Response shape from `GET /api/v1/integrations/whatsapp/capacity` —
+ *  drives the campaign create modal's quota banner (Step 3.5.16).
+ *  Mirrors backend `WhatsAppCapacityOut`.
+ *
+ *  `daily_limit` and `remaining` are both `-1` when `is_unlimited`
+ *  is true; the UI uses those sentinels to hide the progress bar
+ *  and the "X remaining" copy. `usage_percent` is capped at 100. */
+export interface WhatsAppCapacity {
+  tier: string;
+  tier_label: string;
+  daily_limit: number;
+  used_today: number;
+  remaining: number;
+  usage_percent: number;
+  is_unlimited: boolean;
+}
+
+
 export interface DlqListFilters {
   page?: number;
   size?: number;
@@ -521,6 +539,18 @@ export class IntegrationsApiService {
     return this.http.get<WhatsAppTemplate[]>(
       `${this.base}/whatsapp/templates`,
       { params },
+    );
+  }
+
+  // --- WhatsApp send capacity (Step 3.5.16) -----------------------
+
+  /** Current Meta messaging tier + today's used quota. The campaign
+   *  create modal renders this as a "X / Y remaining today" banner
+   *  before sending. 409 when WhatsApp is not connected — the modal
+   *  treats that as "hide the banner". */
+  getWhatsAppCapacity(): Observable<WhatsAppCapacity> {
+    return this.http.get<WhatsAppCapacity>(
+      `${this.base}/whatsapp/capacity`,
     );
   }
 }

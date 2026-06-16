@@ -107,7 +107,25 @@ class WhatsAppTemplateSyncOut(BaseModel):
     total: int
 
 
+class WhatsAppCapacityOut(BaseModel):
+    """Response shape for `GET /api/v1/integrations/whatsapp/capacity`
+    — drives the campaign create modal's quota banner (Step 3.5.16).
+
+    `daily_limit` and `remaining` are both `-1` when `is_unlimited`
+    is true; the UI uses those sentinels to hide the progress bar
+    and the "X remaining" copy. `usage_percent` is capped at 100."""
+
+    tier: str
+    tier_label: str
+    daily_limit: int
+    used_today: int
+    remaining: int
+    usage_percent: int
+    is_unlimited: bool
+
+
 __all__ = [
+    "WhatsAppCapacityOut",
     "WhatsAppConnectIn",
     "WhatsAppIntegrationStatus",
     "WhatsAppStatusOut",

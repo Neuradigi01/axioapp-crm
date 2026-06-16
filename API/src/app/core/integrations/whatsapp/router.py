@@ -6,12 +6,13 @@
   GET  /api/v1/integrations/whatsapp/status           → projection (no creds)
   POST /api/v1/integrations/whatsapp/templates/sync   → pull Meta library
   GET  /api/v1/integrations/whatsapp/templates        → list for picker
+  GET  /api/v1/integrations/whatsapp/capacity         → tier + remaining
 
 Admin endpoints (connect/disconnect/test/sync) gate on
 `settings.integrations.manage` — Owner-only by default. The templates
-LIST endpoint gates on `campaigns.read` instead — any campaign-author
-needs to see the picker, not just integration admins. Encrypted
-credential columns NEVER appear in any response body.
+LIST and capacity endpoints gate on `campaigns.read` instead — any
+campaign-author needs the picker + quota banner, not just integration
+admins. Encrypted credential columns NEVER appear in any response body.
 """
 from __future__ import annotations
 
@@ -30,11 +31,13 @@ from src.app.core.integrations.whatsapp.connect import (
     test_connection,
 )
 from src.app.core.integrations.whatsapp.schemas import (
+    WhatsAppCapacityOut,
     WhatsAppConnectIn,
     WhatsAppStatusOut,
     WhatsAppTemplateRead,
     WhatsAppTemplateSyncOut,
 )
+from src.app.core.integrations.whatsapp.status import get_send_capacity
 from src.app.core.integrations.whatsapp.templates import (
     list_templates,
     sync_templates,
@@ -171,3 +174,31 @@ async def list_templates_endpoint(
         db, status=status_filter, category=category
     )
     return [WhatsAppTemplateRead.model_validate(r) for r in rows]
+
+
+# --- Capacity (Step 3.5.16) ----------------------------------------------
+
+
+@router.get("/capacity", response_model=WhatsAppCapacityOut)
+async def capacity_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("campaigns.read")),
+) -> WhatsAppCapacityOut:
+    """Current Meta messaging tier + today's used quota for the active
+    org. Drives the "X / Y messages remaining today" banner the
+    campaign create modal renders before send (Step 3.5.16).
+
+    Gated on `campaigns.read` (same as templates LIST) so any campaign-
+    author can see the banner, not just integration admins.
+
+    409 when WhatsApp is not connected — the modal handles that branch
+    by hiding the banner entirely and falling back to the existing
+    "connect WhatsApp first" empty state."""
+    try:
+        capacity = await get_send_capacity(db)
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        )
+    return WhatsAppCapacityOut.model_validate(capacity)

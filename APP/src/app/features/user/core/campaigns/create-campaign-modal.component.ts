@@ -26,6 +26,7 @@ import {
 } from '../contacts/groups/groups-api.service';
 import {
   IntegrationsApiService,
+  WhatsAppCapacity,
   WhatsAppTemplate,
 } from '../settings/integrations/integrations-api.service';
 import {
@@ -91,6 +92,21 @@ export class CreateCampaignModalComponent {
   protected readonly audienceCount = signal<number | null>(null);
   protected readonly audienceCountLoading = signal(false);
   private readonly audiencePreview$ = new Subject<void>();
+
+  // --- WhatsApp send capacity state (Step 3.5.16) --------------------
+
+  /** Signal mirror of `form.controls.channel.value` so the capacity-
+   *  warning `computed()` blocks below react to channel changes
+   *  (form controls aren't signals on their own). Synced via the
+   *  valueChanges subscription in the constructor. */
+  protected readonly channelSignal = signal<ConversationChannel>('whatsapp');
+
+  /** `null` = not yet loaded or WhatsApp not connected (409). The
+   *  banner is hidden in both cases — the user sees no error, and
+   *  the existing "no approved templates" empty state already
+   *  signals the disconnected branch. */
+  protected readonly capacity = signal<WhatsAppCapacity | null>(null);
+  protected readonly capacityLoading = signal(false);
 
   // --- WhatsApp template picker state -------------------------------
 
@@ -182,14 +198,19 @@ export class CreateCampaignModalComponent {
     this.form.controls.channel.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((channel) => {
+        this.channelSignal.set(channel);
         if (channel === 'whatsapp' && !this.templatesLoaded()) {
           this._loadTemplates();
+        }
+        if (channel === 'whatsapp' && this.capacity() === null) {
+          this._loadCapacity();
         }
       });
 
     // Initial load — default channel is whatsapp.
     if (this.form.controls.channel.value === 'whatsapp') {
       this._loadTemplates();
+      this._loadCapacity();
     }
 
     // Load saved groups once for the audience builder dropdown.
@@ -366,6 +387,83 @@ export class CreateCampaignModalComponent {
         },
       });
   }
+
+  private _loadCapacity(): void {
+    this.capacityLoading.set(true);
+    this.integrationsApi
+      .getWhatsAppCapacity()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (c) => {
+          this.capacity.set(c);
+          this.capacityLoading.set(false);
+        },
+        error: () => {
+          // 409 (WhatsApp not connected) and any transient error fall
+          // through to the same null state — the banner stays hidden
+          // and the existing "no templates" empty state already tells
+          // the operator to connect WhatsApp.
+          this.capacity.set(null);
+          this.capacityLoading.set(false);
+        },
+      });
+  }
+
+  /** Refresh the capacity banner — bound to the banner's "Refresh"
+   *  button. Re-fetches even when the previous load succeeded. */
+  protected refreshCapacity(): void {
+    this._loadCapacity();
+  }
+
+  /** Coloured-band hint for the banner. `null` when capacity isn't
+   *  loaded yet or WhatsApp isn't connected. */
+  protected readonly capacityBand = computed<
+    'green' | 'amber' | 'red' | null
+  >(() => {
+    const c = this.capacity();
+    if (!c || c.is_unlimited) return null;
+    if (c.usage_percent >= 90) return 'red';
+    if (c.usage_percent >= 70) return 'amber';
+    return 'green';
+  });
+
+  /** Banner severity for the audience-vs-quota cross-check. `error`
+   *  when the selected audience exceeds remaining quota; `warning`
+   *  when it would consume >50% of remaining. `null` otherwise. */
+  protected readonly audienceQuotaWarning = computed<
+    { kind: 'error' | 'warning'; message: string } | null
+  >(() => {
+    const c = this.capacity();
+    if (!c || c.is_unlimited) return null;
+    if (this.channelSignal() !== 'whatsapp') return null;
+    const count = this.audienceCount();
+    if (count === null || count <= 0) return null;
+    if (count > c.remaining) {
+      const skipped = count - c.remaining;
+      return {
+        kind: 'error',
+        message: `${count.toLocaleString()} contacts selected, but only ${c.remaining.toLocaleString()} sends remaining today. ${skipped.toLocaleString()} will be skipped or queue for tomorrow.`,
+      };
+    }
+    if (c.remaining > 0 && count > c.remaining * 0.5) {
+      const pct = Math.round((count / c.remaining) * 100);
+      return {
+        kind: 'warning',
+        message: `This campaign will use ${pct}% of today's remaining quota.`,
+      };
+    }
+    return null;
+  });
+
+  /** Send button gate — disables the submit when WhatsApp quota is
+   *  exhausted. Non-WhatsApp channels are never gated. */
+  protected readonly quotaBlocksSubmit = computed<boolean>(() => {
+    const c = this.capacity();
+    if (!c) return false;
+    if (c.is_unlimited) return false;
+    if (this.channelSignal() !== 'whatsapp') return false;
+    return c.remaining === 0;
+  });
 
   protected save(): void {
     if (!this.form.valid) {
