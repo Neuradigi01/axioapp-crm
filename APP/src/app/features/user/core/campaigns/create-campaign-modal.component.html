@@ -30,6 +30,59 @@
         </label>
       </div>
 
+      <!-- WhatsApp send-capacity banner — Step 3.5.16 -->
+      @if (isWhatsAppChannel() && capacity(); as c) {
+        <div
+          class="rounded-md border p-3 text-xs"
+          [class.border-emerald-200]="capacityBand() === 'green'"
+          [class.bg-emerald-50]="capacityBand() === 'green'"
+          [class.border-amber-200]="capacityBand() === 'amber'"
+          [class.bg-amber-50]="capacityBand() === 'amber'"
+          [class.border-rose-200]="capacityBand() === 'red'"
+          [class.bg-rose-50]="capacityBand() === 'red'"
+          [class.border-zinc-200]="capacityBand() === null"
+          [class.bg-zinc-50]="capacityBand() === null"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 space-y-1">
+              <div class="font-medium text-zinc-800">
+                WhatsApp quota: {{ c.tier_label }}
+              </div>
+              @if (c.is_unlimited) {
+                <div class="text-zinc-600">Unlimited messages today.</div>
+              } @else {
+                <div class="text-zinc-700">
+                  {{ c.used_today.toLocaleString() }} used ·
+                  <span class="font-semibold">
+                    {{ c.remaining.toLocaleString() }} remaining today
+                  </span>
+                </div>
+                <div class="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200">
+                  <div
+                    class="h-full transition-all"
+                    [class.bg-emerald-500]="capacityBand() === 'green'"
+                    [class.bg-amber-500]="capacityBand() === 'amber'"
+                    [class.bg-rose-500]="capacityBand() === 'red'"
+                    [style.width.%]="c.usage_percent"
+                  ></div>
+                </div>
+                <div class="text-[10px] text-zinc-500">
+                  Resets at 5:30 AM IST (00:00 UTC). {{ c.usage_percent }}% used.
+                </div>
+              }
+            </div>
+            <button
+              type="button"
+              (click)="refreshCapacity()"
+              [disabled]="capacityLoading()"
+              class="shrink-0 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+            >
+              {{ capacityLoading() ? 'Refreshing…' : 'Refresh' }}
+            </button>
+          </div>
+        </div>
+      }
+
       <fieldset class="rounded-md border border-zinc-200 p-3 space-y-3">
         <legend class="px-1 text-xs font-medium text-zinc-600">Audience</legend>
         <!-- 3-mode radio toggle (Step 3.5.9) -->
@@ -156,6 +209,21 @@
             </span>
           }
         </div>
+
+        <!-- Audience vs. WhatsApp quota cross-check — Step 3.5.16 -->
+        @if (audienceQuotaWarning(); as w) {
+          <div
+            class="rounded-md border px-2 py-1.5 text-xs"
+            [class.border-rose-200]="w.kind === 'error'"
+            [class.bg-rose-50]="w.kind === 'error'"
+            [class.text-rose-700]="w.kind === 'error'"
+            [class.border-amber-200]="w.kind === 'warning'"
+            [class.bg-amber-50]="w.kind === 'warning'"
+            [class.text-amber-800]="w.kind === 'warning'"
+          >
+            {{ w.message }}
+          </div>
+        }
       </fieldset>
 
       @if (isWhatsAppChannel() && templates().length > 0) {
@@ -296,7 +364,8 @@
         </button>
         <button
           type="submit"
-          [disabled]="submitting()"
+          [disabled]="submitting() || quotaBlocksSubmit()"
+          [title]="quotaBlocksSubmit() ? 'WhatsApp daily quota reached. Resets at 5:30 AM IST.' : ''"
           class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
         >
           {{ submitting() ? 'Saving…' : 'Save draft' }}
