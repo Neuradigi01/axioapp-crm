@@ -259,6 +259,7 @@ async def _handle_whatsapp_webhook(
            - `statuses[]` present → update CampaignMessage rows.
            - `messages[]` present → fall through to `receive_webhook`.
     """
+    from config import WHATSAPP_APP_SECRET
     from src.app.core.campaigns.service import apply_meta_status
     from src.app.core.conversations.adapters.whatsapp import (
         WhatsAppAdapter,
@@ -284,8 +285,23 @@ async def _handle_whatsapp_webhook(
         )
     integration, config = bundle
 
-    # Per-org signature verification.
-    app_secret = decrypt(config.app_secret_enc)
+    # Signature verification — prefer the env-side platform secret
+    # (set when the deploy is using Embedded Signup, whatsapp-platform-
+    # upgrade Step 2), fall back to the per-org `app_secret_enc` that
+    # the legacy manual-connect flow wrote. Orgs that connected before
+    # ES landed keep working without an env var being set.
+    app_secret = WHATSAPP_APP_SECRET
+    if not app_secret:
+        if not config.app_secret_enc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "WhatsApp signature secret is not configured for "
+                    "this org and no platform-level WHATSAPP_APP_SECRET "
+                    "is set."
+                ),
+            )
+        app_secret = decrypt(config.app_secret_enc)
     signature = request.headers.get("x-hub-signature-256")
     # Build a throwaway adapter just for the signature helper — it's a
     # pure HMAC check that doesn't touch any other instance state.

@@ -2,7 +2,7 @@
 
 **Goal:** Wire the backend half of Meta's Embedded Signup flow. Add a new endpoint that receives the authorization `code` + `phone_number_id` + `waba_id` from the frontend popup callback, exchanges the code for a long-lived system user access token via Meta Graph API, registers the phone number for Cloud API, subscribes the app to the WABA's webhooks, and persists everything into the existing `tbl_integrations` + `tbl_whatsapp_account_configs` rows. Customer connects without ever pasting a token or ID — fully Intercom-style.
 **Track:** WhatsApp Platform Upgrade — Phase 1 (Embedded Signup)
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 1 (Meta App Configuration ID + env vars in place).
 
 ---

@@ -120,6 +120,14 @@ WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID = os.getenv("WHATSAPP_EMBEDDED_SIGNUP_CONFIG_
 # Graph API version pin for WhatsApp Cloud API calls. Defaults to
 # v19.0 to match META_GRAPH_API_VERSION (same Meta App, same pin).
 WHATSAPP_GRAPH_API_VERSION = os.getenv("WHATSAPP_GRAPH_API_VERSION", "v19.0")
+# Meta App secret — used for X-Hub-Signature-256 verification on
+# inbound WhatsApp webhooks. Orgs connected via Embedded Signup
+# (whatsapp-platform-upgrade Step 2) share this single platform-level
+# secret because the Meta App IS the platform. Orgs that connected
+# via the legacy manual flow keep their per-org `app_secret_enc`;
+# the webhook verifier prefers this env var and falls back to the
+# per-org row only when this is empty.
+WHATSAPP_APP_SECRET = _env("WHATSAPP_APP_SECRET", "")
 
 # Ad integrations (Google Ads + Meta Ads) — OAuth-token encryption.
 # Fernet key — 32 url-safe-base64-encoded bytes. Generate with:

@@ -61,7 +61,7 @@ After Step 4, steps 5–29 each ship independently in any priority order.
 | # | Title | Status | Effort |
 |---|---|---|---|
 | 1 | [Meta App configuration & prerequisites](step-01-meta-app-config.md) | **COMPLETED (code half)** — env vars wired in `.env.example` + `config.py`. Dashboard half is owner-side action. | ~2 hrs |
-| 2 | [Embedded Signup backend exchange endpoint](step-02-embedded-signup-backend.md) | Pending | ~1.5 days |
+| 2 | [Embedded Signup backend exchange endpoint](step-02-embedded-signup-backend.md) | **COMPLETED** | ~1.5 days |
 | 3 | [Embedded Signup frontend popup flow](step-03-embedded-signup-frontend.md) | Pending | ~1 day |
 | 4 | [Data deletion callback for Meta App Review](step-04-data-deletion-callback.md) | Pending | ~3 hrs |
 | 5 | [Outbound media send (image, video, audio, document)](step-05-outbound-media-send.md) | Pending | ~3 days |

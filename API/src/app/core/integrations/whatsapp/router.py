@@ -1,18 +1,23 @@
 """HTTP routes for the WhatsApp Business Account connect surface.
 
-  POST /api/v1/integrations/whatsapp/connect          → validate + store
-  POST /api/v1/integrations/whatsapp/disconnect       → null token + status
-  POST /api/v1/integrations/whatsapp/test             → ping Meta now
-  GET  /api/v1/integrations/whatsapp/status           → projection (no creds)
-  POST /api/v1/integrations/whatsapp/templates/sync   → pull Meta library
-  GET  /api/v1/integrations/whatsapp/templates        → list for picker
-  GET  /api/v1/integrations/whatsapp/capacity         → tier + remaining
+  POST /api/v1/integrations/whatsapp/connect                    → validate + store
+  POST /api/v1/integrations/whatsapp/disconnect                 → null token + status
+  POST /api/v1/integrations/whatsapp/test                       → ping Meta now
+  GET  /api/v1/integrations/whatsapp/status                     → projection (no creds)
+  POST /api/v1/integrations/whatsapp/embedded-signup/exchange   → ES popup callback
+  POST /api/v1/integrations/whatsapp/templates/sync             → pull Meta library
+  GET  /api/v1/integrations/whatsapp/templates                  → list for picker
+  GET  /api/v1/integrations/whatsapp/capacity                   → tier + remaining
 
-Admin endpoints (connect/disconnect/test/sync) gate on
+Admin endpoints (connect/disconnect/test/sync/embedded-signup) gate on
 `settings.integrations.manage` — Owner-only by default. The templates
 LIST and capacity endpoints gate on `campaigns.read` instead — any
 campaign-author needs the picker + quota banner, not just integration
 admins. Encrypted credential columns NEVER appear in any response body.
+
+The manual `/connect` endpoint is kept as the "Advanced (self-host)"
+fallback for operators who want to bring their own Meta App; the
+embedded-signup path is the default Intercom-style flow.
 """
 from __future__ import annotations
 
@@ -23,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.conversations.adapters.whatsapp import WhatsAppNotConnected
+from src.app.shared.rate_limit import InMemoryRateLimiter
 from src.app.core.integrations.whatsapp.connect import (
     MetaValidationError,
     connect_account,
@@ -30,7 +36,16 @@ from src.app.core.integrations.whatsapp.connect import (
     get_status,
     test_connection,
 )
+from src.app.core.integrations.whatsapp.embedded_signup import (
+    EmbeddedSignupNotConfigured,
+    complete_embedded_signup,
+)
+from src.app.core.integrations.whatsapp.meta_graph_client import (
+    MetaGraphError,
+)
 from src.app.core.integrations.whatsapp.schemas import (
+    EmbeddedSignupExchangeIn,
+    EmbeddedSignupExchangeOut,
     WhatsAppCapacityOut,
     WhatsAppConnectIn,
     WhatsAppStatusOut,
@@ -49,6 +64,13 @@ from src.app.shared.db import get_db
 router = APIRouter(
     prefix="/whatsapp", tags=["Integrations · WhatsApp"]
 )
+
+
+# Per-org rate cap on Embedded Signup exchange attempts — 5 per minute.
+# Prevents code-replay loops if the popup flaps. Per-org keying (not
+# per-IP) so two operators in the same org sharing the network bench
+# don't lock each other out.
+_es_exchange_limiter = InMemoryRateLimiter(max_hits=5, window_seconds=60.0)
 
 
 @router.post("/connect", response_model=WhatsAppStatusOut)
@@ -116,6 +138,54 @@ async def test_endpoint(
             detail=str(exc),
         )
     return WhatsAppStatusOut.model_validate(projection)
+
+
+@router.post(
+    "/embedded-signup/exchange",
+    response_model=EmbeddedSignupExchangeOut,
+)
+async def embedded_signup_exchange_endpoint(
+    payload: EmbeddedSignupExchangeIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("settings.integrations.manage")
+    ),
+) -> EmbeddedSignupExchangeOut:
+    """Receive the popup's `(code, phone_number_id, waba_id)` payload,
+    run the Embedded Signup orchestration, and return the connected
+    projection. Error mapping is pre-bound inside `MetaGraphError`
+    (400 for expired code, 403 for permission, 503 for unverified
+    webhook, 502 otherwise)."""
+    rl = _es_exchange_limiter.check(str(user.org_id))
+    if not rl.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"Too many connect attempts — wait "
+                f"{int(rl.retry_after)}s and retry."
+            ),
+            headers={"Retry-After": str(int(rl.retry_after) + 1)},
+        )
+    try:
+        result = await complete_embedded_signup(
+            db,
+            org_id=user.org_id,
+            actor_id=user.legacy_uuid,
+            code=payload.code,
+            phone_number_id=payload.phone_number_id,
+            waba_id=payload.waba_id,
+        )
+    except EmbeddedSignupNotConfigured as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    except MetaGraphError as exc:
+        raise HTTPException(
+            status_code=exc.http_status,
+            detail=exc.user_message,
+        )
+    return EmbeddedSignupExchangeOut.model_validate(result)
 
 
 @router.get("/status", response_model=WhatsAppStatusOut)

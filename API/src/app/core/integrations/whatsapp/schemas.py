@@ -45,6 +45,44 @@ class WhatsAppConnectIn(BaseModel):
     rate_limit_per_sec: int = Field(default=50, ge=1, le=1000)
 
 
+class EmbeddedSignupExchangeIn(BaseModel):
+    """HTTP body for `POST /embedded-signup/exchange`.
+
+    The frontend popup (Step 3) hands us the three values it harvested
+    from Meta's FB.login response: the short-lived auth `code`, the
+    selected `phone_number_id`, and its parent `waba_id`. The backend
+    does the heavy lifting from there — exchange, fetch, subscribe,
+    register, persist."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    code: str = Field(min_length=1, max_length=512)
+    phone_number_id: str = Field(min_length=1, max_length=64)
+    waba_id: str = Field(min_length=1, max_length=64)
+
+
+class EmbeddedSignupExchangeOut(BaseModel):
+    """Response shape for `POST /embedded-signup/exchange`.
+
+    The Settings UI uses this to render the success state immediately
+    after the popup closes — no follow-up `GET /status` call needed.
+    `phone_numbers_available` + `selected_index` surface Phase-9-pending
+    multi-number context so the frontend can warn the customer when
+    their WABA has more phones than we connected."""
+
+    status: WhatsAppIntegrationStatus
+    phone_id: str
+    waba_id: str
+    display_phone_number: str
+    verified_name: Optional[str] = None
+    api_version: str
+    rate_limit_per_sec: int
+    phone_numbers_available: int
+    selected_index: int
+    messaging_limit_tier: Optional[str] = None
+    quality_rating: Optional[str] = None
+
+
 class WhatsAppStatusOut(ORMModel):
     """Projection returned by `connect`, `test`, and `GET /status`.
 
@@ -125,6 +163,8 @@ class WhatsAppCapacityOut(BaseModel):
 
 
 __all__ = [
+    "EmbeddedSignupExchangeIn",
+    "EmbeddedSignupExchangeOut",
     "WhatsAppCapacityOut",
     "WhatsAppConnectIn",
     "WhatsAppIntegrationStatus",

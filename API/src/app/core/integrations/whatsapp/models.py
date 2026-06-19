@@ -59,7 +59,11 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     display_phone_number: Mapped[str] = mapped_column(Text, nullable=False)
     verified_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Fernet ciphertext — same key as parent integration's access_token_enc.
-    app_secret_enc: Mapped[str] = mapped_column(Text, nullable=False)
+    # Nullable since whatsapp-platform-upgrade Step 2: Embedded Signup
+    # orgs share one platform-level secret via env (`WHATSAPP_APP_SECRET`)
+    # and don't need a per-org row here. Legacy manually-connected orgs
+    # keep their per-org ciphertext as the signature-verifier fallback.
+    app_secret_enc: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     verify_token: Mapped[str] = mapped_column(Text, nullable=False)
     api_version: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'v18.0'")
