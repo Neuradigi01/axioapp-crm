@@ -102,6 +102,7 @@ export class ComposeBarComponent {
 
   @Output() readonly send = new EventEmitter<string>();
   @Output() readonly sendMedia = new EventEmitter<ComposerMediaPayload>();
+  @Output() readonly openInteractive = new EventEmitter<void>();
   @Output() readonly toggleAi = new EventEmitter<boolean>();
 
   @ViewChild('fileInput') private readonly fileInput!: ElementRef<HTMLInputElement>;
@@ -132,6 +133,11 @@ export class ComposeBarComponent {
 
   protected onTextChange(value: string): void {
     this.text.set(value);
+  }
+
+  protected requestInteractive(): void {
+    if (!this.canAttachMedia()) return;
+    this.openInteractive.emit();
   }
 
   protected submit(): void {

@@ -137,6 +137,7 @@ async def send_outbound(
     user_id: uuid.UUID,
     text_body: str,
     attachments: list[dict[str, Any]],
+    interactive: dict[str, Any] | None = None,
 ) -> Message:
     conv = await get_conversation(session, conversation_id)
     # WhatsApp goes through the per-org resolver (Step 3.5.3) — it
@@ -148,14 +149,27 @@ async def send_outbound(
     else:
         adapter = resolve(conv.channel)
 
+    if interactive is not None and conv.channel != ConversationChannel.whatsapp:
+        # Interactive messages are a WhatsApp-only surface today.
+        # Surface as a 400 via the router (ValueError → HTTPException).
+        raise ValueError(
+            "Interactive messages are only supported on WhatsApp "
+            "conversations."
+        )
+
     is_first_outbound = await _is_first_outbound(session, conversation_id)
 
-    ref = await adapter.send(
-        org_id=conv.org_id,
-        external_id=conv.external_id,
-        text=text_body,
-        attachments=attachments,
-    )
+    # Pass `interactive` only when supplied so the registry-based
+    # adapters (which haven't opted into the kwarg) don't break.
+    send_kwargs: dict[str, Any] = {
+        "org_id": conv.org_id,
+        "external_id": conv.external_id,
+        "text": text_body,
+        "attachments": attachments,
+    }
+    if interactive is not None:
+        send_kwargs["interactive"] = interactive
+    ref = await adapter.send(**send_kwargs)
     now = datetime.now(timezone.utc)
     sent_at = ref.sent_at or now
 
@@ -166,6 +180,7 @@ async def send_outbound(
         sender_user_id=user_id,
         text=text_body,
         attachments=attachments,
+        interactive_payload=interactive,
         channel_message_id=ref.channel_message_id,
         payload={"adapter_ref": ref.channel_message_id},
         sent_at=sent_at,

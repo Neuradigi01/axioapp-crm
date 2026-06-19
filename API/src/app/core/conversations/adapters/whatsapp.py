@@ -107,6 +107,104 @@ def _make_rate_limit_error(response: httpx.Response) -> "WhatsAppRateLimited":
     )
 
 
+# Interactive message kinds the adapter understands. The composer
+# builder modal feeds one of these dicts into `send()` via the
+# `interactive` kwarg; the adapter shapes it into Meta's documented
+# envelope. See `core/conversations/schemas.InteractivePayload` for the
+# validated input shape — by the time we reach the adapter the
+# Pydantic discriminated union has already enforced Meta's char limits.
+_INTERACTIVE_KINDS = {"reply_buttons", "cta_url", "list"}
+
+
+def _build_interactive_envelope(
+    *,
+    to: str,
+    interactive: dict[str, Any],
+) -> dict[str, Any]:
+    """Turn the composer's `interactive` dict into Meta's `type:
+    interactive` envelope.
+
+    Header/footer are optional everywhere; body is mandatory. Each
+    `kind` maps to one of Meta's documented `interactive.type` values:
+
+      * ``reply_buttons`` → ``button`` with up to 3 `quick_reply`
+        action buttons.
+      * ``cta_url`` → ``cta_url`` with a single URL-opening button.
+      * ``list`` → ``list`` with sections + rows.
+
+    The persisted ``interactive_payload`` row column keeps the
+    operator-facing shape so the bubble can re-render months later;
+    Meta-facing envelope is rebuilt on the fly here."""
+    kind = interactive["kind"]
+    body = {"text": interactive["body"]}
+    block: dict[str, Any] = {"body": body}
+
+    header = interactive.get("header")
+    if isinstance(header, dict) and header.get("text"):
+        block["header"] = {"type": "text", "text": header["text"]}
+
+    footer = interactive.get("footer")
+    if isinstance(footer, str) and footer:
+        block["footer"] = {"text": footer}
+
+    if kind == "reply_buttons":
+        block["type"] = "button"
+        block["action"] = {
+            "buttons": [
+                {
+                    "type": "reply",
+                    "reply": {
+                        "id": btn["id"],
+                        "title": btn["title"],
+                    },
+                }
+                for btn in interactive["buttons"]
+            ]
+        }
+    elif kind == "cta_url":
+        block["type"] = "cta_url"
+        block["action"] = {
+            "name": "cta_url",
+            "parameters": {
+                "display_text": interactive["button_text"],
+                "url": interactive["url"],
+            },
+        }
+    elif kind == "list":
+        block["type"] = "list"
+        block["action"] = {
+            "button": interactive["button_text"],
+            "sections": [
+                {
+                    "title": section["title"],
+                    "rows": [
+                        {
+                            "id": row["id"],
+                            "title": row["title"],
+                            **(
+                                {"description": row["description"]}
+                                if row.get("description")
+                                else {}
+                            ),
+                        }
+                        for row in section["rows"]
+                    ],
+                }
+                for section in interactive["sections"]
+            ],
+        }
+    else:
+        raise ValueError(f"unknown interactive kind: {kind!r}")
+
+    return {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to,
+        "type": "interactive",
+        "interactive": block,
+    }
+
+
 _MEDIA_ATTACHMENT_TYPES = {"image", "video", "audio", "document"}
 
 # Meta accepts a caption for image / video / document media envelopes
@@ -258,33 +356,41 @@ class WhatsAppAdapter:
         external_id: str,
         text: str,
         attachments: list[dict[str, Any]],
+        interactive: dict[str, Any] | None = None,
     ) -> ChannelMessageRef:
         """POST a message to Meta's Cloud API.
 
-        Branches on whether ``attachments`` carries a media reference
-        (``{type: image|video|audio|document, media_id: str, caption?:
-        str}`` — produced by the multipart media-upload endpoint).
-        When present, the adapter emits Meta's media envelope; ``text``
-        is used as the caption for image/video/document (audio doesn't
-        support captions per Meta's spec). When absent, behaves
-        identically to the original text-only path.
+        Routes to one of three envelopes, in priority order:
+
+          * ``interactive`` (whatsapp-platform-upgrade Step 6) — Meta's
+            ``type=interactive`` shape for quick-reply buttons, CTA
+            buttons, or list messages.
+          * Media reference inside ``attachments`` (Step 5) — Meta's
+            ``image``/``video``/``audio``/``document`` envelope.
+          * Plain text — original text-only path.
 
         Templates are still routed through ``send_template``."""
-        media = _first_media_attachment(attachments)
-        if media is not None:
-            envelope = _build_media_envelope(
-                to=_normalize_phone(external_id).lstrip("+"),
-                media=media,
-                text=text,
+        to = _normalize_phone(external_id).lstrip("+")
+        if interactive:
+            envelope = _build_interactive_envelope(
+                to=to, interactive=interactive
             )
         else:
-            envelope = {
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": _normalize_phone(external_id).lstrip("+"),
-                "type": "text",
-                "text": {"body": text},
-            }
+            media = _first_media_attachment(attachments)
+            if media is not None:
+                envelope = _build_media_envelope(
+                    to=to,
+                    media=media,
+                    text=text,
+                )
+            else:
+                envelope = {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "to": to,
+                    "type": "text",
+                    "text": {"body": text},
+                }
         headers = {
             "Authorization": f"Bearer {self._token}",
             "Content-Type": "application/json",
@@ -417,6 +523,54 @@ class WhatsAppAdapter:
             media = message.get(media_type)
             if isinstance(media, dict) and media.get("id"):
                 attachments.append({"type": media_type, **media})
+
+        # Interactive reply events (whatsapp-platform-upgrade Step 6).
+        # Meta delivers these as `interactive: { type: button_reply |
+        # list_reply, button_reply: {id, title} | list_reply: {id,
+        # title, description}, context: {id: <original_message_id>} }`.
+        # Surface the tapped row as the text body so the inbox renders
+        # something readable, and stash the attribution shape on
+        # `attachments[]` so the bubble can show "↳ Reply to: …".
+        interactive = message.get("interactive")
+        if isinstance(interactive, dict):
+            kind = interactive.get("type")
+            context = message.get("context")
+            original_id = (
+                context.get("id") if isinstance(context, dict) else None
+            )
+            if kind == "button_reply":
+                payload = interactive.get("button_reply") or {}
+                if isinstance(payload, dict):
+                    title = payload.get("title")
+                    if isinstance(title, str) and not text_body:
+                        text_body = title
+                    attachments.append(
+                        {
+                            "type": "reply",
+                            "reply_kind": "button",
+                            "reply_to_id": payload.get("id"),
+                            "reply_to_title": title,
+                            "reply_to_message_id": original_id,
+                        }
+                    )
+            elif kind == "list_reply":
+                payload = interactive.get("list_reply") or {}
+                if isinstance(payload, dict):
+                    title = payload.get("title")
+                    if isinstance(title, str) and not text_body:
+                        text_body = title
+                    attachments.append(
+                        {
+                            "type": "reply",
+                            "reply_kind": "list",
+                            "reply_to_id": payload.get("id"),
+                            "reply_to_title": title,
+                            "reply_to_description": payload.get(
+                                "description"
+                            ),
+                            "reply_to_message_id": original_id,
+                        }
+                    )
 
         ts_raw = message.get("timestamp")
         sent_at: datetime | None

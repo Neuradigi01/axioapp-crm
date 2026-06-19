@@ -73,6 +73,16 @@
       >
         <lucide-icon name="paperclip" size="16" aria-hidden="true"></lucide-icon>
       </button>
+      <button
+        type="button"
+        (click)="requestInteractive()"
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50"
+        aria-label="Send an interactive message"
+        title="Interactive message"
+        data-testid="compose-interactive-button"
+      >
+        <lucide-icon name="list" size="16" aria-hidden="true"></lucide-icon>
+      </button>
       <input
         #fileInput
         type="file"

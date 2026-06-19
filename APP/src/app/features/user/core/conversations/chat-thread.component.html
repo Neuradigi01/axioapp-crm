@@ -102,12 +102,65 @@
                 }
               </span>
             }
+            @if (replyAttribution(m); as attr) {
+              <p
+                class="mb-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-[10px] font-medium text-zinc-600"
+              >
+                ↳ Reply to: {{ attr.title }}
+              </p>
+            }
             @if (m.text) {
               <p class="whitespace-pre-wrap break-words">{{ m.text }}</p>
             }
-            @if (m.attachments.length > 0) {
+            @switch (interactiveKind(m)) {
+              @case ('reply_buttons') {
+                <div class="mt-2 space-y-1">
+                  @for (b of interactiveButtons(m); track b.id) {
+                    <div
+                      class="rounded border border-white/20 bg-white/10 px-2 py-1 text-center text-xs font-medium text-white"
+                    >
+                      {{ b.title }}
+                    </div>
+                  }
+                </div>
+              }
+              @case ('cta_url') {
+                @if (interactiveCta(m); as cta) {
+                  <a
+                    [href]="cta.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="mt-2 block rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-center text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                  >
+                    {{ cta.button_text }}
+                  </a>
+                }
+              }
+              @case ('list') {
+                <div
+                  class="mt-2 space-y-1 rounded border border-white/20 bg-white/10 p-2"
+                >
+                  @for (s of interactiveListSections(m); track s.title) {
+                    <p class="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+                      {{ s.title }}
+                    </p>
+                    @for (r of s.rows; track r.id) {
+                      <div class="rounded bg-white/10 px-2 py-1 text-xs">
+                        <span class="font-medium">{{ r.title }}</span>
+                        @if (r.description) {
+                          <span class="ml-1 text-[10px] opacity-80">
+                            — {{ r.description }}
+                          </span>
+                        }
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            }
+            @if (mediaAttachmentCount(m) > 0) {
               <p class="mt-1 text-[10px] uppercase tracking-wide opacity-70">
-                {{ m.attachments.length }} attachment(s)
+                {{ mediaAttachmentCount(m) }} attachment(s)
               </p>
             }
             <p

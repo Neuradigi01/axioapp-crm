@@ -174,6 +174,14 @@ class Message(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("'{}'::jsonb"),
     )
+    # whatsapp-platform-upgrade Step 6: outbound Meta interactive
+    # envelope (reply buttons / CTA / list). NULL on text + media +
+    # template rows. The thread bubble renders this so button labels
+    # stay visible even months after send; replay audits also read
+    # from here.
+    interactive_payload: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )
     sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

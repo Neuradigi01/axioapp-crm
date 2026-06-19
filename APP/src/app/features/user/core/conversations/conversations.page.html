@@ -67,7 +67,13 @@
           [contactId]="conv.contact_id"
           (send)="onSendText($event)"
           (sendMedia)="onSendMedia($event)"
+          (openInteractive)="openInteractive()"
           (toggleAi)="onToggleAi($event)"
+        />
+        <app-interactive-builder
+          [open]="interactiveOpen()"
+          (cancel)="closeInteractive()"
+          (submit)="onSendInteractive($event)"
         />
       } @else {
         <div class="flex flex-1 items-center justify-center px-4 text-center text-sm text-zinc-500">

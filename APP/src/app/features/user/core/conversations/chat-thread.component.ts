@@ -134,4 +134,111 @@ export class ChatThreadComponent implements AfterViewChecked {
   protected staffColorFor(userId: string | null): OwnerColor {
     return ownerColor(userId);
   }
+
+  // --- Interactive (whatsapp-platform-upgrade Step 6) --------------
+
+  protected interactiveKind(
+    m: ConversationMessage,
+  ): 'reply_buttons' | 'cta_url' | 'list' | null {
+    const p = m.interactive_payload;
+    if (!p || typeof p !== 'object') return null;
+    const k = (p as { kind?: string }).kind;
+    return k === 'reply_buttons' || k === 'cta_url' || k === 'list'
+      ? k
+      : null;
+  }
+
+  protected interactiveButtons(
+    m: ConversationMessage,
+  ): Array<{ id: string; title: string }> {
+    const p = m.interactive_payload as
+      | { buttons?: Array<{ id?: string; title?: string }> }
+      | null;
+    if (!p?.buttons) return [];
+    return p.buttons
+      .filter((b) => typeof b.id === 'string' && typeof b.title === 'string')
+      .map((b) => ({ id: b.id as string, title: b.title as string }));
+  }
+
+  protected interactiveCta(
+    m: ConversationMessage,
+  ): { button_text: string; url: string } | null {
+    const p = m.interactive_payload as
+      | { button_text?: string; url?: string }
+      | null;
+    if (!p?.button_text || !p?.url) return null;
+    return { button_text: p.button_text, url: p.url };
+  }
+
+  protected interactiveListSections(
+    m: ConversationMessage,
+  ): Array<{
+    title: string;
+    rows: Array<{ id: string; title: string; description?: string }>;
+  }> {
+    const p = m.interactive_payload as
+      | {
+          sections?: Array<{
+            title?: string;
+            rows?: Array<{
+              id?: string;
+              title?: string;
+              description?: string;
+            }>;
+          }>;
+        }
+      | null;
+    if (!p?.sections) return [];
+    return p.sections.map((s) => ({
+      title: s.title ?? '',
+      rows: (s.rows ?? [])
+        .filter(
+          (r) => typeof r.id === 'string' && typeof r.title === 'string',
+        )
+        .map((r) => ({
+          id: r.id as string,
+          title: r.title as string,
+          description: r.description,
+        })),
+    }));
+  }
+
+  /** Pull the inbound reply-attribution shape `parse_webhook` adds
+   *  to `attachments[]` when Meta delivers a button_reply / list_reply
+   *  event. Returns null when the message isn't a reply. */
+  protected replyAttribution(
+    m: ConversationMessage,
+  ): { title: string; kind: 'button' | 'list' } | null {
+    for (const att of m.attachments ?? []) {
+      const a = att as {
+        type?: string;
+        reply_kind?: string;
+        reply_to_title?: string;
+      };
+      if (
+        a.type === 'reply' &&
+        (a.reply_kind === 'button' || a.reply_kind === 'list') &&
+        typeof a.reply_to_title === 'string'
+      ) {
+        return { title: a.reply_to_title, kind: a.reply_kind };
+      }
+    }
+    return null;
+  }
+
+  /** True when the attachment list has a real media reference
+   *  (image/video/audio/document) — Step-5's attachments. The Step-6
+   *  reply attribution lives in the same array but should NOT be
+   *  counted as a media attachment. */
+  protected mediaAttachmentCount(m: ConversationMessage): number {
+    return (m.attachments ?? []).filter((att) => {
+      const t = (att as { type?: string }).type;
+      return (
+        t === 'image' ||
+        t === 'video' ||
+        t === 'audio' ||
+        t === 'document'
+      );
+    }).length;
+  }
 }

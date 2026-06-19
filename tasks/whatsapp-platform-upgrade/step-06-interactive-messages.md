@@ -1,7 +1,7 @@
 # Step 6 — Interactive messages (reply buttons + CTA buttons + list)
 
 **Goal:** Send Meta-spec interactive messages from the conversation composer — quick-reply buttons (max 3), call-to-action buttons (URL or phone), and list messages (up to 10 items in sections). Recipient taps → reply event lands as inbound message in Core CRM with metadata pointing at which button/list-item was selected.
-**Status:** Pending
+**Status:** COMPLETED (code) — pending migration apply when DB is back online
 **Depends on:** Step 5 (composer pattern established).
 
 ---

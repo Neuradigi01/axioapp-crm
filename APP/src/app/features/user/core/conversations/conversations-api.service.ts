@@ -46,6 +46,11 @@ export interface ConversationMessage {
   sender_user_id: string | null;
   text: string | null;
   attachments: Array<Record<string, unknown>>;
+  /** Outbound interactive envelope (whatsapp-platform-upgrade Step 6).
+   *  Mirrors the validated `InteractivePayload` discriminated union the
+   *  builder modal emits — the bubble renderer reads it to show button
+   *  labels / list rows. */
+  interactive_payload: Record<string, unknown> | null;
   channel_message_id: string | null;
   sent_at: string | null;
   delivered_at: string | null;
@@ -99,6 +104,21 @@ export class ConversationsApiService {
       text,
       attachments: [],
     });
+  }
+
+  /**
+   * Outbound interactive message — reply buttons / CTA URL / list
+   * (whatsapp-platform-upgrade Step 6). The backend validates the
+   * payload against Meta's published limits before shipping.
+   */
+  sendInteractive(
+    id: string,
+    interactive: Record<string, unknown>,
+  ): Observable<ConversationMessage> {
+    return this.http.post<ConversationMessage>(
+      `${this.base}/${id}/messages`,
+      { text: '', attachments: [], interactive },
+    );
   }
 
   /**

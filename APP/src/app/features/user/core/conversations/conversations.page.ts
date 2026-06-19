@@ -23,6 +23,10 @@ import {
   ComposerMediaPayload,
 } from './compose-bar.component';
 import { ConversationListComponent } from './conversation-list.component';
+import {
+  InteractiveBuilderComponent,
+  InteractivePayload,
+} from './interactive-builder.component';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
 import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
 import {
@@ -54,6 +58,7 @@ import { extractApiError } from '@core/services/api-error.util';
     ConversationListComponent,
     ChatThreadComponent,
     ComposeBarComponent,
+    InteractiveBuilderComponent,
     ReassignModalComponent,
   ],
   templateUrl: './conversations.page.html',
@@ -94,6 +99,12 @@ export class ConversationsPageComponent {
   protected readonly reassignOpen = signal(false);
   protected readonly reassignSubmitting = signal(false);
   protected readonly reassignError = signal<string | null>(null);
+
+  /** When `true`, the interactive-message builder modal is mounted.
+   *  Lives outside the compose bar so dragging the dialog around
+   *  doesn't blow away the composer's transient state (staged file,
+   *  partially-typed caption, etc.). */
+  protected readonly interactiveOpen = signal(false);
 
   protected readonly selectedConversation = computed<Conversation | null>(() => {
     const id = this.selectedId();
@@ -204,6 +215,7 @@ export class ConversationsPageComponent {
       sender_user_id: null,
       text,
       attachments: [],
+      interactive_payload: null,
       channel_message_id: null,
       sent_at: new Date().toISOString(),
       delivered_at: null,
@@ -249,6 +261,83 @@ export class ConversationsPageComponent {
       });
   }
 
+  // --- Interactive (Step 6) ----------------------------------------------
+
+  protected openInteractive(): void {
+    if (!this.selectedConversation()) return;
+    this.interactiveOpen.set(true);
+  }
+
+  protected closeInteractive(): void {
+    this.interactiveOpen.set(false);
+  }
+
+  /**
+   * Outbound interactive message — reply buttons / CTA URL / list
+   * (whatsapp-platform-upgrade Step 6). The builder modal emits the
+   * validated payload; we close the modal, optimistic-append the
+   * placeholder bubble, then swap in the server's row.
+   */
+  protected onSendInteractive(payload: InteractivePayload): void {
+    const id = this.selectedId();
+    if (!id) return;
+    this.interactiveOpen.set(false);
+
+    const previewText = payload.body || '[interactive message]';
+    const optimistic: ConversationMessage = {
+      id: 'tmp-' + Math.random().toString(36).slice(2),
+      org_id: '',
+      conversation_id: id,
+      direction: 'out',
+      sender_user_id: null,
+      text: previewText,
+      attachments: [],
+      interactive_payload: payload as unknown as Record<string, unknown>,
+      channel_message_id: null,
+      sent_at: new Date().toISOString(),
+      delivered_at: null,
+      read_at: null,
+      created_at: new Date().toISOString(),
+    };
+    this.detail.update((d) =>
+      d ? { ...d, messages: [...d.messages, optimistic] } : d,
+    );
+
+    this.api
+      .sendInteractive(id, payload as unknown as Record<string, unknown>)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (real) => {
+          this.detail.update((d) =>
+            d
+              ? {
+                  ...d,
+                  messages: d.messages.map((m) =>
+                    m.id === optimistic.id ? real : m,
+                  ),
+                }
+              : d,
+          );
+          this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.detail.update((d) =>
+            d
+              ? {
+                  ...d,
+                  messages: d.messages.filter(
+                    (m) => m.id !== optimistic.id,
+                  ),
+                }
+              : d,
+          );
+          this.loadError.set(
+            extractApiError(err) ?? 'Could not send interactive message.',
+          );
+        },
+      });
+  }
+
   /**
    * Outbound media message for WhatsApp conversations (whatsapp-
    * platform-upgrade Step 5). Optimistic-append the placeholder, fire
@@ -279,6 +368,7 @@ export class ConversationsPageComponent {
           uploading: true,
         },
       ],
+      interactive_payload: null,
       channel_message_id: null,
       sent_at: new Date().toISOString(),
       delivered_at: null,

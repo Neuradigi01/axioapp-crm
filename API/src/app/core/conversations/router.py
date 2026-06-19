@@ -133,13 +133,40 @@ async def send_message_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
 ) -> MessageOut:
-    msg = await send_outbound(
-        db,
-        conversation_id=conversation_id,
-        user_id=user.legacy_uuid,
-        text_body=payload.text,
-        attachments=payload.attachments,
+    # Must carry at least one of the three payloads — the schema relaxed
+    # `text` to optional to allow interactive-only sends, so re-check at
+    # the boundary instead of with a Pydantic root validator (keeps the
+    # error message friendlier).
+    if (
+        not payload.text
+        and not payload.attachments
+        and payload.interactive is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Message must include text, an attachment, or an "
+                "interactive payload."
+            ),
+        )
+    interactive_dict = (
+        payload.interactive.model_dump(mode="json")
+        if payload.interactive is not None
+        else None
     )
+    try:
+        msg = await send_outbound(
+            db,
+            conversation_id=conversation_id,
+            user_id=user.legacy_uuid,
+            text_body=payload.text,
+            attachments=payload.attachments,
+            interactive=interactive_dict,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        )
     return MessageOut.model_validate(msg)
 
 
