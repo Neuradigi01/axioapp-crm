@@ -1,4 +1,10 @@
-<div class="border-t border-zinc-200 bg-white px-4 py-3">
+<div
+  class="border-t border-zinc-200 bg-white px-4 py-3"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave($event)"
+  (drop)="onDrop($event)"
+  [class.bg-emerald-50]="isDragging() && canAttachMedia()"
+>
   @if (templateError(); as err) {
     <div class="mb-2 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800">
       <lucide-icon name="alert-triangle" size="14" class="mt-0.5 shrink-0" aria-hidden="true"></lucide-icon>
@@ -8,14 +14,81 @@
       </button>
     </div>
   }
+
+  @if (mediaError(); as merr) {
+    <div class="mb-2 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800">
+      <lucide-icon name="alert-triangle" size="14" class="mt-0.5 shrink-0" aria-hidden="true"></lucide-icon>
+      <span class="flex-1">{{ merr }}</span>
+      <button type="button" class="text-rose-700 hover:text-rose-900" aria-label="Dismiss" (click)="dismissMediaError()">
+        <lucide-icon name="x" size="12" aria-hidden="true"></lucide-icon>
+      </button>
+    </div>
+  }
+
+  @if (stagedFile(); as f) {
+    <div
+      class="mb-2 flex items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-2"
+      data-testid="compose-media-preview"
+    >
+      @switch (stagedType()) {
+        @case ('image') {
+          <lucide-icon name="image" size="20" class="text-zinc-500" aria-hidden="true"></lucide-icon>
+        }
+        @case ('video') {
+          <lucide-icon name="video" size="20" class="text-zinc-500" aria-hidden="true"></lucide-icon>
+        }
+        @case ('audio') {
+          <lucide-icon name="music" size="20" class="text-zinc-500" aria-hidden="true"></lucide-icon>
+        }
+        @default {
+          <lucide-icon name="file-text" size="20" class="text-zinc-500" aria-hidden="true"></lucide-icon>
+        }
+      }
+      <div class="flex-1 truncate">
+        <div class="truncate text-xs font-medium text-zinc-800">{{ f.name }}</div>
+        <div class="text-[10px] text-zinc-500">
+          {{ stagedType() }} · {{ formatBytes(f.size) }}
+        </div>
+      </div>
+      <button
+        type="button"
+        (click)="clearStaged()"
+        class="rounded p-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
+        aria-label="Remove attachment"
+      >
+        <lucide-icon name="x" size="14" aria-hidden="true"></lucide-icon>
+      </button>
+    </div>
+  }
+
   <div class="flex items-end gap-2">
+    @if (canAttachMedia()) {
+      <button
+        type="button"
+        (click)="openFilePicker()"
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50"
+        aria-label="Attach a file"
+        title="Attach a file"
+        data-testid="compose-attach-button"
+      >
+        <lucide-icon name="paperclip" size="16" aria-hidden="true"></lucide-icon>
+      </button>
+      <input
+        #fileInput
+        type="file"
+        class="hidden"
+        accept="image/jpeg,image/png,video/mp4,video/3gpp,audio/aac,audio/mp4,audio/mpeg,audio/amr,audio/ogg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv"
+        (change)="onFilePicked($event)"
+      />
+    }
     <textarea
       [ngModel]="text()"
       (ngModelChange)="onTextChange($event)"
       (keydown)="onKey($event)"
       rows="2"
-      placeholder="Type a reply or let AI handle it…"
-      class="block min-h-[2.5rem] flex-1 resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      [attr.placeholder]="placeholder()"
+      [disabled]="!!stagedFile() && !captionsSupported()"
+      class="block min-h-[2.5rem] flex-1 resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-500"
     ></textarea>
     <div class="flex flex-col items-stretch gap-2">
       @if (channel === 'email') {
@@ -41,7 +114,7 @@
       <button
         type="button"
         (click)="submit()"
-        [disabled]="!text().trim()"
+        [disabled]="!stagedFile() && !text().trim().length"
         class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
       >
         Send
@@ -49,6 +122,12 @@
     </div>
   </div>
   <p class="mt-2 text-[10px] text-zinc-400">
-    Enter to send · Shift+Enter for a new line
+    @if (canAttachMedia()) {
+      Enter to send · Shift+Enter for newline · drag a file or click
+      <lucide-icon name="paperclip" size="10" class="inline align-middle" aria-hidden="true"></lucide-icon>
+      to attach
+    } @else {
+      Enter to send · Shift+Enter for a new line
+    }
   </p>
 </div>

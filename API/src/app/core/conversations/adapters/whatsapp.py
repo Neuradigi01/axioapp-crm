@@ -107,6 +107,69 @@ def _make_rate_limit_error(response: httpx.Response) -> "WhatsAppRateLimited":
     )
 
 
+_MEDIA_ATTACHMENT_TYPES = {"image", "video", "audio", "document"}
+
+# Meta accepts a caption for image / video / document media envelopes
+# but silently drops it for audio. Keep this set in sync with
+# `media_upload._CAPTIONS_SUPPORTED` — the router uses that one for
+# input validation; this one is the adapter's render-time guard.
+_MEDIA_CAPTIONABLE = {"image", "video", "document"}
+
+
+def _first_media_attachment(
+    attachments: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Return the first attachment that looks like a media reference
+    (``{type, media_id}``), or ``None``. Inbound-style descriptors
+    (``{type, id, sha256}`` from `parse_webhook`) live in the same
+    list shape — discriminate on ``media_id`` to avoid mis-handling
+    them when the caller echoes an inbound payload back."""
+    for att in attachments:
+        if not isinstance(att, dict):
+            continue
+        t = att.get("type")
+        if t in _MEDIA_ATTACHMENT_TYPES and isinstance(
+            att.get("media_id"), str
+        ):
+            return att
+    return None
+
+
+def _build_media_envelope(
+    *,
+    to: str,
+    media: dict[str, Any],
+    text: str,
+) -> dict[str, Any]:
+    """Render Meta's media-message envelope.
+
+    Caption sourcing: the composer's text field is reused as the
+    caption for image/video/document. ``media['caption']`` (when
+    present) takes precedence so an automation can pass a structured
+    caption without piggy-backing on the human-typed text.
+
+    For ``document`` we also forward the ``filename`` Meta uses to
+    label the download on the recipient side."""
+    media_type = media["type"]
+    media_id = media["media_id"]
+    block: dict[str, Any] = {"id": media_id}
+    if media_type in _MEDIA_CAPTIONABLE:
+        caption = media.get("caption") or text
+        if isinstance(caption, str) and caption:
+            block["caption"] = caption[:1024]
+    if media_type == "document":
+        filename = media.get("filename")
+        if isinstance(filename, str) and filename:
+            block["filename"] = filename
+    return {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to,
+        "type": media_type,
+        media_type: block,
+    }
+
+
 def _render_template_components(
     *,
     variables: dict[int, str],
@@ -196,19 +259,32 @@ class WhatsAppAdapter:
         text: str,
         attachments: list[dict[str, Any]],
     ) -> ChannelMessageRef:
-        """POST a text message to Meta's Cloud API.
+        """POST a message to Meta's Cloud API.
 
-        `attachments` is accepted for protocol parity but ignored here —
-        media uploads + templates are deferred per the step spec.
-        """
-        to = _normalize_phone(external_id).lstrip("+")
-        envelope = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": to,
-            "type": "text",
-            "text": {"body": text},
-        }
+        Branches on whether ``attachments`` carries a media reference
+        (``{type: image|video|audio|document, media_id: str, caption?:
+        str}`` — produced by the multipart media-upload endpoint).
+        When present, the adapter emits Meta's media envelope; ``text``
+        is used as the caption for image/video/document (audio doesn't
+        support captions per Meta's spec). When absent, behaves
+        identically to the original text-only path.
+
+        Templates are still routed through ``send_template``."""
+        media = _first_media_attachment(attachments)
+        if media is not None:
+            envelope = _build_media_envelope(
+                to=_normalize_phone(external_id).lstrip("+"),
+                media=media,
+                text=text,
+            )
+        else:
+            envelope = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": _normalize_phone(external_id).lstrip("+"),
+                "type": "text",
+                "text": {"body": text},
+            }
         headers = {
             "Authorization": f"Bearer {self._token}",
             "Content-Type": "application/json",
@@ -416,10 +492,19 @@ async def resolve_whatsapp_adapter(
             "Connect it in Settings → Integrations."
         )
     integration, config = bundle
+    # `app_secret_enc` is NULL for orgs that connected via Embedded
+    # Signup (whatsapp-platform-upgrade Step 2) — the webhook verifier
+    # falls back to the env-side `WHATSAPP_APP_SECRET`, and `send()`
+    # never touches the adapter's `_app_secret` attribute at all. Pass
+    # an empty string here so the constructor doesn't trip on `None`;
+    # the signature path keeps reading from env for ES-connected orgs.
+    app_secret = (
+        decrypt(config.app_secret_enc) if config.app_secret_enc else ""
+    )
     return WhatsAppAdapter(
         phone_id=config.phone_id,
         token=decrypt(integration.access_token_enc),
-        app_secret=decrypt(config.app_secret_enc),
+        app_secret=app_secret,
         verify_token=config.verify_token,
         api_version=config.api_version,
     )

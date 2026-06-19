@@ -18,11 +18,32 @@ from typing import Any, Optional
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.conversations.adapters.whatsapp import (
+    WhatsAppNotConnected,
+    resolve_whatsapp_adapter,
+)
+from src.app.core.conversations.media_upload import (
+    MAX_CAPTION_LENGTH,
+    MediaUploadError,
+    captions_supported,
+    upload_to_meta,
+    validate_attachment,
+)
 from src.app.core.conversations.models import (
     ConversationChannel,
     ConversationStatus,
@@ -32,6 +53,7 @@ from src.app.core.conversations.registry import (
     resolve,
 )
 from src.app.core.conversations.schemas import (
+    AttachmentType,
     ConversationDetail,
     ConversationListResponse,
     ConversationOut,
@@ -117,6 +139,116 @@ async def send_message_endpoint(
         user_id=user.legacy_uuid,
         text_body=payload.text,
         attachments=payload.attachments,
+    )
+    return MessageOut.model_validate(msg)
+
+
+@router.post(
+    "/{conversation_id}/messages/media",
+    response_model=MessageOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def send_media_message_endpoint(
+    conversation_id: uuid.UUID,
+    file: UploadFile = File(...),
+    type: AttachmentType = Form(...),
+    caption: Optional[str] = Form(default=None, max_length=MAX_CAPTION_LENGTH),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> MessageOut:
+    """Outbound media message for WhatsApp conversations (Step 5 of
+    whatsapp-platform-upgrade).
+
+    The browser uploads the binary in a multipart envelope; the server
+    streams it once into memory, validates MIME + size against Meta's
+    documented per-type caps, uploads to ``POST /{phone_id}/media``,
+    and ships the resulting ``media_id`` to the recipient via the
+    standard ``send_outbound`` pipeline (which writes the row + emits
+    the activity log + bumps the conversation's last_message_at).
+
+    Currently WhatsApp-only — other channels (web/email/sms) have no
+    Meta-style media-id flow; expand the conversation lookup branch
+    below when a second channel needs it."""
+    conv = await get_conversation(db, conversation_id)
+    if conv.channel != ConversationChannel.whatsapp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Media messages are only supported on WhatsApp "
+                f"conversations (got {conv.channel.value!r})."
+            ),
+        )
+
+    mime_type = (file.content_type or "").lower()
+    file_bytes = await file.read()
+    try:
+        validate_attachment(
+            type_=type,
+            mime_type=mime_type,
+            size_bytes=len(file_bytes),
+        )
+    except MediaUploadError as exc:
+        raise HTTPException(
+            status_code=exc.http_status, detail=exc.user_message
+        )
+
+    try:
+        bundle = await resolve_whatsapp_adapter(db)
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+
+    # Resolve the per-org Cloud API credentials. The adapter holds them
+    # in private attrs; we read directly because the upload uses the
+    # SAME phone_id + token that the send call will use a moment later.
+    phone_id = getattr(bundle, "_phone_id", None)
+    token = getattr(bundle, "_token", None)
+    api_version = getattr(bundle, "_api_version", None)
+    if not phone_id or not token or not api_version:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="WhatsApp adapter is in an unexpected state.",
+        )
+
+    try:
+        media_id = await upload_to_meta(
+            phone_id=phone_id,
+            token=token,
+            api_version=api_version,
+            file_bytes=file_bytes,
+            mime_type=mime_type,
+            filename=file.filename or "file",
+        )
+    except MediaUploadError as exc:
+        raise HTTPException(
+            status_code=exc.http_status, detail=exc.user_message
+        )
+
+    effective_caption = caption if captions_supported(type) else None
+
+    attachment_record = {
+        "type": type,
+        "media_id": media_id,
+        "mime_type": mime_type,
+        "filename": file.filename,
+        "size_bytes": len(file_bytes),
+        "caption": effective_caption,
+    }
+    text_body = effective_caption or ""
+    # `send_outbound` requires non-empty text for the activity-log
+    # preview + the row's `text` column. Use the media type as a stable
+    # fallback when no caption was supplied so the inbox doesn't render
+    # an empty row.
+    if not text_body:
+        text_body = f"[{type}]"
+
+    msg = await send_outbound(
+        db,
+        conversation_id=conversation_id,
+        user_id=user.legacy_uuid,
+        text_body=text_body,
+        attachments=[attachment_record],
     )
     return MessageOut.model_validate(msg)
 

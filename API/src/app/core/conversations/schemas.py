@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.shared.schemas import ORMModel, PaginatedResponse
 from src.app.core.conversations.models import (
@@ -23,6 +23,31 @@ from src.app.core.conversations.models import (
     ConversationStatus,
     MessageDirection,
 )
+
+
+AttachmentType = Literal["image", "video", "audio", "document"]
+
+
+class AttachmentPayload(BaseModel):
+    """Structured attachment descriptor produced by the media-upload
+    pipeline. Stored verbatim on ``Message.attachments`` and rendered
+    in the inbox thread.
+
+    ``media_id`` is Meta's identifier returned from
+    ``POST /{phone_id}/media``; ``caption`` is folded into the
+    outbound envelope by the WhatsApp adapter (silently dropped for
+    audio per Meta's spec). The remaining fields are display
+    metadata the inbox thread uses to render a file card without
+    re-querying Meta."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    type: AttachmentType
+    media_id: str = Field(min_length=1, max_length=128)
+    mime_type: str = Field(min_length=1, max_length=128)
+    filename: Optional[str] = Field(default=None, max_length=255)
+    size_bytes: Optional[int] = Field(default=None, ge=0)
+    caption: Optional[str] = Field(default=None, max_length=1024)
 
 
 class MessageSendPayload(BaseModel):

@@ -66,6 +66,7 @@
           [channel]="conv.channel"
           [contactId]="conv.contact_id"
           (send)="onSendText($event)"
+          (sendMedia)="onSendMedia($event)"
           (toggleAi)="onToggleAi($event)"
         />
       } @else {

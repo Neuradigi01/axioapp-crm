@@ -1,7 +1,7 @@
 # Step 5 — Outbound media send (image, video, audio, document)
 
 **Goal:** Lift the "media uploads are deferred" block from the WhatsApp send path. Customer can attach image / video / audio / document to a conversation message via the composer, file uploads to Meta Graph API's media endpoint, returned `media_id` ships in the outbound message payload, and recipient receives the rich media on WhatsApp.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 4 (Phase 1 closed — connected ES org with valid long-lived token).
 
 ---

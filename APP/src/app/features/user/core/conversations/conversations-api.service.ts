@@ -101,6 +101,31 @@ export class ConversationsApiService {
     });
   }
 
+  /**
+   * Outbound media message for WhatsApp conversations (whatsapp-
+   * platform-upgrade Step 5). Single multipart round-trip — the
+   * backend uploads the binary to Meta, mints a media_id, and ships
+   * it on the conversation. Backend returns friendly 413/415/422
+   * detail messages on size/MIME/type mismatches.
+   */
+  sendMedia(
+    id: string,
+    file: File,
+    type: 'image' | 'video' | 'audio' | 'document',
+    caption?: string,
+  ): Observable<ConversationMessage> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    form.append('type', type);
+    if (caption) {
+      form.append('caption', caption);
+    }
+    return this.http.post<ConversationMessage>(
+      `${this.base}/${id}/messages/media`,
+      form,
+    );
+  }
+
   patch(id: string, payload: ConversationPatch): Observable<Conversation> {
     return this.http.patch<Conversation>(`${this.base}/${id}`, payload);
   }

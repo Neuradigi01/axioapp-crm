@@ -18,7 +18,10 @@ import {
   ConversationsApiService,
 } from './conversations-api.service';
 import { ChatThreadComponent } from './chat-thread.component';
-import { ComposeBarComponent } from './compose-bar.component';
+import {
+  ComposeBarComponent,
+  ComposerMediaPayload,
+} from './compose-bar.component';
 import { ConversationListComponent } from './conversation-list.component';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
 import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
@@ -241,6 +244,81 @@ export class ConversationsPageComponent {
           );
           this.loadError.set(
             extractApiError(err) ?? 'Could not send message.',
+          );
+        },
+      });
+  }
+
+  /**
+   * Outbound media message for WhatsApp conversations (whatsapp-
+   * platform-upgrade Step 5). Optimistic-append the placeholder, fire
+   * the multipart upload, then swap in the server's row. On failure
+   * the placeholder is rolled back and the friendly error from the
+   * backend (oversize / bad MIME / Meta refusal) lands in `loadError`.
+   */
+  protected onSendMedia(payload: ComposerMediaPayload): void {
+    const id = this.selectedId();
+    if (!id) return;
+
+    const placeholderText = payload.caption ?? `[${payload.type}]`;
+    const optimistic: ConversationMessage = {
+      id: 'tmp-' + Math.random().toString(36).slice(2),
+      org_id: '',
+      conversation_id: id,
+      direction: 'out',
+      sender_user_id: null,
+      text: placeholderText,
+      attachments: [
+        {
+          type: payload.type,
+          filename: payload.file.name,
+          mime_type: payload.file.type,
+          size_bytes: payload.file.size,
+          caption: payload.caption ?? null,
+          // No media_id yet — backend mints it.
+          uploading: true,
+        },
+      ],
+      channel_message_id: null,
+      sent_at: new Date().toISOString(),
+      delivered_at: null,
+      read_at: null,
+      created_at: new Date().toISOString(),
+    };
+    this.detail.update((d) =>
+      d ? { ...d, messages: [...d.messages, optimistic] } : d,
+    );
+
+    this.api
+      .sendMedia(id, payload.file, payload.type, payload.caption)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (real) => {
+          this.detail.update((d) =>
+            d
+              ? {
+                  ...d,
+                  messages: d.messages.map((m) =>
+                    m.id === optimistic.id ? real : m,
+                  ),
+                }
+              : d,
+          );
+          this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.detail.update((d) =>
+            d
+              ? {
+                  ...d,
+                  messages: d.messages.filter(
+                    (m) => m.id !== optimistic.id,
+                  ),
+                }
+              : d,
+          );
+          this.loadError.set(
+            extractApiError(err) ?? 'Could not send media.',
           );
         },
       });
