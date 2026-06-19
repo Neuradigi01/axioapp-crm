@@ -150,6 +150,13 @@ async def complete_embedded_signup(
         after={"waba_id": waba_id, "phone_number_id": phone_number_id},
     )
 
+    # Step 1a — capture the Meta-side user_id for the Data Deletion
+    # Callback (Step 4). Best-effort: if `/debug_token` rebuffs, the
+    # connect still succeeds — the integration row just gets a NULL
+    # `meta_user_id` and Meta's deletion callback won't match it (the
+    # operator can still disconnect manually from Settings).
+    meta_user_id = await client.debug_token(token)
+
     # Step 2 — fetch WABA + phone numbers in parallel-ish (sequential
     # is fine; both are sub-second). Pick the requested phone or fall
     # back to the first phone the WABA exposes if Meta's ES popup
@@ -230,6 +237,7 @@ async def complete_embedded_signup(
         token=token,
         selected=selected,
         waba=waba,
+        meta_user_id=meta_user_id,
     )
     config = await _upsert_config(
         session,
@@ -315,10 +323,16 @@ async def _upsert_integration(
     token: str,
     selected: PhoneInfo,
     waba: WabaInfo,
+    meta_user_id: Optional[str] = None,
 ) -> Integration:
     """Insert-or-update the (org, whatsapp) row with the long-lived
     system-user token. Encrypts before write. Status flips to
-    `connected`, prior `last_error` clears."""
+    `connected`, prior `last_error` clears.
+
+    ``meta_user_id`` (when present) is persisted for Step 4's Data
+    Deletion Callback to use as the join key. ``None`` keeps the
+    column NULL, which is correct for the rare case where Meta's
+    `/debug_token` lookup failed mid-connect."""
     existing = await _get_integration_row(session)
     access_enc = encrypt(token)
     now = datetime.now(timezone.utc)
@@ -341,6 +355,7 @@ async def _upsert_integration(
             disconnected_at=None,
             disconnected_by=None,
             webhook_secret=None,
+            meta_user_id=meta_user_id,
         )
         session.add(row)
     else:
@@ -356,6 +371,10 @@ async def _upsert_integration(
         existing.connected_by = actor_id
         existing.disconnected_at = None
         existing.disconnected_by = None
+        # Only overwrite when we got a fresh identity — keep the prior
+        # value on a reconnect where /debug_token transiently failed.
+        if meta_user_id is not None:
+            existing.meta_user_id = meta_user_id
         row = existing
     await session.flush()
     return row

@@ -132,6 +132,18 @@ class Integration(Base, TenantScoped):
     webhook_secret: Mapped[Optional[str]] = mapped_column(
         Text, nullable=True
     )
+    # Meta-side user identifier captured during WhatsApp Embedded
+    # Signup (whatsapp-platform-upgrade Step 2) via a `GET /debug_token`
+    # call after the code exchange. Used as the join key by Meta's
+    # mandatory Data Deletion Callback (Step 4): when Meta posts a
+    # signed deletion request, we look up every Integration row with a
+    # matching `meta_user_id` to find which orgs to scrub. NULL for
+    # legacy manually-connected rows (no Meta identity ever captured)
+    # and for non-WhatsApp providers (Google Ads / Meta Ads have their
+    # own per-provider identity columns).
+    meta_user_id: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
 
     @property
     def is_connected(self) -> bool:

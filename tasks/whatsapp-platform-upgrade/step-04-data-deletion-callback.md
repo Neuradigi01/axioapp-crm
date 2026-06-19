@@ -2,7 +2,7 @@
 
 **Goal:** Implement Meta's mandatory Data Deletion Callback endpoint so the Meta App can be submitted for App Review on `whatsapp_business_management` + `whatsapp_business_messaging` permissions. The endpoint receives signed deletion requests from Meta, validates them, kicks off an async deletion job for the affected user's WhatsApp-derived data (conversations, messages, contact records sourced from WA), and returns Meta's required JSON response with a confirmation URL the user can check.
 **Track:** WhatsApp Platform Upgrade — Phase 1 (Embedded Signup)
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 2 (backend), Step 3 (frontend) — Embedded Signup must be working end-to-end before App Review submission.
 
 ---

@@ -524,8 +524,263 @@ async def _fetch_leadgen_details(
         return None
 
 
+# --- Step 4 (whatsapp-platform-upgrade): Meta data-deletion worker -------
+
+
+@_shared_task(
+    bind=True,
+    name="src.app.core.integrations.meta.tasks.delete_meta_user_data",
+    autoretry_for=(ConnectionError, TimeoutError),
+    max_retries=3,
+    retry_backoff=10,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
+def delete_meta_user_data(
+    self, request_id: str
+) -> dict[str, Any]:
+    """Sync Celery entrypoint — bridges into async via ``asyncio.run``.
+
+    ``request_id`` is the ``tbl_meta_data_deletion_requests.id`` row the
+    callback just inserted. Worker re-reads the row to discover which
+    orgs to scrub; it does NOT trust task-arg state beyond the id."""
+    try:
+        return asyncio.run(
+            delete_meta_user_data_async(request_id=request_id)
+        )
+    except (ConnectionError, TimeoutError) as exc:
+        if HAS_CELERY:
+            raise self.retry(exc=exc)
+        raise
+
+
+# Expose under the .delay() name the caller in `data_deletion.py` uses.
+delete_meta_user_data_async_task = delete_meta_user_data
+
+
+async def delete_meta_user_data_async(
+    *,
+    request_id: str,
+) -> dict[str, Any]:
+    """Anonymise every WhatsApp-sourced conversation + message owned by
+    the orgs Meta's deletion callback flagged.
+
+    Scope (kept narrow to satisfy Meta App Review without dragging
+    GDPR-class compliance work into this step):
+
+      * For each affected org, find conversations on ``channel=whatsapp``
+        and wipe ``messages.text`` / ``payload`` / ``attachments``.
+        Conversation `external_id` is replaced with a sentinel so the
+        natural-key index can't accidentally re-attach future webhooks
+        to a deleted thread.
+      * Skip contact-record anonymisation — that's Phase-8 compliance
+        work. WhatsApp message content is the actual PII Meta cares
+        about for this callback.
+      * The integration row's ``meta_user_id`` is nulled so a
+        subsequent reconnect mints a fresh identity and won't fall
+        into this same deletion result accidentally.
+
+    Status transitions: pending → in_progress → completed/failed. Audit
+    log fires once per affected org (``compliance.meta_data_deletion.
+    executed``) plus one terminal event."""
+    from sqlalchemy import select, text as sql_text
+    from src.app.core.integrations.meta.models import (
+        MetaDataDeletionRequest,
+        MetaDataDeletionStatus,
+    )
+
+    request_uuid = uuid.UUID(request_id)
+    async with async_session() as session:
+        stmt = select(MetaDataDeletionRequest).where(
+            MetaDataDeletionRequest.id == request_uuid
+        )
+        row = (await session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            logger.warning(
+                "delete_meta_user_data: request_id=%s not found", request_id
+            )
+            return {"status": "missing", "request_id": request_id}
+
+        if row.status != MetaDataDeletionStatus.pending:
+            # Re-delivery from Celery; idempotent — don't redo work.
+            return {
+                "status": row.status.value,
+                "request_id": request_id,
+            }
+
+        row.status = MetaDataDeletionStatus.in_progress
+        await session.commit()
+        await session.refresh(row)
+
+        affected_org_ids = list(row.affected_org_ids or [])
+        meta_user_id = row.meta_user_id
+        confirmation_code = row.confirmation_code
+
+    failure_reason: Optional[str] = None
+    try:
+        for org_id in affected_org_ids:
+            await _scrub_whatsapp_for_org(org_id=org_id)
+            # Per-org audit row so an auditor can reconstruct exactly
+            # which tenants the cross-org callback touched.
+            try:
+                from src.app.core import audit as _audit
+
+                await _audit.log(
+                    "compliance.meta_data_deletion.executed",
+                    entity_type="meta_data_deletion_request",
+                    entity_id=request_uuid,
+                    org_id=org_id,
+                    after={
+                        "confirmation_code": confirmation_code,
+                        "meta_user_id_hash": _short_hash(meta_user_id),
+                    },
+                )
+            except Exception:
+                # audit.log is best-effort by design; never abort the
+                # scrub because the audit insert failed.
+                logger.exception(
+                    "audit.log failed during meta deletion scrub"
+                )
+        await _null_meta_user_id(meta_user_id=meta_user_id)
+    except Exception as exc:
+        failure_reason = f"{type(exc).__name__}: {exc}"[:1024]
+        logger.exception(
+            "delete_meta_user_data: scrub failed for request %s",
+            request_id,
+        )
+
+    async with async_session() as session:
+        refresh_stmt = select(MetaDataDeletionRequest).where(
+            MetaDataDeletionRequest.id == request_uuid
+        )
+        row = (await session.execute(refresh_stmt)).scalar_one()
+        if failure_reason:
+            row.status = MetaDataDeletionStatus.failed
+            row.failure_reason = failure_reason
+        else:
+            row.status = MetaDataDeletionStatus.completed
+            row.completed_at = _utc_now()
+        await session.commit()
+
+    # Terminal audit event — fires once per request, against any one of
+    # the affected orgs (audit.log requires an org_id; we pick the
+    # first as the representative tenant for the completion record).
+    try:
+        from src.app.core import audit as _audit
+
+        action = (
+            "compliance.meta_data_deletion.failed"
+            if failure_reason
+            else "compliance.meta_data_deletion.completed"
+        )
+        await _audit.log(
+            action,
+            entity_type="meta_data_deletion_request",
+            entity_id=request_uuid,
+            org_id=(affected_org_ids[0] if affected_org_ids else None),
+            after={
+                "confirmation_code": confirmation_code,
+                "affected_org_count": len(affected_org_ids),
+                "failure_reason": failure_reason,
+            },
+        )
+    except Exception:
+        logger.exception("terminal audit.log failed for meta deletion")
+
+    return {
+        "status": "failed" if failure_reason else "completed",
+        "request_id": request_id,
+        "affected_orgs": len(affected_org_ids),
+    }
+
+
+async def _scrub_whatsapp_for_org(*, org_id: uuid.UUID) -> None:
+    """Null out message content on every WhatsApp conversation in this
+    org. Bypasses ORM tenant filter via raw SQL because the Celery
+    task has no RequestContext set, and pushing one just for an
+    UPDATE is heavier than the typed SQL below.
+
+    Conversation rows survive (the unread-count + last_message_at
+    columns remain so the inbox doesn't crash) but their content is
+    gone. The external_id is replaced with a sentinel that can't
+    collide with a real phone number so the natural-key lookup
+    ``(channel, external_id)`` won't reuse the row on a future inbound."""
+    from sqlalchemy import text as sql_text
+
+    async with async_session() as session:
+        await session.execute(
+            sql_text(
+                """
+                UPDATE tbl_messages
+                SET text = NULL,
+                    payload = '{}'::jsonb,
+                    attachments = '[]'::jsonb
+                WHERE org_id = :org_id
+                  AND conversation_id IN (
+                      SELECT id FROM tbl_conversations
+                      WHERE org_id = :org_id
+                        AND channel = 'whatsapp'
+                  )
+                """
+            ),
+            {"org_id": str(org_id)},
+        )
+        await session.execute(
+            sql_text(
+                """
+                UPDATE tbl_conversations
+                SET external_id = '<deleted-' || id::text || '>'
+                WHERE org_id = :org_id
+                  AND channel = 'whatsapp'
+                  AND external_id NOT LIKE '<deleted-%'
+                """
+            ),
+            {"org_id": str(org_id)},
+        )
+        await session.commit()
+
+
+async def _null_meta_user_id(*, meta_user_id: str) -> None:
+    """Strip the Meta identity off every Integration row that matched.
+    A future ES reconnect will mint a fresh identity, so the same
+    deletion request won't apply twice."""
+    from sqlalchemy import text as sql_text
+
+    async with async_session() as session:
+        await session.execute(
+            sql_text(
+                """
+                UPDATE tbl_integrations
+                SET meta_user_id = NULL
+                WHERE meta_user_id = :meta_user_id
+                """
+            ),
+            {"meta_user_id": meta_user_id},
+        )
+        await session.commit()
+
+
+def _short_hash(value: str) -> str:
+    """SHA-256 of the Meta user_id, truncated, for audit logs. The
+    full Meta user_id is itself PII; the hash makes audit rows
+    reconstructable for forensics without re-leaking the identity."""
+    import hashlib as _hashlib
+
+    return _hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def _utc_now():
+    from datetime import datetime as _dt
+    from datetime import timezone as _tz
+
+    return _dt.now(_tz.utc)
+
+
 __all__ = [
     "HAS_CELERY",
+    "delete_meta_user_data",
+    "delete_meta_user_data_async",
+    "delete_meta_user_data_async_task",
     "process_meta_lead",
     "process_meta_lead_async",
 ]

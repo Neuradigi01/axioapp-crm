@@ -6,10 +6,15 @@
   GET  /api/v1/integrations/meta/pages/{id}/forms       → admin: Lead Forms on a Page
   POST /api/v1/integrations/meta/pages/{id}/subscribe   → admin: subscribe to leadgen
   POST /api/v1/integrations/meta/pages/{id}/unsubscribe → admin: stop deliveries
+  POST /api/v1/integrations/meta/data-deletion          → Meta-mandated deletion callback (Step 4)
+  GET  /api/v1/integrations/meta/data-deletion/status   → public status lookup by confirmation_code
 
 Authorize + the admin endpoints sit behind `settings.integrations.manage`.
 Callback is HIT BY FACEBOOK'S BROWSER, so it can't gate on the CRM
-JWT — HMAC-signed `state` is the trust root.
+JWT — HMAC-signed `state` is the trust root. The data-deletion routes
+have no JWT gate either: Meta posts the deletion callback with its
+own HMAC, and the status GET is read by the deleted user (who has no
+Core CRM account by definition).
 
 Same shape as `google/router.py` — symmetric on purpose so the Step-7
 Settings UI can drive both providers through a common shape.
@@ -18,13 +23,13 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import FRONTEND_URL
+from config import FRONTEND_URL, META_APP_SECRET
 from src.app.core.auth.dependencies import require_permissions
-from src.app.core.integrations.meta import oauth, subscriptions
+from src.app.core.integrations.meta import data_deletion, oauth, subscriptions
 from src.app.core.integrations.meta.api_client import (
     MetaGraphClient,
     MetaTokenExpiredError,
@@ -300,6 +305,130 @@ async def unsubscribe_page_endpoint(
         db, integration_id=integration.id, page_id=page_id
     )
     return {"status": "unsubscribed", "page_id": page_id}
+
+
+# --- Data Deletion Callback (whatsapp-platform-upgrade Step 4) ----------
+
+
+@router.post("/data-deletion", include_in_schema=False)
+async def data_deletion_callback_endpoint(request: Request) -> dict:
+    """Meta's mandated Data Deletion Callback. Receives a form-encoded
+    ``signed_request`` whenever a Meta user deletes our app from their
+    Facebook profile; responds synchronously with the confirmation URL
+    the user can poll for status.
+
+    Auth model: the signed_request is the auth mechanism — HMAC-SHA256
+    keyed on ``META_APP_SECRET`` is the trust root, same pattern the
+    OAuth ``state`` parameter uses on the callback above. No JWT.
+
+    Idempotency: Meta retries on transient failures. We dedupe by
+    ``(meta_user_id, issued_at)`` so re-deliveries reuse the existing
+    confirmation_code rather than creating ghost rows."""
+    form = await request.form()
+    signed_request = form.get("signed_request") or ""
+    if not META_APP_SECRET:
+        # Deploy hasn't configured the App Secret yet; surface as 503
+        # rather than silently 400 every callback. Surfaces to ops in
+        # the audit log + Meta logs the failure for the next retry.
+        raise HTTPException(
+            status_code=503,
+            detail="Meta App Secret is not configured on this server.",
+        )
+    try:
+        payload = data_deletion.parse_signed_request(
+            signed_request, app_secret=META_APP_SECRET
+        )
+    except data_deletion.SignedRequestError as exc:
+        # Don't leak the specific reason — single generic 400 message.
+        # Specifics live in server logs for diagnosis.
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "meta_data_deletion: rejected signed_request reason=%s",
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=400, detail="invalid signed_request"
+        )
+
+    user_id = payload["user_id"]
+    issued_at = payload["issued_at"]
+
+    async with async_session() as session:
+        existing = await data_deletion.find_existing_request(
+            session, meta_user_id=user_id, issued_at_epoch=issued_at
+        )
+        if existing is not None:
+            # Idempotent replay — return the same confirmation URL Meta
+            # already showed the user on the first delivery.
+            confirmation_code = existing.confirmation_code
+        else:
+            integrations = (
+                await data_deletion.find_integrations_by_meta_user(
+                    session, meta_user_id=user_id
+                )
+            )
+            request_row = await data_deletion.record_deletion_request(
+                session,
+                meta_user_id=user_id,
+                issued_at_epoch=issued_at,
+                affected_org_ids=[i.org_id for i in integrations],
+            )
+            await session.commit()
+            confirmation_code = request_row.confirmation_code
+
+            # Audit log fires once per callback receipt — picks one of
+            # the affected orgs as the tenant scope (audit.log requires
+            # an org_id). When zero orgs match, no audit row is written
+            # by design; the receipt itself is already logged above.
+            from src.app.core import audit as _audit
+
+            if integrations:
+                await _audit.log(
+                    "compliance.meta_data_deletion.received",
+                    entity_type="meta_data_deletion_request",
+                    entity_id=request_row.id,
+                    org_id=integrations[0].org_id,
+                    after={
+                        "confirmation_code": confirmation_code,
+                        "affected_org_count": len(integrations),
+                    },
+                )
+
+            # Hand the heavy lifting to Celery; the callback returns to
+            # Meta before the scrub finishes. The status endpoint shows
+            # progress until the worker flips the row to `completed`.
+            from src.app.core.integrations.meta import tasks as _tasks
+
+            _tasks.delete_meta_user_data_async_task.delay(
+                str(request_row.id)
+            )
+
+    return {
+        "url": (
+            f"{FRONTEND_URL}/data-deletion-status"
+            f"?confirmation_code={confirmation_code}"
+        ),
+        "confirmation_code": confirmation_code,
+    }
+
+
+@router.get("/data-deletion/status")
+async def data_deletion_status_endpoint(
+    confirmation_code: str = Query(min_length=1, max_length=64),
+) -> dict:
+    """Public status lookup by confirmation_code. Anonymous read — the
+    code itself is the capability key (~384 bits of entropy)."""
+    async with async_session() as session:
+        projection = await data_deletion.get_status_by_code(
+            session, confirmation_code=confirmation_code
+        )
+    if projection is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No deletion request found for this code.",
+        )
+    return projection
 
 
 # --- helpers -------------------------------------------------------------

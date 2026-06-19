@@ -307,6 +307,41 @@ class MetaGraphClient:
             )
         return token
 
+    # ----- 1a. extract Meta user_id from the exchanged token --------------
+
+    async def debug_token(self, token: str) -> Optional[str]:
+        """Resolve the Meta-side user identity behind ``token``.
+
+        Used by the ES orchestration to capture ``Integration.meta_user_id``
+        for Step 4's Data Deletion Callback. Returns ``None`` (not a
+        typed error) when Meta omits the field — the callback will
+        simply find no matching integration row, which is the safe
+        default. Callers MUST NOT block the connect flow on this
+        lookup."""
+        try:
+            body = await self._request(
+                method="GET",
+                url=self._url("/debug_token"),
+                stage="debug_token",
+                params={
+                    "input_token": token,
+                    # App access token format: <app_id>|<app_secret>
+                    "access_token": f"{self._app_id}|{self._app_secret}",
+                },
+            )
+        except MetaGraphError as exc:
+            logger.warning(
+                "debug_token call failed (status=%s): %s",
+                exc.http_status,
+                exc.user_message,
+            )
+            return None
+        data = body.get("data")
+        if not isinstance(data, dict):
+            return None
+        user_id = data.get("user_id")
+        return str(user_id) if isinstance(user_id, str) and user_id else None
+
     # ----- 2. fetch WABA details -------------------------------------------
 
     async def get_waba(self, *, waba_id: str, token: str) -> WabaInfo:

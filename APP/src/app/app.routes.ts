@@ -29,6 +29,18 @@ export const appRoutes: Routes = [
       ),
   },
   {
+    // Meta-mandated public status page for Data Deletion Callback
+    // requests (whatsapp-platform-upgrade Step 4). Reachable without
+    // auth — the deleted Meta user has no Core CRM account by
+    // definition. The route stays valid forever because Meta itself
+    // periodically re-fetches it months after the original deletion.
+    path: 'data-deletion-status',
+    loadComponent: () =>
+      import(
+        './features/accounts/data-deletion-status.component'
+      ).then((m) => m.DataDeletionStatusComponent),
+  },
+  {
     // Onboarding picker — landed on after self-signup, while the
     // user's org is still in `template_id="pending"`. Top-level (not under
     // `/user`) because the user has no fully-set-up org yet, so any
