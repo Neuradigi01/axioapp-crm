@@ -102,10 +102,24 @@ FIREBASE_APP_ID = os.getenv("FIREBASE_APP_ID", "")
 FIREBASE_VAPID_KEY = _env("FIREBASE_VAPID_KEY", "")
 
 # WhatsApp Business Cloud API
-# WhatsApp credentials no longer live here — Step 3.5.12 moved both
-# outbound (per-org token via `whatsapp_account_configs`) and inbound
-# (signature verified per-org by `phone_id` lookup) off the env. Each
-# org connects via Settings → Integrations → WhatsApp.
+# Per-org credentials (access token, phone_id, waba_id) live in the
+# `integrations` + `whatsapp_account_configs` tables (Step 3.5.12) —
+# each org connects via Settings → Integrations → WhatsApp.
+#
+# Platform-level config (one Meta App + one Embedded Signup
+# Configuration fronts all customers, Intercom / HubSpot pattern) lives
+# below. Added by whatsapp-platform-upgrade Step 1.
+#
+# Embedded Signup Configuration ID — created in Meta App Dashboard →
+# WhatsApp → Configurations. Frontend reads via
+# `GET /api/v1/integrations/whatsapp/embedded-signup/config` (Step 3)
+# and passes to `FB.login({ config_id })`. We configure it with
+# `phone_number_selection=existing_only` so the popup never offers
+# virtual-number / display-name-only paths (we are NOT a BSP).
+WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID = os.getenv("WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID", "")
+# Graph API version pin for WhatsApp Cloud API calls. Defaults to
+# v19.0 to match META_GRAPH_API_VERSION (same Meta App, same pin).
+WHATSAPP_GRAPH_API_VERSION = os.getenv("WHATSAPP_GRAPH_API_VERSION", "v19.0")
 
 # Ad integrations (Google Ads + Meta Ads) — OAuth-token encryption.
 # Fernet key — 32 url-safe-base64-encoded bytes. Generate with:

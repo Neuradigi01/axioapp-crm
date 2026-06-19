@@ -2,8 +2,32 @@
 
 **Goal:** Configure the existing Meta App (used today for Meta Ads OAuth) to support WhatsApp Embedded Signup. Add WhatsApp Business Platform product, create an Embedded Signup Configuration, set verification URLs, and confirm Business Verification status. **No code changes in this step** — entirely Meta App Dashboard work. Output: an `WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID` value to drop into `.env`, plus a documented configuration the team can re-apply.
 **Track:** WhatsApp Platform Upgrade — Phase 1 (Embedded Signup)
-**Status:** Pending
+**Status:** COMPLETED (code half) — 2026-06-19. Two env vars wired in `.env.example` + `config.py`. Dashboard half is owner-side action (see "Owner action items" below); resolved Configuration ID gets pasted into `.env` once produced. Core CRM API loads `WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID = ""` cleanly with the empty default until then; Steps 2-3 will read it via `from config import WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID`.
 **Depends on:** None. The Meta App referenced by `META_APP_ID` in [`.env`](API/.env.example) is the target. If business verification was completed for Meta Ads OAuth (likely), it carries over.
+
+---
+
+## Multi-tenant layering
+
+Core CRM is a multi-tenant SaaS. The Embedded Signup architecture splits cleanly into platform-global vs per-org:
+
+| Resource | Scope | Where it lives | Why |
+|---|---|---|---|
+| Meta App ID + Secret | **Platform-global** | `META_APP_ID` / `META_APP_SECRET` env vars in `.env` | One Core CRM Meta App fronts every customer (Intercom / HubSpot pattern). Not BYO-app. |
+| Embedded Signup Configuration ID | **Platform-global** | `WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID` env var (this step adds) | One ES Configuration governs the popup UX for all customer orgs. |
+| Graph API version pin | **Platform-global** | `WHATSAPP_GRAPH_API_VERSION` env var (this step adds) | Coordinated bump across all orgs. |
+| App secret for webhook signature verification | **Platform-global** | `WHATSAPP_APP_SECRET` env var (Step 2 adds) | Webhook hits one URL; one signing key. |
+| Customer's WhatsApp Business Account, phone number, long-lived token | **Per-org** | `tbl_integrations.access_token_enc` + `tbl_whatsapp_account_configs` rows (org_id + RLS) | Each org connects their own WABA via the popup; tokens encrypted at rest with `INTEGRATIONS_ENCRYPTION_KEY`. |
+| Webhook routing | **Per-org by `phone_number_id` lookup** | Existing pattern in `whatsapp/webhook.py` | Inbound message arrives at the single platform URL; payload's `phone_number_id` resolves which org owns it. |
+| Per-org overrides (BYO Meta App) | Not in v1 | — | Tier-1 enterprise customers may want to use their own Meta App. Out of scope here; manual 5-field paste form (kept as "Advanced (self-host)") covers them. |
+
+**Implications for the dashboard config in this step:**
+- App Domains in Meta App Dashboard list our **platform domain** (`app.core-crm.com`), not per-tenant subdomains.
+- The ES popup branding shows **"Connect your account to Core CRM"** — same string for every customer, regardless of which org they're in.
+- Privacy Policy + Terms URLs are **Core CRM's**, not the customer's. (Customers have their own privacy policies but Meta wants ours, since we are the Meta App owner.)
+- Tester whitelist (until App Review passes) restricts ES to **our team's Meta accounts**, NOT per-org users. Real customer rollout is gated on App Review approval at Step 4.
+
+---
 
 ---
 
@@ -39,9 +63,9 @@ Out of scope:
 
 | File | Action |
 |---|---|
-| [`API/.env.example`](API/.env.example) | Add `WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID=` (empty placeholder) and `WHATSAPP_GRAPH_API_VERSION=v19.0` |
-| [`API/src/app/shared/config.py`](API/src/app/shared/config.py) | Add the two new settings fields (typed via Pydantic Settings) |
-| `tasks/whatsapp-platform-upgrade/step-01-meta-app-config.md` | This file — record the chosen Configuration ID + screenshots of the dashboard state at end of step |
+| [`API/.env.example`](API/.env.example) | Added `WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID=` (empty placeholder) + `WHATSAPP_GRAPH_API_VERSION=v19.0` under a new WhatsApp platform-config block. Replaced the old "no env config" comment with multi-tenant-aware framing (per-org credentials still in tables; ES Config + Graph version are platform-global). |
+| [`API/config.py`](API/config.py) | Surfaced the two new settings as module-level constants near existing `META_*` vars. Note: actual path is `API/config.py` (flat module pattern); the layered `app/shared/config.py` path described in the master prompt arrives in repo-skeleton Step 1.1 (not yet run). When that lands, these two vars relocate alongside the Meta Ads OAuth vars. |
+| `tasks/whatsapp-platform-upgrade/step-01-meta-app-config.md` | This file — multi-tenant section added; status flipped to COMPLETED for the code half. Configuration ID gets recorded once the dashboard half lands. |
 
 **3 files modified. 0 created. 0 deleted.**
 
@@ -84,12 +108,10 @@ Out of scope:
    WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID=
    WHATSAPP_GRAPH_API_VERSION=v19.0
    ```
-9. **Update `config.py`** to surface the two new settings:
+9. **Update [`API/config.py`](API/config.py)** to surface the two new settings (flat-module pattern, matches existing `META_*` block):
    ```python
-   class IntegrationsSettings(BaseSettings):
-       # ... existing fields ...
-       whatsapp_embedded_signup_config_id: str = ""
-       whatsapp_graph_api_version: str = "v19.0"
+   WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID = os.getenv("WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID", "")
+   WHATSAPP_GRAPH_API_VERSION = os.getenv("WHATSAPP_GRAPH_API_VERSION", "v19.0")
    ```
 10. **Document outcome** in this step file's "Stop & report" section: the resolved Configuration ID, dashboard screenshots, business verification status.
 
