@@ -71,6 +71,7 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [Rename to `tbl_` Prefix](rename-tbl-prefix/README.md) | 5 | Core (side track — schema-wide convention alignment) |
 | — | [Update Conversations Page](update-conversations-page/README.md) | 3 | Core (side track — surface assignee + sender) |
 | — | [Promote Integrations to Sidebar](promote-integrations-to-sidebar/README.md) | 1 | Core (side track — sidebar promotion) |
+| — | [WhatsApp Platform Upgrade](whatsapp-platform-upgrade/README.md) | 29 | Core (side track — Embedded Signup + full WhatsApp UI uplift) |
 
 **Total: 155 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides + Lead-Capture (4 tracks) + Pricing-and-Billing side tracks).
 

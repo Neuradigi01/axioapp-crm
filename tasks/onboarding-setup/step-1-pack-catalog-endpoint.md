@@ -9,8 +9,8 @@
 ---
 
 ## Scope
-
-Read-only catalog endpoint. No DB writes. No auth gating (the onboarding page may need to fetch this before the user is fully authorized in the org sense; the endpoint is informational and contains no PII).
+ites. No auth gating (the onboarding page may need to fetch this before the user is fully authorized in the org sense;
+Read-only catalog endpoint. No DB wr the endpoint is informational and contains no PII).
 
 The endpoint composes its response from two sources:
 
