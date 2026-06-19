@@ -2,7 +2,7 @@
 
 **Goal:** Replace the existing 5-field manual paste form on the WhatsApp integration card with a single "Connect WhatsApp" button that opens Meta's Embedded Signup popup. Customer logs into Facebook (if needed), selects/creates their WABA + phone number, completes setup inside Meta's popup, and the popup posts back a `code` + `phone_number_id` + `waba_id` which our frontend ships to the Step-2 backend endpoint. **End user never types a token, ID, or app secret.** Old 5-field form preserved behind an "Advanced (self-host)" collapsible for on-prem customers without Meta partner access.
 **Track:** WhatsApp Platform Upgrade — Phase 1 (Embedded Signup)
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 1 (Meta App config + ES Configuration ID), Step 2 (backend exchange endpoint).
 
 ---

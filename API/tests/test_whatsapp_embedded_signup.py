@@ -520,3 +520,62 @@ class TestConfiguration:
                 waba_id=_WABA_ID,
                 http_client_factory=_stub_factory(_happy_routes()),
             )
+
+
+# --- GET /embedded-signup/config (Step 3 backend half) --------------------
+
+
+class TestEmbeddedSignupConfigEndpoint:
+    """The frontend popup boots from this endpoint — see Step 3.
+
+    No Meta calls; no DB. Just asserts the route function returns the
+    env-sourced values in the documented shape and that the schema
+    rejects anything else."""
+
+    @pytest.mark.asyncio
+    async def test_returns_env_values_in_documented_shape(
+        self, monkeypatch
+    ):
+        from src.app.core.integrations.whatsapp import router as wa_router
+
+        monkeypatch.setattr(wa_router, "META_APP_ID", "1234567890")
+        monkeypatch.setattr(
+            wa_router,
+            "WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID",
+            "config_xyz",
+        )
+        monkeypatch.setattr(
+            wa_router, "WHATSAPP_GRAPH_API_VERSION", "v19.0"
+        )
+
+        result = await wa_router.embedded_signup_config_endpoint(
+            _user=object(),
+        )
+
+        assert result.app_id == "1234567890"
+        assert result.config_id == "config_xyz"
+        assert result.graph_api_version == "v19.0"
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_strings_when_unconfigured(
+        self, monkeypatch
+    ):
+        from src.app.core.integrations.whatsapp import router as wa_router
+
+        monkeypatch.setattr(wa_router, "META_APP_ID", "")
+        monkeypatch.setattr(
+            wa_router, "WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID", ""
+        )
+        monkeypatch.setattr(
+            wa_router, "WHATSAPP_GRAPH_API_VERSION", "v19.0"
+        )
+
+        result = await wa_router.embedded_signup_config_endpoint(
+            _user=object(),
+        )
+
+        # Empty strings are the documented "not configured" sentinel —
+        # the frontend renders an inline error when app_id is blank.
+        assert result.app_id == ""
+        assert result.config_id == ""
+        assert result.graph_api_version == "v19.0"

@@ -221,6 +221,47 @@ export interface WhatsAppConnectPayload {
 }
 
 
+/** Response shape from `GET /api/v1/integrations/whatsapp/embedded-signup/config`.
+ *  Public-safe bootstrap values for Meta's FB JS SDK — none are secrets,
+ *  they appear in browser network logs by design.
+ *  Mirrors backend `EmbeddedSignupConfigOut`. */
+export interface EmbeddedSignupConfig {
+  app_id: string;
+  config_id: string;
+  graph_api_version: string;
+}
+
+
+/** Body for `POST /api/v1/integrations/whatsapp/embedded-signup/exchange`.
+ *  The frontend popup harvests these three values from Meta's
+ *  postMessage + `FB.login` callback and ships them to the backend
+ *  for the orchestration (token exchange, subscribe, register, persist). */
+export interface EmbeddedSignupExchangePayload {
+  code: string;
+  phone_number_id: string;
+  waba_id: string;
+}
+
+
+/** Response shape from `POST /embedded-signup/exchange`.
+ *  Mirrors backend `EmbeddedSignupExchangeOut`. Settings UI uses this
+ *  to render the success state immediately without a follow-up
+ *  `GET /status` round-trip. */
+export interface EmbeddedSignupExchangeResult {
+  status: IntegrationStatus;
+  phone_id: string;
+  waba_id: string;
+  display_phone_number: string;
+  verified_name: string | null;
+  api_version: string;
+  rate_limit_per_sec: number;
+  phone_numbers_available: number;
+  selected_index: number;
+  messaging_limit_tier: string | null;
+  quality_rating: string | null;
+}
+
+
 export interface WhatsAppTemplate {
   id: string;
   name: string;
@@ -510,6 +551,31 @@ export class IntegrationsApiService {
     return this.http.post<void>(
       `${this.base}/whatsapp/disconnect`,
       {},
+    );
+  }
+
+  // --- WhatsApp Embedded Signup (whatsapp-platform-upgrade Step 2/3) ---
+
+  /** Public-safe bootstrap values for Meta's FB JS SDK. Called once
+   *  on Connect-button click to feed `FB.init` + `FB.login`. */
+  getWhatsAppEmbeddedSignupConfig(): Observable<EmbeddedSignupConfig> {
+    return this.http.get<EmbeddedSignupConfig>(
+      `${this.base}/whatsapp/embedded-signup/config`,
+    );
+  }
+
+  /** Trade the popup's `(code, phone_number_id, waba_id)` for a
+   *  connected org. Backend exchanges the code for a long-lived
+   *  token, subscribes the WABA to webhooks, registers the phone,
+   *  and persists. 400 (session expired) / 403 (account not approved)
+   *  / 503 (webhook unverified) / 502 (other Meta error) on failure
+   *  — `detail` carries the friendly message. */
+  exchangeWhatsAppEmbeddedSignup(
+    payload: EmbeddedSignupExchangePayload,
+  ): Observable<EmbeddedSignupExchangeResult> {
+    return this.http.post<EmbeddedSignupExchangeResult>(
+      `${this.base}/whatsapp/embedded-signup/exchange`,
+      payload,
     );
   }
 

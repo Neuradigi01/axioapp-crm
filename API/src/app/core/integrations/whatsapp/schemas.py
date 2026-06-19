@@ -45,6 +45,20 @@ class WhatsAppConnectIn(BaseModel):
     rate_limit_per_sec: int = Field(default=50, ge=1, le=1000)
 
 
+class EmbeddedSignupConfigOut(BaseModel):
+    """Response shape for `GET /embedded-signup/config`.
+
+    Every field is public-safe — the Meta App ID and Configuration ID
+    are designed to live in the browser-side `FB.init` / `FB.login`
+    calls. Returning them via an authenticated endpoint (rather than
+    baking into a static bundle) keeps deploy-time config swaps cheap
+    and avoids shipping per-environment build artefacts."""
+
+    app_id: str
+    config_id: str
+    graph_api_version: str
+
+
 class EmbeddedSignupExchangeIn(BaseModel):
     """HTTP body for `POST /embedded-signup/exchange`.
 
@@ -163,6 +177,7 @@ class WhatsAppCapacityOut(BaseModel):
 
 
 __all__ = [
+    "EmbeddedSignupConfigOut",
     "EmbeddedSignupExchangeIn",
     "EmbeddedSignupExchangeOut",
     "WhatsAppCapacityOut",

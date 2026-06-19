@@ -4,6 +4,7 @@
   POST /api/v1/integrations/whatsapp/disconnect                 → null token + status
   POST /api/v1/integrations/whatsapp/test                       → ping Meta now
   GET  /api/v1/integrations/whatsapp/status                     → projection (no creds)
+  GET  /api/v1/integrations/whatsapp/embedded-signup/config     → public app_id + config_id for the popup
   POST /api/v1/integrations/whatsapp/embedded-signup/exchange   → ES popup callback
   POST /api/v1/integrations/whatsapp/templates/sync             → pull Meta library
   GET  /api/v1/integrations/whatsapp/templates                  → list for picker
@@ -26,7 +27,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.auth.dependencies import require_permissions
+from config import (
+    META_APP_ID,
+    WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID,
+    WHATSAPP_GRAPH_API_VERSION,
+)
+from src.app.core.auth.dependencies import get_current_user, require_permissions
 from src.app.core.conversations.adapters.whatsapp import WhatsAppNotConnected
 from src.app.shared.rate_limit import InMemoryRateLimiter
 from src.app.core.integrations.whatsapp.connect import (
@@ -44,6 +50,7 @@ from src.app.core.integrations.whatsapp.meta_graph_client import (
     MetaGraphError,
 )
 from src.app.core.integrations.whatsapp.schemas import (
+    EmbeddedSignupConfigOut,
     EmbeddedSignupExchangeIn,
     EmbeddedSignupExchangeOut,
     WhatsAppCapacityOut,
@@ -138,6 +145,29 @@ async def test_endpoint(
             detail=str(exc),
         )
     return WhatsAppStatusOut.model_validate(projection)
+
+
+@router.get(
+    "/embedded-signup/config",
+    response_model=EmbeddedSignupConfigOut,
+)
+async def embedded_signup_config_endpoint(
+    _user: User = Depends(get_current_user),
+) -> EmbeddedSignupConfigOut:
+    """Public-safe ES bootstrap values for the frontend popup.
+
+    Returns `app_id` (Meta App ID — designed for browser-side
+    `FB.init`), `config_id` (the ES Configuration ID controlling the
+    popup feature set), and `graph_api_version` (the SDK init pin).
+    None of these are secrets — they appear in the browser's network
+    panel for any customer who runs the popup. We still gate on
+    `get_current_user` so anonymous scrapers can't enumerate the
+    deploy's Meta App identity."""
+    return EmbeddedSignupConfigOut(
+        app_id=META_APP_ID,
+        config_id=WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID,
+        graph_api_version=WHATSAPP_GRAPH_API_VERSION,
+    )
 
 
 @router.post(

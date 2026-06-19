@@ -60,9 +60,9 @@ After Step 4, steps 5–29 each ship independently in any priority order.
 
 | # | Title | Status | Effort |
 |---|---|---|---|
-| 1 | [Meta App configuration & prerequisites](step-01-meta-app-config.md) | **COMPLETED (code half)** — env vars wired in `.env.example` + `config.py`. Dashboard half is owner-side action. | ~2 hrs |
-| 2 | [Embedded Signup backend exchange endpoint](step-02-embedded-signup-backend.md) | **COMPLETED** | ~1.5 days |
-| 3 | [Embedded Signup frontend popup flow](step-03-embedded-signup-frontend.md) | Pending | ~1 day |
+| 1 | [Meta App configuration & prerequisites](step-01-meta-app-config.md) | **COMPLETED** — Configuration ID `1048461940853904` wired into `.env`; env vars in `.env.example` + `config.py`. Owner-side dashboard tasks (Business Verification, Required Actions, App Settings URLs) parallel-tracked, do not block code. | ~2 hrs |
+| 2 | [Embedded Signup backend exchange endpoint](step-02-embedded-signup-backend.md) | **COMPLETED** — `POST /embedded-signup/exchange` + `GET /embedded-signup/config` wired in `whatsapp/router.py`; orchestration in `embedded_signup.py`; Meta Graph wrapper in `meta_graph_client.py`. | ~1.5 days |
+| 3 | [Embedded Signup frontend popup flow](step-03-embedded-signup-frontend.md) | **COMPLETED** — Hero "Connect WhatsApp" button + Advanced (self-host) collapsible in `whatsapp-card.component.html`; `connectEmbedded()` handler in `whatsapp-card.component.ts`; FB SDK lifecycle in `whatsapp-fb-sdk.service.ts`. TypeScript check clean. | ~1 day |
 | 4 | [Data deletion callback for Meta App Review](step-04-data-deletion-callback.md) | Pending | ~3 hrs |
 | 5 | [Outbound media send (image, video, audio, document)](step-05-outbound-media-send.md) | Pending | ~3 days |
 | 6 | [Interactive messages (reply buttons + CTA + list)](step-06-interactive-messages.md) | Pending | ~2 days |

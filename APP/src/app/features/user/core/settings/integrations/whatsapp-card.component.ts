@@ -77,6 +77,10 @@ import {
   WhatsAppStatus,
   WhatsAppTemplate,
 } from './integrations-api.service';
+import {
+  EmbeddedSignupCancelled,
+  WhatsAppFbSdkService,
+} from './whatsapp-fb-sdk.service';
 
 
 interface WhatsAppConnectForm {
@@ -106,14 +110,25 @@ export class WhatsAppCardComponent {
   private readonly api = inject(IntegrationsApiService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly fb = inject(FormBuilder);
+  private readonly fbSdk = inject(WhatsAppFbSdkService);
 
-  /** Connect form panel visibility. Auto-expands the first time an
-   *  Owner clicks Connect on a disconnected card; stays closed
-   *  after successful submit so the connected view isn't crowded. */
+  /** Manual-paste form visibility. Collapsed by default — the hero
+   *  "Connect WhatsApp" button (Embedded Signup) is the primary path.
+   *  Operators on self-hosted Meta Apps expand the Advanced section
+   *  to reveal it. */
   protected readonly formExpanded = signal(false);
-  /** Advanced section (api_version) collapsed by default — most
-   *  operators use the v18.0 default. */
+  /** Outer "Advanced — paste credentials manually" collapsible.
+   *  Wraps the entire 5-field form (which itself has an inner
+   *  Advanced section for api_version + rate_limit). Distinct
+   *  from `formExpanded` so the manual form stays in DOM only
+   *  when the Advanced section is open. */
+  protected readonly manualAdvancedExpanded = signal(false);
+  /** Inner advanced section (api_version + rate_limit_per_sec) of
+   *  the manual form. */
   protected readonly advancedExpanded = signal(false);
+  /** Embedded Signup orchestration in-flight — SDK loading, popup
+   *  open, or backend exchange. Drives the hero button spinner. */
+  protected readonly embeddedConnecting = signal(false);
 
   /** Per-button in-flight flags drive spinner state. Four separate
    *  signals (not one shared) so concurrent actions can't reset each
@@ -242,6 +257,90 @@ export class WhatsAppCardComponent {
 
   toggleAdvanced(): void {
     this.advancedExpanded.update((v) => !v);
+  }
+
+  toggleManualAdvanced(): void {
+    this.manualAdvancedExpanded.update((v) => !v);
+    if (!this.manualAdvancedExpanded()) {
+      // Collapsing the outer wrapper also closes the inner form so a
+      // re-expand starts on the friendly default surface.
+      this.formExpanded.set(false);
+    }
+  }
+
+  /**
+   * Embedded Signup orchestration — the hero "Connect WhatsApp"
+   * button. Loads Meta's FB JS SDK on demand, opens the ES popup,
+   * harvests the (code, phone_number_id, waba_id) triple, and POSTs
+   * it to the Step-2 backend `/embedded-signup/exchange` endpoint.
+   *
+   * Error surfaces:
+   *  - Cancelled popup → friendly toast, card stays disconnected.
+   *  - SDK load failure → inline error, retry tooltip.
+   *  - Backend 4xx/5xx → inline error with the backend's user_message.
+   */
+  async connectEmbedded(): Promise<void> {
+    if (this.embeddedConnecting()) return;
+    this.inlineError.set(null);
+    this.embeddedConnecting.set(true);
+    try {
+      const config = await new Promise<{
+        app_id: string;
+        config_id: string;
+        graph_api_version: string;
+      }>((resolve, reject) => {
+        this.api
+          .getWhatsAppEmbeddedSignupConfig()
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({ next: resolve, error: reject });
+      });
+
+      if (!config.app_id || !config.config_id) {
+        this.inlineError.set(
+          'Embedded Signup is not configured on this server. ' +
+            'Use the Advanced manual flow below or contact your admin.',
+        );
+        return;
+      }
+
+      await this.fbSdk.loadSdk(config.app_id, config.graph_api_version);
+      const result = await this.fbSdk.openSignup(config.config_id);
+
+      await new Promise<void>((resolve, reject) => {
+        this.api
+          .exchangeWhatsAppEmbeddedSignup({
+            code: result.code,
+            phone_number_id: result.phoneNumberId,
+            waba_id: result.wabaId,
+          })
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({
+            next: () => resolve(),
+            error: reject,
+          });
+      });
+
+      this.changed.emit();
+    } catch (err) {
+      if (err instanceof EmbeddedSignupCancelled) {
+        // user_cancelled is non-fatal — surface a soft inline note
+        // rather than the red error banner. Popup-blocked / load-
+        // failed are real errors and get the banner.
+        if (err.reason === 'user_cancelled') {
+          this.inlineError.set(null);
+        } else {
+          this.inlineError.set(err.message);
+        }
+      } else if (err instanceof HttpErrorResponse) {
+        this.inlineError.set(extractApiError(err));
+      } else {
+        this.inlineError.set(
+          err instanceof Error ? err.message : 'Unable to connect WhatsApp.',
+        );
+      }
+    } finally {
+      this.embeddedConnecting.set(false);
+    }
   }
 
   connect(): void {
