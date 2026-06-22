@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -17,12 +18,41 @@ class LoginRequest(BaseModel):
     # email via the active `tbl_organization_members` row. Used by the demo
     # pill (which sends an explicit slug) and by manual login (which doesn't).
     org_slug: str | None = Field(default=None, min_length=1, max_length=64)
+    # Two-factor fields. When the user has 2FA enabled, the first POST is
+    # made without these; the response is a `TwoFactorChallengeResponse`
+    # that tells the UI which method to prompt for. The UI submits a
+    # second POST with `two_factor_code` (and optionally
+    # `two_factor_method` if the user picked an alternative).
+    two_factor_code: str | None = Field(default=None, min_length=1, max_length=12)
+    two_factor_method: Literal["authenticator", "email", "sms"] | None = None
 
 
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "Bearer"
     expires_at: datetime
+
+
+class TwoFactorChallengeResponse(BaseModel):
+    """Returned by `POST /auth/login` when the user has 2FA enabled and
+    no code was submitted. The OTP (for email/sms) has already been
+    dispatched; the UI prompts the user and re-POSTs `/auth/login` with
+    the code in `two_factor_code`."""
+    requires_two_factor: Literal[True] = True
+    method: str
+    available_methods: list[str]
+
+
+class TryAnotherWayRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=1, max_length=255)
+    org_slug: str | None = Field(default=None, min_length=1, max_length=64)
+    method: Literal["authenticator", "email", "sms"]
+
+
+class TryAnotherWayResponse(BaseModel):
+    method: str
+    available_methods: list[str]
 
 
 class RefreshResponse(LoginResponse):

@@ -30,11 +30,13 @@ from src.app.core.auth.schemas import (
     SessionListResponse,
     SessionOut,
     SessionRevokeResponse,
+    TwoFactorChallengeResponse,
     TwoFactorStatusResponse,
 )
 from src.app.core.auth.tokens import InvalidToken, TokenClaims, decode_token
 from src.app.core.auth.captcha.router import router as captcha_router
 from src.app.core.auth.password.router import router as password_router
+from src.app.core.auth.two_factor.router import router as two_factor_router
 from src.app.core.users.models import User
 from src.app.shared.context import get_context
 from src.app.shared.db import get_db
@@ -43,6 +45,7 @@ from src.app.shared.rate_limit import login_limiter
 router = APIRouter(prefix="/auth", tags=["Auth"])
 router.include_router(captcha_router)
 router.include_router(password_router)
+router.include_router(two_factor_router)
 _bearer = HTTPBearer(auto_error=False)
 
 
@@ -67,12 +70,12 @@ def _claims_from_bearer(creds: HTTPAuthorizationCredentials | None) -> TokenClai
         )
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=None)
 async def login(
     req: LoginRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-) -> LoginResponse:
+) -> LoginResponse | TwoFactorChallengeResponse:
     rl = login_limiter.check(_client_ip(request))
     if not rl.allowed:
         raise HTTPException(
@@ -86,6 +89,8 @@ async def login(
         email=req.email,
         password=req.password,
         org_slug=req.org_slug,
+        two_factor_code=req.two_factor_code,
+        two_factor_method=req.two_factor_method,
         ip=_client_ip(request),
         ua=request.headers.get("user-agent"),
     )
