@@ -170,6 +170,25 @@ class MessageSendPayload(BaseModel):
     text: str = Field(default="", max_length=4096)
     attachments: list[dict[str, Any]] = Field(default_factory=list)
     interactive: Optional[InteractivePayload] = None
+    # whatsapp-platform-upgrade Step 7: quoted reply. Optional UUID of
+    # a previous message in the same conversation. Service resolves it
+    # to the channel's wamid before calling the adapter; mismatch
+    # (wrong conv / no channel_message_id yet) surfaces as 400.
+    reply_to_message_id: Optional[uuid.UUID] = None
+
+
+class ReactionRequest(BaseModel):
+    """Body of ``POST /conversations/{id}/messages/{message_id}/reactions``.
+
+    `emoji` is a single-grapheme string (Meta enforces "one Unicode
+    emoji" — we don't try to validate the grapheme cluster here, the
+    Cloud API does it). Empty/null `emoji` removes the caller's
+    existing reaction (WhatsApp's documented "send empty reaction
+    to remove" pattern)."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    emoji: Optional[str] = Field(default=None, max_length=16)
 
 
 class ConversationPatch(BaseModel):
@@ -209,6 +228,12 @@ class MessageOut(ORMModel):
     # The inbox bubble renders buttons / list rows from this dict; the
     # raw shape mirrors what the operator built in the composer.
     interactive_payload: Optional[dict[str, Any]] = None
+    # whatsapp-platform-upgrade Step 7: quoted-reply target + the
+    # reaction list applied to this message by its viewers. `reactions`
+    # entries are `{user, emoji, ts}` dicts — see `core/conversations/
+    # service._apply_reaction` for write rules.
+    reply_to_message_id: Optional[uuid.UUID] = None
+    reactions: list[dict[str, Any]] = Field(default_factory=list)
     channel_message_id: Optional[str]
     sent_at: Optional[datetime]
     delivered_at: Optional[datetime]

@@ -106,6 +106,11 @@ export class ConversationsPageComponent {
    *  partially-typed caption, etc.). */
   protected readonly interactiveOpen = signal(false);
 
+  /** Step 7: message currently being quoted by the composer. Null
+   *  when not in reply mode. Cleared on send-success, Esc, or the X
+   *  on the snippet. */
+  protected readonly replyingTo = signal<ConversationMessage | null>(null);
+
   protected readonly selectedConversation = computed<Conversation | null>(() => {
     const id = this.selectedId();
     return this.items().find((c) => c.id === id) ?? null;
@@ -206,6 +211,11 @@ export class ConversationsPageComponent {
     const id = this.selectedId();
     if (!id || !text.trim()) return;
 
+    // Step 7: pull the in-flight reply target (set by chat-thread's
+    // Reply click) and clear the composer's reply mode atomically.
+    const replyTarget = this.replyingTo();
+    this.replyingTo.set(null);
+
     // Optimistic append while the POST is in flight.
     const optimistic: ConversationMessage = {
       id: 'tmp-' + Math.random().toString(36).slice(2),
@@ -216,6 +226,8 @@ export class ConversationsPageComponent {
       text,
       attachments: [],
       interactive_payload: null,
+      reply_to_message_id: replyTarget?.id ?? null,
+      reactions: [],
       channel_message_id: null,
       sent_at: new Date().toISOString(),
       delivered_at: null,
@@ -227,7 +239,7 @@ export class ConversationsPageComponent {
     );
 
     this.api
-      .send(id, text)
+      .send(id, text, replyTarget?.id ?? null)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (real) => {
@@ -256,6 +268,43 @@ export class ConversationsPageComponent {
           );
           this.loadError.set(
             extractApiError(err) ?? 'Could not send message.',
+          );
+        },
+      });
+  }
+
+  // --- Reply / React (Step 7) ----------------------------------------
+
+  protected onReplyTo(m: ConversationMessage): void {
+    this.replyingTo.set(m);
+  }
+
+  protected onClearReply(): void {
+    this.replyingTo.set(null);
+  }
+
+  protected onReact(evt: { messageId: string; emoji: string | null }): void {
+    const conversationId = this.selectedId();
+    if (!conversationId) return;
+    this.api
+      .reactToMessage(conversationId, evt.messageId, evt.emoji)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.detail.update((d) =>
+            d
+              ? {
+                  ...d,
+                  messages: d.messages.map((m) =>
+                    m.id === updated.id ? updated : m,
+                  ),
+                }
+              : d,
+          );
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loadError.set(
+            extractApiError(err) ?? 'Could not update reaction.',
           );
         },
       });
@@ -293,6 +342,8 @@ export class ConversationsPageComponent {
       text: previewText,
       attachments: [],
       interactive_payload: payload as unknown as Record<string, unknown>,
+      reply_to_message_id: null,
+      reactions: [],
       channel_message_id: null,
       sent_at: new Date().toISOString(),
       delivered_at: null,
@@ -369,6 +420,8 @@ export class ConversationsPageComponent {
         },
       ],
       interactive_payload: null,
+      reply_to_message_id: null,
+      reactions: [],
       channel_message_id: null,
       sent_at: new Date().toISOString(),
       delivered_at: null,

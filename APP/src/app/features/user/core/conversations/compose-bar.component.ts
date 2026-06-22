@@ -16,6 +16,7 @@ import {
   EmailTemplateRenderResponse,
 } from '../services/email-templates-api.service';
 import { EmailTemplatePickerComponent } from '../shared/email/template-picker.component';
+import { ConversationMessage } from './conversations-api.service';
 
 
 export type ComposerAttachmentType =
@@ -99,11 +100,17 @@ export class ComposeBarComponent {
   @Input() contactId: string | null = null;
   /** Optional lead id when the conversation is lead-linked. */
   @Input() leadId: string | null = null;
+  /** Step 7: the message currently being quoted, if any. The composer
+   *  renders a snippet block above the input; the parent reads this
+   *  back on send to attach `reply_to_message_id`. Cleared by Esc or
+   *  the X button. */
+  @Input() replyingTo: ConversationMessage | null = null;
 
   @Output() readonly send = new EventEmitter<string>();
   @Output() readonly sendMedia = new EventEmitter<ComposerMediaPayload>();
   @Output() readonly openInteractive = new EventEmitter<void>();
   @Output() readonly toggleAi = new EventEmitter<boolean>();
+  @Output() readonly clearReply = new EventEmitter<void>();
 
   @ViewChild('fileInput') private readonly fileInput!: ElementRef<HTMLInputElement>;
 
@@ -158,10 +165,44 @@ export class ComposeBarComponent {
   }
 
   protected onKey(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && this.replyingTo) {
+      event.preventDefault();
+      this.clearReply.emit();
+      return;
+    }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       this.submit();
     }
+  }
+
+  protected quotedSnippet(): string {
+    const m = this.replyingTo;
+    if (!m) return '';
+    if (m.text) return m.text;
+    const att = (m.attachments ?? []).find((a) => {
+      const t = (a as { type?: string }).type;
+      return (
+        t === 'image' || t === 'video' || t === 'audio' || t === 'document'
+      );
+    });
+    const type = (att as { type?: string } | undefined)?.type;
+    switch (type) {
+      case 'image':
+        return '📷 Photo';
+      case 'video':
+        return '🎥 Video';
+      case 'audio':
+        return '🎵 Audio';
+      case 'document':
+        return '📄 Document';
+      default:
+        return 'Original message';
+    }
+  }
+
+  protected dismissReply(): void {
+    this.clearReply.emit();
   }
 
   protected flipAi(): void {

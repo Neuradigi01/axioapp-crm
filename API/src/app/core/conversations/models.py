@@ -182,6 +182,23 @@ class Message(Base, TenantScoped):
     interactive_payload: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB, nullable=True
     )
+    # whatsapp-platform-upgrade Step 7: reply-to / reactions.
+    # `reply_to_message_id` is a self-FK to the message being quoted —
+    # `ON DELETE SET NULL` so a deleted original leaves the reply intact
+    # with a "deleted" placeholder. `reactions` is an append/replace
+    # list of `{user, emoji, ts}` dicts — one row per reactor (Meta caps
+    # at one reaction per user per message). Inbound reactions write to
+    # the *target* message's column, not the reaction event's own row.
+    reply_to_message_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_messages.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    reactions: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sql_text("'[]'::jsonb"),
+    )
     sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

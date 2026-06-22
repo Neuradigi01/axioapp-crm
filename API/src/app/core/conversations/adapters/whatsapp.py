@@ -357,6 +357,7 @@ class WhatsAppAdapter:
         text: str,
         attachments: list[dict[str, Any]],
         interactive: dict[str, Any] | None = None,
+        reply_to_channel_message_id: str | None = None,
     ) -> ChannelMessageRef:
         """POST a message to Meta's Cloud API.
 
@@ -369,7 +370,12 @@ class WhatsAppAdapter:
             ``image``/``video``/``audio``/``document`` envelope.
           * Plain text — original text-only path.
 
-        Templates are still routed through ``send_template``."""
+        Templates are still routed through ``send_template``.
+
+        ``reply_to_channel_message_id`` (Step 7): when set, the
+        envelope carries Meta's documented ``context: {message_id}``
+        shape so the recipient client renders the new bubble as a
+        quoted reply to the original."""
         to = _normalize_phone(external_id).lstrip("+")
         if interactive:
             envelope = _build_interactive_envelope(
@@ -391,6 +397,8 @@ class WhatsAppAdapter:
                     "type": "text",
                     "text": {"body": text},
                 }
+        if reply_to_channel_message_id:
+            envelope["context"] = {"message_id": reply_to_channel_message_id}
         headers = {
             "Authorization": f"Bearer {self._token}",
             "Content-Type": "application/json",
@@ -404,6 +412,65 @@ class WhatsAppAdapter:
         if resp.status_code >= 400:
             raise WhatsAppSendError(
                 f"whatsapp send failed: {resp.status_code} {resp.text}"
+            )
+        body = resp.json()
+        msg_id = (
+            body.get("messages", [{}])[0].get("id")
+            if isinstance(body, dict)
+            else None
+        )
+        return ChannelMessageRef(
+            channel_message_id=str(msg_id) if msg_id else "",
+            sent_at=datetime.now(timezone.utc),
+        )
+
+    # --- outbound (reaction) ----------------------------------------------
+
+    async def send_reaction(
+        self,
+        *,
+        external_id: str,
+        target_channel_message_id: str,
+        emoji: str | None,
+    ) -> ChannelMessageRef:
+        """POST a reaction to Meta's Cloud API
+        (whatsapp-platform-upgrade Step 7).
+
+        Meta's ``type=reaction`` envelope carries a sub-block with
+        ``message_id`` (the target wamid) + ``emoji`` (single unicode
+        emoji, or empty string to remove). Per Meta docs, sending an
+        empty string with the same recipient+target combination removes
+        the caller's previous reaction.
+
+        Returns a ``ChannelMessageRef`` with the new reaction event's
+        own wamid; the service typically discards this — reactions
+        write to the *target* message's ``reactions`` JSONB rather
+        than landing as their own row."""
+        to = _normalize_phone(external_id).lstrip("+")
+        envelope = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "reaction",
+            "reaction": {
+                "message_id": target_channel_message_id,
+                "emoji": emoji or "",
+            },
+        }
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Content-Type": "application/json",
+        }
+        async with self._http_factory() as client:
+            resp = await client.post(
+                self.endpoint, json=envelope, headers=headers
+            )
+        if resp.status_code == 429:
+            raise _make_rate_limit_error(resp)
+        if resp.status_code >= 400:
+            raise WhatsAppSendError(
+                f"whatsapp reaction send failed: "
+                f"{resp.status_code} {resp.text}"
             )
         body = resp.json()
         msg_id = (
@@ -524,6 +591,36 @@ class WhatsAppAdapter:
             if isinstance(media, dict) and media.get("id"):
                 attachments.append({"type": media_type, **media})
 
+        # Reaction event (whatsapp-platform-upgrade Step 7) — Meta sends
+        # these as standalone messages with `type: reaction`. The engine
+        # short-circuits these in `receive_webhook`: instead of creating
+        # a new message row, it applies the emoji to the target row's
+        # `reactions` JSONB and returns. Empty `emoji` = remove.
+        reaction_block: dict[str, Any] | None = None
+        if isinstance(message.get("reaction"), dict):
+            r = message["reaction"]
+            target = r.get("message_id")
+            emoji = r.get("emoji")
+            if isinstance(target, str):
+                reaction_block = {
+                    "target_channel_message_id": target,
+                    "emoji": emoji if isinstance(emoji, str) else "",
+                    "reactor_external_id": external_id,
+                }
+
+        # Quoted-reply attribution (Step 7): Meta delivers the original
+        # message's wamid in `context.id` for ANY message type that
+        # quotes a previous one (text, media, template — not just
+        # interactive). The interactive branch below extracts it again
+        # for button/list replies; do the lookup once here so it covers
+        # the text path too.
+        reply_to_wamid: str | None = None
+        ctx = message.get("context")
+        if isinstance(ctx, dict):
+            cid = ctx.get("id")
+            if isinstance(cid, str) and cid:
+                reply_to_wamid = cid
+
         # Interactive reply events (whatsapp-platform-upgrade Step 6).
         # Meta delivers these as `interactive: { type: button_reply |
         # list_reply, button_reply: {id, title} | list_reply: {id,
@@ -590,6 +687,8 @@ class WhatsAppAdapter:
             channel_message_id=str(message.get("id") or "") or None,
             sent_at=sent_at,
             raw=payload,
+            reply_to_channel_message_id=reply_to_wamid,
+            reaction=reaction_block,
         )
 
     # --- signature / handshake --------------------------------------------

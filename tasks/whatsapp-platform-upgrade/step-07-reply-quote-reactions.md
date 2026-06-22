@@ -1,7 +1,7 @@
 # Step 7 — Reply / quote previous message + reactions
 
 **Goal:** Standard WhatsApp UX additions — reply-to-quote any previous message in the thread (with quoted snippet rendered above the new bubble) and react to a message with emoji. Both supported in outbound + parsed in inbound.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 6 (composer has builder-modal pattern established).
 
 ---

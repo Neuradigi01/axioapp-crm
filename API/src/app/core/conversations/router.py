@@ -60,12 +60,14 @@ from src.app.core.conversations.schemas import (
     ConversationPatch,
     MessageOut,
     MessageSendPayload,
+    ReactionRequest,
 )
 from src.app.core.conversations.service import (
     get_conversation,
     list_conversations,
     list_messages,
     patch_conversation,
+    react_to_message,
     receive_webhook,
     send_outbound,
 )
@@ -162,6 +164,39 @@ async def send_message_endpoint(
             text_body=payload.text,
             attachments=payload.attachments,
             interactive=interactive_dict,
+            reply_to_message_id=payload.reply_to_message_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        )
+    return MessageOut.model_validate(msg)
+
+
+@router.post(
+    "/{conversation_id}/messages/{message_id}/reactions",
+    response_model=MessageOut,
+)
+async def react_endpoint(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    payload: ReactionRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> MessageOut:
+    """React to a message with a single emoji (Step 7).
+
+    Sending an empty / null `emoji` removes the caller's reaction —
+    matches Meta's documented Cloud-API pattern. Returns the target
+    message row with its updated `reactions` JSONB so the SPA can swap
+    the bubble's reaction badge without a follow-up fetch."""
+    try:
+        msg = await react_to_message(
+            db,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            user_id=user.legacy_uuid,
+            emoji=payload.emoji,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -397,6 +432,10 @@ async def webhook_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         )
+    # Reaction events return None — the row update is enough; the SPA
+    # picks up the change on the next thread poll / WS push.
+    if msg is None:
+        return {"reaction_applied": True}
     return {"message_id": str(msg.id)}
 
 
@@ -505,6 +544,8 @@ async def _handle_whatsapp_webhook(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         )
+    if msg is None:
+        return {"reaction_applied": True}
     return {"message_id": str(msg.id)}
 
 

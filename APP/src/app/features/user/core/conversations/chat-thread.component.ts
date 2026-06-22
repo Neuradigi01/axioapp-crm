@@ -9,6 +9,7 @@ import {
   ViewChild,
   computed,
   inject,
+  signal,
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -16,7 +17,9 @@ import {
   Conversation,
   ConversationDetail,
   ConversationMessage,
+  MessageReaction,
 } from './conversations-api.service';
+import { ReactionPickerComponent } from './reaction-picker.component';
 import { StaffListItem } from '../staff/staff-api.service';
 import {
   OwnerColor,
@@ -37,7 +40,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
   selector: 'app-chat-thread',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, ReactionPickerComponent],
   templateUrl: './chat-thread.component.html',
 })
 export class ChatThreadComponent implements AfterViewChecked {
@@ -54,6 +57,20 @@ export class ChatThreadComponent implements AfterViewChecked {
    * the modal + PATCH. We emit a bare event because the parent already
    * knows which conversation is selected via `selectedConversation()`. */
   @Output() readonly reassign = new EventEmitter<void>();
+
+  /** Step 7: user clicked Reply on a message — parent puts the composer
+   *  into "replying-to" mode with the quoted snippet. */
+  @Output() readonly replyTo = new EventEmitter<ConversationMessage>();
+
+  /** Step 7: user picked a reaction emoji (or null to remove). */
+  @Output() readonly react = new EventEmitter<{
+    messageId: string;
+    emoji: string | null;
+  }>();
+
+  /** Which message currently has its reaction picker open. Null = none.
+   *  Toggled by the React button on the hover action bar. */
+  protected readonly pickerOpenFor = signal<string | null>(null);
 
   /** Permission gate for the reassign click target — same key the
    * backend enforces on `PATCH /api/v1/conversations/{id}`. */
@@ -240,5 +257,102 @@ export class ChatThreadComponent implements AfterViewChecked {
         t === 'document'
       );
     }).length;
+  }
+
+  // --- Reply / quote / reactions (Step 7) ----------------------------
+
+  /** Look up the message being quoted in the in-memory thread cache.
+   *  Cross-pagination quotes fall back to null — the bubble renders
+   *  "Original message" without the body preview. */
+  protected quotedMessage(
+    m: ConversationMessage,
+  ): ConversationMessage | null {
+    if (!m.reply_to_message_id || !this.detail) return null;
+    return (
+      this.detail.messages.find((x) => x.id === m.reply_to_message_id) ?? null
+    );
+  }
+
+  /** Short preview for a quoted block — uses the original's text when
+   *  available, else the first media attachment's type emoji ("📷
+   *  Photo" / "🎥 Video" / etc.) per the spec's smoke point 7. */
+  protected quotedPreview(target: ConversationMessage | null): string {
+    if (!target) return 'Original message';
+    if (target.text) return target.text;
+    const att = (target.attachments ?? []).find((a) => {
+      const t = (a as { type?: string }).type;
+      return (
+        t === 'image' || t === 'video' || t === 'audio' || t === 'document'
+      );
+    });
+    const type = (att as { type?: string } | undefined)?.type;
+    switch (type) {
+      case 'image':
+        return '📷 Photo';
+      case 'video':
+        return '🎥 Video';
+      case 'audio':
+        return '🎵 Audio';
+      case 'document':
+        return '📄 Document';
+      default:
+        return 'Original message';
+    }
+  }
+
+  /** Aggregate the reactions list into `{emoji → count}` for the badge
+   *  row. Order preserved by first-seen so the row stays stable across
+   *  re-renders. */
+  protected groupedReactions(
+    m: ConversationMessage,
+  ): Array<{ emoji: string; count: number }> {
+    const counts = new Map<string, number>();
+    for (const r of m.reactions ?? []) {
+      counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+    }
+    return Array.from(counts, ([emoji, count]) => ({ emoji, count }));
+  }
+
+  /** The current user's reaction on a message, if any — used by the
+   *  picker to highlight the active one and to flip a re-tap into a
+   *  remove. */
+  protected myReaction(m: ConversationMessage): string | null {
+    const me = this.auth.currentUserId();
+    if (!me) return null;
+    const mine = (m.reactions ?? []).find(
+      (r: MessageReaction) => r.actor === me,
+    );
+    return mine?.emoji ?? null;
+  }
+
+  protected openPicker(messageId: string): void {
+    this.pickerOpenFor.update((cur) =>
+      cur === messageId ? null : messageId,
+    );
+  }
+
+  protected closePicker(): void {
+    this.pickerOpenFor.set(null);
+  }
+
+  protected pickReaction(messageId: string, emoji: string | null): void {
+    this.closePicker();
+    this.react.emit({ messageId, emoji });
+  }
+
+  protected onReplyClick(m: ConversationMessage): void {
+    this.replyTo.emit(m);
+  }
+
+  protected async copyText(m: ConversationMessage): Promise<void> {
+    const text = m.text ?? '';
+    if (!text || typeof navigator?.clipboard?.writeText !== 'function') {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Best-effort — clipboard permission failures are silent.
+    }
   }
 }

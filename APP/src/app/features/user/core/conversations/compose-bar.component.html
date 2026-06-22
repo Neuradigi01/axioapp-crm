@@ -25,6 +25,33 @@
     </div>
   }
 
+  @if (replyingTo; as r) {
+    <div
+      class="mb-2 flex items-center gap-2 rounded-md border-l-2 border-zinc-400 bg-zinc-50 px-2 py-1 text-xs text-zinc-700"
+    >
+      <lucide-icon
+        name="corner-up-left"
+        size="14"
+        class="shrink-0 text-zinc-500"
+        aria-hidden="true"
+      ></lucide-icon>
+      <div class="min-w-0 flex-1">
+        <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+          Replying to
+        </p>
+        <p class="truncate text-xs">{{ quotedSnippet() }}</p>
+      </div>
+      <button
+        type="button"
+        (click)="dismissReply()"
+        class="rounded p-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
+        aria-label="Cancel reply"
+      >
+        <lucide-icon name="x" size="14" aria-hidden="true"></lucide-icon>
+      </button>
+    </div>
+  }
+
   @if (stagedFile(); as f) {
     <div
       class="mb-2 flex items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-2"
