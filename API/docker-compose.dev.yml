@@ -1,3 +1,10 @@
+# Development overrides (non-secret). Secrets come from secrets.enc.env via
+# `sops exec-env`; shared infra (redis) is defined once in docker-compose.yml.
+# Env-specific non-secret values are merged in via the *dev-env anchor.
+x-dev-env: &dev-env
+  IS_DEVELOPMENT: "true"
+  DB_NULL_POOL: "1"
+
 services:
   api:
     build:
@@ -8,50 +15,23 @@ services:
     volumes:
       - .:/app
     environment:
-      - ENV=development
-      - REDIS_HOST=redis
-      - IS_DEVELOPMENT=true
-      - MASTER_KEY=${MASTER_KEY:-}
+      <<: *dev-env
     command: ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "-m", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   celery:
     volumes:
       - .:/app
     environment:
-      - ENV=development
-      - REDIS_HOST=redis
-      - MASTER_KEY=${MASTER_KEY:-}
-      - DB_NULL_POOL=1
-    depends_on:
-      - redis
+      <<: *dev-env
 
   celery-beat:
     volumes:
       - .:/app
     environment:
-      - ENV=development
-      - REDIS_HOST=redis
-      - MASTER_KEY=${MASTER_KEY:-}
-      - DB_NULL_POOL=1
-    depends_on:
-      - redis
+      <<: *dev-env
 
   flower:
     volumes:
       - .:/app
     environment:
-      - ENV=development
-      - REDIS_HOST=redis
-      - MASTER_KEY=${MASTER_KEY:-}
-      - DB_NULL_POOL=1
-    depends_on:
-      - redis
-
-  redis:
-    image: "redis:7-alpine"
-    restart: unless-stopped
-    volumes:
-      - redis_dev_data:/data
-
-volumes:
-  redis_dev_data:
+      <<: *dev-env

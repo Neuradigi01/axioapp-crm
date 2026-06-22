@@ -1,31 +1,42 @@
 # API — Quick Reference
 
+The stack is driven by `run.cmd` (Windows / development) and `run.sh` (Linux / Mac /
+production). Both wrap Docker Compose and decrypt secrets in-memory via `sops exec-env`
+for each command — no plaintext secrets are ever written to disk. Run `run.cmd help`
+(or `./run.sh help`) for the full command list.
+
+> **First time on this machine?** See [Secrets (SOPS + age)](#secrets-sops--age) below
+> before starting the stack — you need `sops` + `age`, an age key, and to be listed as a
+> recipient in `.sops.yaml`.
+
 ## Starting the App
 
 ### Windows (Development)
 
 ```
-docker-helper.cmd up
+run.cmd up
 ```
 
 ### Linux / Mac (Production)
 
 ```
-./docker-helper.sh up
+./run.sh up
 ```
 
-### With Celery (background tasks)
+`up` starts the **full** stack: api + redis + celery + beat + flower.
+
+### API + Redis only (no background workers)
 
 ```
-docker-helper.cmd up-celery        # Windows
-./docker-helper.sh up-celery       # Linux / Mac
+run.cmd up-api        # Windows
+./run.sh up-api       # Linux / Mac
 ```
 
 ## Stopping the App
 
 ```
-docker-helper.cmd down             # Windows
-./docker-helper.sh down            # Linux / Mac
+run.cmd down          # Windows
+./run.sh down         # Linux / Mac
 ```
 
 ## What Happens on Startup
@@ -53,93 +64,70 @@ Whenever you change the ORM models — add a column, create a new table, rename 
 **1. Make sure Docker is running**
 
 ```
-docker-helper.cmd up               # Windows
+run.cmd up            # Windows
 ```
 
-**2. Open a shell inside the container**
+**2. Generate the migration**
 
 ```
-docker exec -it template_api-api-1 bash
+run.cmd migrate add_phone_column_to_tbl_user_info
 ```
 
-**3. Generate the migration**
+Keep the message a single `snake_case` token. This creates a new file in
+`alembic/versions/`. Review it to make sure it looks correct.
+
+> You can also work inside the container directly:
+> `docker exec -it crm-api-1 bash` then `alembic revision --autogenerate -m "..."`.
+
+**3. Apply it**
 
 ```
-alembic revision --autogenerate -m "add phone column to tbl_user_info"
-```
-
-This creates a new file in `alembic/versions/`. Review it to make sure it looks correct.
-
-**4. Apply it**
-
-```
-alembic upgrade head
+run.cmd upgrade
 ```
 
 Or just restart the container — it applies automatically on startup.
 
-**5. Commit the migration file to git**
+**4. Commit the migration file to git**
 
 ### Rolling Back (Downgrade)
 
-Open a shell inside the container first:
-
 ```
-docker exec -it template_api-api-1 bash
-```
-
-**Rollback the last migration:**
-
-```
-alembic downgrade -1
+run.cmd downgrade           # roll back the last migration
+run.cmd downgrade 2         # roll back the last 2
 ```
 
-**Rollback the last 2 migrations:**
-
-```
-alembic downgrade -2
-```
-
-**Rollback to a specific revision:**
-
-```
-alembic downgrade abc123def456
-```
-
-You can find revision IDs with `alembic history --verbose`.
-
-**Rollback everything (empty database):**
-
-```
-alembic downgrade base
-```
-
-### Other Useful Commands
-
-Run these inside the container (`docker exec -it template_api-api-1 bash`):
+For finer control (a specific revision, `base`, history), open a shell inside the
+container (`docker exec -it crm-api-1 bash`) and use `alembic` directly:
 
 | What | Command |
 |------|---------|
 | See current migration | `alembic current` |
 | See full history | `alembic history --verbose` |
+| Downgrade to a revision | `alembic downgrade abc123def456` |
+| Downgrade everything | `alembic downgrade base` |
 | Create empty migration (manual SQL) | `alembic revision -m "describe it"` |
-| Upgrade to a specific revision | `alembic upgrade abc123def456` |
 | See what SQL a migration would run | `alembic upgrade head --sql` |
+
+### Seeds
+
+Seeds run automatically on startup. To run them on demand:
+
+```
+run.cmd seed                # all seeds
+run.cmd seed admin          # a specific seed
+```
 
 ### First-Time Setup (Fresh Database)
 
 If you're starting from scratch with no migration files:
 
 ```
-docker-helper.cmd up
-docker exec -it template_api-api-1 bash
-alembic revision --autogenerate -m "initial tables"
-exit
-docker-helper.cmd down
-docker-helper.cmd up
+run.cmd up
+run.cmd migrate initial_tables
+run.cmd restart
 ```
 
-The second startup will apply the migration and seed the database.
+The restart will apply the migration and seed the database.
 
 ---
 
@@ -150,7 +138,7 @@ Tests use a separate database (`<your_db_name>_test`). It is created automatical
 **1. Open a shell inside the container**
 
 ```
-docker exec -it template_api-api-1 bash
+run.cmd shell             # or: docker exec -it crm-api-1 bash
 ```
 
 **2. Run all tests**
@@ -159,64 +147,55 @@ docker exec -it template_api-api-1 bash
 python -m pytest tests/ -v
 ```
 
-**Run a specific test folder:**
+**Run a specific test folder / file:**
 
 ```
 python -m pytest tests/test_auth/ -v
-```
-
-**Run a single test file:**
-
-```
 python -m pytest tests/test_auth/test_login.py -v
 ```
 
 ---
 
-## Encrypting .env Secrets
+## Secrets (SOPS + age)
 
-Sensitive values in `.env` can be encrypted so they're not stored in plain text. This protects against malware that scans for `.env` files.
+Secrets are **not** stored in plaintext. Non-secret config lives in `config.env`
+(committed in the clear); secrets live in `secrets.enc.env`, encrypted with
+[SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age) and
+committed. At runtime `run.cmd` / `run.sh` decrypt them **in memory** and forward them
+into the containers — there is no plaintext secrets file on disk. Full design notes:
+[`SOPS_INTEGRATION_GUIDE.md`](SOPS_INTEGRATION_GUIDE.md).
 
-**Encrypt all sensitive values:**
-
-```
-docker-helper.cmd encrypt-secrets     # Windows
-./docker-helper.sh encrypt-secrets    # Linux / Mac
-```
-
-You'll be prompted to enter and confirm a `MASTER_KEY`. This encrypts values like `DB_PASSWORD`, `JWT_SECRET_KEY`, etc. in-place — they'll become `ENC:...` strings in your `.env` file.
-
-**Decrypt back to plain text:**
+### First-time machine setup
 
 ```
-docker-helper.cmd decrypt-secrets     # Windows
-./docker-helper.sh decrypt-secrets    # Linux / Mac
+run.cmd secrets-install     # install sops + age (winget on Windows / brew / GitHub binaries)
+# open a NEW terminal so PATH refreshes, then:
+run.cmd secrets-keygen      # generate this machine's age key; prints your age1... PUBLIC key
 ```
 
-**Setting MASTER_KEY (never store in `.env` — that defeats the purpose):**
+Send your **public** key to whoever manages `.sops.yaml`. They add it and run
+`run.cmd secrets-rekey`, then commit `secrets.enc.env`. After that you can decrypt.
 
-Development (Windows):
-```
-setx MASTER_KEY "your-master-key"
-# Restart VS Code, then docker-compose picks it up via docker-compose.dev.yml
-```
+### Day-to-day
 
-Production (VPS — one-time setup, shared across all apps on the server):
 ```
-echo "MASTER_KEY=your-master-key" | sudo tee /etc/master.env
-sudo chmod 600 /etc/master.env
-# docker-compose.prod.yml reads this file automatically
+run.cmd secrets-edit        # opens secrets.enc.env decrypted in your editor; re-encrypts on save
+run.cmd secrets-rekey       # re-encrypt to the current recipients in .sops.yaml
 ```
 
-> **Note:** Without `MASTER_KEY`, plain text values still work as before. Encryption is fully opt-in.
+> **Never hand-edit `secrets.enc.env`** — it has an integrity MAC and per-recipient
+> wrapped keys. Change secrets only via `run.cmd secrets-edit`.
+
+The age **private** key (`~/.config/sops/age/keys.txt`) never leaves your machine and is
+never committed.
 
 ---
 
 ## Viewing Logs
 
 ```
-docker logs template_api-api-1
-docker logs template_api-api-1 -f    # follow (live)
+docker logs crm-api-1
+docker logs crm-api-1 -f    # follow (live)
 ```
 
 ## Rebuilding After Code Changes
@@ -224,5 +203,6 @@ docker logs template_api-api-1 -f    # follow (live)
 The `up` command already includes `--build`, so just run:
 
 ```
-docker-helper.cmd down && docker-helper.cmd up
+run.cmd restart       # Windows  (down then up)
+./run.sh restart      # Linux / Mac
 ```

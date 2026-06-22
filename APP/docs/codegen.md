@@ -15,7 +15,7 @@ backend's `/openapi.json` using
 ```bash
 # 1. Make sure the backend is running on http://localhost:8000.
 #    From repo root:
-cd API && docker-helper.cmd up      # if not already up
+cd API && run.cmd up                # if not already up
 
 # 2. Generate the types:
 cd app

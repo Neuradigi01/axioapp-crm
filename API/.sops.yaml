@@ -1,0 +1,37 @@
+# SOPS configuration — declares which files get encrypted and who can decrypt
+# them. The `run.sh`/`run.cmd` secrets-* commands wrap sops; you rarely call it directly.
+#
+# Each entry under `keys:` is one person/machine's age PUBLIC key, anchored
+# (&name) so it can be referenced (*name) in creation_rules below. sops itself
+# ignores the `keys:` block — it exists so every key is labelled with its owner.
+#
+# To grant access: add an anchored key line + its *alias under `age:`, then run
+# `run.cmd secrets-rekey`. To revoke: delete both lines, re-key, AND rotate the
+# actual secret values at their source (a removed key still holds any
+# plaintext/data-key it already had).
+#
+# Generate your keypair with `run.cmd secrets-keygen` (prints your age1... key),
+# then send it to whoever manages this file.
+keys:
+  - &ryder-home    age1j9dkddxu407w844mqghgj4nwz036wn4pj6dhpe7rnu6jdr2xdavsn963jh   # Ryder — home PC
+  - &ryder-office  age13ylplv3wgmk0xlr5kyr9y26zvddurvtyvf49wcv4wp2g9cq9l98sar975n   # Ryder — office PC
+  - &sagar         age100ggf6lrynn392esamkea5a4cca9vemzx8rpws7kdzdn3mqvrg5q68pza9   # Sagar
+  - &pratik        age1s3huk7pyru23zmmjzexjnhcrfvqzvdruyw86hglmuedpxtps540svrh49m   # Pratik
+  - &prod-server   age1xcsw0mafsq5mdh890sxk6w65v4k9vsvlyyw2qjd7czv7ygpuxfasd5nq52   # Production server (srv634277, key in /root)
+  - &prod-server2   age10jgvatqaawvt3jg3h4qvlatv4nmzspgwatxvyfd8q9psk34u556szjp6ne   # Production server (srv634277, key in /root)
+
+
+
+# The secrets file is named secrets.enc.env (the .env extension lets sops
+# auto-detect dotenv format — required for `sops exec-env`, which has no
+# --input-type flag). path_regex matches it; the $ anchor stops over-matching.
+creation_rules:
+  - path_regex: secrets\.enc\.env$
+    key_groups:
+      - age:
+          - *ryder-home
+          - *ryder-office
+          - *sagar
+          - *pratik
+          - *prod-server
+          - *prod-server2

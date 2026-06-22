@@ -6,10 +6,10 @@ Notes on what is NOT covered here:
   - RLS policies: the test conftest builds the schema from
     `Base.metadata.create_all`, not from the Alembic migration, so the
     `apply_rls(...)` policies do not exist on the test DB. Live-DB
-    smoke (after `docker-helper.cmd upgrade`) verifies isolation.
+    smoke (after `run.cmd upgrade`) verifies isolation.
   - Backfill: same reason. The backfill INSERT runs only on the real
     migration. Smoke verifies one row per `organizations` row.
-  - Downgrade: tested via the docker-helper.cmd smoke loop in the step
+  - Downgrade: tested via the run.cmd smoke loop in the step
     report (`downgrade -1` then `upgrade head`), not as a pytest case.
 """
 from __future__ import annotations

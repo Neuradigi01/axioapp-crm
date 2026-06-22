@@ -91,7 +91,7 @@ def _state_secret() -> bytes:
     if not INTEGRATIONS_ENCRYPTION_KEY:
         raise RuntimeError(
             "INTEGRATIONS_ENCRYPTION_KEY not configured — required for "
-            "OAuth state signing. See .env.example."
+            "OAuth state signing. Add it to secrets.enc.env via `run secrets-edit`."
         )
     return INTEGRATIONS_ENCRYPTION_KEY.encode("utf-8")
 
@@ -190,7 +190,7 @@ def start_authorize(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
                 "Meta OAuth app is not configured. Set META_APP_ID in "
-                ".env — see tasks/ad-integrations/manual-meta-oauth-setup.md."
+                "config.env — see tasks/ad-integrations/manual-meta-oauth-setup.md."
             ),
         )
     state_payload = {

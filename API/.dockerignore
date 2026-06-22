@@ -1,0 +1,39 @@
+# Secrets are injected at runtime via `sops exec-env`, never baked into the
+# image. config.env (non-secret) is intentionally NOT excluded so the loader's
+# load_dotenv() works for non-Docker local runs.
+secrets.enc.env
+*.dec.env
+.sops.yaml
+*.agekey
+age-key*.txt
+keys.txt
+
+# Host-side stack helpers — not needed inside the image.
+run.cmd
+run.sh
+
+# Any stray legacy env files must never reach the image.
+.env
+.env.*
+
+# VCS / CI / editor metadata
+.git
+.gitignore
+.gitattributes
+.idea
+.vscode
+
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+.venv/
+venv/
+
+# Local runtime cruft
+logs/
+*.log
+celerybeat-schedule*

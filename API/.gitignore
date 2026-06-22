@@ -66,6 +66,14 @@ ENV/
 env.bak/
 venv.bak/
 
+# SOPS + age — never commit private keys or decrypted secret dumps.
+# (config.env and secrets.enc.env ARE committed — do NOT ignore them.)
+*.agekey
+age-key*.txt
+keys.txt
+*.dec.env
+secrets.dec.env
+
 # Celery stuff
 celerybeat-schedule
 celerybeat.pid

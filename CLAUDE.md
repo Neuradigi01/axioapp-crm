@@ -134,7 +134,7 @@ If anything is ambiguous, **stop and ask one concrete question** with 2–3 opti
 - The shell is **PowerShell**. Use PowerShell syntax (`$env:VAR`, `$null`, backtick continuation). Bash is also available via the Bash tool for POSIX scripts.
 - For Python work in `api/`, prefer `uv run <cmd>` (e.g., `uv run uvicorn src.app.main:app`, `uv run alembic upgrade head`, `uv run pytest`).
 - For Angular work in `app/`, use `npm` / `ng` as usual.
-- Database password and other secrets live in `.env` (never commit). `.env.example` is the canonical list.
+- Secrets (DB password, JWT/Fernet keys, API keys) live in `API/secrets.enc.env`, **SOPS + age encrypted** and committed; they are decrypted in-memory at runtime by `sops exec-env` (via `run.cmd` / `run.sh`) and read through `os.getenv`. Non-secret config lives in `API/config.env` (committed plaintext). There is no `.env` / `.env.example`. See [`API/SOPS_INTEGRATION_GUIDE.md`](API/SOPS_INTEGRATION_GUIDE.md). Edit secrets with `run secrets-edit`; never hand-edit `secrets.enc.env`.
 
 ## Where to find what
 

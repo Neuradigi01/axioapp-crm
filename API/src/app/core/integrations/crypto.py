@@ -45,7 +45,7 @@ def _build_fernet() -> Fernet:
             "INTEGRATIONS_ENCRYPTION_KEY is not set. Generate one with: "
             "python -c 'from cryptography.fernet import Fernet; "
             "print(Fernet.generate_key().decode())' "
-            "and put it in your .env. See .env.example."
+            "and add it to secrets.enc.env via `run secrets-edit`."
         )
     try:
         return Fernet(key.encode("utf-8") if isinstance(key, str) else key)
