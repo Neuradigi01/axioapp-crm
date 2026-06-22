@@ -360,6 +360,18 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // whatsapp-platform-upgrade Step 9 — template builder UI.
+        // Read-gated; write + submit affordances inside are hidden
+        // per-role by the page component (junior sales sees the
+        // table but no Create / Edit / Submit buttons).
+        path: 'whatsapp/templates',
+        canActivate: [permissionGuard('whatsapp.templates.read')],
+        loadComponent: () =>
+          import(
+            './core/whatsapp/templates/whatsapp-templates.page'
+          ).then((m) => m.WhatsAppTemplatesPageComponent),
+      },
+      {
         path: 'calls',
         loadComponent: () =>
           import('./core/calls/call-center.page').then(
