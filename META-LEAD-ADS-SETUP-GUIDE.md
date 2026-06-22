@@ -40,7 +40,7 @@ Lead visible in CRM /user/leads
 - **Facebook account** with admin rights on a FB Page
 - **Meta Business Manager** account
 - **ngrok** account (free tier OK)
-- **MASTER_KEY** string (encryption key set kiya tha pichli baar — yaad rakhna ya secure place mein save)
+- **sops + age** installed + your **age key** present (`run.cmd secrets-keygen` if first time on this machine) with your public key added as a recipient in `API/.sops.yaml`. Secrets then decrypt automatically — no MASTER_KEY. See [`API/SOPS_INTEGRATION_GUIDE.md`](API/SOPS_INTEGRATION_GUIDE.md).
 
 ---
 
@@ -51,7 +51,9 @@ crm/
 ├── API/                ← Backend (FastAPI + Python)
 │   ├── docker-compose.yml
 │   ├── docker-compose.dev.yml
-│   ├── .env             ← Secrets (gitignored)
+│   ├── config.env        ← Non-secret config (committed, plaintext)
+│   ├── secrets.enc.env   ← Secrets, SOPS + age encrypted (committed)
+│   ├── run.cmd / run.sh  ← Stack runner (wraps `sops exec-env`)
 │   ├── requirements.txt
 │   └── src/
 │       └── app/core/integrations/meta/   ← Meta integration code
@@ -97,7 +99,7 @@ Forwarding   https://XXXX-31-97-109-228.ngrok-free.app -> http://localhost:8000
 
 **Yeh URL note karo** — Phase 2 + 3 mein use hoga.
 
-⚠️ **Critical**: Free tier mein har restart pe URL **change** hota hai. Iska matlab `.env` aur Meta dashboard har baar update karne padenge. Production mein stable HTTPS chahiye (Cloudflare Tunnel free + static URL deta hai).
+⚠️ **Critical**: Free tier mein har restart pe URL **change** hota hai. Iska matlab `config.env` aur Meta dashboard har baar update karne padenge. Production mein stable HTTPS chahiye (Cloudflare Tunnel free + static URL deta hai).
 
 ---
 
@@ -119,7 +121,7 @@ App Dashboard → **App settings → Basic**:
 - **App ID** (top — long number)
 - **App Secret** — "Show" button click karo, password confirm karo
 
-Yeh values `.env` mein jayengi.
+**App ID** `config.env` mein jayega (non-secret); **App Secret** `secrets.enc.env` mein (secret) — Phase 3 dekho.
 
 ### 2.3 Use Case add karo — "Capture & manage ad leads with Marketing API"
 
@@ -172,13 +174,18 @@ Same page, scroll down → **Webhook fields** table → `leadgen` row mein **Sub
 
 ---
 
-## Phase 3 — `.env` Configuration
+## Phase 3 — `config.env` + `secrets.enc.env` Configuration
 
-### 3.1 `.env` file kholo
+Non-secret values `config.env` mein (committed plaintext); secrets `secrets.enc.env` mein (SOPS-encrypted, committed).
 
+### 3.1 Secrets edit kaise karein
+
+```powershell
+cd C:\Users\USER\Desktop\Projects\crm\API
+run.cmd secrets-edit
 ```
-C:\Users\USER\Desktop\Projects\crm\API\.env
-```
+
+Yeh `secrets.enc.env` ko aapke editor mein **decrypted** kholega; save karte hi **re-encrypt** ho jayega. `config.env` ek normal text editor se edit karo. `secrets.enc.env` ko **kabhi haath se edit mat karo** — sirf `run.cmd secrets-edit` se.
 
 ### 3.2 Verify Token generate karo
 
@@ -191,29 +198,38 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 Output (example): `mK7tQ9_rP3vYx2NbHl4Wj8sFcA6oZxKpRdEvL5T-uXg`
 
 Yeh value **dono jagah** use hogi:
-- `.env` mein
+- `secrets.enc.env` mein (it's a secret)
 - Meta dashboard webhook Verify Token field mein
 
 ### 3.3 Meta values fill karo
 
+**Non-secret** → `config.env` (normal editor):
+
 ```ini
 # Meta (Facebook + Instagram) Ads OAuth
 META_APP_ID=<App_ID_from_2.2>
-META_APP_SECRET=<App_Secret_from_2.2>
 META_OAUTH_REDIRECT_URI=https://<YOUR_NGROK_URL>.ngrok-free.app/api/v1/integrations/meta/callback
-META_WEBHOOK_VERIFY_TOKEN=<token_from_3.2>
 META_GRAPH_API_VERSION=v19.0
 ```
 
+**Secrets** → `run.cmd secrets-edit` (decrypts `secrets.enc.env`):
+
+```ini
+META_APP_SECRET=<App_Secret_from_2.2>
+META_WEBHOOK_VERIFY_TOKEN=<token_from_3.2>
+```
+
 ### 3.4 Celery enable karo
+
+`config.env` mein:
 
 ```ini
 CELERY_ENABLED=true
 ```
 
-### 3.5 DB encrypted values
+### 3.5 DB + other secrets
 
-Already encrypted hain `ENC:` prefix ke saath. **MASTER_KEY** env var chahiye decrypt karne ke liye (Phase 5 mein).
+`DB_PASSWORD`, `JWT_SECRET_KEY`, `FERNET_KEY`, `INTEGRATIONS_ENCRYPTION_KEY` waance sab `secrets.enc.env` mein SOPS-encrypted hain. `run.cmd` har stack/DB command pe inhe **in-memory decrypt** karta hai (`sops exec-env`) aur containers mein forward karta hai — koi MASTER_KEY ya manual decrypt step nahi. Disk pe plaintext secrets kabhi nahi.
 
 ---
 
@@ -255,42 +271,39 @@ Ab Page ke liye Lead Access fully configured hai.
 
 ## Phase 5 — Docker Stack Setup
 
-### 5.1 PowerShell mein MASTER_KEY set karo
+### 5.1 First time? sops + age + age key ready karo
 
 ```powershell
-$env:MASTER_KEY = "<your-master-key-string>"
+cd C:\Users\USER\Desktop\Projects\crm\API
+run.cmd secrets-install     # sops + age install (winget) — phir NEW terminal kholo PATH refresh ke liye
+run.cmd secrets-keygen      # is machine ki age key banao; aapki age1... PUBLIC key print karega
 ```
 
-Verify:
-```powershell
-echo $env:MASTER_KEY
-```
+Apni **public** key `.sops.yaml` manage karne wale ko bhejo. Woh use add karke `run.cmd secrets-rekey` chalayega + `secrets.enc.env` commit karega. Uske baad aap decrypt kar paoge. (Agar key pehle se hai toh yeh skip.)
 
-Aapki string print honi chahiye.
-
-⚠️ **CRITICAL**: MASTER_KEY ek hi PowerShell session mein valid hai. Window band → env var khatam. Docker compose **same window** se chalana.
+⚠️ Koi MASTER_KEY nahi — `run.cmd` har command pe `secrets.enc.env` ko aapki age key se **in-memory** decrypt karta hai. Private key (`%USERPROFILE%\.config\sops\age\keys.txt`) kabhi commit/share mat karo.
 
 ### 5.2 Docker stack up
 
 ```powershell
 cd C:\Users\USER\Desktop\Projects\crm\API
-docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile celery up -d
+run.cmd up
 ```
 
-60 sec wait karo (alembic migrations + seeds + module discovery).
+`run.cmd up` = full stack (api + redis + celery + beat + flower), secrets in-memory decrypt karke. 60 sec wait karo (alembic migrations + seeds + module discovery).
 
 ### 5.3 Status verify
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile celery ps
+docker compose --env-file config.env -f docker-compose.yml -f docker-compose.dev.yml --profile celery ps
 ```
 
 5 services `Up X seconds` hone chahiye:
-- template_api-api-1
-- template_api-celery-1
-- template_api-celery-beat-1
-- template_api-flower-1
-- template_api-redis-1
+- crm-api-1
+- crm-celery-1
+- crm-celery-beat-1
+- crm-flower-1
+- crm-redis-1
 
 ### 5.4 Health checks
 
@@ -309,7 +322,7 @@ Same response — confirms ngrok tunnel forwarding works.
 ### 5.5 Pool type verify (NullPool active)
 
 ```powershell
-docker exec template_api-celery-1 python -c "from src.core.db import engine; print('Pool:', type(engine.sync_engine.pool).__name__)"
+docker exec crm-celery-1 python -c "from src.core.db import engine; print('Pool:', type(engine.sync_engine.pool).__name__)"
 ```
 
 Expected: `Pool: NullPool` ✅
@@ -507,7 +520,7 @@ Agar Testing Tool stuck rahe ya manually verify karna ho:
 #### C.1 Real leadgen_id pull karo
 
 ```powershell
-docker exec template_api-celery-1 python -c "import asyncio, httpx, asyncpg; from src.app.core.integrations.crypto import decrypt; from config import DB_PASSWORD, DB_HOST, DB_PORT, DB_USER, DB_NAME; loop = asyncio.new_event_loop(); c = loop.run_until_complete(asyncpg.connect(host=DB_HOST, port=int(DB_PORT), user=DB_USER, password=DB_PASSWORD, database=DB_NAME)); row = loop.run_until_complete(c.fetchrow(\"SELECT page_token_enc FROM meta_page_tokens WHERE page_id='<PAGE_ID>'\")); token = decrypt(row['page_token_enc']); loop.run_until_complete(c.close()); h = httpx.Client(); r = h.get('https://graph.facebook.com/v19.0/<FORM_ID>/leads', params={'access_token': token, 'limit': 50}); print(r.json())"
+docker exec crm-celery-1 python -c "import asyncio, httpx, asyncpg; from src.app.core.integrations.crypto import decrypt; from config import DB_PASSWORD, DB_HOST, DB_PORT, DB_USER, DB_NAME; loop = asyncio.new_event_loop(); c = loop.run_until_complete(asyncpg.connect(host=DB_HOST, port=int(DB_PORT), user=DB_USER, password=DB_PASSWORD, database=DB_NAME)); row = loop.run_until_complete(c.fetchrow(\"SELECT page_token_enc FROM meta_page_tokens WHERE page_id='<PAGE_ID>'\")); token = decrypt(row['page_token_enc']); loop.run_until_complete(c.close()); h = httpx.Client(); r = h.get('https://graph.facebook.com/v19.0/<FORM_ID>/leads', params={'access_token': token, 'limit': 50}); print(r.json())"
 ```
 
 Output mein leads list → kisi entry ka `id` field copy karo.
@@ -515,13 +528,13 @@ Output mein leads list → kisi entry ka `id` field copy karo.
 #### C.2 Task fire karo
 
 ```powershell
-docker exec template_api-celery-1 python -c "from src.celery.worker import celery; from src.app.core.integrations.meta.tasks import process_meta_lead; result = process_meta_lead.delay({'leadgen_id': '<REAL_LEADGEN_ID>', 'form_id': '<FORM_ID>', 'page_id': '<PAGE_ID>', 'ad_id': None, 'campaign_id': None, 'created_time': 1780472068}); print('Task queued:', result.id)"
+docker exec crm-celery-1 python -c "from src.celery.worker import celery; from src.app.core.integrations.meta.tasks import process_meta_lead; result = process_meta_lead.delay({'leadgen_id': '<REAL_LEADGEN_ID>', 'form_id': '<FORM_ID>', 'page_id': '<PAGE_ID>', 'ad_id': None, 'campaign_id': None, 'created_time': 1780472068}); print('Task queued:', result.id)"
 ```
 
 #### C.3 Logs check
 
 ```powershell
-docker logs template_api-celery-1 --since 30s 2>&1 | findstr /i "process_meta"
+docker logs crm-celery-1 --since 30s 2>&1 | findstr /i "process_meta"
 ```
 
 Expected: `succeeded: {'status': 'created', 'lead_id': '...'}`
@@ -550,17 +563,14 @@ Real users form fill karenge → **real webhook fire** → CRM mein real leads a
 
 ### Issue 1 — `ngrok 502 ERR_NGROK_3004` ya tunnel dead
 
-ngrok terminal band ho gaya. Restart karo: `ngrok http 8000`. **Naya URL milega** — `.env` aur Meta dashboard ke 2 URLs update karo.
+ngrok terminal band ho gaya. Restart karo: `ngrok http 8000`. **Naya URL milega** — `config.env` aur Meta dashboard ke 2 URLs update karo.
 
-### Issue 2 — `InvalidPasswordError` for postgres
+### Issue 2 — `InvalidPasswordError` for postgres (ya secrets empty)
 
-MASTER_KEY env var current shell mein set nahi hai. Set karo:
-
-```powershell
-$env:MASTER_KEY = "<your-master-key>"
-```
-
-Phir **same window** se docker compose chalao.
+Secrets decrypt nahi ho rahe / inject nahi hue. Check:
+1. `sops` + `age` installed hain (`run.cmd secrets-install`).
+2. Aapki age key maujood hai (`%USERPROFILE%\.config\sops\age\keys.txt`) aur aapki public key `.sops.yaml` recipients mein hai (warna `run.cmd secrets-rekey` karwao).
+3. Stack hamesha `run.cmd up` se chalao — raw `docker compose up` secrets ko inject **nahi** karta (empty values milenge).
 
 ### Issue 3 — `meta webhook: failed to enqueue task`
 
@@ -580,7 +590,7 @@ Celery worker mein async DB engine cross-loop bug. Fix:
    - `DB_NULL_POOL=1` env var
    - `volumes: - .:/app` mount
 
-Container recreate karo (`down + up`).
+Container recreate karo (`run.cmd restart`).
 
 ### Issue 5 — `NoReferencedTableError: organizations`
 
@@ -613,7 +623,7 @@ OAuth flow ne Pages access nahi diya. Fix:
 ### Issue 8 — Webhook verify fail (Meta dashboard mein red error)
 
 Verify Token mismatch. Check karo:
-1. `.env` mein `META_WEBHOOK_VERIFY_TOKEN` value
+1. `secrets.enc.env` mein `META_WEBHOOK_VERIFY_TOKEN` value (`run.cmd secrets-edit` se dekho)
 2. Meta dashboard webhook field mein same value
 3. Trailing spaces / hidden chars nahi hone chahiye
 
@@ -641,8 +651,8 @@ CRM mein Disconnect + Reconnect karo new permission ke saath.
 | # | File | Fix |
 |---|------|-----|
 | 1 | `API/requirements.txt` | Added `celery[redis]`, `flower`, `psycopg2-binary` |
-| 2 | `API/docker-compose.dev.yml` | Added `MASTER_KEY=${MASTER_KEY:-}` to celery/beat/flower |
-| 3 | `API/docker-compose.dev.yml` | Added `DB_NULL_POOL=1` env var + `.:/app` volume mount to celery/beat/flower |
+| 2 | `API/docker-compose.yml` | Secrets reach celery/beat/flower via the `x-secret-vars` passthrough (SOPS `exec-env`) — no MASTER_KEY |
+| 3 | `API/docker-compose.dev.yml` | `DB_NULL_POOL=1` env var + `.:/app` volume mount on celery/beat/flower |
 | 4 | `API/src/core/db.py` | Conditional NullPool based on `DB_NULL_POOL` env var |
 | 5 | `API/src/celery/worker.py` | `worker_process_init` + `task_prerun` signals for engine disposal |
 | 6 | `API/src/celery/worker.py` | Early import of `src.app.core.tenants.models` for ORM metadata |
@@ -659,29 +669,26 @@ CRM mein Disconnect + Reconnect karo new permission ke saath.
    ngrok http 8000
    → Naya URL note karo
 
-2. .env mein META_OAUTH_REDIRECT_URI update karo with new ngrok URL
+2. config.env mein META_OAUTH_REDIRECT_URI update karo with new ngrok URL
 
 3. Meta dashboard mein 2 URLs update karo:
    - Facebook Login → Settings → Valid OAuth Redirect URIs
    - Use cases → Capture & manage ad leads → Customize → Webhooks → Callback URL
      (+ Verify and Save)
 
-4. PowerShell mein MASTER_KEY set karo:
-   $env:MASTER_KEY = "<your-master-key>"
-
-5. Docker stack up karo:
+4. Docker stack up karo (run.cmd secrets ko in-memory decrypt karta hai):
    cd C:\Users\USER\Desktop\Projects\crm\API
-   docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile celery up -d
+   run.cmd up
 
-6. Wait 60 sec, phir verify:
+5. Wait 60 sec, phir verify:
    curl http://localhost:8000/api/v1/health
    curl https://<ngrok>.ngrok-free.app/api/v1/health
 
-7. Frontend start karo:
+6. Frontend start karo:
    cd C:\Users\USER\Desktop\Projects\crm\APP
    npm start
 
-8. Browser: http://localhost:4200 → login → ready
+7. Browser: http://localhost:4200 → login → ready
 ```
 
 ---
@@ -720,7 +727,7 @@ CRM mein Disconnect + Reconnect karo new permission ke saath.
 
 ### Operational
 
-- ngrok URL rotation: free tier mein har restart pe change → automate `.env` update + Meta dashboard sync via script
+- ngrok URL rotation: free tier mein har restart pe change → automate `config.env` update + Meta dashboard sync via script
 - Monitor DLQ regularly — failed webhooks/leads operator intervention chahiye
 - Set up alerts for `processed=0` over time window (might indicate Meta delivery issue)
 
@@ -734,6 +741,7 @@ CRM mein Disconnect + Reconnect karo new permission ke saath.
 - Business Manager: [business.facebook.com](https://business.facebook.com)
 - Ads Manager: [adsmanager.facebook.com](https://adsmanager.facebook.com)
 - ngrok Dashboard: [dashboard.ngrok.com](https://dashboard.ngrok.com)
+- SOPS secret management: [`API/SOPS_INTEGRATION_GUIDE.md`](API/SOPS_INTEGRATION_GUIDE.md)
 
 ---
 
@@ -742,13 +750,13 @@ CRM mein Disconnect + Reconnect karo new permission ke saath.
 ### Backend logs (live)
 
 ```powershell
-docker logs template_api-celery-1 --follow
+docker logs crm-celery-1 --follow
 ```
 
 ### Filter Meta-related logs
 
 ```powershell
-docker logs template_api-celery-1 --since 5m 2>&1 | findstr /i "process_meta"
+docker logs crm-celery-1 --since 5m 2>&1 | findstr /i "process_meta"
 ```
 
 ### Health checks
@@ -761,35 +769,36 @@ curl https://<ngrok>.ngrok-free.app/api/v1/health
 ### Pool type check
 
 ```powershell
-docker exec template_api-celery-1 python -c "from src.core.db import engine; print('Pool:', type(engine.sync_engine.pool).__name__)"
+docker exec crm-celery-1 python -c "from src.core.db import engine; print('Pool:', type(engine.sync_engine.pool).__name__)"
 ```
 
 ### List leads for a form via Meta API
 
 ```powershell
-docker exec template_api-celery-1 python -c "import asyncio, httpx, asyncpg; from src.app.core.integrations.crypto import decrypt; from config import DB_PASSWORD, DB_HOST, DB_PORT, DB_USER, DB_NAME; loop = asyncio.new_event_loop(); c = loop.run_until_complete(asyncpg.connect(host=DB_HOST, port=int(DB_PORT), user=DB_USER, password=DB_PASSWORD, database=DB_NAME)); row = loop.run_until_complete(c.fetchrow(\"SELECT page_token_enc FROM meta_page_tokens WHERE page_id='<PAGE_ID>'\")); token = decrypt(row['page_token_enc']); loop.run_until_complete(c.close()); h = httpx.Client(); r = h.get('https://graph.facebook.com/v19.0/<FORM_ID>/leads', params={'access_token': token, 'limit': 50}); print(r.json())"
+docker exec crm-celery-1 python -c "import asyncio, httpx, asyncpg; from src.app.core.integrations.crypto import decrypt; from config import DB_PASSWORD, DB_HOST, DB_PORT, DB_USER, DB_NAME; loop = asyncio.new_event_loop(); c = loop.run_until_complete(asyncpg.connect(host=DB_HOST, port=int(DB_PORT), user=DB_USER, password=DB_PASSWORD, database=DB_NAME)); row = loop.run_until_complete(c.fetchrow(\"SELECT page_token_enc FROM meta_page_tokens WHERE page_id='<PAGE_ID>'\")); token = decrypt(row['page_token_enc']); loop.run_until_complete(c.close()); h = httpx.Client(); r = h.get('https://graph.facebook.com/v19.0/<FORM_ID>/leads', params={'access_token': token, 'limit': 50}); print(r.json())"
 ```
 
 ### Manual task fire with real IDs
 
 ```powershell
-docker exec template_api-celery-1 python -c "from src.celery.worker import celery; from src.app.core.integrations.meta.tasks import process_meta_lead; result = process_meta_lead.delay({'leadgen_id': '<REAL_ID>', 'form_id': '<FORM_ID>', 'page_id': '<PAGE_ID>', 'ad_id': None, 'campaign_id': None, 'created_time': 1780472068}); print('Task queued:', result.id)"
+docker exec crm-celery-1 python -c "from src.celery.worker import celery; from src.app.core.integrations.meta.tasks import process_meta_lead; result = process_meta_lead.delay({'leadgen_id': '<REAL_ID>', 'form_id': '<FORM_ID>', 'page_id': '<PAGE_ID>', 'ad_id': None, 'campaign_id': None, 'created_time': 1780472068}); print('Task queued:', result.id)"
 ```
 
 ### Service status
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile celery ps
+docker compose --env-file config.env -f docker-compose.yml -f docker-compose.dev.yml --profile celery ps
 ```
 
-### Down + Up (after .env or docker-compose changes)
+### Down + Up (after config.env / secrets.enc.env / docker-compose changes)
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile celery down
-docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile celery up -d
+run.cmd restart
 ```
+
+(`run.cmd restart` = down + up, secrets in-memory decrypt karke. Raw `docker compose up` ke saath secrets empty aayenge.)
 
 ---
 
-**Document last updated**: 2026-06-03  
+**Document last updated**: 2026-06-22 (secrets migrated to SOPS + age; stack runs via `run.cmd` / `run.sh`)  
 **Pipeline status**: Production-ready code-level. Real lead arrival depends on Meta-side delivery (Testing Tool) or paid ad campaign.

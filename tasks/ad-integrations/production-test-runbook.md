@@ -36,17 +36,24 @@ These are the gates that, if any fail, you should NOT proceed.
       https://api.<your-prod-domain>/api/v1/integrations/google/callback
       ```
       (NOT the localhost dev one.)
-- [ ] **Production `.env`** has these set on the prod server:
+- [ ] **Production config + secrets** are set for the prod server.
+      Non-secret → `API/config.env` (committed plaintext):
       ```
       GOOGLE_OAUTH_CLIENT_ID=<production client id>
-      GOOGLE_OAUTH_CLIENT_SECRET=<production secret>
       GOOGLE_OAUTH_REDIRECT_URI=https://api.<your-prod-domain>/api/v1/integrations/google/callback
-      GOOGLE_ADS_DEVELOPER_TOKEN=<Basic Access token, NOT Explorer>
       GOOGLE_ADS_LOGIN_CUSTOMER_ID=9387299841
       GOOGLE_ADS_API_VERSION=v21
-      INTEGRATIONS_ENCRYPTION_KEY=<a real Fernet key, NOT the dev one>
-      MASTER_KEY=<set in environment, not in .env file>
       ```
+      Secret → `secrets.enc.env` via `./run.sh secrets-edit` (SOPS + age):
+      ```
+      GOOGLE_OAUTH_CLIENT_SECRET=<production secret>
+      GOOGLE_ADS_DEVELOPER_TOKEN=<Basic Access token, NOT Explorer>
+      INTEGRATIONS_ENCRYPTION_KEY=<a real Fernet key, NOT the dev one>
+      ```
+      The prod server must hold its age private key at
+      `~/.config/sops/age/keys.txt` and be a recipient in `.sops.yaml`
+      (`prod-server` / `prod-server2`). No MASTER_KEY — `./run.sh`
+      decrypts secrets in-memory per command.
 - [ ] **HTTPS** terminates correctly at `api.<your-prod-domain>` (Google
       will refuse non-HTTPS webhook URLs in production).
 - [ ] **Celery worker container running** in production. Inline-fallback
