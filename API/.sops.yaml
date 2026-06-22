@@ -19,8 +19,8 @@ keys:
   - &pratik        age1s3huk7pyru23zmmjzexjnhcrfvqzvdruyw86hglmuedpxtps540svrh49m   # Pratik
   - &prod-server   age1xcsw0mafsq5mdh890sxk6w65v4k9vsvlyyw2qjd7czv7ygpuxfasd5nq52   # Production server (srv634277, key in /root)
   - &prod-server2   age10jgvatqaawvt3jg3h4qvlatv4nmzspgwatxvyfd8q9psk34u556szjp6ne   # Production server (srv634277, key in /root)
-
-
+  - &ankesh        age1m5408duwpttc7hr59nd44fn2dvnc0aqxru7yrlffxqlkuyjvvqzqe2k0ev   # Ankesh
+  - &ajay          age19e8x8gw2smj9ldhxww5jxmc074y3unutwc7lxm04esahrjwex4xsf5adxx   # Ajay
 
 # The secrets file is named secrets.enc.env (the .env extension lets sops
 # auto-detect dotenv format — required for `sops exec-env`, which has no
@@ -35,3 +35,5 @@ creation_rules:
           - *pratik
           - *prod-server
           - *prod-server2
+          - *ankesh
+          - *ajay
