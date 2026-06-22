@@ -30,5 +30,10 @@ MODULE = ModuleDescriptor(
         "whatsapp.templates.read",
         "whatsapp.templates.write",
         "whatsapp.templates.submit",
+        # whatsapp-platform-upgrade Step 11 — business profile editor.
+        # Single key gates both read + write since the page is a single
+        # surface; junior roles inherit no access unless explicitly
+        # granted (they don't get a useful read-only view).
+        "whatsapp.business_profile.manage",
     ],
 )

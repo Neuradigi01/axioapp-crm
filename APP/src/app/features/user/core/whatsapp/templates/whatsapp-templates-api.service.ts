@@ -92,6 +92,46 @@ export interface ListTemplatesQuery {
   language?: string;
 }
 
+// --- Performance card (whatsapp-platform-upgrade Step 10) -----------
+
+export type TemplatePerformanceRange = '7d' | '30d' | '90d';
+
+export interface TemplateDailyBucket {
+  date: string;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+}
+
+export interface TemplateFailureGroup {
+  bucket: string;
+  label: string;
+  count: number;
+}
+
+export interface TemplatePerformance {
+  template_id: string;
+  range_key: TemplatePerformanceRange;
+  range_start: string;
+  range_end: string;
+
+  sent: number;
+  delivered: number;
+  read: number;
+  replied: number;
+  click_through: number;
+  failed: number;
+
+  delivery_rate: number;
+  read_rate: number;
+  reply_rate: number;
+
+  daily: TemplateDailyBucket[];
+  failures: TemplateFailureGroup[];
+  used_in_campaigns: number;
+}
+
 
 @Injectable({ providedIn: 'root' })
 export class WhatsAppTemplatesApiService {
@@ -147,6 +187,20 @@ export class WhatsAppTemplatesApiService {
     return this.http.post<WhatsAppTemplateRead>(
       `${this.base}/${id}/duplicate`,
       {},
+    );
+  }
+
+  /** Per-template performance card payload — sent / delivered / read /
+   *  replied / click_through / failed counts, day-grain buckets, and
+   *  failure breakdown. Step 10. */
+  performance(
+    id: string,
+    range: TemplatePerformanceRange,
+  ): Observable<TemplatePerformance> {
+    const params = buildHttpParams({ range });
+    return this.http.get<TemplatePerformance>(
+      `${this.base}/${id}/performance`,
+      { params },
     );
   }
 }

@@ -24,7 +24,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Text, text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -112,6 +112,50 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     )
     tier_synced_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    # whatsapp-platform-upgrade Step 11 — Meta Business profile editor.
+    # Mirrors the `whatsapp_business_profile` Graph endpoint shape;
+    # populated by `business_profile.refresh_from_meta` on first open
+    # and on the operator-side Refresh button.
+    profile_about: Mapped[Optional[str]] = mapped_column(
+        String(length=139), nullable=True
+    )
+    profile_description: Mapped[Optional[str]] = mapped_column(
+        String(length=512), nullable=True
+    )
+    profile_address: Mapped[Optional[str]] = mapped_column(
+        String(length=256), nullable=True
+    )
+    profile_email: Mapped[Optional[str]] = mapped_column(
+        String(length=128), nullable=True
+    )
+    profile_websites: Mapped[Optional[list[str]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    profile_vertical: Mapped[Optional[str]] = mapped_column(
+        String(length=64), nullable=True
+    )
+    profile_picture_url: Mapped[Optional[str]] = mapped_column(
+        String(length=512), nullable=True
+    )
+    profile_last_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Day-of-week schedule (storage only — Step 16 reads to decide
+    # whether the away message fires). Shape:
+    #   [{day: 0..6, intervals: [{open: "10:00", close: "19:00"}, …]}]
+    # Day 0 = Monday. Closed days omit intervals.
+    business_hours: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    # Free-text storage for the Step-16 automation. Variable
+    # substitution ({{contact.first_name}} etc.) happens at send time;
+    # Step 11 only persists the template text.
+    greeting_message: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
+    away_message: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

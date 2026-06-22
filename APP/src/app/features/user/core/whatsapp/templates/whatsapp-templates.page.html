@@ -50,7 +50,23 @@
     }
   </header>
 
-  @if (wizardMode() !== null) {
+  @if (viewingPerformance(); as perfRow) {
+    <section class="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
+      <div class="mb-4 flex items-center gap-2 text-xs text-zinc-500">
+        <button
+          type="button"
+          (click)="closePerformance()"
+          class="inline-flex items-center gap-1 rounded text-zinc-600 hover:text-zinc-900"
+        >
+          <lucide-icon name="arrow-left" size="12" />
+          Back to list
+        </button>
+        <span>·</span>
+        <span class="font-medium text-zinc-700">Performance</span>
+      </div>
+      <app-template-performance [template]="perfRow" />
+    </section>
+  } @else if (wizardMode() !== null) {
     <section class="mx-auto w-full max-w-5xl flex-1 px-6 py-6">
       <div class="mb-4 flex items-center gap-2 text-xs text-zinc-500">
         <button
@@ -175,6 +191,18 @@
                   </td>
                   <td class="px-4 py-3 text-right text-xs">
                     <div class="inline-flex items-center gap-1">
+                      @if (row.submission_status === 'approved') {
+                        <button
+                          type="button"
+                          (click)="openPerformance(row)"
+                          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                          title="Performance"
+                          aria-label="Performance"
+                        >
+                          <lucide-icon name="trending-up" size="12" />
+                          Metrics
+                        </button>
+                      }
                       @if (
                         (row.submission_status === 'draft' || row.submission_status === 'rejected')
                         && canSubmit()

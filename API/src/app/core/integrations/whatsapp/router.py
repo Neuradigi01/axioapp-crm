@@ -22,9 +22,19 @@ embedded-signup path is the default Intercom-style flow.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import (
@@ -42,6 +52,13 @@ from src.app.core.integrations.whatsapp.connect import (
     get_status,
     test_connection,
 )
+from src.app.core.integrations.whatsapp.business_profile import (
+    BusinessProfileError,
+    get_profile as bp_get_profile,
+    refresh_from_meta as bp_refresh_from_meta,
+    update_profile as bp_update_profile,
+    upload_picture as bp_upload_picture,
+)
 from src.app.core.integrations.whatsapp.embedded_signup import (
     EmbeddedSignupNotConfigured,
     complete_embedded_signup,
@@ -53,6 +70,8 @@ from src.app.core.integrations.whatsapp.schemas import (
     EmbeddedSignupConfigOut,
     EmbeddedSignupExchangeIn,
     EmbeddedSignupExchangeOut,
+    WhatsAppBusinessProfilePatch,
+    WhatsAppBusinessProfileRead,
     WhatsAppCapacityOut,
     WhatsAppConnectIn,
     WhatsAppStatusOut,
@@ -274,6 +293,144 @@ async def list_templates_endpoint(
         db, status=status_filter, category=category
     )
     return [WhatsAppTemplateRead.model_validate(r) for r in rows]
+
+
+# --- Business profile (whatsapp-platform-upgrade Step 11) ---------------
+
+
+def _config_to_profile_out(config: Any) -> WhatsAppBusinessProfileRead:
+    """Project a `WhatsAppAccountConfig` row → the read-shape the
+    editor consumes. Order-preserving so the hours editor renders
+    Monday..Sunday consistently."""
+    return WhatsAppBusinessProfileRead(
+        phone_id=config.phone_id,
+        display_phone_number=config.display_phone_number,
+        verified_name=config.verified_name,
+        about=config.profile_about,
+        description=config.profile_description,
+        address=config.profile_address,
+        email=config.profile_email,
+        websites=list(config.profile_websites or []),
+        vertical=config.profile_vertical,
+        profile_picture_url=config.profile_picture_url,
+        last_synced_at=config.profile_last_synced_at,
+        business_hours=list(config.business_hours or []),
+        greeting_message=config.greeting_message,
+        away_message=config.away_message,
+    )
+
+
+@router.get(
+    "/business-profile",
+    response_model=WhatsAppBusinessProfileRead,
+)
+async def business_profile_get_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("whatsapp.business_profile.manage")
+    ),
+) -> WhatsAppBusinessProfileRead:
+    """Local mirror of the Meta business profile + CRM-side automation
+    fields. On first open this triggers a one-shot Meta refresh so the
+    form opens populated; subsequent opens read straight from the DB
+    (the Refresh button is the explicit re-sync path)."""
+    try:
+        config = await bp_get_profile(db)
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+    return _config_to_profile_out(config)
+
+
+@router.patch(
+    "/business-profile",
+    response_model=WhatsAppBusinessProfileRead,
+)
+async def business_profile_patch_endpoint(
+    payload: WhatsAppBusinessProfilePatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("whatsapp.business_profile.manage")
+    ),
+) -> WhatsAppBusinessProfileRead:
+    """Apply the operator's edits. Meta-bound fields push to the Graph
+    API; CRM-only fields (hours / greeting / away) write straight to
+    the local row. Empty patches are a no-op (no Meta call)."""
+    patch_dict = payload.model_dump(exclude_unset=True, mode="json")
+    try:
+        config = await bp_update_profile(
+            db, actor_id=user.legacy_uuid, patch=patch_dict
+        )
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+    except BusinessProfileError as exc:
+        raise HTTPException(
+            status_code=exc.http_status, detail=exc.user_message
+        )
+    return _config_to_profile_out(config)
+
+
+@router.post(
+    "/business-profile/refresh",
+    response_model=WhatsAppBusinessProfileRead,
+)
+async def business_profile_refresh_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("whatsapp.business_profile.manage")
+    ),
+) -> WhatsAppBusinessProfileRead:
+    """Pull current Meta profile values + persist to the local mirror.
+    Stamps `last_synced_at` so the UI can render staleness."""
+    try:
+        config = await bp_refresh_from_meta(db)
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+    except BusinessProfileError as exc:
+        raise HTTPException(
+            status_code=exc.http_status, detail=exc.user_message
+        )
+    return _config_to_profile_out(config)
+
+
+@router.post(
+    "/business-profile/picture",
+    response_model=WhatsAppBusinessProfileRead,
+)
+async def business_profile_picture_endpoint(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("whatsapp.business_profile.manage")
+    ),
+) -> WhatsAppBusinessProfileRead:
+    """Upload a square JPEG/PNG profile picture. Goes through Meta's
+    `/media` endpoint, then attached to the profile via
+    `profile_picture_handle`. The new public URL lands on the next
+    refresh."""
+    mime_type = (file.content_type or "").lower()
+    file_bytes = await file.read()
+    try:
+        config = await bp_upload_picture(
+            db,
+            actor_id=user.legacy_uuid,
+            file_bytes=file_bytes,
+            mime_type=mime_type,
+        )
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+    except BusinessProfileError as exc:
+        raise HTTPException(
+            status_code=exc.http_status, detail=exc.user_message
+        )
+    return _config_to_profile_out(config)
 
 
 # --- Capacity (Step 3.5.16) ----------------------------------------------

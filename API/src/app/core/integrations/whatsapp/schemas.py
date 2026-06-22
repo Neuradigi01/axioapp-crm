@@ -279,6 +279,157 @@ class WhatsAppTemplateSubmissionOut(BaseModel):
     meta_status: Optional[str] = None
 
 
+# --- Per-template performance (whatsapp-platform-upgrade Step 10) ----
+
+
+class WhatsAppTemplateDailyBucket(BaseModel):
+    """One day-grain bucket on the performance line chart."""
+
+    date: str
+    sent: int
+    delivered: int
+    read: int
+    failed: int
+
+
+class WhatsAppTemplateFailureGroup(BaseModel):
+    """One grouped failure reason on the breakdown table.
+
+    `bucket` is a stable machine key (``rate_limited`` / ``opted_out``
+    / ``invalid_number`` / ``template_paused`` / ``other``); `label`
+    is the operator-facing string."""
+
+    bucket: str
+    label: str
+    count: int
+
+
+# --- Business profile editor (whatsapp-platform-upgrade Step 11) ----
+
+
+# Meta-published verticals
+# https://developers.facebook.com/docs/whatsapp/cloud-api/reference
+# /business-profiles#vertical
+WhatsAppBusinessVertical = Literal[
+    "UNDEFINED",
+    "OTHER",
+    "AUTO",
+    "BEAUTY",
+    "APPAREL",
+    "EDU",
+    "ENTERTAIN",
+    "EVENT_PLAN",
+    "FINANCE",
+    "GROCERY",
+    "GOVT",
+    "HOTEL",
+    "HEALTH",
+    "NONPROFIT",
+    "PROF_SERVICES",
+    "RETAIL",
+    "TRAVEL",
+    "RESTAURANT",
+]
+
+
+class WhatsAppBusinessHoursInterval(BaseModel):
+    """One open-close interval within a single day. Times are local
+    to the operator (timezone display is the page's concern, not the
+    schema's). Stored as ``HH:MM`` strings rather than time objects
+    so the JSONB shape is human-readable and JSON-clean."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    open: str = Field(pattern=r"^\d{2}:\d{2}$")
+    close: str = Field(pattern=r"^\d{2}:\d{2}$")
+
+
+class WhatsAppBusinessHoursDay(BaseModel):
+    """One day's schedule. `day` is 0..6 (Monday..Sunday, ISO style).
+    Closed days emit an empty `intervals` list. Multiple intervals per
+    day support split-shift schedules (e.g. 10:00-13:00 + 17:00-21:00)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    day: int = Field(ge=0, le=6)
+    intervals: list[WhatsAppBusinessHoursInterval] = Field(default_factory=list)
+
+
+class WhatsAppBusinessProfilePatch(BaseModel):
+    """Body of ``PATCH /api/v1/integrations/whatsapp/business-profile``.
+
+    Every field optional — only supplied fields are pushed to Meta.
+    Field length / format caps match Meta's documented limits +
+    `tbl_whatsapp_account_configs` column widths. Websites are capped
+    at 2 entries per Meta's spec."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    about: Optional[str] = Field(default=None, max_length=139)
+    description: Optional[str] = Field(default=None, max_length=512)
+    address: Optional[str] = Field(default=None, max_length=256)
+    email: Optional[str] = Field(default=None, max_length=128)
+    websites: Optional[list[str]] = Field(default=None, max_length=2)
+    vertical: Optional[WhatsAppBusinessVertical] = None
+    # Core-CRM-only fields. Stored verbatim; Step 16 reads them.
+    business_hours: Optional[list[WhatsAppBusinessHoursDay]] = None
+    greeting_message: Optional[str] = Field(default=None, max_length=4096)
+    away_message: Optional[str] = Field(default=None, max_length=4096)
+
+
+class WhatsAppBusinessProfileRead(BaseModel):
+    """Response shape for ``GET /api/v1/integrations/whatsapp/business-profile``.
+
+    Carries every field the editor needs to render (Meta-side profile
+    + CRM-side hours + greeting/away) plus `last_synced_at` so the UI
+    can warn when the row is stale."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    phone_id: str
+    display_phone_number: str
+    verified_name: Optional[str] = None
+    about: Optional[str] = None
+    description: Optional[str] = None
+    address: Optional[str] = None
+    email: Optional[str] = None
+    websites: list[str] = Field(default_factory=list)
+    vertical: Optional[str] = None
+    profile_picture_url: Optional[str] = None
+    last_synced_at: Optional[datetime] = None
+    business_hours: list[WhatsAppBusinessHoursDay] = Field(default_factory=list)
+    greeting_message: Optional[str] = None
+    away_message: Optional[str] = None
+
+
+class WhatsAppTemplatePerformanceOut(BaseModel):
+    """Response shape for ``GET /templates/{id}/performance?range=...``.
+
+    Empty-state friendly — counts default to zero; `daily` and
+    `failures` may be empty lists when the template has never been
+    sent inside the range."""
+
+    template_id: uuid.UUID
+    range_key: Literal["7d", "30d", "90d"]
+    range_start: datetime
+    range_end: datetime
+
+    sent: int
+    delivered: int
+    read: int
+    replied: int
+    click_through: int
+    failed: int
+
+    delivery_rate: float
+    read_rate: float
+    reply_rate: float
+
+    daily: list[WhatsAppTemplateDailyBucket] = Field(default_factory=list)
+    failures: list[WhatsAppTemplateFailureGroup] = Field(default_factory=list)
+    used_in_campaigns: int = 0
+
+
 class WhatsAppTemplateSyncOut(BaseModel):
     """Counts returned by `POST /api/v1/integrations/whatsapp/templates/sync`.
 
@@ -316,10 +467,18 @@ __all__ = [
     "WhatsAppConnectIn",
     "WhatsAppIntegrationStatus",
     "WhatsAppStatusOut",
+    "WhatsAppBusinessHoursDay",
+    "WhatsAppBusinessHoursInterval",
+    "WhatsAppBusinessProfilePatch",
+    "WhatsAppBusinessProfileRead",
+    "WhatsAppBusinessVertical",
     "WhatsAppTemplateButton",
     "WhatsAppTemplateButtonType",
     "WhatsAppTemplateCategory",
+    "WhatsAppTemplateDailyBucket",
+    "WhatsAppTemplateFailureGroup",
     "WhatsAppTemplateHeaderType",
+    "WhatsAppTemplatePerformanceOut",
     "WhatsAppTemplateRead",
     "WhatsAppTemplateStatus",
     "WhatsAppTemplateSubmissionOut",

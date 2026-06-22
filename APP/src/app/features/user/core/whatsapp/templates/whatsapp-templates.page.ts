@@ -21,6 +21,7 @@ import {
   WhatsAppTemplateUpsert,
   WhatsAppTemplatesApiService,
 } from './whatsapp-templates-api.service';
+import { TemplatePerformanceComponent } from './template-performance.component';
 import { TemplateWizardComponent } from './template-wizard.component';
 
 /**
@@ -88,6 +89,7 @@ const FILTER_TABS: Array<{
     CommonModule,
     FormsModule,
     LucideAngularModule,
+    TemplatePerformanceComponent,
     TemplateWizardComponent,
   ],
   templateUrl: './whatsapp-templates.page.html',
@@ -113,6 +115,11 @@ export class WhatsAppTemplatesPageComponent {
   protected readonly editingTemplate = signal<WhatsAppTemplateRead | null>(null);
   protected readonly wizardSubmitting = signal<boolean>(false);
   protected readonly wizardError = signal<string | null>(null);
+
+  /** Step 10: when set, render the per-template performance card
+   *  instead of the list / wizard. Click "Back to list" clears it. */
+  protected readonly viewingPerformance =
+    signal<WhatsAppTemplateRead | null>(null);
 
   /** Per-row spinner state for submit / duplicate / delete. */
   protected readonly busyRowId = signal<string | null>(null);
@@ -182,6 +189,14 @@ export class WhatsAppTemplatesPageComponent {
     this.editingTemplate.set(null);
     this.wizardError.set(null);
     this.wizardMode.set('create');
+  }
+
+  protected openPerformance(row: WhatsAppTemplateRead): void {
+    this.viewingPerformance.set(row);
+  }
+
+  protected closePerformance(): void {
+    this.viewingPerformance.set(null);
   }
 
   protected openEdit(row: WhatsAppTemplateRead): void {

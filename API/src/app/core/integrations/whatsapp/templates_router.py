@@ -36,14 +36,20 @@ from src.app.core.integrations.whatsapp.models import (
     WhatsAppTemplateSubmissionStatus,
 )
 from src.app.core.integrations.whatsapp.schemas import (
+    WhatsAppTemplatePerformanceOut,
     WhatsAppTemplateRead,
     WhatsAppTemplateSubmissionOut,
     WhatsAppTemplateUpsert,
+)
+from src.app.core.integrations.whatsapp.templates_analytics import (
+    RangeKey,
+    get_template_performance,
 )
 from src.app.core.integrations.whatsapp.templates_service import (
     create_draft,
     delete_template,
     duplicate_template,
+    get_template_or_404,
     list_templates_managed,
     submit_for_approval,
     update_draft,
@@ -210,3 +216,66 @@ async def duplicate_endpoint(
         db, actor_id=user.legacy_uuid, template_id=template_id
     )
     return WhatsAppTemplateRead.model_validate(row)
+
+
+@router.get(
+    "/{template_id}/performance",
+    response_model=WhatsAppTemplatePerformanceOut,
+)
+async def performance_endpoint(
+    template_id: uuid.UUID,
+    range: str = Query(default="30d", max_length=8, alias="range"),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("whatsapp.templates.read")),
+) -> WhatsAppTemplatePerformanceOut:
+    """Per-template performance card payload (Step 10).
+
+    `range` accepts ``7d`` / ``30d`` / ``90d``; anything else returns
+    422. The template must exist + belong to the active org (RLS
+    auto-scopes the existence check)."""
+    if range not in ("7d", "30d", "90d"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="range must be one of 7d, 30d, 90d.",
+        )
+    # Existence check — guarantees a 404 (not an empty payload) when
+    # the template doesn't belong to the active org. RLS handles the
+    # cross-tenant case (returns no row → 404).
+    await get_template_or_404(db, template_id)
+    result = await get_template_performance(
+        db, template_id=template_id, range_key=range  # type: ignore[arg-type]
+    )
+    return WhatsAppTemplatePerformanceOut(
+        template_id=result.template_id,
+        range_key=result.range_key,
+        range_start=result.range_start,
+        range_end=result.range_end,
+        sent=result.sent,
+        delivered=result.delivered,
+        read=result.read,
+        replied=result.replied,
+        click_through=result.click_through,
+        failed=result.failed,
+        delivery_rate=result.delivery_rate,
+        read_rate=result.read_rate,
+        reply_rate=result.reply_rate,
+        daily=[
+            {  # type: ignore[arg-type]
+                "date": b.date,
+                "sent": b.sent,
+                "delivered": b.delivered,
+                "read": b.read,
+                "failed": b.failed,
+            }
+            for b in result.daily
+        ],
+        failures=[
+            {  # type: ignore[arg-type]
+                "bucket": f.bucket,
+                "label": f.label,
+                "count": f.count,
+            }
+            for f in result.failures
+        ],
+        used_in_campaigns=result.used_in_campaigns,
+    )

@@ -372,6 +372,17 @@ export const userRoutes: Routes = [
           ).then((m) => m.WhatsAppTemplatesPageComponent),
       },
       {
+        // whatsapp-platform-upgrade Step 11 — business profile editor.
+        // Single permission key gates the whole page (the editor is
+        // admin-grade — junior roles get no useful read-only view).
+        path: 'whatsapp/business-profile',
+        canActivate: [permissionGuard('whatsapp.business_profile.manage')],
+        loadComponent: () =>
+          import(
+            './core/whatsapp/business-profile/business-profile.page'
+          ).then((m) => m.WhatsAppBusinessProfilePageComponent),
+      },
+      {
         path: 'calls',
         loadComponent: () =>
           import('./core/calls/call-center.page').then(
