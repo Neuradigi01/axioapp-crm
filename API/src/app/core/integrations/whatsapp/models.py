@@ -113,6 +113,26 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     tier_synced_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # whatsapp-platform-upgrade Step 12 — phone health snapshot.
+    # Cached per hourly refresh by `health_service.refresh_from_meta`.
+    # `health_synced_at` lets the UI render staleness; the event log
+    # in `tbl_whatsapp_phone_health_events` carries the timeline of
+    # changes.
+    quality_rating: Mapped[Optional[str]] = mapped_column(
+        String(length=16), nullable=True
+    )
+    name_status: Mapped[Optional[str]] = mapped_column(
+        String(length=32), nullable=True
+    )
+    throughput: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True
+    )
+    restrictions: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    health_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # whatsapp-platform-upgrade Step 11 — Meta Business profile editor.
     # Mirrors the `whatsapp_business_profile` Graph endpoint shape;
     # populated by `business_profile.refresh_from_meta` on first open
@@ -259,8 +279,65 @@ class WhatsAppTemplate(Base, TenantScoped):
         return sorted({int(m) for m in _VARIABLE_RE.findall(self.body)})
 
 
+class WhatsAppPhoneHealthEventType(str, enum.Enum):
+    """Phone-health event-log discriminator
+    (whatsapp-platform-upgrade Step 12)."""
+
+    quality_change = "quality_change"
+    tier_change = "tier_change"
+    name_status_change = "name_status_change"
+    restriction_added = "restriction_added"
+    restriction_lifted = "restriction_lifted"
+
+
+whatsapp_phone_health_event_type_enum = ENUM(
+    WhatsAppPhoneHealthEventType,
+    name="whatsapp_phone_health_event_type",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class WhatsAppPhoneHealthEvent(Base, TenantScoped):
+    """Append-only audit log of phone-health changes.
+
+    Written by the hourly refresh task and the
+    ``phone_number_quality_update`` webhook handler whenever a field
+    moves. `occurred_at` is the wall-clock from Meta's payload (when
+    available) so timeline rendering survives out-of-order webhook
+    delivery. `recorded_at` is the row insert time."""
+
+    __tablename__ = "tbl_whatsapp_phone_health_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    phone_id: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    event_type: Mapped[WhatsAppPhoneHealthEventType] = mapped_column(
+        whatsapp_phone_health_event_type_enum, nullable=False
+    )
+    old_value: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    new_value: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
 __all__ = [
     "WhatsAppAccountConfig",
+    "WhatsAppPhoneHealthEvent",
+    "WhatsAppPhoneHealthEventType",
     "WhatsAppTemplate",
     "WhatsAppTemplateSubmissionStatus",
 ]

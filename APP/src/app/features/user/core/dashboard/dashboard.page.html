@@ -42,6 +42,12 @@
   <!-- Quick-actions row — permission-gated; collapses entirely when none visible -->
   <app-dashboard-quick-actions />
 
+  <!-- whatsapp-platform-upgrade Step 12 — WhatsApp health widget.
+       Hidden when the org has no connected WhatsApp integration. -->
+  <div class="mb-4">
+    <app-whatsapp-health-widget />
+  </div>
+
   @if (error(); as err) {
     <div class="mb-4 flex items-center justify-between gap-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
       <span>{{ err }}</span>

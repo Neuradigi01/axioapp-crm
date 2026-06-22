@@ -472,6 +472,52 @@ async def _handle_whatsapp_webhook(
     )
     from src.app.shared.context import RequestContext, set_context
 
+    # whatsapp-platform-upgrade Step 12 — phone quality events. Same
+    # shape as template-status events: discriminated by
+    # `changes[0].field`. Routed via WABA id (entry.id) because the
+    # phone metadata isn't carried on these payloads.
+    quality_event = _extract_phone_quality_event(payload)
+    if quality_event is not None:
+        bundle = await find_org_by_waba_id(
+            db, waba_id=quality_event["waba_id"]
+        )
+        if bundle is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    f"no WhatsApp integration found for "
+                    f"waba_id={quality_event['waba_id']}"
+                ),
+            )
+        integration, config = bundle
+        _verify_whatsapp_signature(
+            raw=raw,
+            signature_header=request.headers.get("x-hub-signature-256"),
+            config=config,
+            platform_secret=WHATSAPP_APP_SECRET,
+        )
+        set_context(
+            RequestContext(org_id=integration.org_id, user_id=None)
+        )
+        from src.app.core.integrations.whatsapp.health_service import (
+            apply_webhook_quality_event,
+        )
+
+        # Use the resolved config's phone_id rather than the webhook's
+        # display_phone_number — the lookup column is the Meta-side
+        # opaque id, not the E.164 string. Phase-9 multi-number per
+        # WABA will need to disambiguate by display_phone_number; for
+        # the single-phone-per-WABA case (current scope) this is fine.
+        applied = await apply_webhook_quality_event(
+            db,
+            org_id=integration.org_id,
+            phone_id=config.phone_id,
+            new_quality=quality_event.get("event"),
+            new_tier=quality_event.get("current_limit"),
+            occurred_at=quality_event.get("occurred_at"),
+        )
+        return {"phone_quality_applied": applied}
+
     # whatsapp-platform-upgrade Step 8 — template status events carry
     # no `metadata.phone_number_id`. Route by `entry[0].id` (WABA id)
     # before the phone-id branch.
@@ -602,6 +648,64 @@ def _extract_phone_number_id(payload: dict[str, Any]) -> str | None:
     except (KeyError, IndexError, TypeError):
         return None
     return None
+
+
+def _extract_phone_quality_event(
+    payload: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Detect + parse a ``phone_number_quality_update`` webhook event
+    (whatsapp-platform-upgrade Step 12).
+
+    Meta delivers these with ``changes[0].field`` =
+    ``phone_number_quality_update``. The ``value`` carries the new
+    quality rating + (occasionally) the messaging-limit tier. Phone
+    routing key is ``value.display_phone_number`` (full E.164
+    string), but the simpler dispatch key is ``entry[0].id`` (WABA
+    id) so we use that to look up the org.
+
+    Returns a dict ``{waba_id, phone_id, event, current_limit,
+    occurred_at}`` or None when the payload isn't a quality event."""
+    from datetime import datetime, timezone
+
+    try:
+        entry = payload["entry"][0]
+        change = entry["changes"][0]
+    except (KeyError, IndexError, TypeError):
+        return None
+    if not isinstance(change, dict):
+        return None
+    if change.get("field") != "phone_number_quality_update":
+        return None
+    value = change.get("value")
+    if not isinstance(value, dict):
+        return None
+    event = value.get("event")
+    if not isinstance(event, str) or not event:
+        return None
+    raw_phone = value.get("display_phone_number") or value.get("phone_number")
+    phone_id = (
+        str(raw_phone) if isinstance(raw_phone, (str, int)) else ""
+    )
+    if not phone_id:
+        return None
+    occurred_at: datetime | None = None
+    raw_ts = value.get("timestamp") or entry.get("time")
+    if isinstance(raw_ts, (int, float)):
+        try:
+            occurred_at = datetime.fromtimestamp(int(raw_ts), tz=timezone.utc)
+        except (TypeError, ValueError):
+            occurred_at = None
+    return {
+        "waba_id": str(entry.get("id") or "") or None,
+        "phone_id": phone_id,
+        "event": event,
+        "current_limit": (
+            value.get("current_limit")
+            if isinstance(value.get("current_limit"), str)
+            else None
+        ),
+        "occurred_at": occurred_at,
+    }
 
 
 def _extract_template_status_event(

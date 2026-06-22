@@ -304,6 +304,56 @@ class WhatsAppTemplateFailureGroup(BaseModel):
     count: int
 
 
+# --- Phone health (whatsapp-platform-upgrade Step 12) ---------------
+
+
+WhatsAppQualityRating = Literal["GREEN", "YELLOW", "RED", "UNKNOWN"]
+
+
+class WhatsAppPhoneHealthEventRead(BaseModel):
+    """One timeline-chart point. `occurred_at` is the wall-clock from
+    Meta (or now() for events we wrote without a Meta timestamp).
+    `old_value` / `new_value` are the diff shape — the UI surfaces
+    the verbatim values in the tooltip."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    phone_id: str
+    event_type: str
+    old_value: Optional[dict[str, Any]] = None
+    new_value: Optional[dict[str, Any]] = None
+    occurred_at: datetime
+    recorded_at: datetime
+
+
+class WhatsAppPhoneHealthRead(BaseModel):
+    """Aggregate read for the phone-health card + dashboard widget.
+
+    Carries the live snapshot (quality / tier / restrictions /
+    throughput) plus the 30-day event timeline and a quick-glance
+    derived `recovery_keys[]` list the UI uses to render the recovery
+    checklist when quality is degraded."""
+
+    phone_id: str
+    display_phone_number: str
+    verified_name: Optional[str] = None
+    quality_rating: WhatsAppQualityRating = "UNKNOWN"
+    messaging_limit_tier: Optional[str] = None
+    tier_label: Optional[str] = None
+    name_status: Optional[str] = None
+    throughput: Optional[int] = None
+    restrictions: list[dict[str, Any]] = Field(default_factory=list)
+    health_synced_at: Optional[datetime] = None
+    daily_limit: int = 0
+    used_today: int = 0
+    remaining: int = 0
+    usage_percent: int = 0
+    is_unlimited: bool = False
+    recovery_keys: list[str] = Field(default_factory=list)
+    events: list[WhatsAppPhoneHealthEventRead] = Field(default_factory=list)
+
+
 # --- Business profile editor (whatsapp-platform-upgrade Step 11) ----
 
 
@@ -472,6 +522,9 @@ __all__ = [
     "WhatsAppBusinessProfilePatch",
     "WhatsAppBusinessProfileRead",
     "WhatsAppBusinessVertical",
+    "WhatsAppPhoneHealthEventRead",
+    "WhatsAppPhoneHealthRead",
+    "WhatsAppQualityRating",
     "WhatsAppTemplateButton",
     "WhatsAppTemplateButtonType",
     "WhatsAppTemplateCategory",

@@ -59,6 +59,10 @@ from src.app.core.integrations.whatsapp.business_profile import (
     update_profile as bp_update_profile,
     upload_picture as bp_upload_picture,
 )
+from src.app.core.integrations.whatsapp.health_service import (
+    get_phone_health,
+    refresh_from_meta as health_refresh_from_meta,
+)
 from src.app.core.integrations.whatsapp.embedded_signup import (
     EmbeddedSignupNotConfigured,
     complete_embedded_signup,
@@ -72,6 +76,7 @@ from src.app.core.integrations.whatsapp.schemas import (
     EmbeddedSignupExchangeOut,
     WhatsAppBusinessProfilePatch,
     WhatsAppBusinessProfileRead,
+    WhatsAppPhoneHealthRead,
     WhatsAppCapacityOut,
     WhatsAppConnectIn,
     WhatsAppStatusOut,
@@ -431,6 +436,54 @@ async def business_profile_picture_endpoint(
             status_code=exc.http_status, detail=exc.user_message
         )
     return _config_to_profile_out(config)
+
+
+# --- Phone health (whatsapp-platform-upgrade Step 12) -------------------
+
+
+@router.get(
+    "/phone-health",
+    response_model=WhatsAppPhoneHealthRead,
+)
+async def phone_health_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("campaigns.read")),
+) -> WhatsAppPhoneHealthRead:
+    """Phone-health snapshot + 30-day event timeline. Read-gated on
+    `campaigns.read` (same as the capacity banner) so any campaign-
+    author can see the card.
+
+    The hourly Celery task keeps the snapshot fresh; this endpoint
+    just reads. The cache may be stale for up to an hour — the UI
+    shows `health_synced_at` so the operator knows."""
+    try:
+        payload = await get_phone_health(db)
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+    return WhatsAppPhoneHealthRead(**payload)
+
+
+@router.post(
+    "/phone-health/refresh",
+    response_model=WhatsAppPhoneHealthRead,
+)
+async def phone_health_refresh_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("campaigns.read")),
+) -> WhatsAppPhoneHealthRead:
+    """Force-pull fresh health values from Meta. The hourly cron is
+    the routine path; this endpoint is the operator's "I just acted
+    on a recovery suggestion, refresh now" affordance."""
+    try:
+        await health_refresh_from_meta(db)
+        payload = await get_phone_health(db)
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+    return WhatsAppPhoneHealthRead(**payload)
 
 
 # --- Capacity (Step 3.5.16) ----------------------------------------------

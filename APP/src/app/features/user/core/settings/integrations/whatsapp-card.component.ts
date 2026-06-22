@@ -81,6 +81,7 @@ import {
   EmbeddedSignupCancelled,
   WhatsAppFbSdkService,
 } from './whatsapp-fb-sdk.service';
+import { PhoneHealthCardComponent } from '../../whatsapp/phone-health/phone-health-card.component';
 
 
 interface WhatsAppConnectForm {
@@ -98,7 +99,12 @@ interface WhatsAppConnectForm {
   selector: 'app-whatsapp-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, LucideAngularModule, ReactiveFormsModule],
+  imports: [
+    DatePipe,
+    LucideAngularModule,
+    ReactiveFormsModule,
+    PhoneHealthCardComponent,
+  ],
   templateUrl: './whatsapp-card.component.html',
 })
 export class WhatsAppCardComponent {

@@ -1,7 +1,7 @@
 # Step 12 — Phone health & quality dashboard
 
 **Goal:** Surface WhatsApp phone-number health (quality rating, messaging limit tier, restrictions, throughput, verified name status) on the Integrations page + a dashboard widget. Customer reacts to drops before Meta suspends.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Phase 1 webhook subscriptions (`phone_number_quality_update` event subscribed in Step 1).
 
 ---

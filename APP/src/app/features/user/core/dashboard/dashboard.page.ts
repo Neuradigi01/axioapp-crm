@@ -18,6 +18,7 @@ import { DashboardKpiTileComponent } from './shared/dashboard-kpi-tile.component
 import { FunnelChartComponent } from './widgets/funnel-chart.component';
 import { QuickActionsComponent } from './widgets/quick-actions.component';
 import { TrendChartComponent } from './widgets/trend-chart.component';
+import { WhatsAppHealthWidgetComponent } from './widgets/whatsapp-health-widget.component';
 
 interface DashboardCard {
   key: string;
@@ -86,6 +87,7 @@ interface DashboardSummary {
     DashboardDateRangeComponent,
     DashboardKpiTileComponent,
     QuickActionsComponent,
+    WhatsAppHealthWidgetComponent,
     TrendChartComponent,
     FunnelChartComponent,
   ],
