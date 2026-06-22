@@ -1,23 +1,26 @@
+from __future__ import annotations
+
+import base64
 import random
 import string
 import time
-import base64
 from io import BytesIO
+
 import httpx
 from captcha.image import ImageCaptcha
-from src.utilities.fernet_util import fernet
+
 from config import RECAPTCHA_SECRET_KEY
+from src.utilities.fernet_util import fernet
 
 ALLOWED_CHARS = "".join(
-    c for c in string.ascii_uppercase + string.digits
-    if c not in "0OIl1"
+    c for c in string.ascii_uppercase + string.digits if c not in "0OIl1"
 )
 CAPTCHA_LENGTH = 5
 CAPTCHA_EXPIRY_SECONDS = 60
 RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
 
 
-def generate_captcha() -> dict:
+def generate_captcha() -> dict[str, str]:
     answer = "".join(random.choices(ALLOWED_CHARS, k=CAPTCHA_LENGTH))
 
     image_captcha = ImageCaptcha(width=280, height=90)
@@ -28,7 +31,6 @@ def generate_captcha() -> dict:
     base64_image = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
     token = fernet.encrypt(f"{answer}|{int(time.time())}")
-
     return {"image": base64_image, "token": token}
 
 
@@ -40,9 +42,7 @@ def verify_captcha(token: str, answer: str) -> bool:
             return False
 
         original_answer, timestamp_str = parts
-        timestamp = int(timestamp_str)
-
-        if int(time.time()) - timestamp > CAPTCHA_EXPIRY_SECONDS:
+        if int(time.time()) - int(timestamp_str) > CAPTCHA_EXPIRY_SECONDS:
             return False
 
         return answer.strip().upper() == original_answer.upper()
@@ -57,7 +57,6 @@ async def verify_recaptcha(token: str) -> bool:
                 RECAPTCHA_VERIFY_URL,
                 data={"secret": RECAPTCHA_SECRET_KEY, "response": token},
             )
-            result = response.json()
-            return result.get("success", False)
+            return bool(response.json().get("success", False))
     except Exception:
         return False
