@@ -4,7 +4,8 @@ from src.core.logger import logger
 from src.core.security.password import hash_password
 from src.models.user import UserLogin, UserInfo
 from src.data_access import user_da, admin_da
-from src.providers import email_provider, captcha_provider
+from src.providers import email_provider
+from src.app.shared.providers import captcha as captcha_provider
 from src.services.security.verification_service import validate_otp_token, send_post_registration_verification
 from src.schemas.auth import RegisterRequest
 from src.constants import messages

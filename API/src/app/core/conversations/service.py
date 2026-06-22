@@ -138,6 +138,7 @@ async def send_outbound(
     text_body: str,
     attachments: list[dict[str, Any]],
     interactive: dict[str, Any] | None = None,
+    reply_to_message_id: uuid.UUID | None = None,
 ) -> Message:
     conv = await get_conversation(session, conversation_id)
     # WhatsApp goes through the per-org resolver (Step 3.5.3) — it
@@ -157,6 +158,27 @@ async def send_outbound(
             "conversations."
         )
 
+    # Step 7: resolve the reply target to a channel-side wamid the
+    # adapter can put inside `context.message_id`. Mismatches (wrong
+    # conversation, target has no `channel_message_id` yet because it's
+    # still in flight) raise ValueError → 400.
+    reply_to_wamid: str | None = None
+    if reply_to_message_id is not None:
+        target = (
+            await session.execute(
+                select(Message).where(Message.id == reply_to_message_id)
+            )
+        ).scalar_one_or_none()
+        if target is None or target.conversation_id != conv.id:
+            raise ValueError(
+                "reply_to_message_id does not belong to this conversation."
+            )
+        if not target.channel_message_id:
+            raise ValueError(
+                "Cannot reply to a message that has not been delivered yet."
+            )
+        reply_to_wamid = target.channel_message_id
+
     is_first_outbound = await _is_first_outbound(session, conversation_id)
 
     # Pass `interactive` only when supplied so the registry-based
@@ -169,6 +191,8 @@ async def send_outbound(
     }
     if interactive is not None:
         send_kwargs["interactive"] = interactive
+    if reply_to_wamid is not None:
+        send_kwargs["reply_to_channel_message_id"] = reply_to_wamid
     ref = await adapter.send(**send_kwargs)
     now = datetime.now(timezone.utc)
     sent_at = ref.sent_at or now
@@ -181,6 +205,7 @@ async def send_outbound(
         text=text_body,
         attachments=attachments,
         interactive_payload=interactive,
+        reply_to_message_id=reply_to_message_id,
         channel_message_id=ref.channel_message_id,
         payload={"adapter_ref": ref.channel_message_id},
         sent_at=sent_at,
@@ -224,7 +249,13 @@ async def receive_webhook(
     *,
     channel: ConversationChannel,
     payload: dict[str, Any],
-) -> Message:
+) -> Message | None:
+    """Process an inbound webhook event.
+
+    Returns the persisted `Message` row for text/media inbound events.
+    Returns `None` when the event was a reaction (Step 7) — those don't
+    create a new row, they patch the target message's `reactions` JSONB
+    in-place. The router still responds 202 in both cases."""
     adapter = resolve(channel)
     parsed: InboundMessage = adapter.parse_webhook(payload)
 
@@ -233,12 +264,50 @@ async def receive_webhook(
     )
     sent_at = parsed.sent_at or datetime.now(timezone.utc)
 
+    # Step 7: reaction events short-circuit. Locate the target message
+    # (by its wamid) and mutate its `reactions` JSONB. No new row, no
+    # unread bump, no notification — matches WhatsApp's UX where
+    # reactions don't surface as fresh messages in the recipient's
+    # inbox count.
+    if parsed.reaction is not None:
+        await _apply_inbound_reaction(
+            session,
+            conversation_id=conv.id,
+            target_wamid=parsed.reaction["target_channel_message_id"],
+            emoji=parsed.reaction.get("emoji") or "",
+            reactor_external_id=parsed.reaction.get("reactor_external_id"),
+            event_time=sent_at,
+        )
+        await session.commit()
+        return None
+
+    # Step 7: resolve the quoted-reply target back to our UUID by
+    # looking up the wamid on `Message.channel_message_id`. If we don't
+    # find it (e.g. the original was sent before this conversation was
+    # attached to our system), leave `reply_to_message_id` NULL but
+    # keep the rest of the inbound row — the frontend renders "Replied
+    # to an earlier message" without the snippet.
+    reply_to_uuid: uuid.UUID | None = None
+    if parsed.reply_to_channel_message_id:
+        target = (
+            await session.execute(
+                select(Message).where(
+                    Message.channel_message_id
+                    == parsed.reply_to_channel_message_id,
+                    Message.conversation_id == conv.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if target is not None:
+            reply_to_uuid = target.id
+
     msg = Message(
         org_id=conv.org_id,
         conversation_id=conv.id,
         direction=MessageDirection.in_,
         text=parsed.text,
         attachments=parsed.attachments,
+        reply_to_message_id=reply_to_uuid,
         channel_message_id=parsed.channel_message_id,
         payload=parsed.raw,
         sent_at=sent_at,
@@ -263,6 +332,119 @@ async def receive_webhook(
             },
         )
     return msg
+
+
+async def react_to_message(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    user_id: uuid.UUID,
+    emoji: str | None,
+) -> Message:
+    """Outbound reaction (whatsapp-platform-upgrade Step 7).
+
+    Calls the channel adapter's `send_reaction`, then applies the
+    reactor's emoji to the target message's `reactions` JSONB locally:
+
+      * `emoji=None|""` removes any existing reaction by this user.
+      * Otherwise replaces (Meta enforces one reaction per user per
+        message; we mirror that constraint).
+
+    Returns the updated target `Message`. Raises `ValueError` (→ 400)
+    if the message doesn't belong to the conversation, has no
+    `channel_message_id` yet, or the channel isn't WhatsApp."""
+    conv = await get_conversation(session, conversation_id)
+    if conv.channel != ConversationChannel.whatsapp:
+        raise ValueError(
+            "Reactions are only supported on WhatsApp conversations."
+        )
+
+    target = (
+        await session.execute(
+            select(Message).where(Message.id == message_id)
+        )
+    ).scalar_one_or_none()
+    if target is None or target.conversation_id != conv.id:
+        raise ValueError(
+            "message_id does not belong to this conversation."
+        )
+    if not target.channel_message_id:
+        raise ValueError(
+            "Cannot react to a message that has not been delivered yet."
+        )
+
+    adapter = await resolve_whatsapp_adapter(session)
+    await adapter.send_reaction(
+        external_id=conv.external_id,
+        target_channel_message_id=target.channel_message_id,
+        emoji=emoji,
+    )
+
+    now = datetime.now(timezone.utc)
+    target.reactions = _merge_reaction(
+        list(target.reactions or []),
+        actor=str(user_id),
+        emoji=emoji,
+        ts=now,
+    )
+    await session.commit()
+    await session.refresh(target)
+    return target
+
+
+def _merge_reaction(
+    existing: list[dict[str, Any]],
+    *,
+    actor: str,
+    emoji: str | None,
+    ts: datetime,
+) -> list[dict[str, Any]]:
+    """Replace `actor`'s entry in `existing`; empty `emoji` removes it.
+
+    The list stays at most one entry per `actor` — WhatsApp's
+    one-reaction-per-user-per-message rule mirrored locally so the
+    frontend doesn't have to re-coalesce on render."""
+    rest = [r for r in existing if r.get("actor") != actor]
+    if not emoji:
+        return rest
+    rest.append(
+        {"actor": actor, "emoji": emoji, "ts": ts.isoformat()}
+    )
+    return rest
+
+
+async def _apply_inbound_reaction(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    target_wamid: str,
+    emoji: str,
+    reactor_external_id: str | None,
+    event_time: datetime,
+) -> None:
+    """Apply an inbound reaction event to the target message's
+    `reactions` JSONB. Silent no-op when the target wamid doesn't
+    match any of our message rows — Meta occasionally replays old
+    reactions for messages we never persisted (e.g. sent through a
+    different system)."""
+    target = (
+        await session.execute(
+            select(Message).where(
+                Message.channel_message_id == target_wamid,
+                Message.conversation_id == conversation_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if target is None:
+        return
+    actor = reactor_external_id or "external"
+    target.reactions = _merge_reaction(
+        list(target.reactions or []),
+        actor=actor,
+        emoji=emoji,
+        ts=event_time,
+    )
 
 
 async def patch_conversation(
@@ -403,6 +585,7 @@ __all__ = [
     "list_conversations",
     "list_messages",
     "patch_conversation",
+    "react_to_message",
     "receive_webhook",
     "send_outbound",
 ]

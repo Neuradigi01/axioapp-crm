@@ -60,15 +60,19 @@
           [staffById]="staffById()"
           (toggleAi)="onToggleAi($event)"
           (reassign)="openReassign()"
+          (replyTo)="onReplyTo($event)"
+          (react)="onReact($event)"
         />
         <app-compose-bar
           [aiHandling]="conv.ai_handling"
           [channel]="conv.channel"
           [contactId]="conv.contact_id"
+          [replyingTo]="replyingTo()"
           (send)="onSendText($event)"
           (sendMedia)="onSendMedia($event)"
           (openInteractive)="openInteractive()"
           (toggleAi)="onToggleAi($event)"
+          (clearReply)="onClearReply()"
         />
         <app-interactive-builder
           [open]="interactiveOpen()"

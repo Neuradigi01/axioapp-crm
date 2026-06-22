@@ -30,8 +30,10 @@ from src.app.core.auth.schemas import (
     RefreshResponse,
     RegisterRequest,
     RegisterResponse,
+    TwoFactorChallengeResponse,
 )
 from src.app.core.auth.tokens import ACCESS_TOKEN_TTL, TokenClaims, encode_token
+from src.app.core.auth.two_factor import service as two_factor_service
 from src.app.core.packs.installer import install as install_pack
 from src.app.core.packs.loader import PackLoadError, load_pack
 from src.app.core.packs.service import get_catalog
@@ -110,9 +112,11 @@ async def login(
     email: str,
     password: str,
     org_slug: str | None,
+    two_factor_code: str | None = None,
+    two_factor_method: str | None = None,
     ip: str | None = None,
     ua: str | None = None,
-) -> LoginResponse:
+) -> LoginResponse | TwoFactorChallengeResponse:
     invalid = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid credentials",
@@ -147,6 +151,32 @@ async def login(
             ua=ua,
         )
         raise invalid
+
+    # 2FA gate. When `two_factor_enabled` is true on the user's
+    # `tbl_user_login` row, this either returns a challenge (no code yet)
+    # or raises 401 (bad code). On success / 2FA disabled it returns None
+    # and we continue to mint the token.
+    challenge = await two_factor_service.enforce_at_login(
+        db,
+        member_id=user.id,
+        email=user.info.email if user.info else None,
+        mobile=user.info.mobile_no if user.info else None,
+        submitted_code=two_factor_code,
+        submitted_method=two_factor_method,
+    )
+    if challenge is not None:
+        await audit.log(
+            "auth.login.2fa_challenge",
+            org_id=org.id,
+            user_id=user.legacy_uuid,
+            after={"method": challenge.method},
+            ip=ip,
+            ua=ua,
+        )
+        return TwoFactorChallengeResponse(
+            method=challenge.method,
+            available_methods=challenge.available_methods,
+        )
 
     token_id = uuid.uuid4()
     now = datetime.now(timezone.utc)

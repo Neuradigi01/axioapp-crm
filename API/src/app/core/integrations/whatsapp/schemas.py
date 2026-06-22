@@ -11,11 +11,12 @@ leaves the server.
 """
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.app.shared.schemas import ORMModel
 
@@ -128,10 +129,11 @@ WhatsAppTemplateHeaderType = Literal[
 class WhatsAppTemplateRead(ORMModel):
     """Row projection for `GET /api/v1/integrations/whatsapp/templates`.
 
-    Used by the Settings UI template list (Step 3.5.4) and the campaign
-    create-modal picker (Step 3.5.5). `variable_count` lets the picker
-    render the right number of variable-binding inputs without parsing
-    the body."""
+    Used by the Settings UI template list (Step 3.5.4), the campaign
+    create-modal picker (Step 3.5.5), and the management surface
+    introduced in Step 8 (CRUD + submit). `variable_count` lets the
+    picker render the right number of variable-binding inputs without
+    parsing the body."""
 
     id: uuid.UUID
     name: str
@@ -144,7 +146,338 @@ class WhatsAppTemplateRead(ORMModel):
     footer_text: Optional[str] = None
     variable_count: int
     meta_template_id: Optional[str] = None
+    # whatsapp-platform-upgrade Step 8 — operator-side lifecycle +
+    # rejection metadata + structured component payload.
+    submission_status: str = "draft"
+    rejection_reason: Optional[str] = None
+    submitted_by_user_id: Optional[uuid.UUID] = None
+    submitted_at: Optional[datetime] = None
+    body_components: Optional[list[dict[str, Any]]] = None
     last_synced_at: datetime
+
+
+# --- Template management (whatsapp-platform-upgrade Step 8) ----------
+#
+# Meta-published limits the schema enforces at the boundary. These
+# match developers.facebook.com/docs/whatsapp/business-management-api
+# /message-templates limits as of API v19.0; tighten when Meta tightens.
+
+
+_TEMPLATE_BODY_MAX = 1024
+_TEMPLATE_HEADER_TEXT_MAX = 60
+_TEMPLATE_FOOTER_MAX = 60
+_TEMPLATE_BUTTON_TITLE_MAX = 25
+_TEMPLATE_BUTTON_URL_MAX = 2000
+_TEMPLATE_BUTTON_PHONE_MAX = 20
+_TEMPLATE_BUTTONS_MAX = 10  # Meta allows up to 10 mixed buttons
+_TEMPLATE_NAME_RE = re.compile(r"^[a-z0-9_]+$")
+
+WhatsAppTemplateButtonType = Literal["QUICK_REPLY", "URL", "PHONE_NUMBER"]
+
+
+class WhatsAppTemplateButton(BaseModel):
+    """One button entry inside ``body_components`` BUTTONS row.
+
+    Meta supports three kinds — quick-reply (the recipient taps to
+    send the title text back as a webhook reply), URL (opens a link),
+    and phone-number (opens dialer). A single template can mix URL
+    and PHONE_NUMBER call-to-action buttons OR have a quick-reply
+    pack — never both per Meta's spec; the parent ``body_components``
+    validator enforces the rule."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    type: WhatsAppTemplateButtonType
+    text: str = Field(min_length=1, max_length=_TEMPLATE_BUTTON_TITLE_MAX)
+    url: Optional[str] = Field(
+        default=None,
+        max_length=_TEMPLATE_BUTTON_URL_MAX,
+        pattern=r"^https?://.+",
+    )
+    phone_number: Optional[str] = Field(
+        default=None, max_length=_TEMPLATE_BUTTON_PHONE_MAX
+    )
+
+    @model_validator(mode="after")
+    def _check_button_payload(self) -> "WhatsAppTemplateButton":
+        if self.type == "URL" and not self.url:
+            raise ValueError("URL buttons require a `url`.")
+        if self.type == "PHONE_NUMBER" and not self.phone_number:
+            raise ValueError(
+                "PHONE_NUMBER buttons require a `phone_number`."
+            )
+        if self.type == "QUICK_REPLY" and (self.url or self.phone_number):
+            raise ValueError(
+                "QUICK_REPLY buttons must not carry url / phone_number."
+            )
+        return self
+
+
+class WhatsAppTemplateUpsert(BaseModel):
+    """Body of ``POST /api/v1/whatsapp/templates`` (create draft) and
+    ``PATCH /{id}`` (edit while draft/rejected).
+
+    Meta enforces the validation rules below at submit-time; we
+    apply them at create + edit time so the UI catches mistakes
+    before they reach Meta. ``variable_count`` is derived from the
+    ``{{n}}`` placeholders in ``body`` — the service computes it,
+    not the client."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=512, pattern=r"^[a-z0-9_]+$")
+    language: str = Field(min_length=2, max_length=16)
+    category: Literal["MARKETING", "UTILITY", "AUTHENTICATION"]
+    body: str = Field(min_length=1, max_length=_TEMPLATE_BODY_MAX)
+    header_type: Optional[Literal["TEXT", "IMAGE", "VIDEO", "DOCUMENT"]] = None
+    header_text: Optional[str] = Field(
+        default=None, max_length=_TEMPLATE_HEADER_TEXT_MAX
+    )
+    footer_text: Optional[str] = Field(
+        default=None, max_length=_TEMPLATE_FOOTER_MAX
+    )
+    buttons: list[WhatsAppTemplateButton] = Field(
+        default_factory=list, max_length=_TEMPLATE_BUTTONS_MAX
+    )
+
+    @model_validator(mode="after")
+    def _check_buttons_and_header(self) -> "WhatsAppTemplateUpsert":
+        # TEXT header carries `header_text`; media headers (IMAGE /
+        # VIDEO / DOCUMENT) come with a sample asset attached at
+        # submit-time and don't carry text. Reject the mismatch early.
+        if self.header_type == "TEXT" and not self.header_text:
+            raise ValueError(
+                "TEXT header requires `header_text`."
+            )
+        if self.header_type not in (None, "TEXT") and self.header_text:
+            raise ValueError(
+                "Media headers (IMAGE/VIDEO/DOCUMENT) don't take "
+                "`header_text` — supply a sample asset at submit time."
+            )
+
+        # Buttons: mixing quick-reply with CTA isn't allowed (Meta spec).
+        kinds = {b.type for b in self.buttons}
+        if "QUICK_REPLY" in kinds and len(kinds) > 1:
+            raise ValueError(
+                "Quick-reply buttons cannot be mixed with URL or "
+                "phone-number buttons in the same template."
+            )
+        return self
+
+
+class WhatsAppTemplateSubmissionOut(BaseModel):
+    """Response shape for ``POST /templates/{id}/submit``.
+
+    Returns the row's new status + the Meta-side template id so the UI
+    can swap state without a follow-up fetch. ``meta_status`` is the
+    raw Meta value (``PENDING`` immediately after submit; ``APPROVED`` /
+    ``REJECTED`` once the webhook lands)."""
+
+    id: uuid.UUID
+    submission_status: str
+    meta_template_id: Optional[str] = None
+    meta_status: Optional[str] = None
+
+
+# --- Per-template performance (whatsapp-platform-upgrade Step 10) ----
+
+
+class WhatsAppTemplateDailyBucket(BaseModel):
+    """One day-grain bucket on the performance line chart."""
+
+    date: str
+    sent: int
+    delivered: int
+    read: int
+    failed: int
+
+
+class WhatsAppTemplateFailureGroup(BaseModel):
+    """One grouped failure reason on the breakdown table.
+
+    `bucket` is a stable machine key (``rate_limited`` / ``opted_out``
+    / ``invalid_number`` / ``template_paused`` / ``other``); `label`
+    is the operator-facing string."""
+
+    bucket: str
+    label: str
+    count: int
+
+
+# --- Phone health (whatsapp-platform-upgrade Step 12) ---------------
+
+
+WhatsAppQualityRating = Literal["GREEN", "YELLOW", "RED", "UNKNOWN"]
+
+
+class WhatsAppPhoneHealthEventRead(BaseModel):
+    """One timeline-chart point. `occurred_at` is the wall-clock from
+    Meta (or now() for events we wrote without a Meta timestamp).
+    `old_value` / `new_value` are the diff shape — the UI surfaces
+    the verbatim values in the tooltip."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    phone_id: str
+    event_type: str
+    old_value: Optional[dict[str, Any]] = None
+    new_value: Optional[dict[str, Any]] = None
+    occurred_at: datetime
+    recorded_at: datetime
+
+
+class WhatsAppPhoneHealthRead(BaseModel):
+    """Aggregate read for the phone-health card + dashboard widget.
+
+    Carries the live snapshot (quality / tier / restrictions /
+    throughput) plus the 30-day event timeline and a quick-glance
+    derived `recovery_keys[]` list the UI uses to render the recovery
+    checklist when quality is degraded."""
+
+    phone_id: str
+    display_phone_number: str
+    verified_name: Optional[str] = None
+    quality_rating: WhatsAppQualityRating = "UNKNOWN"
+    messaging_limit_tier: Optional[str] = None
+    tier_label: Optional[str] = None
+    name_status: Optional[str] = None
+    throughput: Optional[int] = None
+    restrictions: list[dict[str, Any]] = Field(default_factory=list)
+    health_synced_at: Optional[datetime] = None
+    daily_limit: int = 0
+    used_today: int = 0
+    remaining: int = 0
+    usage_percent: int = 0
+    is_unlimited: bool = False
+    recovery_keys: list[str] = Field(default_factory=list)
+    events: list[WhatsAppPhoneHealthEventRead] = Field(default_factory=list)
+
+
+# --- Business profile editor (whatsapp-platform-upgrade Step 11) ----
+
+
+# Meta-published verticals
+# https://developers.facebook.com/docs/whatsapp/cloud-api/reference
+# /business-profiles#vertical
+WhatsAppBusinessVertical = Literal[
+    "UNDEFINED",
+    "OTHER",
+    "AUTO",
+    "BEAUTY",
+    "APPAREL",
+    "EDU",
+    "ENTERTAIN",
+    "EVENT_PLAN",
+    "FINANCE",
+    "GROCERY",
+    "GOVT",
+    "HOTEL",
+    "HEALTH",
+    "NONPROFIT",
+    "PROF_SERVICES",
+    "RETAIL",
+    "TRAVEL",
+    "RESTAURANT",
+]
+
+
+class WhatsAppBusinessHoursInterval(BaseModel):
+    """One open-close interval within a single day. Times are local
+    to the operator (timezone display is the page's concern, not the
+    schema's). Stored as ``HH:MM`` strings rather than time objects
+    so the JSONB shape is human-readable and JSON-clean."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    open: str = Field(pattern=r"^\d{2}:\d{2}$")
+    close: str = Field(pattern=r"^\d{2}:\d{2}$")
+
+
+class WhatsAppBusinessHoursDay(BaseModel):
+    """One day's schedule. `day` is 0..6 (Monday..Sunday, ISO style).
+    Closed days emit an empty `intervals` list. Multiple intervals per
+    day support split-shift schedules (e.g. 10:00-13:00 + 17:00-21:00)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    day: int = Field(ge=0, le=6)
+    intervals: list[WhatsAppBusinessHoursInterval] = Field(default_factory=list)
+
+
+class WhatsAppBusinessProfilePatch(BaseModel):
+    """Body of ``PATCH /api/v1/integrations/whatsapp/business-profile``.
+
+    Every field optional — only supplied fields are pushed to Meta.
+    Field length / format caps match Meta's documented limits +
+    `tbl_whatsapp_account_configs` column widths. Websites are capped
+    at 2 entries per Meta's spec."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    about: Optional[str] = Field(default=None, max_length=139)
+    description: Optional[str] = Field(default=None, max_length=512)
+    address: Optional[str] = Field(default=None, max_length=256)
+    email: Optional[str] = Field(default=None, max_length=128)
+    websites: Optional[list[str]] = Field(default=None, max_length=2)
+    vertical: Optional[WhatsAppBusinessVertical] = None
+    # Core-CRM-only fields. Stored verbatim; Step 16 reads them.
+    business_hours: Optional[list[WhatsAppBusinessHoursDay]] = None
+    greeting_message: Optional[str] = Field(default=None, max_length=4096)
+    away_message: Optional[str] = Field(default=None, max_length=4096)
+
+
+class WhatsAppBusinessProfileRead(BaseModel):
+    """Response shape for ``GET /api/v1/integrations/whatsapp/business-profile``.
+
+    Carries every field the editor needs to render (Meta-side profile
+    + CRM-side hours + greeting/away) plus `last_synced_at` so the UI
+    can warn when the row is stale."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    phone_id: str
+    display_phone_number: str
+    verified_name: Optional[str] = None
+    about: Optional[str] = None
+    description: Optional[str] = None
+    address: Optional[str] = None
+    email: Optional[str] = None
+    websites: list[str] = Field(default_factory=list)
+    vertical: Optional[str] = None
+    profile_picture_url: Optional[str] = None
+    last_synced_at: Optional[datetime] = None
+    business_hours: list[WhatsAppBusinessHoursDay] = Field(default_factory=list)
+    greeting_message: Optional[str] = None
+    away_message: Optional[str] = None
+
+
+class WhatsAppTemplatePerformanceOut(BaseModel):
+    """Response shape for ``GET /templates/{id}/performance?range=...``.
+
+    Empty-state friendly — counts default to zero; `daily` and
+    `failures` may be empty lists when the template has never been
+    sent inside the range."""
+
+    template_id: uuid.UUID
+    range_key: Literal["7d", "30d", "90d"]
+    range_start: datetime
+    range_end: datetime
+
+    sent: int
+    delivered: int
+    read: int
+    replied: int
+    click_through: int
+    failed: int
+
+    delivery_rate: float
+    read_rate: float
+    reply_rate: float
+
+    daily: list[WhatsAppTemplateDailyBucket] = Field(default_factory=list)
+    failures: list[WhatsAppTemplateFailureGroup] = Field(default_factory=list)
+    used_in_campaigns: int = 0
 
 
 class WhatsAppTemplateSyncOut(BaseModel):
@@ -184,9 +517,24 @@ __all__ = [
     "WhatsAppConnectIn",
     "WhatsAppIntegrationStatus",
     "WhatsAppStatusOut",
+    "WhatsAppBusinessHoursDay",
+    "WhatsAppBusinessHoursInterval",
+    "WhatsAppBusinessProfilePatch",
+    "WhatsAppBusinessProfileRead",
+    "WhatsAppBusinessVertical",
+    "WhatsAppPhoneHealthEventRead",
+    "WhatsAppPhoneHealthRead",
+    "WhatsAppQualityRating",
+    "WhatsAppTemplateButton",
+    "WhatsAppTemplateButtonType",
     "WhatsAppTemplateCategory",
+    "WhatsAppTemplateDailyBucket",
+    "WhatsAppTemplateFailureGroup",
     "WhatsAppTemplateHeaderType",
+    "WhatsAppTemplatePerformanceOut",
     "WhatsAppTemplateRead",
     "WhatsAppTemplateStatus",
+    "WhatsAppTemplateSubmissionOut",
     "WhatsAppTemplateSyncOut",
+    "WhatsAppTemplateUpsert",
 ]

@@ -360,6 +360,29 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // whatsapp-platform-upgrade Step 9 — template builder UI.
+        // Read-gated; write + submit affordances inside are hidden
+        // per-role by the page component (junior sales sees the
+        // table but no Create / Edit / Submit buttons).
+        path: 'whatsapp/templates',
+        canActivate: [permissionGuard('whatsapp.templates.read')],
+        loadComponent: () =>
+          import(
+            './core/whatsapp/templates/whatsapp-templates.page'
+          ).then((m) => m.WhatsAppTemplatesPageComponent),
+      },
+      {
+        // whatsapp-platform-upgrade Step 11 — business profile editor.
+        // Single permission key gates the whole page (the editor is
+        // admin-grade — junior roles get no useful read-only view).
+        path: 'whatsapp/business-profile',
+        canActivate: [permissionGuard('whatsapp.business_profile.manage')],
+        loadComponent: () =>
+          import(
+            './core/whatsapp/business-profile/business-profile.page'
+          ).then((m) => m.WhatsAppBusinessProfilePageComponent),
+      },
+      {
         path: 'calls',
         loadComponent: () =>
           import('./core/calls/call-center.page').then(

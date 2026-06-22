@@ -18,17 +18,45 @@ to one sidecar per integration row.
 """
 from __future__ import annotations
 
+import enum
 import re
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Text, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, text
+from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
+
+
+class WhatsAppTemplateSubmissionStatus(str, enum.Enum):
+    """Operator-side lifecycle for a WhatsApp template
+    (whatsapp-platform-upgrade Step 8).
+
+    Distinct from the legacy ``status`` column, which carries Meta's
+    raw status text verbatim. The two coexist: ``status`` reflects
+    what Meta last told us; ``submission_status`` reflects what the
+    operator did in the CRM. They diverge during the brief window
+    between a Submit click and the next ``message_template_status_update``
+    webhook (status='PENDING' / submission_status='pending_review')."""
+
+    draft = "draft"
+    pending_review = "pending_review"
+    approved = "approved"
+    rejected = "rejected"
+    paused = "paused"
+    disabled = "disabled"
+
+
+whatsapp_template_submission_status_enum = ENUM(
+    WhatsAppTemplateSubmissionStatus,
+    name="whatsapp_template_submission_status",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
 
 
 _VARIABLE_RE = re.compile(r"\{\{(\d+)\}\}")
@@ -85,6 +113,70 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     tier_synced_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # whatsapp-platform-upgrade Step 12 — phone health snapshot.
+    # Cached per hourly refresh by `health_service.refresh_from_meta`.
+    # `health_synced_at` lets the UI render staleness; the event log
+    # in `tbl_whatsapp_phone_health_events` carries the timeline of
+    # changes.
+    quality_rating: Mapped[Optional[str]] = mapped_column(
+        String(length=16), nullable=True
+    )
+    name_status: Mapped[Optional[str]] = mapped_column(
+        String(length=32), nullable=True
+    )
+    throughput: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True
+    )
+    restrictions: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    health_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # whatsapp-platform-upgrade Step 11 — Meta Business profile editor.
+    # Mirrors the `whatsapp_business_profile` Graph endpoint shape;
+    # populated by `business_profile.refresh_from_meta` on first open
+    # and on the operator-side Refresh button.
+    profile_about: Mapped[Optional[str]] = mapped_column(
+        String(length=139), nullable=True
+    )
+    profile_description: Mapped[Optional[str]] = mapped_column(
+        String(length=512), nullable=True
+    )
+    profile_address: Mapped[Optional[str]] = mapped_column(
+        String(length=256), nullable=True
+    )
+    profile_email: Mapped[Optional[str]] = mapped_column(
+        String(length=128), nullable=True
+    )
+    profile_websites: Mapped[Optional[list[str]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    profile_vertical: Mapped[Optional[str]] = mapped_column(
+        String(length=64), nullable=True
+    )
+    profile_picture_url: Mapped[Optional[str]] = mapped_column(
+        String(length=512), nullable=True
+    )
+    profile_last_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Day-of-week schedule (storage only — Step 16 reads to decide
+    # whether the away message fires). Shape:
+    #   [{day: 0..6, intervals: [{open: "10:00", close: "19:00"}, …]}]
+    # Day 0 = Monday. Closed days omit intervals.
+    business_hours: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    # Free-text storage for the Step-16 automation. Variable
+    # substitution ({{contact.first_name}} etc.) happens at send time;
+    # Step 11 only persists the template text.
+    greeting_message: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
+    away_message: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -139,6 +231,30 @@ class WhatsAppTemplate(Base, TenantScoped):
     meta_template_id: Mapped[Optional[str]] = mapped_column(
         Text, nullable=True
     )
+    # whatsapp-platform-upgrade Step 8 — structured Meta component
+    # payload. NULL for legacy sync rows (the next sync round repops);
+    # populated on every new draft so we can resubmit verbatim. Each
+    # element is a `{type, format?, text?, buttons?[]}` dict matching
+    # Meta's `/{waba_id}/message_templates` POST shape.
+    body_components: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    submission_status: Mapped[WhatsAppTemplateSubmissionStatus] = (
+        mapped_column(
+            whatsapp_template_submission_status_enum,
+            nullable=False,
+            server_default=text("'draft'"),
+        )
+    )
+    rejection_reason: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
+    submitted_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_synced_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -163,4 +279,65 @@ class WhatsAppTemplate(Base, TenantScoped):
         return sorted({int(m) for m in _VARIABLE_RE.findall(self.body)})
 
 
-__all__ = ["WhatsAppAccountConfig", "WhatsAppTemplate"]
+class WhatsAppPhoneHealthEventType(str, enum.Enum):
+    """Phone-health event-log discriminator
+    (whatsapp-platform-upgrade Step 12)."""
+
+    quality_change = "quality_change"
+    tier_change = "tier_change"
+    name_status_change = "name_status_change"
+    restriction_added = "restriction_added"
+    restriction_lifted = "restriction_lifted"
+
+
+whatsapp_phone_health_event_type_enum = ENUM(
+    WhatsAppPhoneHealthEventType,
+    name="whatsapp_phone_health_event_type",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class WhatsAppPhoneHealthEvent(Base, TenantScoped):
+    """Append-only audit log of phone-health changes.
+
+    Written by the hourly refresh task and the
+    ``phone_number_quality_update`` webhook handler whenever a field
+    moves. `occurred_at` is the wall-clock from Meta's payload (when
+    available) so timeline rendering survives out-of-order webhook
+    delivery. `recorded_at` is the row insert time."""
+
+    __tablename__ = "tbl_whatsapp_phone_health_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    phone_id: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    event_type: Mapped[WhatsAppPhoneHealthEventType] = mapped_column(
+        whatsapp_phone_health_event_type_enum, nullable=False
+    )
+    old_value: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    new_value: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+__all__ = [
+    "WhatsAppAccountConfig",
+    "WhatsAppPhoneHealthEvent",
+    "WhatsAppPhoneHealthEventType",
+    "WhatsAppTemplate",
+    "WhatsAppTemplateSubmissionStatus",
+]

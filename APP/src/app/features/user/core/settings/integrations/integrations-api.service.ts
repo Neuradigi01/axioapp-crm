@@ -619,4 +619,58 @@ export class IntegrationsApiService {
       `${this.base}/whatsapp/capacity`,
     );
   }
+
+  // --- WhatsApp phone health (whatsapp-platform-upgrade Step 12) --
+
+  /** Per-number health snapshot + 30-day event timeline. Drives the
+   *  Phone health card on the Integrations page + the dashboard
+   *  widget. The hourly Celery task keeps the data fresh; this
+   *  endpoint reads the cached row. */
+  getWhatsAppPhoneHealth(): Observable<WhatsAppPhoneHealth> {
+    return this.http.get<WhatsAppPhoneHealth>(
+      `${this.base}/whatsapp/phone-health`,
+    );
+  }
+
+  /** Force-pull fresh health values from Meta — the operator's
+   *  "I just acted on a recovery suggestion, refresh now" affordance. */
+  refreshWhatsAppPhoneHealth(): Observable<WhatsAppPhoneHealth> {
+    return this.http.post<WhatsAppPhoneHealth>(
+      `${this.base}/whatsapp/phone-health/refresh`,
+      {},
+    );
+  }
+}
+
+
+export type WhatsAppQualityRating = 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN';
+
+export interface WhatsAppPhoneHealthEvent {
+  id: string;
+  phone_id: string;
+  event_type: string;
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  occurred_at: string;
+  recorded_at: string;
+}
+
+export interface WhatsAppPhoneHealth {
+  phone_id: string;
+  display_phone_number: string;
+  verified_name: string | null;
+  quality_rating: WhatsAppQualityRating;
+  messaging_limit_tier: string | null;
+  tier_label: string | null;
+  name_status: string | null;
+  throughput: number | null;
+  restrictions: Array<Record<string, unknown>>;
+  health_synced_at: string | null;
+  daily_limit: number;
+  used_today: number;
+  remaining: number;
+  usage_percent: number;
+  is_unlimited: boolean;
+  recovery_keys: string[];
+  events: WhatsAppPhoneHealthEvent[];
 }

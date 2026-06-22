@@ -1,7 +1,7 @@
 # Step 10 — Per-template performance card
 
 **Goal:** Surface per-template metrics (sent / delivered / read / replied / click-through / failed) over selectable time ranges, with failure breakdown. Customer sees which templates perform and which to retire.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 9 (templates UI exists to host the card).
 
 ---

@@ -1,7 +1,8 @@
 # Step 11 — Business profile editor
 
-**Goal:** Customer manages WhatsApp Business profile (display name request, description, address, hours, email, websites, vertical, profile photo) entirely from Core CRM. No more Meta Business Manager trips. Includes business hours editor (Core-side, used by Step 16 automation) and storage for greeting / away message text (wired by Step 16).
-**Status:** Pending
+**Goal:** Customer manages WhatsApp Business profile (display name request, description, address, hours, email, websites, vertical, profile photo) entirely from Core CRM. No more Meta 
+Business Manager trips. Includes business hours editor (Core-side, used by Step 16 automation) and storage for greeting / away message text (wired by Step 16).
+**Status:** COMPLETED
 **Depends on:** Phase 1 complete (connected WABA with manageable token).
 
 ---

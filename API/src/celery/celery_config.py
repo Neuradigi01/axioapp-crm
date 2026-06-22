@@ -98,4 +98,12 @@ beat_schedule = {
         'task': 'src.app.core.email_sequences.tasks.tick_email_sequences',
         'schedule': 60.0,
     },
+    # whatsapp-platform-upgrade Step 12 — hourly per-org phone-health
+    # refresh. One Graph API call per connected org per hour, well
+    # inside Meta's per-token rate limit. Offset to minute=20 so it
+    # doesn't contend with the other hourly sweeps.
+    'whatsapp-phone-health-refresh': {
+        'task': 'src.app.core.integrations.whatsapp.health_tasks.refresh_phone_health_all_orgs',
+        'schedule': crontab(minute=20),
+    },
 }

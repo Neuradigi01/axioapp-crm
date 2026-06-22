@@ -38,6 +38,12 @@ export interface ConversationListResponse {
   size: number;
 }
 
+export interface MessageReaction {
+  actor: string;
+  emoji: string;
+  ts: string;
+}
+
 export interface ConversationMessage {
   id: string;
   org_id: string;
@@ -51,6 +57,15 @@ export interface ConversationMessage {
    *  builder modal emits — the bubble renderer reads it to show button
    *  labels / list rows. */
   interactive_payload: Record<string, unknown> | null;
+  /** UUID of the message this one quotes (Step 7). The thread component
+   *  resolves the snippet by looking up the target id in the local
+   *  thread cache; cross-pagination quotes fall back to "Original
+   *  message". */
+  reply_to_message_id: string | null;
+  /** Reactions applied to THIS message (Step 7). One entry per actor;
+   *  inbound reactions list the reactor's phone, outbound ones list
+   *  the staff user id. */
+  reactions: MessageReaction[];
   channel_message_id: string | null;
   sent_at: string | null;
   delivered_at: string | null;
@@ -99,11 +114,35 @@ export class ConversationsApiService {
     return this.http.get<ConversationDetail>(`${this.base}/${id}`);
   }
 
-  send(id: string, text: string): Observable<ConversationMessage> {
-    return this.http.post<ConversationMessage>(`${this.base}/${id}/messages`, {
-      text,
-      attachments: [],
-    });
+  send(
+    id: string,
+    text: string,
+    replyToMessageId?: string | null,
+  ): Observable<ConversationMessage> {
+    const body: Record<string, unknown> = { text, attachments: [] };
+    if (replyToMessageId) body['reply_to_message_id'] = replyToMessageId;
+    return this.http.post<ConversationMessage>(
+      `${this.base}/${id}/messages`,
+      body,
+    );
+  }
+
+  /**
+   * Add / replace / remove a reaction on a message
+   * (whatsapp-platform-upgrade Step 7). Pass `null` or `''` as
+   * `emoji` to remove the caller's existing reaction — matches
+   * Meta's Cloud-API "empty reaction removes" pattern. Returns the
+   * target message with its updated `reactions` JSONB.
+   */
+  reactToMessage(
+    conversationId: string,
+    messageId: string,
+    emoji: string | null,
+  ): Observable<ConversationMessage> {
+    return this.http.post<ConversationMessage>(
+      `${this.base}/${conversationId}/messages/${messageId}/reactions`,
+      { emoji },
+    );
   }
 
   /**

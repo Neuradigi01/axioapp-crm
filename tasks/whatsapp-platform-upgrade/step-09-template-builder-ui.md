@@ -1,7 +1,7 @@
 # Step 9 — Template builder UI (dedicated page + multi-step wizard)
 
 **Goal:** New dedicated page `/user/whatsapp/templates` with list view + create/edit wizard + live WhatsApp-style preview. Customer creates marketing / utility / authentication templates entirely inside Core CRM and submits for Meta approval without visiting Meta Business Manager.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 8 (backend CRUD + submit endpoint live).
 
 ---

@@ -45,6 +45,15 @@ class InboundMessage:
     WhatsApp phone number); the engine uses it to look up or create
     the matching `Conversation`. The raw envelope is preserved on
     `messages.payload` for debugging.
+
+    `reply_to_channel_message_id` (Step 7) is the channel-side id of
+    the message this one quotes — the engine resolves it back to our
+    UUID via the unique `channel_message_id` index.
+
+    `reaction` (Step 7) is a reaction *event* — when set, the engine
+    does NOT create a new message row; it locates the target message
+    (by `reaction["target_channel_message_id"]`) and applies the
+    reactor's emoji to that row's `reactions` JSONB.
     """
 
     external_id: str
@@ -53,6 +62,8 @@ class InboundMessage:
     channel_message_id: str | None = None
     sent_at: datetime | None = None
     raw: dict[str, Any] = field(default_factory=dict)
+    reply_to_channel_message_id: str | None = None
+    reaction: dict[str, Any] | None = None
 
 
 class ChannelAdapter(Protocol):

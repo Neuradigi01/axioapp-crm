@@ -63,6 +63,14 @@ _CORE_ADMIN_KEYS: list[str] = [
     "calls.read", "calls.write", "calls.outcomes.manage",
     "reviews.read", "reviews.write",
     "campaigns.read", "campaigns.write", "campaigns.send",
+    # whatsapp-platform-upgrade Step 8 — Admin manages templates and
+    # may submit to Meta. Junior roles get `whatsapp.templates.read`
+    # via the picker but not write/submit by default.
+    "whatsapp.templates.read",
+    "whatsapp.templates.write",
+    "whatsapp.templates.submit",
+    # whatsapp-platform-upgrade Step 11 — business profile editor.
+    "whatsapp.business_profile.manage",
     "tasks.read", "tasks.write",
     "pipelines.read", "pipelines.manage", "pipelines.write",
     "activities.read", "activities.write",
@@ -111,6 +119,10 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     "conversations.read", "conversations.write",
     "calls.read", "calls.write",
     "pipelines.read",
+    # whatsapp-platform-upgrade Step 8 — Employees can READ templates
+    # (they use them from compose) but cannot author or submit. Write +
+    # submit stay Admin/Owner per the manager's RBAC spec.
+    "whatsapp.templates.read",
     # Read-only so the dynamic forms on contacts / leads / walk-ins
     # can render their `custom_data` inputs. Mutation of the schema
     # stays Admin+Owner only via `custom_fields.write`.

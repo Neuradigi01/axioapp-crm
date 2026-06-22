@@ -171,6 +171,15 @@
     </div>
   }
 
+  <!-- whatsapp-platform-upgrade Step 12 — phone health strip.
+       Visible only when connected; the card handles its own
+       loading / error / empty states. -->
+  @if (isConnected() && !formExpanded()) {
+    <div class="mt-4">
+      <app-phone-health-card />
+    </div>
+  }
+
   <!-- Action row: top-level CTAs (Test / Reconnect / Disconnect) for
        connected + error states. The disconnected hero CTA above
        replaces what used to live here. -->
