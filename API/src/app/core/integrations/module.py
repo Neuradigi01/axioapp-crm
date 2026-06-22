@@ -20,5 +20,15 @@ MODULE = ModuleDescriptor(
     route="/api/v1/integrations",
     frontend_route="/user/integrations",
     menu_position=900,
-    permissions=["settings.integrations.manage"],
+    permissions=[
+        "settings.integrations.manage",
+        # whatsapp-platform-upgrade Step 8 — template management.
+        # Read is wide (any operator on the Templates page); write
+        # gates draft create/edit/duplicate/delete; submit is the
+        # narrower "ship to Meta" action, defaulted off for junior
+        # roles via the role template defaults.
+        "whatsapp.templates.read",
+        "whatsapp.templates.write",
+        "whatsapp.templates.submit",
+    ],
 )

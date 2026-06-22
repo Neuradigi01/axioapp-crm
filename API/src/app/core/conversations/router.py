@@ -449,11 +449,13 @@ async def _handle_whatsapp_webhook(
     """WhatsApp-specific webhook handler with per-org credential routing.
 
     Sequence:
-      1. Extract `phone_number_id` from the payload's metadata.
+      1. Detect template-status events (route via WABA id) OR extract
+         `phone_number_id` from the payload's metadata.
       2. Look up the org's WhatsApp account config — 404 if unknown.
       3. Verify the X-Hub-Signature-256 with the org's `app_secret`.
       4. Set the tenant context so downstream ORM queries respect RLS.
       5. Dispatch:
+           - `message_template_status_update` field → templates_service
            - `statuses[]` present → update CampaignMessage rows.
            - `messages[]` present → fall through to `receive_webhook`.
     """
@@ -466,8 +468,50 @@ async def _handle_whatsapp_webhook(
     from src.app.core.integrations.crypto import decrypt
     from src.app.core.integrations.whatsapp.connect import (
         find_org_by_phone_id,
+        find_org_by_waba_id,
     )
     from src.app.shared.context import RequestContext, set_context
+
+    # whatsapp-platform-upgrade Step 8 — template status events carry
+    # no `metadata.phone_number_id`. Route by `entry[0].id` (WABA id)
+    # before the phone-id branch.
+    template_event = _extract_template_status_event(payload)
+    if template_event is not None:
+        bundle = await find_org_by_waba_id(
+            db, waba_id=template_event["waba_id"]
+        )
+        if bundle is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    f"no WhatsApp integration found for "
+                    f"waba_id={template_event['waba_id']}"
+                ),
+            )
+        integration, config = bundle
+        _verify_whatsapp_signature(
+            raw=raw,
+            signature_header=request.headers.get("x-hub-signature-256"),
+            config=config,
+            platform_secret=WHATSAPP_APP_SECRET,
+        )
+        set_context(
+            RequestContext(org_id=integration.org_id, user_id=None)
+        )
+        from src.app.core.integrations.whatsapp.templates_service import (
+            apply_template_status_update,
+        )
+
+        applied = await apply_template_status_update(
+            db,
+            org_id=integration.org_id,
+            meta_template_id=template_event.get("message_template_id"),
+            template_name=template_event.get("message_template_name"),
+            language=template_event.get("message_template_language"),
+            event=template_event["event"],
+            reason=template_event.get("reason"),
+        )
+        return {"template_status_applied": applied}
 
     phone_id = _extract_phone_number_id(payload)
     if not phone_id:
@@ -558,3 +602,105 @@ def _extract_phone_number_id(payload: dict[str, Any]) -> str | None:
     except (KeyError, IndexError, TypeError):
         return None
     return None
+
+
+def _extract_template_status_event(
+    payload: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Detect + parse a ``message_template_status_update`` webhook event
+    (whatsapp-platform-upgrade Step 8).
+
+    Meta delivers these alongside inbound messages on the same
+    callback URL; the discriminator is ``entry[0].changes[0].field``.
+    The change's ``value`` carries the template id + status event +
+    optional rejection reason. ``entry[0].id`` is the WABA id (the
+    template routing key — there's no phone-number metadata on these
+    payloads).
+
+    Returns a dict ``{waba_id, event, message_template_id,
+    message_template_name, message_template_language, reason}`` or
+    None when the payload isn't a template-status event."""
+    try:
+        entry = payload["entry"][0]
+        change = entry["changes"][0]
+    except (KeyError, IndexError, TypeError):
+        return None
+    if not isinstance(change, dict):
+        return None
+    if change.get("field") != "message_template_status_update":
+        return None
+    value = change.get("value")
+    if not isinstance(value, dict):
+        return None
+    event = value.get("event")
+    if not isinstance(event, str) or not event:
+        return None
+    return {
+        "waba_id": str(entry.get("id") or "") or None,
+        "event": event,
+        "message_template_id": (
+            str(value["message_template_id"])
+            if value.get("message_template_id") is not None
+            else None
+        ),
+        "message_template_name": (
+            value.get("message_template_name")
+            if isinstance(value.get("message_template_name"), str)
+            else None
+        ),
+        "message_template_language": (
+            value.get("message_template_language")
+            if isinstance(value.get("message_template_language"), str)
+            else None
+        ),
+        "reason": (
+            value.get("reason")
+            if isinstance(value.get("reason"), str)
+            else None
+        ),
+    }
+
+
+def _verify_whatsapp_signature(
+    *,
+    raw: bytes,
+    signature_header: str | None,
+    config: Any,
+    platform_secret: str,
+) -> None:
+    """Verify the ``X-Hub-Signature-256`` header. Raises 403 on
+    mismatch and 500 when neither the env-side platform secret nor the
+    per-org ``app_secret_enc`` is configured.
+
+    Hoisted out of the messages branch so the template-status branch
+    can reuse it; the messages branch still has the same inline check
+    for tests-shaped fidelity. ``config`` is a ``WhatsAppAccountConfig``
+    but typed loose to avoid an import cycle between the conversations
+    router and the integrations package."""
+    from src.app.core.conversations.adapters.whatsapp import WhatsAppAdapter
+    from src.app.core.integrations.crypto import decrypt
+
+    app_secret = platform_secret
+    if not app_secret:
+        if not config.app_secret_enc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "WhatsApp signature secret is not configured for "
+                    "this org and no platform-level WHATSAPP_APP_SECRET "
+                    "is set."
+                ),
+            )
+        app_secret = decrypt(config.app_secret_enc)
+    adapter = WhatsAppAdapter(
+        phone_id=config.phone_id,
+        token="",
+        app_secret=app_secret,
+        verify_token=config.verify_token,
+        api_version=config.api_version,
+    )
+    if not adapter.verify_signature(raw, signature_header):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="invalid webhook signature",
+        )

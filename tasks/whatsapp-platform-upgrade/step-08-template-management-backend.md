@@ -1,7 +1,7 @@
 # Step 8 — Template management backend (CRUD + Meta submit + status sync)
 
 **Goal:** Promote `tbl_whatsapp_templates` from a read-only Meta-sync table to a full Core CRM source-of-truth surface. Backend endpoints for create / edit / submit-for-approval / duplicate / delete templates. Webhook handles approval / rejection status updates.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Phase 1 complete (ES-connected org with token authorized for template management).
 
 ---

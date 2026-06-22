@@ -568,6 +568,38 @@ async def find_org_by_phone_id(
     return integration, config
 
 
+async def find_org_by_waba_id(
+    session: AsyncSession, *, waba_id: str
+) -> Optional[tuple[Integration, WhatsAppAccountConfig]]:
+    """Look up the org owning a given WABA id
+    (whatsapp-platform-upgrade Step 8).
+
+    Used by the ``message_template_status_update`` webhook branch —
+    Meta delivers template-status events with ``entry[0].id`` set to
+    the WABA id (no phone-number metadata in this payload type).
+    Same RLS-bypass rationale as :func:`find_org_by_phone_id`: the
+    webhook arrives without tenant context, the routing key is the
+    Meta id."""
+    from sqlalchemy import text as sql_text
+
+    if not waba_id:
+        return None
+    sql = sql_text(
+        """
+        SELECT c.phone_id
+        FROM tbl_whatsapp_account_configs c
+        WHERE c.waba_id = :waba_id
+        LIMIT 1
+        """
+    )
+    row = (
+        await session.execute(sql, {"waba_id": waba_id})
+    ).mappings().first()
+    if row is None:
+        return None
+    return await find_org_by_phone_id(session, phone_id=row["phone_id"])
+
+
 async def find_org_by_verify_token(
     session: AsyncSession, *, verify_token: str
 ) -> Optional[tuple[Integration, WhatsAppAccountConfig]]:
@@ -606,6 +638,7 @@ __all__ = [
     "disconnect_account",
     "find_org_by_phone_id",
     "find_org_by_verify_token",
+    "find_org_by_waba_id",
     "get_active_config",
     "get_status",
     "test_connection",

@@ -441,6 +441,71 @@ class MetaGraphClient:
             headers={"Authorization": f"Bearer {token}"},
         )
 
+    # ----- 7. submit a draft template for Meta approval -------------------
+    # (whatsapp-platform-upgrade Step 8)
+
+    async def submit_template(
+        self,
+        *,
+        waba_id: str,
+        token: str,
+        name: str,
+        language: str,
+        category: str,
+        components: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """POST a new template draft to ``/{waba_id}/message_templates``.
+
+        Meta validates synchronously: schema errors come back as 400
+        with a specific reason (header too long, mixed buttons, etc.).
+        On success Meta returns ``{id, status, category}`` where
+        ``id`` is the template's permanent Meta-side identifier and
+        ``status`` is the initial value (typically ``PENDING``).
+        Returns the parsed body for the caller to persist."""
+        import json
+
+        body = await self._request(
+            method="POST",
+            url=self._url(f"/{waba_id}/message_templates"),
+            stage="submit_template",
+            data={
+                "name": name,
+                "language": language,
+                "category": category,
+                "components": json.dumps(components),
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        return body
+
+    # ----- 8. delete a template (by name) from Meta ----------------------
+
+    async def delete_template(
+        self,
+        *,
+        waba_id: str,
+        token: str,
+        name: str,
+        meta_template_id: Optional[str] = None,
+    ) -> None:
+        """``DELETE /{waba_id}/message_templates?name=...``.
+
+        Meta deletes ALL languages of a template name unless an
+        ``hsm_id`` is supplied. We pass ``hsm_id=meta_template_id`` so
+        the delete is scoped to the exact row the operator hit Delete
+        on — sibling language rows survive. Idempotent: Meta returns
+        success if the row is already gone."""
+        params: dict[str, str] = {"name": name}
+        if meta_template_id:
+            params["hsm_id"] = meta_template_id
+        await self._request(
+            method="DELETE",
+            url=self._url(f"/{waba_id}/message_templates"),
+            stage="delete_template",
+            params=params,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
 
 def _phone_from_payload(
     payload: dict[str, Any], *, fallback_id: str

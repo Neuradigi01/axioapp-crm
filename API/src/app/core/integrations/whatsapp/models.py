@@ -18,17 +18,45 @@ to one sidecar per integration row.
 """
 from __future__ import annotations
 
+import enum
 import re
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Text, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
+
+
+class WhatsAppTemplateSubmissionStatus(str, enum.Enum):
+    """Operator-side lifecycle for a WhatsApp template
+    (whatsapp-platform-upgrade Step 8).
+
+    Distinct from the legacy ``status`` column, which carries Meta's
+    raw status text verbatim. The two coexist: ``status`` reflects
+    what Meta last told us; ``submission_status`` reflects what the
+    operator did in the CRM. They diverge during the brief window
+    between a Submit click and the next ``message_template_status_update``
+    webhook (status='PENDING' / submission_status='pending_review')."""
+
+    draft = "draft"
+    pending_review = "pending_review"
+    approved = "approved"
+    rejected = "rejected"
+    paused = "paused"
+    disabled = "disabled"
+
+
+whatsapp_template_submission_status_enum = ENUM(
+    WhatsAppTemplateSubmissionStatus,
+    name="whatsapp_template_submission_status",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
 
 
 _VARIABLE_RE = re.compile(r"\{\{(\d+)\}\}")
@@ -139,6 +167,30 @@ class WhatsAppTemplate(Base, TenantScoped):
     meta_template_id: Mapped[Optional[str]] = mapped_column(
         Text, nullable=True
     )
+    # whatsapp-platform-upgrade Step 8 — structured Meta component
+    # payload. NULL for legacy sync rows (the next sync round repops);
+    # populated on every new draft so we can resubmit verbatim. Each
+    # element is a `{type, format?, text?, buttons?[]}` dict matching
+    # Meta's `/{waba_id}/message_templates` POST shape.
+    body_components: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    submission_status: Mapped[WhatsAppTemplateSubmissionStatus] = (
+        mapped_column(
+            whatsapp_template_submission_status_enum,
+            nullable=False,
+            server_default=text("'draft'"),
+        )
+    )
+    rejection_reason: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
+    submitted_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_synced_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -163,4 +215,8 @@ class WhatsAppTemplate(Base, TenantScoped):
         return sorted({int(m) for m in _VARIABLE_RE.findall(self.body)})
 
 
-__all__ = ["WhatsAppAccountConfig", "WhatsAppTemplate"]
+__all__ = [
+    "WhatsAppAccountConfig",
+    "WhatsAppTemplate",
+    "WhatsAppTemplateSubmissionStatus",
+]
