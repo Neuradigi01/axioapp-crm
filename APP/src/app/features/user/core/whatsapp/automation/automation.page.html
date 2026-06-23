@@ -1,0 +1,257 @@
+<div class="flex min-h-[calc(100vh-4rem)] flex-col bg-zinc-50">
+  <header class="border-b border-zinc-200 bg-white px-6 py-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-semibold text-zinc-900">
+          WhatsApp Automation
+        </h1>
+        <p class="text-xs text-zinc-500">
+          Keyword-triggered rules — fire actions (reply, tag, assign,
+          escalate to AI) when inbound messages match.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          (click)="reload()"
+          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          <lucide-icon name="refresh-cw" size="14" />
+          Refresh
+        </button>
+        @if (canManage()) {
+          <button
+            type="button"
+            (click)="openCreate()"
+            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800"
+          >
+            <lucide-icon name="plus" size="14" />
+            New rule
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (toast(); as msg) {
+      <div class="mt-3 flex items-start justify-between gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+        <span class="flex-1">{{ msg }}</span>
+        <button
+          type="button"
+          (click)="dismissToast()"
+          class="text-zinc-500 hover:text-zinc-700"
+          aria-label="Dismiss"
+        >
+          <lucide-icon name="x" size="12" />
+        </button>
+      </div>
+    }
+    @if (loadError(); as err) {
+      <div class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        {{ err }}
+      </div>
+    }
+  </header>
+
+  @if (mode() !== 'list') {
+    <section class="mx-auto w-full max-w-3xl flex-1 px-6 py-6">
+      <div class="mb-4 flex items-center gap-2 text-xs text-zinc-500">
+        <button
+          type="button"
+          (click)="closeEditor()"
+          class="inline-flex items-center gap-1 rounded text-zinc-600 hover:text-zinc-900"
+        >
+          <lucide-icon name="arrow-left" size="12" />
+          Back to list
+        </button>
+      </div>
+      <app-keyword-rule-editor
+        [rule]="editingRule()"
+        (saved)="onSaved($event)"
+        (cancel)="closeEditor()"
+      />
+    </section>
+  } @else {
+    <section class="flex-1 px-6 py-4">
+      <!-- Dry-run test panel -->
+      <div class="mb-4 rounded-md border border-zinc-200 bg-white p-3">
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          Test a message
+        </p>
+        <p class="mb-2 text-[11px] text-zinc-500">
+          Dry-run — paste a sample message and we'll tell you which
+          rule matches + what actions would fire. Nothing is sent.
+        </p>
+        <div class="flex items-start gap-2">
+          <input
+            type="text"
+            [ngModel]="testText()"
+            (ngModelChange)="testText.set($event)"
+            placeholder="How much for the sofa?"
+            class="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+          />
+          <button
+            type="button"
+            (click)="runTest()"
+            [disabled]="testRunning() || !testText().trim()"
+            class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          >
+            {{ testRunning() ? 'Testing…' : 'Test' }}
+          </button>
+        </div>
+        @if (testError(); as err) {
+          <p class="mt-2 text-xs text-rose-600">{{ err }}</p>
+        }
+        @if (testResult(); as r) {
+          @if (r.matched_rule_id) {
+            <div class="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              <p class="font-semibold">
+                Matched: {{ r.matched_rule_name }}
+              </p>
+              <p class="mt-0.5">
+                {{ r.actions.length }}
+                {{ r.actions.length === 1 ? 'action' : 'actions' }} would run:
+              </p>
+              <ul class="ml-3 mt-1 list-disc text-[11px]">
+                @for (a of r.actions; track a.id) {
+                  <li>{{ a.action_type }}</li>
+                }
+              </ul>
+            </div>
+          } @else {
+            <p class="mt-2 rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+              No rule matched this message.
+            </p>
+          }
+        }
+      </div>
+
+      <!-- Rules list -->
+      <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        @if (loading()) {
+          <div class="px-6 py-8 text-center text-sm text-zinc-500">Loading…</div>
+        } @else if (rules().length === 0) {
+          <div class="px-6 py-12 text-center">
+            <p class="text-sm font-medium text-zinc-700">
+              No rules yet.
+            </p>
+            @if (canManage()) {
+              <button
+                type="button"
+                (click)="openCreate()"
+                class="mt-3 inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800"
+              >
+                <lucide-icon name="plus" size="14" />
+                Create your first rule
+              </button>
+            }
+          </div>
+        } @else {
+          <table class="w-full text-sm">
+            <thead class="bg-zinc-50 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              <tr>
+                <th class="w-12 px-2 py-2">Order</th>
+                <th class="px-4 py-2">Name</th>
+                <th class="px-4 py-2">Match</th>
+                <th class="px-4 py-2">Keywords</th>
+                <th class="px-4 py-2">Actions</th>
+                <th class="px-4 py-2">Enabled</th>
+                <th class="px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of rules(); track r.id; let i = $index) {
+                <tr class="border-t border-zinc-100 hover:bg-zinc-50">
+                  <td class="px-2 py-3">
+                    <div class="flex flex-col gap-0.5">
+                      <button
+                        type="button"
+                        (click)="moveUp(i)"
+                        [disabled]="!canManage() || i === 0"
+                        class="rounded p-0.5 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30"
+                        aria-label="Move up"
+                      >
+                        <lucide-icon name="chevron-up" size="12" />
+                      </button>
+                      <button
+                        type="button"
+                        (click)="moveDown(i)"
+                        [disabled]="!canManage() || i === rules().length - 1"
+                        class="rounded p-0.5 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30"
+                        aria-label="Move down"
+                      >
+                        <lucide-icon name="chevron-down" size="12" />
+                      </button>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <p class="text-xs font-medium text-zinc-900">{{ r.name }}</p>
+                    <p class="text-[10px] text-zinc-500">
+                      Priority {{ r.priority }}
+                    </p>
+                  </td>
+                  <td class="px-4 py-3 text-xs text-zinc-700">{{ r.match_type }}</td>
+                  <td class="px-4 py-3">
+                    <div class="flex flex-wrap gap-1">
+                      @for (k of r.keywords.slice(0, 3); track k) {
+                        <span class="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-700">
+                          {{ k }}
+                        </span>
+                      }
+                      @if (r.keywords.length > 3) {
+                        <span class="text-[10px] text-zinc-500">
+                          +{{ r.keywords.length - 3 }} more
+                        </span>
+                      }
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 text-xs text-zinc-700">
+                    {{ r.actions.length }}
+                  </td>
+                  <td class="px-4 py-3">
+                    <button
+                      type="button"
+                      (click)="toggleEnabled(r)"
+                      [disabled]="!canManage()"
+                      [class]="
+                        'rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ' +
+                        (r.enabled
+                          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                          : 'bg-zinc-100 text-zinc-500 ring-zinc-200')
+                      "
+                    >
+                      {{ r.enabled ? 'On' : 'Off' }}
+                    </button>
+                  </td>
+                  <td class="px-4 py-3 text-right text-xs">
+                    @if (canManage()) {
+                      <div class="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          (click)="openEdit(r)"
+                          class="rounded p-1 text-zinc-500 hover:bg-zinc-100"
+                          title="Edit"
+                          aria-label="Edit"
+                        >
+                          <lucide-icon name="pencil" size="14" />
+                        </button>
+                        <button
+                          type="button"
+                          (click)="confirmDelete(r)"
+                          class="rounded p-1 text-rose-500 hover:bg-rose-50"
+                          title="Delete"
+                          aria-label="Delete"
+                        >
+                          <lucide-icon name="trash-2" size="14" />
+                        </button>
+                      </div>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    </section>
+  }
+</div>

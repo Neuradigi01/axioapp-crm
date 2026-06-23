@@ -1,7 +1,7 @@
 # Step 17 — Keyword triggers + auto-tagging
 
 **Goal:** Rule engine for "if inbound message matches keyword → execute actions" (reply text, reply template, tag conversation, assign to user, escalate to AI). Auto-tagging from content piggybacks the same engine.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 16 (auto-reply pipeline exists), Step 14 (tags).
 
 ---

@@ -366,6 +366,20 @@ async def receive_webhook(
             conversation=conv,
             inbound_message_id=msg.id,
         )
+
+        # whatsapp-platform-upgrade Step 17 — keyword rule engine.
+        # Runs AFTER auto-reply so a new-contact greeting fires
+        # before any keyword-driven actions. Engine catches its own
+        # exceptions; failures here never roll back the inbound row.
+        from src.app.core.integrations.whatsapp.keyword_engine import (
+            dispatch_keyword_rules,
+        )
+
+        await dispatch_keyword_rules(
+            session,
+            conversation=conv,
+            text=parsed.text,
+        )
     return msg
 
 

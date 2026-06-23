@@ -35,5 +35,9 @@ MODULE = ModuleDescriptor(
         # surface; junior roles inherit no access unless explicitly
         # granted (they don't get a useful read-only view).
         "whatsapp.business_profile.manage",
+        # whatsapp-platform-upgrade Step 17 — automation (keyword rules
+        # + future Step-18 assignment rules). Same Owner/Admin-only
+        # model as business profile.
+        "whatsapp.automation.manage",
     ],
 )
