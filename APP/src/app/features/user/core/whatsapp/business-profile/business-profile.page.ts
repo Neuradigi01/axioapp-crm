@@ -15,6 +15,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { AutoReplySectionComponent } from './auto-reply-section.component';
 import {
   BusinessHoursDay,
   BusinessHoursInterval,
@@ -79,7 +80,12 @@ const DEFAULT_HOURS: BusinessHoursDay[] = [0, 1, 2, 3, 4, 5].map((d) => ({
   selector: 'app-whatsapp-business-profile-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucideAngularModule,
+    AutoReplySectionComponent,
+  ],
   templateUrl: './business-profile.page.html',
 })
 export class WhatsAppBusinessProfilePageComponent {

@@ -1,7 +1,7 @@
 # Step 16 — Welcome message + out-of-hours auto-reply
 
 **Goal:** Wire the greeting / away message text stored in Step 11 to actually fire on inbound webhooks. New-contact greeting on first message; out-of-hours auto-reply based on Step 11's business hours.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 11 (storage for greeting + away + business hours), Step 8 (templates exist for out-of-session greetings).
 
 ---

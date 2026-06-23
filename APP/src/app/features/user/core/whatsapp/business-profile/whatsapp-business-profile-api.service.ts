@@ -72,10 +72,41 @@ export interface WhatsAppBusinessProfilePatch {
 }
 
 
+/**
+ * Step 16 — auto-reply pipeline settings.
+ *
+ * Subset of the same `WhatsAppAccountConfig` row the business
+ * profile editor reads; lives on a dedicated endpoint so the
+ * auto-reply section can fetch / save without re-uploading the
+ * whole profile.
+ */
+export interface AutoReplySettings {
+  greeting_enabled: boolean;
+  greeting_message: string | null;
+  greeting_template_id: string | null;
+
+  away_enabled: boolean;
+  away_message: string | null;
+  away_template_id: string | null;
+
+  business_hours: BusinessHoursDay[];
+}
+
+export interface AutoReplySettingsPatch {
+  greeting_enabled?: boolean;
+  greeting_message?: string | null;
+  greeting_template_id?: string | null;
+  away_enabled?: boolean;
+  away_message?: string | null;
+  away_template_id?: string | null;
+}
+
+
 @Injectable({ providedIn: 'root' })
 export class WhatsAppBusinessProfileApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/integrations/whatsapp/business-profile`;
+  private readonly autoReplyBase = `${environment.apiBaseUrl}/integrations/whatsapp/auto-reply`;
 
   get(): Observable<WhatsAppBusinessProfile> {
     return this.http.get<WhatsAppBusinessProfile>(this.base);
@@ -105,6 +136,24 @@ export class WhatsAppBusinessProfileApiService {
     return this.http.post<WhatsAppBusinessProfile>(
       `${this.base}/picture`,
       form,
+    );
+  }
+
+  // --- Auto-reply (whatsapp-platform-upgrade Step 16) -----------------
+
+  /** Read the auto-reply toggles + linked template references. */
+  getAutoReplySettings(): Observable<AutoReplySettings> {
+    return this.http.get<AutoReplySettings>(`${this.autoReplyBase}/settings`);
+  }
+
+  /** Update the auto-reply toggles + linked templates. Server
+   *  refuses to save an enabled toggle without a body OR template. */
+  patchAutoReplySettings(
+    payload: AutoReplySettingsPatch,
+  ): Observable<AutoReplySettings> {
+    return this.http.patch<AutoReplySettings>(
+      `${this.autoReplyBase}/settings`,
+      payload,
     );
   }
 }

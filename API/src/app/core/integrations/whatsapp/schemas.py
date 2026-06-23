@@ -354,6 +354,51 @@ class WhatsAppPhoneHealthRead(BaseModel):
     events: list[WhatsAppPhoneHealthEventRead] = Field(default_factory=list)
 
 
+# --- Auto-reply (whatsapp-platform-upgrade Step 16) ------------------
+
+
+class AutoReplySettingsRead(BaseModel):
+    """Response shape for ``GET /api/v1/integrations/whatsapp/auto-reply/settings``.
+
+    Carries every field the operator's toggle row + textarea + linked-
+    template pickers need. Reuses the Step-11 `greeting_message` /
+    `away_message` / `business_hours` from the same row — the
+    auto-reply section on the business-profile page edits the same
+    underlying record."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    greeting_enabled: bool = False
+    greeting_message: Optional[str] = None
+    greeting_template_id: Optional[uuid.UUID] = None
+
+    away_enabled: bool = False
+    away_message: Optional[str] = None
+    away_template_id: Optional[uuid.UUID] = None
+
+    business_hours: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AutoReplySettingsPatch(BaseModel):
+    """Body of ``PATCH /api/v1/integrations/whatsapp/auto-reply/settings``.
+
+    Every field optional — only supplied fields are applied. The
+    service enforces "if you enable greeting, you must have message
+    OR template_id" — both NULL with the toggle on is rejected
+    at the boundary so the auto-reply pipeline never fires an empty
+    string."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    greeting_enabled: Optional[bool] = None
+    greeting_message: Optional[str] = Field(default=None, max_length=4096)
+    greeting_template_id: Optional[uuid.UUID] = None
+
+    away_enabled: Optional[bool] = None
+    away_message: Optional[str] = Field(default=None, max_length=4096)
+    away_template_id: Optional[uuid.UUID] = None
+
+
 # --- Business profile editor (whatsapp-platform-upgrade Step 11) ----
 
 
@@ -517,6 +562,8 @@ __all__ = [
     "WhatsAppConnectIn",
     "WhatsAppIntegrationStatus",
     "WhatsAppStatusOut",
+    "AutoReplySettingsPatch",
+    "AutoReplySettingsRead",
     "WhatsAppBusinessHoursDay",
     "WhatsAppBusinessHoursInterval",
     "WhatsAppBusinessProfilePatch",

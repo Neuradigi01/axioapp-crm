@@ -24,7 +24,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -176,6 +176,27 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     )
     away_message: Mapped[Optional[str]] = mapped_column(
         Text, nullable=True
+    )
+    # whatsapp-platform-upgrade Step 16 — auto-reply pipeline toggles
+    # + out-of-session template fallbacks. The greeting / away text
+    # above is used in-session (free-text reply); when the contact
+    # is outside their 24-hour session window, the linked approved
+    # template fires instead.
+    greeting_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    away_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    greeting_template_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    away_template_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

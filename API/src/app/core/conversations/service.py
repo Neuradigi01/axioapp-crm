@@ -350,6 +350,22 @@ async def receive_webhook(
                 "channel": conv.channel.value,
             },
         )
+
+    # whatsapp-platform-upgrade Step 16 — fire auto-reply pipeline.
+    # Greeting + out-of-hours away dispatch after the inbound row is
+    # persisted so cooldown queries see consistent state. Failures
+    # are caught inside `dispatch_auto_replies`; this call never
+    # raises into the webhook handler.
+    if conv.channel == ConversationChannel.whatsapp:
+        from src.app.core.integrations.whatsapp.auto_reply import (
+            dispatch_auto_replies,
+        )
+
+        await dispatch_auto_replies(
+            session,
+            conversation=conv,
+            inbound_message_id=msg.id,
+        )
     return msg
 
 

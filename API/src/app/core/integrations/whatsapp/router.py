@@ -49,6 +49,7 @@ from src.app.core.integrations.whatsapp.connect import (
     MetaValidationError,
     connect_account,
     disconnect_account,
+    get_active_config,
     get_status,
     test_connection,
 )
@@ -71,6 +72,8 @@ from src.app.core.integrations.whatsapp.meta_graph_client import (
     MetaGraphError,
 )
 from src.app.core.integrations.whatsapp.schemas import (
+    AutoReplySettingsPatch,
+    AutoReplySettingsRead,
     EmbeddedSignupConfigOut,
     EmbeddedSignupExchangeIn,
     EmbeddedSignupExchangeOut,
@@ -436,6 +439,165 @@ async def business_profile_picture_endpoint(
             status_code=exc.http_status, detail=exc.user_message
         )
     return _config_to_profile_out(config)
+
+
+# --- Auto-reply settings (whatsapp-platform-upgrade Step 16) ------------
+
+
+@router.get(
+    "/auto-reply/settings",
+    response_model=AutoReplySettingsRead,
+)
+async def auto_reply_settings_get_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("whatsapp.business_profile.manage")
+    ),
+) -> AutoReplySettingsRead:
+    """Read the auto-reply toggles + linked templates for the active
+    org. Reuses the same `WhatsAppAccountConfig` row that the
+    business-profile editor reads (Step 11); the auto-reply section
+    on the business-profile page edits a subset of the same record."""
+    try:
+        config = await bp_get_profile(db, auto_refresh=False)
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+    return AutoReplySettingsRead(
+        greeting_enabled=config.greeting_enabled,
+        greeting_message=config.greeting_message,
+        greeting_template_id=config.greeting_template_id,
+        away_enabled=config.away_enabled,
+        away_message=config.away_message,
+        away_template_id=config.away_template_id,
+        business_hours=list(config.business_hours or []),
+    )
+
+
+@router.patch(
+    "/auto-reply/settings",
+    response_model=AutoReplySettingsRead,
+)
+async def auto_reply_settings_patch_endpoint(
+    payload: AutoReplySettingsPatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("whatsapp.business_profile.manage")
+    ),
+) -> AutoReplySettingsRead:
+    """Update the auto-reply toggles + linked templates. The router
+    layer enforces the "if you enable a path, you must have a body
+    OR a template" invariant — the auto-reply pipeline silently
+    skips a path that's enabled but unconfigured, but the operator
+    deserves to know at save time."""
+    try:
+        bundle = await get_active_config(db)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="WhatsApp is not connected for this org.",
+        )
+    if bundle is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="WhatsApp is not connected for this org.",
+        )
+    _, config = bundle
+
+    patch_dict = payload.model_dump(exclude_unset=True, mode="python")
+
+    # Snapshot before changes — fed into the audit log.
+    before = {
+        "greeting_enabled": config.greeting_enabled,
+        "greeting_message": config.greeting_message,
+        "greeting_template_id": (
+            str(config.greeting_template_id)
+            if config.greeting_template_id
+            else None
+        ),
+        "away_enabled": config.away_enabled,
+        "away_message": config.away_message,
+        "away_template_id": (
+            str(config.away_template_id) if config.away_template_id else None
+        ),
+    }
+
+    if "greeting_enabled" in patch_dict:
+        config.greeting_enabled = bool(patch_dict["greeting_enabled"])
+    if "greeting_message" in patch_dict:
+        config.greeting_message = patch_dict["greeting_message"] or None
+    if "greeting_template_id" in patch_dict:
+        config.greeting_template_id = patch_dict["greeting_template_id"]
+    if "away_enabled" in patch_dict:
+        config.away_enabled = bool(patch_dict["away_enabled"])
+    if "away_message" in patch_dict:
+        config.away_message = patch_dict["away_message"] or None
+    if "away_template_id" in patch_dict:
+        config.away_template_id = patch_dict["away_template_id"]
+
+    # Boundary check — refuse to save an enabled toggle with no body
+    # AND no template. The pipeline would no-op silently; the
+    # operator should know at save time.
+    if config.greeting_enabled and not (
+        config.greeting_message or config.greeting_template_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Greeting is enabled but has no message text or fallback "
+                "template. Add one before saving."
+            ),
+        )
+    if config.away_enabled and not (
+        config.away_message or config.away_template_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Away reply is enabled but has no message text or "
+                "fallback template. Add one before saving."
+            ),
+        )
+
+    await db.commit()
+    await db.refresh(config)
+
+    from src.app.core import audit as audit_module
+
+    await audit_module.log(
+        "integration.whatsapp.auto_reply_updated",
+        entity_type="whatsapp_account",
+        entity_id=config.id,
+        user_id=user.legacy_uuid,
+        before=before,
+        after={
+            "greeting_enabled": config.greeting_enabled,
+            "greeting_message": config.greeting_message,
+            "greeting_template_id": (
+                str(config.greeting_template_id)
+                if config.greeting_template_id
+                else None
+            ),
+            "away_enabled": config.away_enabled,
+            "away_message": config.away_message,
+            "away_template_id": (
+                str(config.away_template_id)
+                if config.away_template_id
+                else None
+            ),
+        },
+    )
+
+    return AutoReplySettingsRead(
+        greeting_enabled=config.greeting_enabled,
+        greeting_message=config.greeting_message,
+        greeting_template_id=config.greeting_template_id,
+        away_enabled=config.away_enabled,
+        away_message=config.away_message,
+        away_template_id=config.away_template_id,
+        business_hours=list(config.business_hours or []),
+    )
 
 
 # --- Phone health (whatsapp-platform-upgrade Step 12) -------------------
