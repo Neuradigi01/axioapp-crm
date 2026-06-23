@@ -75,6 +75,12 @@ _CORE_ADMIN_KEYS: list[str] = [
     "whatsapp.business_profile.manage",
     # whatsapp-platform-upgrade Step 17 — keyword automation rules.
     "whatsapp.automation.manage",
+    # whatsapp-platform-upgrade Step 20 — conversation analytics
+    # dashboard (volume / response time / outcomes / leaderboard).
+    # Owner + Admin get visibility; Employee + junior roles do not by
+    # default — manager-spec: "is WhatsApp working" is a leadership
+    # question, not floor staff.
+    "whatsapp.analytics.read",
     "tasks.read", "tasks.write",
     "pipelines.read", "pipelines.manage", "pipelines.write",
     "activities.read", "activities.write",

@@ -401,6 +401,17 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // whatsapp-platform-upgrade Step 20 — conversation analytics
+        // dashboard. Gated on `whatsapp.analytics.read`; sidebar entry
+        // surfaces via the reporting module descriptor.
+        path: 'reports/whatsapp',
+        canActivate: [permissionGuard('whatsapp.analytics.read')],
+        loadComponent: () =>
+          import(
+            './core/reporting/whatsapp/whatsapp-reports-page.component'
+          ).then((m) => m.WhatsAppReportsPageComponent),
+      },
+      {
         path: 'reviews',
         canActivate: [permissionGuard('reviews.read')],
         loadComponent: () =>
