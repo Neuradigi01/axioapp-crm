@@ -75,7 +75,7 @@ keys.txt
 secrets.dec.env
 
 # Celery stuff
-celerybeat-schedule
+celerybeat-schedule*
 celerybeat.pid
 
 # mypy

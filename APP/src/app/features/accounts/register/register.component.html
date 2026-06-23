@@ -1,210 +1,244 @@
-<div class="register">
-  <mat-card class="register__card">
-    <mat-card-header class="register__header">
-      <mat-card-title class="register__title">Create Account</mat-card-title>
-      <mat-card-subtitle class="register__subtitle">Fill in your details to register</mat-card-subtitle>
-    </mat-card-header>
+<div class="w-full rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
+  <div class="mb-6 text-center">
+    <h1 class="text-xl font-semibold text-zinc-900">Create Account</h1>
+    <p class="mt-1 text-sm text-zinc-500">Fill in your details to register</p>
+  </div>
 
-    <mat-card-content>
-      <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="register__form">
-        <!-- Name Row -->
-        <div class="register__name-row">
-          <mat-form-field appearance="outline">
-            <mat-label>First Name</mat-label>
-            <input matInput formControlName="first_name" autocomplete="given-name" />
-            <mat-error><app-validation-message [control]="registerForm.controls['first_name']" label="First name" /></mat-error>
-          </mat-form-field>
+  <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="space-y-4">
+    <!-- Name Row -->
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div>
+        <label for="first_name" class="mb-1 block text-sm font-medium text-zinc-700">First Name</label>
+        <input
+          id="first_name"
+          type="text"
+          formControlName="first_name"
+          autocomplete="given-name"
+          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+        @if (registerForm.controls['first_name'].invalid && (registerForm.controls['first_name'].touched || registerForm.controls['first_name'].dirty)) {
+          <p class="mt-1 text-xs text-rose-600">
+            <app-validation-message [control]="registerForm.controls['first_name']" label="First name" />
+          </p>
+        }
+      </div>
+      <div>
+        <label for="last_name" class="mb-1 block text-sm font-medium text-zinc-700">Last Name</label>
+        <input
+          id="last_name"
+          type="text"
+          formControlName="last_name"
+          autocomplete="family-name"
+          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+        @if (registerForm.controls['last_name'].invalid && (registerForm.controls['last_name'].touched || registerForm.controls['last_name'].dirty)) {
+          <p class="mt-1 text-xs text-rose-600">
+            <app-validation-message [control]="registerForm.controls['last_name']" label="Last name" />
+          </p>
+        }
+      </div>
+    </div>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Last Name</mat-label>
-            <input matInput formControlName="last_name" autocomplete="family-name" />
-            <mat-error><app-validation-message [control]="registerForm.controls['last_name']" label="Last name" /></mat-error>
-          </mat-form-field>
-        </div>
-
-        <!-- Email + Inline OTP -->
-        <div class="register__otp-group">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Email</mat-label>
-            <input matInput formControlName="email" type="email" autocomplete="email" />
-            @if (needsEmailOtp()) {
-              <button mat-icon-button matSuffix type="button"
-                [disabled]="registerForm.get('email')!.invalid || isSendingEmailOtp() || emailTimer.remaining() > 0"
-                (click)="sendEmailOtp()"
-                class="register__otp-suffix-btn"
-                [attr.aria-label]="'Send email OTP'">
-                @if (isSendingEmailOtp()) {
-                  <mat-spinner diameter="18"></mat-spinner>
-                } @else {
-                  <mat-icon>{{ emailOtpSent() ? 'refresh' : 'send' }}</mat-icon>
-                }
-              </button>
-            }
-            <mat-error><app-validation-message [control]="registerForm.controls['email']" label="Email" /></mat-error>
-            @if (needsEmailOtp() && emailTimer.remaining() > 0) {
-              <mat-hint>Resend in {{ emailTimer.remaining() }}s</mat-hint>
-            }
-          </mat-form-field>
-
-          @if (needsEmailOtp() && emailOtpSent()) {
-            <mat-form-field appearance="outline" class="full-width register__otp-field">
-              <mat-label>Email OTP</mat-label>
-              <input matInput formControlName="email_otp_code" autocomplete="one-time-code" />
-              <mat-icon matPrefix>pin</mat-icon>
-            </mat-form-field>
-          }
-        </div>
-
-        <!-- Mobile + Inline OTP -->
-        <div class="register__otp-group">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Mobile Number</mat-label>
-            <input matInput formControlName="mobile_no" type="tel" autocomplete="tel" />
-            @if (needsSmsOtp()) {
-              <button mat-icon-button matSuffix type="button"
-                [disabled]="!registerForm.get('mobile_no')!.value || isSendingSmsOtp() || smsTimer.remaining() > 0"
-                (click)="sendSmsOtp()"
-                class="register__otp-suffix-btn"
-                [attr.aria-label]="'Send SMS OTP'">
-                @if (isSendingSmsOtp()) {
-                  <mat-spinner diameter="18"></mat-spinner>
-                } @else {
-                  <mat-icon>{{ smsOtpSent() ? 'refresh' : 'send' }}</mat-icon>
-                }
-              </button>
-            }
-            @if (needsSmsOtp() && smsTimer.remaining() > 0) {
-              <mat-hint>Resend in {{ smsTimer.remaining() }}s</mat-hint>
-            }
-          </mat-form-field>
-
-          @if (needsSmsOtp() && smsOtpSent()) {
-            <mat-form-field appearance="outline" class="full-width register__otp-field">
-              <mat-label>Mobile OTP</mat-label>
-              <input matInput formControlName="mobile_otp_code" autocomplete="one-time-code" />
-              <mat-icon matPrefix>pin</mat-icon>
-            </mat-form-field>
-          }
-        </div>
-
-        <!-- Country / State Row -->
-        <div class="register__location-row">
-          <mat-form-field appearance="outline">
-            <mat-label>Country</mat-label>
-            <mat-select formControlName="country_id"
-              panelClass="searchable-select-panel"
-              (selectionChange)="onCountryChange()"
-              (openedChange)="onCountrySelectToggle($event)">
-              <div class="select-search">
-                <mat-icon class="select-search__icon">search</mat-icon>
-                <input class="select-search__input"
-                  #countrySearchInput
-                  placeholder="Search country..."
-                  (input)="countrySearchTerm.set(countrySearchInput.value)"
-                  (keydown)="$event.stopPropagation()">
-              </div>
-              <div class="select-options">
-                <mat-option [value]="null">-- Select --</mat-option>
-                @for (country of filteredCountries(); track country.id) {
-                  <mat-option [value]="country.id">{{ country.name }}</mat-option>
-                }
-              </div>
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>State</mat-label>
-            <mat-select formControlName="state_id"
-              panelClass="searchable-select-panel"
-              (openedChange)="onStateSelectToggle($event)">
-              <div class="select-search">
-                <mat-icon class="select-search__icon">search</mat-icon>
-                <input class="select-search__input"
-                  #stateSearchInput
-                  placeholder="Search state..."
-                  (input)="stateSearchTerm.set(stateSearchInput.value)"
-                  (keydown)="$event.stopPropagation()">
-              </div>
-              <div class="select-options">
-                <mat-option [value]="null">-- Select --</mat-option>
-                @for (state of filteredStates(); track state.id) {
-                  <mat-option [value]="state.id">{{ state.name }}</mat-option>
-                }
-              </div>
-            </mat-select>
-          </mat-form-field>
-        </div>
-
-        <!-- Password -->
-        <mat-form-field appearance="outline" class="full-width" appPasswordToggle #pwToggle="passwordToggle">
-          <mat-label>Password</mat-label>
-          <input
-            matInput
-            formControlName="password"
-            [type]="pwToggle.type()"
-            autocomplete="new-password" />
+    <!-- Email + Inline OTP -->
+    <div>
+      <label for="email" class="mb-1 block text-sm font-medium text-zinc-700">Email</label>
+      <div class="flex gap-2">
+        <input
+          id="email"
+          type="email"
+          formControlName="email"
+          autocomplete="email"
+          class="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+        @if (needsEmailOtp()) {
           <button
-            mat-icon-button
-            matSuffix
             type="button"
-            (click)="pwToggle.toggle()"
-            [attr.aria-label]="pwToggle.ariaLabel()">
-            <mat-icon>{{ pwToggle.icon() }}</mat-icon>
+            (click)="sendEmailOtp()"
+            [disabled]="registerForm.get('email')!.invalid || isSendingEmailOtp() || emailTimer.remaining() > 0"
+            class="shrink-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {{ isSendingEmailOtp() ? 'Sending…' : emailOtpSent() ? 'Resend' : 'Send OTP' }}
           </button>
-          <mat-error><app-validation-message [control]="registerForm.controls['password']" label="Password" /></mat-error>
-        </mat-form-field>
+        }
+      </div>
+      @if (registerForm.controls['email'].invalid && (registerForm.controls['email'].touched || registerForm.controls['email'].dirty)) {
+        <p class="mt-1 text-xs text-rose-600">
+          <app-validation-message [control]="registerForm.controls['email']" label="Email" />
+        </p>
+      }
+      @if (needsEmailOtp() && emailTimer.remaining() > 0) {
+        <p class="mt-1 text-xs text-zinc-500">Resend in {{ emailTimer.remaining() }}s</p>
+      }
+    </div>
 
-        <!-- Confirm Password -->
-        <mat-form-field appearance="outline" class="full-width" appPasswordToggle #cpToggle="passwordToggle">
-          <mat-label>Confirm Password</mat-label>
-          <input
-            matInput
-            formControlName="confirm_password"
-            [type]="cpToggle.type()"
-            autocomplete="new-password" />
+    @if (needsEmailOtp() && emailOtpSent()) {
+      <div>
+        <label for="email_otp_code" class="mb-1 block text-sm font-medium text-zinc-700">Email OTP</label>
+        <input
+          id="email_otp_code"
+          type="text"
+          formControlName="email_otp_code"
+          autocomplete="one-time-code"
+          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+      </div>
+    }
+
+    <!-- Mobile + Inline OTP -->
+    <div>
+      <label for="mobile_no" class="mb-1 block text-sm font-medium text-zinc-700">Mobile Number</label>
+      <div class="flex gap-2">
+        <input
+          id="mobile_no"
+          type="tel"
+          formControlName="mobile_no"
+          autocomplete="tel"
+          class="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+        @if (needsSmsOtp()) {
           <button
-            mat-icon-button
-            matSuffix
             type="button"
-            (click)="cpToggle.toggle()"
-            [attr.aria-label]="cpToggle.ariaLabel()">
-            <mat-icon>{{ cpToggle.icon() }}</mat-icon>
+            (click)="sendSmsOtp()"
+            [disabled]="!registerForm.get('mobile_no')!.value || isSendingSmsOtp() || smsTimer.remaining() > 0"
+            class="shrink-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {{ isSendingSmsOtp() ? 'Sending…' : smsOtpSent() ? 'Resend' : 'Send OTP' }}
           </button>
-          <mat-error><app-validation-message [control]="registerForm.controls['confirm_password']" label="Confirm password" /></mat-error>
-        </mat-form-field>
+        }
+      </div>
+      @if (needsSmsOtp() && smsTimer.remaining() > 0) {
+        <p class="mt-1 text-xs text-zinc-500">Resend in {{ smsTimer.remaining() }}s</p>
+      }
+    </div>
 
-        <!-- Referral ID -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Referral ID (optional)</mat-label>
-          <input matInput formControlName="referral_id" />
-        </mat-form-field>
+    @if (needsSmsOtp() && smsOtpSent()) {
+      <div>
+        <label for="mobile_otp_code" class="mb-1 block text-sm font-medium text-zinc-700">Mobile OTP</label>
+        <input
+          id="mobile_otp_code"
+          type="text"
+          formControlName="mobile_otp_code"
+          autocomplete="one-time-code"
+          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+      </div>
+    }
 
-        <!-- Captcha -->
-        <app-captcha
-          #captchaRef
-          (typeChange)="onCaptchaTypeChange($event)"
-          (tokenChange)="onCaptchaTokenChange($event)" />
+    <!-- Country / State Row -->
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div>
+        <label for="country_id" class="mb-1 block text-sm font-medium text-zinc-700">Country</label>
+        <select
+          id="country_id"
+          formControlName="country_id"
+          (change)="onCountryChange()"
+          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        >
+          <option [ngValue]="null">-- Select --</option>
+          @for (country of countries(); track country.id) {
+            <option [ngValue]="country.id">{{ country.name }}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label for="state_id" class="mb-1 block text-sm font-medium text-zinc-700">State</label>
+        <select
+          id="state_id"
+          formControlName="state_id"
+          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400"
+        >
+          <option [ngValue]="null">{{ statesLoading() ? 'Loading…' : '-- Select --' }}</option>
+          @for (state of states(); track state.id) {
+            <option [ngValue]="state.id">{{ state.name }}</option>
+          }
+        </select>
+      </div>
+    </div>
 
-        <!-- Submit -->
+    <!-- Password -->
+    <div>
+      <label for="password" class="mb-1 block text-sm font-medium text-zinc-700">Password</label>
+      <div class="relative" appPasswordToggle #pwToggle="passwordToggle">
+        <input
+          id="password"
+          formControlName="password"
+          [type]="pwToggle.type()"
+          autocomplete="new-password"
+          class="w-full rounded-md border border-zinc-300 px-3 py-2 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
         <button
-          mat-flat-button
-          type="submit"
-          class="register__submit full-width"
-          [disabled]="isLoading()">
-          @if (isLoading()) {
-            <mat-spinner diameter="20"></mat-spinner>
-          } @else {
-            Create Account
-          }
+          type="button"
+          (click)="pwToggle.toggle()"
+          [attr.aria-label]="pwToggle.ariaLabel()"
+          class="absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400 transition hover:text-zinc-600"
+        >
+          <lucide-icon [name]="pwToggle.hidden() ? 'eye' : 'eye-off'" class="h-4 w-4" />
         </button>
-      </form>
-    </mat-card-content>
+      </div>
+      @if (registerForm.controls['password'].invalid && (registerForm.controls['password'].touched || registerForm.controls['password'].dirty)) {
+        <p class="mt-1 text-xs text-rose-600">
+          <app-validation-message [control]="registerForm.controls['password']" label="Password" />
+        </p>
+      }
+    </div>
 
-    <mat-card-actions class="register__actions">
-      <span class="register__actions-text">
-        Already have an account?
-        <a mat-button [routerLink]="loginUrl" class="register__link">Login</a>
-      </span>
-    </mat-card-actions>
-  </mat-card>
+    <!-- Confirm Password -->
+    <div>
+      <label for="confirm_password" class="mb-1 block text-sm font-medium text-zinc-700">Confirm Password</label>
+      <div class="relative" appPasswordToggle #cpToggle="passwordToggle">
+        <input
+          id="confirm_password"
+          formControlName="confirm_password"
+          [type]="cpToggle.type()"
+          autocomplete="new-password"
+          class="w-full rounded-md border border-zinc-300 px-3 py-2 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+        <button
+          type="button"
+          (click)="cpToggle.toggle()"
+          [attr.aria-label]="cpToggle.ariaLabel()"
+          class="absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400 transition hover:text-zinc-600"
+        >
+          <lucide-icon [name]="cpToggle.hidden() ? 'eye' : 'eye-off'" class="h-4 w-4" />
+        </button>
+      </div>
+      @if (registerForm.controls['confirm_password'].invalid && (registerForm.controls['confirm_password'].touched || registerForm.controls['confirm_password'].dirty)) {
+        <p class="mt-1 text-xs text-rose-600">
+          <app-validation-message [control]="registerForm.controls['confirm_password']" label="Confirm password" />
+        </p>
+      }
+    </div>
+
+    <!-- Referral ID -->
+    <div>
+      <label for="referral_id" class="mb-1 block text-sm font-medium text-zinc-700">Referral ID (optional)</label>
+      <input
+        id="referral_id"
+        type="text"
+        formControlName="referral_id"
+        class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      />
+    </div>
+
+    <!-- Captcha -->
+    <app-captcha
+      #captchaRef
+      (typeChange)="onCaptchaTypeChange($event)"
+      (tokenChange)="onCaptchaTokenChange($event)"
+    />
+
+    <!-- Submit -->
+    <button
+      type="submit"
+      [disabled]="isLoading()"
+      class="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {{ isLoading() ? 'Creating account…' : 'Create Account' }}
+    </button>
+  </form>
+
+  <p class="mt-6 text-center text-sm text-zinc-500">
+    Already have an account?
+    <a [routerLink]="loginUrl" class="font-medium text-zinc-900 hover:underline">Login</a>
+  </p>
 </div>

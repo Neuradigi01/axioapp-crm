@@ -1,21 +1,13 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
+import { LucideAngularModule } from 'lucide-angular';
 import { getRoute } from '@core/services/routes-helper.service';
 
 @Component({
   selector: 'app-email-verification-notice',
   templateUrl: './email-verification-notice.component.html',
-  styleUrl: './email-verification-notice.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    RouterLink,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-  ],
+  imports: [RouterLink, LucideAngularModule],
 })
 export class EmailVerificationNoticeComponent implements OnInit {
   private readonly router = inject(Router);
