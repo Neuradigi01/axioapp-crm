@@ -357,6 +357,7 @@ export class ConversationsPageComponent {
       reactions: [],
       is_internal: true,
       mentioned_user_ids: payload.mentions,
+      is_ai: false,
       channel_message_id: null,
       sent_at: new Date().toISOString(),
       delivered_at: null,
