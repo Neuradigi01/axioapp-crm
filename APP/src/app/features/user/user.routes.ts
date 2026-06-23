@@ -383,6 +383,17 @@ export const userRoutes: Routes = [
           ).then((m) => m.WhatsAppBusinessProfilePageComponent),
       },
       {
+        // whatsapp-platform-upgrade Step 17 — keyword automation rules.
+        // Future Step 18 (auto-assignment) + Step 19 (AI agent) will
+        // tab into this same page.
+        path: 'whatsapp/automation',
+        canActivate: [permissionGuard('whatsapp.automation.manage')],
+        loadComponent: () =>
+          import(
+            './core/whatsapp/automation/automation.page'
+          ).then((m) => m.WhatsAppAutomationPageComponent),
+      },
+      {
         path: 'calls',
         loadComponent: () =>
           import('./core/calls/call-center.page').then(

@@ -73,6 +73,8 @@ _CORE_ADMIN_KEYS: list[str] = [
     "whatsapp.templates.submit",
     # whatsapp-platform-upgrade Step 11 — business profile editor.
     "whatsapp.business_profile.manage",
+    # whatsapp-platform-upgrade Step 17 — keyword automation rules.
+    "whatsapp.automation.manage",
     "tasks.read", "tasks.write",
     "pipelines.read", "pipelines.manage", "pipelines.write",
     "activities.read", "activities.write",

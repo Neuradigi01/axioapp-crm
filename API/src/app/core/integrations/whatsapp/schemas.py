@@ -354,6 +354,123 @@ class WhatsAppPhoneHealthRead(BaseModel):
     events: list[WhatsAppPhoneHealthEventRead] = Field(default_factory=list)
 
 
+# --- Keyword rules (whatsapp-platform-upgrade Step 17) ---------------
+
+
+KeywordMatchTypeLiteral = Literal["contains", "exact", "regex"]
+KeywordActionTypeLiteral = Literal[
+    "reply_text",
+    "reply_template",
+    "tag_conversation",
+    "assign_to_user",
+    "escalate_to_ai",
+]
+
+
+class KeywordActionPayload(BaseModel):
+    """One action attached to a rule. `action_config` shape varies by
+    `action_type`:
+
+      * ``reply_text``         → ``{"text": "..."}``
+      * ``reply_template``     → ``{"template_id": "<uuid>"}``
+      * ``tag_conversation``   → ``{"tag_id": "<uuid>"}``
+      * ``assign_to_user``     → ``{"user_id": "<uuid>"}``
+      * ``escalate_to_ai``     → ``{}`` (toggles `ai_handling=true`)
+
+    The engine validates the config shape per type at dispatch time
+    — keep this schema permissive so a future action type can be
+    added without a migration to the JSONB."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action_type: KeywordActionTypeLiteral
+    action_config: dict[str, Any] = Field(default_factory=dict)
+    position: int = Field(default=0, ge=0, le=100)
+
+
+class KeywordRuleUpsert(BaseModel):
+    """Body of ``POST /api/v1/integrations/whatsapp/keyword-rules`` +
+    ``PATCH /{id}``. On PATCH, every field is optional — partial
+    updates only touch what's supplied."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=128)
+    keywords: list[str] = Field(min_length=1, max_length=50)
+    match_type: KeywordMatchTypeLiteral = "contains"
+    enabled: bool = True
+    priority: int = Field(default=100, ge=0, le=10000)
+    actions: list[KeywordActionPayload] = Field(
+        default_factory=list, max_length=10
+    )
+
+    @model_validator(mode="after")
+    def _check_keyword_lengths(self) -> "KeywordRuleUpsert":
+        # Regex patterns get extra scrutiny — cap length at 200 chars
+        # to bound match runtime; the engine's eval also wraps in a
+        # try/except so a bad regex doesn't crash the inbound webhook.
+        cap = 200 if self.match_type == "regex" else 256
+        for k in self.keywords:
+            if not k.strip():
+                raise ValueError("Keywords cannot be blank.")
+            if len(k) > cap:
+                raise ValueError(
+                    f"Keyword exceeds the {cap}-character limit."
+                )
+        return self
+
+
+class KeywordActionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    action_type: str
+    action_config: dict[str, Any]
+    position: int
+
+
+class KeywordRuleRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    keywords: list[str]
+    match_type: str
+    enabled: bool
+    priority: int
+    created_by_user_id: Optional[uuid.UUID] = None
+    created_at: datetime
+    updated_at: datetime
+    actions: list[KeywordActionRead] = Field(default_factory=list)
+
+
+class KeywordRuleReorder(BaseModel):
+    """Body of ``POST /keyword-rules/reorder`` — a list of rule ids
+    in the order they should evaluate. Server reassigns `priority`
+    based on list position so the operator can drag-to-reorder
+    without picking explicit numbers."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rule_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+
+
+class RuleTestRequest(BaseModel):
+    """Body of ``POST /keyword-rules/test``. Dry-run — evaluates every
+    enabled rule against `text` + returns the first match's id +
+    its actions. Does NOT actually send / tag / assign anything."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    text: str = Field(min_length=1, max_length=4096)
+
+
+class RuleTestResponse(BaseModel):
+    matched_rule_id: Optional[uuid.UUID] = None
+    matched_rule_name: Optional[str] = None
+    actions: list[KeywordActionRead] = Field(default_factory=list)
+
+
 # --- Auto-reply (whatsapp-platform-upgrade Step 16) ------------------
 
 
@@ -564,6 +681,15 @@ __all__ = [
     "WhatsAppStatusOut",
     "AutoReplySettingsPatch",
     "AutoReplySettingsRead",
+    "KeywordActionPayload",
+    "KeywordActionRead",
+    "KeywordActionTypeLiteral",
+    "KeywordMatchTypeLiteral",
+    "KeywordRuleRead",
+    "KeywordRuleReorder",
+    "KeywordRuleUpsert",
+    "RuleTestRequest",
+    "RuleTestResponse",
     "WhatsAppBusinessHoursDay",
     "WhatsAppBusinessHoursInterval",
     "WhatsAppBusinessProfilePatch",

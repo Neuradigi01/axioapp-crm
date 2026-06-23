@@ -25,7 +25,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, text
-from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
@@ -355,8 +355,135 @@ class WhatsAppPhoneHealthEvent(Base, TenantScoped):
     )
 
 
+class KeywordMatchType(str, enum.Enum):
+    """How a rule's keyword list is tested against inbound text
+    (whatsapp-platform-upgrade Step 17).
+
+    * ``contains`` — case-insensitive substring; matches if ANY
+      keyword is found inside the text.
+    * ``exact`` — case-insensitive exact match against the whole
+      message body.
+    * ``regex`` — Python ``re.search`` with the keyword as a regex.
+      Length-capped + try/except-wrapped at evaluation time to
+      survive operator typos."""
+
+    contains = "contains"
+    exact = "exact"
+    regex = "regex"
+
+
+class KeywordActionType(str, enum.Enum):
+    reply_text = "reply_text"
+    reply_template = "reply_template"
+    tag_conversation = "tag_conversation"
+    assign_to_user = "assign_to_user"
+    escalate_to_ai = "escalate_to_ai"
+
+
+whatsapp_keyword_match_type_enum = ENUM(
+    KeywordMatchType,
+    name="whatsapp_keyword_match_type",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+whatsapp_keyword_action_type_enum = ENUM(
+    KeywordActionType,
+    name="whatsapp_keyword_action_type",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class WhatsAppKeywordRule(Base, TenantScoped):
+    """One operator-defined rule
+    (whatsapp-platform-upgrade Step 17).
+
+    Evaluated in `priority` ascending order — lower number = higher
+    priority. The first rule that matches an inbound message fires
+    its actions and short-circuits the rest of the evaluation loop
+    (Step 17 spec; future "continue on match" toggle would live on
+    this row)."""
+
+    __tablename__ = "tbl_whatsapp_keyword_rules"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    name: Mapped[str] = mapped_column(String(length=128), nullable=False)
+    keywords: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
+    match_type: Mapped[KeywordMatchType] = mapped_column(
+        whatsapp_keyword_match_type_enum,
+        nullable=False,
+        server_default=text("'contains'"),
+    )
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    priority: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("100")
+    )
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=text("now()"),
+    )
+
+
+class WhatsAppKeywordAction(Base, TenantScoped):
+    """One action attached to a rule. Multiple actions per rule run
+    in `position` order — a rule can reply with a template, tag the
+    conversation, AND escalate to AI on one match."""
+
+    __tablename__ = "tbl_whatsapp_keyword_actions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    rule_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "tbl_whatsapp_keyword_rules.id", ondelete="CASCADE"
+        ),
+        nullable=False,
+    )
+    action_type: Mapped[KeywordActionType] = mapped_column(
+        whatsapp_keyword_action_type_enum, nullable=False
+    )
+    action_config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    position: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
 __all__ = [
+    "KeywordActionType",
+    "KeywordMatchType",
     "WhatsAppAccountConfig",
+    "WhatsAppKeywordAction",
+    "WhatsAppKeywordRule",
     "WhatsAppPhoneHealthEvent",
     "WhatsAppPhoneHealthEventType",
     "WhatsAppTemplate",
