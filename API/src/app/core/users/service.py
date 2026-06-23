@@ -1,6 +1,6 @@
 """Service layer for users.
 
-Reads + writes for the three-table user model (DR.7+):
+Writes for the three-table user model (DR.7+):
   - tbl_user_login   → auth row (id bigint, password, is_active, legacy_uuid)
   - tbl_user_info    → profile (member_id, first_name, last_name, email, mobile_no)
   - tbl_organization_members → membership (org_id, role_id, status, is_active, is_demo)
@@ -8,6 +8,10 @@ Reads + writes for the three-table user model (DR.7+):
 Write paths (create / update / status) always fan out across all three
 tables in dependency order. Audit events fire after each successful
 write so the team can trace who changed what.
+
+Reads — single-user lookups, membership predicates, role guards, profile
+fetches — live in `src.app.core.users.data_access`. This service file
+holds orchestration only: transactions, audit, business rules.
 """
 from __future__ import annotations
 
@@ -20,64 +24,16 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
-from src.app.shared.audit import log_entity_change
+from src.app.core import audit, data_access
 from src.app.core.auth.models import AuthSession
 from src.app.core.permissions.models import Role
 from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.core.users.schemas import MeUpdate, UserCreate, UserUpdate
+from src.app.shared.audit import log_entity_change
 from src.app.shared.security.password import hash_password, verify_password
 
 
-async def get_user_by_id(session: AsyncSession, user_id: uuid.UUID) -> User | None:
-    """Look up a FurnitureCRM user by their UUID identity.
-
-    After DR.6.3 the User model is backed by `tbl_user_login`, whose
-    storage PK (`User.id`) is bigint. The UUID that callers carry
-    around — JWT `sub`, audit FKs, AuthSession.user_id — lives in
-    `User.legacy_uuid`. We query against that column.
-    """
-    result = await session.execute(
-        select(User).where(User.legacy_uuid == user_id)
-    )
-    return result.scalar_one_or_none()
-
-
-async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
-    """Lookup by email. `email` is stored as CITEXT so this is case-insensitive.
-
-    After DR.7 the email column lives on `tbl_user_info`, so the lookup
-    joins through that table. The JOIN naturally excludes the legacy
-    `tbl_user_login` admin row (no membership) when an org context is
-    needed — callers wanting org isolation should compose with that
-    layer themselves; this helper is global by design.
-    """
-    result = await session.execute(
-        select(User)
-        .join(UserInfo, UserInfo.member_id == User.id)
-        .where(UserInfo.email == email)
-    )
-    return result.scalar_one_or_none()
-
-
-async def count_active_members(
-    session: AsyncSession, org_id: uuid.UUID
-) -> int:
-    """Number of active members in the org — feeds `seats.in_use` on the
-    subscription read API (Step 7).
-
-    Counts `tbl_organization_members` rows with `is_active=True` for the
-    given org. Paused / archived memberships do not consume a seat.
-    """
-    result = await session.execute(
-        select(func.count())
-        .select_from(OrganizationMember)
-        .where(
-            OrganizationMember.organization_id == org_id,
-            OrganizationMember.is_active.is_(True),
-        )
-    )
-    return int(result.scalar_one())
+# --- list (the one read kept here — non-trivial cross-table list query) -
 
 
 async def list_users(
@@ -122,23 +78,6 @@ def _split_full_name(full_name: str) -> tuple[str, str]:
     return first, last
 
 
-async def _ensure_role_in_org(
-    session: AsyncSession, *, role_id: uuid.UUID, org_id: uuid.UUID
-) -> Role:
-    """422 if `role_id` does not belong to `org_id`."""
-    role = (
-        await session.execute(
-            select(Role).where(Role.id == role_id, Role.org_id == org_id)
-        )
-    ).scalar_one_or_none()
-    if role is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"role_id {role_id} not found in this org",
-        )
-    return role
-
-
 async def create_user(
     session: AsyncSession,
     *,
@@ -152,15 +91,11 @@ async def create_user(
     we write a random unguessable password so the bcrypt verify path
     can never short-circuit on an empty/NULL hash.
     """
-    await _ensure_role_in_org(session, role_id=payload.role_id, org_id=org_id)
+    await data_access.get_role_in_org(
+        session, role_id=payload.role_id, org_id=org_id
+    )
 
-    # Email collision check — tbl_user_info.email is GLOBAL unique.
-    existing = (
-        await session.execute(
-            select(UserInfo.member_id).where(UserInfo.email == payload.email)
-        )
-    ).scalar_one_or_none()
-    if existing is not None:
+    if await data_access.email_exists(session, payload.email):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"email {payload.email} is already in use",
@@ -237,35 +172,17 @@ async def update_user(
 ) -> User:
     """Update name / phone (tbl_user_info) and/or role (tbl_organization_members).
 
-    Raises 404 if the user doesn't have an active membership in `org_id`.
+    Raises 404 if the user doesn't have a membership in `org_id`.
     `user_id` is the UUID identity (`tbl_user_login.legacy_uuid`).
     """
-    user = await get_user_by_id(session, user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"user {user_id} not found",
-        )
+    user, membership = await data_access.require_membership(
+        session,
+        user_uuid=user_id,
+        org_id=org_id,
+        on_missing=status.HTTP_404_NOT_FOUND,
+    )
 
-    membership = (
-        await session.execute(
-            select(OrganizationMember).where(
-                OrganizationMember.user_member_id == user.id,
-                OrganizationMember.organization_id == org_id,
-            )
-        )
-    ).scalar_one_or_none()
-    if membership is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"user {user_id} is not a member of this org",
-        )
-
-    profile = (
-        await session.execute(
-            select(UserInfo).where(UserInfo.member_id == user.id)
-        )
-    ).scalar_one_or_none()
+    profile = await data_access.get_user_info(session, user.id)
     if profile is None:
         # Profile row should always exist for FurnitureCRM users
         # (created by DR.7.2 backfill or `create_user` above), but
@@ -293,7 +210,7 @@ async def update_user(
     if "phone" in changes:
         profile.mobile_no = changes["phone"]
     if "role_id" in changes and changes["role_id"] is not None:
-        new_role = await _ensure_role_in_org(
+        new_role = await data_access.get_role_in_org(
             session, role_id=changes["role_id"], org_id=org_id
         )
         if membership.role_id != changes["role_id"]:
@@ -359,41 +276,19 @@ async def set_user_status(
       - the target still has open records (409) — the caller must
         run `POST /users/{id}/transfer-records` to a new owner first.
     """
-    # Imported lazily to avoid a circular import at module load:
-    # offboarding depends on every entity's service which in turn
-    # imports core.users for the OrganizationMember type.
-    from src.app.core.users.offboarding import (
-        assert_not_owner_role,
-        compute_open_records_counts,
+    user, membership = await data_access.require_membership(
+        session,
+        user_uuid=user_id,
+        org_id=org_id,
+        on_missing=status.HTTP_404_NOT_FOUND,
     )
-
-    user = await get_user_by_id(session, user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"user {user_id} not found",
-        )
-
-    membership = (
-        await session.execute(
-            select(OrganizationMember).where(
-                OrganizationMember.user_member_id == user.id,
-                OrganizationMember.organization_id == org_id,
-            )
-        )
-    ).scalar_one_or_none()
-    if membership is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"user {user_id} is not a member of this org",
-        )
 
     if not is_active:
         # Owner guard first — the most authoritative refusal.
-        await assert_not_owner_role(
+        await data_access.assert_not_owner_role(
             session, user_uuid=user_id, org_id=org_id
         )
-        counts = await compute_open_records_counts(
+        counts = await data_access.compute_open_records_counts(
             session, user_uuid=user_id, org_id=org_id
         )
         if counts["total"] > 0:
@@ -450,11 +345,7 @@ async def update_self(
     inviting a new account. Only the profile fields the user can
     self-manage are honoured here.
     """
-    profile = (
-        await session.execute(
-            select(UserInfo).where(UserInfo.member_id == user.id)
-        )
-    ).scalar_one_or_none()
+    profile = await data_access.get_user_info(session, user.id)
     if profile is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -26,11 +26,10 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.core.auth.models import AuthSession
 from src.app.core.permissions.service import list_permissions_for_role
 from src.app.core.users.models import User
-from src.app.core.users.service import get_user_by_id
 from src.app.shared.context import get_context
 from src.app.shared.db import get_db
 
@@ -58,7 +57,7 @@ async def get_current_user(db: AsyncSession = Depends(get_db)) -> User:
     if session.expires_at <= datetime.now(timezone.utc):
         raise UNAUTHORIZED
 
-    user = await get_user_by_id(db, ctx.user_id)
+    user = await data_access.get_user_by_uuid(db, ctx.user_id)
     if user is None or not user.is_active:
         raise UNAUTHORIZED
     return user
@@ -89,7 +88,7 @@ async def get_current_staff(db: AsyncSession = Depends(get_db)) -> User:
     if session.expires_at <= datetime.now(timezone.utc):
         raise UNAUTHORIZED
 
-    user = await get_user_by_id(db, ctx.user_id)
+    user = await data_access.get_user_by_uuid(db, ctx.user_id)
     if user is None or not user.is_active:
         raise UNAUTHORIZED
     return user

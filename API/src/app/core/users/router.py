@@ -27,10 +27,8 @@ from src.app.core.permissions.service import (
 )
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import User
-from src.app.core.users.offboarding import (
-    compute_open_records_counts,
-    transfer_records,
-)
+from src.app.core import data_access
+from src.app.core.users.offboarding import transfer_records
 from src.app.core.users.schemas import (
     MeUpdate,
     OpenRecordsCounts,
@@ -189,9 +187,9 @@ async def open_records_counts_endpoint(
     """Per-entity open-record counts for one user — feeds the
     deactivation modal so the admin can see what would need to be
     transferred. The five entities counted: contacts, leads,
-    walk_ins, appointments, tasks. See `offboarding.py` for the
+    walk_ins, appointments, tasks. See `data_access.memberships` for the
     "open" predicates."""
-    counts = await compute_open_records_counts(
+    counts = await data_access.compute_open_records_counts(
         session, user_uuid=user_id, org_id=_user.org_id
     )
     return OpenRecordsCounts(

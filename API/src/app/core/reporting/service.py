@@ -2,7 +2,7 @@
 
 The first report is `compute_workload`, which loops over every member
 of the org and runs the same per-entity "open" predicates that
-`users/offboarding.compute_open_records_counts` uses for the
+`data_access.memberships.compute_open_records_counts` uses for the
 deactivation modal. Same predicates → same numbers, so the Settings
 → Staff Workload tab and the deactivation modal never disagree.
 
@@ -21,8 +21,8 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core import data_access
 from src.app.core.users.models import OrganizationMember, User, UserInfo
-from src.app.core.users.offboarding import compute_open_records_counts
 
 
 async def compute_workload(
@@ -56,7 +56,7 @@ async def compute_workload(
         if user.legacy_uuid is None:
             # Shouldn't happen post-DR.6.2 backfill; defensively skip.
             continue
-        counts = await compute_open_records_counts(
+        counts = await data_access.compute_open_records_counts(
             session, user_uuid=user.legacy_uuid, org_id=org_id
         )
         entries.append(
