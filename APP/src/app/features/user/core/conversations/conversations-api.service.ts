@@ -17,6 +17,70 @@ export type ConversationStatus = 'open' | 'snoozed' | 'closed';
 
 export type MessageDirection = 'in' | 'out';
 
+export interface ConversationTagRef {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface ConversationTag {
+  id: string;
+  name: string;
+  color: string;
+  created_by_user_id: string | null;
+  created_at: string;
+  usage_count: number;
+}
+
+export type TagColor =
+  | 'zinc'
+  | 'rose'
+  | 'amber'
+  | 'yellow'
+  | 'lime'
+  | 'emerald'
+  | 'teal'
+  | 'sky'
+  | 'blue'
+  | 'indigo'
+  | 'violet'
+  | 'fuchsia';
+
+export const TAG_PALETTE: TagColor[] = [
+  'zinc',
+  'rose',
+  'amber',
+  'yellow',
+  'lime',
+  'emerald',
+  'teal',
+  'sky',
+  'blue',
+  'indigo',
+  'violet',
+  'fuchsia',
+];
+
+/**
+ * Tailwind class lookup for tag chips. Kept in lockstep with the
+ * backend `_TAG_COLORS` set in `conversations/schemas.py` — adding a
+ * color to one without the other breaks rendering.
+ */
+export const TAG_COLOR_CLASSES: Record<TagColor, string> = {
+  zinc: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+  rose: 'bg-rose-100 text-rose-700 ring-rose-200',
+  amber: 'bg-amber-100 text-amber-800 ring-amber-200',
+  yellow: 'bg-yellow-100 text-yellow-800 ring-yellow-200',
+  lime: 'bg-lime-100 text-lime-800 ring-lime-200',
+  emerald: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+  teal: 'bg-teal-100 text-teal-700 ring-teal-200',
+  sky: 'bg-sky-100 text-sky-700 ring-sky-200',
+  blue: 'bg-blue-100 text-blue-700 ring-blue-200',
+  indigo: 'bg-indigo-100 text-indigo-700 ring-indigo-200',
+  violet: 'bg-violet-100 text-violet-700 ring-violet-200',
+  fuchsia: 'bg-fuchsia-100 text-fuchsia-700 ring-fuchsia-200',
+};
+
 export interface Conversation {
   id: string;
   org_id: string;
@@ -29,6 +93,8 @@ export interface Conversation {
   last_message_at: string | null;
   unread_count: number;
   created_at: string;
+  /** Step 14 — assigned tag chips. Empty array when none / not loaded. */
+  tags: ConversationTagRef[];
 }
 
 export interface ConversationListResponse {
@@ -89,6 +155,8 @@ export interface ConversationListQuery {
   status?: ConversationStatus;
   assigned_to?: string;
   q?: string;
+  /** Step 14 — OR-semantic filter on tag ids. */
+  tag_ids?: string[];
   page?: number;
   size?: number;
 }
@@ -110,6 +178,7 @@ export class ConversationsApiService {
       status: query.status,
       assigned_to: query.assigned_to,
       q: query.q,
+      tag_ids: query.tag_ids,
       page: query.page,
       size: query.size,
     });
@@ -212,5 +281,63 @@ export class ConversationsApiService {
 
   patch(id: string, payload: ConversationPatch): Observable<Conversation> {
     return this.http.patch<Conversation>(`${this.base}/${id}`, payload);
+  }
+
+  // --- Tags (whatsapp-platform-upgrade Step 14) -----------------------
+
+  /** List every tag in the active org with its assignment count. */
+  listTags(search?: string): Observable<ConversationTag[]> {
+    const params = buildHttpParams({ search });
+    return this.http.get<ConversationTag[]>(
+      `${this.base}/tags`,
+      { params },
+    );
+  }
+
+  /** Create a new tag. Server enforces case-insensitive uniqueness;
+   *  409 on duplicate. */
+  createTag(name: string, color: TagColor): Observable<ConversationTag> {
+    return this.http.post<ConversationTag>(`${this.base}/tags`, {
+      name,
+      color,
+    });
+  }
+
+  /** Rename / recolor an existing tag. Both fields optional. */
+  updateTag(
+    tagId: string,
+    patch: { name?: string; color?: TagColor },
+  ): Observable<ConversationTag> {
+    return this.http.patch<ConversationTag>(
+      `${this.base}/tags/${tagId}`,
+      patch,
+    );
+  }
+
+  /** Delete a tag. Cascade-removes every assignment. */
+  deleteTag(tagId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/tags/${tagId}`);
+  }
+
+  /** Attach a tag to a conversation. Idempotent. Returns the updated
+   *  tag list so the SPA can swap chips without a follow-up fetch. */
+  assignTag(
+    conversationId: string,
+    tagId: string,
+  ): Observable<ConversationTagRef[]> {
+    return this.http.post<ConversationTagRef[]>(
+      `${this.base}/${conversationId}/tags`,
+      { tag_id: tagId },
+    );
+  }
+
+  /** Detach a tag from a conversation. Idempotent. */
+  unassignTag(
+    conversationId: string,
+    tagId: string,
+  ): Observable<ConversationTagRef[]> {
+    return this.http.delete<ConversationTagRef[]>(
+      `${this.base}/${conversationId}/tags/${tagId}`,
+    );
   }
 }

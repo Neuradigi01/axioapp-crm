@@ -22,6 +22,8 @@ import {
   ownerColor,
   staffInitials,
 } from '../shared/owner-color.util';
+import { TagChipComponent } from './tag-chip.component';
+import { TagFilterComponent } from './tag-filter.component';
 
 interface ChannelBadgeStyle {
   label: string;
@@ -96,7 +98,12 @@ const ASSIGNEE_MODES: Array<{ value: AssigneeMode; label: string }> = [
   selector: 'app-conversation-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, LucideAngularModule],
+  imports: [
+    FormsModule,
+    LucideAngularModule,
+    TagChipComponent,
+    TagFilterComponent,
+  ],
   templateUrl: './conversation-list.component.html',
 })
 export class ConversationListComponent {
@@ -119,6 +126,13 @@ export class ConversationListComponent {
   /** Emits the value that should be sent as `?assigned_to=…` on the
    * conversations list endpoint. `undefined` means "no filter" ("All"). */
   @Output() readonly assigneeChange = new EventEmitter<string | undefined>();
+  /** Step 14 — emits the active tag-filter id array. Parent feeds
+   *  this back into the list `tag_ids` query param (OR semantics). */
+  @Output() readonly tagFilterChange = new EventEmitter<string[]>();
+
+  /** Active tag-filter ids — hydrated by the parent so a refresh
+   *  doesn't reset the filter. */
+  @Input() tagFilterIds: string[] = [];
 
   protected readonly statusOptions = STATUS_OPTIONS;
   protected readonly channelOptions = CHANNEL_OPTIONS;

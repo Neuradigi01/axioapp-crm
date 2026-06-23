@@ -15,6 +15,7 @@ import {
   ConversationDetail,
   ConversationListQuery,
   ConversationMessage,
+  ConversationTagRef,
   ConversationsApiService,
 } from './conversations-api.service';
 import { ChatThreadComponent } from './chat-thread.component';
@@ -182,6 +183,38 @@ export class ConversationsPageComponent {
     });
     this.persistAssignee(value);
     this.reloadList();
+  }
+
+  // --- Tags (Step 14) ------------------------------------------------
+
+  protected readonly tagFilterIds = signal<string[]>([]);
+
+  protected onTagFilterChange(ids: string[]): void {
+    this.tagFilterIds.set(ids);
+    this.filters.update((prev) => {
+      const { tag_ids: _omit, ...rest } = prev;
+      return ids.length > 0 ? { ...rest, tag_ids: ids } : rest;
+    });
+    this.reloadList();
+  }
+
+  /** Step 14 — tag-manager dispatched a change. Patch the row in
+   *  both the list signal and the detail signal so chips refresh
+   *  immediately without a follow-up fetch. */
+  protected onTagsChanged(tags: ConversationTagRef[]): void {
+    const id = this.selectedId();
+    if (!id) return;
+    this.items.update((rows) =>
+      rows.map((r) => (r.id === id ? { ...r, tags } : r)),
+    );
+    this.detail.update((d) =>
+      d
+        ? {
+            ...d,
+            conversation: { ...d.conversation, tags },
+          }
+        : d,
+    );
   }
 
   // --- sessionStorage helpers (org-prefixed) ------------------------------

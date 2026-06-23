@@ -1,7 +1,7 @@
 # Step 14 — Tags and labels on conversations
 
 **Goal:** Org-scoped tags for conversations with CRUD, assign/unassign, multi-tag OR filter in inbox, and chip display in list rows + conversation header.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 13 (conversation-level patterns established).
 
 ---

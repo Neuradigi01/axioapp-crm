@@ -72,6 +72,7 @@ async def list_conversations(
     status_filter: Optional[ConversationStatus] = None,
     assigned_to: Optional[str] = None,
     q: Optional[str] = None,
+    tag_ids: Optional[list[uuid.UUID]] = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Conversation], int]:
@@ -97,6 +98,19 @@ async def list_conversations(
             filters.append(Conversation.assigned_to_id == owner_uuid)
     if q:
         filters.append(Conversation.external_id.ilike(f"%{q}%"))
+    # Step 14 — OR-semantic tag filter. A conversation matches when it
+    # carries AT LEAST ONE of the listed tag ids.
+    if tag_ids:
+        from src.app.core.conversations.models import (
+            ConversationTagAssignment,
+        )
+
+        tagged_subquery = (
+            select(ConversationTagAssignment.conversation_id)
+            .where(ConversationTagAssignment.tag_id.in_(tag_ids))
+            .scalar_subquery()
+        )
+        filters.append(Conversation.id.in_(tagged_subquery))
 
     where = and_(*filters) if filters else None
     base = select(Conversation)

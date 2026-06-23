@@ -17,9 +17,12 @@ import {
   Conversation,
   ConversationDetail,
   ConversationMessage,
+  ConversationTagRef,
   MessageReaction,
 } from './conversations-api.service';
 import { ReactionPickerComponent } from './reaction-picker.component';
+import { TagChipComponent } from './tag-chip.component';
+import { TagManagerComponent } from './tag-manager.component';
 import { StaffListItem } from '../staff/staff-api.service';
 import {
   OwnerColor,
@@ -40,7 +43,12 @@ import { FurnitureAuthService } from '../auth/auth.service';
   selector: 'app-chat-thread',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, ReactionPickerComponent],
+  imports: [
+    LucideAngularModule,
+    ReactionPickerComponent,
+    TagChipComponent,
+    TagManagerComponent,
+  ],
   templateUrl: './chat-thread.component.html',
 })
 export class ChatThreadComponent implements AfterViewChecked {
@@ -71,6 +79,27 @@ export class ChatThreadComponent implements AfterViewChecked {
   /** Which message currently has its reaction picker open. Null = none.
    *  Toggled by the React button on the hover action bar. */
   protected readonly pickerOpenFor = signal<string | null>(null);
+
+  /** Step 14 — visibility of the tag-manager dropdown on the
+   *  conversation header. */
+  protected readonly tagManagerOpen = signal<boolean>(false);
+
+  /** Step 14 — emitted when the tag list on the active conversation
+   *  changes (assign / unassign / create). The page updates the
+   *  conversation row in its `items` list + the detail. */
+  @Output() readonly tagsChanged = new EventEmitter<ConversationTagRef[]>();
+
+  protected toggleTagManager(): void {
+    this.tagManagerOpen.update((v) => !v);
+  }
+
+  protected closeTagManager(): void {
+    this.tagManagerOpen.set(false);
+  }
+
+  protected onTagsChanged(tags: ConversationTagRef[]): void {
+    this.tagsChanged.emit(tags);
+  }
 
   /** Permission gate for the reassign click target — same key the
    * backend enforces on `PATCH /api/v1/conversations/{id}`. */

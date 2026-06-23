@@ -15,5 +15,14 @@ MODULE = ModuleDescriptor(
     route="/api/v1/conversations",
     frontend_route="/user/conversations",
     menu_position=500,
-    permissions=["conversations.read", "conversations.write"],
+    permissions=[
+        "conversations.read",
+        "conversations.write",
+        # whatsapp-platform-upgrade Step 14 — gate for tag CRUD.
+        # Assignment continues to use `conversations.write`; only
+        # creating / editing / deleting the tag library requires the
+        # manage key. Owner + Admin get it; Employee does not by
+        # default (they assign existing tags but don't manage the set).
+        "settings.conversations.manage",
+    ],
 )

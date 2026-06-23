@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.app.shared.schemas import ORMModel, PaginatedResponse
 from src.app.core.conversations.models import (
@@ -177,6 +177,87 @@ class MessageSendPayload(BaseModel):
     reply_to_message_id: Optional[uuid.UUID] = None
 
 
+# --- Tags (whatsapp-platform-upgrade Step 14) ------------------------
+
+
+# Fixed palette — keys map to Tailwind class sets on the frontend
+# (`bg-{color}-100 text-{color}-700 ring-{color}-200`). The list is
+# explicit (not free-form hex) so the picker can't ship low-contrast
+# colors. Add to this set before adding to the picker.
+_TAG_COLORS = {
+    "zinc",
+    "rose",
+    "amber",
+    "yellow",
+    "lime",
+    "emerald",
+    "teal",
+    "sky",
+    "blue",
+    "indigo",
+    "violet",
+    "fuchsia",
+}
+
+
+class TagCreate(BaseModel):
+    """Body of ``POST /api/v1/conversations/tags``.
+
+    Names are trimmed + case-insensitively unique per-org (DB-level
+    enforcement via the `uq_conv_tags_org_lower_name` functional
+    index)."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=64)
+    color: str = Field(default="zinc", max_length=16)
+
+    @model_validator(mode="after")
+    def _check_color_in_palette(self) -> "TagCreate":
+        if self.color not in _TAG_COLORS:
+            raise ValueError(
+                f"color must be one of: {sorted(_TAG_COLORS)}"
+            )
+        return self
+
+
+class TagUpdate(BaseModel):
+    """Body of ``PATCH /api/v1/conversations/tags/{id}``. Both fields
+    optional — only supplied keys are applied."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    color: Optional[str] = Field(default=None, max_length=16)
+
+    @model_validator(mode="after")
+    def _check_color(self) -> "TagUpdate":
+        if self.color is not None and self.color not in _TAG_COLORS:
+            raise ValueError(
+                f"color must be one of: {sorted(_TAG_COLORS)}"
+            )
+        return self
+
+
+class TagOut(ORMModel):
+    id: uuid.UUID
+    name: str
+    color: str
+    created_by_user_id: Optional[uuid.UUID] = None
+    created_at: datetime
+    # Populated by `list_tags` (count of assignments). Defaults to 0
+    # when read via the per-conversation embed.
+    usage_count: int = 0
+
+
+class AssignTagRequest(BaseModel):
+    """Body of ``POST /api/v1/conversations/{id}/tags``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tag_id: uuid.UUID
+
+
 class NoteCreate(BaseModel):
     """Body of ``POST /api/v1/conversations/{id}/notes``.
 
@@ -224,6 +305,10 @@ class ConversationOut(ORMModel):
     last_message_at: Optional[datetime]
     unread_count: int
     created_at: datetime
+    # Step 14 — assigned tags as embedded `{id, name, color}` triples.
+    # Populated by the list / detail services; defaults to empty when
+    # not selected for performance.
+    tags: list[dict[str, Any]] = Field(default_factory=list)
 
 
 ConversationListResponse = PaginatedResponse[ConversationOut]

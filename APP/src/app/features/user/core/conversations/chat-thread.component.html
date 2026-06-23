@@ -44,6 +44,30 @@
           {{ staffNameFor(conversation.assigned_to_id) }}
         </span>
       }
+      <!-- Step 14 — Tags button with chip-row preview + manager dropdown -->
+      <div class="relative">
+        <button
+          type="button"
+          (click)="toggleTagManager(); $event.stopPropagation()"
+          class="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          aria-label="Tags"
+        >
+          <lucide-icon name="tag" class="h-3 w-3" />
+          @if (conversation.tags && conversation.tags.length > 0) {
+            <span>{{ conversation.tags.length }}</span>
+          } @else {
+            <span>Tags</span>
+          }
+        </button>
+        @if (tagManagerOpen()) {
+          <app-tag-manager
+            [conversationId]="conversation.id"
+            [assignedTags]="conversation.tags || []"
+            (tagsChanged)="onTagsChanged($event)"
+            (close)="closeTagManager()"
+          />
+        }
+      </div>
       <button
         type="button"
         (click)="toggle()"
@@ -58,6 +82,16 @@
       </button>
     </div>
   </div>
+
+  @if (conversation.tags && conversation.tags.length > 0) {
+    <div class="border-b border-zinc-100 bg-white px-4 py-2">
+      <div class="flex flex-wrap gap-1">
+        @for (t of conversation.tags; track t.id) {
+          <app-tag-chip [tag]="t" />
+        }
+      </div>
+    </div>
+  }
 
   <!-- Messages -->
   <div

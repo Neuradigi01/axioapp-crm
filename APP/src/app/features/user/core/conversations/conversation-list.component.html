@@ -59,6 +59,13 @@
         }
       </select>
     }
+    <!-- Step 14 — tag filter chip (hidden when org has no tags) -->
+    <div class="flex items-center justify-end">
+      <app-tag-filter
+        [value]="tagFilterIds"
+        (filterChange)="tagFilterChange.emit($event)"
+      />
+    </div>
   </div>
 
   <!-- List -->
@@ -126,6 +133,21 @@
                     </span>
                   }
                 </div>
+                @if (c.tags && c.tags.length > 0) {
+                  <!-- Step 14 — inline tag chips on list rows. Cap at 3
+                       visible + "+N more" so the row height stays
+                       stable even for over-tagged conversations. -->
+                  <div class="mt-1 flex flex-wrap items-center gap-1">
+                    @for (t of c.tags.slice(0, 3); track t.id) {
+                      <app-tag-chip [tag]="t" />
+                    }
+                    @if (c.tags.length > 3) {
+                      <span class="text-[10px] text-zinc-500">
+                        +{{ c.tags.length - 3 }} more
+                      </span>
+                    }
+                  </div>
+                }
               </div>
               @if (c.unread_count > 0) {
                 <span class="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">

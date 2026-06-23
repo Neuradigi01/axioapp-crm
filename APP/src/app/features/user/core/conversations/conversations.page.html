@@ -44,8 +44,10 @@
         [staffById]="staffById()"
         [currentUserId]="currentUserId() ?? ''"
         [initialAssignee]="initialAssignee"
+        [tagFilterIds]="tagFilterIds()"
         (filtersChange)="onFiltersChange($event)"
         (assigneeChange)="onAssigneeFilterChange($event)"
+        (tagFilterChange)="onTagFilterChange($event)"
         (select)="onSelect($event)"
       />
     </aside>
@@ -62,6 +64,7 @@
           (reassign)="openReassign()"
           (replyTo)="onReplyTo($event)"
           (react)="onReact($event)"
+          (tagsChanged)="onTagsChanged($event)"
         />
         <app-compose-bar
           [aiHandling]="conv.ai_handling"

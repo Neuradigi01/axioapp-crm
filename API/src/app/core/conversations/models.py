@@ -31,6 +31,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy import text as sql_text
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB, UUID
@@ -223,6 +224,74 @@ class Message(Base, TenantScoped):
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+
+
+class ConversationTag(Base, TenantScoped):
+    """Operator-defined label for conversations
+    (whatsapp-platform-upgrade Step 14).
+
+    Org-scoped, case-insensitively unique per-org by name. `color` is
+    a fixed-palette key the frontend maps to a Tailwind class set —
+    keeps the column small + the choices accessible."""
+
+    __tablename__ = "tbl_conversation_tags"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    name: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    color: Mapped[str] = mapped_column(
+        String(length=16),
+        nullable=False,
+        server_default=sql_text("'zinc'"),
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+
+
+class ConversationTagAssignment(Base, TenantScoped):
+    """Many-to-many between conversations and tags. CASCADE on both
+    legs so deleting a tag or a conversation cleans up the bridge
+    rows automatically."""
+
+    __tablename__ = "tbl_conversation_tag_assignments"
+    __table_args__ = (
+        UniqueConstraint(
+            "conversation_id", "tag_id", name="uq_conv_tag_assignment"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_conversations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_conversation_tags.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tagged_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    tagged_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=sql_text("now()"),

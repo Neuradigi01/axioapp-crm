@@ -60,6 +60,8 @@ _CORE_ADMIN_KEYS: list[str] = [
     "walk_ins.read", "walk_ins.write",
     "catalog.read", "catalog.write",
     "conversations.read", "conversations.write",
+    # whatsapp-platform-upgrade Step 14 — tag CRUD. Owner + Admin only.
+    "settings.conversations.manage",
     "calls.read", "calls.write", "calls.outcomes.manage",
     "reviews.read", "reviews.write",
     "campaigns.read", "campaigns.write", "campaigns.send",

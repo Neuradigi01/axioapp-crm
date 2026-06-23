@@ -26,6 +26,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     UploadFile,
     status,
 )
@@ -54,6 +55,7 @@ from src.app.core.conversations.registry import (
 )
 from src.app.core.conversations.notes_service import post_note
 from src.app.core.conversations.schemas import (
+    AssignTagRequest,
     AttachmentType,
     ConversationDetail,
     ConversationListResponse,
@@ -63,6 +65,19 @@ from src.app.core.conversations.schemas import (
     MessageSendPayload,
     NoteCreate,
     ReactionRequest,
+    TagCreate,
+    TagOut,
+    TagUpdate,
+)
+from src.app.core.conversations.tags_service import (
+    assign_tag,
+    bulk_tags_for_conversations,
+    create_tag,
+    delete_tag,
+    list_tags,
+    list_tags_for_conversation,
+    unassign_tag,
+    update_tag,
 )
 from src.app.core.conversations.service import (
     get_conversation,
@@ -90,6 +105,9 @@ async def list_endpoint(
     # to `IS NULL`; anything else is rejected with a 422-style error.
     assigned_to: Optional[str] = Query(default=None, max_length=64),
     q: Optional[str] = Query(default=None, max_length=255),
+    # Step 14 — OR-semantic tag filter. Repeat the query param to
+    # match multiple tags: ?tag_ids=uuid1&tag_ids=uuid2.
+    tag_ids: Optional[list[uuid.UUID]] = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -101,14 +119,22 @@ async def list_endpoint(
         status_filter=status_,
         assigned_to=assigned_to,
         q=q,
+        tag_ids=tag_ids,
         page=page,
         size=size,
     )
+    # Bulk-fetch tags for the rows we're about to return so the chip
+    # row in the list view doesn't N+1.
+    tags_by_conv = await bulk_tags_for_conversations(
+        db, [r.id for r in rows]
+    )
+    items = []
+    for r in rows:
+        out = ConversationOut.model_validate(r)
+        out.tags = tags_by_conv.get(r.id, [])
+        items.append(out)
     return ConversationListResponse(
-        items=[ConversationOut.model_validate(r) for r in rows],
-        total=total,
-        page=page,
-        size=size,
+        items=items, total=total, page=page, size=size
     )
 
 
@@ -120,9 +146,122 @@ async def get_detail_endpoint(
 ) -> ConversationDetail:
     conv = await get_conversation(db, conversation_id)
     msgs = await list_messages(db, conversation_id)
+    conv_out = ConversationOut.model_validate(conv)
+    conv_out.tags = await list_tags_for_conversation(db, conversation_id)
     return ConversationDetail(
-        conversation=ConversationOut.model_validate(conv),
+        conversation=conv_out,
         messages=[MessageOut.model_validate(m) for m in msgs],
+    )
+
+
+# --- Tags (whatsapp-platform-upgrade Step 14) -----------------------------
+
+
+@router.get("/tags", response_model=list[TagOut])
+async def list_tags_endpoint(
+    search: Optional[str] = Query(default=None, max_length=64),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.read")),
+) -> list[TagOut]:
+    """Return every tag in the active org with its assignment count.
+    Read-gated on `conversations.read` so junior staff can render the
+    chip palette + filter chip without needing the manage key."""
+    rows = await list_tags(db, search=search)
+    return [TagOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/tags", response_model=TagOut, status_code=status.HTTP_201_CREATED
+)
+async def create_tag_endpoint(
+    payload: TagCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("settings.conversations.manage")
+    ),
+) -> TagOut:
+    tag = await create_tag(
+        db,
+        actor_id=user.legacy_uuid,
+        org_id=user.org_id,
+        name=payload.name,
+        color=payload.color,
+    )
+    return TagOut.model_validate(tag)
+
+
+@router.patch("/tags/{tag_id}", response_model=TagOut)
+async def update_tag_endpoint(
+    tag_id: uuid.UUID,
+    payload: TagUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("settings.conversations.manage")
+    ),
+) -> TagOut:
+    tag = await update_tag(
+        db,
+        actor_id=user.legacy_uuid,
+        tag_id=tag_id,
+        name=payload.name,
+        color=payload.color,
+    )
+    return TagOut.model_validate(tag)
+
+
+@router.delete(
+    "/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_tag_endpoint(
+    tag_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("settings.conversations.manage")
+    ),
+) -> Response:
+    await delete_tag(
+        db, actor_id=user.legacy_uuid, tag_id=tag_id
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{conversation_id}/tags",
+    response_model=list[dict[str, Any]],
+)
+async def assign_tag_endpoint(
+    conversation_id: uuid.UUID,
+    payload: AssignTagRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> list[dict[str, Any]]:
+    """Attach an existing tag to a conversation. Idempotent — a
+    re-assignment is a no-op. Returns the post-assignment tag list
+    so the SPA can swap chips without re-fetching."""
+    return await assign_tag(
+        db,
+        actor_id=user.legacy_uuid,
+        org_id=user.org_id,
+        conversation_id=conversation_id,
+        tag_id=payload.tag_id,
+    )
+
+
+@router.delete(
+    "/{conversation_id}/tags/{tag_id}",
+    response_model=list[dict[str, Any]],
+)
+async def unassign_tag_endpoint(
+    conversation_id: uuid.UUID,
+    tag_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> list[dict[str, Any]]:
+    return await unassign_tag(
+        db,
+        actor_id=user.legacy_uuid,
+        conversation_id=conversation_id,
+        tag_id=tag_id,
     )
 
 
