@@ -393,6 +393,24 @@ async def receive_webhook(
             )
 
             await dispatch_assignment(session, conversation=conv)
+
+        # whatsapp-platform-upgrade Step 19 — AI agent. When the
+        # conversation has `ai_handling=true`, the AI reply pipeline
+        # generates a response (or escalates to a human on low
+        # confidence / handover keyword / explicit AI request).
+        # Failures are caught inside; this call never raises into
+        # the webhook handler.
+        await session.refresh(conv)
+        if conv.ai_handling:
+            from src.app.core.integrations.whatsapp.ai_handler import (
+                dispatch_ai_response,
+            )
+
+            await dispatch_ai_response(
+                session,
+                conversation=conv,
+                inbound_text=parsed.text,
+            )
     return msg
 
 
@@ -588,12 +606,34 @@ async def _find_or_create_conversation(
             session, org_id=ctx.org_id, phone=external_id
         )
 
+    # whatsapp-platform-upgrade Step 19 — if the org has
+    # `ai_handling_default_enabled=true` on its WhatsApp config,
+    # the new conversation lands with `ai_handling=true` so the AI
+    # agent handles it from the very first inbound. Best-effort
+    # lookup: errors fall back to the default-off behaviour.
+    ai_handling_default = False
+    if channel == ConversationChannel.whatsapp:
+        try:
+            from src.app.core.integrations.whatsapp.connect import (
+                get_active_config,
+            )
+
+            bundle = await get_active_config(session)
+            if bundle is not None:
+                _, wa_config = bundle
+                ai_handling_default = bool(
+                    getattr(wa_config, "ai_handling_default_enabled", False)
+                )
+        except Exception:
+            pass
+
     conv = Conversation(
         org_id=ctx.org_id,
         channel=channel,
         external_id=external_id,
         contact_id=contact_id,
         status=ConversationStatus.open,
+        ai_handling=ai_handling_default,
     )
     session.add(conv)
     await session.flush()

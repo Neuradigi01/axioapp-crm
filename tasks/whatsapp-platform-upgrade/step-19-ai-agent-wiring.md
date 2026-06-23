@@ -1,7 +1,7 @@
 # Step 19 — AI agent wiring on WhatsApp
 
 **Goal:** Wire the orphan `tbl_conversations.ai_handling` field to the existing `core/ai/` module. When AI handling is enabled on a conversation, inbound messages route through the AI agent → response sent back through WhatsApp adapter as an outbound message. Handover to human on confidence threshold / explicit request / manual override.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 17 (automation pipeline), Step 18 (assignment fallback on handover).
 
 ---

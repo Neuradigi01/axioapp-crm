@@ -137,6 +137,21 @@ export class WhatsAppAutomationApiService {
       { rule_ids: ruleIds },
     );
   }
+
+  // --- AI settings (whatsapp-platform-upgrade Step 19) --------------
+
+  private readonly aiBase = `${environment.apiBaseUrl}/integrations/whatsapp/ai`;
+
+  getAISettings(): Observable<AISettings> {
+    return this.http.get<AISettings>(`${this.aiBase}/settings`);
+  }
+
+  patchAISettings(payload: AISettingsPatch): Observable<AISettings> {
+    return this.http.patch<AISettings>(
+      `${this.aiBase}/settings`,
+      payload,
+    );
+  }
 }
 
 
@@ -169,4 +184,21 @@ export interface AssignmentRuleUpsert {
   enabled: boolean;
   priority: number;
   skip_outside_hours: boolean;
+}
+
+
+// --- Step 19 — AI settings ----------------------------------------
+
+export interface AISettings {
+  ai_handling_default_enabled: boolean;
+  ai_confidence_threshold: number;
+  ai_handover_keywords: string[];
+  ai_system_prompt: string | null;
+}
+
+export interface AISettingsPatch {
+  ai_handling_default_enabled?: boolean;
+  ai_confidence_threshold?: number;
+  ai_handover_keywords?: string[];
+  ai_system_prompt?: string | null;
 }

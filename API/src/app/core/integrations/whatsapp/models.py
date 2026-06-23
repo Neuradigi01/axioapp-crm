@@ -24,7 +24,16 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -197,6 +206,22 @@ class WhatsAppAccountConfig(Base, TenantScoped):
         UUID(as_uuid=True),
         ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    # whatsapp-platform-upgrade Step 19 — AI agent settings. The
+    # per-conversation toggle lives on ``tbl_conversations.ai_handling``
+    # (existing column); these are the org-wide knobs the operator
+    # tunes via Automation → AI Settings.
+    ai_handling_default_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    ai_confidence_threshold: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default=text("0.6")
+    )
+    ai_handover_keywords: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
+    ai_system_prompt: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

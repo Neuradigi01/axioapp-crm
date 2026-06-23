@@ -32,7 +32,10 @@ from src.app.core.integrations.whatsapp.models import (
     WhatsAppKeywordAction,
     WhatsAppKeywordRule,
 )
+from src.app.core.integrations.whatsapp.connect import get_active_config
 from src.app.core.integrations.whatsapp.schemas import (
+    AISettingsPatch,
+    AISettingsRead,
     AssignmentRuleRead,
     AssignmentRuleReorder,
     AssignmentRuleUpsert,
@@ -535,3 +538,109 @@ async def reorder_assignment_rules_endpoint(
         )
     ).scalars().all()
     return [AssignmentRuleRead.model_validate(r) for r in refreshed]
+
+
+# --- AI settings (whatsapp-platform-upgrade Step 19) --------------------
+
+
+ai_settings_router = APIRouter(
+    prefix="/whatsapp/ai",
+    tags=["Integrations · WhatsApp · Automation"],
+)
+
+
+@ai_settings_router.get(
+    "/settings", response_model=AISettingsRead
+)
+async def get_ai_settings_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(
+        require_permissions("whatsapp.automation.manage")
+    ),
+) -> AISettingsRead:
+    """Read the org-wide AI knobs (default-enable, confidence
+    threshold, handover keywords, system prompt). 409 when the org
+    hasn't connected WhatsApp — the rest of the page handles that
+    branch already."""
+    bundle = await get_active_config(db)
+    if bundle is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="WhatsApp is not connected for this org.",
+        )
+    _, config = bundle
+    return AISettingsRead(
+        ai_handling_default_enabled=config.ai_handling_default_enabled,
+        ai_confidence_threshold=float(config.ai_confidence_threshold),
+        ai_handover_keywords=list(config.ai_handover_keywords or []),
+        ai_system_prompt=config.ai_system_prompt,
+    )
+
+
+@ai_settings_router.patch(
+    "/settings", response_model=AISettingsRead
+)
+async def patch_ai_settings_endpoint(
+    payload: AISettingsPatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(
+        require_permissions("whatsapp.automation.manage")
+    ),
+) -> AISettingsRead:
+    bundle = await get_active_config(db)
+    if bundle is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="WhatsApp is not connected for this org.",
+        )
+    _, config = bundle
+
+    patch_dict = payload.model_dump(exclude_unset=True, mode="python")
+    before = {
+        "ai_handling_default_enabled": config.ai_handling_default_enabled,
+        "ai_confidence_threshold": float(config.ai_confidence_threshold),
+        "ai_handover_keywords": list(config.ai_handover_keywords or []),
+        "ai_system_prompt": config.ai_system_prompt,
+    }
+
+    if "ai_handling_default_enabled" in patch_dict:
+        config.ai_handling_default_enabled = bool(
+            patch_dict["ai_handling_default_enabled"]
+        )
+    if "ai_confidence_threshold" in patch_dict:
+        config.ai_confidence_threshold = float(
+            patch_dict["ai_confidence_threshold"]
+        )
+    if "ai_handover_keywords" in patch_dict:
+        # Strip + filter blanks at the boundary so the engine never
+        # has to defend against empty-string substring matches.
+        raw = patch_dict["ai_handover_keywords"] or []
+        config.ai_handover_keywords = [
+            kw.strip() for kw in raw if isinstance(kw, str) and kw.strip()
+        ]
+    if "ai_system_prompt" in patch_dict:
+        config.ai_system_prompt = (
+            patch_dict["ai_system_prompt"] or None
+        )
+
+    await db.commit()
+    await db.refresh(config)
+    await audit.log(
+        "integration.whatsapp.ai_settings_updated",
+        entity_type="whatsapp_account",
+        entity_id=config.id,
+        user_id=user.legacy_uuid,
+        before=before,
+        after={
+            "ai_handling_default_enabled": config.ai_handling_default_enabled,
+            "ai_confidence_threshold": float(config.ai_confidence_threshold),
+            "ai_handover_keywords": list(config.ai_handover_keywords or []),
+            "ai_system_prompt": config.ai_system_prompt,
+        },
+    )
+    return AISettingsRead(
+        ai_handling_default_enabled=config.ai_handling_default_enabled,
+        ai_confidence_threshold=float(config.ai_confidence_threshold),
+        ai_handover_keywords=list(config.ai_handover_keywords or []),
+        ai_system_prompt=config.ai_system_prompt,
+    )

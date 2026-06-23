@@ -354,6 +354,47 @@ class WhatsAppPhoneHealthRead(BaseModel):
     events: list[WhatsAppPhoneHealthEventRead] = Field(default_factory=list)
 
 
+# --- AI settings (whatsapp-platform-upgrade Step 19) -----------------
+
+
+class AISettingsRead(BaseModel):
+    """Response shape for ``GET /api/v1/integrations/whatsapp/ai/settings``.
+
+    The per-conversation ``ai_handling`` toggle lives on
+    `tbl_conversations` (existing column); these are org-wide knobs."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    ai_handling_default_enabled: bool = False
+    ai_confidence_threshold: float = 0.6
+    ai_handover_keywords: list[str] = Field(default_factory=list)
+    ai_system_prompt: Optional[str] = None
+
+
+class AISettingsPatch(BaseModel):
+    """Body of ``PATCH /api/v1/integrations/whatsapp/ai/settings``.
+    Every field optional; only supplied fields are applied."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    ai_handling_default_enabled: Optional[bool] = None
+    ai_confidence_threshold: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0
+    )
+    ai_handover_keywords: Optional[list[str]] = Field(
+        default=None, max_length=50
+    )
+    ai_system_prompt: Optional[str] = Field(default=None, max_length=4096)
+
+
+class AIHandlingToggle(BaseModel):
+    """Body of ``PATCH /api/v1/conversations/{id}/ai-handling``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ai_handling: bool
+
+
 # --- Assignment rules (whatsapp-platform-upgrade Step 18) ------------
 
 
@@ -786,6 +827,9 @@ __all__ = [
     "WhatsAppConnectIn",
     "WhatsAppIntegrationStatus",
     "WhatsAppStatusOut",
+    "AIHandlingToggle",
+    "AISettingsPatch",
+    "AISettingsRead",
     "AssignmentRuleRead",
     "AssignmentRuleReorder",
     "AssignmentRuleUpsert",

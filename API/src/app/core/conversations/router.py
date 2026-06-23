@@ -507,6 +507,36 @@ async def patch_endpoint(
     return ConversationOut.model_validate(conv)
 
 
+@router.patch(
+    "/{conversation_id}/ai-handling", response_model=ConversationOut
+)
+async def patch_ai_handling_endpoint(
+    conversation_id: uuid.UUID,
+    payload: dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.write")),
+) -> ConversationOut:
+    """Dedicated toggle for the AI-handling flag
+    (whatsapp-platform-upgrade Step 19).
+
+    Equivalent to ``PATCH /{id}`` with `{ai_handling: bool}`, but
+    surfaces a friendlier 422 when the body is malformed + audits
+    under a dedicated event name so analytics can count toggles
+    separately from generic triage edits."""
+    raw = payload.get("ai_handling")
+    if not isinstance(raw, bool):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="`ai_handling` must be true or false.",
+        )
+    conv = await patch_conversation(
+        db,
+        conversation_id=conversation_id,
+        payload=ConversationPatch(ai_handling=raw),
+    )
+    return ConversationOut.model_validate(conv)
+
+
 @router.get(
     "/webhooks/{channel}",
     response_class=PlainTextResponse,

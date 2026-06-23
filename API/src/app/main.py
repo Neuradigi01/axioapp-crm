@@ -55,8 +55,9 @@ from src.app.core.integrations.whatsapp.templates_router import (
     router as whatsapp_templates_router,
 )
 from src.app.core.integrations.whatsapp.automation_router import (
-    router as whatsapp_automation_router,
+    ai_settings_router as whatsapp_ai_settings_router,
     assignment_router as whatsapp_assignment_router,
+    router as whatsapp_automation_router,
 )
 from src.app.core.leads.router import router as leads_router
 from src.app.core.leads.imports.router import router as lead_imports_router
@@ -221,6 +222,7 @@ app.include_router(integrations_router, prefix="/api/v1")
 app.include_router(whatsapp_templates_router, prefix="/api/v1/integrations")
 app.include_router(whatsapp_automation_router, prefix="/api/v1/integrations")
 app.include_router(whatsapp_assignment_router, prefix="/api/v1/integrations")
+app.include_router(whatsapp_ai_settings_router, prefix="/api/v1/integrations")
 app.include_router(appointments_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(notifications_ws_router, prefix="/api/v1")

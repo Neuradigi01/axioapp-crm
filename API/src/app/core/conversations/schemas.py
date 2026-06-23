@@ -339,6 +339,11 @@ class MessageOut(ORMModel):
     # the notification fanout at insert time.
     is_internal: bool = False
     mentioned_user_ids: list[uuid.UUID] = Field(default_factory=list)
+    # whatsapp-platform-upgrade Step 19 — derived from
+    # `payload['author']` on the ORM row. Frontend renders a small
+    # "🤖 AI" badge on the bubble. Defaults False for human +
+    # auto-reply + keyword-rule messages.
+    is_ai: bool = False
     channel_message_id: Optional[str]
     sent_at: Optional[datetime]
     delivered_at: Optional[datetime]

@@ -15,6 +15,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
 
+import { AISettingsComponent } from './ai-settings.component';
 import { AssignmentRuleEditorComponent } from './assignment-rule-editor.component';
 import { KeywordRuleEditorComponent } from './keyword-rule-editor.component';
 import {
@@ -25,7 +26,7 @@ import {
 } from './whatsapp-automation-api.service';
 
 type Mode = 'list' | 'create' | 'edit';
-type Tab = 'keywords' | 'assignment';
+type Tab = 'keywords' | 'assignment' | 'ai';
 
 
 /**
@@ -46,6 +47,7 @@ type Tab = 'keywords' | 'assignment';
     CommonModule,
     FormsModule,
     LucideAngularModule,
+    AISettingsComponent,
     AssignmentRuleEditorComponent,
     KeywordRuleEditorComponent,
   ],

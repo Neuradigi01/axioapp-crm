@@ -238,6 +238,18 @@ class Message(Base, TenantScoped):
         server_default=sql_text("now()"),
     )
 
+    @property
+    def is_ai(self) -> bool:
+        """True when this outbound message was authored by the AI
+        agent (whatsapp-platform-upgrade Step 19). Reads
+        ``payload['author']`` so the wire schema can expose a simple
+        bool without leaking the full payload dict. Frontend bubble
+        renders the 🤖 AI badge on this."""
+        payload = self.payload or {}
+        if not isinstance(payload, dict):
+            return False
+        return payload.get("author") == "ai"
+
 
 class ConversationTag(Base, TenantScoped):
     """Operator-defined label for conversations
