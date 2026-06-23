@@ -478,10 +478,85 @@ class WhatsAppKeywordAction(Base, TenantScoped):
     )
 
 
+class AssignmentStrategy(str, enum.Enum):
+    """Auto-assignment strategy
+    (whatsapp-platform-upgrade Step 18).
+
+    Each strategy reads a different shape of ``config`` JSONB; the
+    engine + schema layer enforce per-strategy config validation."""
+
+    round_robin = "round_robin"
+    load_balanced = "load_balanced"
+    tag_based = "tag_based"
+    team_based = "team_based"
+
+
+whatsapp_assignment_strategy_enum = ENUM(
+    AssignmentStrategy,
+    name="whatsapp_assignment_strategy",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class WhatsAppAssignmentRule(Base, TenantScoped):
+    """One operator-defined assignment rule
+    (whatsapp-platform-upgrade Step 18).
+
+    The engine walks active rules in `priority` ascending order on
+    every new (still-unassigned) conversation. ``last_assigned_user_id``
+    is the round-robin cursor — the engine reads + writes it under
+    a ``SELECT FOR UPDATE`` lock so concurrent webhooks don't all
+    pick the same user."""
+
+    __tablename__ = "tbl_whatsapp_assignment_rules"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    name: Mapped[str] = mapped_column(String(length=128), nullable=False)
+    strategy: Mapped[AssignmentStrategy] = mapped_column(
+        whatsapp_assignment_strategy_enum, nullable=False
+    )
+    config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    priority: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("100")
+    )
+    skip_outside_hours: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    last_assigned_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=text("now()"),
+    )
+
+
 __all__ = [
+    "AssignmentStrategy",
     "KeywordActionType",
     "KeywordMatchType",
     "WhatsAppAccountConfig",
+    "WhatsAppAssignmentRule",
     "WhatsAppKeywordAction",
     "WhatsAppKeywordRule",
     "WhatsAppPhoneHealthEvent",

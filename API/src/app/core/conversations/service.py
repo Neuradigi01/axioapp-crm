@@ -380,6 +380,19 @@ async def receive_webhook(
             conversation=conv,
             text=parsed.text,
         )
+
+        # whatsapp-platform-upgrade Step 18 — auto-assignment engine.
+        # Skips when the conversation already has an `assigned_to_id`
+        # (set manually or by a keyword `assign_to_user` action).
+        # Engine catches its own exceptions; failures never roll
+        # back the inbound row.
+        await session.refresh(conv)
+        if conv.assigned_to_id is None:
+            from src.app.core.integrations.whatsapp.assignment_engine import (
+                dispatch_assignment,
+            )
+
+            await dispatch_assignment(session, conversation=conv)
     return msg
 
 

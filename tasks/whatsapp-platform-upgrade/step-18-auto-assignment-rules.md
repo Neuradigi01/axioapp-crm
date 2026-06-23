@@ -1,7 +1,7 @@
 # Step 18 — Auto-assignment rules (round-robin / load-balanced / tag-based / team-based)
 
 **Goal:** Auto-assign new conversations to staff using configurable strategies. Round-robin distributes evenly; load-balanced picks lightest queue; tag-based maps tags to users; team-based maps to staff groups.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 14 (tags), Step 17 (automation page exists).
 
 ---

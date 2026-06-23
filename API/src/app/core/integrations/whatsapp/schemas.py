@@ -354,6 +354,113 @@ class WhatsAppPhoneHealthRead(BaseModel):
     events: list[WhatsAppPhoneHealthEventRead] = Field(default_factory=list)
 
 
+# --- Assignment rules (whatsapp-platform-upgrade Step 18) ------------
+
+
+AssignmentStrategyLiteral = Literal[
+    "round_robin", "load_balanced", "tag_based", "team_based"
+]
+
+
+class AssignmentRuleUpsert(BaseModel):
+    """Body of ``POST /api/v1/integrations/whatsapp/assignment-rules``
+    and ``PATCH /{id}``. Per-strategy `config` shape:
+
+      * ``round_robin``   — ``{"eligible_user_ids": [uuid, ...]}``
+      * ``load_balanced`` — ``{"eligible_user_ids": [uuid, ...],
+                               "cap_per_user": int|null}``
+      * ``tag_based``     — ``{"mapping": {tag_id: user_id, ...}}``
+      * ``team_based``    — ``{"team_id": uuid}``
+
+    Cross-field validation: every strategy except ``team_based``
+    needs a non-empty ``eligible_user_ids`` / ``mapping``."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=128)
+    strategy: AssignmentStrategyLiteral
+    config: dict[str, Any] = Field(default_factory=dict)
+    enabled: bool = True
+    priority: int = Field(default=100, ge=0, le=10000)
+    skip_outside_hours: bool = False
+
+    @model_validator(mode="after")
+    def _check_config(self) -> "AssignmentRuleUpsert":
+        cfg = self.config or {}
+        if self.strategy in ("round_robin", "load_balanced"):
+            users = cfg.get("eligible_user_ids")
+            if not isinstance(users, list) or not users:
+                raise ValueError(
+                    "`eligible_user_ids` must be a non-empty list."
+                )
+            if len(users) > 200:
+                raise ValueError(
+                    "`eligible_user_ids` cannot exceed 200 entries."
+                )
+            for u in users:
+                # Cheapest validation we can do client-side; UUID
+                # parsing failure surfaces a clear 422.
+                try:
+                    uuid.UUID(str(u))
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(
+                        f"`eligible_user_ids` contains a non-UUID value: {u!r}"
+                    ) from exc
+            if self.strategy == "load_balanced":
+                cap = cfg.get("cap_per_user")
+                if cap is not None and (
+                    not isinstance(cap, int) or cap <= 0
+                ):
+                    raise ValueError(
+                        "`cap_per_user` must be a positive integer or null."
+                    )
+        elif self.strategy == "tag_based":
+            mapping = cfg.get("mapping")
+            if not isinstance(mapping, dict) or not mapping:
+                raise ValueError(
+                    "`mapping` must be a non-empty {tag_id: user_id} object."
+                )
+            for tag_id, user_id in mapping.items():
+                try:
+                    uuid.UUID(str(tag_id))
+                    uuid.UUID(str(user_id))
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(
+                        "`mapping` keys + values must be UUIDs."
+                    ) from exc
+        elif self.strategy == "team_based":
+            team_id = cfg.get("team_id")
+            if not team_id:
+                raise ValueError("`team_id` is required for team_based.")
+            try:
+                uuid.UUID(str(team_id))
+            except (TypeError, ValueError) as exc:
+                raise ValueError("`team_id` must be a UUID.") from exc
+        return self
+
+
+class AssignmentRuleRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    strategy: str
+    config: dict[str, Any]
+    enabled: bool
+    priority: int
+    skip_outside_hours: bool
+    last_assigned_user_id: Optional[uuid.UUID] = None
+    created_by_user_id: Optional[uuid.UUID] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AssignmentRuleReorder(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rule_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+
+
 # --- Keyword rules (whatsapp-platform-upgrade Step 17) ---------------
 
 
@@ -679,6 +786,10 @@ __all__ = [
     "WhatsAppConnectIn",
     "WhatsAppIntegrationStatus",
     "WhatsAppStatusOut",
+    "AssignmentRuleRead",
+    "AssignmentRuleReorder",
+    "AssignmentRuleUpsert",
+    "AssignmentStrategyLiteral",
     "AutoReplySettingsPatch",
     "AutoReplySettingsRead",
     "KeywordActionPayload",

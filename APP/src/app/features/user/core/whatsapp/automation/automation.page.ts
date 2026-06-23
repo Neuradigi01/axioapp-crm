@@ -15,14 +15,17 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
 
+import { AssignmentRuleEditorComponent } from './assignment-rule-editor.component';
 import { KeywordRuleEditorComponent } from './keyword-rule-editor.component';
 import {
+  AssignmentRule,
   KeywordRule,
   RuleTestResponse,
   WhatsAppAutomationApiService,
 } from './whatsapp-automation-api.service';
 
 type Mode = 'list' | 'create' | 'edit';
+type Tab = 'keywords' | 'assignment';
 
 
 /**
@@ -43,6 +46,7 @@ type Mode = 'list' | 'create' | 'edit';
     CommonModule,
     FormsModule,
     LucideAngularModule,
+    AssignmentRuleEditorComponent,
     KeywordRuleEditorComponent,
   ],
   templateUrl: './automation.page.html',
@@ -59,6 +63,19 @@ export class WhatsAppAutomationPageComponent {
 
   protected readonly mode = signal<Mode>('list');
   protected readonly editingRule = signal<KeywordRule | null>(null);
+
+  /** Step 18 — tab switcher between keyword rules and assignment rules. */
+  protected readonly activeTab = signal<Tab>('keywords');
+
+  protected readonly assignmentRules = signal<AssignmentRule[]>([]);
+  protected readonly editingAssignmentRule = signal<AssignmentRule | null>(
+    null,
+  );
+
+  protected setTab(tab: Tab): void {
+    this.activeTab.set(tab);
+    this.closeEditor();
+  }
 
   // Dry-run test panel
   protected readonly testText = signal<string>('');
@@ -93,6 +110,116 @@ export class WhatsAppAutomationPageComponent {
           );
         },
       });
+    this.api
+      .listAssignmentRules()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => this.assignmentRules.set(rows),
+        error: () => this.assignmentRules.set([]),
+      });
+  }
+
+  // --- Step 18: assignment rules ----------------------------------
+
+  protected openCreateAssignment(): void {
+    if (!this.canManage()) return;
+    this.editingAssignmentRule.set(null);
+    this.mode.set('create');
+  }
+
+  protected openEditAssignment(rule: AssignmentRule): void {
+    if (!this.canManage()) return;
+    this.editingAssignmentRule.set(rule);
+    this.mode.set('edit');
+  }
+
+  protected onAssignmentSaved(_rule: AssignmentRule): void {
+    this.toast.set(
+      this.mode() === 'create'
+        ? 'Assignment rule created.'
+        : 'Assignment rule saved.',
+    );
+    this.editingAssignmentRule.set(null);
+    this.mode.set('list');
+    this.reload();
+  }
+
+  protected toggleAssignmentEnabled(rule: AssignmentRule): void {
+    if (!this.canManage()) return;
+    this.api
+      .updateAssignmentRule(rule.id, {
+        name: rule.name,
+        strategy: rule.strategy,
+        config: rule.config,
+        enabled: !rule.enabled,
+        priority: rule.priority,
+        skip_outside_hours: rule.skip_outside_hours,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.assignmentRules.update((arr) =>
+            arr.map((r) => (r.id === updated.id ? updated : r)),
+          );
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toast.set(
+            extractApiError(err) ?? 'Could not toggle the rule.',
+          );
+        },
+      });
+  }
+
+  protected confirmDeleteAssignment(rule: AssignmentRule): void {
+    if (!this.canManage()) return;
+    if (!confirm(`Delete assignment rule "${rule.name}"?`)) return;
+    this.api
+      .deleteAssignmentRule(rule.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.assignmentRules.update((arr) =>
+            arr.filter((r) => r.id !== rule.id),
+          );
+          this.toast.set('Assignment rule deleted.');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toast.set(
+            extractApiError(err) ?? 'Could not delete the rule.',
+          );
+        },
+      });
+  }
+
+  protected moveAssignmentUp(idx: number): void {
+    if (idx === 0) return;
+    const next = [...this.assignmentRules()];
+    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+    this.applyAssignmentReorder(next);
+  }
+
+  protected moveAssignmentDown(idx: number): void {
+    const current = this.assignmentRules();
+    if (idx >= current.length - 1) return;
+    const next = [...current];
+    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+    this.applyAssignmentReorder(next);
+  }
+
+  private applyAssignmentReorder(ordered: AssignmentRule[]): void {
+    this.assignmentRules.set(ordered);
+    this.api
+      .reorderAssignmentRules(ordered.map((r) => r.id))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => this.assignmentRules.set(rows),
+        error: (err: HttpErrorResponse) => {
+          this.toast.set(
+            extractApiError(err) ?? 'Could not reorder rules.',
+          );
+          this.reload();
+        },
+      });
   }
 
   // --- mode switching --------------------------------------------
@@ -111,6 +238,7 @@ export class WhatsAppAutomationPageComponent {
 
   protected closeEditor(): void {
     this.editingRule.set(null);
+    this.editingAssignmentRule.set(null);
     this.mode.set('list');
   }
 

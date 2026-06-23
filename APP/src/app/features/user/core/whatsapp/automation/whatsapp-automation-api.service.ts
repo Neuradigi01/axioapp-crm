@@ -102,4 +102,71 @@ export class WhatsAppAutomationApiService {
   test(text: string): Observable<RuleTestResponse> {
     return this.http.post<RuleTestResponse>(`${this.base}/test`, { text });
   }
+
+  // --- Assignment rules (whatsapp-platform-upgrade Step 18) ---------
+
+  private readonly assignmentBase = `${environment.apiBaseUrl}/integrations/whatsapp/assignment-rules`;
+
+  listAssignmentRules(): Observable<AssignmentRule[]> {
+    return this.http.get<AssignmentRule[]>(this.assignmentBase);
+  }
+
+  createAssignmentRule(
+    payload: AssignmentRuleUpsert,
+  ): Observable<AssignmentRule> {
+    return this.http.post<AssignmentRule>(this.assignmentBase, payload);
+  }
+
+  updateAssignmentRule(
+    id: string,
+    payload: AssignmentRuleUpsert,
+  ): Observable<AssignmentRule> {
+    return this.http.patch<AssignmentRule>(
+      `${this.assignmentBase}/${id}`,
+      payload,
+    );
+  }
+
+  deleteAssignmentRule(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.assignmentBase}/${id}`);
+  }
+
+  reorderAssignmentRules(ruleIds: string[]): Observable<AssignmentRule[]> {
+    return this.http.post<AssignmentRule[]>(
+      `${this.assignmentBase}/reorder`,
+      { rule_ids: ruleIds },
+    );
+  }
+}
+
+
+// --- Step 18 types -------------------------------------------------
+
+export type AssignmentStrategy =
+  | 'round_robin'
+  | 'load_balanced'
+  | 'tag_based'
+  | 'team_based';
+
+export interface AssignmentRule {
+  id: string;
+  name: string;
+  strategy: AssignmentStrategy;
+  config: Record<string, unknown>;
+  enabled: boolean;
+  priority: number;
+  skip_outside_hours: boolean;
+  last_assigned_user_id: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssignmentRuleUpsert {
+  name: string;
+  strategy: AssignmentStrategy;
+  config: Record<string, unknown>;
+  enabled: boolean;
+  priority: number;
+  skip_outside_hours: boolean;
 }
