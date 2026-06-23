@@ -1,7 +1,7 @@
 # Step 20 — Conversation analytics (volume, response time, outcomes, agent leaderboard)
 
 **Goal:** Reporting → WhatsApp tab with message volume, response time distribution, outcome breakdown, and agent leaderboard. Manager dashboards that answer "is WhatsApp working?" and "who's responding fastest?"
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 14 (tags for outcome breakdown), Step 19 (AI vs human attribution).
 
 ---
