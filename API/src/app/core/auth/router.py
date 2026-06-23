@@ -37,6 +37,7 @@ from src.app.core.auth.tokens import InvalidToken, TokenClaims, decode_token
 from src.app.core.auth.captcha.router import router as captcha_router
 from src.app.core.auth.password.router import router as password_router
 from src.app.core.auth.two_factor.router import router as two_factor_router
+from src.app.core.auth.verification.router import router as verification_router
 from src.app.core.users.models import User
 from src.app.shared.context import get_context
 from src.app.shared.db import get_db
@@ -46,6 +47,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 router.include_router(captcha_router)
 router.include_router(password_router)
 router.include_router(two_factor_router)
+router.include_router(verification_router)
 _bearer = HTTPBearer(auto_error=False)
 
 
