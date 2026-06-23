@@ -25,7 +25,6 @@ from src.app.core.permissions.service import (
     get_role_by_id,
     list_permissions_for_role,
 )
-from src.app.core.tenants.models import Organization
 from src.app.core.users.models import User
 from src.app.core import data_access
 from src.app.core.users.offboarding import transfer_records
@@ -92,11 +91,8 @@ async def get_me(
 ) -> UserMe:
     role = await get_role_by_id(session, user.role_id)
     permissions = await list_permissions_for_role(session, user.role_id)
-    org = (
-        await session.execute(
-            select(Organization).where(Organization.id == user.org_id)
-        )
-    ).scalar_one()
+    org = await data_access.get_organization_by_id(session, user.org_id)
+    assert org is not None  # authed user implies their org exists
     return UserMe(
         # `user.id` is the bigint storage PK of tbl_user_login (DR.6.3).
         # The UUID identity exposed to consumers is `user.legacy_uuid`.

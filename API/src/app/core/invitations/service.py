@@ -32,7 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.core.auth.models import AuthSession
 from src.app.core.auth.tokens import ACCESS_TOKEN_TTL, encode_token
 from src.app.core.invitations.models import Invitation
@@ -66,18 +66,9 @@ async def create_invitation(
     ua: str | None = None,
 ) -> tuple[Invitation, str]:
     """Issue an invitation. Returns (row, raw_accept_link)."""
-    role = (
-        await session.execute(
-            select(Role).where(
-                Role.id == payload.role_id, Role.org_id == org_id
-            )
-        )
-    ).scalar_one_or_none()
-    if role is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"role_id {payload.role_id} not found in this org",
-        )
+    role = await data_access.get_role_in_org(
+        session, role_id=payload.role_id, org_id=org_id
+    )
 
     existing_user = (
         await session.execute(
@@ -126,11 +117,8 @@ async def create_invitation(
         f"{frontend_url.rstrip('/')}/accounts/accept-invite?token={raw_token}"
     )
 
-    org = (
-        await session.execute(
-            select(Organization).where(Organization.id == org_id)
-        )
-    ).scalar_one()
+    org = await data_access.get_organization_by_id(session, org_id)
+    assert org is not None  # caller validated org_id upstream
 
     body = (
         f"You've been invited to join {org.name} ({org.slug}) "
@@ -253,11 +241,8 @@ async def lookup_invitation(
             select(Role).where(Role.id == inv.role_id)
         )
     ).scalar_one()
-    org = (
-        await session.execute(
-            select(Organization).where(Organization.id == inv.org_id)
-        )
-    ).scalar_one()
+    org = await data_access.get_organization_by_id(session, inv.org_id)
+    assert org is not None  # invitation FK guarantees org exists
 
     return {
         "email": inv.email,

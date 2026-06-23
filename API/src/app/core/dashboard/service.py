@@ -45,7 +45,7 @@ from src.app.core.permissions.models import Role
 from src.app.core.permissions.service import list_permissions_for_role
 from src.app.core.pipelines.models import Pipeline, PipelineStage
 from src.app.core.tasks.models import Task, TaskStatus
-from src.app.core.tenants.models import Organization
+from src.app.core import data_access
 from src.app.core.users.models import User, UserInfo
 
 
@@ -135,11 +135,8 @@ async def _has_users_read(session: AsyncSession, role_id: uuid.UUID) -> bool:
 async def _greeting(session: AsyncSession, user: User) -> Greeting:
     info = user.info
     first = (info.first_name if info else "") or ""
-    org = (
-        await session.execute(
-            select(Organization).where(Organization.id == user.org_id)
-        )
-    ).scalar_one()
+    org = await data_access.get_organization_by_id(session, user.org_id)
+    assert org is not None  # authed user implies their org exists
     role = (
         await session.execute(
             select(Role).where(Role.id == user.role_id)

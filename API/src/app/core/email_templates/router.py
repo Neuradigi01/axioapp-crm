@@ -30,7 +30,7 @@ from src.app.core.email_templates.schemas import (
     EmailTemplateUpdate,
     VariableRegistryEntry,
 )
-from src.app.core.tenants.models import Organization
+from src.app.core import data_access
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -171,11 +171,7 @@ async def render_template_endpoint(
     template = await templates_service.get_template(
         db, template_id=template_id
     )
-    org = (
-        await db.execute(
-            select(Organization).where(Organization.id == user.org_id)
-        )
-    ).scalar_one_or_none()
+    org = await data_access.get_organization_by_id(db, user.org_id)
     context = await templates_service.build_context(
         db,
         org=org,

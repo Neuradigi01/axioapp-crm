@@ -31,7 +31,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.core.campaigns.models import (
     Campaign,
     CampaignMessage,
@@ -512,9 +512,7 @@ async def dispatch_chunk(
             wa_rate_per_sec = max(1, int(_wa_config.rate_limit_per_sec or 50))
 
     for cid in contact_ids:
-        contact = (
-            await session.execute(select(Contact).where(Contact.id == cid))
-        ).scalar_one_or_none()
+        contact = await data_access.get_contact(session, cid)
         if contact is None or not contact.phone:
             await _mark_message(
                 session,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core import data_access
 from src.app.core.auth import service as auth_service
 from src.app.core.auth.schemas import TryAnotherWayRequest, TryAnotherWayResponse
 from src.app.core.auth.two_factor import service as two_factor_service
@@ -58,13 +59,15 @@ async def try_another_way(
         raise invalid
 
     if req.org_slug:
-        org = await auth_service._get_org_by_slug(db, req.org_slug)
+        org = await data_access.get_organization_by_slug(db, req.org_slug)
     else:
         org = await auth_service._resolve_org_for_email(db, user_email)
     if org is None:
         raise invalid
 
-    user = await auth_service._get_user_by_email_in_org(db, org.id, user_email)
+    user = await data_access.get_user_by_email(
+        db, user_email, org_id=org.id, active_only=True
+    )
     if user is None or not user.is_active:
         raise invalid
     if not verify_password(req.password, user.password_hash):

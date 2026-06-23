@@ -136,6 +136,21 @@ async def count_active_members(
 # --- role lookups -------------------------------------------------------
 
 
+async def get_role_by_id_in_org(
+    session: AsyncSession, *, role_id: uuid.UUID, org_id: uuid.UUID
+) -> Role | None:
+    """Resolve `role_id` within `org_id` — returns None on miss.
+
+    The non-raising sibling of `get_role_in_org`. Callers that need
+    a specific HTTP status (e.g. 404 for the role-CRUD endpoints, 422
+    for assignment validation) build the right exception themselves.
+    """
+    result = await session.execute(
+        select(Role).where(Role.id == role_id, Role.org_id == org_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_role_in_org(
     session: AsyncSession, *, role_id: uuid.UUID, org_id: uuid.UUID
 ) -> Role:
@@ -144,11 +159,9 @@ async def get_role_in_org(
     Used by user-create / user-update to validate the caller's chosen
     role assignment before persisting it.
     """
-    role = (
-        await session.execute(
-            select(Role).where(Role.id == role_id, Role.org_id == org_id)
-        )
-    ).scalar_one_or_none()
+    role = await get_role_by_id_in_org(
+        session, role_id=role_id, org_id=org_id
+    )
     if role is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -167,6 +180,22 @@ async def get_owner_role(
             Role.name == "Owner",
             Role.is_system.is_(True),
         )
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_admin_role(
+    session: AsyncSession, org_id: uuid.UUID
+) -> Role | None:
+    """Resolve the Admin role (`name='Admin'`) in this org.
+
+    Admin is `is_system=False` per the template install — Owner can
+    rename or delete the row. Returns None when the Owner deleted it;
+    callers (e.g. ownership-transfer) must then accept an explicit
+    `demote_to_role_id` instead of defaulting to Admin.
+    """
+    result = await session.execute(
+        select(Role).where(Role.org_id == org_id, Role.name == "Admin")
     )
     return result.scalar_one_or_none()
 

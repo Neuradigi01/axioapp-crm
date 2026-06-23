@@ -19,12 +19,20 @@ sibling sub-module here as their query helpers get consolidated.
 
 `__init__` re-exports the union so callers see a single namespace.
 """
+from src.app.core.data_access.auth_sessions import get_auth_session
+from src.app.core.data_access.contacts import get_contact, get_contact_by_phone
+from src.app.core.data_access.organizations import (
+    get_organization_by_id,
+    get_organization_by_slug,
+)
 from src.app.core.data_access.memberships import (
     assert_not_owner_role,
     compute_open_records_counts,
     count_active_members,
+    get_admin_role,
     get_membership,
     get_owner_role,
+    get_role_by_id_in_org,
     get_role_in_org,
     list_open_record_ids,
     require_membership,
@@ -41,8 +49,15 @@ __all__ = [
     "compute_open_records_counts",
     "count_active_members",
     "email_exists",
+    "get_admin_role",
+    "get_auth_session",
+    "get_contact",
+    "get_contact_by_phone",
     "get_membership",
+    "get_organization_by_id",
+    "get_organization_by_slug",
     "get_owner_role",
+    "get_role_by_id_in_org",
     "get_role_in_org",
     "get_user_by_email",
     "get_user_by_uuid",

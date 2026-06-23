@@ -7,11 +7,11 @@ import asyncio
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
-from src.app.shared.db import async_session
+from src.app.core import data_access
 from src.app.core.tenants.models import Organization
+from src.app.shared.db import async_session
 
 DEMO_ORG_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 DEMO_ORG = {
@@ -28,9 +28,7 @@ DEMO_ORG = {
 
 async def seed_demo_org() -> None:
     async with async_session() as session:
-        existing = (
-            await session.execute(select(Organization).where(Organization.id == DEMO_ORG_ID))
-        ).scalar_one_or_none()
+        existing = await data_access.get_organization_by_id(session, DEMO_ORG_ID)
         if existing is not None:
             print(f"Demo org already exists (id={existing.id}, slug={existing.slug}). Skipped.")
             return

@@ -30,7 +30,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.core.activities.models import Activity
 from src.app.core.leads.models import Lead, LeadStatus
 from src.app.core.staff.models import (
@@ -74,9 +74,7 @@ def _attendance_snapshot(a: Attendance) -> dict[str, Any]:
 async def _ensure_user_in_scope(
     session: AsyncSession, user_id: uuid.UUID
 ) -> User:
-    user = (
-        await session.execute(select(User).where(User.legacy_uuid == user_id))
-    ).scalar_one_or_none()
+    user = await data_access.get_user_by_uuid(session, user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

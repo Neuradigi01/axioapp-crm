@@ -30,7 +30,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.core.calls.models import CallOutcome
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
@@ -103,11 +103,7 @@ async def install(
     """
     report = InstallReport(template_id=manifest.template_id, version=manifest.version)
 
-    org = (
-        await session.execute(
-            select(Organization).where(Organization.id == org_id)
-        )
-    ).scalar_one_or_none()
+    org = await data_access.get_organization_by_id(session, org_id)
     if org is None:
         report.errors.append(f"organization {org_id} not found")
         return report

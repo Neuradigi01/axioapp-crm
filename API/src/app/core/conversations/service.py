@@ -34,7 +34,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
 from src.app.core.contacts.models import Contact
@@ -652,11 +652,7 @@ async def _resolve_or_create_contact_by_phone(
     the phone string is empty."""
     if not phone:
         return None
-    existing = (
-        await session.execute(
-            select(Contact).where(Contact.phone == phone)
-        )
-    ).scalar_one_or_none()
+    existing = await data_access.get_contact_by_phone(session, phone)
     if existing is not None:
         return existing.id
     contact = Contact(

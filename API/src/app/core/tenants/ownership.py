@@ -22,7 +22,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.core.permissions.models import Role
 from src.app.core.users.models import OrganizationMember, User
 
@@ -39,35 +39,6 @@ class _Invalid(HTTPException):
         )
 
 
-async def _owner_role_for_org(
-    session: AsyncSession, org_id: uuid.UUID
-) -> Role | None:
-    return (
-        await session.execute(
-            select(Role).where(
-                Role.org_id == org_id,
-                Role.name == "Owner",
-                Role.is_system.is_(True),
-            )
-        )
-    ).scalar_one_or_none()
-
-
-async def _admin_role_for_org(
-    session: AsyncSession, org_id: uuid.UUID
-) -> Role | None:
-    """The Admin role as installed by the template — `is_system=False`.
-
-    Returns None when the Owner deleted Admin from the Roles page. The
-    transfer caller must then pass an explicit `demote_to_role_id`.
-    """
-    return (
-        await session.execute(
-            select(Role).where(Role.org_id == org_id, Role.name == "Admin")
-        )
-    ).scalar_one_or_none()
-
-
 async def transfer_ownership(
     session: AsyncSession,
     *,
@@ -82,7 +53,7 @@ async def transfer_ownership(
     if org_id is None:
         raise _Forbidden("Caller has no active org membership.")
 
-    owner_role = await _owner_role_for_org(session, org_id)
+    owner_role = await data_access.get_owner_role(session, org_id)
     if owner_role is None:
         raise _Invalid("This org has no Owner role — cannot transfer.")
 
@@ -94,48 +65,36 @@ async def transfer_ownership(
     if caller.legacy_uuid == target_user_uuid:
         raise _Invalid("Cannot transfer ownership to yourself.")
 
-    # Resolve target by UUID → bigint id → membership row in this org.
-    target_user_id_row = (
-        await session.execute(
-            select(User.id).where(User.legacy_uuid == target_user_uuid)
-        )
-    ).scalar_one_or_none()
-    if target_user_id_row is None:
-        raise _Invalid("Target user not found.")
-
-    target_membership = (
-        await session.execute(
-            select(OrganizationMember).where(
-                OrganizationMember.organization_id == org_id,
-                OrganizationMember.user_member_id == target_user_id_row,
-                OrganizationMember.is_active.is_(True),
-            )
-        )
-    ).scalar_one_or_none()
-    if target_membership is None:
-        raise _Invalid("Target is not an active member of this org.")
+    # Resolve target user + active membership in one shot.
+    _, target_membership = await data_access.require_membership(
+        session,
+        user_uuid=target_user_uuid,
+        org_id=org_id,
+        active_only=True,
+        on_missing=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        not_found_detail="Target user not found.",
+        not_member_detail="Target is not an active member of this org.",
+    )
     if target_membership.role_id == owner_role.id:
         raise _Invalid(
             "Target is already Owner — multiple Owner rows detected. "
             "Contact support."
         )
 
-    # Resolve caller's own membership row (the one we'll demote).
-    caller_membership = (
-        await session.execute(
-            select(OrganizationMember).where(
-                OrganizationMember.organization_id == org_id,
-                OrganizationMember.user_member_id == caller.id,
-                OrganizationMember.is_active.is_(True),
-            )
-        )
-    ).scalar_one_or_none()
+    # Resolve caller's own membership row (the one we'll demote). The
+    # caller User is already loaded, so we go straight by bigint id.
+    caller_membership = await data_access.get_membership(
+        session,
+        user_member_id=caller.id,
+        org_id=org_id,
+        active_only=True,
+    )
     if caller_membership is None:
         raise _Forbidden("Caller has no active membership row to demote.")
 
     # Resolve demote role.
     if demote_to_role_id is None:
-        admin_role = await _admin_role_for_org(session, org_id)
+        admin_role = await data_access.get_admin_role(session, org_id)
         if admin_role is None:
             raise _Invalid(
                 "No Admin role exists in this org. Pass demote_to_role_id "
@@ -143,6 +102,9 @@ async def transfer_ownership(
             )
         demote_role = admin_role
     else:
+        # Explicit role-id lookup kept inline so the 422 wording stays
+        # specific to the `demote_to_role_id` field name; sliced into
+        # data_access in a later sweep with the other Role.id callers.
         demote_role = (
             await session.execute(
                 select(Role).where(

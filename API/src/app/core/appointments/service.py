@@ -30,7 +30,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import activities, audit
+from src.app.core import activities, audit, data_access
 from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.appointments.models import Appointment, AppointmentStatus
 from src.app.core.appointments.schemas import (
@@ -189,9 +189,7 @@ async def _ensure_contact_in_scope(
 async def _ensure_user_in_scope(
     session: AsyncSession, user_id: uuid.UUID
 ) -> None:
-    user = (
-        await session.execute(select(User.legacy_uuid).where(User.legacy_uuid == user_id))
-    ).scalar_one_or_none()
+    user = await data_access.get_user_by_uuid(session, user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

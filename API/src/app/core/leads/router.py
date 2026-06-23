@@ -73,7 +73,7 @@ from src.app.core.settings.schemas import (
     LeadRoutingConfigUpdate,
 )
 from src.app.core.settings.service import get_or_create as get_or_create_settings
-from src.app.core.tenants.models import Organization
+from src.app.core import data_access
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -252,9 +252,8 @@ async def export_leads_csv_endpoint(
         sort=sort,
     )
 
-    org = (
-        await db.execute(select(Organization).where(Organization.id == user.org_id))
-    ).scalar_one()
+    org = await data_access.get_organization_by_id(db, user.org_id)
+    assert org is not None  # authed user implies their org exists
     filename = export_filename(org.slug)
 
     return StreamingResponse(

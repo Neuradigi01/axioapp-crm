@@ -19,10 +19,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
-from sqlalchemy import select
 
+from src.app.core import data_access
 from src.app.core.auth.tokens import InvalidToken, decode_token
-from src.app.core.auth.models import AuthSession
 from src.app.core.notifications.manager import manager
 from src.app.shared.db import async_session
 
@@ -44,11 +43,9 @@ async def notifications_stream(
 
     # 2) Verify the session row exists and is still live.
     async with async_session() as session:
-        row = (
-            await session.execute(
-                select(AuthSession).where(AuthSession.id == claims.token_id)
-            )
-        ).scalar_one_or_none()
+        row = await data_access.get_auth_session(
+            session, session_id=claims.token_id
+        )
     if (
         row is None
         or row.revoked_at is not None

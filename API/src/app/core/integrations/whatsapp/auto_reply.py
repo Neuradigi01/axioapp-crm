@@ -39,7 +39,7 @@ from typing import Any, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations.adapters.whatsapp import (
     WhatsAppNotConnected,
@@ -375,11 +375,9 @@ async def dispatch_auto_replies(
     # Resolve contact + org once for variable substitution.
     contact: Optional[Contact] = None
     if conversation.contact_id is not None:
-        contact = (
-            await session.execute(
-                select(Contact).where(Contact.id == conversation.contact_id)
-            )
-        ).scalar_one_or_none()
+        contact = await data_access.get_contact(
+            session, conversation.contact_id
+        )
     org = (
         await session.execute(
             select(Organization).where(

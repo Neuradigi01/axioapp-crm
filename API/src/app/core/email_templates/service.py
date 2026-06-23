@@ -43,7 +43,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.core.contacts.models import Contact
 from src.app.core.custom_fields.models import CustomFieldDefinition
 from src.app.core.email.variables import (
@@ -300,11 +300,7 @@ async def build_context(
 ) -> dict[str, Any]:
     """Load the contact (required), optional lead, sender, org and
     fold them into the nested dict the variable engine consumes."""
-    contact = (
-        await session.execute(
-            select(Contact).where(Contact.id == contact_id)
-        )
-    ).scalar_one_or_none()
+    contact = await data_access.get_contact(session, contact_id)
     if contact is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

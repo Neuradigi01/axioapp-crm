@@ -14,7 +14,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.shared.audit import log_entity_change
 from src.app.core.permissions.models import Permission, Role, RolePermission
 from src.app.core.permissions.schemas import RoleCreate, RoleUpdate
@@ -285,11 +285,9 @@ async def update_role(
     pack manifest or core seeds and must stay stable. Admins create
     custom roles instead of editing the system ones.
     """
-    role = (
-        await session.execute(
-            select(Role).where(Role.id == role_id, Role.org_id == org_id)
-        )
-    ).scalar_one_or_none()
+    role = await data_access.get_role_by_id_in_org(
+        session, role_id=role_id, org_id=org_id
+    )
     if role is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -366,11 +364,9 @@ async def delete_role(
     org_id: uuid.UUID,
 ) -> None:
     """Delete a custom role. 409 if anyone currently has it."""
-    role = (
-        await session.execute(
-            select(Role).where(Role.id == role_id, Role.org_id == org_id)
-        )
-    ).scalar_one_or_none()
+    role = await data_access.get_role_by_id_in_org(
+        session, role_id=role_id, org_id=org_id
+    )
     if role is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

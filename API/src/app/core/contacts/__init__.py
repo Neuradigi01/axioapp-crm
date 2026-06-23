@@ -7,7 +7,6 @@ the per-org `custom_field_definitions` (rule 3, rule 4).
 from src.app.core.contacts.service import (
     create_contact,
     delete_contact,
-    get_contact,
     list_contacts,
     update_contact,
 )
@@ -15,7 +14,6 @@ from src.app.core.contacts.service import (
 __all__ = [
     "create_contact",
     "delete_contact",
-    "get_contact",
     "list_contacts",
     "update_contact",
 ]

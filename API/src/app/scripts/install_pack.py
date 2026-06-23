@@ -22,11 +22,10 @@ import sys
 import uuid
 from pathlib import Path
 
-from sqlalchemy import select
 
+from src.app.core import data_access
 from src.app.core.packs.installer import install
 from src.app.core.packs.loader import PackLoadError, load_pack
-from src.app.core.tenants.models import Organization
 from src.app.shared.context import RequestContext, set_context
 from src.app.shared.db import async_session
 
@@ -44,11 +43,7 @@ def _resolve_pack_file(template_id: str | None, pack_file: str | None) -> Path:
 
 async def _resolve_org(slug: str) -> uuid.UUID:
     async with async_session() as session:
-        org = (
-            await session.execute(
-                select(Organization).where(Organization.slug == slug)
-            )
-        ).scalar_one_or_none()
+        org = await data_access.get_organization_by_slug(session, slug)
         if org is None:
             raise SystemExit(f"organization '{slug}' not found")
         return org.id

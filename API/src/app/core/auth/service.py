@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 from pathlib import Path
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.core.auth.models import AuthSession
 from src.app.core.auth.schemas import (
     LoginResponse,
@@ -39,6 +39,7 @@ from src.app.core.packs.loader import PackLoadError, load_pack
 from src.app.core.packs.service import get_catalog
 from src.app.core.permissions import role_templates
 from src.app.core.permissions.models import Role
+from src.app.core.subscriptions.signup_hook import create_trial_subscription
 from src.app.core.tenants.models import Organization
 from src.app.core.tenants.service import create_organization
 from src.app.core.users.models import OrganizationMember, User, UserInfo
@@ -52,11 +53,6 @@ logger = logging.getLogger(__name__)
 # ships with the core CRM and supplies the default Leads pipeline,
 # lead sources, and call outcomes any new tenant needs out of the box.
 _BASE_PACK_FILE = Path("src/app/packs/base/pack.yaml")
-
-
-async def _get_org_by_slug(db: AsyncSession, slug: str) -> Organization | None:
-    result = await db.execute(select(Organization).where(Organization.slug == slug))
-    return result.scalar_one_or_none()
 
 
 async def _resolve_org_for_email(
@@ -81,31 +77,6 @@ async def _resolve_org_for_email(
     return result.scalar_one_or_none()
 
 
-async def _get_user_by_email_in_org(
-    db: AsyncSession, org_id: uuid.UUID, email: str
-) -> User | None:
-    # Three-table lookup after DR.7: `tbl_user_info` carries the email,
-    # `tbl_organization_members` carries the org membership + active
-    # flag, `tbl_user_login` carries auth state. We require the
-    # membership to be `is_active=true` so a deactivated user is
-    # filtered out even if their auth row is still active.
-    result = await db.execute(
-        select(User)
-        .join(UserInfo, UserInfo.member_id == User.id)
-        .join(
-            OrganizationMember,
-            OrganizationMember.user_member_id == User.id,
-        )
-        .where(
-            UserInfo.email == email,
-            OrganizationMember.organization_id == org_id,
-            OrganizationMember.is_active.is_(True),
-            User.is_active.is_(True),
-        )
-    )
-    return result.scalar_one_or_none()
-
-
 async def login(
     db: AsyncSession,
     *,
@@ -123,14 +94,16 @@ async def login(
     )
 
     if org_slug:
-        org = await _get_org_by_slug(db, org_slug)
+        org = await data_access.get_organization_by_slug(db, org_slug)
     else:
         org = await _resolve_org_for_email(db, email)
     if org is None:
         # No tenant known → can't attribute to a row, intentionally skip audit.
         raise invalid
 
-    user = await _get_user_by_email_in_org(db, org.id, email)
+    user = await data_access.get_user_by_email(
+        db, email, org_id=org.id, active_only=True
+    )
     if user is None or not user.is_active:
         await audit.log(
             "auth.login.failure",
@@ -222,9 +195,9 @@ async def refresh(db: AsyncSession, claims: TokenClaims) -> RefreshResponse:
         detail="Invalid or revoked token",
     )
 
-    session = (
-        await db.execute(select(AuthSession).where(AuthSession.id == claims.token_id))
-    ).scalar_one_or_none()
+    session = await data_access.get_auth_session(
+        db, session_id=claims.token_id
+    )
     if session is None or session.revoked_at is not None:
         raise invalid
 
@@ -339,13 +312,9 @@ async def revoke_user_session(
     session id doesn't belong to the user (we don't leak existence —
     same row check as `notifications.mark_read`).
     """
-    result = await db.execute(
-        select(AuthSession).where(
-            AuthSession.id == session_id,
-            AuthSession.user_id == user_id,
-        )
+    row = await data_access.get_auth_session(
+        db, session_id=session_id, user_id=user_id
     )
-    row = result.scalar_one_or_none()
     if row is None:
         return False
     if row.revoked_at is None:
@@ -450,11 +419,7 @@ async def register_with_new_org(
             }
         )
     )
-    bigint_id = (
-        await db.execute(
-            select(User.id).where(User.legacy_uuid == user_uuid)
-        )
-    ).scalar_one()
+    bigint_id = (await data_access.get_user_by_uuid(db, user_uuid)).id
 
     db.add(
         UserInfo(
@@ -482,7 +447,6 @@ async def register_with_new_org(
     # The subscription row lands inside this signup transaction so a
     # later insert failure rolls back the trial too; orgs never exist
     # without an active subscription.
-    from src.app.core.subscriptions.signup_hook import create_trial_subscription
     await create_trial_subscription(db, org_id=org.id)
 
     token_id = uuid.uuid4()
@@ -616,11 +580,7 @@ async def register_user_only(
             }
         )
     )
-    bigint_id = (
-        await db.execute(
-            select(User.id).where(User.legacy_uuid == user_uuid)
-        )
-    ).scalar_one()
+    bigint_id = (await data_access.get_user_by_uuid(db, user_uuid)).id
 
     db.add(
         UserInfo(
@@ -648,7 +608,6 @@ async def register_user_only(
     # including orgs in the two-stage onboarding flow. The subscription
     # row lands inside this signup transaction so a later failure rolls
     # the trial back along with the rest of the bootstrap.
-    from src.app.core.subscriptions.signup_hook import create_trial_subscription
     await create_trial_subscription(db, org_id=org.id)
 
     token_id = uuid.uuid4()
@@ -739,11 +698,7 @@ async def complete_onboarding(
     """
     tile = _validate_template_choice(req.template_id)
 
-    org = (
-        await db.execute(
-            select(Organization).where(Organization.id == user.org_id)
-        )
-    ).scalar_one_or_none()
+    org = await data_access.get_organization_by_id(db, user.org_id)
     if org is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

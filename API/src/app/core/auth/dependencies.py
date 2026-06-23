@@ -27,7 +27,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit, data_access
-from src.app.core.auth.models import AuthSession
 from src.app.core.permissions.service import list_permissions_for_role
 from src.app.core.users.models import User
 from src.app.shared.context import get_context
@@ -49,9 +48,7 @@ async def get_current_user(db: AsyncSession = Depends(get_db)) -> User:
     if ctx.scope is not None and ctx.scope != "admin":
         raise UNAUTHORIZED
 
-    session = (
-        await db.execute(select(AuthSession).where(AuthSession.id == ctx.token_id))
-    ).scalar_one_or_none()
+    session = await data_access.get_auth_session(db, session_id=ctx.token_id)
     if session is None or session.revoked_at is not None:
         raise UNAUTHORIZED
     if session.expires_at <= datetime.now(timezone.utc):

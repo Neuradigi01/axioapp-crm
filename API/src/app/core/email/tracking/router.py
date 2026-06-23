@@ -50,6 +50,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core import data_access
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations.models import (
     Conversation,
@@ -262,11 +263,7 @@ async def _opt_out_contact(
                 RequestContext(org_id=org_id, user_id=None)
             )
             try:
-                contact = (
-                    await session.execute(
-                        select(Contact).where(Contact.id == contact_id)
-                    )
-                ).scalar_one_or_none()
+                contact = await data_access.get_contact(session, contact_id)
                 if contact is None:
                     return False, None
                 now = datetime.now(timezone.utc)

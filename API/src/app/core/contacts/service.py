@@ -24,7 +24,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core import audit, data_access
 from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.contacts.models import Contact
 from src.app.core.contacts.schemas import ContactCreate, ContactUpdate
@@ -64,14 +64,6 @@ _SNAPSHOT_FIELDS = (
 def _snapshot(contact: Contact) -> dict[str, Any]:
     """JSONB-friendly snapshot for audit `before`/`after`."""
     return snapshot(contact, fields=_SNAPSHOT_FIELDS)
-
-
-async def get_contact(
-    session: AsyncSession, contact_id: uuid.UUID
-) -> Contact | None:
-    """Return a single contact by id, scoped to the active tenant."""
-    result = await session.execute(select(Contact).where(Contact.id == contact_id))
-    return result.scalar_one_or_none()
 
 
 async def create_contact(
@@ -129,7 +121,7 @@ async def update_contact(
     contact_id: uuid.UUID,
     payload: ContactUpdate,
 ) -> Contact:
-    contact = ensure_found(await get_contact(session, contact_id), entity="contact")
+    contact = ensure_found(await data_access.get_contact(session, contact_id), entity="contact")
 
     before = _snapshot(contact)
     changes = payload.model_dump(exclude_unset=True)
@@ -168,7 +160,7 @@ async def update_contact(
 async def delete_contact(
     session: AsyncSession, *, contact_id: uuid.UUID
 ) -> None:
-    contact = ensure_found(await get_contact(session, contact_id), entity="contact")
+    contact = ensure_found(await data_access.get_contact(session, contact_id), entity="contact")
     before = _snapshot(contact)
     contact_uuid = contact.id
     await session.delete(contact)
@@ -306,7 +298,7 @@ async def reassign_contact(
     `commit=False` lets `bulk_reassign_contacts` batch many reassigns into
     one transaction without N intermediate commits.
     """
-    contact = ensure_found(await get_contact(session, contact_id), entity="contact")
+    contact = ensure_found(await data_access.get_contact(session, contact_id), entity="contact")
 
     if assigned_to_id is not None:
         await _assert_user_in_org(
@@ -370,7 +362,7 @@ async def bulk_reassign_contacts(
 
     reassigned = 0
     for cid in ids:
-        contact = await get_contact(session, cid)
+        contact = await data_access.get_contact(session, cid)
         if contact is None:
             continue
         if contact.assigned_to_id == assigned_to_id:
