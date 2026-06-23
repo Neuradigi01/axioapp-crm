@@ -34,6 +34,7 @@ from src.app.core.auth.schemas import (
     TwoFactorStatusResponse,
 )
 from src.app.core.auth.tokens import InvalidToken, TokenClaims, decode_token
+from src.app.core.auth.admin_login.router import router as admin_login_router
 from src.app.core.auth.captcha.router import router as captcha_router
 from src.app.core.auth.password.router import router as password_router
 from src.app.core.auth.two_factor.router import router as two_factor_router
@@ -48,6 +49,7 @@ router.include_router(captcha_router)
 router.include_router(password_router)
 router.include_router(two_factor_router)
 router.include_router(verification_router)
+router.include_router(admin_login_router)
 _bearer = HTTPBearer(auto_error=False)
 
 
