@@ -44,9 +44,14 @@ class TwoFactorChallengeResponse(BaseModel):
 
 
 class TryAnotherWayRequest(BaseModel):
-    email: str = Field(min_length=3, max_length=255)
+    # Legacy admin panel posts `identifier` + `user_type`; the User-side
+    # FurnitureCRM flow posts `email` + `org_slug`. We accept both so a
+    # single endpoint serves both pools.
+    identifier: str | None = Field(default=None, min_length=1, max_length=255)
+    email: str | None = Field(default=None, min_length=3, max_length=255)
     password: str = Field(min_length=1, max_length=255)
     org_slug: str | None = Field(default=None, min_length=1, max_length=64)
+    user_type: Literal["User", "Admin"] = "User"
     method: Literal["authenticator", "email", "sms"]
 
 
