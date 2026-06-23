@@ -33,7 +33,7 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy import text as sql_text
-from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
@@ -198,6 +198,20 @@ class Message(Base, TenantScoped):
         JSONB,
         nullable=False,
         server_default=sql_text("'[]'::jsonb"),
+    )
+    # whatsapp-platform-upgrade Step 13 — internal notes + @mentions.
+    # `is_internal=true` rows are operator-only — the engine refuses
+    # to dispatch them via any channel adapter, and they're styled
+    # yellow in the thread. `mentioned_user_ids` is the list of staff
+    # the note's author tagged with `@name`; the notes service writes
+    # one notification per id on insert.
+    is_internal: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("false")
+    )
+    mentioned_user_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)),
+        nullable=False,
+        server_default=sql_text("'{}'::uuid[]"),
     )
     sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

@@ -66,6 +66,12 @@ export interface ConversationMessage {
    *  inbound reactions list the reactor's phone, outbound ones list
    *  the staff user id. */
   reactions: MessageReaction[];
+  /** Step 13 — true when this message is an operator-only internal note
+   *  (yellow-styled bubble; never reaches the customer). */
+  is_internal: boolean;
+  /** Step 13 — UUIDs of staff @-mentioned in the note. Each gets one
+   *  in-app notification on insert. */
+  mentioned_user_ids: string[];
   channel_message_id: string | null;
   sent_at: string | null;
   delivered_at: string | null;
@@ -142,6 +148,25 @@ export class ConversationsApiService {
     return this.http.post<ConversationMessage>(
       `${this.base}/${conversationId}/messages/${messageId}/reactions`,
       { emoji },
+    );
+  }
+
+  /**
+   * Post an internal-only note on a conversation
+   * (whatsapp-platform-upgrade Step 13).
+   *
+   * Notes never reach the customer — they're operator annotations
+   * rendered yellow in the thread. `mentions` is capped at 5
+   * server-side; the picker enforces the same cap.
+   */
+  postNote(
+    conversationId: string,
+    text: string,
+    mentions: string[] = [],
+  ): Observable<ConversationMessage> {
+    return this.http.post<ConversationMessage>(
+      `${this.base}/${conversationId}/notes`,
+      { text, mentions },
     );
   }
 

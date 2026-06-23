@@ -177,6 +177,20 @@ class MessageSendPayload(BaseModel):
     reply_to_message_id: Optional[uuid.UUID] = None
 
 
+class NoteCreate(BaseModel):
+    """Body of ``POST /api/v1/conversations/{id}/notes``.
+
+    Internal-only message — never dispatched to the channel. `mentions`
+    is capped at 5 ids to bound notification fanout (Step 13's risk:
+    spammy @-group calls). The router rejects ids that aren't org
+    members at insert time."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    text: str = Field(min_length=1, max_length=4096)
+    mentions: list[uuid.UUID] = Field(default_factory=list, max_length=5)
+
+
 class ReactionRequest(BaseModel):
     """Body of ``POST /conversations/{id}/messages/{message_id}/reactions``.
 
@@ -234,6 +248,12 @@ class MessageOut(ORMModel):
     # service._apply_reaction` for write rules.
     reply_to_message_id: Optional[uuid.UUID] = None
     reactions: list[dict[str, Any]] = Field(default_factory=list)
+    # whatsapp-platform-upgrade Step 13 — internal notes flag +
+    # @mentions. The frontend renders is_internal=true with yellow
+    # styling and an "Internal note" label; mentioned_user_ids drives
+    # the notification fanout at insert time.
+    is_internal: bool = False
+    mentioned_user_ids: list[uuid.UUID] = Field(default_factory=list)
     channel_message_id: Optional[str]
     sent_at: Optional[datetime]
     delivered_at: Optional[datetime]

@@ -21,6 +21,7 @@ import { ChatThreadComponent } from './chat-thread.component';
 import {
   ComposeBarComponent,
   ComposerMediaPayload,
+  ComposerNotePayload,
 } from './compose-bar.component';
 import { ConversationListComponent } from './conversation-list.component';
 import {
@@ -93,6 +94,12 @@ export class ConversationsPageComponent {
    * via `GET /api/v1/staff`; the list is small (org-wide staff) and
    * rarely changes within a session. */
   protected readonly staffById = signal<Map<string, StaffListItem>>(new Map());
+
+  /** Step 13 — flat staff array for the @-mention picker in the
+   *  composer. Derived from `staffById` (single source of truth). */
+  protected readonly staffList = computed<StaffListItem[]>(() =>
+    Array.from(this.staffById().values()),
+  );
 
   /** When `true`, the reassign modal is rendered inline and bound to
    * `selectedConversation()`. Cancel/confirm flip it back to `false`. */
@@ -228,6 +235,8 @@ export class ConversationsPageComponent {
       interactive_payload: null,
       reply_to_message_id: replyTarget?.id ?? null,
       reactions: [],
+      is_internal: false,
+      mentioned_user_ids: [],
       channel_message_id: null,
       sent_at: new Date().toISOString(),
       delivered_at: null,
@@ -268,6 +277,70 @@ export class ConversationsPageComponent {
           );
           this.loadError.set(
             extractApiError(err) ?? 'Could not send message.',
+          );
+        },
+      });
+  }
+
+  // --- Internal note (Step 13) ---------------------------------------
+
+  protected onSendNote(payload: ComposerNotePayload): void {
+    const id = this.selectedId();
+    if (!id || !payload.text.trim()) return;
+
+    const optimistic: ConversationMessage = {
+      id: 'tmp-' + Math.random().toString(36).slice(2),
+      org_id: '',
+      conversation_id: id,
+      direction: 'out',
+      sender_user_id: this.auth.currentUserId(),
+      text: payload.text,
+      attachments: [],
+      interactive_payload: null,
+      reply_to_message_id: null,
+      reactions: [],
+      is_internal: true,
+      mentioned_user_ids: payload.mentions,
+      channel_message_id: null,
+      sent_at: new Date().toISOString(),
+      delivered_at: null,
+      read_at: null,
+      created_at: new Date().toISOString(),
+    };
+    this.detail.update((d) =>
+      d ? { ...d, messages: [...d.messages, optimistic] } : d,
+    );
+
+    this.api
+      .postNote(id, payload.text, payload.mentions)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (real) => {
+          this.detail.update((d) =>
+            d
+              ? {
+                  ...d,
+                  messages: d.messages.map((m) =>
+                    m.id === optimistic.id ? real : m,
+                  ),
+                }
+              : d,
+          );
+          this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.detail.update((d) =>
+            d
+              ? {
+                  ...d,
+                  messages: d.messages.filter(
+                    (m) => m.id !== optimistic.id,
+                  ),
+                }
+              : d,
+          );
+          this.loadError.set(
+            extractApiError(err) ?? 'Could not post the note.',
           );
         },
       });
@@ -344,6 +417,8 @@ export class ConversationsPageComponent {
       interactive_payload: payload as unknown as Record<string, unknown>,
       reply_to_message_id: null,
       reactions: [],
+      is_internal: false,
+      mentioned_user_ids: [],
       channel_message_id: null,
       sent_at: new Date().toISOString(),
       delivered_at: null,
@@ -422,6 +497,8 @@ export class ConversationsPageComponent {
       interactive_payload: null,
       reply_to_message_id: null,
       reactions: [],
+      is_internal: false,
+      mentioned_user_ids: [],
       channel_message_id: null,
       sent_at: new Date().toISOString(),
       delivered_at: null,

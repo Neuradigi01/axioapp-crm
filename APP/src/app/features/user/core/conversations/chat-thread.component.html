@@ -73,6 +73,32 @@
     } @else {
       @for (m of detail.messages; track m.id) {
         @let senderColor = staffColorFor(m.sender_user_id);
+        @if (m.is_internal) {
+          <!-- Step 13 — internal note bubble. Yellow border + label,
+               never sent to the customer. Notes use the out direction
+               internally but render centered with the operator's name. -->
+          <div class="flex justify-center">
+            <div
+              class="max-w-[85%] rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 shadow-sm"
+            >
+              <p class="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                <lucide-icon name="sticky-note" size="10" />
+                Internal note
+                <span class="font-normal text-amber-600">
+                  · {{ staffNameFor(m.sender_user_id) }}
+                  · {{ formatTime(m.sent_at || m.created_at) }}
+                </span>
+              </p>
+              <p class="whitespace-pre-wrap break-words">{{ m.text }}</p>
+              @if (m.mentioned_user_ids && m.mentioned_user_ids.length > 0) {
+                <p class="mt-1 text-[10px] text-amber-700">
+                  Mentioned: {{ m.mentioned_user_ids.length }}
+                  {{ m.mentioned_user_ids.length === 1 ? 'person' : 'people' }}
+                </p>
+              }
+            </div>
+          </div>
+        } @else {
         <div
           [class]="
             'group relative flex ' +
@@ -296,6 +322,7 @@
             </p>
           </div>
         </div>
+        }
       }
     }
   </div>

@@ -1,7 +1,7 @@
 # Step 13 — Internal notes on conversations
 
 **Goal:** Add internal-only notes (with @mentions) on conversations. Notes never send to the customer; appear in the thread with yellow styling + mention notifications go to mentioned staff.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Phase 1 closed.
 
 ---

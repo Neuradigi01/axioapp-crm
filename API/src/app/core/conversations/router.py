@@ -52,6 +52,7 @@ from src.app.core.conversations.registry import (
     ChannelNotRegistered,
     resolve,
 )
+from src.app.core.conversations.notes_service import post_note
 from src.app.core.conversations.schemas import (
     AttachmentType,
     ConversationDetail,
@@ -60,6 +61,7 @@ from src.app.core.conversations.schemas import (
     ConversationPatch,
     MessageOut,
     MessageSendPayload,
+    NoteCreate,
     ReactionRequest,
 )
 from src.app.core.conversations.service import (
@@ -170,6 +172,34 @@ async def send_message_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         )
+    return MessageOut.model_validate(msg)
+
+
+@router.post(
+    "/{conversation_id}/notes",
+    response_model=MessageOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_note_endpoint(
+    conversation_id: uuid.UUID,
+    payload: NoteCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> MessageOut:
+    """Post an internal-only note to the conversation
+    (whatsapp-platform-upgrade Step 13).
+
+    Notes never reach the customer — they're operator-only annotations
+    rendered yellow in the thread. Mentions in `payload.mentions` fan
+    out one in-app notification per id; the schema caps the list at
+    5 to bound notification spam from group calls."""
+    msg = await post_note(
+        db,
+        conversation_id=conversation_id,
+        author_id=user.legacy_uuid,
+        text=payload.text,
+        mentioned_user_ids=payload.mentions,
+    )
     return MessageOut.model_validate(msg)
 
 

@@ -17,6 +17,7 @@ import {
 } from '../services/email-templates-api.service';
 import { EmailTemplatePickerComponent } from '../shared/email/template-picker.component';
 import { ConversationMessage } from './conversations-api.service';
+import { StaffListItem } from '../staff/staff-api.service';
 
 
 export type ComposerAttachmentType =
@@ -31,6 +32,20 @@ export interface ComposerMediaPayload {
   type: ComposerAttachmentType;
   caption?: string;
 }
+
+
+/**
+ * Internal note payload (whatsapp-platform-upgrade Step 13).
+ * Emitted alongside the existing send/sendMedia events when the
+ * composer is in "Note" mode.
+ */
+export interface ComposerNotePayload {
+  text: string;
+  mentions: string[];
+}
+
+
+const MAX_MENTIONS = 5;
 
 
 // Mirror of backend per-type caps in `core/conversations/media_upload.py`.
@@ -106,8 +121,15 @@ export class ComposeBarComponent {
    *  the X button. */
   @Input() replyingTo: ConversationMessage | null = null;
 
+  /** Step 13: org staff list for the @-mention picker. The parent
+   *  (conversations.page) loads this once at mount and passes it
+   *  down. Empty when not yet loaded — the picker just renders no
+   *  candidates. */
+  @Input() staff: StaffListItem[] = [];
+
   @Output() readonly send = new EventEmitter<string>();
   @Output() readonly sendMedia = new EventEmitter<ComposerMediaPayload>();
+  @Output() readonly sendNote = new EventEmitter<ComposerNotePayload>();
   @Output() readonly openInteractive = new EventEmitter<void>();
   @Output() readonly toggleAi = new EventEmitter<boolean>();
   @Output() readonly clearReply = new EventEmitter<void>();
@@ -116,6 +138,38 @@ export class ComposeBarComponent {
 
   protected readonly text = signal<string>('');
   protected readonly templateError = signal<string | null>(null);
+
+  /** Step 13: composer mode toggle. "reply" sends to the channel as
+   *  usual; "note" persists an internal-only annotation. */
+  protected readonly mode = signal<'reply' | 'note'>('reply');
+  protected readonly MAX_MENTIONS = MAX_MENTIONS;
+
+  /** Mention picker state. Visible when the user just typed `@` at
+   *  the end of the current text. `mentionQuery` is the chars typed
+   *  after the `@`; the picker filters `staff` by that prefix. */
+  protected readonly mentionOpen = signal<boolean>(false);
+  protected readonly mentionQuery = signal<string>('');
+  /** Resolved mentions for the in-flight note. Each entry is
+   *  ``{userId, displayName}`` — we keep both so the chip row can
+   *  render without re-resolving from `staff` on every keystroke. */
+  protected readonly mentions = signal<
+    Array<{ userId: string; displayName: string }>
+  >([]);
+
+  protected readonly mentionCandidates = computed(() => {
+    const q = this.mentionQuery().toLowerCase();
+    const chosen = new Set(this.mentions().map((m) => m.userId));
+    return this.staff
+      .filter(
+        (s) =>
+          !chosen.has(s.id) &&
+          (q.length === 0 ||
+            s.full_name.toLowerCase().includes(q)),
+      )
+      .slice(0, 6);
+  });
+
+  protected readonly isNoteMode = computed(() => this.mode() === 'note');
 
   protected readonly stagedFile = signal<File | null>(null);
   protected readonly stagedType = signal<ComposerAttachmentType | null>(null);
@@ -130,6 +184,9 @@ export class ComposeBarComponent {
     return t === 'image' || t === 'video' || t === 'document';
   });
   protected readonly placeholder = computed(() => {
+    if (this.isNoteMode()) {
+      return 'Add an internal note — only your team can see it. Type @ to mention.';
+    }
     if (!this.stagedFile()) {
       return 'Type a reply or let AI handle it…';
     }
@@ -140,6 +197,67 @@ export class ComposeBarComponent {
 
   protected onTextChange(value: string): void {
     this.text.set(value);
+    if (this.isNoteMode()) {
+      this.refreshMentionPicker(value);
+    }
+  }
+
+  /** Reads the text buffer, opens the mention picker when the cursor
+   *  sits just after an active `@` token (e.g. `Hey @rav` → picker
+   *  open with query "rav"). Closes the picker on whitespace after the
+   *  `@`. The implementation keeps the rule simple — last @-segment
+   *  in the string — because the composer is a single-line-ish
+   *  textarea, not a full WYSIWYG editor. */
+  private refreshMentionPicker(value: string): void {
+    const match = /(?:^|\s)@(\w*)$/.exec(value);
+    if (match) {
+      this.mentionQuery.set(match[1] || '');
+      this.mentionOpen.set(true);
+    } else {
+      this.mentionOpen.set(false);
+      this.mentionQuery.set('');
+    }
+  }
+
+  protected setMode(mode: 'reply' | 'note'): void {
+    if (this.mode() === mode) return;
+    this.mode.set(mode);
+    // Switching to note mode clears any reply target — a note doesn't
+    // carry channel context. Switching back to reply leaves mentions
+    // alone (cheap re-toggle).
+    if (mode === 'note' && this.replyingTo) {
+      this.clearReply.emit();
+    }
+    if (mode === 'reply') {
+      this.mentionOpen.set(false);
+    }
+  }
+
+  protected pickMention(staff: StaffListItem): void {
+    if (this.mentions().length >= MAX_MENTIONS) return;
+    this.mentions.update((arr) => [
+      ...arr,
+      { userId: staff.id, displayName: staff.full_name },
+    ]);
+    // Replace the trailing `@query` token with `@FullName` so the
+    // operator sees what they tagged inline with the note text.
+    const current = this.text();
+    const replaced = current.replace(
+      /(?:^|\s)@(\w*)$/,
+      (match) => {
+        const prefix = match.startsWith(' ') ? ' ' : '';
+        return `${prefix}@${staff.full_name} `;
+      },
+    );
+    this.text.set(replaced);
+    this.mentionOpen.set(false);
+    this.mentionQuery.set('');
+  }
+
+  protected removeMention(userId: string): void {
+    this.mentions.update((arr) =>
+      arr.filter((m) => m.userId !== userId),
+    );
   }
 
   protected requestInteractive(): void {
@@ -151,6 +269,23 @@ export class ComposeBarComponent {
     const file = this.stagedFile();
     const type = this.stagedType();
     const trimmed = this.text().trim();
+
+    // Step 13 — Note mode bypasses every channel path. Media + reply
+    // affordances are silently ignored when posting a note (the UI
+    // hides them already; this is a defensive guard).
+    if (this.isNoteMode()) {
+      if (!trimmed) return;
+      this.sendNote.emit({
+        text: trimmed,
+        mentions: this.mentions().map((m) => m.userId),
+      });
+      this.text.set('');
+      this.mentions.set([]);
+      this.mentionOpen.set(false);
+      this.mentionQuery.set('');
+      return;
+    }
+
     if (file && type) {
       const caption =
         this.captionsSupported() && trimmed ? trimmed : undefined;
