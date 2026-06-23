@@ -1,7 +1,7 @@
 # Step 15 — 24-hour session window banner + WhatsApp-specific composer states
 
 **Goal:** Make the WhatsApp 24-hour session window visible to staff. Composer disables regular text out-of-session and prominently surfaces the template picker instead. Prevents "ghosting" caused by sends Meta drops silently.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 14 (inbox upgrades pattern).
 
 ---

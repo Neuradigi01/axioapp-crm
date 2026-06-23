@@ -346,6 +346,26 @@ class MessageOut(ORMModel):
     created_at: datetime
 
 
+class WhatsAppSessionState(BaseModel):
+    """24-hour session window read shape
+    (whatsapp-platform-upgrade Step 15).
+
+    Computed server-side from `Conversation.last_customer_message_at`
+    on every detail fetch. `expires_at` is the absolute UTC timestamp
+    the window closes; `hours_remaining` is a float for easy
+    frontend rendering ("4h 12m" → derive minutes from the fractional
+    part). Both are 0 / None when out of session."""
+
+    in_session: bool
+    expires_at: Optional[datetime] = None
+    hours_remaining: float = 0.0
+    last_customer_message_at: Optional[datetime] = None
+
+
 class ConversationDetail(BaseModel):
     conversation: ConversationOut
     messages: list[MessageOut]
+    # Step 15 — populated only for WhatsApp conversations. NULL on
+    # every other channel (no session-window concept). The banner
+    # component renders nothing when this is None.
+    whatsapp_session_state: Optional[WhatsAppSessionState] = None

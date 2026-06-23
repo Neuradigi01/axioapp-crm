@@ -145,9 +145,18 @@ export interface ConversationMessage {
   created_at: string;
 }
 
+export interface WhatsAppSessionState {
+  in_session: boolean;
+  expires_at: string | null;
+  hours_remaining: number;
+  last_customer_message_at: string | null;
+}
+
 export interface ConversationDetail {
   conversation: Conversation;
   messages: ConversationMessage[];
+  /** Step 15 — only populated for WhatsApp conversations. */
+  whatsapp_session_state: WhatsAppSessionState | null;
 }
 
 export interface ConversationListQuery {

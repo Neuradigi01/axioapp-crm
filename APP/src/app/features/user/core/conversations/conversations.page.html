@@ -65,6 +65,7 @@
           (replyTo)="onReplyTo($event)"
           (react)="onReact($event)"
           (tagsChanged)="onTagsChanged($event)"
+          (pickTemplate)="onPickTemplate()"
         />
         <app-compose-bar
           [aiHandling]="conv.ai_handling"
@@ -72,6 +73,7 @@
           [contactId]="conv.contact_id"
           [replyingTo]="replyingTo()"
           [staff]="staffList()"
+          [outOfSession]="isOutOfSession()"
           (send)="onSendText($event)"
           (sendMedia)="onSendMedia($event)"
           (sendNote)="onSendNote($event)"

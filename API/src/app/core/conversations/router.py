@@ -79,6 +79,9 @@ from src.app.core.conversations.tags_service import (
     unassign_tag,
     update_tag,
 )
+from src.app.core.conversations.whatsapp_session import (
+    compute_session_state,
+)
 from src.app.core.conversations.service import (
     get_conversation,
     list_conversations,
@@ -148,9 +151,16 @@ async def get_detail_endpoint(
     msgs = await list_messages(db, conversation_id)
     conv_out = ConversationOut.model_validate(conv)
     conv_out.tags = await list_tags_for_conversation(db, conversation_id)
+    # Step 15 — attach WhatsApp 24-hour session state only for
+    # whatsapp conversations. Other channels (SMS / Email / web)
+    # have no session-window concept; the banner stays hidden.
+    session_state = None
+    if conv.channel == ConversationChannel.whatsapp:
+        session_state = compute_session_state(conv.last_customer_message_at)
     return ConversationDetail(
         conversation=conv_out,
         messages=[MessageOut.model_validate(m) for m in msgs],
+        whatsapp_session_state=session_state,
     )
 
 

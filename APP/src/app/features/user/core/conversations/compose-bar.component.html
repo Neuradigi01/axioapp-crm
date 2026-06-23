@@ -175,7 +175,7 @@
         (keydown)="onKey($event)"
         rows="2"
         [attr.placeholder]="placeholder()"
-        [disabled]="!!stagedFile() && !captionsSupported()"
+        [disabled]="textareaDisabled()"
         [class]="
           'block min-h-[2.5rem] w-full resize-none rounded-md border px-3 py-2 text-sm placeholder-zinc-400 shadow-sm focus:outline-none focus:ring-1 disabled:bg-zinc-100 disabled:text-zinc-500 ' +
           (isNoteMode()
@@ -231,7 +231,10 @@
       <button
         type="button"
         (click)="submit()"
-        [disabled]="!stagedFile() && !text().trim().length"
+        [disabled]="
+          (!isNoteMode() && outOfSession) ||
+          (!stagedFile() && !text().trim().length)
+        "
         class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
       >
         Send

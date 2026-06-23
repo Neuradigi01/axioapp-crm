@@ -124,6 +124,15 @@ class Conversation(Base, TenantScoped):
     last_message_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # whatsapp-platform-upgrade Step 15 — timestamp of the most recent
+    # *customer-driven* message in this conversation. Used to compute
+    # the WhatsApp 24-hour session window. NULL when the customer has
+    # never sent a message (session-helper treats NULL as out-of-session).
+    # Updated atomically with every inbound message insert in
+    # `service.receive_webhook`.
+    last_customer_message_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     unread_count: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=sql_text("0")
     )

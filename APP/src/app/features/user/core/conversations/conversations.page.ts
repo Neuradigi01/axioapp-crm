@@ -185,6 +185,28 @@ export class ConversationsPageComponent {
     this.reloadList();
   }
 
+  // --- Session window (Step 15) --------------------------------------
+
+  /** True when the selected conversation is on WhatsApp AND outside
+   *  its 24-hour session window. Drives the composer's text-input
+   *  disabled state. Non-WhatsApp conversations + missing state
+   *  (still loading) are treated as "in session" so the composer
+   *  doesn't lock down spuriously. */
+  protected readonly isOutOfSession = computed(() => {
+    const state = this.detail()?.whatsapp_session_state;
+    if (!state) return false;
+    return !state.in_session;
+  });
+
+  /** Step 15 — banner's [Pick template] CTA. Routes to the templates
+   *  page where the operator can pick + submit a template. In a
+   *  future step this could open an inline template-send picker. */
+  protected onPickTemplate(): void {
+    // Lazy import: keep the page bundle lean by routing imperatively
+    // instead of declaring RouterLink in this page (already a big file).
+    window.location.href = '/user/whatsapp/templates';
+  }
+
   // --- Tags (Step 14) ------------------------------------------------
 
   protected readonly tagFilterIds = signal<string[]>([]);

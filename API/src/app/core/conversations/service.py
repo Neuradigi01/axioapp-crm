@@ -328,6 +328,11 @@ async def receive_webhook(
     )
     session.add(msg)
     conv.last_message_at = sent_at
+    # whatsapp-platform-upgrade Step 15 — bump the session-window
+    # pivot. Every inbound customer message resets the 24-hour clock.
+    # Atomic with the message insert so a webhook racing the
+    # in-flight UI poll never sees a stale state.
+    conv.last_customer_message_at = sent_at
     conv.unread_count = (conv.unread_count or 0) + 1
     await session.commit()
     await session.refresh(msg)

@@ -127,6 +127,12 @@ export class ComposeBarComponent {
    *  candidates. */
   @Input() staff: StaffListItem[] = [];
 
+  /** Step 15: WhatsApp 24-hour session window has expired. When true,
+   *  the textarea is disabled in Reply mode (note mode is unaffected
+   *  — internal notes don't reach the customer). The banner above
+   *  the thread carries the "Pick template" CTA. */
+  @Input() outOfSession = false;
+
   @Output() readonly send = new EventEmitter<string>();
   @Output() readonly sendMedia = new EventEmitter<ComposerMediaPayload>();
   @Output() readonly sendNote = new EventEmitter<ComposerNotePayload>();
@@ -187,12 +193,24 @@ export class ComposeBarComponent {
     if (this.isNoteMode()) {
       return 'Add an internal note — only your team can see it. Type @ to mention.';
     }
+    if (this.outOfSession) {
+      return 'Session expired — only approved WhatsApp templates can be sent right now.';
+    }
     if (!this.stagedFile()) {
       return 'Type a reply or let AI handle it…';
     }
     return this.captionsSupported()
       ? 'Add a caption (optional)…'
       : 'Audio messages don’t support captions';
+  });
+
+  /** Step 15 — derived "can free-text" state used by the textarea
+   *  disabled-binding + the Send button enabled-binding. Note mode
+   *  bypasses the session-window check (notes are internal). */
+  protected readonly textareaDisabled = computed(() => {
+    if (this.isNoteMode()) return false;
+    if (this.outOfSession) return true;
+    return !!this.stagedFile() && !this.captionsSupported();
   });
 
   protected onTextChange(value: string): void {
@@ -285,6 +303,11 @@ export class ComposeBarComponent {
       this.mentionQuery.set('');
       return;
     }
+
+    // Step 15 — refuse free-text + media sends when the WhatsApp
+    // session window has expired. The textarea is already disabled
+    // for the operator; this is a defence in depth.
+    if (this.outOfSession) return;
 
     if (file && type) {
       const caption =

@@ -93,6 +93,13 @@
     </div>
   }
 
+  <!-- Step 15 — WhatsApp 24-hour session window banner. Renders
+       nothing for non-WhatsApp conversations (the input is null). -->
+  <app-session-window-banner
+    [state]="detail?.whatsapp_session_state ?? null"
+    (pickTemplate)="pickTemplate.emit()"
+  />
+
   <!-- Messages -->
   <div
     #scrollHost
