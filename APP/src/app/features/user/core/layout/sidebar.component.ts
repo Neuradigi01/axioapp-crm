@@ -24,8 +24,14 @@ export class SidebarComponent implements OnInit {
   private readonly moduleApi = inject(ModuleApiService);
   private readonly auth = inject(FurnitureAuthService);
 
-  readonly open = input.required<boolean>();
+  /** Desktop expand/collapse state. */
+  readonly expanded = input.required<boolean>();
+  /** Mobile off-canvas drawer open state. */
+  readonly mobileOpen = input.required<boolean>();
+  /** Desktop collapse/expand toggle (chevron button). */
   readonly toggle = output<void>();
+  /** Mobile drawer close (X button or nav-link tap). */
+  readonly close = output<void>();
 
   /** Current tenant — drives the sidebar header brand. `null` until
    * the first `/me` response lands. */

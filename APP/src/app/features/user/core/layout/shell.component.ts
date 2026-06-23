@@ -26,12 +26,23 @@ const SIDEBAR_STORAGE_KEY = 'furniturecrm:sidebar-open';
   templateUrl: './shell.component.html',
 })
 export class ShellComponent {
+  /** Desktop expand/collapse state (persisted). */
   protected readonly sidebarOpen = signal(this.loadInitialSidebarState());
+  /** Mobile off-canvas drawer state (always starts closed, not persisted). */
+  protected readonly mobileMenuOpen = signal(false);
 
   toggleSidebar(): void {
     const next = !this.sidebarOpen();
     this.sidebarOpen.set(next);
     localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+  }
+
+  toggleMobileMenu(): void {
+    this.mobileMenuOpen.update((v) => !v);
+  }
+
+  closeMobileMenu(): void {
+    this.mobileMenuOpen.set(false);
   }
 
   private loadInitialSidebarState(): boolean {
