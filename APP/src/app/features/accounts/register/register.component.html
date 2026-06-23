@@ -14,7 +14,7 @@
           type="text"
           formControlName="first_name"
           autocomplete="given-name"
-          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         @if (registerForm.controls['first_name'].invalid && (registerForm.controls['first_name'].touched || registerForm.controls['first_name'].dirty)) {
           <p class="mt-1 text-xs text-rose-600">
@@ -29,7 +29,7 @@
           type="text"
           formControlName="last_name"
           autocomplete="family-name"
-          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         @if (registerForm.controls['last_name'].invalid && (registerForm.controls['last_name'].touched || registerForm.controls['last_name'].dirty)) {
           <p class="mt-1 text-xs text-rose-600">
@@ -48,7 +48,7 @@
           type="email"
           formControlName="email"
           autocomplete="email"
-          class="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         @if (needsEmailOtp()) {
           <button
@@ -79,7 +79,7 @@
           type="text"
           formControlName="email_otp_code"
           autocomplete="one-time-code"
-          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </div>
     }
@@ -93,7 +93,7 @@
           type="tel"
           formControlName="mobile_no"
           autocomplete="tel"
-          class="w-full min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         @if (needsSmsOtp()) {
           <button
@@ -119,7 +119,7 @@
           type="text"
           formControlName="mobile_otp_code"
           autocomplete="one-time-code"
-          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </div>
     }
@@ -164,7 +164,7 @@
           formControlName="password"
           [type]="pwToggle.type()"
           autocomplete="new-password"
-          class="w-full rounded-md border border-zinc-300 px-3 py-2 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         <button
           type="button"
@@ -191,7 +191,7 @@
           formControlName="confirm_password"
           [type]="cpToggle.type()"
           autocomplete="new-password"
-          class="w-full rounded-md border border-zinc-300 px-3 py-2 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         <button
           type="button"
@@ -216,7 +216,7 @@
         id="referral_id"
         type="text"
         formControlName="referral_id"
-        class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       />
     </div>
 

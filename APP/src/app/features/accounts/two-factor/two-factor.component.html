@@ -28,7 +28,7 @@
         type="text"
         inputmode="numeric"
         maxlength="1"
-        class="h-12 w-10 rounded-md border border-zinc-300 text-center text-lg font-semibold text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:bg-zinc-100"
+        class="h-12 w-10 rounded-md border border-zinc-300 bg-white text-center text-lg font-semibold text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:bg-zinc-100"
         [value]="digit"
         [disabled]="isLoading() || isExpired"
         (input)="onDigitInput($index, $event)"

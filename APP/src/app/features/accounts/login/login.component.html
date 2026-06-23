@@ -19,7 +19,7 @@
         type="text"
         formControlName="identifier"
         autocomplete="username"
-        class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       />
       @if (loginForm.controls['identifier'].invalid && (loginForm.controls['identifier'].touched || loginForm.controls['identifier'].dirty)) {
         <p class="mt-1 text-xs text-rose-600">
@@ -37,7 +37,7 @@
           formControlName="password"
           [type]="pwToggle.type()"
           autocomplete="current-password"
-          class="w-full rounded-md border border-zinc-300 px-3 py-2 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         <button
           type="button"
