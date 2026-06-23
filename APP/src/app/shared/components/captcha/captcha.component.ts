@@ -1,22 +1,14 @@
 import { Component, ChangeDetectionStrategy, signal, output, inject, OnInit, OnDestroy, ElementRef, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { LucideAngularModule } from 'lucide-angular';
 import { AuthApiService } from '@app/services/auth-api.service';
 import { CaptchaType } from '@app/schemas/auth';
 
 @Component({
   selector: 'app-captcha',
   templateUrl: './captcha.component.html',
-  styleUrl: './captcha.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    ReactiveFormsModule,
-    MatButtonModule,
-    MatIconModule,
-    MatProgressSpinnerModule,
-  ],
+  imports: [ReactiveFormsModule, LucideAngularModule],
 })
 export class CaptchaComponent implements OnInit, OnDestroy {
   private readonly authApi = inject(AuthApiService);

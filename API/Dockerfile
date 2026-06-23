@@ -25,10 +25,6 @@ RUN if [ "$is_development" = "true" ] ; then pip install --no-cache-dir -r requi
 
 COPY . .
 
-# Fix line endings and make entrypoint executable
-RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
-
 EXPOSE 8000
 
-ENTRYPOINT ["./entrypoint.sh"]
-CMD ["gunicorn", "main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "2", "--max-requests", "100", "--max-requests-jitter", "10"]
+CMD ["gunicorn", "src.app.main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "2", "--max-requests", "100", "--max-requests-jitter", "10"]

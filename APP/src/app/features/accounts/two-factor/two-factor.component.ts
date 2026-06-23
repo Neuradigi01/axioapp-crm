@@ -1,9 +1,6 @@
 import { Component, ChangeDetectionStrategy, signal, inject, OnInit, OnDestroy, ElementRef, viewChildren } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { LucideAngularModule } from 'lucide-angular';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthApiService } from '@app/services/auth-api.service';
 import { AuthService } from '@core/services/auth.service';
@@ -17,15 +14,8 @@ import { DeviceInfoService } from '@core/services/device-info.service';
 @Component({
   selector: 'app-two-factor',
   templateUrl: './two-factor.component.html',
-  styleUrl: './two-factor.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    RouterLink,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatProgressSpinnerModule,
-  ],
+  imports: [RouterLink, LucideAngularModule],
 })
 export class TwoFactorComponent implements OnInit, OnDestroy {
   private readonly authApi = inject(AuthApiService);

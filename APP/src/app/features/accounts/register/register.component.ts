@@ -1,13 +1,7 @@
-import { Component, ChangeDetectionStrategy, signal, computed, inject, OnInit, OnDestroy, viewChild, ElementRef } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, inject, OnInit, OnDestroy, viewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
+import { LucideAngularModule } from 'lucide-angular';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ValidationMessageComponent } from '@shared/components/validation-message/validation-message.component';
 import { CaptchaComponent } from '@shared/components/captcha/captcha.component';
@@ -30,18 +24,11 @@ import { ICountry, IState } from '@app/schemas/common';
 @Component({
   selector: 'app-register',
   templateUrl: './register.component.html',
-  styleUrl: './register.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule,
     RouterLink,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatButtonModule,
-    MatIconModule,
-    MatProgressSpinnerModule,
-    MatSelectModule,
+    LucideAngularModule,
     ValidationMessageComponent,
     CaptchaComponent,
     PasswordToggleDirective,
@@ -106,23 +93,6 @@ export class RegisterComponent implements OnInit, OnDestroy {
   readonly states = signal<IState[]>([]);
   readonly statesLoading = signal(false);
 
-  readonly countrySearchTerm = signal('');
-  readonly stateSearchTerm = signal('');
-
-  readonly filteredCountries = computed(() => {
-    const term = this.countrySearchTerm().toLowerCase();
-    if (!term) return this.countries();
-    return this.countries().filter(c => c.name.toLowerCase().includes(term));
-  });
-
-  readonly filteredStates = computed(() => {
-    const term = this.stateSearchTerm().toLowerCase();
-    if (!term) return this.states();
-    return this.states().filter(s => s.name.toLowerCase().includes(term));
-  });
-
-  private readonly countrySearchInput = viewChild<ElementRef<HTMLInputElement>>('countrySearchInput');
-  private readonly stateSearchInput = viewChild<ElementRef<HTMLInputElement>>('stateSearchInput');
   private readonly captchaRef = viewChild<CaptchaComponent>('captchaRef');
 
   readonly loginUrl = getRoute('login').url;
@@ -200,26 +170,6 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   onCaptchaTokenChange(token: string): void {
     this.captchaToken.set(token);
-  }
-
-  onCountrySelectToggle(opened: boolean): void {
-    if (opened) {
-      setTimeout(() => this.countrySearchInput()?.nativeElement.focus());
-    } else {
-      this.countrySearchTerm.set('');
-      const el = this.countrySearchInput()?.nativeElement;
-      if (el) el.value = '';
-    }
-  }
-
-  onStateSelectToggle(opened: boolean): void {
-    if (opened) {
-      setTimeout(() => this.stateSearchInput()?.nativeElement.focus());
-    } else {
-      this.stateSearchTerm.set('');
-      const el = this.stateSearchInput()?.nativeElement;
-      if (el) el.value = '';
-    }
   }
 
   async onCountryChange(): Promise<void> {

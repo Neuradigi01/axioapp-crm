@@ -1,28 +1,36 @@
 @if (captchaType()) {
-  <div class="captcha">
+  <div>
     @if (isLoading()) {
-      <div class="captcha__loading">
-        <mat-spinner diameter="24" />
-      </div>
+      <div class="py-3 text-center text-sm text-zinc-400">Loading…</div>
     } @else if (captchaType() === 'image') {
-      <div class="captcha__container">
-        <div class="captcha__image-wrap">
+      <div class="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-2">
+        <div class="flex shrink-0 items-center gap-1">
           @if (captchaImage()) {
-            <img [src]="'data:image/png;base64,' + captchaImage()" alt="Captcha" class="captcha__image" />
+            <img
+              [src]="'data:image/png;base64,' + captchaImage()"
+              alt="Captcha"
+              class="pointer-events-none h-11 w-auto select-none rounded"
+            />
           }
-          <button mat-icon-button type="button" (click)="refresh()" class="captcha__refresh" aria-label="Refresh captcha">
-            <mat-icon>refresh</mat-icon>
+          <button
+            type="button"
+            (click)="refresh()"
+            aria-label="Refresh captcha"
+            class="rounded p-1 text-zinc-400 transition hover:text-zinc-700"
+          >
+            <lucide-icon name="refresh-cw" class="h-4 w-4" />
           </button>
         </div>
         <input
-          class="captcha__code-input"
+          class="h-10 min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 font-mono uppercase tracking-widest text-zinc-900 placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           [formControl]="captchaAnswer"
           placeholder="Enter code"
           autocomplete="off"
-          spellcheck="false" />
+          spellcheck="false"
+        />
       </div>
     } @else if (captchaType() === 'recaptcha_v2') {
-      <div #recaptchaContainer class="captcha__recaptcha-v2"></div>
+      <div #recaptchaContainer class="mb-2"></div>
     }
   </div>
 }

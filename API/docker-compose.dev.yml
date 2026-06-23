@@ -11,7 +11,7 @@ services:
       args:
         - is_development=true
     ports:
-      - "5678:5678"
+      - "5682:5678"
     volumes:
       - .:/app
     environment:

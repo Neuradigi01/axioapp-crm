@@ -40,7 +40,8 @@ furniture-crm/
 ├── app/                                ← Angular frontend (renamed from APP/)
 │   └── src/app/
 │       ├── features/
-│       │   ├── accounts/               ← UNTOUCHED. Login/register/2FA.
+│       │   ├── accounts/               ← Login/register/2FA. Migrated to Tailwind
+│       │   │                             to match the user app (logic unchanged).
 │       │   ├── admin/                  ← UNTOUCHED. Legacy template admin panel — NOT
 │       │   │                             part of FurnitureCRM. Don't modify, don't delete.
 │       │   └── user/                   ← FurnitureCRM lives here.
@@ -101,7 +102,7 @@ These are project-specific deviations from a clean-slate build:
 - **`features/admin/` is left UNTOUCHED indefinitely.** It is the legacy template's admin panel and is not part of FurnitureCRM. Do not modify, delete, or repurpose any file inside it. The login form's "Admin login" button continues to work and redirects to `/admin/dashboard` (legacy). FurnitureCRM does not use this path.
 - **`features/user/` hosts the FurnitureCRM frontend.** All Layer 1 (`core/`) and Layer 2 (`packs/furniture/`) module code lives at `app/src/app/features/user/core/...` and `app/src/app/features/user/packs/furniture/...`. The seven FurnitureCRM roles all log in via the user-login button and land at `/user/...`.
 - **`staff-portal/` is a separate top-level route tree** at `app/src/app/staff-portal/` for PIN tablet login. NOT under `features/user/`.
-- **Existing auth pages** (login/register/forgot/reset/2FA) **keep their PrimeNG + Angular Material visuals** — option (a) chosen by user. **All new pages use Tailwind only.** Two styling systems coexist by design.
+- **Auth pages were migrated to Tailwind** to match the FurnitureCRM user app. The accounts pages (login, register, forgot/reset password, two-factor, verify-email, email-verification-notice), the shared accounts layout, and the shared captcha component were rebuilt in Tailwind (zinc palette, white `rounded-xl border border-zinc-200 shadow-sm` cards, `bg-zinc-900` primary button) so login no longer reads as a different product from the dashboard. **All auth/registration logic is unchanged** — only markup + styling. Notes: the accounts-layout theme toggle was removed (the user app is light-only with no toggle); register's country/state `mat-select` (with in-panel search) became a Tailwind-styled native `<select>` (native type-ahead, no search box); error toasts still use `MatSnackBar`. `features/admin/` is untouched and keeps its Material visuals. **All pages now use Tailwind only.** (This supersedes the earlier option (a) — "keep Material visuals" — chosen by the user.)
 - **Folders renamed lowercase:** `API/` → `api/`, `APP/` → `app/`. **`Flutter/` untouched** (not part of this product).
 - **Old template docs** under `api/docs/` and `app/docs/` remain as **reference** for the existing auth code's patterns. They do **not** describe FurnitureCRM and should not drive new code.
 

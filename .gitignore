@@ -52,8 +52,15 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Storage (file uploads)
-storage/
+# Storage (runtime file uploads). Anchored to the API root's upload dir
+# (created by main.py as ./storage relative to the runtime CWD). A bare,
+# unanchored `storage/` also matched the SOURCE package
+# src/app/shared/storage/ and silently un-tracked it — it never got
+# committed, never shipped in the image, and prod died with
+# ModuleNotFoundError: 'src.app.shared.storage'. Keep these anchored.
+/API/storage/
+/api/storage/
+/storage/
 
 # Docker volumes
 postgres-data/

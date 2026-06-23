@@ -32,7 +32,6 @@
     "ng-apexcharts": "^2.4.0",
     "ng2-charts": "^10.0.0",
     "ngx-spinner": "^21.1.0",
-    "primeng": "^21.1.3",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

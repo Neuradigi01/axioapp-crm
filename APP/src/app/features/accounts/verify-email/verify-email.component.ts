@@ -1,24 +1,14 @@
 import { Component, ChangeDetectionStrategy, signal, inject, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { LucideAngularModule } from 'lucide-angular';
 import { AuthApiService } from '@app/services/auth-api.service';
 import { getRoute } from '@core/services/routes-helper.service';
 
 @Component({
   selector: 'app-verify-email',
   templateUrl: './verify-email.component.html',
-  styleUrl: './verify-email.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    RouterLink,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatProgressSpinnerModule,
-  ],
+  imports: [RouterLink, LucideAngularModule],
 })
 export class VerifyEmailComponent implements OnInit {
   private readonly authApi = inject(AuthApiService);
