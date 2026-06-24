@@ -1,7 +1,8 @@
 # Step 23 — DND / block list + conversation export (DPDP right-to-access)
 
-**Goal:** Block list per org (numbers we won't send to / accept from). Inbound from blocked silently dropped; outbound refuses. Plus DPDP right-to-access: export a contact's full data (conversations, opt-in history, deals) as JSON + PDF.
-**Status:** Pending
+**Goal:** Bl       
+ ock list per org (numbers we won't send to / accept from). Inbound from blocked silently dropped; outbound refuses. Plus DPDP right-to-access: export a contact's full data (conversations, opt-in history, deals) as JSON + PDF.
+**Status:** COMPLETED
 **Depends on:** Step 22 (consent events table).
 
 ---

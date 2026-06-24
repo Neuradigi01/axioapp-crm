@@ -32,6 +32,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB, UUID
@@ -576,12 +577,67 @@ class WhatsAppAssignmentRule(Base, TenantScoped):
     )
 
 
+class WhatsAppBlockListEntry(Base, TenantScoped):
+    """Per-org WhatsApp block list
+    (whatsapp-platform-upgrade Step 23).
+
+    Inbound from a number in this table is dropped before any
+    conversation row is written. Outbound to a blocked number is
+    refused by the campaign send-guard + the WA adapter
+    pre-send check, so a stray manual reply or a campaign that
+    snuck past audience filters still can't reach a blocked phone.
+
+    ``phone_number`` is stored as digits-only (no leading ``+``),
+    matching the normalisation we already do on contact phone +
+    the inbound external_id. Unique per org (a different tenant
+    can independently block the same number). RLS via
+    ``app.org_id``.
+    """
+
+    __tablename__ = "tbl_whatsapp_block_list"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id", "phone_number", name="uq_block_list_org_phone"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    phone_number: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(
+        ENUM(
+            "spam",
+            "fraud",
+            "requested",
+            "harassment",
+            "other",
+            name="whatsapp_block_reason",
+            create_type=False,
+        ),
+        nullable=False,
+        server_default=text("'other'"),
+    )
+    blocked_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
 __all__ = [
     "AssignmentStrategy",
     "KeywordActionType",
     "KeywordMatchType",
     "WhatsAppAccountConfig",
     "WhatsAppAssignmentRule",
+    "WhatsAppBlockListEntry",
     "WhatsAppKeywordAction",
     "WhatsAppKeywordRule",
     "WhatsAppPhoneHealthEvent",

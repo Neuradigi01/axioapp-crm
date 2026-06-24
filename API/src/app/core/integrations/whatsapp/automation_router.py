@@ -644,3 +644,125 @@ async def patch_ai_settings_endpoint(
         ai_handover_keywords=list(config.ai_handover_keywords or []),
         ai_system_prompt=config.ai_system_prompt,
     )
+
+
+# --- Block list (whatsapp-platform-upgrade Step 23) ---------------------
+
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from src.app.core.integrations.whatsapp.block_list import (
+    BLOCK_REASONS,
+    BlockListError,
+    add_entry as block_add_entry,
+    list_entries as block_list_entries,
+    remove_entry as block_remove_entry,
+)
+
+
+class _BlockEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    phone_number: str
+    reason: str
+    blocked_by_user_id: uuid.UUID | None
+    notes: str | None
+    created_at: Any
+
+
+class _BlockListPage(BaseModel):
+    items: list[_BlockEntryOut]
+    total: int
+    page: int
+    size: int
+
+
+class _BlockEntryCreate(BaseModel):
+    """Body of ``POST /whatsapp/block-list``."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    phone_number: str = Field(min_length=4, max_length=32)
+    reason: str = Field(default="other")
+    notes: str | None = Field(default=None, max_length=2000)
+
+
+block_list_router = APIRouter(
+    prefix="/whatsapp/block-list",
+    tags=["Integrations · WhatsApp · Compliance"],
+)
+
+
+@block_list_router.get("", response_model=_BlockListPage)
+async def list_blocked_endpoint(
+    search: str | None = None,
+    page: int = 1,
+    size: int = 50,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("whatsapp.opt_in.manage")),
+) -> _BlockListPage:
+    rows, total = await block_list_entries(
+        db,
+        org_id=user.org_id,
+        search=search,
+        page=page,
+        size=size,
+    )
+    return _BlockListPage(
+        items=[_BlockEntryOut.model_validate(r) for r in rows],
+        total=total,
+        page=page,
+        size=size,
+    )
+
+
+@block_list_router.post(
+    "",
+    response_model=_BlockEntryOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_blocked_endpoint(
+    payload: _BlockEntryCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("whatsapp.opt_in.manage")),
+) -> _BlockEntryOut:
+    if payload.reason not in BLOCK_REASONS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"reason must be one of {sorted(BLOCK_REASONS)}",
+        )
+    try:
+        row = await block_add_entry(
+            db,
+            org_id=user.org_id,
+            phone=payload.phone_number,
+            reason=payload.reason,
+            actor_user_id=user.legacy_uuid,
+            notes=payload.notes,
+        )
+    except BlockListError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+    return _BlockEntryOut.model_validate(row)
+
+
+@block_list_router.delete(
+    "/{entry_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def remove_blocked_endpoint(
+    entry_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("whatsapp.opt_in.manage")),
+) -> Response:
+    removed = await block_remove_entry(
+        db,
+        org_id=user.org_id,
+        entry_id=entry_id,
+        actor_user_id=user.legacy_uuid,
+    )
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="block-list entry not found",
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

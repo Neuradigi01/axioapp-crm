@@ -507,6 +507,65 @@ async def patch_endpoint(
     return ConversationOut.model_validate(conv)
 
 
+@router.get(
+    "/{conversation_id}/export.csv",
+    summary="Download conversation transcript as CSV (Step 23 / DPDP).",
+)
+async def export_conversation_csv_endpoint(
+    conversation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.read")),
+) -> Response:
+    """CSV transcript excluding internal notes (Step 13). Anyone
+    with `conversations.read` can export their own conversations —
+    DPDP right-to-access is the rationale; the audit log on the
+    server records the download."""
+    from src.app.core.conversations.export import export_conversation_csv
+
+    blob, filename, _conv, _msgs = await export_conversation_csv(
+        db, conversation_id=conversation_id
+    )
+    return Response(
+        content=blob,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+@router.get(
+    "/{conversation_id}/export.pdf",
+    summary="Download conversation transcript as PDF (Step 23 / DPDP).",
+)
+async def export_conversation_pdf_endpoint(
+    conversation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.read")),
+) -> Response:
+    """PDF transcript. Same data as CSV — rendered for human
+    review (legal disclosure / customer-service handoff). Internal
+    notes excluded."""
+    from src.app.core.conversations.export import export_conversation_pdf
+
+    try:
+        blob, filename = await export_conversation_pdf(
+            db, conversation_id=conversation_id
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    return Response(
+        content=blob,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
 @router.patch(
     "/{conversation_id}/ai-handling", response_model=ConversationOut
 )
@@ -834,6 +893,35 @@ async def _handle_whatsapp_webhook(
             if ok:
                 updated += 1
         return {"updated": updated}
+
+    # whatsapp-platform-upgrade Step 23 — early block-list drop.
+    # Runs BEFORE `receive_webhook` so a blocked number never creates
+    # a conversation row, never trips auto-reply / AI / assignment,
+    # and never writes to the inbox. We return 202 so Meta doesn't
+    # retry — silent drop is the spec'd behaviour.
+    from src.app.core.conversations.adapters.whatsapp import (
+        parse_inbound_phone,
+    )
+    from src.app.core.integrations.whatsapp.block_list import is_blocked
+
+    blocked_phone = parse_inbound_phone(payload)
+    if blocked_phone:
+        hit = await is_blocked(
+            db, org_id=integration.org_id, phone=blocked_phone
+        )
+        if hit is not None:
+            from src.app.core import audit
+
+            await audit.log(
+                "whatsapp.block_list.inbound_dropped",
+                entity_type="whatsapp_block",
+                entity_id=hit.id,
+                after={
+                    "phone_number": hit.phone_number,
+                    "reason": hit.reason,
+                },
+            )
+            return {"blocked": True, "reason": hit.reason}
 
     try:
         msg = await receive_webhook(

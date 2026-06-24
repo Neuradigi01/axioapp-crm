@@ -33,6 +33,7 @@ from src.app.core.contacts.consent_service import (
     list_consent_events,
     record_transition,
 )
+from src.app.core.contacts.data_export import build_contact_data_export
 from src.app.core.contacts.schemas import (
     ConsentEventOut,
     ContactBulkAddTag,
@@ -345,6 +346,55 @@ def _client_ip(request: Request) -> str | None:
         return fwd.split(",")[0].strip()[:64]
     client = request.client
     return client.host[:64] if client else None
+
+
+@router.get(
+    "/{contact_id}/data-export",
+    summary="DPDP right-to-access — full data ZIP for one contact.",
+)
+async def export_contact_data_endpoint(
+    contact_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.read")),
+) -> Response:
+    """Streams a ZIP archive with the contact's profile + consent
+    log + leads + conversation transcripts. Anyone with
+    `contacts.read` can trigger an export — DPDP §11(a) requires
+    the data fiduciary to make this available; the server audits
+    the download with the requester's user id.
+
+    Internal operator notes (Step 13) are excluded from
+    transcripts. Cross-tenant data is impossible — RLS scopes
+    every query."""
+    try:
+        bundle = await build_contact_data_export(
+            db,
+            contact_id=contact_id,
+            requested_by_user_id=user.legacy_uuid,
+        )
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        )
+    from src.app.core import audit
+
+    await audit.log(
+        "contacts.data_exported",
+        entity_type="contact",
+        entity_id=contact_id,
+        user_id=user.legacy_uuid,
+        after=bundle.summary,
+    )
+    return Response(
+        content=bundle.archive_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{bundle.filename}"'
+            ),
+        },
+    )
 
 
 @router.get(

@@ -156,6 +156,24 @@ async def send_outbound(
     reply_to_message_id: uuid.UUID | None = None,
 ) -> Message:
     conv = await get_conversation(session, conversation_id)
+    # whatsapp-platform-upgrade Step 23 — block-list pre-flight on
+    # WhatsApp manual outbound. Refuse cleanly with ValueError →
+    # 400 so the SPA surfaces the reason in the composer.
+    if conv.channel == ConversationChannel.whatsapp:
+        from src.app.core.integrations.whatsapp.block_list import (
+            is_blocked,
+        )
+
+        block_hit = await is_blocked(
+            session, org_id=conv.org_id, phone=conv.external_id
+        )
+        if block_hit is not None:
+            raise ValueError(
+                f"This number is on the block list "
+                f"(reason: {block_hit.reason}). Unblock it from "
+                f"Settings → WhatsApp → Block List to send again."
+            )
+
     # WhatsApp goes through the per-org resolver (Step 3.5.3) — it
     # loads the active tenant's encrypted token from the integrations
     # table and instantiates an adapter with those credentials. Other

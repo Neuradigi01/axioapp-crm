@@ -80,6 +80,13 @@
       >
         {{ conversation.ai_handling ? 'AI Handled' : 'Needs Human' }}
       </button>
+      <!-- Step 23 — DPDP transcript export + DND block action. -->
+      <app-conversation-export-button [conversationId]="conversation.id" />
+      @if (conversation.channel === 'whatsapp') {
+        <app-conversation-block-number-action
+          [phoneNumber]="conversation.external_id"
+        />
+      }
     </div>
   </div>
 

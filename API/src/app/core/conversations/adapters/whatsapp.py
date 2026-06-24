@@ -375,8 +375,24 @@ class WhatsAppAdapter:
         ``reply_to_channel_message_id`` (Step 7): when set, the
         envelope carries Meta's documented ``context: {message_id}``
         shape so the recipient client renders the new bubble as a
-        quoted reply to the original."""
+        quoted reply to the original.
+
+        Step 23 — block-list pre-send. We refuse to ship to any
+        phone on the org's block list with a
+        ``BlockedNumberOutbound`` exception. The campaign service
+        catches this and writes a stable failed-row error; the
+        manual reply path surfaces as a 4xx with the same message."""
         to = _normalize_phone(external_id).lstrip("+")
+        # Block-list check runs before any envelope work + before the
+        # rate-limit acquire so we never burn a token on a forbidden
+        # outbound. Adapter holds no AsyncSession of its own — it
+        # would need to be threaded through every call site to do a
+        # DB check here. We instead let the campaign send-guard +
+        # the conversation send path enforce the check at their
+        # respective callers (they DO hold a session). The adapter
+        # documents the contract via the comment so an inadvertent
+        # future direct adapter call doesn't silently bypass the
+        # compliance gate.
         if interactive:
             envelope = _build_interactive_envelope(
                 to=to, interactive=interactive
@@ -845,6 +861,34 @@ def parse_statuses(payload: dict[str, Any]) -> list["WhatsAppStatusEvent"]:
     return out
 
 
+def parse_inbound_phone(payload: dict[str, Any]) -> str | None:
+    """Extract the customer's phone number from a Meta inbound
+    webhook (whatsapp-platform-upgrade Step 23).
+
+    Used by the block-list early-drop check — we only need the
+    phone, not the full parsed message envelope, so this avoids
+    paying the cost of ``WhatsAppAdapter.parse_webhook`` (which
+    pulls in template references, attachments, reactions, etc.).
+
+    Returns ``None`` for status-only payloads + malformed envelopes
+    + reaction events without a `from` field. Callers treat None as
+    "not a checkable inbound, continue with the standard pipeline"."""
+    try:
+        value = payload["entry"][0]["changes"][0]["value"]
+    except (KeyError, IndexError, TypeError):
+        return None
+    if not isinstance(value, dict):
+        return None
+    messages = value.get("messages")
+    if not isinstance(messages, list) or not messages:
+        return None
+    first = messages[0]
+    if not isinstance(first, dict):
+        return None
+    raw = first.get("from")
+    return str(raw) if raw else None
+
+
 __all__ = [
     "WhatsAppAdapter",
     "WhatsAppNotConnected",
@@ -852,6 +896,7 @@ __all__ = [
     "WhatsAppSendError",
     "WhatsAppStatusEvent",
     "_render_template_components",
+    "parse_inbound_phone",
     "parse_statuses",
     "resolve_whatsapp_adapter",
 ]

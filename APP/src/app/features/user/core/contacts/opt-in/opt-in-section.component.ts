@@ -19,6 +19,7 @@ import {
   ContactsApiService,
   OptInHistory,
 } from '../contacts-api.service';
+import { ContactDataExportButtonComponent } from './data-export-button.component';
 import { OptInChipComponent } from './opt-in-chip.component';
 
 /**
@@ -33,7 +34,12 @@ import { OptInChipComponent } from './opt-in-chip.component';
   selector: 'app-opt-in-section',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, OptInChipComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    OptInChipComponent,
+    ContactDataExportButtonComponent,
+  ],
   template: `
     <section class="rounded-md border border-zinc-200 bg-white p-4">
       <header class="mb-3 flex items-center justify-between">
@@ -45,9 +51,12 @@ import { OptInChipComponent } from './opt-in-chip.component';
             DPDP-grade consent record.
           </p>
         </div>
-        @if (history(); as h) {
-          <app-opt-in-chip [status]="h.status" />
-        }
+        <div class="flex items-center gap-2">
+          <app-contact-data-export-button [contactId]="contactId()" />
+          @if (history(); as h) {
+            <app-opt-in-chip [status]="h.status" />
+          }
+        </div>
       </header>
 
       @if (loading()) {

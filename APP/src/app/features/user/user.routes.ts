@@ -394,6 +394,17 @@ export const userRoutes: Routes = [
           ).then((m) => m.WhatsAppAutomationPageComponent),
       },
       {
+        // whatsapp-platform-upgrade Step 23 — block list (DND).
+        // Gated on `whatsapp.opt_in.manage` so Owner + Admin manage
+        // it but junior staff don't see the surface.
+        path: 'whatsapp/block-list',
+        canActivate: [permissionGuard('whatsapp.opt_in.manage')],
+        loadComponent: () =>
+          import(
+            './core/whatsapp/block-list/block-list-page.component'
+          ).then((m) => m.BlockListPageComponent),
+      },
+      {
         path: 'calls',
         loadComponent: () =>
           import('./core/calls/call-center.page').then(

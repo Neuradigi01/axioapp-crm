@@ -557,6 +557,32 @@ async def dispatch_chunk(
                 )
                 continue
 
+            # Step 23 — block-list pre-flight. Same shape as the
+            # opt-in guard above: mark failed + continue. The
+            # Step-21 failure classifier maps the error string to
+            # the `opted_out` bucket (closest match for "we won't
+            # send"). Keep the message stable so the dashboard
+            # numbers stay reconcilable across deploys.
+            from src.app.core.integrations.whatsapp.block_list import (
+                is_blocked,
+            )
+
+            block_hit = await is_blocked(
+                session, org_id=campaign.org_id, phone=contact.phone
+            )
+            if block_hit is not None:
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error=(
+                        f"send blocked: number is on the block list "
+                        f"(reason: {block_hit.reason})"
+                    ),
+                )
+                continue
+
         # Find / create the (channel, external_id) conversation so the
         # outbound message also appears in the inbox.
         conversation = await _find_or_create_conversation(
