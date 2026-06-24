@@ -21,7 +21,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import data_access
+from src.app.core.users import data_access
 from src.app.core.users.models import OrganizationMember, User, UserInfo
 
 

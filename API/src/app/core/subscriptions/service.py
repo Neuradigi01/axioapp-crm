@@ -50,7 +50,7 @@ from src.app.core.subscriptions.schemas import (
     SeatPreview,
     SubscriptionCurrentResponse,
 )
-from src.app.core import data_access
+from src.app.core.users import data_access
 
 
 # Cycle lengths used when projecting `first_renewal_at` in the preview.

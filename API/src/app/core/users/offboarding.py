@@ -30,7 +30,7 @@ import uuid
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import data_access
+from src.app.core.users import data_access
 from src.app.core.appointments.service import bulk_reassign_appointments
 from src.app.core.contacts.service import bulk_reassign_contacts
 from src.app.core.leads.service import bulk_reassign_leads

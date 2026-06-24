@@ -30,7 +30,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit, data_access
+from src.app.core import audit
+from src.app.core.tenants import data_access
 from src.app.core.calls.models import CallOutcome
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,

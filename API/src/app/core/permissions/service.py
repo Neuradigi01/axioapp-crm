@@ -14,7 +14,8 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit, data_access
+from src.app.core import audit
+from src.app.core.users import data_access
 from src.app.shared.audit import log_entity_change
 from src.app.core.permissions.models import Permission, Role, RolePermission
 from src.app.core.permissions.schemas import RoleCreate, RoleUpdate

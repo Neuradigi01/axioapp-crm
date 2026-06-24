@@ -30,7 +30,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit, data_access
+from src.app.core import audit
+from src.app.core.users import data_access
 from src.app.core.activities.models import Activity
 from src.app.core.leads.models import Lead, LeadStatus
 from src.app.core.staff.models import (

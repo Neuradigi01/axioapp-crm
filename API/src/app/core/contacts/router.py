@@ -56,7 +56,8 @@ from src.app.core.contacts.service import (
     reassign_contact,
     update_contact,
 )
-from src.app.core import data_access
+from src.app.core.contacts import data_access as contacts_da
+from src.app.core.tenants import data_access as tenants_da
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -127,7 +128,7 @@ async def get_contact_endpoint(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("contacts.read")),
 ) -> ContactOut:
-    contact = await data_access.get_contact(db, contact_id)
+    contact = await contacts_da.get_contact(db, contact_id)
     if contact is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
@@ -269,7 +270,7 @@ async def export_csv_endpoint(
     # often signed into multiple orgs and the file is more useful when
     # named per-org; (2) keeps separate per-tenant exports from
     # colliding on disk.
-    org = await data_access.get_organization_by_id(db, user.org_id)
+    org = await tenants_da.get_organization_by_id(db, user.org_id)
     assert org is not None  # authed user implies their org exists
 
     today = datetime.now(timezone.utc).date().isoformat()

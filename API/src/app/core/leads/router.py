@@ -73,7 +73,7 @@ from src.app.core.settings.schemas import (
     LeadRoutingConfigUpdate,
 )
 from src.app.core.settings.service import get_or_create as get_or_create_settings
-from src.app.core import data_access
+from src.app.core.tenants import data_access
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
 
-from src.app.core import data_access
+from src.app.core.auth import data_access
 from src.app.core.auth.tokens import InvalidToken, decode_token
 from src.app.core.notifications.manager import manager
 from src.app.shared.db import async_session

@@ -50,7 +50,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import data_access
+from src.app.core.contacts import data_access
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations.models import (
     Conversation,

@@ -23,7 +23,7 @@ import uuid
 from pathlib import Path
 
 
-from src.app.core import data_access
+from src.app.core.tenants import data_access
 from src.app.core.packs.installer import install
 from src.app.core.packs.loader import PackLoadError, load_pack
 from src.app.shared.context import RequestContext, set_context

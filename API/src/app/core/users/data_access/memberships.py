@@ -24,7 +24,7 @@ from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead, LeadStatus
 from src.app.core.permissions.models import Role
 from src.app.core.tasks.models import Task, TaskStatus
-from src.app.core.data_access.users import get_user_by_uuid
+from src.app.core.users.data_access.users import get_user_by_uuid
 from src.app.core.users.models import OrganizationMember, User
 from src.app.core.walk_ins.models import WalkIn, WalkInStatus
 

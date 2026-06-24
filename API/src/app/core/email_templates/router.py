@@ -30,7 +30,7 @@ from src.app.core.email_templates.schemas import (
     EmailTemplateUpdate,
     VariableRegistryEntry,
 )
-from src.app.core import data_access
+from src.app.core.tenants import data_access
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 

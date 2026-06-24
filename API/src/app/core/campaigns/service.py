@@ -31,7 +31,8 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit, data_access
+from src.app.core import audit
+from src.app.core.contacts import data_access
 from src.app.core.campaigns.models import (
     Campaign,
     CampaignMessage,

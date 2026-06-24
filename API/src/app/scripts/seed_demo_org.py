@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from sqlalchemy.dialects.postgresql import insert
 
-from src.app.core import data_access
+from src.app.core.tenants import data_access
 from src.app.core.tenants.models import Organization
 from src.app.shared.db import async_session
 

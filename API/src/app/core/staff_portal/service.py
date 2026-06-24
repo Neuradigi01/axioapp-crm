@@ -29,7 +29,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit, data_access
+from src.app.core import audit
+from src.app.core.tenants import data_access
 from src.app.core.auth.tokens import STAFF_TOKEN_TTL, encode_token
 from src.app.core.staff.models import EmploymentStatus, StaffProfile
 from src.app.core.staff_portal.models import StaffSession

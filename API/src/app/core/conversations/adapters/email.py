@@ -43,7 +43,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit, data_access
+from src.app.core import audit
+from src.app.core.contacts import data_access as contacts_da
+from src.app.core.tenants import data_access as tenants_da
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
 from src.app.core.contacts.models import Contact
@@ -285,7 +287,7 @@ async def send_email(
             ),
         )
 
-    contact = await data_access.get_contact(session, contact_id)
+    contact = await contacts_da.get_contact(session, contact_id)
     if contact is None or not contact.email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -309,7 +311,7 @@ async def send_email(
     ).scalar_one_or_none()
     if not tracking_footer.has_required_address(org_settings):
         raise MissingCompanyAddress()
-    org_row = await data_access.get_organization_by_id(session, org_id)
+    org_row = await tenants_da.get_organization_by_id(session, org_id)
 
     # Resolve conversation: explicit id wins; else find-or-create by
     # (contact, email channel). Multiple email threads with the same

@@ -45,7 +45,7 @@ from src.app.core.permissions.models import Role
 from src.app.core.permissions.service import list_permissions_for_role
 from src.app.core.pipelines.models import Pipeline, PipelineStage
 from src.app.core.tasks.models import Task, TaskStatus
-from src.app.core import data_access
+from src.app.core.tenants import data_access
 from src.app.core.users.models import User, UserInfo
 
 

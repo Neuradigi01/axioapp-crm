@@ -21,7 +21,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 from pathlib import Path
 
-from src.app.core import audit, data_access
+from src.app.core import audit
+from src.app.core.auth import data_access as auth_da
+from src.app.core.tenants import data_access as tenants_da
+from src.app.core.users import data_access as users_da
 from src.app.core.auth.models import AuthSession
 from src.app.core.auth.schemas import (
     LoginResponse,
@@ -94,14 +97,14 @@ async def login(
     )
 
     if org_slug:
-        org = await data_access.get_organization_by_slug(db, org_slug)
+        org = await tenants_da.get_organization_by_slug(db, org_slug)
     else:
         org = await _resolve_org_for_email(db, email)
     if org is None:
         # No tenant known → can't attribute to a row, intentionally skip audit.
         raise invalid
 
-    user = await data_access.get_user_by_email(
+    user = await users_da.get_user_by_email(
         db, email, org_id=org.id, active_only=True
     )
     if user is None or not user.is_active:
@@ -195,7 +198,7 @@ async def refresh(db: AsyncSession, claims: TokenClaims) -> RefreshResponse:
         detail="Invalid or revoked token",
     )
 
-    session = await data_access.get_auth_session(
+    session = await auth_da.get_auth_session(
         db, session_id=claims.token_id
     )
     if session is None or session.revoked_at is not None:
@@ -312,7 +315,7 @@ async def revoke_user_session(
     session id doesn't belong to the user (we don't leak existence —
     same row check as `notifications.mark_read`).
     """
-    row = await data_access.get_auth_session(
+    row = await auth_da.get_auth_session(
         db, session_id=session_id, user_id=user_id
     )
     if row is None:
@@ -419,7 +422,7 @@ async def register_with_new_org(
             }
         )
     )
-    bigint_id = (await data_access.get_user_by_uuid(db, user_uuid)).id
+    bigint_id = (await users_da.get_user_by_uuid(db, user_uuid)).id
 
     db.add(
         UserInfo(
@@ -580,7 +583,7 @@ async def register_user_only(
             }
         )
     )
-    bigint_id = (await data_access.get_user_by_uuid(db, user_uuid)).id
+    bigint_id = (await users_da.get_user_by_uuid(db, user_uuid)).id
 
     db.add(
         UserInfo(
@@ -698,7 +701,7 @@ async def complete_onboarding(
     """
     tile = _validate_template_choice(req.template_id)
 
-    org = await data_access.get_organization_by_id(db, user.org_id)
+    org = await tenants_da.get_organization_by_id(db, user.org_id)
     if org is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

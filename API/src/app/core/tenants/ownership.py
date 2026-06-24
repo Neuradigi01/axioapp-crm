@@ -22,7 +22,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit, data_access
+from src.app.core import audit
+from src.app.core.users import data_access
 from src.app.core.permissions.models import Role
 from src.app.core.users.models import OrganizationMember, User
 
