@@ -46,6 +46,20 @@ export interface ComposerNotePayload {
 }
 
 
+/**
+ * Outbound location share (whatsapp-platform-upgrade Step 28).
+ * Lat/lng required + optional human-readable name + address.
+ * Emitted by the composer's location dialog; the parent shapes
+ * this into an attachment + posts via `api.send`.
+ */
+export interface ComposerLocationPayload {
+  latitude: number;
+  longitude: number;
+  name?: string | null;
+  address?: string | null;
+}
+
+
 const MAX_MENTIONS = 5;
 
 
@@ -145,6 +159,7 @@ export class ComposeBarComponent {
   @Output() readonly send = new EventEmitter<string>();
   @Output() readonly sendMedia = new EventEmitter<ComposerMediaPayload>();
   @Output() readonly sendNote = new EventEmitter<ComposerNotePayload>();
+  @Output() readonly sendLocation = new EventEmitter<ComposerLocationPayload>();
   @Output() readonly openInteractive = new EventEmitter<void>();
   @Output() readonly toggleAi = new EventEmitter<boolean>();
   @Output() readonly clearReply = new EventEmitter<void>();
@@ -154,6 +169,83 @@ export class ComposeBarComponent {
    *  selection per-conversation so switching threads doesn't
    *  silently reset the choice. */
   protected readonly sendFromPhoneId = signal<string | null>(null);
+
+  // --- Step 28: outbound location share -------------------------------
+
+  protected readonly locationDialogOpen = signal<boolean>(false);
+  protected readonly locationDraft = signal<{
+    latitude: string;
+    longitude: string;
+    name: string;
+    address: string;
+  }>({ latitude: '', longitude: '', name: '', address: '' });
+
+  protected openLocationDialog(): void {
+    this.locationDraft.set({
+      latitude: '',
+      longitude: '',
+      name: '',
+      address: '',
+    });
+    this.locationDialogOpen.set(true);
+  }
+
+  protected closeLocationDialog(): void {
+    this.locationDialogOpen.set(false);
+  }
+
+  protected patchLocation(
+    patch: Partial<{ latitude: string; longitude: string; name: string; address: string }>,
+  ): void {
+    this.locationDraft.update((d) => ({ ...d, ...patch }));
+  }
+
+  /** Pull the device's geolocation via the browser API. Best-effort;
+   *  any failure (permission denied, no GPS, https-only context)
+   *  leaves the form unchanged. */
+  protected useMyLocation(): void {
+    if (!navigator.geolocation) {
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        this.patchLocation({
+          latitude: String(pos.coords.latitude),
+          longitude: String(pos.coords.longitude),
+        });
+      },
+      () => {
+        // Silent — operator can still type coords manually.
+      },
+      { enableHighAccuracy: false, timeout: 5_000 },
+    );
+  }
+
+  protected canSendLocation(): boolean {
+    const d = this.locationDraft();
+    const lat = Number(d.latitude);
+    const lng = Number(d.longitude);
+    return (
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180
+    );
+  }
+
+  protected submitLocation(): void {
+    if (!this.canSendLocation()) return;
+    const d = this.locationDraft();
+    this.sendLocation.emit({
+      latitude: Number(d.latitude),
+      longitude: Number(d.longitude),
+      name: d.name.trim() || null,
+      address: d.address.trim() || null,
+    });
+    this.locationDialogOpen.set(false);
+  }
 
   protected onSendFromChange(phoneId: string | null): void {
     this.sendFromPhoneId.set(phoneId);

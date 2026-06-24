@@ -213,8 +213,12 @@ export class ConversationsApiService {
     text: string,
     replyToMessageId?: string | null,
     sendFromPhoneId?: string | null,
+    attachments?: Array<Record<string, unknown>>,
   ): Observable<ConversationMessage> {
-    const body: Record<string, unknown> = { text, attachments: [] };
+    const body: Record<string, unknown> = {
+      text,
+      attachments: attachments ?? [],
+    };
     if (replyToMessageId) body['reply_to_message_id'] = replyToMessageId;
     // Step 27b — multi-number Send-From selection. Server resolves
     // the adapter against this phone instead of the org default.

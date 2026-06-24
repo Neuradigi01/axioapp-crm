@@ -22,6 +22,7 @@ import {
 import { ChatThreadComponent } from './chat-thread.component';
 import {
   ComposeBarComponent,
+  ComposerLocationPayload,
   ComposerMediaPayload,
   ComposerNotePayload,
 } from './compose-bar.component';
@@ -530,6 +531,95 @@ export class ConversationsPageComponent {
           );
           this.loadError.set(
             extractApiError(err) ?? 'Could not send interactive message.',
+          );
+        },
+      });
+  }
+
+  /**
+   * Outbound location share (Step 28). Posts via the standard
+   * `/messages` endpoint with a `location` attachment — the
+   * adapter detects it and ships the Meta-shape location envelope.
+   * Optimistic-append a placeholder message so the inbox refresh
+   * doesn't visually stutter while the POST is in flight.
+   */
+  protected onSendLocation(payload: ComposerLocationPayload): void {
+    const id = this.selectedId();
+    if (!id) return;
+    const previewLabel =
+      payload.name?.trim() || payload.address?.trim() || 'Shared location';
+    const sendFromPhoneId =
+      this.composeBar?.currentSendFromPhoneId() ?? null;
+    const optimistic: ConversationMessage = {
+      id: 'tmp-' + Math.random().toString(36).slice(2),
+      org_id: '',
+      conversation_id: id,
+      direction: 'out',
+      sender_user_id: null,
+      text: `📍 ${previewLabel}`,
+      attachments: [
+        {
+          type: 'location',
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+          name: payload.name ?? null,
+          address: payload.address ?? null,
+        },
+      ],
+      interactive_payload: null,
+      reply_to_message_id: null,
+      reactions: [],
+      is_internal: false,
+      mentioned_user_ids: [],
+      is_ai: false,
+      channel_message_id: null,
+      sent_at: new Date().toISOString(),
+      delivered_at: null,
+      read_at: null,
+      created_at: new Date().toISOString(),
+    };
+    this.detail.update((d) =>
+      d ? { ...d, messages: [...d.messages, optimistic] } : d,
+    );
+    this.api
+      .send(id, `📍 ${previewLabel}`, null, sendFromPhoneId, [
+        {
+          type: 'location',
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+          name: payload.name,
+          address: payload.address,
+        },
+      ])
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (msg) => {
+          this.detail.update((d) =>
+            d
+              ? {
+                  ...d,
+                  messages: d.messages.map((x) =>
+                    x.id === optimistic.id ? msg : x,
+                  ),
+                }
+              : d,
+          );
+        },
+        error: (err: HttpErrorResponse) => {
+          // Roll back the optimistic placeholder + surface the
+          // backend error in the standard loadError banner.
+          this.detail.update((d) =>
+            d
+              ? {
+                  ...d,
+                  messages: d.messages.filter(
+                    (x) => x.id !== optimistic.id,
+                  ),
+                }
+              : d,
+          );
+          this.loadError.set(
+            extractApiError(err) ?? 'Could not share location.',
           );
         },
       });

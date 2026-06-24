@@ -304,6 +304,24 @@
                 </div>
               }
             }
+            <!-- Step 28 — edge inbound types. Each renders distinctly
+                 in the thread; falls through to the generic
+                 "N attachment(s)" pill for media types. -->
+            @if (locationAttachment(m); as loc) {
+              <div class="mt-2">
+                <app-location-bubble [location]="loc" />
+              </div>
+            }
+            @if (vcardAttachment(m); as vc) {
+              <div class="mt-2">
+                <app-vcard-bubble [vcard]="vc" />
+              </div>
+            }
+            @if (stickerAttachment(m); as st) {
+              <div class="mt-2">
+                <app-sticker-bubble [sticker]="st" />
+              </div>
+            }
             @if (mediaAttachmentCount(m) > 0) {
               <p class="mt-1 text-[10px] uppercase tracking-wide opacity-70">
                 {{ mediaAttachmentCount(m) }} attachment(s)

@@ -160,6 +160,19 @@
       >
         <lucide-icon name="list" size="16" aria-hidden="true"></lucide-icon>
       </button>
+      <!-- Step 28 — outbound location share. WhatsApp-only. -->
+      @if (channel === 'whatsapp') {
+        <button
+          type="button"
+          (click)="openLocationDialog()"
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50"
+          aria-label="Share a location"
+          title="Share a location"
+          data-testid="compose-location-button"
+        >
+          <lucide-icon name="map-pin" size="16" aria-hidden="true"></lucide-icon>
+        </button>
+      }
       <input
         #fileInput
         type="file"
@@ -262,3 +275,93 @@
     }
   </p>
 </div>
+
+<!-- Step 28 — outbound location dialog. Lat/lng + optional label/address.
+     Operator can pull the device's geolocation via the Use my location
+     button (browser prompts; falls back silently). -->
+@if (locationDialogOpen()) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40"
+    (click)="closeLocationDialog()"
+  >
+    <div
+      class="w-full max-w-md rounded-md border border-zinc-200 bg-white p-4 shadow-lg"
+      (click)="$event.stopPropagation()"
+    >
+      <p class="mb-2 text-sm font-semibold text-zinc-900">Share a location</p>
+      <div class="mb-2 grid grid-cols-2 gap-2 text-xs">
+        <label>
+          <span class="mb-1 block font-medium text-zinc-700">Latitude</span>
+          <input
+            type="number"
+            step="any"
+            class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+            placeholder="19.0760"
+            [ngModel]="locationDraft().latitude"
+            (ngModelChange)="patchLocation({ latitude: $event })"
+          />
+        </label>
+        <label>
+          <span class="mb-1 block font-medium text-zinc-700">Longitude</span>
+          <input
+            type="number"
+            step="any"
+            class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+            placeholder="72.8777"
+            [ngModel]="locationDraft().longitude"
+            (ngModelChange)="patchLocation({ longitude: $event })"
+          />
+        </label>
+      </div>
+      <label class="mb-2 block text-xs">
+        <span class="mb-1 block font-medium text-zinc-700">Name (optional)</span>
+        <input
+          type="text"
+          maxlength="200"
+          class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+          placeholder="Sharma Furniture — Andheri"
+          [ngModel]="locationDraft().name"
+          (ngModelChange)="patchLocation({ name: $event })"
+        />
+      </label>
+      <label class="mb-3 block text-xs">
+        <span class="mb-1 block font-medium text-zinc-700">Address (optional)</span>
+        <input
+          type="text"
+          maxlength="500"
+          class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+          placeholder="123 Andheri West, Mumbai"
+          [ngModel]="locationDraft().address"
+          (ngModelChange)="patchLocation({ address: $event })"
+        />
+      </label>
+      <div class="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          (click)="useMyLocation()"
+          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+        >
+          <lucide-icon name="map-pin" size="12" aria-hidden="true"></lucide-icon>
+          Use my location
+        </button>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            (click)="closeLocationDialog()"
+            class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            [disabled]="!canSendLocation()"
+            (click)="submitLocation()"
+            class="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          >
+            Send location
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

@@ -1,7 +1,7 @@
 # Step 28 — Edge inbound types (location, contact card, stickers)
 
 **Goal:** Handle inbound message types not yet covered: location share, contact card (vCard), stickers. Reactions already covered in Step 7. Each renders distinctly in the thread.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Phase 2 closed (media + interactive infrastructure).
 
 ---

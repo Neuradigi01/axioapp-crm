@@ -233,6 +233,55 @@ def _first_media_attachment(
     return None
 
 
+def _first_location_attachment(
+    attachments: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Step 28 — return the first ``type: 'location'`` attachment
+    with usable lat / lng, or ``None``. Sits parallel to
+    :func:`_first_media_attachment` so the send pipeline can branch
+    on location → media → text in priority order."""
+    for att in attachments:
+        if not isinstance(att, dict):
+            continue
+        if att.get("type") != "location":
+            continue
+        if (
+            att.get("latitude") is not None
+            and att.get("longitude") is not None
+        ):
+            return att
+    return None
+
+
+def _build_location_envelope(
+    *,
+    to: str,
+    attachment: dict[str, Any],
+) -> dict[str, Any]:
+    """Step 28 — Meta location envelope.
+
+    Required: ``latitude`` + ``longitude``. Optional: ``name`` +
+    ``address`` (clients render both as a card; absence is fine —
+    Meta falls back to a generic pin)."""
+    location_block: dict[str, Any] = {
+        "latitude": float(attachment["latitude"]),
+        "longitude": float(attachment["longitude"]),
+    }
+    name = attachment.get("name")
+    if isinstance(name, str) and name.strip():
+        location_block["name"] = name.strip()[:1000]
+    address = attachment.get("address")
+    if isinstance(address, str) and address.strip():
+        location_block["address"] = address.strip()[:1000]
+    return {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to,
+        "type": "location",
+        "location": location_block,
+    }
+
+
 def _build_media_envelope(
     *,
     to: str,
@@ -398,8 +447,21 @@ class WhatsAppAdapter:
                 to=to, interactive=interactive
             )
         else:
-            media = _first_media_attachment(attachments)
-            if media is not None:
+            # whatsapp-platform-upgrade Step 28 — outbound location.
+            # The composer attaches an envelope of shape
+            # ``{type: "location", latitude, longitude, name?, address?}``
+            # which we forward to Meta's documented `location` payload.
+            location_attachment = _first_location_attachment(attachments)
+            media = (
+                None
+                if location_attachment is not None
+                else _first_media_attachment(attachments)
+            )
+            if location_attachment is not None:
+                envelope = _build_location_envelope(
+                    to=to, attachment=location_attachment
+                )
+            elif media is not None:
                 envelope = _build_media_envelope(
                     to=to,
                     media=media,
@@ -606,6 +668,116 @@ class WhatsAppAdapter:
             media = message.get(media_type)
             if isinstance(media, dict) and media.get("id"):
                 attachments.append({"type": media_type, **media})
+
+        # whatsapp-platform-upgrade Step 28 — edge inbound types.
+        # Each branch persists the full Meta payload onto
+        # `attachments[]` + sets a sensible ``text_body`` fallback so
+        # the inbox list page (which only renders text) shows a
+        # readable preview.
+
+        # Location: `messages[0].location = {latitude, longitude,
+        # name?, address?}`. Lat/lng are required; name + address
+        # are operator-set on the share dialog.
+        location = message.get("location")
+        if isinstance(location, dict) and location.get("latitude") is not None:
+            lat = location.get("latitude")
+            lng = location.get("longitude")
+            name = location.get("name")
+            address = location.get("address")
+            attachments.append(
+                {
+                    "type": "location",
+                    "latitude": lat,
+                    "longitude": lng,
+                    "name": name if isinstance(name, str) else None,
+                    "address": address
+                    if isinstance(address, str)
+                    else None,
+                }
+            )
+            if not text_body:
+                # Operator-readable preview for the inbox list — name
+                # if Meta provided one, else "📍 Shared location".
+                if isinstance(name, str) and name.strip():
+                    text_body = f"📍 {name.strip()}"
+                elif isinstance(address, str) and address.strip():
+                    text_body = f"📍 {address.strip()}"
+                else:
+                    text_body = "📍 Shared location"
+
+        # Contacts (vCard): `messages[0].contacts = [{name:{formatted_name,
+        # first_name, last_name}, phones:[{phone, wa_id?, type?}],
+        # emails:[{email, type?}], org?, addresses?, urls?}]`. Meta
+        # sends one or more cards; we keep the array verbatim plus
+        # extract the primary card's display fields so the bubble can
+        # render without re-parsing the whole structure.
+        contacts = message.get("contacts")
+        if isinstance(contacts, list) and contacts:
+            primary = contacts[0] if isinstance(contacts[0], dict) else {}
+            name_obj = primary.get("name") if isinstance(
+                primary.get("name"), dict
+            ) else {}
+            formatted = (
+                name_obj.get("formatted_name")
+                if isinstance(name_obj, dict)
+                else None
+            )
+            phones = primary.get("phones") if isinstance(
+                primary.get("phones"), list
+            ) else []
+            primary_phone = None
+            if phones and isinstance(phones[0], dict):
+                primary_phone = phones[0].get("phone") or phones[0].get(
+                    "wa_id"
+                )
+            emails = primary.get("emails") if isinstance(
+                primary.get("emails"), list
+            ) else []
+            primary_email = None
+            if emails and isinstance(emails[0], dict):
+                primary_email = emails[0].get("email")
+            attachments.append(
+                {
+                    "type": "contacts",
+                    "formatted_name": formatted
+                    if isinstance(formatted, str)
+                    else None,
+                    "primary_phone": str(primary_phone)
+                    if primary_phone
+                    else None,
+                    "primary_email": str(primary_email)
+                    if primary_email
+                    else None,
+                    "cards": contacts,
+                }
+            )
+            if not text_body:
+                label = (
+                    formatted
+                    if isinstance(formatted, str) and formatted.strip()
+                    else primary_phone
+                    or "contact"
+                )
+                text_body = f"📇 Shared contact: {label}"
+
+        # Sticker: `messages[0].sticker = {id, mime_type, sha256,
+        # animated?}`. Meta delivers a media-style envelope similar
+        # to image/video; we surface it on attachments with a
+        # dedicated type so the bubble can apply sticker-specific
+        # styling (no border, "Sticker" pill).
+        sticker = message.get("sticker")
+        if isinstance(sticker, dict) and sticker.get("id"):
+            attachments.append(
+                {
+                    "type": "sticker",
+                    "id": sticker.get("id"),
+                    "mime_type": sticker.get("mime_type"),
+                    "animated": bool(sticker.get("animated", False)),
+                    "sha256": sticker.get("sha256"),
+                }
+            )
+            if not text_body:
+                text_body = "🟦 Sticker"
 
         # Reaction event (whatsapp-platform-upgrade Step 7) — Meta sends
         # these as standalone messages with `type: reaction`. The engine

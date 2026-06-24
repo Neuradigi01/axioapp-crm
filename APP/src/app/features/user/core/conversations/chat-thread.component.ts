@@ -27,6 +27,18 @@ import { TagManagerComponent } from './tag-manager.component';
 import { AttributionChipComponent } from './header/attribution-chip.component';
 import { ConversationBlockNumberActionComponent } from './header/block-number-action.component';
 import { ConversationExportButtonComponent } from './header/export-button.component';
+import {
+  LocationAttachment,
+  LocationBubbleComponent,
+} from './thread/location-bubble.component';
+import {
+  StickerAttachment,
+  StickerBubbleComponent,
+} from './thread/sticker-bubble.component';
+import {
+  VCardAttachment,
+  VCardBubbleComponent,
+} from './thread/vcard-bubble.component';
 import { StaffListItem } from '../staff/staff-api.service';
 import {
   OwnerColor,
@@ -56,6 +68,9 @@ import { FurnitureAuthService } from '../auth/auth.service';
     ConversationBlockNumberActionComponent,
     ConversationExportButtonComponent,
     AttributionChipComponent,
+    LocationBubbleComponent,
+    StickerBubbleComponent,
+    VCardBubbleComponent,
   ],
   templateUrl: './chat-thread.component.html',
 })
@@ -299,6 +314,38 @@ export class ChatThreadComponent implements AfterViewChecked {
         t === 'document'
       );
     }).length;
+  }
+
+  /** Step 28 — pluck the first `location` attachment, or null.
+   *  The bubble renders only when present so location-less
+   *  messages don't paint an empty card. */
+  protected locationAttachment(
+    m: ConversationMessage,
+  ): LocationAttachment | null {
+    const found = (m.attachments ?? []).find(
+      (att) => (att as { type?: string }).type === 'location',
+    );
+    return found ? (found as unknown as LocationAttachment) : null;
+  }
+
+  /** Step 28 — first `contacts` (vCard) attachment, or null. */
+  protected vcardAttachment(
+    m: ConversationMessage,
+  ): VCardAttachment | null {
+    const found = (m.attachments ?? []).find(
+      (att) => (att as { type?: string }).type === 'contacts',
+    );
+    return found ? (found as unknown as VCardAttachment) : null;
+  }
+
+  /** Step 28 — first `sticker` attachment, or null. */
+  protected stickerAttachment(
+    m: ConversationMessage,
+  ): StickerAttachment | null {
+    const found = (m.attachments ?? []).find(
+      (att) => (att as { type?: string }).type === 'sticker',
+    );
+    return found ? (found as unknown as StickerAttachment) : null;
   }
 
   // --- Reply / quote / reactions (Step 7) ----------------------------
