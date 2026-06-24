@@ -95,6 +95,13 @@ export interface Conversation {
   created_at: string;
   /** Step 14 — assigned tag chips. Empty array when none / not loaded. */
   tags: ConversationTagRef[];
+  /** Step 24 — click-to-WhatsApp ad attribution. Set on the first
+   *  inbound that carried a Meta `referral` block; null on organic.
+   *  The chat-thread chip + filters read `acquisition_source ==='ad'`
+   *  to decide whether to render. */
+  acquisition_source?: 'organic' | 'ad' | 'qr' | 'wa_me' | 'form' | null;
+  acquisition_campaign_id?: string | null;
+  acquisition_ad_id?: string | null;
 }
 
 export interface ConversationListResponse {

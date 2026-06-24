@@ -6,6 +6,7 @@ import {
   signal,
 } from '@angular/core';
 
+import { AdRoiWidgetComponent } from './ad-roi-widget.component';
 import { AgentLeaderboardComponent } from './agent-leaderboard.component';
 import { AIMetricsWidgetComponent } from './ai-metrics-widget.component';
 import { CostWidgetComponent } from './cost-widget.component';
@@ -50,6 +51,7 @@ import {
     CostWidgetComponent,
     QualityTimelineComponent,
     AIMetricsWidgetComponent,
+    AdRoiWidgetComponent,
   ],
   template: `
     <div class="space-y-4 p-4">
@@ -127,6 +129,9 @@ import {
       </div>
 
       <app-wa-quality-timeline [range]="range()" />
+
+      <!-- Step 24 — click-to-WhatsApp ad ROI. -->
+      <app-wa-ad-roi-widget [range]="range()" />
     </div>
   `,
 })

@@ -64,6 +64,14 @@ class InboundMessage:
     raw: dict[str, Any] = field(default_factory=dict)
     reply_to_channel_message_id: str | None = None
     reaction: dict[str, Any] | None = None
+    # whatsapp-platform-upgrade Step 24 — Meta click-to-WhatsApp
+    # ad referral block. Populated by the WhatsApp adapter when
+    # ``messages[0].referral`` is present (only on inbound from a
+    # Meta-Ads CTA / Facebook post deep-link). ``None`` for organic
+    # inbound. Shape mirrors Meta's documented object: ``source_url``,
+    # ``source_id``, ``source_type`` ("ad" | "post"), ``body``,
+    # ``headline``, ``ctwa_clid``.
+    referral: dict[str, Any] | None = None
 
 
 class ChannelAdapter(Protocol):

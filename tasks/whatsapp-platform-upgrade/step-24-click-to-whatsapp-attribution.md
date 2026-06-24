@@ -1,7 +1,7 @@
 # Step 24 — Click-to-WhatsApp ad attribution
 
 **Goal:** Capture Meta Ad referral payload on inbound WhatsApp messages → attribute conversations to their source ad / campaign. Surface attribution chips in conversations + ad ROI dashboard in Reporting.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Existing Meta Ads OAuth wiring + Phase 1 closed.
 
 ---

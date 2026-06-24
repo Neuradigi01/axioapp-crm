@@ -297,6 +297,71 @@ async def receive_webhook(
     )
     sent_at = parsed.sent_at or datetime.now(timezone.utc)
 
+    # whatsapp-platform-upgrade Step 24 — click-to-WhatsApp ad
+    # attribution. Single-touch: capture only when the conversation
+    # has never recorded an acquisition source. Subsequent inbounds
+    # (even from a different ad) don't overwrite the original
+    # attribution — multi-touch is a future spec. Best-effort:
+    # the ad-id → campaign-name lookup talks to Meta and may fail
+    # (token expired, ad deleted, network); we still persist the
+    # raw referral payload so the operator gets *some* attribution
+    # even on a degraded lookup.
+    if (
+        parsed.referral
+        and channel == ConversationChannel.whatsapp
+        and not conv.acquisition_source
+    ):
+        try:
+            from src.app.core.integrations.meta.ads_lookup import (
+                resolve_ad,
+            )
+
+            source_type = str(
+                parsed.referral.get("source_type") or ""
+            ).lower()
+            ad_id_raw = parsed.referral.get("source_id")
+            source = (
+                "ad"
+                if source_type in ("ad", "ad_post", "post")
+                else "organic"
+            )
+            metadata: dict[str, Any] = {}
+            if source == "ad" and ad_id_raw:
+                lookup = await resolve_ad(
+                    session,
+                    org_id=conv.org_id,
+                    ad_id=str(ad_id_raw),
+                )
+                if lookup:
+                    metadata = lookup
+
+            conv.acquisition_source = source
+            conv.acquisition_ad_id = (
+                str(ad_id_raw) if ad_id_raw else None
+            )
+            conv.acquisition_campaign_id = metadata.get(
+                "campaign_id"
+            )
+            conv.acquisition_landing_url = str(
+                parsed.referral.get("source_url") or ""
+            ) or None
+            # Persist the whole referral envelope so the chip / ad
+            # ROI widget can pull the headline + prefilled body
+            # without a follow-up Meta call. Merge in the resolved
+            # campaign labels too.
+            payload = dict(parsed.referral)
+            if metadata:
+                payload["_resolved"] = metadata
+            conv.acquisition_referral_payload = payload
+            await session.commit()
+            await session.refresh(conv)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "attribution capture failed for conv %s", conv.id
+            )
+
     # Step 7: reaction events short-circuit. Locate the target message
     # (by its wamid) and mutate its `reactions` JSONB. No new row, no
     # unread bump, no notification — matches WhatsApp's UX where

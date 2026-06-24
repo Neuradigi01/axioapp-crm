@@ -696,6 +696,26 @@ class WhatsAppAdapter:
         except (TypeError, ValueError):
             sent_at = None
 
+        # whatsapp-platform-upgrade Step 24 — Meta click-to-WhatsApp
+        # referral block. Present only when the customer's first
+        # inbound came from a Meta Ad CTA or a Facebook post
+        # deep-link. Meta documents the keys but the envelope is
+        # fluid: ``source_id`` (ad id), ``source_type`` ("ad" /
+        # "post"), ``source_url``, ``body`` (prefilled text the
+        # customer chose to send), ``headline``, ``ctwa_clid``
+        # (click-tracking id). We pass the whole dict through so
+        # future Meta-side additions don't need a schema migration.
+        referral_block: dict[str, Any] | None = None
+        raw_referral = message.get("referral") if isinstance(
+            message, dict
+        ) else None
+        if isinstance(raw_referral, dict) and raw_referral:
+            referral_block = {
+                k: v
+                for k, v in raw_referral.items()
+                if isinstance(k, str)
+            }
+
         return InboundMessage(
             external_id=external_id,
             text=text_body,
@@ -705,6 +725,7 @@ class WhatsAppAdapter:
             raw=payload,
             reply_to_channel_message_id=reply_to_wamid,
             reaction=reaction_block,
+            referral=referral_block,
         )
 
     # --- signature / handshake --------------------------------------------

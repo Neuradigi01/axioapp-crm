@@ -309,6 +309,34 @@ class ConversationOut(ORMModel):
     # Populated by the list / detail services; defaults to empty when
     # not selected for performance.
     tags: list[dict[str, Any]] = Field(default_factory=list)
+    # Step 24 — click-to-WhatsApp ad attribution. Slim trio on the
+    # list / detail payload so the chip can render without a
+    # second fetch; the full referral envelope ships from
+    # `GET /{id}/attribution`.
+    acquisition_source: Optional[str] = None
+    acquisition_campaign_id: Optional[str] = None
+    acquisition_ad_id: Optional[str] = None
+
+
+class ConversationAttributionOut(BaseModel):
+    """Detailed attribution surface for the chat-thread chip + Meta
+    Ads Manager deeplink (whatsapp-platform-upgrade Step 24).
+
+    ``deeplink`` is built server-side via
+    :func:`ads_lookup.deeplink_for_ad` so the SPA doesn't have to
+    encode Meta's URL format. ``payload`` is the raw referral
+    envelope as captured from Meta + the resolved campaign
+    metadata under ``_resolved``."""
+
+    conversation_id: uuid.UUID
+    source: Optional[str]
+    campaign_id: Optional[str]
+    campaign_name: Optional[str]
+    ad_id: Optional[str]
+    ad_name: Optional[str]
+    landing_url: Optional[str]
+    deeplink: Optional[str]
+    payload: dict[str, Any] = Field(default_factory=dict)
 
 
 ConversationListResponse = PaginatedResponse[ConversationOut]

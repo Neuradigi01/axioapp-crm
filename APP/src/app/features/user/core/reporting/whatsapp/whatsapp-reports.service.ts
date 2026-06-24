@@ -161,6 +161,25 @@ export interface AIMetricsReport {
   escalation_reasons: Record<string, number>;
 }
 
+/** Step 24 — click-to-WhatsApp ad ROI roll-up. */
+export interface AdAttributionRow {
+  campaign_id: string | null;
+  campaign_name: string | null;
+  ad_id: string | null;
+  ad_name: string | null;
+  conversations: number;
+  leads: number;
+  revenue: number;
+}
+
+export interface AdAttributionReport {
+  range: ReportRange;
+  rows: AdAttributionRow[];
+  total_conversations: number;
+  total_leads: number;
+  total_revenue: number;
+}
+
 /**
  * WhatsApp analytics API client (whatsapp-platform-upgrade Step 20).
  *
@@ -243,6 +262,15 @@ export class WhatsAppReportsService {
     return this.http.get<AIMetricsReport>(`${this.base}/ai-metrics`, {
       params,
     });
+  }
+
+  /** Step 24 — per-campaign click-to-WhatsApp conversion + revenue. */
+  getAdAttribution(range: ReportRange): Observable<AdAttributionReport> {
+    const params = new HttpParams().set('range', range);
+    return this.http.get<AdAttributionReport>(
+      `${this.base}/ad-attribution`,
+      { params },
+    );
   }
 }
 

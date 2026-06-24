@@ -136,6 +136,37 @@ class Conversation(Base, TenantScoped):
     unread_count: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=sql_text("0")
     )
+    # whatsapp-platform-upgrade Step 24 — click-to-WhatsApp ad
+    # attribution. Single-touch: set on the first inbound that
+    # carries a Meta `referral` block; never overwritten on later
+    # messages. NULL on every pre-existing conversation (treated as
+    # organic). The `acquisition_referral_payload` JSONB preserves
+    # the raw Meta object so future Meta-side fields stay queryable
+    # without a schema migration.
+    acquisition_source: Mapped[str | None] = mapped_column(
+        ENUM(
+            "organic",
+            "ad",
+            "qr",
+            "wa_me",
+            "form",
+            name="conversation_acquisition_source",
+            create_type=False,
+        ),
+        nullable=True,
+    )
+    acquisition_campaign_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
+    )
+    acquisition_ad_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
+    )
+    acquisition_landing_url: Mapped[str | None] = mapped_column(
+        String(2048), nullable=True
+    )
+    acquisition_referral_payload: Mapped[dict[str, Any] | None] = (
+        mapped_column(JSONB, nullable=True)
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

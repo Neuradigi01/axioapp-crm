@@ -23,6 +23,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.reporting.ad_attribution import compute_ad_attribution
 from src.app.core.reporting.campaign_analytics import (
     compute_ai_metrics,
     compute_campaign_failures,
@@ -445,3 +446,47 @@ async def whatsapp_ai_metrics_endpoint(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         )
     return _AIMetricsOut.model_validate(report)
+
+
+# --- Ad attribution (whatsapp-platform-upgrade Step 24) ---------------------
+
+
+class _AdAttributionRowOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    campaign_id: Optional[str]
+    campaign_name: Optional[str]
+    ad_id: Optional[str]
+    ad_name: Optional[str]
+    conversations: int
+    leads: int
+    revenue: float
+
+
+class _AdAttributionReportOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    range: str
+    rows: list[_AdAttributionRowOut]
+    total_conversations: int
+    total_leads: int
+    total_revenue: float
+
+
+@router.get(
+    "/whatsapp/ad-attribution",
+    response_model=_AdAttributionReportOut,
+    summary="Per-campaign click-to-WhatsApp conversion + revenue",
+)
+async def whatsapp_ad_attribution_endpoint(
+    range: str = _RANGE30_QUERY,
+    user: User = Depends(require_permissions("whatsapp.analytics.read")),
+    session: AsyncSession = Depends(get_db),
+) -> _AdAttributionReportOut:
+    try:
+        report = await compute_ad_attribution(
+            session, org_id=user.org_id, range_key=range
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
+    return _AdAttributionReportOut.model_validate(report)

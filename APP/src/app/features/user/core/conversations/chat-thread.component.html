@@ -5,8 +5,12 @@
       <p class="truncate text-sm font-semibold text-zinc-900">
         {{ conversation.external_id }}
       </p>
-      <p class="text-xs text-zinc-500 capitalize">
-        {{ conversation.channel }} · {{ conversation.status }}
+      <p class="flex items-center gap-2 text-xs text-zinc-500 capitalize">
+        <span>{{ conversation.channel }} · {{ conversation.status }}</span>
+        <!-- Step 24 — attribution chip. Hidden for organic. -->
+        @if (conversation.acquisition_source === 'ad') {
+          <app-attribution-chip [conversationId]="conversation.id" />
+        }
       </p>
     </div>
     <div class="flex items-center gap-2">

@@ -57,6 +57,7 @@ from src.app.core.conversations.notes_service import post_note
 from src.app.core.conversations.schemas import (
     AssignTagRequest,
     AttachmentType,
+    ConversationAttributionOut,
     ConversationDetail,
     ConversationListResponse,
     ConversationOut,
@@ -505,6 +506,45 @@ async def patch_endpoint(
         db, conversation_id=conversation_id, payload=payload
     )
     return ConversationOut.model_validate(conv)
+
+
+@router.get(
+    "/{conversation_id}/attribution",
+    response_model=ConversationAttributionOut,
+    summary="Click-to-WhatsApp ad attribution for a conversation (Step 24).",
+)
+async def get_conversation_attribution_endpoint(
+    conversation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.read")),
+) -> ConversationAttributionOut:
+    """Return the captured referral metadata + a Meta Ads Manager
+    deeplink (when the ad was resolved on capture). Conversations
+    without attribution return a row with ``source=None`` so the
+    SPA can render "Organic" without a 404 branch."""
+    from src.app.core.integrations.meta.ads_lookup import (
+        deeplink_for_ad,
+    )
+
+    conv = await get_conversation(db, conversation_id)
+    payload = conv.acquisition_referral_payload or {}
+    resolved = (
+        payload.get("_resolved")
+        if isinstance(payload.get("_resolved"), dict)
+        else None
+    ) or {}
+    deeplink = deeplink_for_ad(resolved) if resolved else None
+    return ConversationAttributionOut(
+        conversation_id=conv.id,
+        source=conv.acquisition_source,
+        campaign_id=conv.acquisition_campaign_id,
+        campaign_name=resolved.get("campaign_name"),
+        ad_id=conv.acquisition_ad_id,
+        ad_name=resolved.get("ad_name"),
+        landing_url=conv.acquisition_landing_url,
+        deeplink=deeplink,
+        payload=payload,
+    )
 
 
 @router.get(

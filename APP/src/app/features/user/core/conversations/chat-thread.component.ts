@@ -24,6 +24,7 @@ import { ReactionPickerComponent } from './reaction-picker.component';
 import { SessionWindowBannerComponent } from './session-window-banner.component';
 import { TagChipComponent } from './tag-chip.component';
 import { TagManagerComponent } from './tag-manager.component';
+import { AttributionChipComponent } from './header/attribution-chip.component';
 import { ConversationBlockNumberActionComponent } from './header/block-number-action.component';
 import { ConversationExportButtonComponent } from './header/export-button.component';
 import { StaffListItem } from '../staff/staff-api.service';
@@ -54,6 +55,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
     TagManagerComponent,
     ConversationBlockNumberActionComponent,
     ConversationExportButtonComponent,
+    AttributionChipComponent,
   ],
   templateUrl: './chat-thread.component.html',
 })
