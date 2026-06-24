@@ -415,6 +415,16 @@ export const userRoutes: Routes = [
           ).then((m) => m.WhatsAppFlowsPageComponent),
       },
       {
+        // whatsapp-platform-upgrade Step 26 — QR + wa.me tracking links.
+        // Reuses `whatsapp.automation.manage` per the step spec.
+        path: 'whatsapp/quick-links',
+        canActivate: [permissionGuard('whatsapp.automation.manage')],
+        loadComponent: () =>
+          import(
+            './core/whatsapp/quick-links/quick-links-page.component'
+          ).then((m) => m.WhatsAppQuickLinksPageComponent),
+      },
+      {
         path: 'calls',
         loadComponent: () =>
           import('./core/calls/call-center.page').then(

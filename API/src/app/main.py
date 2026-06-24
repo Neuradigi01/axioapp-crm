@@ -63,6 +63,10 @@ from src.app.core.integrations.whatsapp.automation_router import (
 from src.app.core.integrations.whatsapp.flows_router import (
     router as whatsapp_flows_router,
 )
+from src.app.core.integrations.whatsapp.quick_links_router import (
+    public_router as whatsapp_public_quick_links_router,
+    router as whatsapp_quick_links_router,
+)
 from src.app.core.leads.router import router as leads_router
 from src.app.core.leads.imports.router import router as lead_imports_router
 from src.app.core.notifications.router import router as notifications_router
@@ -229,6 +233,11 @@ app.include_router(whatsapp_assignment_router, prefix="/api/v1/integrations")
 app.include_router(whatsapp_ai_settings_router, prefix="/api/v1/integrations")
 app.include_router(whatsapp_block_list_router, prefix="/api/v1/integrations")
 app.include_router(whatsapp_flows_router, prefix="/api/v1/integrations")
+app.include_router(whatsapp_quick_links_router, prefix="/api/v1/integrations")
+# Step 26 — public 302 redirect mounted at the app root (no version
+# prefix). This is the URL the QR code encodes + the wa.me short
+# link humans share offline.
+app.include_router(whatsapp_public_quick_links_router)
 app.include_router(appointments_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(notifications_ws_router, prefix="/api/v1")

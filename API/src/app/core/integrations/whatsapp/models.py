@@ -759,6 +759,115 @@ class WhatsAppFlowSubmission(Base, TenantScoped):
     )
 
 
+class WhatsAppQuickLink(Base, TenantScoped):
+    """Operator-defined wa.me / QR tracking link
+    (whatsapp-platform-upgrade Step 26).
+
+    Each row owns a base62 slug that resolves at the public
+    ``/wa/{code}`` endpoint to a 302 redirect at
+    ``wa.me/{phone}?text=...``. The slug is globally unique so the
+    public endpoint can resolve without a tenant context.
+
+    Counters (``click_count`` / ``scan_count`` /
+    ``attributed_conversation_count``) are denormalised for the
+    stats card. Authoritative tallies live in
+    ``tbl_whatsapp_quick_link_clicks`` — the counters are bumped
+    on each insert as a fast read path."""
+
+    __tablename__ = "tbl_whatsapp_quick_links"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_wa_quick_links_code"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(32), nullable=False)
+    prefilled_message: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    prefilled_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    click_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    scan_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    attributed_conversation_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class WhatsAppQuickLinkClick(Base, TenantScoped):
+    """Append-only click / scan log for the quick-contact links
+    (whatsapp-platform-upgrade Step 26).
+
+    Captures anonymised UA family + optional referrer + IP hash so
+    the inbound-attribution match can pair a recent click with the
+    matching customer message without storing PII. The
+    ``matched_at`` + ``matched_conversation_id`` fields are filled
+    in by ``receive_webhook`` when an inbound text matches the
+    link's ``prefilled_hash`` within the 10-minute window."""
+
+    __tablename__ = "tbl_whatsapp_quick_link_clicks"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    link_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_whatsapp_quick_links.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source: Mapped[str] = mapped_column(
+        String(8), nullable=False, server_default=text("'link'")
+    )
+    ua_family: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    region: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    referrer: Mapped[str | None] = mapped_column(
+        String(2048), nullable=True
+    )
+    ip_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    matched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    matched_conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
 __all__ = [
     "AssignmentStrategy",
     "KeywordActionType",
@@ -772,6 +881,8 @@ __all__ = [
     "WhatsAppKeywordRule",
     "WhatsAppPhoneHealthEvent",
     "WhatsAppPhoneHealthEventType",
+    "WhatsAppQuickLink",
+    "WhatsAppQuickLinkClick",
     "WhatsAppTemplate",
     "WhatsAppTemplateSubmissionStatus",
 ]

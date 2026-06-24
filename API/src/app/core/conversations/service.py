@@ -435,6 +435,37 @@ async def receive_webhook(
             },
         )
 
+    # whatsapp-platform-upgrade Step 26 — QR / wa.me attribution match.
+    # Best-effort: if this is a plain inbound (no Meta referral block
+    # already captured in Step 24's branch above) and the conversation
+    # has no acquisition source yet, try to pair the inbound text with
+    # a recent quick-link click whose `prefilled_hash` matches. Single-
+    # touch — same convention as Step 24.
+    if (
+        conv.channel == ConversationChannel.whatsapp
+        and not customer_opted_out
+        and not conv.acquisition_source
+        and parsed.text
+    ):
+        try:
+            from src.app.core.integrations.whatsapp.quick_links import (
+                attribute_inbound,
+            )
+
+            await attribute_inbound(
+                session,
+                conversation=conv,
+                inbound_text=parsed.text,
+            )
+            await session.refresh(conv)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "quick-link attribution match failed for conv %s",
+                conv.id,
+            )
+
     # whatsapp-platform-upgrade Step 25 — WhatsApp Flows submission.
     # When the inbound carried an `nfm_reply` attachment, hand the
     # parsed form data off to the flows service. Best-effort: any
