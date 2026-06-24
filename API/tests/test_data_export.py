@@ -60,12 +60,10 @@ class _Msg:
     )
 
 
-@dataclass
 class _Channel(Enum):
     whatsapp = "whatsapp"
 
 
-@dataclass
 class _Status(Enum):
     open = "open"
 
