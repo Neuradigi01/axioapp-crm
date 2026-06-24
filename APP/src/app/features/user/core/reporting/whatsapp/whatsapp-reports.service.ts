@@ -83,6 +83,84 @@ export interface LeaderboardReport {
   rows: LeaderboardRow[];
 }
 
+/** Step 21 — campaign funnel + failures + cost + quality timeline + AI metrics. */
+
+export interface FunnelStage {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface CampaignFunnelReport {
+  campaign_id: string;
+  name: string;
+  status: string;
+  started_at: string | null;
+  stages: FunnelStage[];
+  delivery_median_seconds: number | null;
+  delivery_p95_seconds: number | null;
+}
+
+export interface FailureBucket {
+  reason: string;
+  label: string;
+  count: number;
+}
+
+export interface CampaignFailuresReport {
+  campaign_id: string;
+  total_failed: number;
+  buckets: FailureBucket[];
+  sample_errors: string[];
+}
+
+export interface CostLine {
+  category: string;
+  count: number;
+  rate: number;
+  currency: string;
+  total: number;
+}
+
+export interface CostReport {
+  range: ReportRange;
+  region: string;
+  currency: string;
+  lines: CostLine[];
+  total: number;
+  is_estimate: boolean;
+}
+
+export interface QualityEvent {
+  occurred_at: string;
+  event_type: string;
+  old_value: string | null;
+  new_value: string | null;
+}
+
+export interface QualityVolumePoint {
+  bucket_start: string;
+  sent: number;
+}
+
+export interface QualityTimelineReport {
+  range: ReportRange;
+  events: QualityEvent[];
+  volume: QualityVolumePoint[];
+}
+
+export interface AIMetricsReport {
+  range: ReportRange;
+  ai_replies: number;
+  human_replies: number;
+  ai_response_rate: number;
+  ai_handled_conversations: number;
+  escalated_conversations: number;
+  escalation_rate: number;
+  ai_only_completed: number;
+  escalation_reasons: Record<string, number>;
+}
+
 /**
  * WhatsApp analytics API client (whatsapp-platform-upgrade Step 20).
  *
@@ -126,6 +204,45 @@ export class WhatsAppReportsService {
       `${this.base}/agent-leaderboard`,
       { params },
     );
+  }
+
+  /** Step 21 — per-campaign funnel + time-to-delivery percentiles. */
+  getCampaignFunnel(campaignId: string): Observable<CampaignFunnelReport> {
+    return this.http.get<CampaignFunnelReport>(
+      `${environment.apiBaseUrl}/reports/campaigns/${campaignId}/funnel`,
+    );
+  }
+
+  /** Step 21 — per-campaign failure-reason breakdown. */
+  getCampaignFailures(
+    campaignId: string,
+  ): Observable<CampaignFailuresReport> {
+    return this.http.get<CampaignFailuresReport>(
+      `${environment.apiBaseUrl}/reports/campaigns/${campaignId}/failures`,
+    );
+  }
+
+  /** Step 21 — estimated WhatsApp cost for the org in the window. */
+  getCost(range: ReportRange, region = 'IN'): Observable<CostReport> {
+    const params = new HttpParams().set('range', range).set('region', region);
+    return this.http.get<CostReport>(`${this.base}/cost`, { params });
+  }
+
+  /** Step 21 — phone-quality events + daily send volume. */
+  getQualityTimeline(range: ReportRange): Observable<QualityTimelineReport> {
+    const params = new HttpParams().set('range', range);
+    return this.http.get<QualityTimelineReport>(
+      `${this.base}/quality-timeline`,
+      { params },
+    );
+  }
+
+  /** Step 21 — AI response + escalation + completion-proxy metrics. */
+  getAIMetrics(range: ReportRange): Observable<AIMetricsReport> {
+    const params = new HttpParams().set('range', range);
+    return this.http.get<AIMetricsReport>(`${this.base}/ai-metrics`, {
+      params,
+    });
   }
 }
 

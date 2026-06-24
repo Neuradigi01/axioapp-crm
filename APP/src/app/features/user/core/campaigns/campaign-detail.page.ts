@@ -13,6 +13,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { CampaignAnalyticsTabComponent } from './detail/analytics-tab.component';
 import {
   Campaign,
   CampaignMessage,
@@ -22,6 +23,11 @@ import {
 } from './campaigns-api.service';
 
 const POLL_INTERVAL_MS = 5_000;
+
+/** Step 21 — campaign-detail page tabs. "Overview" is the existing
+ *  stats + messages view; "Analytics" mounts the new funnel +
+ *  failure-breakdown widget. */
+export type CampaignDetailTab = 'overview' | 'analytics';
 
 /**
  * Campaign detail â€” stats KPIs + per-message table with retry.
@@ -34,10 +40,17 @@ const POLL_INTERVAL_MS = 5_000;
   selector: 'app-campaign-detail-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideAngularModule],
+  imports: [RouterLink, LucideAngularModule, CampaignAnalyticsTabComponent],
   templateUrl: './campaign-detail.page.html',
 })
 export class CampaignDetailPageComponent {
+  /** Step 21 — active sub-tab. Defaults to the existing overview. */
+  protected readonly activeTab = signal<CampaignDetailTab>('overview');
+
+  protected setTab(tab: CampaignDetailTab): void {
+    this.activeTab.set(tab);
+  }
+
   private readonly api = inject(CampaignsApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);

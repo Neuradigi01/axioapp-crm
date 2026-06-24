@@ -23,6 +23,13 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.reporting.campaign_analytics import (
+    compute_ai_metrics,
+    compute_campaign_failures,
+    compute_campaign_funnel,
+    compute_cost,
+    compute_quality_timeline,
+)
 from src.app.core.reporting.service import compute_workload
 from src.app.core.reporting.whatsapp_analytics import (
     compute_agent_leaderboard,
@@ -241,3 +248,200 @@ async def whatsapp_agent_leaderboard_endpoint(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         )
     return _LeaderboardReportOut.model_validate(report)
+
+
+# --- Campaign + cost + quality + AI metrics (Step 21) ----------------------
+
+
+class _FunnelStageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    key: str
+    label: str
+    count: int
+
+
+class _CampaignFunnelOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    campaign_id: uuid.UUID
+    name: str
+    status: str
+    started_at: Optional[datetime]
+    stages: list[_FunnelStageOut]
+    delivery_median_seconds: Optional[float]
+    delivery_p95_seconds: Optional[float]
+
+
+class _FailureBucketOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    reason: str
+    label: str
+    count: int
+
+
+class _CampaignFailuresOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    campaign_id: uuid.UUID
+    total_failed: int
+    buckets: list[_FailureBucketOut]
+    sample_errors: list[str]
+
+
+class _CostLineOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    category: str
+    count: int
+    rate: float
+    currency: str
+    total: float
+
+
+class _CostReportOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    range: str
+    region: str
+    currency: str
+    lines: list[_CostLineOut]
+    total: float
+    is_estimate: bool
+
+
+class _QualityEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    occurred_at: datetime
+    event_type: str
+    old_value: Optional[str]
+    new_value: Optional[str]
+
+
+class _QualityVolumePointOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    bucket_start: datetime
+    sent: int
+
+
+class _QualityTimelineOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    range: str
+    events: list[_QualityEventOut]
+    volume: list[_QualityVolumePointOut]
+
+
+class _AIMetricsOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    range: str
+    ai_replies: int
+    human_replies: int
+    ai_response_rate: float
+    ai_handled_conversations: int
+    escalated_conversations: int
+    escalation_rate: float
+    ai_only_completed: int
+    escalation_reasons: dict[str, int]
+
+
+_REGION_QUERY = Query(default="IN", pattern="^[A-Z]{2}$")
+_RANGE30_QUERY = Query(default="30d", pattern="^(7d|30d|90d)$")
+
+
+@router.get(
+    "/campaigns/{campaign_id}/funnel",
+    response_model=_CampaignFunnelOut,
+    summary="Per-campaign funnel (targeted → sent → … → converted)",
+)
+async def campaign_funnel_endpoint(
+    campaign_id: uuid.UUID,
+    user: User = Depends(require_permissions("whatsapp.analytics.read")),
+    session: AsyncSession = Depends(get_db),
+) -> _CampaignFunnelOut:
+    report = await compute_campaign_funnel(
+        session, org_id=user.org_id, campaign_id=campaign_id
+    )
+    if report is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="campaign not found",
+        )
+    return _CampaignFunnelOut.model_validate(report)
+
+
+@router.get(
+    "/campaigns/{campaign_id}/failures",
+    response_model=_CampaignFailuresOut,
+    summary="Per-campaign failure breakdown by reason taxonomy",
+)
+async def campaign_failures_endpoint(
+    campaign_id: uuid.UUID,
+    user: User = Depends(require_permissions("whatsapp.analytics.read")),
+    session: AsyncSession = Depends(get_db),
+) -> _CampaignFailuresOut:
+    report = await compute_campaign_failures(
+        session, org_id=user.org_id, campaign_id=campaign_id
+    )
+    return _CampaignFailuresOut.model_validate(report)
+
+
+@router.get(
+    "/whatsapp/cost",
+    response_model=_CostReportOut,
+    summary="Estimated WhatsApp cost (Meta categories × region rates)",
+)
+async def whatsapp_cost_endpoint(
+    range: str = _RANGE30_QUERY,
+    region: str = _REGION_QUERY,
+    user: User = Depends(require_permissions("whatsapp.analytics.read")),
+    session: AsyncSession = Depends(get_db),
+) -> _CostReportOut:
+    try:
+        report = await compute_cost(
+            session,
+            org_id=user.org_id,
+            region=region,
+            range_key=range,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
+    return _CostReportOut.model_validate(report)
+
+
+@router.get(
+    "/whatsapp/quality-timeline",
+    response_model=_QualityTimelineOut,
+    summary="Phone-quality events + daily send volume",
+)
+async def whatsapp_quality_timeline_endpoint(
+    range: str = _RANGE30_QUERY,
+    user: User = Depends(require_permissions("whatsapp.analytics.read")),
+    session: AsyncSession = Depends(get_db),
+) -> _QualityTimelineOut:
+    try:
+        report = await compute_quality_timeline(
+            session, org_id=user.org_id, range_key=range
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
+    return _QualityTimelineOut.model_validate(report)
+
+
+@router.get(
+    "/whatsapp/ai-metrics",
+    response_model=_AIMetricsOut,
+    summary="AI response rate + escalation rate + AI-only completion proxy",
+)
+async def whatsapp_ai_metrics_endpoint(
+    range: str = _RANGE30_QUERY,
+    user: User = Depends(require_permissions("whatsapp.analytics.read")),
+    session: AsyncSession = Depends(get_db),
+) -> _AIMetricsOut:
+    try:
+        report = await compute_ai_metrics(
+            session, org_id=user.org_id, range_key=range
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
+    return _AIMetricsOut.model_validate(report)

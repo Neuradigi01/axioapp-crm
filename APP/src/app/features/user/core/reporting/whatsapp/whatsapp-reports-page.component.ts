@@ -7,7 +7,10 @@ import {
 } from '@angular/core';
 
 import { AgentLeaderboardComponent } from './agent-leaderboard.component';
+import { AIMetricsWidgetComponent } from './ai-metrics-widget.component';
+import { CostWidgetComponent } from './cost-widget.component';
 import { OutcomesWidgetComponent } from './outcomes-widget.component';
+import { QualityTimelineComponent } from './quality-timeline.component';
 import { ResponseTimeWidgetComponent } from './response-time-widget.component';
 import { VolumeWidgetComponent } from './volume-widget.component';
 import {
@@ -44,6 +47,9 @@ import {
     ResponseTimeWidgetComponent,
     OutcomesWidgetComponent,
     AgentLeaderboardComponent,
+    CostWidgetComponent,
+    QualityTimelineComponent,
+    AIMetricsWidgetComponent,
   ],
   template: `
     <div class="space-y-4 p-4">
@@ -113,6 +119,14 @@ import {
       </div>
 
       <app-wa-agent-leaderboard [range]="range()" />
+
+      <!-- Step 21 — cost + quality timeline + AI metrics. -->
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <app-wa-cost-widget [range]="range()" />
+        <app-wa-ai-metrics-widget [range]="range()" />
+      </div>
+
+      <app-wa-quality-timeline [range]="range()" />
     </div>
   `,
 })

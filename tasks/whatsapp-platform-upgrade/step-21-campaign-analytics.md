@@ -1,7 +1,7 @@
 # Step 21 — Campaign analytics + funnel + cost dashboard + quality timeline
 
 **Goal:** Per-campaign rollup (funnel + failure breakdown + cost), org-wide WhatsApp cost dashboard (Meta conversation-pricing categories), and quality-timeline chart correlating quality + tier + send volume.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 12 (quality history events), Step 20 (analytics widget library reuse).
 
 ---
