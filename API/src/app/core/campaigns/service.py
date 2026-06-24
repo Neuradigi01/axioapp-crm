@@ -128,6 +128,18 @@ async def create_campaign(
         # when the operator chose one on the create modal. NULL
         # preserves the legacy "use org default" behaviour.
         send_from_phone_id=payload.send_from_phone_id,
+        # Step 29 — A/B test config. Server defaults take over for
+        # non-A/B campaigns (is_ab_test=false, split_ratio=50, etc.).
+        is_ab_test=bool(payload.is_ab_test),
+        variant_a_template_id=payload.variant_a_template_id
+        if payload.is_ab_test
+        else None,
+        variant_b_template_id=payload.variant_b_template_id
+        if payload.is_ab_test
+        else None,
+        split_ratio=int(payload.split_ratio),
+        winner_metric=payload.winner_metric if payload.is_ab_test else None,
+        winner_holdback_hours=int(payload.winner_holdback_hours),
         status=CampaignStatus.draft,
         created_by_id=user_id,
     )
@@ -320,6 +332,21 @@ async def enqueue(
         session, audience_filter=campaign.audience_filter
     )
 
+    # whatsapp-platform-upgrade Step 29 — minimum-audience guard.
+    # A/B requires ≥ 50 recipients to keep the winner metric out
+    # of statistical noise. The spec calls this out explicitly:
+    # smaller audiences produce flaky winners.
+    if campaign.is_ab_test and len(contact_ids) < 50:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"A/B campaigns need at least 50 recipients to keep "
+                f"the winner metric statistically meaningful. This "
+                f"audience has {len(contact_ids)}. Reduce the A/B "
+                f"toggle or widen the audience filter."
+            ),
+        )
+
     if not contact_ids:
         campaign.status = CampaignStatus.done
         await session.commit()
@@ -383,6 +410,25 @@ async def enqueue(
                     str(campaign.id),
                     [str(c) for c in chunk],
                 )
+            # whatsapp-platform-upgrade Step 29 — schedule the A/B
+            # winner decider to fire `winner_holdback_hours` after
+            # dispatch. The task is idempotent + checks
+            # `winning_variant is NULL` before running, so a re-queue
+            # after a worker crash doesn't double-flip.
+            if campaign.is_ab_test:
+                try:
+                    from src.app.core.campaigns.tasks import run_ab_decision
+
+                    run_ab_decision.apply_async(
+                        args=[str(campaign.id)],
+                        countdown=int(campaign.winner_holdback_hours)
+                        * 3600,
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception(
+                        "could not schedule A/B decider for campaign %s",
+                        campaign.id,
+                    )
         else:
             for chunk in chunks:
                 await dispatch_chunk(
@@ -490,7 +536,52 @@ async def dispatch_chunk(
     # ON DELETE SET NULL FK kept the campaign intact, but there's
     # nothing to send.
     template_row: WhatsAppTemplate | None = None
-    if campaign.template_id is not None:
+    # Step 29 — A/B campaigns load BOTH variant templates up-front;
+    # the per-contact loop picks one via `_assign_ab_variant`. Once
+    # the decider has flipped `winning_variant`, every subsequent
+    # chunk sends only the winning template (the dispatcher reads
+    # the winning row via the same lookup below).
+    template_a_row: WhatsAppTemplate | None = None
+    template_b_row: WhatsAppTemplate | None = None
+    if campaign.is_ab_test:
+        ids = [
+            tid
+            for tid in (
+                campaign.variant_a_template_id,
+                campaign.variant_b_template_id,
+            )
+            if tid is not None
+        ]
+        rows = (
+            await session.execute(
+                select(WhatsAppTemplate).where(WhatsAppTemplate.id.in_(ids))
+            )
+        ).scalars().all()
+        by_id = {r.id: r for r in rows}
+        template_a_row = by_id.get(campaign.variant_a_template_id)
+        template_b_row = by_id.get(campaign.variant_b_template_id)
+        if template_a_row is None or template_b_row is None:
+            for cid in contact_ids:
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error=(
+                        "A/B variant template no longer exists locally "
+                        "— re-sync from Settings → Integrations → WhatsApp."
+                    ),
+                )
+            return
+        # When a winner has already been chosen, route every recipient
+        # in this chunk to the winning template (legacy single-template
+        # branch). Subsequent contacts beyond the original split land
+        # here.
+        if campaign.winning_variant == "A":
+            template_row = template_a_row
+        elif campaign.winning_variant == "B":
+            template_row = template_b_row
+    elif campaign.template_id is not None:
         template_row = (
             await session.execute(
                 select(WhatsAppTemplate).where(
@@ -548,6 +639,29 @@ async def dispatch_chunk(
                 error="contact has no phone for this channel",
             )
             continue
+
+        # whatsapp-platform-upgrade Step 29 — per-recipient variant
+        # assignment. Only applies during the A/B hold-out window
+        # (before a winner is decided). Once the winner is set, the
+        # earlier branch already pinned ``template_row`` to the
+        # winning template + the variant tag stays NULL on the row.
+        assigned_variant: str | None = None
+        if (
+            campaign.is_ab_test
+            and campaign.winning_variant is None
+            and template_a_row is not None
+            and template_b_row is not None
+        ):
+            assigned_variant = _assign_ab_variant(
+                campaign_id=campaign.id,
+                contact_id=cid,
+                split_ratio=int(campaign.split_ratio),
+            )
+            template_row = (
+                template_a_row
+                if assigned_variant == "A"
+                else template_b_row
+            )
 
         # Channel-specific opt-in check. Other channels (SMS / email)
         # have their own opt-out columns; this guard only applies to
@@ -707,6 +821,10 @@ async def dispatch_chunk(
             new_status=CampaignMessageStatus.sent,
             channel_message_id=ref.channel_message_id,
             sent_at=ref.sent_at or now,
+            # Step 29 — stamp the A/B variant on the message row so
+            # per-variant analytics can compute reply / read / click
+            # rates without joining back to the campaign config.
+            variant=assigned_variant,
         )
 
     # If this was the last queued chunk, flip the campaign to `done`.
@@ -760,6 +878,7 @@ async def _mark_message(
     channel_message_id: str | None = None,
     error: str | None = None,
     sent_at: datetime | None = None,
+    variant: str | None = None,
 ) -> None:
     row = (
         await session.execute(
@@ -777,7 +896,37 @@ async def _mark_message(
         row.error = error
     if sent_at is not None:
         row.sent_at = sent_at
+    # Step 29 — only stamp the variant when explicitly passed in.
+    # Leaves the legacy NULL state untouched for non-A/B campaigns +
+    # for the post-winner phase where everyone gets the winning
+    # template directly.
+    if variant is not None:
+        row.variant = variant
     await session.commit()
+
+
+def _assign_ab_variant(
+    *,
+    campaign_id: uuid.UUID,
+    contact_id: uuid.UUID,
+    split_ratio: int,
+) -> str:
+    """Step 29 — deterministic per-(campaign, contact) variant pick.
+
+    Hashes the pair into a 0–99 bucket; recipients in the first
+    ``split_ratio`` slots get A, the rest B. Deterministic so a
+    re-run of the same chunk (e.g. retry after a worker crash)
+    re-assigns the same contact to the same variant — keeps the
+    split honest even under retries. ``split_ratio`` of 0 sends
+    every recipient to B; 100 sends every recipient to A — both
+    valid edge cases the operator can set on the create modal."""
+    import hashlib
+
+    h = hashlib.sha256(
+        f"{campaign_id}:{contact_id}".encode("utf-8")
+    ).digest()
+    bucket = h[0] % 100
+    return "A" if bucket < max(0, min(100, split_ratio)) else "B"
 
 
 _TEMPLATE_VAR_RE = re.compile(r"\{\{\s*(\w+)\s*\}\}")

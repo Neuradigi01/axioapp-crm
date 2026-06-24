@@ -19,6 +19,7 @@ import { catchError, debounceTime, switchMap } from 'rxjs/operators';
 
 import { ConversationChannel } from '../conversations/conversations-api.service';
 import { SendFromPickerComponent } from '../whatsapp/shared/send-from-picker.component';
+import { AbTestSectionComponent } from './ab/ab-test-section.component';
 import { extractApiError } from '@core/services/api-error.util';
 import {
   ContactGroup,
@@ -67,6 +68,7 @@ import {
     RouterLink,
     LucideAngularModule,
     SendFromPickerComponent,
+    AbTestSectionComponent,
   ],
   templateUrl: './create-campaign-modal.component.html',
 })
@@ -117,6 +119,17 @@ export class CreateCampaignModalComponent {
   // --- WhatsApp template picker state -------------------------------
 
   protected readonly templates = signal<WhatsAppTemplate[]>([]);
+
+  /** Step 29 — slim id+name projection for the A/B section's
+   *  template dropdowns. The full `WhatsAppTemplate` shape is more
+   *  than the picker needs; this keeps the section component's
+   *  input contract tight. */
+  protected approvedTemplatesForPicker(): Array<{
+    id: string;
+    name: string;
+  }> {
+    return this.templates().map((t) => ({ id: t.id, name: t.name }));
+  }
   protected readonly templatesLoading = signal(false);
   protected readonly templatesLoaded = signal(false);
   protected readonly selectedTemplateId = signal<string | null>(null);
@@ -196,6 +209,18 @@ export class CreateCampaignModalComponent {
     // connected phones (the SendFromPickerComponent enforces that
     // at render time).
     send_from_phone_id: this.fb.control<string | null>(null),
+    // Step 29 — A/B testing knobs. `is_ab_test` is the master
+    // gate; the section component reads the other four fields.
+    is_ab_test: this.fb.control<boolean>(false, { nonNullable: true }),
+    variant_a_template_id: this.fb.control<string | null>(null),
+    variant_b_template_id: this.fb.control<string | null>(null),
+    split_ratio: this.fb.control<number>(50, { nonNullable: true }),
+    winner_metric: this.fb.control<
+      'reply_rate' | 'read_rate' | 'click_rate' | null
+    >(null),
+    winner_holdback_hours: this.fb.control<number>(24, {
+      nonNullable: true,
+    }),
   });
 
   protected readonly isWhatsApp = computed(() =>
@@ -547,6 +572,19 @@ export class CreateCampaignModalComponent {
         // when set, the dispatcher pins the campaign to this
         // specific WhatsApp phone instead of the org default.
         send_from_phone_id: v.send_from_phone_id ?? null,
+        // Step 29 — A/B test config. Server defaults take over
+        // when is_ab_test is false; the variant pair + metric are
+        // required otherwise (server validates).
+        is_ab_test: v.is_ab_test ?? false,
+        variant_a_template_id: v.is_ab_test
+          ? (v.variant_a_template_id ?? null)
+          : null,
+        variant_b_template_id: v.is_ab_test
+          ? (v.variant_b_template_id ?? null)
+          : null,
+        split_ratio: v.split_ratio ?? 50,
+        winner_metric: v.is_ab_test ? (v.winner_metric ?? null) : null,
+        winner_holdback_hours: v.winner_holdback_hours ?? 24,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({

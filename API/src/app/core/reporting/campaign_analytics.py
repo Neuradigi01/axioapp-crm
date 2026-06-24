@@ -813,6 +813,168 @@ async def compute_ai_metrics(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class AbVariantBreakdown:
+    """One side of the A/B comparison (Step 29). All counts are
+    integers; ``reply_rate`` / ``read_rate`` / ``click_rate`` are
+    0..1 ratios so the SPA can render percentages without doing
+    division. Empty samples → 0 across the board."""
+
+    variant: str
+    template_id: Optional[str]
+    template_name: Optional[str]
+    sent: int
+    delivered: int
+    read: int
+    replied: int
+    failed: int
+    reply_rate: float
+    read_rate: float
+
+
+@dataclass(frozen=True, slots=True)
+class AbComparisonReport:
+    campaign_id: uuid.UUID
+    is_ab_test: bool
+    winner_metric: Optional[str]
+    winning_variant: Optional[str]
+    winner_decided_at: Optional[datetime]
+    a: Optional[AbVariantBreakdown]
+    b: Optional[AbVariantBreakdown]
+
+
+async def compute_ab_comparison(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    campaign_id: uuid.UUID,
+) -> Optional[AbComparisonReport]:
+    """Per-variant side-by-side metrics for the campaign-detail
+    Analytics tab (Step 29).
+
+    Returns ``None`` when the campaign doesn't exist; an
+    ``AbComparisonReport`` with ``is_ab_test=False`` when the
+    campaign is single-template (the UI hides the comparison block
+    in that case). For A/B campaigns: one
+    ``AbVariantBreakdown`` per side with the same shape so the
+    table renders without conditional branches."""
+    head = (
+        await session.execute(
+            text(
+                """
+                SELECT id, is_ab_test, winner_metric::text AS winner_metric,
+                       winning_variant, winner_decided_at,
+                       variant_a_template_id, variant_b_template_id
+                FROM tbl_campaigns
+                WHERE id = :cid AND org_id = :org_id
+                """
+            ),
+            {"cid": campaign_id, "org_id": org_id},
+        )
+    ).first()
+    if head is None:
+        return None
+    if not bool(head.is_ab_test):
+        return AbComparisonReport(
+            campaign_id=campaign_id,
+            is_ab_test=False,
+            winner_metric=None,
+            winning_variant=None,
+            winner_decided_at=None,
+            a=None,
+            b=None,
+        )
+
+    async def _variant(letter: str, tpl_id) -> AbVariantBreakdown:
+        # Per-variant funnel counts using the same status taxonomy
+        # as `compute_campaign_funnel`. Reply count uses the same
+        # CTE shape as the standalone funnel — minor duplication
+        # for clarity vs sharing a helper with subtle bool params.
+        counts = (
+            await session.execute(
+                text(
+                    """
+                    SELECT
+                      COUNT(*) AS sent_q,
+                      SUM(CASE WHEN status IN ('sent','delivered','read')
+                               THEN 1 ELSE 0 END) AS sent,
+                      SUM(CASE WHEN status IN ('delivered','read')
+                               THEN 1 ELSE 0 END) AS delivered,
+                      SUM(CASE WHEN status = 'read' THEN 1 ELSE 0 END) AS read,
+                      SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
+                    FROM tbl_campaign_messages
+                    WHERE campaign_id = :cid AND variant = :v
+                    """
+                ),
+                {"cid": campaign_id, "v": letter},
+            )
+        ).first()
+        replied_row = (
+            await session.execute(
+                text(
+                    """
+                    SELECT COUNT(DISTINCT cm.contact_id) AS replied
+                    FROM tbl_campaign_messages cm
+                    JOIN tbl_conversations c ON c.contact_id = cm.contact_id
+                    JOIN tbl_messages m
+                         ON m.conversation_id = c.id
+                        AND m.direction = 'in'
+                    WHERE cm.campaign_id = :cid
+                      AND cm.variant = :v
+                      AND cm.sent_at IS NOT NULL
+                      AND m.created_at >  cm.sent_at
+                      AND m.created_at <= cm.sent_at + INTERVAL '7 days'
+                    """
+                ),
+                {"cid": campaign_id, "v": letter},
+            )
+        ).first()
+        tpl_name = None
+        if tpl_id is not None:
+            tpl_row = (
+                await session.execute(
+                    text(
+                        "SELECT name FROM tbl_whatsapp_templates "
+                        "WHERE id = :tid"
+                    ),
+                    {"tid": tpl_id},
+                )
+            ).first()
+            tpl_name = tpl_row.name if tpl_row else None
+        sent = int(counts.sent or 0) if counts else 0
+        delivered = int(counts.delivered or 0) if counts else 0
+        read_n = int(counts.read or 0) if counts else 0
+        replied = int((replied_row.replied if replied_row else 0) or 0)
+        failed = int(counts.failed or 0) if counts else 0
+        return AbVariantBreakdown(
+            variant=letter,
+            template_id=str(tpl_id) if tpl_id else None,
+            template_name=tpl_name,
+            sent=sent,
+            delivered=delivered,
+            read=read_n,
+            replied=replied,
+            failed=failed,
+            reply_rate=round(replied / delivered, 4) if delivered else 0.0,
+            read_rate=round(read_n / delivered, 4) if delivered else 0.0,
+        )
+
+    a = await _variant("A", head.variant_a_template_id)
+    b = await _variant("B", head.variant_b_template_id)
+    decided_at = head.winner_decided_at
+    if decided_at is not None and decided_at.tzinfo is None:
+        decided_at = decided_at.replace(tzinfo=timezone.utc)
+    return AbComparisonReport(
+        campaign_id=campaign_id,
+        is_ab_test=True,
+        winner_metric=head.winner_metric,
+        winning_variant=head.winning_variant,
+        winner_decided_at=decided_at,
+        a=a,
+        b=b,
+    )
+
+
 __all__ = [
     "FAILURE_REASONS",
     "FunnelStage",
@@ -825,10 +987,13 @@ __all__ = [
     "QualityVolumePoint",
     "QualityTimelineReport",
     "AIMetricsReport",
+    "AbVariantBreakdown",
+    "AbComparisonReport",
     "compute_campaign_funnel",
     "compute_campaign_failures",
     "compute_cost",
     "compute_quality_timeline",
     "compute_ai_metrics",
+    "compute_ab_comparison",
     "_classify_failure",
 ]

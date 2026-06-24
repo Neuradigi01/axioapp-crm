@@ -261,8 +261,77 @@ async def _dispatch_scheduled_campaigns_async() -> dict[str, Any]:
     return {"fired": fired, "checked_at": now.isoformat()}
 
 
+# whatsapp-platform-upgrade Step 29 — A/B winner decider.
+# Runs `winner_holdback_hours` after the A/B campaign's dispatch
+# completes. Picks the winning variant, persists it, + lets the
+# next chunk pick up the winning template via the dispatch-time
+# lookup in `service.dispatch_chunk` (a re-queue of the campaign
+# is the cheap way to ship the winning template to any contacts
+# the operator added post-hoc — for the v1 the audience is
+# resolved up-front at start, so the decider's persistence is the
+# only behaviour change).
+@_shared_task(
+    name="campaigns.run_ab_decision",
+    bind=True,
+    autoretry_for=(Exception,),
+    max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
+def run_ab_decision(self: Any, campaign_id: str) -> dict[str, Any]:
+    """Pick the A/B winner for ``campaign_id``. Idempotent — the
+    decider no-ops when ``winning_variant`` is already set, so a
+    re-run after a worker crash doesn't double-flip.
+
+    Returns a summary dict with the chosen variant + per-variant
+    metric breakdown so the Celery flower task log captures the
+    decision context."""
+
+    async def _run() -> dict[str, Any]:
+        from src.app.shared.db import async_session
+        from src.app.shared.context import RequestContext, reset_context, set_context
+        from src.app.core.campaigns.ab_decider import decide_winner
+        from src.app.core.campaigns.models import Campaign
+
+        cid = uuid.UUID(campaign_id)
+        async with async_session() as session:
+            # Resolve org from the campaign so RLS-scoped writes land
+            # in the right tenant. We skip RLS by bypassing the
+            # context — the decider lookup uses the explicit
+            # `campaign_id` filter as the tenant gate.
+            row = (
+                await session.execute(
+                    select(Campaign).where(Campaign.id == cid)
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return {"decided": False, "reason": "campaign_not_found"}
+            token = set_context(
+                RequestContext(org_id=row.org_id, user_id=None)
+            )
+            try:
+                decision = await decide_winner(session, campaign_id=cid)
+            finally:
+                reset_context(token)
+        if decision is None:
+            return {"decided": False, "reason": "no_decision"}
+        return {
+            "decided": True,
+            "winning_variant": decision.winning_variant,
+            "metric": decision.metric,
+            "a_rate": decision.a.rate,
+            "b_rate": decision.b.rate,
+            "a_samples": decision.a.samples,
+            "b_samples": decision.b.samples,
+        }
+
+    return asyncio.run(_run())
+
+
 __all__ = [
     "HAS_CELERY",
     "dispatch_scheduled_campaigns",
+    "run_ab_decision",
     "send_campaign_chunk",
 ]

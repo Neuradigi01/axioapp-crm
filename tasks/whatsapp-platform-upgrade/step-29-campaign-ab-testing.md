@@ -1,7 +1,7 @@
 # Step 29 — Campaign A/B testing
 
 **Goal:** Split a campaign audience between two templates; auto-decide winner by configurable metric (reply / read / click rate); remaining recipients get the winning variant.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 9 (templates), Step 21 (campaign analytics for metric tracking).
 
 ---

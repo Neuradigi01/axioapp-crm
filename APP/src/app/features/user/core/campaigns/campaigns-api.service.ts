@@ -71,6 +71,16 @@ export interface CampaignCreate {
    *  "use org default" behaviour; a string pins the dispatcher to
    *  the matching Meta phone-number-id. */
   send_from_phone_id?: string | null;
+  /** Step 29 — A/B test config. When `is_ab_test` is true, both
+   *  variant_*_template_id fields and `winner_metric` are required;
+   *  the single-template `template` / `template_id` fields are
+   *  ignored. Audience size ≥ 50 enforced server-side on start. */
+  is_ab_test?: boolean;
+  variant_a_template_id?: string | null;
+  variant_b_template_id?: string | null;
+  split_ratio?: number;
+  winner_metric?: 'reply_rate' | 'read_rate' | 'click_rate' | null;
+  winner_holdback_hours?: number;
 }
 
 export type CampaignUpdate = Partial<{

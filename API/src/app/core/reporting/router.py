@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.reporting.ad_attribution import compute_ad_attribution
 from src.app.core.reporting.campaign_analytics import (
+    compute_ab_comparison,
     compute_ai_metrics,
     compute_campaign_failures,
     compute_campaign_funnel,
@@ -490,3 +491,52 @@ async def whatsapp_ad_attribution_endpoint(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         )
     return _AdAttributionReportOut.model_validate(report)
+
+
+# --- A/B comparison (whatsapp-platform-upgrade Step 29) --------------------
+
+
+class _AbVariantOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    variant: str
+    template_id: Optional[str]
+    template_name: Optional[str]
+    sent: int
+    delivered: int
+    read: int
+    replied: int
+    failed: int
+    reply_rate: float
+    read_rate: float
+
+
+class _AbComparisonOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    campaign_id: uuid.UUID
+    is_ab_test: bool
+    winner_metric: Optional[str]
+    winning_variant: Optional[str]
+    winner_decided_at: Optional[datetime]
+    a: Optional[_AbVariantOut]
+    b: Optional[_AbVariantOut]
+
+
+@router.get(
+    "/campaigns/{campaign_id}/ab-comparison",
+    response_model=_AbComparisonOut,
+    summary="Per-variant funnel + rates for A/B campaigns",
+)
+async def campaign_ab_comparison_endpoint(
+    campaign_id: uuid.UUID,
+    user: User = Depends(require_permissions("whatsapp.analytics.read")),
+    session: AsyncSession = Depends(get_db),
+) -> _AbComparisonOut:
+    report = await compute_ab_comparison(
+        session, org_id=user.org_id, campaign_id=campaign_id
+    )
+    if report is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="campaign not found",
+        )
+    return _AbComparisonOut.model_validate(report)

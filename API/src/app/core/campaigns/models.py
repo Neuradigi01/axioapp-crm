@@ -27,9 +27,12 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
+    CHAR,
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
 )
 from sqlalchemy import text as sql_text
@@ -130,6 +133,53 @@ class Campaign(Base, TenantScoped):
     send_from_phone_id: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )
+    # whatsapp-platform-upgrade Step 29 — A/B testing.
+    # ``is_ab_test`` is the master gate; when False every other
+    # A/B column is ignored. When True the dispatcher assigns each
+    # recipient to A or B per ``split_ratio``, the Celery decider
+    # runs after ``winner_holdback_hours``, and remaining unsent
+    # recipients receive the winning template.
+    is_ab_test: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=sql_text("false"),
+    )
+    variant_a_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    variant_b_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    split_ratio: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=sql_text("50"),
+    )
+    winner_metric: Mapped[str | None] = mapped_column(
+        ENUM(
+            "reply_rate",
+            "read_rate",
+            "click_rate",
+            name="campaign_winner_metric",
+            create_type=False,
+        ),
+        nullable=True,
+    )
+    winner_holdback_hours: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=sql_text("24"),
+    )
+    winner_decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    winning_variant: Mapped[str | None] = mapped_column(
+        CHAR(1), nullable=True
+    )
     status: Mapped[CampaignStatus] = mapped_column(
         campaign_status_enum,
         nullable=False,
@@ -198,6 +248,14 @@ class CampaignMessage(Base, TenantScoped):
     )
     read_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    # whatsapp-platform-upgrade Step 29 — A/B test variant marker.
+    # ``'A'`` / ``'B'`` for recipients dispatched during the A/B
+    # hold-out window; ``NULL`` for non-A/B campaigns + recipients
+    # sent after the winner was decided (those receive the winning
+    # template directly without a variant tag).
+    variant: Mapped[str | None] = mapped_column(
+        CHAR(1), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

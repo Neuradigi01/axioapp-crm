@@ -68,12 +68,30 @@ class CampaignCreate(BaseModel):
     # NULL falls back to the org default phone; an explicit value
     # pins the dispatcher to that Meta phone-number-id.
     send_from_phone_id: Optional[str] = Field(default=None, max_length=64)
+    # whatsapp-platform-upgrade Step 29 — A/B testing knobs. When
+    # ``is_ab_test`` is True, the four other A/B fields drive the
+    # split + winner decision. When False, every other A/B field
+    # is ignored (and the underlying columns stay at server defaults).
+    is_ab_test: bool = False
+    variant_a_template_id: Optional[uuid.UUID] = None
+    variant_b_template_id: Optional[uuid.UUID] = None
+    split_ratio: int = Field(default=50, ge=0, le=100)
+    winner_metric: Optional[
+        Literal["reply_rate", "read_rate", "click_rate"]
+    ] = None
+    winner_holdback_hours: int = Field(default=24, ge=1, le=168)
 
     @model_validator(mode="after")
     def _exactly_one_template_source(self) -> "CampaignCreate":
         """Either free-text body or an approved-template reference —
         not both, not neither. Mixing the two would make dispatch's
-        text-vs-template branch (Step 3.5.6) ambiguous."""
+        text-vs-template branch (Step 3.5.6) ambiguous.
+
+        Step 29 — A/B campaigns skip this check because they pin
+        templates via ``variant_a_template_id`` / ``variant_b_template_id``
+        instead of ``template`` / ``template_id``."""
+        if self.is_ab_test:
+            return self
         if self.template is None and self.template_id is None:
             raise ValueError(
                 "Provide either 'template' (free text) or 'template_id' "
@@ -87,6 +105,33 @@ class CampaignCreate(BaseModel):
             # No variables for a 0-variable template is fine, but make
             # the field explicitly `{}` so dispatch doesn't see None.
             self.template_variables = {}
+        return self
+
+    @model_validator(mode="after")
+    def _validate_ab_config(self) -> "CampaignCreate":
+        """Step 29 — A/B campaigns must carry both template ids + a
+        distinct pair + a winner metric. The minimum-audience guard
+        is enforced at start-campaign time (we don't know the
+        audience size until then)."""
+        if not self.is_ab_test:
+            return self
+        if (
+            self.variant_a_template_id is None
+            or self.variant_b_template_id is None
+        ):
+            raise ValueError(
+                "A/B campaigns require both variant_a_template_id "
+                "and variant_b_template_id."
+            )
+        if self.variant_a_template_id == self.variant_b_template_id:
+            raise ValueError(
+                "Variant A and B must reference different templates."
+            )
+        if self.winner_metric is None:
+            raise ValueError(
+                "A/B campaigns require a winner_metric "
+                "(reply_rate / read_rate / click_rate)."
+            )
         return self
 
 

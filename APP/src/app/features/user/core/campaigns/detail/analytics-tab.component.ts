@@ -17,6 +17,7 @@ import {
   CampaignFunnelReport,
   WhatsAppReportsService,
 } from '../../reporting/whatsapp/whatsapp-reports.service';
+import { AbVariantComparisonComponent } from './ab-variant-comparison.component';
 import { FailuresTableComponent } from './failures-table.component';
 import { FunnelChartComponent } from './funnel-chart.component';
 
@@ -34,8 +35,20 @@ import { FunnelChartComponent } from './funnel-chart.component';
   selector: 'app-campaign-analytics-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FunnelChartComponent, FailuresTableComponent],
+  imports: [
+    CommonModule,
+    FunnelChartComponent,
+    FailuresTableComponent,
+    AbVariantComparisonComponent,
+  ],
   template: `
+    <!-- Step 29 — A/B variant comparison. Renders only for A/B
+         campaigns (the component itself short-circuits when the
+         API returns is_ab_test=false). -->
+    <div class="mb-4">
+      <app-ab-variant-comparison [campaignId]="campaignId()" />
+    </div>
+
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <div class="rounded-md border border-zinc-200 bg-white p-4">
         <div class="mb-3 flex items-center justify-between">
