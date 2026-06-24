@@ -119,6 +119,14 @@ class EmbedSubmission(BaseModel):
     attribution: SubmissionAttribution = Field(
         default_factory=SubmissionAttribution
     )
+    # whatsapp-platform-upgrade Step 22 — DPDP consent checkbox.
+    # The widget renders a required-by-default checkbox; the submit
+    # button stays disabled until it's ticked. When true the embed
+    # submission service flips the contact to `opted_in` with
+    # `source='form_widget'` and writes a consent-event row carrying
+    # the submitted payload as evidence. False / missing leaves the
+    # contact at the org's default ("never_contacted").
+    whatsapp_consent: bool = Field(default=False)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -360,6 +368,22 @@ class WidgetConfigDocument(BaseModel):
     spam_protection: WidgetConfigSpamProtection = Field(
         default_factory=WidgetConfigSpamProtection
     )
+    # whatsapp-platform-upgrade Step 22 — DPDP consent checkbox.
+    # When enabled, the rendered widget shows a required "I agree
+    # to receive WhatsApp messages" checkbox above the submit button.
+    # The submit handler refuses to POST until the checkbox is
+    # ticked. Default `true` so new orgs are DPDP-compliant out of
+    # the box; Owners can opt out only after acknowledging the
+    # warning copy in the Settings → Widget tab.
+    require_whatsapp_consent: bool = Field(default=True)
+    whatsapp_consent_label: str = Field(
+        default=(
+            "I agree to receive WhatsApp messages about my enquiry from "
+            "this business."
+        ),
+        min_length=1,
+        max_length=512,
+    )
 
     @field_validator("fields")
     @classmethod
@@ -381,6 +405,13 @@ class WidgetConfigPublicDocument(BaseModel):
 
     fields: list[WidgetConfigField] = Field(default_factory=list)
     submit_button_label: str = "Get a quote"
+    # Step 22 — DPDP consent. Mirrored from the admin document; the
+    # public widget JS reads both fields to render the checkbox.
+    require_whatsapp_consent: bool = True
+    whatsapp_consent_label: str = (
+        "I agree to receive WhatsApp messages about my enquiry from "
+        "this business."
+    )
     thank_you_message: str = "Thanks — we'll reach out shortly."
     thank_you_url: Optional[str] = None
     branding: WidgetConfigBranding = Field(default_factory=WidgetConfigBranding)

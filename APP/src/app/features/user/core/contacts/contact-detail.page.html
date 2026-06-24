@@ -191,6 +191,12 @@
           </div>
         }
         @case ('overview') {
+          <!-- Step 22 — DPDP opt-in panel. Renders above the
+               standard-fields grid so consent state is always
+               visible without scrolling on small screens. -->
+          <div class="mb-4">
+            <app-opt-in-section [contactId]="c.id" />
+          </div>
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
               <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">

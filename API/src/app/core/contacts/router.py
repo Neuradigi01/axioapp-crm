@@ -28,7 +28,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.contacts.consent_service import (
+    ConsentError,
+    list_consent_events,
+    record_transition,
+)
 from src.app.core.contacts.schemas import (
+    ConsentEventOut,
     ContactBulkAddTag,
     ContactBulkAddTagResult,
     ContactBulkDelete,
@@ -43,6 +49,9 @@ from src.app.core.contacts.schemas import (
     ContactOut,
     ContactReassign,
     ContactUpdate,
+    OptInHistoryOut,
+    OptInRecordRequest,
+    OptOutRecordRequest,
 )
 from src.app.core.contacts.service import (
     bulk_add_tag_contacts,
@@ -321,3 +330,143 @@ async def export_csv_endpoint(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# --- Opt-in (whatsapp-platform-upgrade Step 22) ----------------------------
+
+
+def _client_ip(request: Request) -> str | None:
+    """Best-effort client IP for the consent audit. Honours
+    ``X-Forwarded-For`` when the API is behind a proxy; falls back
+    to the socket address. Returns None when neither is available
+    (e.g. tests using the ASGI direct adapter)."""
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()[:64]
+    client = request.client
+    return client.host[:64] if client else None
+
+
+@router.get(
+    "/{contact_id}/opt-in",
+    response_model=OptInHistoryOut,
+    summary="Current opt-in state + immutable consent-log history",
+)
+async def get_opt_in_endpoint(
+    contact_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.read")),
+) -> OptInHistoryOut:
+    """Read-only view of the opt-in surface for one contact. Read
+    gate is the standard `contacts.read` — every staffer with
+    access to the contact can see the consent state. Manual
+    overrides are gated separately on `whatsapp.opt_in.manage`."""
+    contact = await contacts_da.get_contact(db, contact_id)
+    if contact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
+        )
+    events = await list_consent_events(db, contact_id=contact_id)
+    return OptInHistoryOut(
+        contact_id=contact.id,
+        status=contact.whatsapp_opt_in_status,
+        source=contact.whatsapp_opt_in_source,
+        recorded_at=contact.whatsapp_opt_in_recorded_at,
+        recorded_by_user_id=contact.whatsapp_opt_in_recorded_by_user_id,
+        opt_out_recorded_at=contact.whatsapp_opt_out_recorded_at,
+        opt_out_reason=contact.whatsapp_opt_out_reason,
+        events=[ConsentEventOut.model_validate(e) for e in events],
+    )
+
+
+@router.post(
+    "/{contact_id}/opt-in",
+    response_model=ConsentEventOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Manually record an opt-in (operator override).",
+)
+async def post_opt_in_endpoint(
+    contact_id: uuid.UUID,
+    payload: OptInRecordRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("whatsapp.opt_in.manage")),
+) -> ConsentEventOut:
+    contact = await contacts_da.get_contact(db, contact_id)
+    if contact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
+        )
+    try:
+        result = await record_transition(
+            db,
+            contact=contact,
+            new_status="opted_in",
+            source=payload.source,
+            actor_user_id=user.legacy_uuid,
+            reason=payload.reason,
+            request_evidence=payload.request_evidence,
+            ip_address=_client_ip(request),
+        )
+    except ConsentError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
+    if not result.persisted:
+        # Idempotent no-op — re-fetch the most recent event so the
+        # caller still gets a meaningful row back instead of a 201
+        # with stale data.
+        recent = await list_consent_events(db, contact_id=contact_id, limit=1)
+        if recent:
+            return ConsentEventOut.model_validate(recent[0])
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="contact is already opted in",
+        )
+    recent = await list_consent_events(db, contact_id=contact_id, limit=1)
+    return ConsentEventOut.model_validate(recent[0])
+
+
+@router.post(
+    "/{contact_id}/opt-out",
+    response_model=ConsentEventOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Manually record an opt-out (operator override).",
+)
+async def post_opt_out_endpoint(
+    contact_id: uuid.UUID,
+    payload: OptOutRecordRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("whatsapp.opt_in.manage")),
+) -> ConsentEventOut:
+    contact = await contacts_da.get_contact(db, contact_id)
+    if contact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
+        )
+    try:
+        result = await record_transition(
+            db,
+            contact=contact,
+            new_status="opted_out",
+            source="manual_entry",
+            actor_user_id=user.legacy_uuid,
+            reason=payload.reason,
+            request_evidence=payload.request_evidence,
+            ip_address=_client_ip(request),
+        )
+    except ConsentError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
+    if not result.persisted:
+        recent = await list_consent_events(db, contact_id=contact_id, limit=1)
+        if recent:
+            return ConsentEventOut.model_validate(recent[0])
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="contact is already opted out",
+        )
+    recent = await list_consent_events(db, contact_id=contact_id, limit=1)
+    return ConsentEventOut.model_validate(recent[0])

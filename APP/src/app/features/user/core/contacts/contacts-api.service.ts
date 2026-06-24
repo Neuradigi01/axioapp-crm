@@ -37,6 +37,52 @@ export interface Contact {
   last_activity_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Step 22 — DPDP opt-in state. */
+  whatsapp_opt_in_status?: WhatsAppOptInStatus;
+  whatsapp_opt_in_source?: WhatsAppOptInSource | null;
+  whatsapp_opt_in_recorded_at?: string | null;
+  whatsapp_opt_in_recorded_by_user_id?: string | null;
+  whatsapp_opt_out_recorded_at?: string | null;
+  whatsapp_opt_out_reason?: string | null;
+}
+
+/** Step 22 — DPDP opt-in state machine. Mirrored from the backend
+ *  ``whatsapp_opt_in_status`` ENUM. */
+export type WhatsAppOptInStatus =
+  | 'never_contacted'
+  | 'implicit'
+  | 'opted_in'
+  | 'opted_out';
+
+export type WhatsAppOptInSource =
+  | 'form_widget'
+  | 'bulk_import'
+  | 'manual_entry'
+  | 'inbound_first_message'
+  | 'explicit_opt_in_link'
+  | 'stop_keyword';
+
+export interface ConsentEvent {
+  id: string;
+  channel: string;
+  old_status: WhatsAppOptInStatus | null;
+  new_status: WhatsAppOptInStatus;
+  source: WhatsAppOptInSource | null;
+  actor_user_id: string | null;
+  ip_address: string | null;
+  reason: string | null;
+  recorded_at: string;
+}
+
+export interface OptInHistory {
+  contact_id: string;
+  status: WhatsAppOptInStatus;
+  source: WhatsAppOptInSource | null;
+  recorded_at: string | null;
+  recorded_by_user_id: string | null;
+  opt_out_recorded_at: string | null;
+  opt_out_reason: string | null;
+  events: ConsentEvent[];
 }
 
 export interface ContactCreate {
@@ -229,6 +275,45 @@ export class ContactsApiService extends BaseCrudApiService<
   /** Render-shape custom field defs for the contact dynamic form. */
   renderFields(): Observable<FieldDef[]> {
     return this.http.get<FieldDef[]>(this.renderUrl);
+  }
+
+  /** Step 22 — DPDP opt-in surface. Read returns current state +
+   *  immutable consent-log history for the contact-detail panel.
+   *  Read gates on `contacts.read`; writes gate on
+   *  `whatsapp.opt_in.manage` (server-side; junior roles get 403). */
+  getOptIn(contactId: string): Observable<OptInHistory> {
+    return this.http.get<OptInHistory>(`${this.base}/${contactId}/opt-in`);
+  }
+
+  /** Manual opt-in override. ``source`` must match one of the backend
+   *  enum values; the contact-detail UI defaults to `'manual_entry'`. */
+  recordOptIn(
+    contactId: string,
+    body: {
+      source: WhatsAppOptInSource;
+      reason?: string | null;
+      request_evidence?: Record<string, unknown>;
+    },
+  ): Observable<ConsentEvent> {
+    return this.http.post<ConsentEvent>(
+      `${this.base}/${contactId}/opt-in`,
+      body,
+    );
+  }
+
+  /** Manual opt-out override. Source is always `manual_entry` on this
+   *  path; auto-flips from STOP keyword come through the webhook. */
+  recordOptOut(
+    contactId: string,
+    body: {
+      reason?: string | null;
+      request_evidence?: Record<string, unknown>;
+    },
+  ): Observable<ConsentEvent> {
+    return this.http.post<ConsentEvent>(
+      `${this.base}/${contactId}/opt-out`,
+      body,
+    );
   }
 
   /** Step 1 of bulk import: stream the file to the backend, get back

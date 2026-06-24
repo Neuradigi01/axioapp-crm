@@ -204,7 +204,14 @@
                   <span class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700">
                     {{ initials(item.full_name) }}
                   </span>
-                  {{ item.full_name }}
+                  <span class="flex items-center gap-2">
+                    {{ item.full_name }}
+                    @if ($any(item).whatsapp_opt_in_status === 'opted_out') {
+                      <app-opt-in-chip
+                        [status]="$any(item).whatsapp_opt_in_status"
+                      />
+                    }
+                  </span>
                 </div>
               </td>
               <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600" (click)="$event.stopPropagation()">

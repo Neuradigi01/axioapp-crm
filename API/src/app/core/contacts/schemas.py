@@ -85,6 +85,13 @@ class ContactOut(TimestampedOrgScopedOut):
     custom_data: dict[str, Any]
     assigned_to_id: uuid.UUID | None
     last_activity_at: datetime | None
+    # whatsapp-platform-upgrade Step 22 — DPDP opt-in state.
+    whatsapp_opt_in_status: str = "never_contacted"
+    whatsapp_opt_in_source: str | None = None
+    whatsapp_opt_in_recorded_at: datetime | None = None
+    whatsapp_opt_in_recorded_by_user_id: uuid.UUID | None = None
+    whatsapp_opt_out_recorded_at: datetime | None = None
+    whatsapp_opt_out_reason: str | None = None
 
 
 class ContactListItem(ORMModel):
@@ -99,6 +106,67 @@ class ContactListItem(ORMModel):
     assigned_to_id: uuid.UUID | None
     last_activity_at: datetime | None
     created_at: datetime
+    # Step 22 — chip on the list page.
+    whatsapp_opt_in_status: str = "never_contacted"
+
+
+# --- Step 22 opt-in request / response shapes ------------------------------
+
+
+class OptInRecordRequest(BaseModel):
+    """Body of ``POST /contacts/{id}/opt-in``."""
+
+    source: str = Field(
+        description="Where this opt-in was captured. One of "
+        "form_widget / bulk_import / manual_entry / "
+        "inbound_first_message / explicit_opt_in_link."
+    )
+    reason: str | None = Field(default=None, max_length=500)
+    request_evidence: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class OptOutRecordRequest(BaseModel):
+    """Body of ``POST /contacts/{id}/opt-out``."""
+
+    reason: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Optional free-text justification (e.g. "
+        "'customer requested by phone').",
+    )
+    request_evidence: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class ConsentEventOut(ORMModel):
+    """One row from the immutable consent log."""
+
+    id: uuid.UUID
+    channel: str
+    old_status: str | None
+    new_status: str
+    source: str | None
+    actor_user_id: uuid.UUID | None
+    ip_address: str | None
+    reason: str | None
+    recorded_at: datetime
+
+
+class OptInHistoryOut(BaseModel):
+    """Combined "where are we + how did we get here" payload for the
+    contact-detail opt-in panel."""
+
+    contact_id: uuid.UUID
+    status: str
+    source: str | None
+    recorded_at: datetime | None
+    recorded_by_user_id: uuid.UUID | None
+    opt_out_recorded_at: datetime | None
+    opt_out_reason: str | None
+    events: list[ConsentEventOut]
 
 
 ContactListResponse = PaginatedResponse[ContactListItem]

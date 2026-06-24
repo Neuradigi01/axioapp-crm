@@ -39,5 +39,10 @@ MODULE = ModuleDescriptor(
         # + future Step-18 assignment rules). Same Owner/Admin-only
         # model as business profile.
         "whatsapp.automation.manage",
+        # whatsapp-platform-upgrade Step 22 — DPDP-ready opt-in. The
+        # read of `/contacts/{id}/opt-in` is gated on `contacts.read`
+        # (every staffer can see the consent state); this manage key
+        # is what gates manual force-flip via the admin UI.
+        "whatsapp.opt_in.manage",
     ],
 )

@@ -1,7 +1,7 @@
 # Step 22 — Opt-in capture (storage + UI + audit + send guard)
 
 **Goal:** DPDP / GDPR-ready opt-in surface. Contacts have explicit opt-in status; transitions recorded in immutable consent log; bulk import / form widget / inbound flows update status correctly; campaign send refuses opted-out contacts.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Phase 1 closed (any time after).
 
 ---

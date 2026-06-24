@@ -81,6 +81,12 @@ _CORE_ADMIN_KEYS: list[str] = [
     # default — manager-spec: "is WhatsApp working" is a leadership
     # question, not floor staff.
     "whatsapp.analytics.read",
+    # whatsapp-platform-upgrade Step 22 — manual override of contact
+    # opt-in status. Read of `/contacts/{id}/opt-in` is gated on
+    # `contacts.read` (every staffer can see the state); only Owner
+    # + Admin can force-flip via the manual API. DPDP audit log
+    # records the override regardless.
+    "whatsapp.opt_in.manage",
     "tasks.read", "tasks.write",
     "pipelines.read", "pipelines.manage", "pipelines.write",
     "activities.read", "activities.write",

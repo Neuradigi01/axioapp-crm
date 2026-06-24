@@ -273,6 +273,47 @@ async def submit(
                 )
                 contact_id = contact.id
 
+            # whatsapp-platform-upgrade Step 22 — DPDP consent capture.
+            # Honour the widget's consent checkbox so the campaign send
+            # guard treats this contact as fully opted-in. Best-effort:
+            # any failure here logs + continues so the lead-create flow
+            # is never derailed by a consent-log write hiccup.
+            if payload.whatsapp_consent and contact_id is not None:
+                try:
+                    from src.app.core.contacts.consent_service import (
+                        record_transition,
+                    )
+                    from src.app.core.contacts.data_access import (
+                        get_contact,
+                    )
+
+                    consent_contact = await get_contact(session, contact_id)
+                    if consent_contact is not None:
+                        await record_transition(
+                            session,
+                            contact=consent_contact,
+                            new_status="opted_in",
+                            source="form_widget",
+                            ip_address=ip,
+                            request_evidence={
+                                "embed_key_id": str(key_id),
+                                "embed_key_prefix": key_row.prefix,
+                                "referrer": (
+                                    payload.attribution.referrer
+                                ),
+                                "landing_url": (
+                                    payload.attribution.landing_url
+                                ),
+                            },
+                            commit=False,
+                        )
+                except Exception:  # noqa: BLE001
+                    logger.exception(
+                        "embed submission opt-in capture failed for "
+                        "contact %s",
+                        contact_id,
+                    )
+
             # 10. Hand off to the centralised ingest service. If the
             # contact already has an OPEN lead in this org, ingest
             # merges the submission into that lead's timeline as a

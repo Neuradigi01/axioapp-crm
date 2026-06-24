@@ -33,6 +33,8 @@ import {
   ContactsApiService,
 } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
+import { OptInChipComponent } from './opt-in/opt-in-chip.component';
+import { OptInSectionComponent } from './opt-in/opt-in-section.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
 
@@ -62,6 +64,8 @@ const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: strin
     PhoneLinkDirective,
     WhatsappLinkDirective,
     MailLinkDirective,
+    OptInSectionComponent,
+    OptInChipComponent,
   ],
   templateUrl: './contact-detail.page.html',
 })

@@ -23,6 +23,7 @@ import {
   SortOrder,
 } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
+import { OptInChipComponent } from './opt-in/opt-in-chip.component';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
@@ -59,6 +60,7 @@ class ContactsListState extends ListPageState<ContactListItem> {}
     WhatsappLinkDirective,
     MailLinkDirective,
     UrlFilterStateDirective,
+    OptInChipComponent,
   ],
   providers: [ContactsListState],
   templateUrl: './contacts-list.page.html',

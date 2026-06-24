@@ -512,6 +512,14 @@ async def dispatch_chunk(
             _, _wa_config = bundle
             wa_rate_per_sec = max(1, int(_wa_config.rate_limit_per_sec or 50))
 
+    # Step 22 — DPDP opt-in pre-flight check. Marketing campaigns on
+    # opted-out contacts must never ship; the dashboard's failure
+    # classifier already maps "opted out" into its own bucket.
+    from src.app.core.campaigns.send_guard import (
+        block_reason,
+        evaluate_contact,
+    )
+
     for cid in contact_ids:
         contact = await data_access.get_contact(session, cid)
         if contact is None or not contact.phone:
@@ -523,6 +531,31 @@ async def dispatch_chunk(
                 error="contact has no phone for this channel",
             )
             continue
+
+        # Channel-specific opt-in check. Other channels (SMS / email)
+        # have their own opt-out columns; this guard only applies to
+        # WhatsApp until those channels grow first-class opt-in cols.
+        if campaign.channel == ConversationChannel.whatsapp:
+            template_category = (
+                template_row.category.lower()
+                if template_row is not None
+                and getattr(template_row, "category", None)
+                else None
+            )
+            decision = evaluate_contact(
+                contact,
+                template_category=template_category,
+                allow_implicit=True,
+            )
+            if decision.should_block:
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error=block_reason(decision),
+                )
+                continue
 
         # Find / create the (channel, external_id) conversation so the
         # outbound message also appears in the inbox.

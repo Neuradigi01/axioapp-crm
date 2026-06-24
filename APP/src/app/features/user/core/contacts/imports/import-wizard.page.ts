@@ -19,7 +19,9 @@ import {
   ContactImportDryRunOut,
   ContactImportUploadOut,
   ContactsApiService,
+  WhatsAppOptInSource,
 } from '../contacts-api.service';
+import { BulkImportOptInStepComponent } from './opt-in-step.component';
 
 /**
  * `/user/contacts/import` — 3-step bulk import wizard wired to the
@@ -69,10 +71,18 @@ const ERROR_VISIBLE_LIMIT = 50;
   selector: 'app-contact-import-wizard-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideAngularModule],
+  imports: [RouterLink, LucideAngularModule, BulkImportOptInStepComponent],
   templateUrl: './import-wizard.page.html',
 })
 export class ContactImportWizardPageComponent {
+  /** Step 22 — DPDP opt-in provenance picked on the map step.
+   *  Null until the operator picks one; gates the Continue button. */
+  protected readonly optInSource = signal<WhatsAppOptInSource | null>(null);
+
+  protected setOptInSource(source: WhatsAppOptInSource): void {
+    this.optInSource.set(source);
+  }
+
   private readonly api = inject(ContactsApiService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -144,6 +154,7 @@ export class ContactImportWizardPageComponent {
       this.fullNameMapped() &&
       this.duplicateTargets().size === 0 &&
       !this.groupNameRequired() &&
+      this.optInSource() !== null &&
       !this.dryRunRunning(),
   );
 

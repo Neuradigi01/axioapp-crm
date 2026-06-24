@@ -352,12 +352,76 @@ async def receive_webhook(
             },
         )
 
+    # whatsapp-platform-upgrade Step 22 — DPDP opt-in auto-flip.
+    # Runs BEFORE auto-reply / keyword / AI engines so a STOP-keyword
+    # customer never gets a greeting or AI follow-up on the same
+    # webhook tick. The helper:
+    #   * On STOP keyword: flip the contact to `opted_out` and ship
+    #     the unsubscribe-confirmation template via the WhatsApp
+    #     adapter, then short-circuit the rest of the pipeline.
+    #   * On first inbound from a `never_contacted` contact: flip to
+    #     `implicit`. Other engines still fire.
+    # All failures are caught inside the helper; the inbound row is
+    # never rolled back. The contact lookup is best-effort — when
+    # the conversation has no `contact_id` yet (e.g. unknown phone),
+    # the helper returns None and the pipeline continues unchanged.
+    customer_opted_out = False
+    if (
+        conv.channel == ConversationChannel.whatsapp
+        and conv.contact_id is not None
+    ):
+        from src.app.core.contacts.consent_service import (
+            auto_flip_on_inbound,
+        )
+        from src.app.core.contacts.data_access import get_contact
+
+        try:
+            contact = await get_contact(session, conv.contact_id)
+            if contact is not None:
+                # First inbound = the row we just persisted IS the
+                # first inbound on this conversation. The "first ever
+                # customer message" signal lives on contact-status
+                # rather than conv-history so a customer who reuses
+                # the channel after a wipe still counts as
+                # implicit-consent on the next inbound.
+                is_first = (
+                    contact.whatsapp_opt_in_status == "never_contacted"
+                )
+                result = await auto_flip_on_inbound(
+                    session,
+                    contact=contact,
+                    inbound_text=parsed.text,
+                    is_first_inbound=is_first,
+                )
+                if result is not None and result.persisted:
+                    await session.commit()
+                    if result.new_status == "opted_out":
+                        customer_opted_out = True
+                        # Ship the "you've been unsubscribed"
+                        # confirmation. Best-effort: any failure
+                        # (template missing, adapter down) is logged
+                        # but doesn't roll back the opt-out itself
+                        # — DPDP compliance trumps the courtesy.
+                        from src.app.core.contacts.consent_service import (
+                            send_opt_out_confirmation,
+                        )
+
+                        await send_opt_out_confirmation(
+                            session, conversation=conv
+                        )
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "opt-in auto-flip failed for conv %s", conv.id
+            )
+
     # whatsapp-platform-upgrade Step 16 — fire auto-reply pipeline.
     # Greeting + out-of-hours away dispatch after the inbound row is
     # persisted so cooldown queries see consistent state. Failures
     # are caught inside `dispatch_auto_replies`; this call never
     # raises into the webhook handler.
-    if conv.channel == ConversationChannel.whatsapp:
+    if conv.channel == ConversationChannel.whatsapp and not customer_opted_out:
         from src.app.core.integrations.whatsapp.auto_reply import (
             dispatch_auto_replies,
         )
