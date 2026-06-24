@@ -132,102 +132,9 @@ async def create_contact_endpoint(
     return ContactOut.model_validate(contact)
 
 
-@router.get("/{contact_id}", response_model=ContactOut)
-async def get_contact_endpoint(
-    contact_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("contacts.read")),
-) -> ContactOut:
-    contact = await contacts_da.get_contact(db, contact_id)
-    if contact is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
-        )
-    return ContactOut.model_validate(contact)
-
-
-@router.patch("/{contact_id}", response_model=ContactOut)
-async def update_contact_endpoint(
-    contact_id: uuid.UUID,
-    payload: ContactUpdate,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("contacts.write")),
-) -> ContactOut:
-    contact = await update_contact(db, contact_id=contact_id, payload=payload)
-    return ContactOut.model_validate(contact)
-
-
-@router.delete("/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_contact_endpoint(
-    contact_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("contacts.write")),
-) -> Response:
-    await delete_contact(db, contact_id=contact_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-# --- Reassign + bulk-action endpoints ---------------------------------------
-
-
-@router.post("/{contact_id}/reassign", response_model=ContactOut)
-async def reassign_contact_endpoint(
-    contact_id: uuid.UUID,
-    payload: ContactReassign,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_permissions("contacts.reassign")),
-) -> ContactOut:
-    contact = await reassign_contact(
-        db,
-        contact_id=contact_id,
-        org_id=user.org_id,
-        assigned_to_id=payload.assigned_to_id,
-        note=payload.note,
-        actor_user_id=user.legacy_uuid,
-    )
-    return ContactOut.model_validate(contact)
-
-
-@router.post("/bulk-reassign", response_model=ContactBulkReassignResult)
-async def bulk_reassign_endpoint(
-    payload: ContactBulkReassign,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_permissions("contacts.reassign")),
-) -> ContactBulkReassignResult:
-    n = await bulk_reassign_contacts(
-        db,
-        ids=payload.ids,
-        org_id=user.org_id,
-        assigned_to_id=payload.assigned_to_id,
-        note=payload.note,
-        actor_user_id=user.legacy_uuid,
-    )
-    return ContactBulkReassignResult(reassigned=n)
-
-
-@router.post("/bulk-delete", response_model=ContactBulkDeleteResult)
-async def bulk_delete_endpoint(
-    payload: ContactBulkDelete,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_permissions("contacts.write")),
-) -> ContactBulkDeleteResult:
-    n = await bulk_delete_contacts(db, ids=payload.ids, org_id=user.org_id)
-    return ContactBulkDeleteResult(deleted=n)
-
-
-@router.post("/bulk-add-tag", response_model=ContactBulkAddTagResult)
-async def bulk_add_tag_endpoint(
-    payload: ContactBulkAddTag,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_permissions("contacts.write")),
-) -> ContactBulkAddTagResult:
-    n = await bulk_add_tag_contacts(
-        db, ids=payload.ids, tag=payload.tag, org_id=user.org_id
-    )
-    return ContactBulkAddTagResult(updated=n)
-
-
-# --- Duplicate check + CSV export -------------------------------------------
+# Static GETs MUST precede `/{contact_id}` — FastAPI matches in
+# registration order, so e.g. `/export.csv` would otherwise be parsed
+# as a UUID and fail validation.
 
 
 @router.get("/check-duplicate", response_model=ContactDuplicateCheckResponse)
@@ -331,6 +238,101 @@ async def export_csv_endpoint(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/{contact_id}", response_model=ContactOut)
+async def get_contact_endpoint(
+    contact_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("contacts.read")),
+) -> ContactOut:
+    contact = await contacts_da.get_contact(db, contact_id)
+    if contact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
+        )
+    return ContactOut.model_validate(contact)
+
+
+@router.patch("/{contact_id}", response_model=ContactOut)
+async def update_contact_endpoint(
+    contact_id: uuid.UUID,
+    payload: ContactUpdate,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("contacts.write")),
+) -> ContactOut:
+    contact = await update_contact(db, contact_id=contact_id, payload=payload)
+    return ContactOut.model_validate(contact)
+
+
+@router.delete("/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_contact_endpoint(
+    contact_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("contacts.write")),
+) -> Response:
+    await delete_contact(db, contact_id=contact_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Reassign + bulk-action endpoints ---------------------------------------
+
+
+@router.post("/{contact_id}/reassign", response_model=ContactOut)
+async def reassign_contact_endpoint(
+    contact_id: uuid.UUID,
+    payload: ContactReassign,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.reassign")),
+) -> ContactOut:
+    contact = await reassign_contact(
+        db,
+        contact_id=contact_id,
+        org_id=user.org_id,
+        assigned_to_id=payload.assigned_to_id,
+        note=payload.note,
+        actor_user_id=user.legacy_uuid,
+    )
+    return ContactOut.model_validate(contact)
+
+
+@router.post("/bulk-reassign", response_model=ContactBulkReassignResult)
+async def bulk_reassign_endpoint(
+    payload: ContactBulkReassign,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.reassign")),
+) -> ContactBulkReassignResult:
+    n = await bulk_reassign_contacts(
+        db,
+        ids=payload.ids,
+        org_id=user.org_id,
+        assigned_to_id=payload.assigned_to_id,
+        note=payload.note,
+        actor_user_id=user.legacy_uuid,
+    )
+    return ContactBulkReassignResult(reassigned=n)
+
+
+@router.post("/bulk-delete", response_model=ContactBulkDeleteResult)
+async def bulk_delete_endpoint(
+    payload: ContactBulkDelete,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.write")),
+) -> ContactBulkDeleteResult:
+    n = await bulk_delete_contacts(db, ids=payload.ids, org_id=user.org_id)
+    return ContactBulkDeleteResult(deleted=n)
+
+
+@router.post("/bulk-add-tag", response_model=ContactBulkAddTagResult)
+async def bulk_add_tag_endpoint(
+    payload: ContactBulkAddTag,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.write")),
+) -> ContactBulkAddTagResult:
+    n = await bulk_add_tag_contacts(
+        db, ids=payload.ids, tag=payload.tag, org_id=user.org_id
+    )
+    return ContactBulkAddTagResult(updated=n)
 
 
 # --- Opt-in (whatsapp-platform-upgrade Step 22) ----------------------------
