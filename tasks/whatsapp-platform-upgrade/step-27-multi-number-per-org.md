@@ -1,7 +1,7 @@
 # Step 27 — Multi-number per org
 
 **Goal:** Lift the 1-org = 1-WA-number constraint. Single org connects N numbers (typically one per store / region) → per-number routing for inbound, per-number selection for outbound, side-by-side health comparison.
-**Status:** Pending
+**Status:** COMPLETED (27a backend + 27b UI)
 **Depends on:** Phases 1-6 closed (touches many call sites).
 
 ---
@@ -93,7 +93,9 @@ Schema constraint shift + new column on conversations + campaigns. Safety net: p
 ## Stop & report
 
 ```
-Step 27 — Multi-number per org (likely split into 27a backend + 27b UI at execution)
+Step 27 — Multi-nu
+
+mber per org (likely split into 27a backend + 27b UI at execution)
 Files: 16
 Verify: multi-number connect / route / send / health comparison; single-number orgs unaffected.
 Tests: 12 pytest + 4 Jest.

@@ -16,6 +16,7 @@ import {
   EmailTemplateRenderResponse,
 } from '../services/email-templates-api.service';
 import { EmailTemplatePickerComponent } from '../shared/email/template-picker.component';
+import { SendFromPickerComponent } from '../whatsapp/shared/send-from-picker.component';
 import { ConversationMessage } from './conversations-api.service';
 import { StaffListItem } from '../staff/staff-api.service';
 
@@ -101,6 +102,7 @@ function classifyFile(file: File): ComposerAttachmentType | null {
     FormsModule,
     LucideAngularModule,
     EmailTemplatePickerComponent,
+    SendFromPickerComponent,
   ],
   templateUrl: './compose-bar.component.html',
 })
@@ -133,12 +135,37 @@ export class ComposeBarComponent {
    *  the thread carries the "Pick template" CTA. */
   @Input() outOfSession = false;
 
+  /** Step 27b — WhatsApp phone the customer reached us on (read
+   *  from the conversation's `received_via_phone_id`). The
+   *  Send-From picker uses this as the preferred default so a
+   *  reply lands on the same number — operators only need to
+   *  override when intentionally switching numbers. */
+  @Input() receivedViaPhoneId: string | null = null;
+
   @Output() readonly send = new EventEmitter<string>();
   @Output() readonly sendMedia = new EventEmitter<ComposerMediaPayload>();
   @Output() readonly sendNote = new EventEmitter<ComposerNotePayload>();
   @Output() readonly openInteractive = new EventEmitter<void>();
   @Output() readonly toggleAi = new EventEmitter<boolean>();
   @Output() readonly clearReply = new EventEmitter<void>();
+
+  /** Step 27b — explicit send-from selection. Null when the org
+   *  is single-number (picker hidden). The parent persists the
+   *  selection per-conversation so switching threads doesn't
+   *  silently reset the choice. */
+  protected readonly sendFromPhoneId = signal<string | null>(null);
+
+  protected onSendFromChange(phoneId: string | null): void {
+    this.sendFromPhoneId.set(phoneId);
+  }
+
+  /** Read by the parent on `(send)` to attach the phone id to the
+   *  outbound API payload. Public so the conversations page can
+   *  call it from the (send) handler without subscribing to yet
+   *  another output. */
+  public currentSendFromPhoneId(): string | null {
+    return this.sendFromPhoneId();
+  }
 
   @ViewChild('fileInput') private readonly fileInput!: ElementRef<HTMLInputElement>;
 

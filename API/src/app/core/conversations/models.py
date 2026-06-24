@@ -104,6 +104,14 @@ class Conversation(Base, TenantScoped):
         conversation_channel_enum, nullable=False
     )
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    # whatsapp-platform-upgrade Step 27a — the Meta phone_number_id
+    # the inbound message arrived on (multi-number per org). NULL on
+    # conversations created before 0115 or via the manual outbound
+    # path. The chat-thread composer reads this to default Send-From
+    # back to the same number the customer reached us on.
+    received_via_phone_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
     contact_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_contacts.id", ondelete="SET NULL"),

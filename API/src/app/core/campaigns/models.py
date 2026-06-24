@@ -123,6 +123,13 @@ class Campaign(Base, TenantScoped):
     schedule_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # whatsapp-platform-upgrade Step 27a — multi-number per org.
+    # When set, the dispatcher resolves this specific WhatsApp
+    # config instead of the org's default phone. NULL preserves
+    # the original behaviour for every existing campaign row.
+    send_from_phone_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
     status: Mapped[CampaignStatus] = mapped_column(
         campaign_status_enum,
         nullable=False,

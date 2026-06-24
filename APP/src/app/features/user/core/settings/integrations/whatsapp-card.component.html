@@ -30,6 +30,44 @@
             }
           </p>
         }
+        <!-- Step 27b — multi-number list. Renders only when 2+ phones
+             are connected so single-number orgs see no visual change. -->
+        @if (hasMultiple()) {
+          <div class="mt-2 rounded-md border border-zinc-200 bg-zinc-50 p-2 text-xs">
+            <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+              All connected numbers ({{ numbers()?.length }})
+            </p>
+            <ul class="space-y-0.5">
+              @for (n of numbers(); track n.phone_id) {
+                <li class="flex items-center justify-between">
+                  <span class="font-mono text-zinc-700">
+                    +{{ n.display_phone_number }}
+                    @if (n.verified_name) {
+                      <span class="ml-1 font-sans text-zinc-500">
+                        — {{ n.verified_name }}
+                      </span>
+                    }
+                  </span>
+                  <span class="flex items-center gap-1 text-[10px]">
+                    @if (n.is_default) {
+                      <span class="rounded-full bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                        Default
+                      </span>
+                    }
+                    @if (n.quality_rating) {
+                      <span class="rounded bg-white px-1.5 py-0.5 text-zinc-700 ring-1 ring-zinc-200">
+                        Quality: {{ n.quality_rating }}
+                      </span>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+            <p class="mt-1 text-[10px] text-zinc-500">
+              Use the Send-From picker on the composer / campaign create modal to choose which number to send from.
+            </p>
+          </div>
+        }
       </div>
     </div>
     <div class="flex shrink-0 items-center gap-2">

@@ -796,9 +796,19 @@ class WhatsAppAdapter:
 
 async def resolve_whatsapp_adapter(
     session: AsyncSession,
+    *,
+    phone_id: str | None = None,
 ) -> "WhatsAppAdapter":
-    """Build a fully-configured `WhatsAppAdapter` from the active
-    tenant's `Integration` row + `WhatsAppAccountConfig` sidecar.
+    """Build a fully-configured `WhatsAppAdapter` for the active tenant.
+
+    ``phone_id`` (whatsapp-platform-upgrade Step 27a) — when set,
+    picks the specific WhatsApp config matching that Meta
+    phone-number-id. The campaign dispatcher passes
+    ``campaign.send_from_phone_id`` here; the manual reply composer
+    passes ``conversation.received_via_phone_id``. When ``None``,
+    we fall back to the org's *default* phone (the oldest config
+    row) — preserves the original single-number behaviour for every
+    legacy org and call site.
 
     Relies on the ORM tenant filter from `TenantScoped` for org
     isolation — the caller must be inside a request / Celery task
@@ -815,8 +825,14 @@ async def resolve_whatsapp_adapter(
     from src.app.core.integrations.crypto import decrypt
     from src.app.core.integrations.whatsapp.connect import get_active_config
 
-    bundle = await get_active_config(session)
+    bundle = await get_active_config(session, phone_id=phone_id)
     if bundle is None:
+        if phone_id is not None:
+            raise WhatsAppNotConnected(
+                f"WhatsApp phone {phone_id!r} is not connected for "
+                "this org. Pick another number or reconnect it from "
+                "Settings → Integrations."
+            )
         raise WhatsAppNotConnected(
             "WhatsApp is not connected for this org. "
             "Connect it in Settings → Integrations."

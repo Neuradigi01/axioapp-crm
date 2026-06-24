@@ -169,6 +169,17 @@
       />
     }
     <div class="relative flex-1">
+      <!-- Step 27b — multi-number Send-From picker. Self-hides when
+           the org has < 2 connected phones. -->
+      @if (channel === 'whatsapp' && mode() === 'reply') {
+        <div class="mb-1 flex justify-end">
+          <app-wa-send-from-picker
+            [value]="sendFromPhoneId()"
+            [preferredPhoneId]="receivedViaPhoneId"
+            (valueChange)="onSendFromChange($event)"
+          />
+        </div>
+      }
       <textarea
         [ngModel]="text()"
         (ngModelChange)="onTextChange($event)"

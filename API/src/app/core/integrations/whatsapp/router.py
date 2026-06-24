@@ -259,6 +259,46 @@ async def status_endpoint(
     return WhatsAppStatusOut.model_validate(projection)
 
 
+# --- Multi-number list (whatsapp-platform-upgrade Step 27a) ----------------
+
+
+@router.get("/numbers", summary="List every connected WhatsApp phone.")
+async def list_numbers_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.read")),
+) -> list[dict[str, Any]]:
+    """Slim per-phone projection for the SPA's Send-From pickers +
+    multi-number Settings card.
+
+    Read gated on `conversations.read` (every staffer with composer
+    access needs to enumerate options); manage-side mutations on
+    these rows are still gated separately on
+    `settings.integrations.manage` via the connect endpoints. Order
+    matches `list_active_configs` — oldest-first, which is the
+    org's default phone at index 0."""
+    from src.app.core.integrations.whatsapp.connect import (
+        list_active_configs,
+    )
+
+    pairs = await list_active_configs(db)
+    out: list[dict[str, Any]] = []
+    for index, (_integration, config) in enumerate(pairs):
+        out.append(
+            {
+                "phone_id": config.phone_id,
+                "display_phone_number": config.display_phone_number,
+                "verified_name": config.verified_name,
+                "waba_id": config.waba_id,
+                "is_default": index == 0,
+                "messaging_limit_tier": getattr(
+                    config, "messaging_limit_tier", None
+                ),
+                "quality_rating": getattr(config, "quality_rating", None),
+            }
+        )
+    return out
+
+
 # --- Templates (Step 3.5.4) ---------------------------------------------
 
 
@@ -333,6 +373,7 @@ def _config_to_profile_out(config: Any) -> WhatsAppBusinessProfileRead:
     response_model=WhatsAppBusinessProfileRead,
 )
 async def business_profile_get_endpoint(
+    phone_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(
         require_permissions("whatsapp.business_profile.manage")
@@ -341,9 +382,12 @@ async def business_profile_get_endpoint(
     """Local mirror of the Meta business profile + CRM-side automation
     fields. On first open this triggers a one-shot Meta refresh so the
     form opens populated; subsequent opens read straight from the DB
-    (the Refresh button is the explicit re-sync path)."""
+    (the Refresh button is the explicit re-sync path).
+
+    Step 27b — ``?phone_id=`` selects a specific connected WhatsApp
+    phone; NULL falls back to the org default phone."""
     try:
-        config = await bp_get_profile(db)
+        config = await bp_get_profile(db, phone_id=phone_id)
     except WhatsAppNotConnected as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(exc)
@@ -357,6 +401,7 @@ async def business_profile_get_endpoint(
 )
 async def business_profile_patch_endpoint(
     payload: WhatsAppBusinessProfilePatch,
+    phone_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(
         require_permissions("whatsapp.business_profile.manage")
@@ -364,11 +409,16 @@ async def business_profile_patch_endpoint(
 ) -> WhatsAppBusinessProfileRead:
     """Apply the operator's edits. Meta-bound fields push to the Graph
     API; CRM-only fields (hours / greeting / away) write straight to
-    the local row. Empty patches are a no-op (no Meta call)."""
+    the local row. Empty patches are a no-op (no Meta call).
+
+    Step 27b — ``?phone_id=`` selects a specific connected phone."""
     patch_dict = payload.model_dump(exclude_unset=True, mode="json")
     try:
         config = await bp_update_profile(
-            db, actor_id=user.legacy_uuid, patch=patch_dict
+            db,
+            actor_id=user.legacy_uuid,
+            patch=patch_dict,
+            phone_id=phone_id,
         )
     except WhatsAppNotConnected as exc:
         raise HTTPException(
@@ -386,15 +436,18 @@ async def business_profile_patch_endpoint(
     response_model=WhatsAppBusinessProfileRead,
 )
 async def business_profile_refresh_endpoint(
+    phone_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(
         require_permissions("whatsapp.business_profile.manage")
     ),
 ) -> WhatsAppBusinessProfileRead:
     """Pull current Meta profile values + persist to the local mirror.
-    Stamps `last_synced_at` so the UI can render staleness."""
+    Stamps `last_synced_at` so the UI can render staleness.
+
+    Step 27b — ``?phone_id=`` selects a specific connected phone."""
     try:
-        config = await bp_refresh_from_meta(db)
+        config = await bp_refresh_from_meta(db, phone_id=phone_id)
     except WhatsAppNotConnected as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(exc)
@@ -412,6 +465,7 @@ async def business_profile_refresh_endpoint(
 )
 async def business_profile_picture_endpoint(
     file: UploadFile = File(...),
+    phone_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(
         require_permissions("whatsapp.business_profile.manage")
@@ -420,7 +474,9 @@ async def business_profile_picture_endpoint(
     """Upload a square JPEG/PNG profile picture. Goes through Meta's
     `/media` endpoint, then attached to the profile via
     `profile_picture_handle`. The new public URL lands on the next
-    refresh."""
+    refresh.
+
+    Step 27b — ``?phone_id=`` selects a specific connected phone."""
     mime_type = (file.content_type or "").lower()
     file_bytes = await file.read()
     try:
@@ -429,6 +485,7 @@ async def business_profile_picture_endpoint(
             actor_id=user.legacy_uuid,
             file_bytes=file_bytes,
             mime_type=mime_type,
+            phone_id=phone_id,
         )
     except WhatsAppNotConnected as exc:
         raise HTTPException(

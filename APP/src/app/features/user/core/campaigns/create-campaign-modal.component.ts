@@ -18,6 +18,7 @@ import { Subject, of } from 'rxjs';
 import { catchError, debounceTime, switchMap } from 'rxjs/operators';
 
 import { ConversationChannel } from '../conversations/conversations-api.service';
+import { SendFromPickerComponent } from '../whatsapp/shared/send-from-picker.component';
 import { extractApiError } from '@core/services/api-error.util';
 import {
   ContactGroup,
@@ -61,7 +62,12 @@ import {
   selector: 'app-create-campaign-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, LucideAngularModule],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    LucideAngularModule,
+    SendFromPickerComponent,
+  ],
   templateUrl: './create-campaign-modal.component.html',
 })
 export class CreateCampaignModalComponent {
@@ -185,6 +191,11 @@ export class CreateCampaignModalComponent {
       validators: [Validators.maxLength(4096)],
     }),
     schedule_at: this.fb.control<string | null>(null),
+    // Step 27b — multi-number Send-From selector. Null = use org
+    // default. The dropdown self-hides when the org has < 2
+    // connected phones (the SendFromPickerComponent enforces that
+    // at render time).
+    send_from_phone_id: this.fb.control<string | null>(null),
   });
 
   protected readonly isWhatsApp = computed(() =>
@@ -532,6 +543,10 @@ export class CreateCampaignModalComponent {
         schedule_at: v.schedule_at
           ? new Date(v.schedule_at).toISOString()
           : null,
+        // Step 27b — null on single-number orgs (picker hidden);
+        // when set, the dispatcher pins the campaign to this
+        // specific WhatsApp phone instead of the org default.
+        send_from_phone_id: v.send_from_phone_id ?? null,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({

@@ -317,6 +317,7 @@ async def send_message_endpoint(
             attachments=payload.attachments,
             interactive=interactive_dict,
             reply_to_message_id=payload.reply_to_message_id,
+            send_from_phone_id=payload.send_from_phone_id,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -964,8 +965,16 @@ async def _handle_whatsapp_webhook(
             return {"blocked": True, "reason": hit.reason}
 
     try:
+        # Step 27a — pass the resolved phone_id through so
+        # `_find_or_create_conversation` can stamp it on new
+        # conversations. ``config.phone_id`` is the Meta-side
+        # phone-number-id that the webhook authenticator already
+        # resolved this inbound to.
         msg = await receive_webhook(
-            db, channel=ConversationChannel.whatsapp, payload=payload
+            db,
+            channel=ConversationChannel.whatsapp,
+            payload=payload,
+            received_via_phone_id=config.phone_id,
         )
     except ValueError as exc:
         raise HTTPException(

@@ -175,6 +175,12 @@ class MessageSendPayload(BaseModel):
     # to the channel's wamid before calling the adapter; mismatch
     # (wrong conv / no channel_message_id yet) surfaces as 400.
     reply_to_message_id: Optional[uuid.UUID] = None
+    # whatsapp-platform-upgrade Step 27a — multi-number per org.
+    # When set, the composer pins the outbound to a specific
+    # connected phone instead of defaulting to whichever number
+    # the conversation arrived on. NULL preserves the legacy
+    # behaviour for every single-number org.
+    send_from_phone_id: Optional[str] = Field(default=None, max_length=64)
 
 
 # --- Tags (whatsapp-platform-upgrade Step 14) ------------------------
@@ -316,6 +322,10 @@ class ConversationOut(ORMModel):
     acquisition_source: Optional[str] = None
     acquisition_campaign_id: Optional[str] = None
     acquisition_ad_id: Optional[str] = None
+    # Step 27a — Meta phone-id the conversation arrived on. NULL
+    # for legacy conversations. The composer reads this to default
+    # "Send from" back to the same number.
+    received_via_phone_id: Optional[str] = None
 
 
 class ConversationAttributionOut(BaseModel):

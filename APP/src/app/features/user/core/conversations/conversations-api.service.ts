@@ -212,9 +212,14 @@ export class ConversationsApiService {
     id: string,
     text: string,
     replyToMessageId?: string | null,
+    sendFromPhoneId?: string | null,
   ): Observable<ConversationMessage> {
     const body: Record<string, unknown> = { text, attachments: [] };
     if (replyToMessageId) body['reply_to_message_id'] = replyToMessageId;
+    // Step 27b — multi-number Send-From selection. Server resolves
+    // the adapter against this phone instead of the org default.
+    // NULL/omitted keeps the legacy behaviour for single-number orgs.
+    if (sendFromPhoneId) body['send_from_phone_id'] = sendFromPhoneId;
     return this.http.post<ConversationMessage>(
       `${this.base}/${id}/messages`,
       body,

@@ -2,6 +2,7 @@
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ViewChild,
   computed,
   effect,
   inject,
@@ -71,6 +72,13 @@ export class ConversationsPageComponent {
   private readonly staffApi = inject(StaffApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** Step 27b — handle to the compose-bar so we can read its
+   *  current Send-From selection on send. The picker self-hides
+   *  for single-number orgs; the ViewChild stays defined either
+   *  way (the compose-bar instance always exists when a
+   *  conversation is open). */
+  @ViewChild('composeBar') protected composeBar?: ComposeBarComponent;
 
   /** Logged-in user id — drives the list component's "Mine" chip. */
   protected readonly currentUserId = this.auth.currentUserId;
@@ -303,8 +311,13 @@ export class ConversationsPageComponent {
       d ? { ...d, messages: [...d.messages, optimistic] } : d,
     );
 
+    // Step 27b — pull the operator's Send-From selection (null
+    // when single-number org / picker hidden) so the backend
+    // resolves the adapter against the chosen phone.
+    const sendFromPhoneId = this.composeBar?.currentSendFromPhoneId() ?? null;
+
     this.api
-      .send(id, text, replyTarget?.id ?? null)
+      .send(id, text, replyTarget?.id ?? null, sendFromPhoneId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (real) => {

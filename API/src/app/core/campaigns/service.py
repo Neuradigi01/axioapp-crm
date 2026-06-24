@@ -124,6 +124,10 @@ async def create_campaign(
             else None
         ),
         schedule_at=payload.schedule_at,
+        # Step 27b — pin the campaign to a specific WhatsApp phone
+        # when the operator chose one on the create modal. NULL
+        # preserves the legacy "use org default" behaviour.
+        send_from_phone_id=payload.send_from_phone_id,
         status=CampaignStatus.draft,
         created_by_id=user_id,
     )
@@ -300,7 +304,10 @@ async def enqueue(
     # disconnected one is rejected with a clear message.
     try:
         if campaign.channel == ConversationChannel.whatsapp:
-            await resolve_whatsapp_adapter(session)
+            await resolve_whatsapp_adapter(
+                session,
+                phone_id=campaign.send_from_phone_id,
+            )
         else:
             resolve_channel(campaign.channel)
     except (ChannelNotRegistered, WhatsAppNotConnected) as exc:
@@ -454,7 +461,12 @@ async def dispatch_chunk(
     # works for both "channel never wired" and "org never connected".
     try:
         if campaign.channel == ConversationChannel.whatsapp:
-            adapter = await resolve_whatsapp_adapter(session)
+            # Step 27a — pin the adapter to the campaign's chosen
+            # send-from phone (NULL falls back to the org default).
+            adapter = await resolve_whatsapp_adapter(
+                session,
+                phone_id=campaign.send_from_phone_id,
+            )
         else:
             adapter = resolve_channel(campaign.channel)
     except (ChannelNotRegistered, WhatsAppNotConnected) as exc:
@@ -507,7 +519,12 @@ async def dispatch_chunk(
     if campaign.channel == ConversationChannel.whatsapp:
         from src.app.core.integrations.whatsapp.connect import get_active_config
 
-        bundle = await get_active_config(session)
+        # Step 27a — rate limit follows the campaign's chosen phone
+        # (NULL → org default). Each Meta phone has its own throughput
+        # tier; mismatching them under-utilises the higher-tier number.
+        bundle = await get_active_config(
+            session, phone_id=campaign.send_from_phone_id
+        )
         if bundle is not None:
             _, _wa_config = bundle
             wa_rate_per_sec = max(1, int(_wa_config.rate_limit_per_sec or 50))

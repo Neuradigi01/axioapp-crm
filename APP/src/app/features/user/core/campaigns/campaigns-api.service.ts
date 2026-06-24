@@ -67,6 +67,10 @@ export interface CampaignCreate {
   template_id?: string | null;
   template_variables?: Record<string, TemplateVariableBinding> | null;
   schedule_at?: string | null;
+  /** Step 27b — multi-number Send-From. NULL keeps the existing
+   *  "use org default" behaviour; a string pins the dispatcher to
+   *  the matching Meta phone-number-id. */
+  send_from_phone_id?: string | null;
 }
 
 export type CampaignUpdate = Partial<{

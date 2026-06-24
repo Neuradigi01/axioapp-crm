@@ -48,12 +48,13 @@
  * operator shouldn't have to retype identifiers when only the token
  * was rotated). Tokens NEVER prefill (backend doesn't expose them).
  */
-import { DatePipe } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  OnInit,
   computed,
   effect,
   inject,
@@ -82,6 +83,7 @@ import {
   WhatsAppFbSdkService,
 } from './whatsapp-fb-sdk.service';
 import { PhoneHealthCardComponent } from '../../whatsapp/phone-health/phone-health-card.component';
+import { WhatsAppNumbersService } from '../../whatsapp/shared/whatsapp-numbers.service';
 
 
 interface WhatsAppConnectForm {
@@ -100,6 +102,7 @@ interface WhatsAppConnectForm {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    CommonModule,
     DatePipe,
     LucideAngularModule,
     ReactiveFormsModule,
@@ -107,7 +110,7 @@ interface WhatsAppConnectForm {
   ],
   templateUrl: './whatsapp-card.component.html',
 })
-export class WhatsAppCardComponent {
+export class WhatsAppCardComponent implements OnInit {
   readonly status = input<WhatsAppStatus | null>(null);
 
   readonly changed = output<void>();
@@ -117,6 +120,24 @@ export class WhatsAppCardComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly fb = inject(FormBuilder);
   private readonly fbSdk = inject(WhatsAppFbSdkService);
+  private readonly numbersService = inject(WhatsAppNumbersService);
+
+  /** Step 27b — every connected WhatsApp phone for this org. The
+   *  card renders a per-row list when there are 2+. The default
+   *  `status` projection still drives the "Connected as …" header
+   *  so single-number orgs see no visual change. */
+  protected readonly numbers = this.numbersService.numbers;
+  protected readonly hasMultiple = (): boolean =>
+    (this.numbersService.numbers()?.length ?? 0) >= 2;
+
+  ngOnInit(): void {
+    // Best-effort — failure is silent; the multi-number block just
+    // doesn't render. The card still works exactly as before.
+    this.numbersService
+      .refresh()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({ error: () => undefined });
+  }
 
   /** Manual-paste form visibility. Collapsed by default — the hero
    *  "Connect WhatsApp" button (Embedded Signup) is the primary path.

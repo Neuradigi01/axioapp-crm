@@ -348,6 +348,16 @@
         />
       </label>
 
+      <!-- Step 27b — multi-number Send-From picker. Self-hides when
+           the org has < 2 connected phones; otherwise the operator
+           picks which number this campaign dispatches from. -->
+      <div class="mt-1">
+        <app-wa-send-from-picker
+          [value]="form.controls.send_from_phone_id.value"
+          (valueChange)="form.controls.send_from_phone_id.setValue($event)"
+        />
+      </div>
+
       @if (submitError(); as err) {
         <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
           {{ err }}

@@ -64,6 +64,10 @@ class CampaignCreate(BaseModel):
     template_id: Optional[uuid.UUID] = None
     template_variables: Optional[dict[str, TemplateVariableBinding]] = None
     schedule_at: Optional[datetime] = None
+    # whatsapp-platform-upgrade Step 27b — multi-number per org.
+    # NULL falls back to the org default phone; an explicit value
+    # pins the dispatcher to that Meta phone-number-id.
+    send_from_phone_id: Optional[str] = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def _exactly_one_template_source(self) -> "CampaignCreate":

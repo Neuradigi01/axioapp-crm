@@ -212,10 +212,17 @@ async def _upload_picture_to_meta(
 
 async def _resolve_active_config(
     session: AsyncSession,
+    *,
+    phone_id: Optional[str] = None,
 ) -> tuple[Any, WhatsAppAccountConfig]:
     """Pull (integration, config) for the active org. Raises
-    ``WhatsAppNotConnected`` mirroring the existing send / sync path."""
-    bundle = await get_active_config(session)
+    ``WhatsAppNotConnected`` mirroring the existing send / sync path.
+
+    whatsapp-platform-upgrade Step 27b — ``phone_id`` selects a
+    specific WhatsApp config when the org has multiple connected
+    numbers. NULL falls back to the org default (the oldest config
+    row), preserving the legacy behaviour for single-number orgs."""
+    bundle = await get_active_config(session, phone_id=phone_id)
     if bundle is None:
         raise WhatsAppNotConnected(
             "WhatsApp is not connected for this org. "
@@ -252,19 +259,27 @@ def _snapshot(config: WhatsAppAccountConfig) -> dict[str, Any]:
 async def get_profile(
     session: AsyncSession,
     *,
+    phone_id: Optional[str] = None,
     auto_refresh: bool = True,
     http_client_factory: HttpClientFactory = _default_http_client_factory,
 ) -> WhatsAppAccountConfig:
     """Return the local profile row. When `auto_refresh` and the row
     has never been synced, do a one-shot Meta GET so the form opens
-    populated. Failures are non-fatal — the form just opens empty."""
-    _, config = await _resolve_active_config(session)
+    populated. Failures are non-fatal — the form just opens empty.
+
+    Step 27b — ``phone_id`` selects the multi-number config; NULL
+    falls back to the org default."""
+    _, config = await _resolve_active_config(session, phone_id=phone_id)
     if auto_refresh and config.profile_last_synced_at is None:
         try:
             await refresh_from_meta(
-                session, http_client_factory=http_client_factory
+                session,
+                phone_id=phone_id,
+                http_client_factory=http_client_factory,
             )
-            _, config = await _resolve_active_config(session)
+            _, config = await _resolve_active_config(
+                session, phone_id=phone_id
+            )
         except BusinessProfileError:
             logger.exception(
                 "first-open Meta refresh failed; opening empty form"
@@ -275,14 +290,20 @@ async def get_profile(
 async def refresh_from_meta(
     session: AsyncSession,
     *,
+    phone_id: Optional[str] = None,
     http_client_factory: HttpClientFactory = _default_http_client_factory,
 ) -> WhatsAppAccountConfig:
     """Pull every Meta-side field + persist to the local row.
 
     Doesn't touch the Core-CRM-only fields (hours, greeting, away).
     Stamps `profile_last_synced_at` so the UI can render "Synced N
-    minutes ago"."""
-    integration, config = await _resolve_active_config(session)
+    minutes ago".
+
+    Step 27b — ``phone_id`` selects which connected phone's profile
+    to refresh; NULL falls back to the org default."""
+    integration, config = await _resolve_active_config(
+        session, phone_id=phone_id
+    )
     token = decrypt(integration.access_token_enc)
 
     meta_data = await _fetch_profile_from_meta(
@@ -322,14 +343,20 @@ async def update_profile(
     *,
     actor_id: uuid.UUID,
     patch: dict[str, Any],
+    phone_id: Optional[str] = None,
     http_client_factory: HttpClientFactory = _default_http_client_factory,
 ) -> WhatsAppAccountConfig:
     """Apply the operator's edits to Meta + the local mirror.
 
     Meta-side fields go through ``_push_profile_to_meta``; Core-CRM-
     only fields (hours / greeting / away) write straight to the row.
-    Empty patches are a no-op (no Meta call, no audit row)."""
-    integration, config = await _resolve_active_config(session)
+    Empty patches are a no-op (no Meta call, no audit row).
+
+    Step 27b — ``phone_id`` selects which connected phone's profile
+    to edit. NULL falls back to the org default."""
+    integration, config = await _resolve_active_config(
+        session, phone_id=phone_id
+    )
     token = decrypt(integration.access_token_enc)
 
     # Split the patch into Meta-bound + Core-only fields. Meta cares
@@ -411,12 +438,16 @@ async def upload_picture(
     actor_id: uuid.UUID,
     file_bytes: bytes,
     mime_type: str,
+    phone_id: Optional[str] = None,
     http_client_factory: HttpClientFactory = _default_http_client_factory,
 ) -> WhatsAppAccountConfig:
     """Upload the operator's picture to Meta + attach the returned
     handle to the profile. Meta requires JPEG/PNG; we accept the
     same here. The DB row picks up `profile_picture_url` on the next
-    refresh — Meta doesn't return the public URL synchronously."""
+    refresh — Meta doesn't return the public URL synchronously.
+
+    Step 27b — ``phone_id`` selects which phone's profile picture
+    to update."""
     if mime_type not in ("image/jpeg", "image/png"):
         raise BusinessProfileError(
             http_status=400,
@@ -428,7 +459,9 @@ async def upload_picture(
             user_message="Profile picture must be 5 MB or smaller.",
         )
 
-    integration, config = await _resolve_active_config(session)
+    integration, config = await _resolve_active_config(
+        session, phone_id=phone_id
+    )
     token = decrypt(integration.access_token_enc)
 
     handle = await _upload_picture_to_meta(

@@ -68,12 +68,14 @@
           (pickTemplate)="onPickTemplate()"
         />
         <app-compose-bar
+          #composeBar
           [aiHandling]="conv.ai_handling"
           [channel]="conv.channel"
           [contactId]="conv.contact_id"
           [replyingTo]="replyingTo()"
           [staff]="staffList()"
           [outOfSession]="isOutOfSession()"
+          [receivedViaPhoneId]="$any(conv).received_via_phone_id ?? null"
           (send)="onSendText($event)"
           (sendMedia)="onSendMedia($event)"
           (sendNote)="onSendNote($event)"

@@ -154,6 +154,7 @@ async def send_outbound(
     attachments: list[dict[str, Any]],
     interactive: dict[str, Any] | None = None,
     reply_to_message_id: uuid.UUID | None = None,
+    send_from_phone_id: str | None = None,
 ) -> Message:
     conv = await get_conversation(session, conversation_id)
     # whatsapp-platform-upgrade Step 23 — block-list pre-flight on
@@ -174,12 +175,20 @@ async def send_outbound(
                 f"Settings → WhatsApp → Block List to send again."
             )
 
-    # WhatsApp goes through the per-org resolver (Step 3.5.3) — it
-    # loads the active tenant's encrypted token from the integrations
-    # table and instantiates an adapter with those credentials. Other
-    # channels stay on the registry's zero-arg factory.
+    # WhatsApp goes through the per-org resolver. Step 27a:
+    # ``send_from_phone_id`` picks a specific phone for multi-number
+    # orgs; explicit > implicit > received_via_phone_id > default.
+    # The fallback chain keeps single-number orgs unchanged (they
+    # never pass ``send_from_phone_id`` and have one config to
+    # resolve anyway).
     if conv.channel == ConversationChannel.whatsapp:
-        adapter = await resolve_whatsapp_adapter(session)
+        resolved_phone_id = (
+            send_from_phone_id
+            or getattr(conv, "received_via_phone_id", None)
+        )
+        adapter = await resolve_whatsapp_adapter(
+            session, phone_id=resolved_phone_id
+        )
     else:
         adapter = resolve(conv.channel)
 
@@ -282,6 +291,7 @@ async def receive_webhook(
     *,
     channel: ConversationChannel,
     payload: dict[str, Any],
+    received_via_phone_id: str | None = None,
 ) -> Message | None:
     """Process an inbound webhook event.
 
@@ -293,7 +303,10 @@ async def receive_webhook(
     parsed: InboundMessage = adapter.parse_webhook(payload)
 
     conv = await _find_or_create_conversation(
-        session, channel=channel, external_id=parsed.external_id
+        session,
+        channel=channel,
+        external_id=parsed.external_id,
+        received_via_phone_id=received_via_phone_id,
     )
     sent_at = parsed.sent_at or datetime.now(timezone.utc)
 
@@ -796,6 +809,7 @@ async def _find_or_create_conversation(
     *,
     channel: ConversationChannel,
     external_id: str,
+    received_via_phone_id: str | None = None,
 ) -> Conversation:
     existing = (
         await session.execute(
@@ -852,6 +866,13 @@ async def _find_or_create_conversation(
         contact_id=contact_id,
         status=ConversationStatus.open,
         ai_handling=ai_handling_default,
+        # whatsapp-platform-upgrade Step 27a — stamp the inbound
+        # phone so the composer can default Send-From back to the
+        # same number on manual reply. Only set on the create branch
+        # — the find branch returns the existing row untouched, so
+        # a conversation never gets its received_via_phone_id
+        # silently rewritten by a webhook from a different number.
+        received_via_phone_id=received_via_phone_id,
     )
     session.add(conv)
     await session.flush()

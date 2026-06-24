@@ -69,36 +69,82 @@ async def _get_integration_row(
 
 
 async def _get_config_row(
-    session: AsyncSession, *, integration_id: uuid.UUID
+    session: AsyncSession,
+    *,
+    integration_id: uuid.UUID,
+    phone_id: Optional[str] = None,
 ) -> Optional[WhatsAppAccountConfig]:
-    """Return the WA sidecar row keyed by `integration_id`, or None."""
-    return (
-        await session.execute(
-            select(WhatsAppAccountConfig).where(
-                WhatsAppAccountConfig.integration_id == integration_id
-            )
-        )
-    ).scalar_one_or_none()
+    """Return ONE WhatsApp sidecar row for the integration.
+
+    When ``phone_id`` is supplied we filter on it directly (Step 27
+    multi-number — the same integration can fan out to many configs).
+    Without ``phone_id`` we return the oldest row, which is "the
+    default" for every legacy single-number org. Order-by-created
+    keeps the default stable across re-runs."""
+    stmt = select(WhatsAppAccountConfig).where(
+        WhatsAppAccountConfig.integration_id == integration_id
+    )
+    if phone_id is not None:
+        stmt = stmt.where(WhatsAppAccountConfig.phone_id == phone_id)
+    stmt = stmt.order_by(WhatsAppAccountConfig.created_at.asc()).limit(1)
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def get_active_config(
     session: AsyncSession,
+    *,
+    phone_id: Optional[str] = None,
 ) -> Optional[tuple[Integration, WhatsAppAccountConfig]]:
-    """Resolve the active tenant's connected WhatsApp config. Returns
-    `(integration, config)` if the org has a `connected` row with a
-    populated sidecar; None otherwise.
+    """Resolve a connected WhatsApp config for the active tenant.
 
-    Callers in dispatch / webhook paths use this to decide whether to
-    fall through to env-var defaults (Step 3.5.3) or hard-fail."""
+    Returns ``(integration, config)`` when:
+      * the org has a ``connected`` integration row, AND
+      * the integration has a populated sidecar config row that
+        matches the optional ``phone_id`` filter.
+
+    When ``phone_id`` is omitted (the legacy call path) we return
+    the org's *default* config — the oldest sidecar — which is what
+    every single-number org has historically held. Multi-number
+    callers should pass an explicit ``phone_id`` to pick the right
+    phone for their send.
+
+    Callers in dispatch / webhook paths use this to decide whether
+    to fall through to env-var defaults (Step 3.5.3) or hard-fail."""
     integration = await _get_integration_row(session)
     if integration is None or integration.status != IntegrationStatus.connected:
         return None
     config = await _get_config_row(
-        session, integration_id=integration.id
+        session, integration_id=integration.id, phone_id=phone_id
     )
     if config is None:
         return None
     return integration, config
+
+
+async def list_active_configs(
+    session: AsyncSession,
+) -> list[tuple[Integration, WhatsAppAccountConfig]]:
+    """Step 27a — return EVERY connected WhatsApp config for the
+    active tenant.
+
+    Powers the multi-number Settings card + the composer / campaign
+    "Send from" dropdown. Returns an empty list when the org has no
+    connected integration. Order is oldest-first so the default
+    phone (matches ``get_active_config(phone_id=None)``) is index 0
+    — the SPA can mark it as the default without an extra query."""
+    integration = await _get_integration_row(session)
+    if integration is None or integration.status != IntegrationStatus.connected:
+        return []
+    rows = (
+        await session.execute(
+            select(WhatsAppAccountConfig)
+            .where(
+                WhatsAppAccountConfig.integration_id == integration.id
+            )
+            .order_by(WhatsAppAccountConfig.created_at.asc())
+        )
+    ).scalars().all()
+    return [(integration, row) for row in rows]
 
 
 async def get_status(session: AsyncSession) -> dict[str, Any]:

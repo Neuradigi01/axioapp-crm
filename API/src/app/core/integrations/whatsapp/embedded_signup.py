@@ -239,6 +239,14 @@ async def complete_embedded_signup(
         waba=waba,
         meta_user_id=meta_user_id,
     )
+    # whatsapp-platform-upgrade Step 27b — multi-number ES. Persist
+    # the operator-selected phone first (it's the one they'll be
+    # primarily working with) + then every other phone Meta returned
+    # from the WABA. Each phone becomes its own
+    # ``WhatsAppAccountConfig`` row; the dispatcher picks between
+    # them via Step 27a's ``send_from_phone_id`` plumbing. We persist
+    # in a single transaction so a mid-loop failure rolls every row
+    # back together.
     config = await _upsert_config(
         session,
         org_id=org_id,
@@ -247,6 +255,31 @@ async def complete_embedded_signup(
         waba=waba,
         api_version=WHATSAPP_GRAPH_API_VERSION,
     )
+    extra_persisted: list[str] = []
+    for phone in phones:
+        if phone.id == selected.id:
+            continue
+        try:
+            await _upsert_config(
+                session,
+                org_id=org_id,
+                integration_id=integration.id,
+                selected=phone,
+                waba=waba,
+                api_version=WHATSAPP_GRAPH_API_VERSION,
+            )
+            extra_persisted.append(phone.id)
+        except Exception:  # noqa: BLE001
+            # Per-phone failures are logged but don't abort the
+            # overall connect — the operator can re-run ES later
+            # to retry the failed phones.
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "embedded_signup: failed to persist phone %s for org %s",
+                phone.id,
+                org_id,
+            )
 
     await audit.log(
         "integration.whatsapp.embedded_signup.completed",
@@ -261,6 +294,10 @@ async def complete_embedded_signup(
             "verified_name": selected.verified_name or waba.verified_name,
             "phone_numbers_available": phones_available,
             "selected_index": selected_index,
+            # Step 27b — every additional phone we connected as part
+            # of this ES run. Empty list when the operator's WABA
+            # had only one phone (the legacy single-number path).
+            "extra_phones_persisted": extra_persisted,
         },
     )
 
@@ -398,9 +435,17 @@ async def _upsert_config(
     `verify_token` is also unused on the ES path — Meta no longer
     sends a per-customer handshake when the Meta App is platform-
     owned and pre-verified — but the column is non-nullable today so
-    we seed it with a random opaque string."""
+    we seed it with a random opaque string.
+
+    whatsapp-platform-upgrade Step 27b — multi-number per org. The
+    lookup is now keyed on ``(integration_id, phone_id)`` so the
+    same integration can fan out to many configs (one per WABA
+    phone). Re-running ES with the same phone is an UPDATE in
+    place; a different phone INSERTS a fresh row."""
     existing = await _get_config_row(
-        session, integration_id=integration_id
+        session,
+        integration_id=integration_id,
+        phone_id=selected.id,
     )
     display = selected.display_phone_number or selected.id
     verified_name = selected.verified_name or waba.verified_name

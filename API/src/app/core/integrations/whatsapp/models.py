@@ -81,6 +81,19 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     which the parent's `disconnect` nulls."""
 
     __tablename__ = "tbl_whatsapp_account_configs"
+    # whatsapp-platform-upgrade Step 27a — multi-number per org.
+    # Identity is now (integration_id, phone_id) rather than
+    # integration_id alone, so the same integration can fan out to
+    # multiple WhatsApp phones (typically one per store / region).
+    # Migration 0115 dropped the legacy `integration_id`-only unique
+    # index and added this composite constraint in its place.
+    __table_args__ = (
+        UniqueConstraint(
+            "integration_id",
+            "phone_id",
+            name="uq_wa_config_integration_phone",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
