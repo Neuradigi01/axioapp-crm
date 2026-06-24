@@ -684,6 +684,46 @@ class WhatsAppAdapter:
                             "reply_to_message_id": original_id,
                         }
                     )
+            elif kind == "nfm_reply":
+                # whatsapp-platform-upgrade Step 25 — WhatsApp Flows
+                # submission. Meta delivers form responses as
+                # ``interactive: {type: nfm_reply, nfm_reply: {name,
+                # body, response_json}}``. ``name`` is the
+                # ``flow_token`` we set on the original send;
+                # ``response_json`` is the user-submitted form data as
+                # a JSON-encoded string (we parse defensively). We
+                # stash both on attachments[] so the receive_webhook
+                # handler can route to flows_service.record_submission.
+                payload = interactive.get("nfm_reply") or {}
+                if isinstance(payload, dict):
+                    response_raw = payload.get("response_json")
+                    response_data: dict[str, Any]
+                    if isinstance(response_raw, dict):
+                        response_data = response_raw
+                    elif isinstance(response_raw, str):
+                        try:
+                            import json as _json
+
+                            decoded = _json.loads(response_raw or "{}")
+                            response_data = (
+                                decoded if isinstance(decoded, dict) else {}
+                            )
+                        except _json.JSONDecodeError:
+                            response_data = {}
+                    else:
+                        response_data = {}
+                    if not text_body:
+                        text_body = (
+                            str(payload.get("body") or "").strip()
+                            or "[Flow submission]"
+                        )
+                    attachments.append(
+                        {
+                            "type": "nfm_reply",
+                            "flow_token": payload.get("name"),
+                            "form_data": response_data,
+                        }
+                    )
 
         ts_raw = message.get("timestamp")
         sent_at: datetime | None

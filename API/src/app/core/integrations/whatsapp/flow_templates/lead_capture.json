@@ -1,0 +1,95 @@
+{
+  "version": "5.0",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "LEAD": []
+  },
+  "screens": [
+    {
+      "id": "LEAD",
+      "title": "Tell us about your enquiry",
+      "terminal": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "We'd love to help!"
+          },
+          {
+            "type": "TextBody",
+            "text": "Share a few details and a teammate will follow up."
+          },
+          {
+            "type": "Form",
+            "name": "lead_form",
+            "children": [
+              {
+                "type": "TextInput",
+                "name": "full_name",
+                "label": "Your full name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "name": "email",
+                "label": "Email (optional)",
+                "required": false,
+                "input-type": "email"
+              },
+              {
+                "type": "Dropdown",
+                "name": "interest",
+                "label": "What are you interested in?",
+                "required": true,
+                "data-source": [
+                  {"id": "living_room", "title": "Living room"},
+                  {"id": "bedroom", "title": "Bedroom"},
+                  {"id": "dining", "title": "Dining"},
+                  {"id": "office", "title": "Office / Work-from-home"},
+                  {"id": "custom_order", "title": "Custom order"},
+                  {"id": "other", "title": "Something else"}
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "budget",
+                "label": "Budget range (optional)",
+                "required": false,
+                "data-source": [
+                  {"id": "under_50k", "title": "Under ₹50,000"},
+                  {"id": "50k_1l", "title": "₹50,000 – ₹1,00,000"},
+                  {"id": "1l_3l", "title": "₹1,00,000 – ₹3,00,000"},
+                  {"id": "3l_plus", "title": "Above ₹3,00,000"}
+                ]
+              },
+              {
+                "type": "TextArea",
+                "name": "notes",
+                "label": "Tell us more (optional)",
+                "required": false,
+                "max-length": 800
+              },
+              {
+                "type": "Footer",
+                "label": "Submit enquiry",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "full_name": "${form.full_name}",
+                    "email": "${form.email}",
+                    "interest": "${form.interest}",
+                    "budget": "${form.budget}",
+                    "notes": "${form.notes}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

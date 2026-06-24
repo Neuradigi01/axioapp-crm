@@ -1,7 +1,7 @@
 # Step 25 — WhatsApp Flows (in-chat forms)
 
 **Goal:** Ship Meta's WhatsApp Flows feature — in-chat forms (appointment booking, lead capture, feedback) that customers fill inside WhatsApp without leaving the conversation. Submissions land back in Core CRM as new leads / appointments / feedback rows.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Phase 1 (manageable token), Step 8 (template management patterns).
 
 ---

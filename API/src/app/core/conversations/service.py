@@ -435,6 +435,45 @@ async def receive_webhook(
             },
         )
 
+    # whatsapp-platform-upgrade Step 25 — WhatsApp Flows submission.
+    # When the inbound carried an `nfm_reply` attachment, hand the
+    # parsed form data off to the flows service. Best-effort: any
+    # failure inside the dispatcher is logged + swallowed so the
+    # message row + downstream pipeline keep flowing.
+    if (
+        conv.channel == ConversationChannel.whatsapp
+        and parsed.attachments
+    ):
+        nfm = next(
+            (
+                a
+                for a in parsed.attachments
+                if isinstance(a, dict)
+                and a.get("type") == "nfm_reply"
+            ),
+            None,
+        )
+        if nfm is not None:
+            try:
+                from src.app.core.integrations.whatsapp.flows_service import (
+                    record_submission,
+                )
+
+                await record_submission(
+                    session,
+                    org_id=conv.org_id,
+                    flow_token=nfm.get("flow_token"),
+                    contact_id=conv.contact_id,
+                    conversation_id=conv.id,
+                    response_data=dict(nfm.get("form_data") or {}),
+                )
+            except Exception:  # noqa: BLE001
+                import logging
+
+                logging.getLogger(__name__).exception(
+                    "flow submission dispatch failed for conv %s", conv.id
+                )
+
     # whatsapp-platform-upgrade Step 22 — DPDP opt-in auto-flip.
     # Runs BEFORE auto-reply / keyword / AI engines so a STOP-keyword
     # customer never gets a greeting or AI follow-up on the same

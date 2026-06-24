@@ -631,6 +631,134 @@ class WhatsAppBlockListEntry(Base, TenantScoped):
     )
 
 
+class WhatsAppFlow(Base, TenantScoped):
+    """Operator-defined WhatsApp Flow (Step 25).
+
+    Stores the Meta Flow JSON definition + a friendly category +
+    the published Meta flow id (NULL until the first publish).
+    Unique per org by name so the operator can't accidentally
+    create two "Booking" flows on the same WABA.
+
+    `json_definition` is Meta-spec'd JSON (not our custom-field
+    engine) — the builder UI only mutates a small subset of fields
+    (labels / options / terminal action); the rest of the JSON
+    comes from a bundled template under
+    ``integrations/whatsapp/flow_templates/``.
+    """
+
+    __tablename__ = "tbl_whatsapp_flows"
+    __table_args__ = (
+        UniqueConstraint("org_id", "name", name="uq_wa_flows_org_name"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    category: Mapped[str] = mapped_column(
+        ENUM(
+            "appointment_booking",
+            "lead_capture",
+            "feedback",
+            "signup",
+            "custom",
+            name="whatsapp_flow_category",
+            create_type=False,
+        ),
+        nullable=False,
+        server_default=text("'custom'"),
+    )
+    status: Mapped[str] = mapped_column(
+        ENUM(
+            "draft",
+            "published",
+            "archived",
+            name="whatsapp_flow_status",
+            create_type=False,
+        ),
+        nullable=False,
+        server_default=text("'draft'"),
+    )
+    json_definition: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    )
+    meta_flow_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class WhatsAppFlowSubmission(Base, TenantScoped):
+    """Inbound flow-response (Step 25).
+
+    Append-only: one row per Meta ``nfm_reply`` webhook event.
+    Carries the resolved local ``flow_id`` when we still have the
+    matching row + Meta's ``flow_token`` as a fallback when the
+    local row was deleted. ``action_taken`` + ``action_entity_id``
+    capture the downstream auto-action so an operator can drill
+    from a submission → the lead / appointment / review it
+    produced.
+    """
+
+    __tablename__ = "tbl_whatsapp_flow_submissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    flow_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_whatsapp_flows.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    flow_token: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
+    )
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_conversations.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    response_data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    )
+    action_taken: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    action_entity_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
 __all__ = [
     "AssignmentStrategy",
     "KeywordActionType",
@@ -638,6 +766,8 @@ __all__ = [
     "WhatsAppAccountConfig",
     "WhatsAppAssignmentRule",
     "WhatsAppBlockListEntry",
+    "WhatsAppFlow",
+    "WhatsAppFlowSubmission",
     "WhatsAppKeywordAction",
     "WhatsAppKeywordRule",
     "WhatsAppPhoneHealthEvent",

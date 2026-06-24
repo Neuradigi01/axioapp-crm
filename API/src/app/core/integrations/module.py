@@ -44,5 +44,10 @@ MODULE = ModuleDescriptor(
         # (every staffer can see the consent state); this manage key
         # is what gates manual force-flip via the admin UI.
         "whatsapp.opt_in.manage",
+        # whatsapp-platform-upgrade Step 25 — WhatsApp Flows manage
+        # key. Gates the SPA library page + every create / publish /
+        # test-send endpoint. Backfilled to Owner/Admin via the
+        # migration so existing orgs can use Flows immediately.
+        "whatsapp.flows.manage",
     ],
 )

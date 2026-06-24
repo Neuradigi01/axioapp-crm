@@ -405,6 +405,16 @@ export const userRoutes: Routes = [
           ).then((m) => m.BlockListPageComponent),
       },
       {
+        // whatsapp-platform-upgrade Step 25 — WhatsApp Flows library.
+        // Gated on `whatsapp.flows.manage` (Owner / Admin by default).
+        path: 'whatsapp/flows',
+        canActivate: [permissionGuard('whatsapp.flows.manage')],
+        loadComponent: () =>
+          import(
+            './core/whatsapp/flows/flows-page.component'
+          ).then((m) => m.WhatsAppFlowsPageComponent),
+      },
+      {
         path: 'calls',
         loadComponent: () =>
           import('./core/calls/call-center.page').then(

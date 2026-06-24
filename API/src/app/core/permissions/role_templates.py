@@ -87,6 +87,10 @@ _CORE_ADMIN_KEYS: list[str] = [
     # + Admin can force-flip via the manual API. DPDP audit log
     # records the override regardless.
     "whatsapp.opt_in.manage",
+    # whatsapp-platform-upgrade Step 25 — WhatsApp Flows (in-chat
+    # forms) library. Same Owner/Admin-only default as the rest of
+    # the WhatsApp admin surfaces; junior roles don't see the page.
+    "whatsapp.flows.manage",
     "tasks.read", "tasks.write",
     "pipelines.read", "pipelines.manage", "pipelines.write",
     "activities.read", "activities.write",

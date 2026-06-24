@@ -1,0 +1,80 @@
+{
+  "version": "5.0",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "FEEDBACK": []
+  },
+  "screens": [
+    {
+      "id": "FEEDBACK",
+      "title": "Share your feedback",
+      "terminal": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "How did we do?"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your feedback helps us serve you better."
+          },
+          {
+            "type": "Form",
+            "name": "feedback_form",
+            "children": [
+              {
+                "type": "Dropdown",
+                "name": "rating",
+                "label": "Overall rating",
+                "required": true,
+                "data-source": [
+                  {"id": "5", "title": "★★★★★ Excellent"},
+                  {"id": "4", "title": "★★★★ Good"},
+                  {"id": "3", "title": "★★★ Okay"},
+                  {"id": "2", "title": "★★ Below expectations"},
+                  {"id": "1", "title": "★ Poor"}
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "topic",
+                "label": "What is this about?",
+                "required": true,
+                "data-source": [
+                  {"id": "product_quality", "title": "Product quality"},
+                  {"id": "delivery", "title": "Delivery experience"},
+                  {"id": "staff", "title": "Staff / service"},
+                  {"id": "store_visit", "title": "Store visit"},
+                  {"id": "other", "title": "Other"}
+                ]
+              },
+              {
+                "type": "TextArea",
+                "name": "comment",
+                "label": "Tell us more",
+                "required": true,
+                "max-length": 1000,
+                "helper-text": "What stood out (good or bad)?"
+              },
+              {
+                "type": "Footer",
+                "label": "Submit feedback",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "rating": "${form.rating}",
+                    "topic": "${form.topic}",
+                    "comment": "${form.comment}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

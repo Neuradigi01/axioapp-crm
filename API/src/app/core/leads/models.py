@@ -67,6 +67,10 @@ class LeadSource(str, enum.Enum):
     widget = "widget"
     google_ads = "google_ads"
     meta_ads = "meta_ads"
+    # whatsapp-platform-upgrade Step 25 — Flows auto-action for the
+    # `lead_capture` category. Migration 0113 added the matching
+    # PG enum value via `ALTER TYPE lead_source ADD VALUE`.
+    whatsapp_flow = "whatsapp_flow"
 
 
 lead_source_enum = ENUM(
