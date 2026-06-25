@@ -23,12 +23,12 @@ import uuid
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, func, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.shared.audit import log_entity_change
+from src.app.core.standard_fields import data_access as _da
 from src.app.core.standard_fields import registry as field_registry
 from src.app.core.standard_fields.models import StandardFieldOverride
 from src.app.core.standard_fields.schemas import (
@@ -76,14 +76,7 @@ def _snapshot(row: StandardFieldOverride) -> dict[str, Any]:
 def _validate_payload_against_registry(
     *, entity: str, field_key: str, payload: StandardFieldOverrideIn
 ) -> None:
-    """Raise 404 / 422 if registry rejects the payload.
-
-    - 404 if `(entity, field_key)` not registered.
-    - 422 if the payload sets any prop not in `overridable_props`.
-
-    Only non-None payload fields count — sending the body
-    `{"label": "x"}` does not "set" the other props.
-    """
+    """Raise 404 / 422 if registry rejects the payload."""
     definition = field_registry.get(entity, field_key)
     if definition is None:
         raise HTTPException(
@@ -111,38 +104,18 @@ def _validate_payload_against_registry(
 async def list_for_org(
     session: AsyncSession, *, org_id: uuid.UUID
 ) -> tuple[list[StandardFieldOverride], int]:
-    """All overrides for the active org. Tenant scoping is automatic but
-    `org_id` is passed in defensively for an explicit WHERE."""
-    stmt = (
-        select(StandardFieldOverride)
-        .where(StandardFieldOverride.org_id == org_id)
-        .order_by(StandardFieldOverride.entity, StandardFieldOverride.field_key)
-    )
-    rows = (await session.execute(stmt)).scalars().all()
-    total = (
-        await session.execute(
-            select(func.count()).select_from(StandardFieldOverride).where(
-                StandardFieldOverride.org_id == org_id
-            )
-        )
-    ).scalar_one()
-    return list(rows), int(total)
+    """All overrides for the active org."""
+    return await _da.list_overrides_for_org(session, org_id=org_id)
 
 
 async def list_for_entity(
     session: AsyncSession, *, org_id: uuid.UUID, entity: str
 ) -> tuple[list[StandardFieldOverride], int]:
     """Overrides for one entity. Used by the per-entity list endpoint."""
-    stmt = (
-        select(StandardFieldOverride)
-        .where(
-            StandardFieldOverride.org_id == org_id,
-            StandardFieldOverride.entity == entity,
-        )
-        .order_by(StandardFieldOverride.field_key)
+    rows = await _da.list_overrides_for_entity(
+        session, org_id=org_id, entity=entity
     )
-    rows = (await session.execute(stmt)).scalars().all()
-    return list(rows), len(rows)
+    return rows, len(rows)
 
 
 async def upsert(
@@ -165,15 +138,9 @@ async def upsert(
         entity=entity, field_key=field_key, payload=payload
     )
 
-    existing = (
-        await session.execute(
-            select(StandardFieldOverride).where(
-                StandardFieldOverride.org_id == org_id,
-                StandardFieldOverride.entity == entity,
-                StandardFieldOverride.field_key == field_key,
-            )
-        )
-    ).scalar_one_or_none()
+    existing = await _da.get_override_by_keys(
+        session, org_id=org_id, entity=entity, field_key=field_key
+    )
     before = _snapshot(existing) if existing is not None else None
 
     payload_dict = payload.model_dump(exclude_none=True)
@@ -192,26 +159,17 @@ async def upsert(
         "updated_at": func.now(),
     }
 
-    stmt = (
-        pg_insert(StandardFieldOverride)
-        .values(**insert_values)
-        .on_conflict_do_update(
-            constraint="uq_standard_field_overrides_org_entity_field",
-            set_=update_values,
-        )
+    await _da.upsert_override(
+        session,
+        insert_values=insert_values,
+        update_values=update_values,
     )
-    await session.execute(stmt)
     await session.commit()
 
-    row = (
-        await session.execute(
-            select(StandardFieldOverride).where(
-                StandardFieldOverride.org_id == org_id,
-                StandardFieldOverride.entity == entity,
-                StandardFieldOverride.field_key == field_key,
-            )
-        )
-    ).scalar_one()
+    row = await _da.get_override_by_keys(
+        session, org_id=org_id, entity=entity, field_key=field_key
+    )
+    assert row is not None  # upsert just guaranteed this row
 
     await log_entity_change(
         action="settings.standard_field_override.updated",
@@ -230,12 +188,7 @@ async def reset(
     entity: str,
     field_key: str,
 ) -> None:
-    """Remove the override row → the field inherits registry defaults.
-
-    404 if no row exists for `(entity, field_key)`. Validating the
-    registry membership too means a caller can't DELETE-poke for the
-    existence of arbitrary field keys.
-    """
+    """Remove the override row → the field inherits registry defaults."""
     definition = field_registry.get(entity, field_key)
     if definition is None:
         raise HTTPException(
@@ -243,15 +196,9 @@ async def reset(
             detail=f"standard field {entity}.{field_key} not in registry",
         )
 
-    existing = (
-        await session.execute(
-            select(StandardFieldOverride).where(
-                StandardFieldOverride.org_id == org_id,
-                StandardFieldOverride.entity == entity,
-                StandardFieldOverride.field_key == field_key,
-            )
-        )
-    ).scalar_one_or_none()
+    existing = await _da.get_override_by_keys(
+        session, org_id=org_id, entity=entity, field_key=field_key
+    )
     if existing is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -261,12 +208,8 @@ async def reset(
     snapshot = _snapshot(existing)
     snapshot_id = existing.id
 
-    await session.execute(
-        delete(StandardFieldOverride).where(
-            StandardFieldOverride.org_id == org_id,
-            StandardFieldOverride.entity == entity,
-            StandardFieldOverride.field_key == field_key,
-        )
+    await _da.delete_override(
+        session, org_id=org_id, entity=entity, field_key=field_key
     )
     await session.commit()
 
@@ -356,12 +299,7 @@ def _merge(
 
 
 def _is_overridden(override: StandardFieldOverride | None) -> bool:
-    """True iff an override row exists with at least one non-NULL column.
-
-    An empty override row (all columns NULL) is treated as not overridden
-    so the Settings UI doesn't show a Reset button for a row that does
-    nothing. The DELETE endpoint can still clean it up if needed.
-    """
+    """True iff an override row exists with at least one non-NULL column."""
     if override is None:
         return False
     return any(getattr(override, col) is not None for col in _OVERRIDE_COLUMNS)
@@ -380,34 +318,24 @@ class EntityNotInRegistry(HTTPException):
 async def _fetch_overrides_map(
     session: AsyncSession, *, org_id: uuid.UUID, entity: str
 ) -> dict[str, StandardFieldOverride]:
-    """One SELECT, one dict keyed by `field_key`. Avoids N+1 in `render_for_entity`."""
-    rows = (
-        await session.execute(
-            select(StandardFieldOverride).where(
-                StandardFieldOverride.org_id == org_id,
-                StandardFieldOverride.entity == entity,
-            )
-        )
-    ).scalars().all()
+    """One SELECT, one dict keyed by `field_key`. Avoids N+1 in
+    `render_for_entity`."""
+    rows = await _da.list_overrides_for_entity(
+        session, org_id=org_id, entity=entity
+    )
     return {row.field_key: row for row in rows}
 
 
 async def render_for_entity(
     session: AsyncSession, *, org_id: uuid.UUID, entity: str
 ) -> list[StandardFieldRendered]:
-    """Return registry defaults merged with the org's overrides for `entity`.
-
-    Sorted by effective `display_order` (override → registry default),
-    with registry insertion order as a deterministic tiebreak so the UI
-    doesn't reorder fields between requests when display_orders collide.
-    """
+    """Return registry defaults merged with the org's overrides for `entity`."""
     registry_defs = field_registry.list_for_entity(entity)
     if not registry_defs:
         raise EntityNotInRegistry(entity)
 
     overrides = await _fetch_overrides_map(session, org_id=org_id, entity=entity)
 
-    # Carry the registry index alongside each merged row for tiebreaking.
     indexed: list[tuple[int, int, StandardFieldRendered]] = []
     for idx, definition in enumerate(registry_defs):
         rendered = _merge(definition, overrides.get(definition.field_key))

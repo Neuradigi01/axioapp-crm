@@ -11,25 +11,22 @@ Public surface:
     Postgres `INSERT ... ON CONFLICT DO UPDATE`. Returns the new value.
   - `get(session, org_id, resource)` — current-period value or 0.
   - `snapshot(session, org_id, resources)` — batched read for the
-    billing settings page (Step 7's subscription read API uses this).
+    billing settings page.
   - `reset_monthly_counters(session, org_id, next_period_start,
         next_period_end)` — inserts fresh zeroed rows for each monthly
     resource. Called from the rollover Celery task in `tasks.py`.
 
 Period resolution is keyed by the canonical resource taxonomy in
-`RESOURCE_PERIOD_KIND` below. Unknown resources raise `KeyError` —
-the taxonomy is the source of truth for what is meterable, mirroring
-the cap names in `plans.yaml`.
+`RESOURCE_PERIOD_KIND` below. Unknown resources raise `KeyError`.
 """
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.subscriptions.models import UsageCounter
+from src.app.core.subscriptions import data_access as _da
 from src.app.core.subscriptions.service import get_active_subscription
 
 
@@ -75,12 +72,7 @@ async def _resolve_current_period(
     session: AsyncSession, org_id: uuid.UUID, resource: str
 ) -> tuple[str, datetime, datetime]:
     """Return `(period_kind, period_start, period_end)` for the org's
-    current accumulation window for `resource`.
-
-    Raises `KeyError` if the resource is not meterable, or `RuntimeError`
-    if the org has no active subscription (and the resource is monthly
-    / lifetime — daily resources don't need a subscription).
-    """
+    current accumulation window for `resource`."""
     try:
         kind = RESOURCE_PERIOD_KIND[resource]
     except KeyError as exc:
@@ -100,8 +92,6 @@ async def _resolve_current_period(
         return kind, sub.created_at, _LIFETIME_SENTINEL_END
     if kind == "monthly":
         return kind, sub.current_period_start, sub.current_period_end
-    # Defensive: the taxonomy is the source of truth, but a stray value
-    # would silently miscount, so raise rather than guess.
     raise ValueError(f"unsupported period_kind {kind!r} for resource {resource!r}")
 
 
@@ -112,24 +102,17 @@ async def _resolve_current_period(
 async def get(
     session: AsyncSession, org_id: uuid.UUID, resource: str
 ) -> int:
-    """Read the current-period counter. Returns 0 if no row exists yet.
-
-    Filters by `period_start` so a stale row from a previous billing
-    cycle does not leak into the current window — the rollover task
-    inserts the new period's row at boundary, but the previous row
-    is left in place as history.
-    """
-    kind, period_start, _ = await _resolve_current_period(session, org_id, resource)
-    row = (
-        await session.execute(
-            select(UsageCounter.value).where(
-                UsageCounter.org_id == org_id,
-                UsageCounter.resource == resource,
-                UsageCounter.period_start == period_start,
-            )
-        )
-    ).scalar_one_or_none()
-    return int(row or 0)
+    """Read the current-period counter. Returns 0 if no row exists yet."""
+    _kind, period_start, _ = await _resolve_current_period(
+        session, org_id, resource
+    )
+    value = await _da.get_usage_counter_value(
+        session,
+        org_id=org_id,
+        resource=resource,
+        period_start=period_start,
+    )
+    return value or 0
 
 
 async def snapshot(
@@ -137,14 +120,7 @@ async def snapshot(
     org_id: uuid.UUID,
     resources: list[str] | None = None,
 ) -> dict[str, int]:
-    """Read multiple counters in one round-trip.
-
-    Used by the in-app billing page (Step 16) and the subscription
-    read API (Step 7) to fill the per-resource progress bars.
-    Resources not yet incremented for the current period are reported
-    as 0, not omitted — the caller always gets a dict keyed by the
-    resources it asked for.
-    """
+    """Read multiple counters in one round-trip."""
     targets = resources or list(RESOURCE_PERIOD_KIND.keys())
     return {r: await get(session, org_id, r) for r in targets}
 
@@ -153,18 +129,6 @@ async def snapshot(
 # Writes
 # ---------------------------------------------------------------------------
 
-_UPSERT_SQL = text(
-    """
-    INSERT INTO tbl_usage_counters (
-        org_id, resource, period_kind, period_start, period_end, value, updated_at
-    )
-    VALUES (:org_id, :resource, :period_kind, :period_start, :period_end, :delta, now())
-    ON CONFLICT (org_id, resource, period_start)
-    DO UPDATE SET value = tbl_usage_counters.value + EXCLUDED.value, updated_at = now()
-    RETURNING value
-    """
-)
-
 
 async def increment(
     session: AsyncSession,
@@ -172,11 +136,12 @@ async def increment(
     resource: str,
     delta: int = 1,
 ) -> int:
-    """Atomically bump the current-period counter and return the new value.
+    """Atomically bump the current-period counter and return the new
+    value.
 
-    Race-safe: the underlying `INSERT ... ON CONFLICT DO UPDATE`
-    serialises concurrent bumps via the `(org_id, resource,
-    period_start)` unique index. Negative `delta` is allowed for
+    Race-safe: the underlying ``INSERT ... ON CONFLICT DO UPDATE``
+    serialises concurrent bumps via the ``(org_id, resource,
+    period_start)`` unique index. Negative ``delta`` is allowed for
     decrement (e.g., a contact is deleted) but is bounded at >= 0 by
     the caller; this function does not floor the value because going
     transiently negative is informative when reconciling drift.
@@ -186,18 +151,15 @@ async def increment(
     kind, period_start, period_end = await _resolve_current_period(
         session, org_id, resource
     )
-    result = await session.execute(
-        _UPSERT_SQL,
-        {
-            "org_id": org_id,
-            "resource": resource,
-            "period_kind": kind,
-            "period_start": period_start,
-            "period_end": period_end,
-            "delta": delta,
-        },
+    return await _da.upsert_usage_counter_returning(
+        session,
+        org_id=org_id,
+        resource=resource,
+        period_kind=kind,
+        period_start=period_start,
+        period_end=period_end,
+        delta=delta,
     )
-    return int(result.scalar_one())
 
 
 # ---------------------------------------------------------------------------
@@ -210,40 +172,20 @@ async def reset_monthly_counters(
     next_period_start: datetime,
     next_period_end: datetime,
 ) -> int:
-    """Insert fresh zeroed rows for every `monthly` resource in the new period.
-
-    Returns the count of rows inserted. Idempotent: if rows for
-    `(org_id, resource, next_period_start)` already exist, the ON
-    CONFLICT clause leaves them untouched.
-
-    `lifetime` and `daily` resources are NOT reset here:
-      - lifetime rows carry the sub's `created_at` as `period_start`
-        and never roll over.
-      - daily rows are reset by `reset_daily_counters` (a separate
-        Celery task that runs at midnight UTC).
-    """
+    """Insert fresh zeroed rows for every `monthly` resource in the
+    new period."""
     inserted = 0
     for resource, kind in RESOURCE_PERIOD_KIND.items():
         if kind != "monthly":
             continue
-        result = await session.execute(
-            text(
-                """
-                INSERT INTO tbl_usage_counters (
-                    org_id, resource, period_kind, period_start, period_end, value, updated_at
-                )
-                VALUES (:org_id, :resource, 'monthly', :period_start, :period_end, 0, now())
-                ON CONFLICT (org_id, resource, period_start) DO NOTHING
-                """
-            ),
-            {
-                "org_id": org_id,
-                "resource": resource,
-                "period_start": next_period_start,
-                "period_end": next_period_end,
-            },
+        inserted += await _da.insert_zero_counter_if_absent(
+            session,
+            org_id=org_id,
+            resource=resource,
+            period_kind="monthly",
+            period_start=next_period_start,
+            period_end=next_period_end,
         )
-        inserted += result.rowcount or 0
     return inserted
 
 
@@ -253,30 +195,18 @@ async def reset_daily_counter_rows(
     next_day_start: datetime,
     next_day_end: datetime,
 ) -> int:
-    """Insert fresh zeroed rows for every `daily` resource for the next UTC day.
-
-    Same idempotency contract as `reset_monthly_counters`.
-    """
+    """Insert fresh zeroed rows for every `daily` resource for the
+    next UTC day."""
     inserted = 0
     for resource, kind in RESOURCE_PERIOD_KIND.items():
         if kind != "daily":
             continue
-        result = await session.execute(
-            text(
-                """
-                INSERT INTO tbl_usage_counters (
-                    org_id, resource, period_kind, period_start, period_end, value, updated_at
-                )
-                VALUES (:org_id, :resource, 'daily', :period_start, :period_end, 0, now())
-                ON CONFLICT (org_id, resource, period_start) DO NOTHING
-                """
-            ),
-            {
-                "org_id": org_id,
-                "resource": resource,
-                "period_start": next_day_start,
-                "period_end": next_day_end,
-            },
+        inserted += await _da.insert_zero_counter_if_absent(
+            session,
+            org_id=org_id,
+            resource=resource,
+            period_kind="daily",
+            period_start=next_day_start,
+            period_end=next_day_end,
         )
-        inserted += result.rowcount or 0
     return inserted

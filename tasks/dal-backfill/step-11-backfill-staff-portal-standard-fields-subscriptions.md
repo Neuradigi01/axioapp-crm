@@ -1,7 +1,7 @@
 # Step 11 — Backfill DAL (staff_portal, standard_fields, subscriptions)
 
 **Goal:** Create `data_access.py` in three core modules. Move all SQL/ORM out of `service.py`. Behaviour unchanged.
-**Status:** Pending
+**Status:** COMPLTED
 **Depends on:** Step 10.
 
 ---

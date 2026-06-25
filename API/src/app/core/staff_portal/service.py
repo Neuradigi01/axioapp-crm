@@ -26,17 +26,16 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.tenants import data_access
 from src.app.core.auth.tokens import STAFF_TOKEN_TTL, encode_token
-from src.app.core.staff.models import EmploymentStatus, StaffProfile
+from src.app.core.staff.models import EmploymentStatus
+from src.app.core.staff_portal import data_access as _da
 from src.app.core.staff_portal.models import StaffSession
 from src.app.core.staff_portal.schemas import StaffPickerUser
 from src.app.core.tenants.models import Organization
-from src.app.core.users.models import OrganizationMember, User, UserInfo
 
 
 # --- rate limiting ---------------------------------------------------------
@@ -90,29 +89,7 @@ async def list_pickable_users(
 ) -> list[StaffPickerUser]:
     """Active staff for the login picker. No PII beyond name."""
     org = await _resolve_org(session, org_slug)
-
-    # users with an active staff profile, ordered by name. Users
-    # without a staff_profile row are intentionally excluded — they
-    # can't clock in until HR sets them up.
-    stmt = (
-        select(
-            User.legacy_uuid.label("legacy_uuid"),
-            UserInfo.first_name,
-            UserInfo.last_name,
-        )
-        .join(UserInfo, UserInfo.member_id == User.id)
-        .join(
-            OrganizationMember,
-            OrganizationMember.user_member_id == User.id,
-        )
-        .join(StaffProfile, StaffProfile.user_id == User.legacy_uuid)
-        .where(OrganizationMember.organization_id == org.id)
-        .where(OrganizationMember.is_active.is_(True))
-        .where(User.is_active.is_(True))
-        .where(StaffProfile.employment_status == EmploymentStatus.active)
-        .order_by(UserInfo.first_name.asc())
-    )
-    rows = (await session.execute(stmt)).all()
+    rows = await _da.list_active_staff_for_picker(session, org_id=org.id)
     return [
         StaffPickerUser(
             id=row.legacy_uuid,
@@ -147,18 +124,9 @@ async def login(
     """Validate PIN → mint staff JWT → persist `staff_sessions` row."""
     org = await _resolve_org(session, org_slug)
 
-    user = (
-        await session.execute(
-            select(User)
-            .join(
-                OrganizationMember,
-                OrganizationMember.user_member_id == User.id,
-            )
-            .where(User.legacy_uuid == user_id)
-            .where(OrganizationMember.organization_id == org.id)
-            .where(OrganizationMember.is_active.is_(True))
-        )
-    ).scalar_one_or_none()
+    user = await _da.get_active_member_user_for_org(
+        session, user_id=user_id, org_id=org.id
+    )
     if user is None or not user.is_active:
         await audit.log(
             "staff_portal.login_failed",
@@ -174,11 +142,7 @@ async def login(
             detail="invalid credentials",
         )
 
-    profile = (
-        await session.execute(
-            select(StaffProfile).where(StaffProfile.user_id == user.legacy_uuid)
-        )
-    ).scalar_one_or_none()
+    profile = await _da.get_staff_profile_by_user_id(session, user.legacy_uuid)
     if profile is None or profile.employment_status != EmploymentStatus.active:
         await audit.log(
             "staff_portal.login_failed",
@@ -239,7 +203,8 @@ async def login(
         ttl=STAFF_TOKEN_TTL,
         scope="staff",
     )
-    session.add(
+    _da.insert_staff_session(
+        session,
         StaffSession(
             id=token_id,
             org_id=org.id,
@@ -247,7 +212,7 @@ async def login(
             expires_at=expires_at,
             ip=ip,
             ua=ua,
-        )
+        ),
     )
     await session.commit()
 
