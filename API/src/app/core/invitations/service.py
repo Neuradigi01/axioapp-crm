@@ -28,8 +28,6 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -37,14 +35,13 @@ from src.app.core.tenants import data_access as tenants_da
 from src.app.core.users import data_access as users_da
 from src.app.core.auth.models import AuthSession
 from src.app.core.auth.tokens import ACCESS_TOKEN_TTL, encode_token
+from src.app.core.invitations import data_access as _da
 from src.app.core.invitations.models import Invitation
 from src.app.core.invitations.schemas import (
     InvitationAccept,
     InvitationCreate,
 )
-from src.app.core.permissions.models import Role
-from src.app.core.tenants.models import Organization
-from src.app.core.users.models import OrganizationMember, User, UserInfo
+from src.app.core.users.models import OrganizationMember, UserInfo
 from src.app.shared.email import Email, get_email_backend
 from src.app.shared.security.password import hash_password
 
@@ -72,12 +69,10 @@ async def create_invitation(
         session, role_id=payload.role_id, org_id=org_id
     )
 
-    existing_user = (
-        await session.execute(
-            select(UserInfo.member_id).where(UserInfo.email == payload.email)
-        )
-    ).scalar_one_or_none()
-    if existing_user is not None:
+    existing_member_id = await _da.find_user_member_id_by_email(
+        session, payload.email
+    )
+    if existing_member_id is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
@@ -86,16 +81,9 @@ async def create_invitation(
         )
 
     now = datetime.now(timezone.utc)
-    pending = (
-        await session.execute(
-            select(Invitation.id).where(
-                Invitation.org_id == org_id,
-                Invitation.email == payload.email,
-                Invitation.accepted_at.is_(None),
-                Invitation.expires_at > now,
-            )
-        )
-    ).scalar_one_or_none()
+    pending = await _da.find_pending_invitation_for_email(
+        session, org_id=org_id, email=payload.email, now=now
+    )
     if pending is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -111,7 +99,7 @@ async def create_invitation(
         token_hash=_hash_token(raw_token),
         expires_at=now + INVITATION_TTL,
     )
-    session.add(invitation)
+    _da.insert_invitation(session, invitation)
     await session.commit()
     await session.refresh(invitation)
 
@@ -159,16 +147,9 @@ async def list_pending(
     session: AsyncSession, *, org_id: uuid.UUID
 ) -> list[Invitation]:
     """Pending (un-accepted, un-expired) invitations for `org_id`."""
-    result = await session.execute(
-        select(Invitation)
-        .where(
-            Invitation.org_id == org_id,
-            Invitation.accepted_at.is_(None),
-            Invitation.expires_at > datetime.now(timezone.utc),
-        )
-        .order_by(Invitation.created_at.desc())
+    return await _da.list_pending_invitations(
+        session, org_id=org_id, now=datetime.now(timezone.utc)
     )
-    return list(result.scalars().all())
 
 
 async def revoke_invitation(
@@ -181,14 +162,9 @@ async def revoke_invitation(
     ua: str | None = None,
 ) -> None:
     """Revoke = set expires_at to now. The row stays for audit."""
-    inv = (
-        await session.execute(
-            select(Invitation).where(
-                Invitation.id == invitation_id,
-                Invitation.org_id == org_id,
-            )
-        )
-    ).scalar_one_or_none()
+    inv = await _da.get_invitation_in_org(
+        session, invitation_id=invitation_id, org_id=org_id
+    )
     if inv is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -220,13 +196,9 @@ async def lookup_invitation(
     session: AsyncSession, *, raw_token: str
 ) -> dict:
     """Unauthenticated. Validates the raw token; raises 404/410 otherwise."""
-    inv = (
-        await session.execute(
-            select(Invitation).where(
-                Invitation.token_hash == _hash_token(raw_token)
-            )
-        )
-    ).scalar_one_or_none()
+    inv = await _da.get_invitation_by_token_hash(
+        session, _hash_token(raw_token)
+    )
     if inv is None or inv.accepted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -238,11 +210,8 @@ async def lookup_invitation(
             detail="invitation expired",
         )
 
-    role = (
-        await session.execute(
-            select(Role).where(Role.id == inv.role_id)
-        )
-    ).scalar_one()
+    role = await _da.get_role_by_id(session, inv.role_id)
+    assert role is not None  # invitation FK guarantees role exists
     org = await tenants_da.get_organization_by_id(session, inv.org_id)
     assert org is not None  # invitation FK guarantees org exists
 
@@ -266,13 +235,9 @@ async def accept_invitation(
     Returns the `LoginResponse`-shaped dict so the caller can hand it
     straight back to the client.
     """
-    inv = (
-        await session.execute(
-            select(Invitation).where(
-                Invitation.token_hash == _hash_token(payload.token)
-            )
-        )
-    ).scalar_one_or_none()
+    inv = await _da.get_invitation_by_token_hash(
+        session, _hash_token(payload.token)
+    )
     if inv is None or inv.accepted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -287,11 +252,9 @@ async def accept_invitation(
     # Email may have been claimed by a separate signup (e.g. an admin
     # ran POST /users for the same address) between issue and accept —
     # surface clearly rather than blowing up on a UNIQUE violation.
-    existing_user = (
-        await session.execute(
-            select(UserInfo.member_id).where(UserInfo.email == inv.email)
-        )
-    ).scalar_one_or_none()
+    existing_user = await _da.find_user_member_id_by_email(
+        session, inv.email
+    )
     if existing_user is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -302,19 +265,14 @@ async def accept_invitation(
         )
 
     new_uuid = uuid.uuid4()
-    inserted_id = (
-        await session.execute(
-            pg_insert(User.__table__)
-            .values(
-                legacy_uuid=new_uuid,
-                user_id="usr_" + new_uuid.hex,
-                password=hash_password(payload.password),
-                is_active=True,
-                two_factor_enabled=False,
-            )
-            .returning(User.__table__.c.id)
-        )
-    ).scalar_one()
+    inserted_id = await _da.insert_user_login_returning_id(
+        session,
+        legacy_uuid=new_uuid,
+        user_id="usr_" + new_uuid.hex,
+        password_hash=hash_password(payload.password),
+        is_active=True,
+        two_factor_enabled=False,
+    )
 
     profile = UserInfo(
         member_id=inserted_id,
@@ -325,7 +283,7 @@ async def accept_invitation(
         is_email_verified=True,  # link-clicker proves they have the address
         is_mobile_verified=False,
     )
-    session.add(profile)
+    _da.insert_user_info(session, profile)
 
     membership = OrganizationMember(
         organization_id=inv.org_id,
@@ -335,7 +293,7 @@ async def accept_invitation(
         is_active=True,
         is_demo=False,
     )
-    session.add(membership)
+    _da.insert_organization_member(session, membership)
 
     inv.accepted_at = datetime.now(timezone.utc)
 
@@ -344,7 +302,8 @@ async def accept_invitation(
     token_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
     expires_at = now + ACCESS_TOKEN_TTL
-    session.add(
+    _da.insert_auth_session(
+        session,
         AuthSession(
             id=token_id,
             org_id=inv.org_id,
@@ -352,7 +311,7 @@ async def accept_invitation(
             expires_at=expires_at,
             ip=ip,
             ua=ua,
-        )
+        ),
     )
 
     await session.commit()
@@ -364,15 +323,7 @@ async def accept_invitation(
         now=now,
     )
 
-    # Best-effort role-name lookup so the audit row is readable without
-    # a second query. Falls back to None if the role row vanished
-    # between accept and audit (vanishingly unlikely; the invite row
-    # carries `role_id` as a FK with ondelete RESTRICT).
-    role_name = (
-        await session.execute(
-            select(Role.name).where(Role.id == inv.role_id)
-        )
-    ).scalar_one_or_none()
+    role_name = await _da.get_role_name_by_id(session, inv.role_id)
 
     await audit.log(
         "invitations.accepted",

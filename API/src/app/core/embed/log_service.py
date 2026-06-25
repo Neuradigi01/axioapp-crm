@@ -22,9 +22,9 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.embed import data_access as _da
 from src.app.core.embed.models import EmbedSubmissionLog, EmbedSubmissionOutcome
 from src.app.core.embed.schemas import (
     EmbedSubmissionDayBucket,
@@ -42,8 +42,7 @@ RETENTION_DAYS = 30
 
 def hash_ip(ip: Optional[str]) -> Optional[str]:
     """Same 16-char SHA-256 prefix used everywhere else in the embed
-    module. Returns None for unknown IPs so the column reads cleanly
-    in the UI ("—")."""
+    module."""
     if not ip or ip == "unknown":
         return None
     return hashlib.sha256(ip.encode("utf-8")).hexdigest()[:16]
@@ -67,7 +66,8 @@ async def record(
     ctx_token = set_context(RequestContext(org_id=org_id, user_id=None))
     try:
         async with async_session() as session:
-            session.add(
+            _da.insert_submission_log(
+                session,
                 EmbedSubmissionLog(
                     org_id=org_id,
                     key_id=key_id,
@@ -77,7 +77,7 @@ async def record(
                     ip_hash=hash_ip(ip),
                     referrer=_truncate(referrer, 2048),
                     landing_url=_truncate(landing_url, 2048),
-                )
+                ),
             )
             await session.commit()
     except Exception:
@@ -105,35 +105,15 @@ async def list_rows(
     page: int = 1,
     page_size: int = 25,
 ) -> tuple[list[EmbedSubmissionLog], int]:
-    """Paginated list of rows (newest first). The active tenant
-    context filters to the caller's org via RLS + ORM mixin."""
-    base = select(EmbedSubmissionLog)
-    if outcome is not None:
-        base = base.where(EmbedSubmissionLog.outcome == outcome)
-    if range_from is not None:
-        base = base.where(EmbedSubmissionLog.created_at >= range_from)
-    if range_to is not None:
-        base = base.where(EmbedSubmissionLog.created_at <= range_to)
-
-    total = (
-        await session.execute(
-            select(func.count()).select_from(base.subquery())
-        )
-    ).scalar_one()
-
-    offset = (page - 1) * page_size
-    rows = (
-        (
-            await session.execute(
-                base.order_by(EmbedSubmissionLog.created_at.desc())
-                .offset(offset)
-                .limit(page_size)
-            )
-        )
-        .scalars()
-        .all()
+    """Paginated list of rows (newest first)."""
+    return await _da.list_submission_logs_query(
+        session,
+        outcome=outcome,
+        range_from=range_from,
+        range_to=range_to,
+        page=page,
+        page_size=page_size,
     )
-    return list(rows), int(total)
 
 
 async def summary(
@@ -149,24 +129,13 @@ async def summary(
     counts, with one entry per calendar day in `[from, to]` so the
     chart's x-axis is dense (zero-count days included).
     """
-    # Per-outcome totals.
-    outcome_rows = (
-        await session.execute(
-            select(
-                EmbedSubmissionLog.outcome,
-                func.count(EmbedSubmissionLog.id),
-            )
-            .where(EmbedSubmissionLog.created_at >= range_from)
-            .where(EmbedSubmissionLog.created_at <= range_to)
-            .group_by(EmbedSubmissionLog.outcome)
-        )
-    ).all()
+    outcome_rows = await _da.submission_outcome_totals(
+        session, range_from=range_from, range_to=range_to
+    )
     by_outcome: dict[str, int] = {
         outcome.value: 0 for outcome in EmbedSubmissionOutcome
     }
     for outcome_value, count in outcome_rows:
-        # outcome_value may come back as the enum or as a string
-        # depending on the dialect projection; handle both.
         key = (
             outcome_value.value
             if isinstance(outcome_value, EmbedSubmissionOutcome)
@@ -174,26 +143,12 @@ async def summary(
         )
         by_outcome[key] = int(count)
 
-    # Per-day, per-outcome counts.
-    day_rows = (
-        await session.execute(
-            select(
-                func.date_trunc(
-                    "day", EmbedSubmissionLog.created_at
-                ).label("day"),
-                EmbedSubmissionLog.outcome,
-                func.count(EmbedSubmissionLog.id),
-            )
-            .where(EmbedSubmissionLog.created_at >= range_from)
-            .where(EmbedSubmissionLog.created_at <= range_to)
-            .group_by("day", EmbedSubmissionLog.outcome)
-        )
-    ).all()
+    day_rows = await _da.submission_daily_outcome_buckets(
+        session, range_from=range_from, range_to=range_to
+    )
 
     buckets: dict[date, dict[str, int]] = {}
     for day, outcome_value, count in day_rows:
-        # `date_trunc` returns a `datetime`; project to `date` for the
-        # bucket key + ISO-date string.
         d = day.date() if isinstance(day, datetime) else day
         key = (
             outcome_value.value
@@ -247,13 +202,10 @@ async def purge_old_embed_submissions() -> int:
     """
     cutoff = datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)
     async with async_session() as session:
-        result = await session.execute(
-            delete(EmbedSubmissionLog).where(
-                EmbedSubmissionLog.created_at < cutoff
-            )
+        deleted = await _da.delete_submission_logs_older_than(
+            session, cutoff
         )
         await session.commit()
-    deleted = int(result.rowcount or 0)
     logger.info(
         "embed.purge_old_embed_submissions removed=%d cutoff=%s",
         deleted,

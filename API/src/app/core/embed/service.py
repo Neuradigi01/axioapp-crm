@@ -38,10 +38,10 @@ from typing import Optional
 
 import bcrypt
 from fastapi import HTTPException, status
-from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.embed import data_access as _da
 from src.app.core.embed.models import EmbedKey
 from src.app.shared.db import async_session
 
@@ -96,12 +96,7 @@ async def issue(
     actor_id: uuid.UUID,
     name: Optional[str] = None,
 ) -> tuple[EmbedKey, str]:
-    """Generate + persist a new key. Returns (row, plaintext).
-
-    Caller responsibility: return the plaintext to the user in the
-    response and never log/persist it elsewhere. The row that gets
-    persisted carries only the bcrypt hash + 11-char prefix.
-    """
+    """Generate + persist a new key. Returns (row, plaintext)."""
     plain = _generate_plain_key()
     prefix = plain[:_PREFIX_DISPLAY_LEN]
     hashed = _hash_key(plain)
@@ -113,7 +108,7 @@ async def issue(
         hash=hashed,
         created_by=actor_id,
     )
-    session.add(row)
+    _da.insert_embed_key(session, row)
     await session.commit()
     await session.refresh(row)
 
@@ -137,12 +132,8 @@ async def revoke(
     actor_id: uuid.UUID,
     key_id: uuid.UUID,
 ) -> EmbedKey:
-    """Soft-revoke. Idempotent — re-revoking is a no-op (no error,
-    no double audit event). Raises 404 if the key doesn't exist or
-    belongs to a different org (RLS-hidden either way)."""
-    row = (
-        await session.execute(select(EmbedKey).where(EmbedKey.id == key_id))
-    ).scalar_one_or_none()
+    """Soft-revoke. Idempotent — re-revoking is a no-op."""
+    row = await _da.get_embed_key_by_id(session, key_id)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="embed key not found"
@@ -167,14 +158,8 @@ async def revoke(
 async def list_keys(
     session: AsyncSession,
 ) -> list[EmbedKey]:
-    """List all keys (live + revoked) for the active org. The Owner
-    sees revoked keys too so they can audit who issued/revoked what."""
-    rows = (
-        await session.execute(
-            select(EmbedKey).order_by(EmbedKey.created_at.desc())
-        )
-    ).scalars().all()
-    return list(rows)
+    """List all keys (live + revoked) for the active org."""
+    return await _da.list_embed_keys(session)
 
 
 async def find_by_plain_key(
@@ -194,20 +179,10 @@ async def find_by_plain_key(
     if len(prefix) != _PREFIX_DISPLAY_LEN:
         return None
 
-    # No request context yet (public endpoint). Open a session OUTSIDE
-    # the TenantScoped auto-filter by setting a sentinel context, then
-    # explicitly filter by prefix + non-revoked. We're safe because
-    # the lookup is parameterised by a prefix the caller proved knowledge
-    # of, and the bcrypt verify gates everything after.
     async with async_session() as session:
-        rows = (
-            await session.execute(
-                select(EmbedKey).where(
-                    EmbedKey.prefix == prefix,
-                    EmbedKey.revoked_at.is_(None),
-                )
-            )
-        ).scalars().all()
+        rows = await _da.list_embed_keys_by_prefix_unrevoked(
+            session, prefix
+        )
         match: Optional[EmbedKey] = None
         for candidate in rows:
             if _verify_key(plain, candidate.hash):
@@ -217,18 +192,13 @@ async def find_by_plain_key(
         if match is None:
             return None
 
-        # Fire-and-forget update of last_used_*. We capture the values
-        # for the caller before issuing the UPDATE so a transient DB
-        # error here can't drop the matched row.
         matched_id = match.id
         try:
-            await session.execute(
-                update(EmbedKey)
-                .where(EmbedKey.id == matched_id)
-                .values(
-                    last_used_at=datetime.now(timezone.utc),
-                    last_used_ip=_hash_ip(ip),
-                )
+            await _da.update_embed_key_last_used(
+                session,
+                key_id=matched_id,
+                when=datetime.now(timezone.utc),
+                ip_hash=_hash_ip(ip),
             )
             await session.commit()
         except Exception:

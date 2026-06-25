@@ -26,15 +26,14 @@ import uuid
 from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
 from src.app.shared.audit import log_entity_change
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldType,
 )
+from src.app.core.embed import data_access as _da
 from src.app.core.embed.models import WidgetConfig
 from src.app.core.embed.schemas import (
     AvailableCustomField,
@@ -60,10 +59,11 @@ _WIDGET_SUPPORTED_CUSTOM_TYPES: set[str] = {
 }
 
 
+_WIDGET_ENTITIES: tuple[str, ...] = ("contact", "lead")
+
+
 def _default_document() -> WidgetConfigDocument:
-    """The shape every freshly-created org starts with. Mirrors the
-    default in the Step 3 spec exactly so the UI never has to choose
-    "what should this look like for a new tenant?"."""
+    """The shape every freshly-created org starts with."""
     return WidgetConfigDocument(
         fields=[
             WidgetConfigField(
@@ -120,11 +120,7 @@ async def get_or_create(
     org_id: uuid.UUID,
 ) -> WidgetConfig:
     """Return the org's widget config row, seeding defaults on miss."""
-    existing = (
-        await session.execute(
-            select(WidgetConfig).where(WidgetConfig.org_id == org_id)
-        )
-    ).scalar_one_or_none()
+    existing = await _da.get_widget_config_for_org(session, org_id)
     if existing is not None:
         return existing
 
@@ -132,7 +128,7 @@ async def get_or_create(
         org_id=org_id,
         config=_default_document().model_dump(mode="json"),
     )
-    session.add(row)
+    _da.insert_widget_config(session, row)
     await session.commit()
     await session.refresh(row)
     return row
@@ -151,18 +147,11 @@ async def update(
     current = WidgetConfigDocument.model_validate(row.config)
 
     patch = payload.model_dump(exclude_unset=True, exclude_none=False)
-    # Pydantic patch-style: only top-level fields actually supplied
-    # get merged. None values that WERE supplied still pass through
-    # (e.g. clearing thank_you_url to None).
     merged_dict = current.model_dump(mode="json")
     for key, value in patch.items():
         merged_dict[key] = value
     merged = WidgetConfigDocument.model_validate(merged_dict)
 
-    # Cross-table validation — any field with `field_source='custom'`
-    # must reference a defined contact custom field whose type the
-    # widget can render. Done here (not in WidgetConfigField's own
-    # validator) because the validator is org-agnostic.
     await _validate_custom_field_refs(session, fields=merged.fields)
 
     row.config = merged.model_dump(mode="json")
@@ -183,9 +172,6 @@ async def update(
     return row
 
 
-_WIDGET_ENTITIES: tuple[str, ...] = ("contact", "lead")
-
-
 async def _validate_custom_field_refs(
     session: AsyncSession,
     *,
@@ -193,29 +179,16 @@ async def _validate_custom_field_refs(
 ) -> None:
     """Reject the PUT if a custom-source field references an unknown
     custom field, the wrong entity, or a type the widget bundle
-    doesn't know how to render. Catches Owner typos + prevents
-    exposing pack-defined system fields the renderer can't handle.
-    """
+    doesn't know how to render."""
     custom_refs = [f for f in fields if f.field_source == "custom"]
     if not custom_refs:
         return
 
-    # Look up by (entity_type, field_key) so contact `address` and lead
-    # `address` (if both exist) don't collide on the validation.
     needed: set[tuple[str, str]] = {(f.entity, f.key) for f in custom_refs}
-    rows = (
-        (
-            await session.execute(
-                select(CustomFieldDefinition).where(
-                    CustomFieldDefinition.entity_type.in_(_WIDGET_ENTITIES),
-                    CustomFieldDefinition.field_key.in_(
-                        [k for _, k in needed]
-                    ),
-                )
-            )
-        )
-        .scalars()
-        .all()
+    rows = await _da.list_custom_field_defs_by_keys(
+        session,
+        entity_types=_WIDGET_ENTITIES,
+        field_keys=[k for _, k in needed],
     )
     found_by_pair: dict[tuple[str, str], CustomFieldDefinition] = {
         (r.entity_type, r.field_key): r for r in rows
@@ -257,26 +230,9 @@ async def list_available_widget_custom_fields(
     session: AsyncSession,
 ) -> list[AvailableCustomField]:
     """Read-only listing of custom fields (contact OR lead) the Settings
-    picker can offer for widget opt-in. Includes a `widget_supported`
-    flag — unsupported types stay in the list (so the Owner can see the
-    field exists) but the picker greys them out.
-    """
-    rows = (
-        (
-            await session.execute(
-                select(CustomFieldDefinition)
-                .where(
-                    CustomFieldDefinition.entity_type.in_(_WIDGET_ENTITIES)
-                )
-                .where(CustomFieldDefinition.is_hidden.is_(False))
-                .order_by(
-                    CustomFieldDefinition.entity_type,
-                    CustomFieldDefinition.display_order,
-                )
-            )
-        )
-        .scalars()
-        .all()
+    picker can offer for widget opt-in."""
+    rows = await _da.list_custom_fields_for_widget_entities(
+        session, entity_types=_WIDGET_ENTITIES
     )
     out: list[AvailableCustomField] = []
     for row in rows:
@@ -289,7 +245,7 @@ async def list_available_widget_custom_fields(
             opts = [str(v) for v in row.options]
         out.append(
             AvailableCustomField(
-                entity=row.entity_type,  # "contact" | "lead"
+                entity=row.entity_type,
                 field_key=row.field_key,
                 field_label=row.field_label,
                 field_type=row.field_type.value,
@@ -310,21 +266,10 @@ list_available_contact_custom_fields = list_available_widget_custom_fields
 
 async def public_get(org_id: uuid.UUID) -> Optional[WidgetConfig]:
     """Public-endpoint read. Opens its own session WITHOUT setting
-    tenant context — the explicit `WHERE org_id = ...` query is the
-    authorisation gate. The embed key the caller proved knowledge
-    of supplies the org_id.
-
-    Returns None if the org has no config yet — public handler
-    treats that as "use bundle defaults" so a freshly-created org
-    with a freshly-issued key has a working widget out of the box.
-    """
+    tenant context — the explicit query keyed by ``org_id`` (resolved
+    from the embed key) is the authorisation gate."""
     async with async_session() as session:
-        row = (
-            await session.execute(
-                select(WidgetConfig).where(WidgetConfig.org_id == org_id)
-            )
-        ).scalar_one_or_none()
-        return row
+        return await _da.get_widget_config_for_org(session, org_id)
 
 
 __all__ = [
