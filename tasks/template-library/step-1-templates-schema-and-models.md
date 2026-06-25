@@ -1,7 +1,7 @@
 # Step 1 — Templates schema and models
 
-**Goal:** Land the five new tables (`tbl_message_templates` + 4 children) with RLS, SQLAlchemy models, Pydantic schemas, and the per-channel enums. No service, no router, no UI yet.
-**Status:** Pending
+**Goal:** Land the four new tables (`tbl_message_templates` + 3 children) with RLS, SQLAlchemy models, Pydantic schemas, and the per-channel enums. No service, no router, no UI yet.
+**Status:** COMPLETED — Migration `0117_templates_schema` applied (DB confirms 4 tables + 4 enums + RLS enabled+forced on all 4 + tenant_isolation_* policies + the hot-path indexes incl. functional unique `(org_id, lower(name), channel)`). Assets table dropped from the spec (no `tbl_files` exists in this codebase yet; deferred to a future step). SQLAlchemy models in `core/templates/models.py` + Pydantic schemas in `core/templates/schemas.py` + 6 smoke-test cases in `tests/templates/test_models_import.py` (pytest run deferred per `feedback_pause_before_pytest.md` memory).
 **Depends on:** Existing `tbl_organizations`, `tbl_users`, `tbl_files`. Reuses `ConversationChannel` enum from `core/conversations/models.py`.
 
 ---

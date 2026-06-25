@@ -52,7 +52,7 @@ Steps 1-8 ship the new module end-to-end with only WA + Email channels usable. S
 
 | # | Title | Status | Effort |
 |---|---|---|---|
-| 1 | [Templates schema + models](step-1-templates-schema-and-models.md) | **Pending** | ~0.5 days |
+| 1 | [Templates schema + models](step-1-templates-schema-and-models.md) | **COMPLETED** | ~0.5 days |
 | 2 | [Templates service + variable engine](step-2-templates-service-and-variables.md) | **Pending** | ~1 day |
 | 3 | [Templates router + permissions](step-3-templates-router.md) | **Pending** | ~0.5 days |
 | 4 | [Internal review workflow](step-4-internal-review-workflow.md) | **Pending** | ~1 day |
