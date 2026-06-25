@@ -320,6 +320,16 @@ class WhatsAppTemplate(Base, TenantScoped):
         nullable=False,
         server_default=text("now()"),
     )
+    # tasks/template-library Step 9 — reciprocal link to the central
+    # ``tbl_message_templates`` row. Populated by migration 0120 for
+    # every existing WA template; new templates get the link set at
+    # create-draft time. ON DELETE CASCADE so removing the central
+    # row also removes its WA extension.
+    message_template_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_message_templates.id", ondelete="CASCADE"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

@@ -78,6 +78,26 @@ _EDITABLE_STATUSES = {
 }
 
 
+# tasks/template-library Step 9 — mirror of `_META_EVENT_TO_STATUS`
+# but mapping the WA submission_status into the central
+# `tbl_message_templates.external_status` value. Used by
+# `apply_template_status_update` to keep the central row in sync.
+def _build_central_external_map():
+    from src.app.core.templates.models import TemplateExternalStatus
+
+    return {
+        WhatsAppTemplateSubmissionStatus.approved: TemplateExternalStatus.approved,
+        WhatsAppTemplateSubmissionStatus.rejected: TemplateExternalStatus.rejected,
+        WhatsAppTemplateSubmissionStatus.paused: TemplateExternalStatus.paused,
+        WhatsAppTemplateSubmissionStatus.disabled: TemplateExternalStatus.rejected,
+        WhatsAppTemplateSubmissionStatus.pending_review: TemplateExternalStatus.pending,
+        WhatsAppTemplateSubmissionStatus.draft: TemplateExternalStatus.n_a,
+    }
+
+
+_WA_STATUS_TO_CENTRAL_EXTERNAL = _build_central_external_map()
+
+
 # --- helpers --------------------------------------------------------------
 
 
@@ -654,6 +674,40 @@ async def apply_template_status_update(
         # the submit response was lost in transit).
         row.meta_template_id = meta_template_id
     row.last_synced_at = datetime.now(timezone.utc)
+
+    # tasks/template-library Step 9 — also sync the central
+    # `tbl_message_templates.external_status` so the unified library's
+    # editor + list show the live Meta verdict without an extra call.
+    # Lookup priority: the reciprocal `message_template_id` link
+    # (preferred — set by migration 0120 + by new-template create);
+    # falls back to `external_provider_id == meta_template_id` for any
+    # extension row whose link wasn't backfilled yet.
+    central_external = _WA_STATUS_TO_CENTRAL_EXTERNAL.get(new_status)
+    if central_external is not None:
+        from src.app.core.templates.models import MessageTemplate
+
+        central_row: Optional[MessageTemplate] = None
+        if row.message_template_id:
+            central_row = (
+                await session.execute(
+                    select(MessageTemplate).where(
+                        MessageTemplate.id == row.message_template_id,
+                        MessageTemplate.org_id == org_id,
+                    )
+                )
+            ).scalar_one_or_none()
+        if central_row is None and row.meta_template_id:
+            central_row = (
+                await session.execute(
+                    select(MessageTemplate).where(
+                        MessageTemplate.external_provider_id == row.meta_template_id,
+                        MessageTemplate.org_id == org_id,
+                    )
+                )
+            ).scalar_one_or_none()
+        if central_row is not None:
+            central_row.external_status = central_external
+
     await session.commit()
 
     await audit.log(

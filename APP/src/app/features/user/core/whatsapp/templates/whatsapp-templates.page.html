@@ -1,4 +1,24 @@
 <div class="flex min-h-[calc(100vh-4rem)] flex-col bg-zinc-50">
+  <!-- tasks/template-library Step 9 — central-library migration banner.
+       The legacy WA wizard below still works; the new central library
+       is the preferred surface for new templates (all channels in one
+       place + a unified review workflow). Removed in a follow-up
+       cleanup PR once operators have switched. -->
+  <div class="border-b border-blue-200 bg-blue-50 px-6 py-2 text-xs text-blue-900">
+    <a
+      [routerLink]="['/user/templates']"
+      [queryParams]="{ channel: 'whatsapp' }"
+      class="inline-flex items-center gap-1 font-medium hover:underline"
+    >
+      <lucide-icon name="arrow-right" size="12" />
+      Open in the new central template library
+    </a>
+    <span class="ml-2 text-blue-700">
+      — all channels (WhatsApp, Email, SMS, …) live there now. This
+      page is kept around for one release.
+    </span>
+  </div>
+
   <header class="border-b border-zinc-200 bg-white px-6 py-4">
     <div class="flex items-center justify-between">
       <div>

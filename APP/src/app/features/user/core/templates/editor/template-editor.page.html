@@ -98,6 +98,22 @@
             Publish
           </button>
         }
+        @if (showSubmitExternalButton()) {
+          <button
+            type="button"
+            (click)="submitToMeta()"
+            [disabled]="transitioning() !== null"
+            class="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50"
+            title="Submit this template to Meta for WhatsApp Business approval"
+          >
+            @if (transitioning() === 'submit_external') {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+            } @else {
+              <lucide-icon name="send" size="12" />
+            }
+            Submit to Meta
+          </button>
+        }
         @if (showArchiveButton()) {
           <button
             type="button"

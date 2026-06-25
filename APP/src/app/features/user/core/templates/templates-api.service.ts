@@ -261,4 +261,25 @@ export class TemplatesApiService {
       payload,
     );
   }
+
+  // --- external submission (Step 9) -----------------------------------
+
+  submitExternal(id: string): Observable<TemplateRead> {
+    return this.http.post<TemplateRead>(
+      `${this.base}/${id}/submit-external`,
+      {},
+    );
+  }
+
+  externalStatus(id: string): Observable<{
+    status: string;
+    rejection_reason: string | null;
+    last_synced_at: string | null;
+  }> {
+    return this.http.get<{
+      status: string;
+      rejection_reason: string | null;
+      last_synced_at: string | null;
+    }>(`${this.base}/${id}/external-status`);
+  }
 }

@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.conversations.models import ConversationChannel
+from src.app.core.templates import external_submission as templates_external
 from src.app.core.templates import service as templates_service
 from src.app.core.templates import test_send as templates_test_send
 from src.app.core.templates import workflow as templates_workflow
@@ -46,6 +47,10 @@ from src.app.core.templates.exceptions import (
     TemplateNotFound,
     TestSendNotSupported,
 )
+from src.app.core.templates.external_submission import (
+    ExternalSubmissionNotSupported,
+    MissingExtensionRow,
+)
 from src.app.core.templates.models import (
     TemplateExternalStatus,
     TemplateInternalStatus,
@@ -54,6 +59,7 @@ from src.app.core.templates.permissions import (
     PERM_PUBLISH,
     PERM_READ,
     PERM_REVIEW,
+    PERM_SUBMIT_EXTERNAL,
     PERM_WRITE,
 )
 from src.app.core.templates.schemas import (
@@ -488,6 +494,97 @@ async def archive_workflow_endpoint(
     except TemplateError as exc:
         raise _workflow_http_map(exc) from exc
     return TemplateRead.model_validate(template)
+
+
+# --- external submission (Step 9) ------------------------------------
+
+
+class ExternalStatusResponse(BaseModel):
+    """Wire shape for ``GET /templates/{id}/external-status``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    rejection_reason: Optional[str] = None
+    last_synced_at: Optional[str] = None
+
+
+def _meta_app_credentials() -> tuple[str, str]:
+    """Pull the Meta App credentials needed by the WA submission path.
+
+    Both are loaded from the SOPS-managed secrets at process start;
+    a missing pair is a 503 (operator can't fix from the UI)."""
+    from config import META_APP_ID, WHATSAPP_APP_SECRET
+
+    if not META_APP_ID or not WHATSAPP_APP_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Server is missing Meta App credentials — "
+                "set META_APP_ID and WHATSAPP_APP_SECRET."
+            ),
+        )
+    return META_APP_ID, WHATSAPP_APP_SECRET
+
+
+@router.post("/{template_id}/submit-external", response_model=TemplateRead)
+async def submit_external_endpoint(
+    template_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_SUBMIT_EXTERNAL)),
+) -> TemplateRead:
+    """Submit the template to its channel's external review pipeline
+    (today: WhatsApp / Meta). Returns the central row with
+    ``external_status='pending'`` on success."""
+    app_id, app_secret = _meta_app_credentials()
+    try:
+        template = await templates_external.submit_external(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            user_id=user.legacy_uuid,
+            app_id=app_id,
+            app_secret=app_secret,
+        )
+    except TemplateNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="template not found",
+        ) from exc
+    except ExternalSubmissionNotSupported as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except MissingExtensionRow as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return TemplateRead.model_validate(template)
+
+
+@router.get(
+    "/{template_id}/external-status",
+    response_model=ExternalStatusResponse,
+)
+async def external_status_endpoint(
+    template_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_READ)),
+) -> ExternalStatusResponse:
+    """Return the live external-status payload (status + rejection
+    reason + last-synced-at) for the editor's status badge."""
+    try:
+        payload = await templates_external.get_external_status(
+            db, org_id=user.org_id, template_id=template_id
+        )
+    except TemplateNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="template not found",
+        ) from exc
+    return ExternalStatusResponse(**payload)
 
 
 # --- test send --------------------------------------------------------

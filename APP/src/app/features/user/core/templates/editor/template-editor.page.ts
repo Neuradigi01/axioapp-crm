@@ -137,8 +137,11 @@ export class TemplateEditorPageComponent {
   protected readonly canPublish = computed(() =>
     this.auth.hasPermission('templates.publish'),
   );
+  protected readonly canSubmitExternal = computed(() =>
+    this.auth.hasPermission('templates.submit_external'),
+  );
 
-  // --- header-button visibility (Step 8) ------------------------------
+  // --- header-button visibility (Step 8 + Step 9) ---------------------
 
   protected readonly showSubmitButton = computed(() => {
     const t = this.template();
@@ -171,6 +174,21 @@ export class TemplateEditorPageComponent {
   protected readonly showVersionsButton = computed(
     () => this.template() !== null,
   );
+  /** Step 9 — Submit-to-Meta is visible only on WhatsApp templates that
+   *  are published (or approved internally) AND whose external status
+   *  is either n_a (never submitted) or rejected (resubmission).
+   *  Anything else (pending / already approved on Meta) hides it. */
+  protected readonly showSubmitExternalButton = computed(() => {
+    const t = this.template();
+    if (t === null) return false;
+    if (t.channel !== 'whatsapp') return false;
+    if (!this.canSubmitExternal()) return false;
+    const internalOk =
+      t.internal_status === 'published' || t.internal_status === 'approved';
+    const externalOk =
+      t.external_status === 'n_a' || t.external_status === 'rejected';
+    return internalOk && externalOk;
+  });
 
   // --- modal / drawer state ------------------------------------------
 
@@ -441,6 +459,19 @@ export class TemplateEditorPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (row) => this.applyTransition(row, 'Archived'),
+        error: (err: HttpErrorResponse) => this.applyTransitionError(err),
+      });
+  }
+
+  protected submitToMeta(): void {
+    const t = this.template();
+    if (!t || this.transitioning()) return;
+    this.transitioning.set('submit_external');
+    this.api
+      .submitExternal(t.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (row) => this.applyTransition(row, 'Submitted to Meta'),
         error: (err: HttpErrorResponse) => this.applyTransitionError(err),
       });
   }

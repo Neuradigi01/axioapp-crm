@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -88,6 +89,7 @@ const FILTER_TABS: Array<{
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
     LucideAngularModule,
     TemplatePerformanceComponent,
     TemplateWizardComponent,

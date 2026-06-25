@@ -20,6 +20,25 @@ from src.app.core.templates.models import (
 )
 
 
+async def get_by_external_provider_id(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    external_provider_id: str,
+) -> MessageTemplate | None:
+    """Reverse lookup — given the provider's template id (Meta /
+    SMS-DLT), return the central row in this org. Used by the Step-14
+    status-sync path + the Meta webhook handler to update the central
+    row's ``external_status`` when Meta fires a status_update event."""
+    result = await session.execute(
+        select(MessageTemplate).where(
+            MessageTemplate.org_id == org_id,
+            MessageTemplate.external_provider_id == external_provider_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_template(
     session: AsyncSession,
     *,

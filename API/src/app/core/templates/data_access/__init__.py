@@ -15,6 +15,7 @@ Sub-modules:
 ``data_access.X`` namespace.
 """
 from src.app.core.templates.data_access.templates import (
+    get_by_external_provider_id,
     get_template,
     list_templates,
 )
@@ -25,6 +26,7 @@ from src.app.core.templates.data_access.versions import (
 
 
 __all__ = [
+    "get_by_external_provider_id",
     "get_template",
     "get_version",
     "list_templates",
