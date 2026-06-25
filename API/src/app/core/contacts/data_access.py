@@ -1,4 +1,7 @@
-"""Contact lookups against `tbl_contacts`.
+"""Data-access layer for the contacts module.
+
+Pure query helpers — no transactions, no audit, no commits. Leaf
+module; never imports a `service.py`.
 
 Two duplicate-by-shape patterns in the codebase: by id (the canonical
 "hydrate this contact" call) and by phone (walk-in reception's
@@ -47,3 +50,6 @@ async def get_contact_by_phone(
         select(Contact).where(Contact.phone == phone)
     )
     return result.scalar_one_or_none()
+
+
+__all__ = ["get_contact", "get_contact_by_phone"]

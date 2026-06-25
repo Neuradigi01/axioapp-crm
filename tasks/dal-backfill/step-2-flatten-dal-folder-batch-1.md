@@ -1,7 +1,7 @@
 # Step 2 — Flatten `data_access/` folder → `data_access.py` (auth, campaigns, contacts, email_sequences)
 
 **Goal:** Convert the four `data_access/` folders to single `data_access.py` files. Pure relocation; behaviour preserved.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 1.
 
 ---

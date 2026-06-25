@@ -1,4 +1,7 @@
-"""Auth-session lookups against `tbl_auth_sessions`.
+"""Data-access layer for the auth module.
+
+Pure query helpers — no transactions, no audit, no commits. Leaf
+module; never imports a `service.py`.
 
 Liveness checks (`revoked_at is None`, `expires_at > now`) are kept on
 the caller side because each authentication path interprets a
@@ -34,3 +37,6 @@ async def get_auth_session(
         stmt = stmt.where(AuthSession.user_id == user_id)
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+__all__ = ["get_auth_session"]

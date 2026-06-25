@@ -1,11 +1,14 @@
-"""Campaign-side template lookups.
+"""Data-access layer for the campaigns module.
+
+Pure query helpers — no transactions, no audit. Leaf module; never
+imports a `service.py`.
 
 Step 11 of ``tasks/template-library`` switched
 ``tbl_campaigns.template_id`` (and the A/B variants) from WA-template
 UUIDs to central ``tbl_message_templates.id`` values. The dispatcher
 still needs the Meta-specific extension row (header type, language,
-button payloads) at send time — this DAL function resolves it via
-the Step-9 reciprocal link.
+button payloads) at send time — `get_wa_extension_for_campaign_template`
+resolves it via the Step-9 reciprocal link.
 """
 from __future__ import annotations
 
@@ -30,3 +33,6 @@ async def get_wa_extension_for_campaign_template(
         )
     )
     return result.scalar_one_or_none()
+
+
+__all__ = ["get_wa_extension_for_campaign_template"]
