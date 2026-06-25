@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.activities.models import Activity, ActivityType
 
 
-async def insert_activity(
+def insert_activity(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
@@ -38,8 +38,9 @@ async def insert_activity(
     payload: dict[str, Any] | None = None,
     user_id: uuid.UUID | None = None,
 ) -> Activity:
-    """Add one Activity row, FLUSH so ``created_at`` is populated, and
-    return it. Caller commits."""
+    """Construct an Activity row and register it for INSERT. Caller
+    must flush (so ``created_at`` is populated for the last-activity
+    bump) and commit."""
     activity = Activity(
         org_id=org_id,
         entity_type=entity_type,
@@ -49,7 +50,6 @@ async def insert_activity(
         user_id=user_id,
     )
     session.add(activity)
-    await session.flush()
     return activity
 
 

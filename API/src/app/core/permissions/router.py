@@ -24,6 +24,7 @@ from fastapi import HTTPException
 
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.permissions import role_templates
+from src.app.core.permissions import service as permissions_service
 from src.app.core.permissions.schemas import (
     PermissionOut,
     RoleCreate,
@@ -174,10 +175,7 @@ async def install_role_template_endpoint(
             detail=f"role {template.name!r} already exists in this org",
         )
 
-    result = await role_templates.install(
-        session, org_id=user.org_id, template_keys=[template_key]
+    role = await permissions_service.install_role_template(
+        session, org_id=user.org_id, template_key=template_key
     )
-    await session.commit()
-    role = result[template_key]
-    await session.refresh(role)
     return RoleOut.model_validate(role)

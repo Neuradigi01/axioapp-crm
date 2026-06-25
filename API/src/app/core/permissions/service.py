@@ -237,6 +237,25 @@ async def update_role(
     return role
 
 
+async def install_role_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    template_key: str,
+) -> Role:
+    """Install a single role template into the org. Owns the
+    transaction so the router stays thin."""
+    from src.app.core.permissions import role_templates
+
+    result = await role_templates.install(
+        session, org_id=org_id, template_keys=[template_key]
+    )
+    await session.commit()
+    role = result[template_key]
+    await session.refresh(role)
+    return role
+
+
 async def delete_role(
     session: AsyncSession,
     *,

@@ -1,7 +1,7 @@
 # Step 14 — CI guard pin-test + final audit
 
 **Goal:** Lock the architecture so it can't silently drift again. Add a pin-test that fails CI if `db.commit / db.rollback / db.refresh / db.flush` appears outside `service.py`, or if `db.execute / select() / db.query / db.add / db.delete` appears in a `router.py`. Then walk every module once more to confirm the whole tree is clean.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 1–13.
 
 ---

@@ -117,7 +117,7 @@ async def log(
 
     try:
         async with async_session() as session:
-            activity = await _da.insert_activity(
+            activity = _da.insert_activity(
                 session,
                 org_id=resolved_org_id,
                 entity_type=entity_type,
@@ -126,6 +126,7 @@ async def log(
                 payload=payload,
                 user_id=resolved_user_id,
             )
+            await session.flush()
             await _bump_last_activity(
                 session,
                 entity_type=entity_type,
@@ -158,7 +159,7 @@ async def record_in_session(
     fire-and-forget alternative for cases where the activity is purely
     informational.
     """
-    activity = await _da.insert_activity(
+    activity = _da.insert_activity(
         session,
         org_id=org_id,
         entity_type=entity_type,
@@ -167,6 +168,7 @@ async def record_in_session(
         payload=payload,
         user_id=user_id,
     )
+    await session.flush()
     await _bump_last_activity(
         session,
         entity_type=entity_type,
@@ -213,7 +215,7 @@ async def create_note(
     request's ``AsyncSession`` so the row is visible to the same
     transaction's follow-up reads if any.
     """
-    activity = await _da.insert_activity(
+    activity = _da.insert_activity(
         session,
         org_id=org_id,
         entity_type=entity_type,
@@ -222,6 +224,7 @@ async def create_note(
         payload={"text": text},
         user_id=user_id,
     )
+    await session.flush()
     await _bump_last_activity(
         session,
         entity_type=entity_type,

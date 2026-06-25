@@ -137,7 +137,7 @@ def create_template_service(db, payload):
     return template
 ```
 
-**Backfill track:** Most existing modules query straight from `service.py` or use a `data_access/` folder (older convention from 2026-06-23, now retired). The [`tasks/dal-backfill/`](tasks/dal-backfill/README.md) side track aligns the whole codebase to this layout module-by-module. A CI pin-test (final step of the track) will fail the build if `db.commit / rollback / refresh / flush` appears outside `service.py`.
+**Convention enforced by CI pin-test:** [`API/tests/test_layered_architecture_convention.py`](API/tests/test_layered_architecture_convention.py) walks every file under `src/app/core/` and `src/app/packs/` and fails CI if (1) `db.commit / rollback / refresh / flush` appears outside `service.py` / `*_service.py`, (2) `db.execute / add / delete / query` or a sqlalchemy CRUD constructor import (`select`, `insert`, `update`, `delete`) appears in `router.py`, or (3) `data_access.py` calls `db.commit / rollback / refresh / flush`. Out-of-scope legacy helpers (Celery workers, webhook handlers, integration sub-modules) have a documented exception list inside the test. New backend code should never need to add to it.
 
 ## Reuse-vs-restructure exceptions (agreed with user)
 
