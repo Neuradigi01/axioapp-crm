@@ -1,7 +1,7 @@
 # Step 12 — SMS adapter stub + DLT fields
 
 **Goal:** Add the SMS channel to the editor as a sub-form with DLT (Distributed Ledger Technology — India TRAI compliance) capture fields. Register a stub `SMSAdapter` in the conversations adapter registry. Actual SMS transport (Gupshup / MSG91 / Kaleyra) is deferred to a future SMS-channel track.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 1-8 (module live + editor). Steps 9 + 10 (central tables populated). Step 11 (campaigns generic).
 
 ---

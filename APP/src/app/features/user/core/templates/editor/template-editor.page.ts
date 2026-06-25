@@ -27,6 +27,7 @@ import { TemplateReviewModalComponent } from '../review/template-review.modal';
 import { TemplateStatusBadgeComponent } from '../template-status-badge.component';
 import { TestSendModalComponent } from '../test-send/test-send.modal';
 import {
+  SmsDltMetadataPatch,
   TemplateChannel,
   TemplateCreatePayload,
   TemplateRead,
@@ -36,6 +37,7 @@ import {
 import { VersionsDrawerComponent } from '../versions/versions-drawer.component';
 import { EmailFormComponent, EmailFormGroup } from './email-form.component';
 import { PreviewPaneComponent } from './preview-pane.component';
+import { SmsFormComponent, SmsFormGroup } from './sms-form.component';
 import { VariablePickerComponent } from './variable-picker.component';
 import { WaFormComponent, WaFormGroup } from './wa-form.component';
 
@@ -57,7 +59,7 @@ import { WaFormComponent, WaFormGroup } from './wa-form.component';
  * reviewers via reject) which Step 8's review modal handles. v1 just
  * shows the banner — the unlock path lives in Step 8.
  */
-type ChannelOption = '' | 'whatsapp' | 'email';
+type ChannelOption = '' | 'whatsapp' | 'email' | 'sms';
 
 const LOCKED_STATUSES = new Set(['in_review', 'approved', 'published']);
 
@@ -77,6 +79,7 @@ const LOCKED_STATUSES = new Set(['in_review', 'approved', 'published']);
     PreviewPaneComponent,
     WaFormComponent,
     EmailFormComponent,
+    SmsFormComponent,
     TemplateReviewModalComponent,
     TestSendModalComponent,
     VersionsDrawerComponent,
@@ -107,6 +110,7 @@ export class TemplateEditorPageComponent {
 
   protected readonly waForm = signal<WaFormGroup | null>(null);
   protected readonly emailForm = signal<EmailFormGroup | null>(null);
+  protected readonly smsForm = signal<SmsFormGroup | null>(null);
 
   // --- loaded template (null for /new) --------------------------------
 
@@ -223,6 +227,9 @@ export class TemplateEditorPageComponent {
       if (channel === 'email' && this.emailForm() === null) {
         this.emailForm.set(EmailFormComponent.build());
       }
+      if (channel === 'sms' && this.smsForm() === null) {
+        this.smsForm.set(SmsFormComponent.build());
+      }
     });
 
     // Wire body / subject signals from whichever sub-form is active so
@@ -261,6 +268,27 @@ export class TemplateEditorPageComponent {
         onCleanup(() => {
           subBody.unsubscribe();
           subSubject.unsubscribe();
+        });
+      } else if (channel === 'sms') {
+        const f = this.smsForm();
+        if (!f) return;
+        const subBody = f.controls.body_text.valueChanges
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe((v) => {
+            this.currentBody.set(v ?? '');
+            this.scheduleAutoSave();
+          });
+        // The DLT fields are saved together with body_text. Any
+        // change schedules the auto-save so the operator doesn't
+        // need to remember to click "Save draft" after editing IDs.
+        const subDlt = f.valueChanges
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe(() => this.scheduleAutoSave());
+        this.currentBody.set(f.controls.body_text.value);
+        this.currentSubject.set(null);
+        onCleanup(() => {
+          subBody.unsubscribe();
+          subDlt.unsubscribe();
         });
       }
     });
@@ -306,17 +334,51 @@ export class TemplateEditorPageComponent {
               body_text: row.body_text,
             });
             this.emailForm.set(f);
+          } else if (row.channel === 'sms') {
+            const f = this.smsForm() ?? SmsFormComponent.build();
+            f.patchValue({ body_text: row.body_text });
+            this.smsForm.set(f);
+            this.loadSmsDltMetadata(row.id);
           }
           if (this.locked()) {
             this.headerForm.disable({ emitEvent: false });
             this.waForm()?.disable({ emitEvent: false });
             this.emailForm()?.disable({ emitEvent: false });
+            this.smsForm()?.disable({ emitEvent: false });
           }
         },
         error: (err: HttpErrorResponse) => {
           this.loadError.set(
             extractApiError(err) ?? 'Could not load template.',
           );
+        },
+      });
+  }
+
+  private loadSmsDltMetadata(templateId: string): void {
+    this.api
+      .getSmsMetadata(templateId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (meta) => {
+          const f = this.smsForm();
+          if (!f) return;
+          f.patchValue(
+            {
+              dlt_entity_id: meta.dlt_entity_id ?? '',
+              dlt_template_id: meta.dlt_template_id ?? '',
+              dlt_content_category: meta.dlt_content_category,
+              dlt_header: meta.dlt_header ?? '',
+              dlt_principal_entity_id: meta.dlt_principal_entity_id ?? '',
+              dlt_template_status: meta.dlt_template_status,
+            },
+            { emitEvent: false },
+          );
+        },
+        error: () => {
+          // Non-fatal — the form falls back to its defaults (pending
+          // / transactional) and the operator can still save body
+          // text. A real error surface lives on the next save.
         },
       });
   }
@@ -355,6 +417,15 @@ export class TemplateEditorPageComponent {
       };
       return base;
     }
+    if (channel === 'sms') {
+      const f = this.smsForm();
+      return {
+        name: this.headerForm.controls.name.value,
+        channel: 'sms' as const,
+        language: 'en',
+        body_text: f?.controls.body_text.value ?? '',
+      };
+    }
     // Email.
     const f = this.emailForm();
     return {
@@ -367,6 +438,20 @@ export class TemplateEditorPageComponent {
     };
   }
 
+  private buildSmsDltPatch(): SmsDltMetadataPatch | null {
+    const f = this.smsForm();
+    if (!f) return null;
+    const v = f.getRawValue();
+    return {
+      dlt_entity_id: v.dlt_entity_id || null,
+      dlt_template_id: v.dlt_template_id || null,
+      dlt_content_category: v.dlt_content_category,
+      dlt_header: v.dlt_header || null,
+      dlt_principal_entity_id: v.dlt_principal_entity_id || null,
+      dlt_template_status: v.dlt_template_status,
+    };
+  }
+
   protected save(): void {
     if (this.locked()) return;
     if (!this.canWrite()) return;
@@ -375,7 +460,12 @@ export class TemplateEditorPageComponent {
       this.saveError.set('Pick a channel before saving.');
       return;
     }
-    const subForm = channel === 'whatsapp' ? this.waForm() : this.emailForm();
+    const subForm =
+      channel === 'whatsapp'
+        ? this.waForm()
+        : channel === 'sms'
+          ? this.smsForm()
+          : this.emailForm();
     if (this.headerForm.invalid || subForm?.invalid) {
       this.headerForm.markAllAsTouched();
       subForm?.markAllAsTouched();
@@ -393,21 +483,47 @@ export class TemplateEditorPageComponent {
 
     obs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (row) => {
-        this.saving.set(false);
-        this.template.set(row);
-        this.toast.set(`Saved · v${row.current_version}`);
-        if (!existing) {
-          // Navigate to the canonical /:id URL so refresh hydrates correctly.
-          void this.router.navigate(['/user/templates', row.id], {
-            replaceUrl: true,
-          });
+        if (row.channel === 'sms') {
+          const dltPatch = this.buildSmsDltPatch();
+          if (dltPatch) {
+            this.api
+              .patchSmsMetadata(row.id, dltPatch)
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                next: () => this.finishSave(row, !existing),
+                error: (err: HttpErrorResponse) => {
+                  // Central row saved; only the DLT patch failed. The
+                  // toast nudges the operator to retry so they don't
+                  // think the whole save was lost.
+                  this.saving.set(false);
+                  this.template.set(row);
+                  this.saveError.set(
+                    extractApiError(err) ??
+                      'Saved the body, but DLT metadata failed to save.',
+                  );
+                },
+              });
+            return;
+          }
         }
+        this.finishSave(row, !existing);
       },
       error: (err: HttpErrorResponse) => {
         this.saving.set(false);
         this.saveError.set(extractApiError(err) ?? 'Could not save template.');
       },
     });
+  }
+
+  private finishSave(row: TemplateRead, isNew: boolean): void {
+    this.saving.set(false);
+    this.template.set(row);
+    this.toast.set(`Saved · v${row.current_version}`);
+    if (isNew) {
+      void this.router.navigate(['/user/templates', row.id], {
+        replaceUrl: true,
+      });
+    }
   }
 
   private scheduleAutoSave(): void {
@@ -483,6 +599,7 @@ export class TemplateEditorPageComponent {
       this.headerForm.disable({ emitEvent: false });
       this.waForm()?.disable({ emitEvent: false });
       this.emailForm()?.disable({ emitEvent: false });
+      this.smsForm()?.disable({ emitEvent: false });
     } else {
       // Workflow may have moved a previously-locked template back to
       // draft (reject / request-changes) — re-enable the form so
@@ -491,6 +608,7 @@ export class TemplateEditorPageComponent {
       this.headerForm.controls.channel.disable({ emitEvent: false });
       this.waForm()?.enable({ emitEvent: false });
       this.emailForm()?.enable({ emitEvent: false });
+      this.smsForm()?.enable({ emitEvent: false });
     }
     this.toast.set(message);
   }
@@ -541,6 +659,11 @@ export class TemplateEditorPageComponent {
           preview_text: row.preview_text ?? '',
           body_text: row.body_text,
         },
+        { emitEvent: false },
+      );
+    } else if (row.channel === 'sms') {
+      this.smsForm()?.patchValue(
+        { body_text: row.body_text },
         { emitEvent: false },
       );
     }

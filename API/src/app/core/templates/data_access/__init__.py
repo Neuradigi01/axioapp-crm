@@ -14,6 +14,10 @@ Sub-modules:
 ``__init__`` re-exports the union so callers see a single
 ``data_access.X`` namespace.
 """
+from src.app.core.templates.data_access.sms_dlt import (
+    find_by_dlt_template_id,
+    get_dlt_metadata,
+)
 from src.app.core.templates.data_access.templates import (
     get_by_external_provider_id,
     get_template,
@@ -26,7 +30,9 @@ from src.app.core.templates.data_access.versions import (
 
 
 __all__ = [
+    "find_by_dlt_template_id",
     "get_by_external_provider_id",
+    "get_dlt_metadata",
     "get_template",
     "get_version",
     "list_templates",

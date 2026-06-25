@@ -24,7 +24,7 @@ channel, so the response is small + cacheable.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -585,6 +585,143 @@ async def external_status_endpoint(
             detail="template not found",
         ) from exc
     return ExternalStatusResponse(**payload)
+
+
+# --- SMS DLT metadata (Step 12) ---------------------------------------
+
+
+class SMSDltMetadataResponse(BaseModel):
+    """Wire shape for ``GET /templates/{id}/sms-metadata``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    dlt_entity_id: Optional[str] = None
+    dlt_template_id: Optional[str] = None
+    dlt_content_category: str = "transactional"
+    dlt_header: Optional[str] = None
+    dlt_principal_entity_id: Optional[str] = None
+    dlt_template_status: str = "pending"
+    dlt_registered_at: Optional[str] = None
+    dlt_rejection_reason: Optional[str] = None
+
+
+class SMSDltMetadataPatch(BaseModel):
+    """Body for ``PATCH /templates/{id}/sms-metadata``. Every field
+    is optional — omit to leave the current value untouched."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    dlt_entity_id: Optional[str] = Field(default=None, max_length=128)
+    dlt_template_id: Optional[str] = Field(default=None, max_length=128)
+    dlt_content_category: Optional[
+        Literal[
+            "transactional",
+            "promotional",
+            "service_explicit",
+            "service_implicit",
+        ]
+    ] = None
+    dlt_header: Optional[str] = Field(default=None, max_length=6)
+    dlt_principal_entity_id: Optional[str] = Field(default=None, max_length=128)
+    dlt_template_status: Optional[
+        Literal["registered", "pending", "rejected"]
+    ] = None
+    dlt_rejection_reason: Optional[str] = Field(default=None, max_length=512)
+
+
+def _serialize_dlt_row(row) -> SMSDltMetadataResponse:
+    return SMSDltMetadataResponse(
+        dlt_entity_id=row.dlt_entity_id,
+        dlt_template_id=row.dlt_template_id,
+        dlt_content_category=row.dlt_content_category.value,
+        dlt_header=row.dlt_header,
+        dlt_principal_entity_id=row.dlt_principal_entity_id,
+        dlt_template_status=row.dlt_template_status.value,
+        dlt_registered_at=(
+            row.dlt_registered_at.isoformat() if row.dlt_registered_at else None
+        ),
+        dlt_rejection_reason=row.dlt_rejection_reason,
+    )
+
+
+@router.get(
+    "/{template_id}/sms-metadata",
+    response_model=SMSDltMetadataResponse,
+)
+async def get_sms_dlt_endpoint(
+    template_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_READ)),
+) -> SMSDltMetadataResponse:
+    """Return the DLT metadata for an SMS template (defaults when
+    none has been captured yet)."""
+    try:
+        template = await templates_service.get_template(
+            db, org_id=user.org_id, template_id=template_id
+        )
+    except TemplateNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="template not found",
+        ) from exc
+    if template.channel != ConversationChannel.sms:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "DLT metadata only applies to SMS templates; this "
+                f"template is on channel '{template.channel.value}'."
+            ),
+        )
+
+    from src.app.core.templates import sms_extension
+
+    row = await sms_extension.get_dlt_metadata(
+        db, org_id=user.org_id, template_id=template_id
+    )
+    if row is None:
+        return SMSDltMetadataResponse()
+    return _serialize_dlt_row(row)
+
+
+@router.patch(
+    "/{template_id}/sms-metadata",
+    response_model=SMSDltMetadataResponse,
+)
+async def patch_sms_dlt_endpoint(
+    template_id: uuid.UUID,
+    payload: SMSDltMetadataPatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> SMSDltMetadataResponse:
+    """Create or update the DLT metadata for an SMS template."""
+    try:
+        template = await templates_service.get_template(
+            db, org_id=user.org_id, template_id=template_id
+        )
+    except TemplateNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="template not found",
+        ) from exc
+    if template.channel != ConversationChannel.sms:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "DLT metadata only applies to SMS templates; this "
+                f"template is on channel '{template.channel.value}'."
+            ),
+        )
+
+    from src.app.core.templates import sms_extension
+
+    row = await sms_extension.set_dlt_metadata(
+        db,
+        org_id=user.org_id,
+        template_id=template_id,
+        user_id=user.legacy_uuid,
+        payload=payload.model_dump(exclude_unset=True),
+    )
+    return _serialize_dlt_row(row)
 
 
 # --- test send --------------------------------------------------------

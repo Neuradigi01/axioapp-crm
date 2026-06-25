@@ -167,6 +167,36 @@ export interface TestSendPayload {
 }
 
 
+export type SmsDltContentCategory =
+  | 'transactional'
+  | 'promotional'
+  | 'service_explicit'
+  | 'service_implicit';
+
+export type SmsDltTemplateStatus = 'registered' | 'pending' | 'rejected';
+
+export interface SmsDltMetadata {
+  dlt_entity_id: string | null;
+  dlt_template_id: string | null;
+  dlt_content_category: SmsDltContentCategory;
+  dlt_header: string | null;
+  dlt_principal_entity_id: string | null;
+  dlt_template_status: SmsDltTemplateStatus;
+  dlt_registered_at: string | null;
+  dlt_rejection_reason: string | null;
+}
+
+export interface SmsDltMetadataPatch {
+  dlt_entity_id?: string | null;
+  dlt_template_id?: string | null;
+  dlt_content_category?: SmsDltContentCategory;
+  dlt_header?: string | null;
+  dlt_principal_entity_id?: string | null;
+  dlt_template_status?: SmsDltTemplateStatus;
+  dlt_rejection_reason?: string | null;
+}
+
+
 @Injectable({ providedIn: 'root' })
 export class TemplatesApiService {
   private readonly http = inject(HttpClient);
@@ -281,5 +311,21 @@ export class TemplatesApiService {
       rejection_reason: string | null;
       last_synced_at: string | null;
     }>(`${this.base}/${id}/external-status`);
+  }
+
+  // --- SMS DLT metadata (Step 12) -------------------------------------
+
+  getSmsMetadata(id: string): Observable<SmsDltMetadata> {
+    return this.http.get<SmsDltMetadata>(`${this.base}/${id}/sms-metadata`);
+  }
+
+  patchSmsMetadata(
+    id: string,
+    payload: SmsDltMetadataPatch,
+  ): Observable<SmsDltMetadata> {
+    return this.http.patch<SmsDltMetadata>(
+      `${this.base}/${id}/sms-metadata`,
+      payload,
+    );
   }
 }

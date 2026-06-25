@@ -353,3 +353,11 @@ class MessageTemplateTestSend(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("now()"),
     )
+
+
+# tasks/template-library Step 12 — re-export the SMS-DLT extension
+# model so the `*.models` pin-test sweep sees it + so
+# `Base.metadata` registers the table for test-DB `create_all`. The
+# model body lives in `sms_extension.py` alongside its service
+# helpers; this is a registration-only import.
+from src.app.core.templates.sms_extension import SMSDLTTemplate  # noqa: E402, F401

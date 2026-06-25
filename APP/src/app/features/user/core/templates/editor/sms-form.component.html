@@ -1,0 +1,135 @@
+<form [formGroup]="form()" class="flex flex-col gap-4">
+  <label class="block">
+    <span class="text-xs font-medium text-zinc-700">
+      Body
+      <span class="text-zinc-400">
+        ({{ bodyLength() }} char{{ bodyLength() === 1 ? '' : 's' }} ·
+        @if (segmentCount() === 0) {
+          0 segments
+        } @else if (segmentCount() === 1) {
+          1 segment
+        } @else {
+          {{ segmentCount() }} segments
+        })
+      </span>
+    </span>
+    <textarea
+      formControlName="body_text"
+      maxlength="1530"
+      rows="6"
+      (focus)="onFocus($event)"
+      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+      placeholder="Hi {{ '{' + '{' + '1' + '}' + '}' }}, your order {{ '{' + '{' + '2' + '}' + '}' }} is ready for pickup."
+    ></textarea>
+    <p class="mt-1 text-[10px] text-zinc-400">
+      SMS supports DLT-style positional variables
+      (<code class="rounded bg-zinc-100 px-1 font-mono">{{ '{' + '{' + '1' + '}' + '}' }}</code>,
+      <code class="rounded bg-zinc-100 px-1 font-mono">{{ '{' + '{' + '2' + '}' + '}' }}</code>, …)
+      or the central library's dot-path tags. The provider adapter
+      maps the right shape at send time.
+    </p>
+  </label>
+
+  <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
+    <p class="text-xs font-semibold text-amber-900">
+      DLT registration metadata
+    </p>
+    <p class="mt-0.5 text-[11px] text-amber-800">
+      India's TRAI mandate requires every SMS template to be registered
+      with a DLT portal (Jio / Airtel / VI). Submit your template via the
+      portal first, then paste the approved IDs below — the
+      future SMS-provider adapter uses them at send time.
+    </p>
+  </div>
+
+  <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+    <label class="block">
+      <span class="text-xs font-medium text-zinc-700">DLT entity ID</span>
+      <input
+        type="text"
+        formControlName="dlt_entity_id"
+        maxlength="128"
+        (focus)="onFocus($event)"
+        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+        placeholder="1101234567890123456"
+      />
+    </label>
+
+    <label class="block">
+      <span class="text-xs font-medium text-zinc-700">DLT template ID</span>
+      <input
+        type="text"
+        formControlName="dlt_template_id"
+        maxlength="128"
+        (focus)="onFocus($event)"
+        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+        placeholder="1707169876543210987"
+      />
+    </label>
+
+    <label class="block">
+      <span class="text-xs font-medium text-zinc-700">Content category</span>
+      <select
+        formControlName="dlt_content_category"
+        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+      >
+        @for (opt of CONTENT_CATEGORY_OPTIONS; track opt.value) {
+          <option [value]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+      <p class="mt-1 text-[10px] text-zinc-500">
+        {{ selectedCategoryDescription() }}
+      </p>
+    </label>
+
+    <label class="block">
+      <span class="text-xs font-medium text-zinc-700">
+        Sender header
+        <span class="text-zinc-400">(6-char alphanumeric)</span>
+      </span>
+      <input
+        type="text"
+        [value]="form().controls.dlt_header.value"
+        (input)="onHeaderInput($any($event.target).value)"
+        maxlength="6"
+        (focus)="onFocus($event)"
+        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm uppercase tracking-wider focus:border-zinc-500 focus:outline-none"
+        placeholder="ACMEFR"
+      />
+    </label>
+
+    <label class="block">
+      <span class="text-xs font-medium text-zinc-700">
+        Principal entity ID
+        <span class="text-zinc-400">(if telco-specific)</span>
+      </span>
+      <input
+        type="text"
+        formControlName="dlt_principal_entity_id"
+        maxlength="128"
+        (focus)="onFocus($event)"
+        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+      />
+    </label>
+
+    <label class="block">
+      <span class="text-xs font-medium text-zinc-700">DLT status</span>
+      <select
+        formControlName="dlt_template_status"
+        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+      >
+        @for (opt of STATUS_OPTIONS; track opt.value) {
+          <option [value]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+    </label>
+  </div>
+
+  <p class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] text-zinc-600">
+    <strong>Note:</strong> SMS send transport (Gupshup / MSG91 / Kaleyra)
+    is not yet wired. Saving this template captures the metadata; the
+    campaign dispatcher will block the send with a "configure an SMS
+    provider in Settings → Integrations" message until the provider
+    track lands.
+  </p>
+</form>

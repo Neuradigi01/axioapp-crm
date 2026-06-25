@@ -26,6 +26,11 @@ from src.app.core.conversations.service import (
 # is registered process-wide because the adapter itself is stateless
 # (it resolves the per-rep mailbox from `account_id` at send time).
 import src.app.core.conversations.adapters.email  # noqa: F401
+# Step 12 (template-library) — register the SMS stub adapter so the
+# editor / campaign dispatch can resolve a channel for 'sms' without
+# crashing with `ChannelNotRegistered`. Sending still fails with
+# `SMSNotConfigured` until a real provider lands in the SMS track.
+import src.app.core.conversations.adapters.sms  # noqa: F401
 
 __all__ = [
     "get_conversation",
