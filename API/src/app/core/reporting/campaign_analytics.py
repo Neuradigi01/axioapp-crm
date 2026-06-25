@@ -498,7 +498,12 @@ async def compute_cost(
                        COUNT(*) AS n
                 FROM tbl_campaign_messages cm
                 JOIN tbl_campaigns c ON c.id = cm.campaign_id
-                LEFT JOIN tbl_whatsapp_templates t ON t.id = c.template_id
+                -- tasks/template-library Step 11: campaigns.template_id
+                -- now points at the central library; join the WA
+                -- extension via its message_template_id link to keep
+                -- the Meta-side `category` cost classifier working.
+                LEFT JOIN tbl_whatsapp_templates t
+                       ON t.message_template_id = c.template_id
                 WHERE cm.org_id = :org_id
                   AND c.channel = 'whatsapp'
                   AND cm.status IN ('sent','delivered','read','failed')
@@ -931,10 +936,12 @@ async def compute_ab_comparison(
         ).first()
         tpl_name = None
         if tpl_id is not None:
+            # tasks/template-library Step 11: `tpl_id` (= campaign's
+            # template_id column) now points at the central library.
             tpl_row = (
                 await session.execute(
                     text(
-                        "SELECT name FROM tbl_whatsapp_templates "
+                        "SELECT name FROM tbl_message_templates "
                         "WHERE id = :tid"
                     ),
                     {"tid": tpl_id},

@@ -104,6 +104,41 @@ async def get_campaign(
 # --- writes --------------------------------------------------------------
 
 
+async def _validate_template_channel_match(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    campaign_channel: ConversationChannel,
+    template_ids: list[uuid.UUID],
+) -> None:
+    """tasks/template-library Step 11 — confirm every referenced
+    template's channel matches the campaign's channel.
+
+    Loads each id from the central library; raises 422 if any
+    template's channel differs or the id doesn't resolve in this org.
+    Skipped when no template ids are supplied (free-text campaign).
+    """
+    from src.app.core.templates import data_access as templates_da
+
+    for tid in template_ids:
+        row = await templates_da.get_template(
+            session, org_id=org_id, template_id=tid
+        )
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"template {tid} not found in this org",
+            )
+        if row.channel != campaign_channel:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"template {tid} has channel '{row.channel.value}' "
+                    f"but the campaign is on '{campaign_channel.value}'"
+                ),
+            )
+
+
 async def create_campaign(
     session: AsyncSession,
     *,
@@ -111,6 +146,21 @@ async def create_campaign(
     user_id: uuid.UUID,
     payload: CampaignCreate,
 ) -> Campaign:
+    template_ids_to_check: list[uuid.UUID] = []
+    if payload.template_id is not None:
+        template_ids_to_check.append(payload.template_id)
+    if payload.is_ab_test:
+        if payload.variant_a_template_id is not None:
+            template_ids_to_check.append(payload.variant_a_template_id)
+        if payload.variant_b_template_id is not None:
+            template_ids_to_check.append(payload.variant_b_template_id)
+    if template_ids_to_check:
+        await _validate_template_channel_match(
+            session,
+            org_id=org_id,
+            campaign_channel=payload.channel,
+            template_ids=template_ids_to_check,
+        )
     campaign = Campaign(
         org_id=org_id,
         name=payload.name,
@@ -528,19 +578,13 @@ async def dispatch_chunk(
             )
         return
 
-    # Template campaigns (Step 3.5.6): load the WhatsAppTemplate row
-    # once per chunk so the loop doesn't re-query for every contact.
-    # If the template was deleted from local cache between campaign
-    # creation and dispatch (Step 3.5.4 hard-delete on sync), every
-    # queued row in this chunk fails with a clear error — the row's
-    # ON DELETE SET NULL FK kept the campaign intact, but there's
-    # nothing to send.
+    # Template campaigns (Step 3.5.6): load the WhatsAppTemplate
+    # extension row once per chunk. Post-Step-11 the FK on the
+    # campaign points at ``tbl_message_templates`` (central library);
+    # the WA extension carries the Meta-specific fields we need for
+    # ``adapter.send_template`` (name / language / header). Lookup
+    # via the Step-9 reciprocal link ``message_template_id``.
     template_row: WhatsAppTemplate | None = None
-    # Step 29 — A/B campaigns load BOTH variant templates up-front;
-    # the per-contact loop picks one via `_assign_ab_variant`. Once
-    # the decider has flipped `winning_variant`, every subsequent
-    # chunk sends only the winning template (the dispatcher reads
-    # the winning row via the same lookup below).
     template_a_row: WhatsAppTemplate | None = None
     template_b_row: WhatsAppTemplate | None = None
     if campaign.is_ab_test:
@@ -554,12 +598,14 @@ async def dispatch_chunk(
         ]
         rows = (
             await session.execute(
-                select(WhatsAppTemplate).where(WhatsAppTemplate.id.in_(ids))
+                select(WhatsAppTemplate).where(
+                    WhatsAppTemplate.message_template_id.in_(ids)
+                )
             )
         ).scalars().all()
-        by_id = {r.id: r for r in rows}
-        template_a_row = by_id.get(campaign.variant_a_template_id)
-        template_b_row = by_id.get(campaign.variant_b_template_id)
+        by_central = {r.message_template_id: r for r in rows}
+        template_a_row = by_central.get(campaign.variant_a_template_id)
+        template_b_row = by_central.get(campaign.variant_b_template_id)
         if template_a_row is None or template_b_row is None:
             for cid in contact_ids:
                 await _mark_message(
@@ -582,10 +628,13 @@ async def dispatch_chunk(
         elif campaign.winning_variant == "B":
             template_row = template_b_row
     elif campaign.template_id is not None:
+        # Step 11 — lookup the WA extension via the central row's id
+        # (the campaign's `template_id` now points at the central
+        # library, not the WA extension).
         template_row = (
             await session.execute(
                 select(WhatsAppTemplate).where(
-                    WhatsAppTemplate.id == campaign.template_id
+                    WhatsAppTemplate.message_template_id == campaign.template_id
                 )
             )
         ).scalar_one_or_none()

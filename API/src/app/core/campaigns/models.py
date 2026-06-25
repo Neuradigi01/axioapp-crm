@@ -111,7 +111,7 @@ class Campaign(Base, TenantScoped):
     # will then fail with a clear "template no longer exists" error.
     template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
+        ForeignKey("tbl_message_templates.id", ondelete="SET NULL"),
         nullable=True,
     )
     # Operator's variable bindings — shape:
@@ -146,12 +146,12 @@ class Campaign(Base, TenantScoped):
     )
     variant_a_template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
+        ForeignKey("tbl_message_templates.id", ondelete="SET NULL"),
         nullable=True,
     )
     variant_b_template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
+        ForeignKey("tbl_message_templates.id", ondelete="SET NULL"),
         nullable=True,
     )
     split_ratio: Mapped[int] = mapped_column(
