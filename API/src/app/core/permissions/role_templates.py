@@ -110,6 +110,15 @@ _CORE_ADMIN_KEYS: list[str] = [
     # Step 7 — sequence library + enroll. Admin authors and enrolls.
     "email.sequences.manage",
     "email.sequences.enroll",
+    # tasks/template-library Step 3 — central multi-channel template
+    # library. Admin can read / write / review (approve drafts) /
+    # publish / submit-to-Meta-or-DLT. Junior roles get read only via
+    # the Employee key list below.
+    "templates.read",
+    "templates.write",
+    "templates.review",
+    "templates.publish",
+    "templates.submit_external",
 ]
 
 
@@ -159,6 +168,11 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     # Step 7 — Employees enroll their own leads into manager-built
     # sequences but cannot author/edit the sequence definitions.
     "email.sequences.enroll",
+    # tasks/template-library Step 3 — Employees can READ templates
+    # (so the editor's variable picker + the conversation composer's
+    # template-pick action work) but cannot author, review, publish,
+    # or submit externally. Owner/Admin holds the rest.
+    "templates.read",
 ]
 
 

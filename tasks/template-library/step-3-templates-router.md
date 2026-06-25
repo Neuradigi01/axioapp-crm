@@ -1,7 +1,7 @@
 # Step 3 — Templates router and permissions
 
 **Goal:** REST endpoints for CRUD + version history + preview. Register five new permission keys and mount the router under `/api/v1/templates`.
-**Status:** Pending
+**Status:** COMPLETED — 9 endpoints live at `/api/v1/templates` (OpenAPI confirms: `GET/POST /`, `GET/PATCH/DELETE /{id}`, `GET /{id}/versions`, `GET /{id}/versions/{version}`, `POST /{id}/preview`, `GET /variables/{channel}`). Five permission keys (`templates.read/write/review/publish/submit_external`) registered in `tbl_permissions` and backfilled onto existing Owner (24 orgs × 5 keys) + Admin (24 × 5) + Employee (24 × 1 = read only) via migration `0118_bf_templates_perm` (which registers keys directly so the role-fanout JOIN finds something). Spec deltas: (1) role-template file actually at `core/permissions/role_templates.py` not `core/auth/`, (2) created `core/templates/module.py` with `menu_position=None` so the registry's lifespan sweep also picks up the keys (Step 5 will flip menu_position to surface the sidebar entry). Pytest deferred per the user's instruction.
 **Depends on:** Step 1 (schema), Step 2 (service).
 
 ---
