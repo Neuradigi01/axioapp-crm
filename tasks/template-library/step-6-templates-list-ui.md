@@ -1,7 +1,7 @@
 # Step 6 — Templates list UI
 
 **Goal:** Angular list page for `/user/templates` — filter by channel + status, search by name, status badges (both internal + external), per-row actions menu. The first frontend step in this track.
-**Status:** Pending
+**Status:** COMPLETED — `templates-api.service.ts` (typed HttpClient for the 13 backend endpoints incl. workflow + test-send), `channel-chip.component` + `template-status-badge.component` (small dumb components with per-channel + per-status palettes), `templates.page` (signal-driven list with channel/status/search filters, server-side pagination at 25 per page, empty state with "Create your first" CTA, loading + error states, write-gated "New template" button), lazy route added to `user.routes.ts` gated on `permissionGuard('templates.read')`. 3 Jest cases in `templates.page.spec.ts`. All Lucide icons used are already registered (`plus`, `search`, `x`, `file-text`, `chevron-left/right`, `loader-2`, `message-circle`, `mail`, `phone`, `bell`, `tag`) — no `app.config.ts` edit needed. The 3 unrelated icon-check failures (`bot`, `external-link`, `megaphone`) are pre-existing in conversation components, not introduced here. Pytest + ng build deferred.
 **Depends on:** Step 3 (REST endpoints), Step 5 (sidebar entry).
 
 ---

@@ -372,6 +372,18 @@ export const userRoutes: Routes = [
           ).then((m) => m.WhatsAppTemplatesPageComponent),
       },
       {
+        // tasks/template-library Step 6 — central multi-channel template
+        // library list page. Read-gated; "New template" + per-row
+        // workflow buttons are hidden per-role inside the page itself
+        // (Employee sees the table; Owner/Admin see write affordances).
+        path: 'templates',
+        canActivate: [permissionGuard('templates.read')],
+        loadComponent: () =>
+          import('./core/templates/templates.page').then(
+            (m) => m.TemplatesPageComponent,
+          ),
+      },
+      {
         // whatsapp-platform-upgrade Step 11 — business profile editor.
         // Single permission key gates the whole page (the editor is
         // admin-grade — junior roles get no useful read-only view).
