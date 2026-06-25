@@ -34,17 +34,16 @@ import base64
 import json
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
 from typing import Any, Iterable, Literal, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, delete, func, or_, select, tuple_
+from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
-from src.app.core.activities.models import Activity, ActivityType
+from src.app.core import activities, audit
+from src.app.core.activities.models import ActivityType
 from src.app.core.contacts.models import Contact
-from src.app.core.leads import filter_dsl, scoring
+from src.app.core.leads import data_access as _da, filter_dsl, scoring
 from src.app.core.leads.csv_export import resolve_custom_columns
 from src.app.core.leads.models import (
     Lead,
@@ -61,7 +60,6 @@ from src.app.core.leads.schemas import (
 )
 from src.app.core.pipelines import move_card
 from src.app.core.pipelines.service import get_pipeline_by_key
-from src.app.core.users.models import OrganizationMember, User
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.queries import ensure_found
@@ -112,11 +110,6 @@ def _snapshot(lead: Lead) -> dict[str, Any]:
     return snapshot(lead, fields=_SNAPSHOT_FIELDS)
 
 
-# --- custom_data validation (mirrors `contacts.service` — intentionally
-# duplicated for now; will be extracted into a shared helper when a
-# third entity needs the same logic). ---
-
-
 # --- pipeline stage helpers ---
 
 
@@ -159,19 +152,13 @@ async def _resolve_initial_stage(
 
 
 async def get_lead(session: AsyncSession, lead_id: uuid.UUID) -> Optional[Lead]:
-    result = await session.execute(select(Lead).where(Lead.id == lead_id))
-    return result.scalar_one_or_none()
+    return await _da.get_lead_by_id(session, lead_id)
 
 
 async def _ensure_contact_in_scope(
     session: AsyncSession, contact_id: uuid.UUID
 ) -> None:
-    # The tenant ORM filter ensures we only see in-org contacts; a missing
-    # row therefore means either nonexistent or foreign-org → 422 either way.
-    contact = (
-        await session.execute(select(Contact.id).where(Contact.id == contact_id))
-    ).scalar_one_or_none()
-    if contact is None:
+    if not await _da.contact_exists_in_org(session, contact_id):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"contact_id {contact_id} not found in this org",
@@ -219,7 +206,7 @@ async def create_lead(
         custom_data=cleaned_custom,
         attribution=payload.attribution,
     )
-    session.add(lead)
+    _da.insert_lead(session, lead)
     await session.flush()
     # Score the freshly inserted row before the commit so the persisted
     # value matches what the caller will see when they next GET the lead.
@@ -263,9 +250,7 @@ async def update_lead(
     await session.flush()
     # Recompute the score iff a column referenced by any active rule
     # changed — keeps the hot path cheap when reps update freeform
-    # notes / custom_data that no rule cares about. ``custom_data`` is
-    # tracked as a single key here; nested-key invalidation would
-    # require parsing the JSONB diff which we don't yet do.
+    # notes / custom_data that no rule cares about.
     changed_fields = set(changes.keys())
     relevant = await scoring.rule_relevant_fields(session, org_id=lead.org_id)
     if relevant and changed_fields & relevant:
@@ -287,7 +272,7 @@ async def delete_lead(session: AsyncSession, *, lead_id: uuid.UUID) -> None:
     lead = ensure_found(await get_lead(session, lead_id), entity="lead")
     before = _snapshot(lead)
     lead_uuid = lead.id
-    await session.delete(lead)
+    await _da.delete_lead_row(session, lead)
     await session.commit()
 
     await log_entity_change(
@@ -316,9 +301,6 @@ async def _build_list_query(
     boolean WHERE clause + the JOIN hint.
 
     Returned tuple: ``(where_clause_or_None, filters_list, needs_contact_join)``.
-    ``filters_list`` is kept for callers that want to inspect or
-    pass-through individual clauses (the CSV export passes the
-    combined expression).
     """
     filters: list[Any] = []
     needs_contact_join = False
@@ -330,8 +312,6 @@ async def _build_list_query(
     if assigned_to is not None:
         filters.append(Lead.assigned_to_id == assigned_to)
     if last_activity_lt is not None:
-        # Treat NULL last_activity_at as "very old" so the no-activity
-        # chip surfaces never-touched leads, which is what reps want.
         filters.append(
             or_(
                 Lead.last_activity_at < last_activity_lt,
@@ -391,8 +371,7 @@ def _order_clause(sort: str, order: str):
 
 
 def _encode_cursor(sort_value: Any, lead_id: uuid.UUID) -> str:
-    """Base64-encode the keyset cursor. ``sort_value`` is ISO-formatted
-    for date/datetime; raw otherwise."""
+    """Base64-encode the keyset cursor."""
     if isinstance(sort_value, datetime):
         payload_v: Any = sort_value.isoformat()
     elif isinstance(sort_value, date):
@@ -420,8 +399,6 @@ def _decode_cursor(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="invalid cursor",
         ) from exc
-    # Coerce v back to the column's native Python type so the keyset
-    # comparison matches the index.
     if v_raw is None:
         return None, lead_id
     if sort in ("created_at", "last_activity_at"):
@@ -440,7 +417,6 @@ def _decode_cursor(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="invalid cursor",
             ) from exc
-    # contact_name
     return str(v_raw), lead_id
 
 
@@ -466,22 +442,7 @@ async def list_leads(
     limit: Optional[int] = None,
     with_total: bool = True,
 ) -> tuple[list[Lead], Optional[int], Optional[str]]:
-    """Filtered list of leads, supporting two pagination modes.
-
-    Offset mode (legacy callers): pass ``page`` + ``size``. Returns
-    ``(rows, total, None)``. ``with_total`` is honoured but the
-    default is ``True`` to match historical behaviour.
-
-    Cursor mode: pass ``cursor`` (opaque base64 token) + ``limit``.
-    Returns ``(rows, total_or_None, next_cursor_or_None)``. ``total``
-    only when the caller opted in with ``with_total=True``. ``cursor``
-    on first request is ``None``; the response's ``next_cursor`` feeds
-    the next request and is itself ``None`` when the set is exhausted.
-
-    Filters: convenience args (``q``, ``source``, ``status_filter``…)
-    compose with the JSON ``filter_dsl_payload`` via AND. ``q`` /
-    ``source`` / ``sort=contact_name`` force the contacts JOIN.
-    """
+    """Filtered list of leads, supporting two pagination modes."""
     where, _filters, needs_contact_join = await _build_list_query(
         session,
         stage=stage,
@@ -496,31 +457,17 @@ async def list_leads(
         sort=sort,
     )
 
-    base = select(Lead)
-    count_stmt = select(func.count()).select_from(Lead)
-    if needs_contact_join:
-        base = base.join(Contact, Lead.contact_id == Contact.id)
-        count_stmt = count_stmt.join(Contact, Lead.contact_id == Contact.id)
-    if where is not None:
-        base = base.where(where)
-        count_stmt = count_stmt.where(where)
-
     primary = _order_clause(sort, order)
     # Secondary key on `Lead.id` makes the keyset bound unambiguous on
-    # ties (e.g. two leads with identical created_at) and matches the
-    # composite indexes added in migration 0070.
+    # ties and matches the composite indexes added in migration 0070.
     secondary = Lead.id.desc() if order == "desc" else Lead.id.asc()
-    base = base.order_by(primary, secondary)
 
     total: Optional[int] = None
     if with_total:
-        total = int((await session.execute(count_stmt)).scalar_one())
+        total = await _da.count_leads_with_where(
+            session, where=where, needs_contact_join=needs_contact_join
+        )
 
-    # Cursor mode is restricted to lead-direct sort keys — sorting by
-    # ``contact_name`` would need the joined name on every result for the
-    # keyset bound, which adds complexity without buying much (the
-    # contact-name sort is a UI nicety used on small pages). FE callers
-    # using ``contact_name`` keep offset mode.
     cursor_eligible_sorts = {"created_at", "last_activity_at", "lead_score"}
     if cursor is not None and sort not in cursor_eligible_sorts:
         raise HTTPException(
@@ -536,16 +483,24 @@ async def list_leads(
         effective_limit = max(_LIMIT_MIN, min(_LIMIT_MAX, limit or _LIMIT_DEFAULT))
         sort_value, last_id = _decode_cursor(cursor, sort)
         sort_col = _SORT_COLUMNS[sort]
-        if order == "desc":
-            keyset = tuple_(sort_col, Lead.id) < tuple_(sort_value, last_id)
-        else:
-            keyset = tuple_(sort_col, Lead.id) > tuple_(sort_value, last_id)
-        base = base.where(keyset)
+        keyset = _da.build_keyset_clause(
+            sort_col=sort_col,
+            sort_value=sort_value,
+            last_id=last_id,
+            order=order,
+        )
         # Fetch limit+1 to determine whether there's a next page
         # without a separate COUNT.
-        rows = (
-            await session.execute(base.limit(effective_limit + 1))
-        ).scalars().all()
+        rows = await _da.list_leads_with_where(
+            session,
+            where=where,
+            needs_contact_join=needs_contact_join,
+            primary_order=primary,
+            secondary_order=secondary,
+            keyset_clause=keyset,
+            offset=0,
+            limit=effective_limit + 1,
+        )
         has_more = len(rows) > effective_limit
         page_rows = list(rows[:effective_limit])
         next_cursor: Optional[str] = None
@@ -557,11 +512,16 @@ async def list_leads(
     # --- offset mode (default / legacy) ---
     effective_size = max(_LIMIT_MIN, min(_LIMIT_MAX, size))
     effective_page = max(1, page)
-    rows = (
-        await session.execute(
-            base.offset((effective_page - 1) * effective_size).limit(effective_size + 1)
-        )
-    ).scalars().all()
+    rows = await _da.list_leads_with_where(
+        session,
+        where=where,
+        needs_contact_join=needs_contact_join,
+        primary_order=primary,
+        secondary_order=secondary,
+        keyset_clause=None,
+        offset=(effective_page - 1) * effective_size,
+        limit=effective_size + 1,
+    )
     has_more = len(rows) > effective_size
     page_rows = list(rows[:effective_size])
     next_cursor = None
@@ -593,8 +553,7 @@ async def list_leads_where(
 ) -> tuple[Any, bool]:
     """Companion to ``list_leads`` used by the CSV export: builds and
     returns the same combined WHERE clause + JOIN hint, without
-    executing it. Keeps export and list in lockstep on filter
-    semantics without paying for two builders."""
+    executing it."""
     where, _filters, needs_join = await _build_list_query(
         session,
         stage=stage,
@@ -623,25 +582,9 @@ async def move_stage_for_lead(
     lost_reason: Optional[str] = None,
     lost_reason_other: Optional[str] = None,
 ) -> Lead:
-    """Move a lead to a new stage and keep `status` in sync.
-
-    Delegates the actual UPDATE + audit + activity to
-    `pipelines.move_card`, then re-fetches the lead and stamps
-    `status` based on the destination stage's `is_won` / `is_lost`
-    flags. The two writes are separate transactions; that's acceptable
-    because the lead's `status` is derived state, not authoritative —
-    the pipeline_stage column is the source of truth.
-
-    When the destination stage has `is_lost=true`, `lost_reason` is
-    required (picklist enforced by `LOST_REASONS`). The FE collects
-    it in the move-to-Lost modal and passes it through here in a
-    single API call, so the timeline shows "moved to <stage> with
-    reason=<x>" instead of two disconnected events.
-    """
+    """Move a lead to a new stage and keep `status` in sync."""
     lead = ensure_found(await get_lead(session, lead_id), entity="lead")
 
-    # Resolve the destination stage's flags up-front so we can reject
-    # an incomplete move-to-Lost call before any DB mutation.
     pipeline = await get_pipeline_by_key(session, key=_LEADS_PIPELINE_KEY)
     new_stage = (
         next((s for s in pipeline.stages if s.key == to_stage), None)
@@ -670,8 +613,6 @@ async def move_stage_for_lead(
                 detail="lost_reason_other is required when lost_reason='other'",
             )
 
-    # `move_card` validates pipeline + stage + card-table-allowlist and
-    # raises HTTPException with the right status code on any problem.
     await move_card(
         session,
         pipeline_key=_LEADS_PIPELINE_KEY,
@@ -681,9 +622,6 @@ async def move_stage_for_lead(
         user_id=user_id,
     )
 
-    # `move_card` updates the row via raw SQL and commits, so the ORM's
-    # cached attributes on `lead` are stale. Force a re-read before we
-    # decide whether `status` needs syncing.
     await session.refresh(lead)
 
     new_status = (
@@ -718,21 +656,10 @@ async def move_stage_for_lead(
 async def _assert_user_in_org(
     session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
 ) -> None:
-    """422 if the target user has no active membership in this org.
-
-    Mirrors `contacts.service._assert_user_in_org` — same cross-tenant
-    guard wording, same OrganizationMember + User.legacy_uuid join."""
-    result = await session.execute(
-        select(OrganizationMember.id)
-        .join(User, User.id == OrganizationMember.user_member_id)
-        .where(
-            User.legacy_uuid == user_uuid,
-            OrganizationMember.organization_id == org_id,
-            OrganizationMember.is_active.is_(True),
-        )
-        .limit(1)
-    )
-    if result.scalar_one_or_none() is None:
+    """422 if the target user has no active membership in this org."""
+    if not await _da.user_has_active_membership(
+        session, org_id=org_id, user_uuid=user_uuid
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="target user is not a member of this organisation",
@@ -773,17 +700,16 @@ async def reassign_lead(
 
     before = _snapshot(lead)
     lead.assigned_to_id = assigned_to_id
-    session.add(
-        Activity(
-            org_id=org_id,
-            entity_type="lead",
-            entity_id=lead.id,
-            type=ActivityType.reassign,
-            payload=_reassign_payload(
-                from_id=before_id, to_id=assigned_to_id, note=note
-            ),
-            user_id=actor_user_id,
-        )
+    await activities.record_in_session(
+        session,
+        org_id=org_id,
+        entity_type="lead",
+        entity_id=lead.id,
+        type=ActivityType.reassign,
+        payload=_reassign_payload(
+            from_id=before_id, to_id=assigned_to_id, note=note
+        ),
+        user_id=actor_user_id,
     )
     await session.commit()
     await session.refresh(lead)
@@ -823,17 +749,16 @@ async def bulk_reassign_leads(
             continue
         before_id = lead.assigned_to_id
         lead.assigned_to_id = assigned_to_id
-        session.add(
-            Activity(
-                org_id=org_id,
-                entity_type="lead",
-                entity_id=lead.id,
-                type=ActivityType.reassign,
-                payload=_reassign_payload(
-                    from_id=before_id, to_id=assigned_to_id, note=note
-                ),
-                user_id=actor_user_id,
-            )
+        await activities.record_in_session(
+            session,
+            org_id=org_id,
+            entity_type="lead",
+            entity_id=lead.id,
+            type=ActivityType.reassign,
+            payload=_reassign_payload(
+                from_id=before_id, to_id=assigned_to_id, note=note
+            ),
+            user_id=actor_user_id,
         )
         reassigned += 1
 
@@ -849,11 +774,11 @@ async def bulk_delete_leads(
 ) -> int:
     """Hard-delete N leads. Belt + suspenders: `org_id` in WHERE alongside
     the per-tenant RLS policy."""
-    result = await session.execute(
-        delete(Lead).where(Lead.id.in_(ids), Lead.org_id == org_id)
+    rowcount = await _da.bulk_delete_leads_by_ids(
+        session, ids=ids, org_id=org_id
     )
     await session.commit()
-    return int(result.rowcount or 0)
+    return rowcount
 
 
 # --- Scoring rule CRUD ------------------------------------------------------
@@ -870,8 +795,7 @@ def _scoring_snapshot(rule: LeadScoringRule) -> dict[str, Any]:
 
 
 def _validate_scoring_condition(condition: dict[str, Any]) -> None:
-    """Parse + validate that a rule condition is scorable in-memory.
-    Mapped to 422 via HTTPException."""
+    """Parse + validate that a rule condition is scorable in-memory."""
     try:
         parsed = filter_dsl.parse(condition)
         filter_dsl.validate_scorable(parsed)
@@ -885,24 +809,14 @@ def _validate_scoring_condition(condition: dict[str, Any]) -> None:
 async def list_scoring_rules(
     session: AsyncSession, *, org_id: uuid.UUID
 ) -> list[LeadScoringRule]:
-    """All rules (active + inactive) for the tenant, oldest first.
-    The settings page surfaces both so an admin can re-enable a rule
-    without losing its history."""
-    result = await session.execute(
-        select(LeadScoringRule)
-        .where(LeadScoringRule.org_id == org_id)
-        .order_by(LeadScoringRule.created_at.asc())
-    )
-    return list(result.scalars())
+    """All rules (active + inactive) for the tenant, oldest first."""
+    return await _da.list_scoring_rules_for_org(session, org_id)
 
 
 async def get_scoring_rule(
     session: AsyncSession, *, rule_id: uuid.UUID
 ) -> Optional[LeadScoringRule]:
-    result = await session.execute(
-        select(LeadScoringRule).where(LeadScoringRule.id == rule_id)
-    )
-    return result.scalar_one_or_none()
+    return await _da.get_scoring_rule_by_id(session, rule_id)
 
 
 async def create_scoring_rule(
@@ -919,7 +833,7 @@ async def create_scoring_rule(
         points=payload.points,
         active=payload.active,
     )
-    session.add(rule)
+    _da.insert_scoring_rule(session, rule)
     await session.commit()
     await session.refresh(rule)
 
@@ -967,7 +881,7 @@ async def delete_scoring_rule(
     before = _scoring_snapshot(rule)
     org_id = rule.org_id
     rule_uuid = rule.id
-    await session.delete(rule)
+    await _da.delete_scoring_rule_row(session, rule)
     await session.commit()
 
     scoring.invalidate_rule_field_cache(org_id)

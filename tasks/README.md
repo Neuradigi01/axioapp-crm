@@ -284,7 +284,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 6: Backfill DAL — custom_fields, email](dal-backfill/step-6-backfill-conversations-custom-fields-email.md) — Done
 - [Step 6a: Backfill DAL — conversations + its helper services](dal-backfill/step-6a-backfill-conversations.md) — Done
 - [Step 7: Backfill DAL — embed, integrations, invitations](dal-backfill/step-7-backfill-embed-integrations-invitations.md) — Done
-- [Step 8: Backfill DAL — leads, notifications, packs](dal-backfill/step-8-backfill-leads-notifications-packs.md) — Pending
+- [Step 8: Backfill DAL — leads, notifications, packs](dal-backfill/step-8-backfill-leads-notifications-packs.md) — Done
 - [Step 9: Backfill DAL — permissions, pipelines, reviews](dal-backfill/step-9-backfill-permissions-pipelines-reviews.md) — Pending
 - [Step 10: Backfill DAL — saved_views, settings, staff](dal-backfill/step-10-backfill-saved-views-settings-staff.md) — Pending
 - [Step 11: Backfill DAL — staff_portal, standard_fields, subscriptions](dal-backfill/step-11-backfill-staff-portal-standard-fields-subscriptions.md) — Pending

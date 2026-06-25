@@ -1,7 +1,7 @@
 # Step 8 — Backfill DAL (leads, notifications, packs)
 
 **Goal:** Create `data_access.py` in three core modules. Move all SQL/ORM out of `service.py`. Behaviour unchanged.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 7. (Leads' router-violation was already fixed in Step 1; this step is the full DAL backfill for the same module.)
 **Effort:** ~0.75 days (leads is query-heavy; packs is the module-registry discovery package, not the `packs/` directory).
 

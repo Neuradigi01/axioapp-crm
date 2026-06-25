@@ -28,10 +28,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import select, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.notifications import data_access as _da
 from src.app.core.notifications.manager import manager
 from src.app.core.notifications.models import (
     Notification,
@@ -94,7 +93,7 @@ async def notify(
                     body=body,
                     payload=payload or {},
                 )
-                session.add(notification)
+                _da.insert_notification(session, notification)
                 await session.commit()
                 await session.refresh(notification)
 
@@ -108,8 +107,8 @@ async def notify(
                     session, user_id=user_id, type_=type
                 )
                 if email_enabled:
-                    recipient_email = await _lookup_user_email(
-                        session, user_id=user_id
+                    recipient_email = await _da.lookup_user_email_by_legacy_uuid(
+                        session, legacy_uuid=user_id
                     )
         finally:
             reset_context(ctx_token)
@@ -143,13 +142,9 @@ async def _channel_enabled(
     channel: NotificationChannel,
 ) -> bool:
     """Default-enabled: if no preference row exists, the channel is on."""
-    result = await session.execute(
-        select(NotificationPreference.enabled)
-        .where(NotificationPreference.user_id == user_id)
-        .where(NotificationPreference.type == type_)
-        .where(NotificationPreference.channel == channel)
+    row = await _da.get_preference_enabled(
+        session, user_id=user_id, type_=type_, channel=channel
     )
-    row = result.scalar_one_or_none()
     return True if row is None else row
 
 
@@ -161,38 +156,13 @@ async def _email_opted_in(
     Different default from in-app: tenants shouldn't suddenly start
     receiving emails when a new notification type is introduced.
     """
-    result = await session.execute(
-        select(NotificationPreference.enabled)
-        .where(NotificationPreference.user_id == user_id)
-        .where(NotificationPreference.type == type_)
-        .where(NotificationPreference.channel == NotificationChannel.email)
+    row = await _da.get_preference_enabled(
+        session,
+        user_id=user_id,
+        type_=type_,
+        channel=NotificationChannel.email,
     )
-    row = result.scalar_one_or_none()
     return bool(row) if row is not None else False
-
-
-async def _lookup_user_email(
-    session: AsyncSession, *, user_id: uuid.UUID
-) -> str | None:
-    """Resolve the recipient's email by `legacy_uuid` -> tbl_user_info.email.
-
-    `legacy_uuid` lives on the layered `User` mapper (DR.6.1+); the
-    legacy `UserLogin` class only maps the bigint `id`. Both target the
-    same `tbl_user_login` table, so we join the layered `User` here.
-    Returns None if the user/profile row is missing or the email field
-    is empty.
-    """
-    from src.app.core.users.models import User, UserInfo
-
-    result = await session.execute(
-        select(UserInfo.email)
-        .join(User, User.id == UserInfo.member_id)
-        .where(User.legacy_uuid == user_id)
-    )
-    email = result.scalar_one_or_none()
-    if email is None or not str(email).strip():
-        return None
-    return str(email).strip()
 
 
 async def _send_email_for(notif: NotificationOut, *, to: str) -> None:
@@ -251,16 +221,9 @@ async def list_for_user(
     unread: Optional[bool] = None,
     limit: int = 50,
 ) -> list[Notification]:
-    stmt = select(Notification).where(Notification.user_id == user_id)
-    if unread is True:
-        stmt = stmt.where(Notification.read_at.is_(None))
-    elif unread is False:
-        stmt = stmt.where(Notification.read_at.is_not(None))
-    stmt = stmt.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(
-        limit
+    return await _da.list_notifications_for_user(
+        session, user_id=user_id, unread=unread, limit=limit
     )
-    rows = (await session.execute(stmt)).scalars().all()
-    return list(rows)
 
 
 async def mark_read(
@@ -268,12 +231,9 @@ async def mark_read(
 ) -> Optional[Notification]:
     """Mark a notification read. Returns the updated row or None if it
     doesn't exist / belongs to another user (we don't leak existence)."""
-    result = await session.execute(
-        select(Notification)
-        .where(Notification.id == notification_id)
-        .where(Notification.user_id == user_id)
+    notification = await _da.get_notification_for_user(
+        session, notification_id=notification_id, user_id=user_id
     )
-    notification = result.scalar_one_or_none()
     if notification is None:
         return None
     if notification.read_at is None:
@@ -288,14 +248,11 @@ async def mark_all_read(
 ) -> int:
     """Mark every unread notification of the user as read. Returns count."""
     now = datetime.now(timezone.utc)
-    result = await session.execute(
-        update(Notification)
-        .where(Notification.user_id == user_id)
-        .where(Notification.read_at.is_(None))
-        .values(read_at=now)
+    touched = await _da.mark_all_unread_read(
+        session, user_id=user_id, when=now
     )
     await session.commit()
-    return int(result.rowcount or 0)
+    return touched
 
 
 # --- Preferences ---
@@ -304,17 +261,8 @@ async def mark_all_read(
 async def get_preferences(
     session: AsyncSession, *, user_id: uuid.UUID
 ) -> list[NotificationPreference]:
-    """Return every explicit preference row this user has set.
-
-    The frontend treats absent (type, channel) pairs as enabled, so the
-    server doesn't pad the response with implicit `true` rows.
-    """
-    result = await session.execute(
-        select(NotificationPreference)
-        .where(NotificationPreference.user_id == user_id)
-        .order_by(NotificationPreference.type, NotificationPreference.channel)
-    )
-    return list(result.scalars().all())
+    """Return every explicit preference row this user has set."""
+    return await _da.list_preferences_for_user(session, user_id=user_id)
 
 
 async def update_preferences(
@@ -338,32 +286,23 @@ async def update_preferences(
     if payload.push is not None:
         channel_values[NotificationChannel.push] = payload.push
 
+    when = datetime.now(timezone.utc)
     for channel, enabled in channel_values.items():
-        stmt = (
-            pg_insert(NotificationPreference)
-            .values(
-                org_id=org_id,
-                user_id=user_id,
-                type=type_,
-                channel=channel,
-                enabled=enabled,
-            )
-            .on_conflict_do_update(
-                constraint="uq_notification_pref_user_type_channel",
-                set_={"enabled": enabled, "updated_at": datetime.now(timezone.utc)},
-            )
+        await _da.upsert_preference(
+            session,
+            org_id=org_id,
+            user_id=user_id,
+            type_=type_,
+            channel=channel,
+            enabled=enabled,
+            when=when,
         )
-        await session.execute(stmt)
     if channel_values:
         await session.commit()
 
-    result = await session.execute(
-        select(NotificationPreference)
-        .where(NotificationPreference.user_id == user_id)
-        .where(NotificationPreference.type == type_)
-        .order_by(NotificationPreference.channel)
+    return await _da.list_preferences_for_user_and_type(
+        session, user_id=user_id, type_=type_
     )
-    return list(result.scalars().all())
 
 
 __all__ = [
