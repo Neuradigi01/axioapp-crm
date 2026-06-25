@@ -1,7 +1,7 @@
 # Step 2 — Templates service and variable engine
 
 **Goal:** Service-layer CRUD + version creation; promote the existing variable engine into `core/templates/variables.py` as a channel-aware shared registry. No HTTP routes, no workflow state transitions yet.
-**Status:** Pending
+**Status:** COMPLETED — `core/templates/exceptions.py` (TemplateNotFound / DuplicateTemplateName / TemplateLocked), `core/templates/variables.py` (promoted from `core/email/variables.py` + added `VariableDef`, `ALLOWED_VARIABLES_BY_CHANNEL`, `variables_for_channel`, lenient `resolve()` alongside strict `render()`, and `extract_variables` alias), `core/email/variables.py` slimmed to a 6-line re-export shim (existing `core/email_templates/service.py` consumer keeps working), `core/templates/service.py` (`create_template` / `get_template` / `list_templates` / `update_template` / `archive_template` / `list_versions` / `get_version` — all RLS-scoped, version-row written atomically with the parent, edit-lock on non-draft, idempotent archive, channel-coherence check on PATCH). Imports confirmed resolving in the api container. 6 + 11 = 17 pytest cases ready in `test_service.py` + `test_variables.py`; pytest run deferred per `feedback_pause_before_pytest.md` memory.
 **Depends on:** Step 1 (schema + models). Re-houses `core/email/variables.py`.
 
 ---
