@@ -1,7 +1,7 @@
 # Step 7 — Templates editor UI (WhatsApp + Email sub-forms)
 
 **Goal:** Channel-aware editor at `/user/templates/{id}` (and `/new`) with WhatsApp and Email sub-forms, variable picker, live preview pane, save-as-draft + save-and-submit flows. SMS / FB / IG / push sub-forms come in Steps 12 + 13.
-**Status:** Pending
+**Status:** COMPLETED — `editor/variable-picker.component` (channel-scoped fetch from `GET /templates/variables/{channel}` + grouped-by-namespace UI + click-to-emit `{{ key }}` events), `editor/preview-pane.component` (inline-template renderer with WA-bubble + email-letter + plain shapes; resolves dot-paths against a hard-coded sample context), `editor/wa-form.component` (signal-input typed reactive form for body + language; Meta-specific WA fields explicitly deferred per spec — note banner in the UI), `editor/email-form.component` (subject + preview-text + body controls with maxlength caps), `editor/template-editor.page` (signal-driven channel switch, two-pane layout with variable picker + preview, focused-textarea tracking via `trackFocus` callback prop, 30s auto-save effect on existing drafts, locked-state banner for in_review/approved/published). Two new routes `/user/templates/new` + `/user/templates/:id` gated on `permissionGuard('templates.read')` — write controls hide inside the page for read-only roles. All 5 Lucide icons used (`arrow-left`, `check`, `x`, `loader-2`, plus the chip/badge transitives) already in the registry. Pytest + ng build + Jest deferred per the locked instruction.
 **Depends on:** Step 6 (list page wired). Reads from Step-3 endpoints + Step-2 variable registry.
 
 ---

@@ -58,7 +58,7 @@ Steps 1-8 ship the new module end-to-end with only WA + Email channels usable. S
 | 4 | [Internal review workflow](step-4-internal-review-workflow.md) | **COMPLETED** | ~1 day |
 | 5 | [Test send + sidebar registration](step-5-test-send-and-sidebar.md) | **COMPLETED** | ~0.5 days |
 | 6 | [Templates list UI](step-6-templates-list-ui.md) | **COMPLETED** | ~1 day |
-| 7 | [Templates editor UI (WA + Email sub-forms)](step-7-templates-editor-ui.md) | **Pending** | ~1.5 days |
+| 7 | [Templates editor UI (WA + Email sub-forms)](step-7-templates-editor-ui.md) | **COMPLETED** | ~1.5 days |
 | 8 | [Review modal + versions drawer + test-send modal](step-8-templates-review-and-versions-ui.md) | **Pending** | ~1 day |
 | 9 | [WhatsApp adapter migration](step-9-whatsapp-adapter-migration.md) | **Pending** | ~1 day |
 | 10 | [Email templates merge + UI move](step-10-email-templates-merge-and-ui-move.md) | **Pending** | ~1 day |

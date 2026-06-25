@@ -384,6 +384,26 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // tasks/template-library Step 7 — channel-aware editor.
+        // `/new` for create, `/:id` for edit. Save / save-and-submit
+        // affordances inside are gated on `templates.write` —
+        // Employee sees a read-only editor.
+        path: 'templates/new',
+        canActivate: [permissionGuard('templates.read')],
+        loadComponent: () =>
+          import('./core/templates/editor/template-editor.page').then(
+            (m) => m.TemplateEditorPageComponent,
+          ),
+      },
+      {
+        path: 'templates/:id',
+        canActivate: [permissionGuard('templates.read')],
+        loadComponent: () =>
+          import('./core/templates/editor/template-editor.page').then(
+            (m) => m.TemplateEditorPageComponent,
+          ),
+      },
+      {
         // whatsapp-platform-upgrade Step 11 — business profile editor.
         // Single permission key gates the whole page (the editor is
         // admin-grade — junior roles get no useful read-only view).

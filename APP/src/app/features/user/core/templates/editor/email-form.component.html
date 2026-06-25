@@ -1,0 +1,44 @@
+<form [formGroup]="form()" class="flex flex-col gap-3">
+  <label class="block">
+    <span class="text-xs font-medium text-zinc-700">Subject</span>
+    <input
+      type="text"
+      formControlName="subject"
+      maxlength="998"
+      (focus)="onFocus($event)"
+      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+      placeholder="e.g. Welcome to {{ '{' + '{' + 'org.name' + '}' + '}' }}"
+    />
+  </label>
+
+  <label class="block">
+    <span class="text-xs font-medium text-zinc-700">
+      Preview text
+      <span class="text-zinc-400">(the line Gmail / Outlook shows after the subject)</span>
+    </span>
+    <input
+      type="text"
+      formControlName="preview_text"
+      maxlength="190"
+      (focus)="onFocus($event)"
+      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+    />
+  </label>
+
+  <label class="block">
+    <span class="text-xs font-medium text-zinc-700">Body</span>
+    <textarea
+      formControlName="body_text"
+      maxlength="65535"
+      rows="14"
+      (focus)="onFocus($event)"
+      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-mono focus:border-zinc-500 focus:outline-none"
+      placeholder="Hi {{ '{' + '{' + 'contact.first_name' + '}' + '}' }}, …"
+    ></textarea>
+    <p class="mt-1 text-[10px] text-zinc-400">
+      Plain text or HTML. Variables like
+      <code class="rounded bg-zinc-100 px-1 py-0.5 font-mono">{{ '{' + '{' + 'contact.first_name' + '}' + '}' }}</code>
+      resolve at send time.
+    </p>
+  </label>
+</form>
