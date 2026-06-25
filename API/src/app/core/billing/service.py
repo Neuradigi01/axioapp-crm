@@ -27,19 +27,15 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from src.app.core import audit
+from src.app.core.billing import data_access as _da
 from src.app.core.billing.models import (
     Invoice,
     InvoiceLine,
     InvoiceStatus,
-    OrgInvoiceSeq,
     Payment,
-    PaymentMethod,
 )
 from src.app.core.billing.schemas import (
     InvoiceCreate,
@@ -48,8 +44,7 @@ from src.app.core.billing.schemas import (
     PaymentCreate,
 )
 from src.app.core.settings.service import get_or_create as get_org_settings
-from src.app.shared.db.pagination import paginate
-from src.app.shared.db.queries import ensure_found, get_or_404
+from src.app.shared.db.queries import ensure_found
 
 
 # --- reads ----------------------------------------------------------------
@@ -63,55 +58,35 @@ async def list_invoices(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Invoice], int]:
-    filters = []
-    if status_filter is not None:
-        filters.append(Invoice.status == status_filter)
-    if contact_id is not None:
-        filters.append(Invoice.contact_id == contact_id)
-
-    base = select(Invoice)
-    if filters:
-        base = base.where(and_(*filters))
-    base = base.order_by(Invoice.created_at.desc())
-
-    return await paginate(session, base, page=page, size=size)
+    return await _da.list_invoices_query(
+        session,
+        status_filter=status_filter,
+        contact_id=contact_id,
+        page=page,
+        size=size,
+    )
 
 
 async def get_invoice(
     session: AsyncSession, invoice_id: uuid.UUID
 ) -> Invoice:
-    return await get_or_404(session, Invoice, invoice_id, entity="invoice")
+    return ensure_found(
+        await _da.get_invoice_by_id(session, invoice_id), entity="invoice"
+    )
 
 
 async def get_invoice_with_lines(
     session: AsyncSession, invoice_id: uuid.UUID
 ) -> tuple[Invoice, list[InvoiceLine]]:
     invoice = await get_invoice(session, invoice_id)
-    lines = (
-        (
-            await session.execute(
-                select(InvoiceLine)
-                .where(InvoiceLine.invoice_id == invoice.id)
-                .order_by(InvoiceLine.created_at.asc())
-            )
-        )
-        .scalars()
-        .all()
-    )
-    return invoice, list(lines)
+    lines = await _da.list_invoice_lines(session, invoice.id)
+    return invoice, lines
 
 
 async def list_payments(
     session: AsyncSession, *, invoice_id: uuid.UUID
 ) -> list[Payment]:
-    rows = (
-        await session.execute(
-            select(Payment)
-            .where(Payment.invoice_id == invoice_id)
-            .order_by(Payment.received_at.asc())
-        )
-    ).scalars().all()
-    return list(rows)
+    return await _da.list_payments_query(session, invoice_id=invoice_id)
 
 
 # --- writes ---------------------------------------------------------------
@@ -133,7 +108,7 @@ async def create_draft(
         notes=payload.notes,
         custom_data=payload.custom_data,
     )
-    session.add(inv)
+    _da.insert_invoice(session, inv)
     await session.commit()
     await session.refresh(inv)
 
@@ -169,7 +144,9 @@ async def update_invoice(
             setattr(inv, field, v)
             changed = True
     if changed:
-        _recompute_totals(inv, await _load_lines(session, inv.id))
+        _recompute_totals(
+            inv, await _da.list_invoice_lines(session, inv.id)
+        )
         await session.commit()
         await session.refresh(inv)
     return inv
@@ -184,7 +161,7 @@ async def delete_invoice(
             status_code=status.HTTP_409_CONFLICT,
             detail="only draft invoices can be deleted; void issued ones instead",
         )
-    await session.delete(inv)
+    await _da.delete_invoice_row(session, inv)
     await session.commit()
 
 
@@ -218,10 +195,10 @@ async def add_line(
         tax_pct=tax_pct,
         line_total=line_total,
     )
-    session.add(line)
+    _da.insert_invoice_line(session, line)
     await session.flush()
 
-    lines = await _load_lines(session, inv.id)
+    lines = await _da.list_invoice_lines(session, inv.id)
     _recompute_totals(inv, lines)
     await session.commit()
     await session.refresh(line)
@@ -240,18 +217,15 @@ async def remove_line(
             status_code=status.HTTP_409_CONFLICT,
             detail="cannot remove lines from a non-draft invoice",
         )
-    line = (
-        await session.execute(
-            select(InvoiceLine).where(
-                InvoiceLine.id == line_id,
-                InvoiceLine.invoice_id == invoice_id,
-            )
-        )
-    ).scalar_one_or_none()
-    line = ensure_found(line, entity="line")
-    await session.delete(line)
+    line = ensure_found(
+        await _da.get_invoice_line(
+            session, invoice_id=invoice_id, line_id=line_id
+        ),
+        entity="line",
+    )
+    await _da.delete_invoice_line(session, line)
     await session.flush()
-    lines = await _load_lines(session, inv.id)
+    lines = await _da.list_invoice_lines(session, inv.id)
     _recompute_totals(inv, lines)
     await session.commit()
 
@@ -278,7 +252,7 @@ async def issue(
             detail="cannot issue a void invoice",
         )
 
-    lines = await _load_lines(session, inv.id)
+    lines = await _da.list_invoice_lines(session, inv.id)
     if not lines:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -290,7 +264,7 @@ async def issue(
     inv.gst_number = settings.gst_number
     inv.issued_at = datetime.now(timezone.utc)
     inv.status = InvoiceStatus.issued
-    inv.number = await _next_invoice_number(session, org_id=inv.org_id)
+    inv.number = await _da.next_invoice_number(session, org_id=inv.org_id)
     _recompute_totals(inv, lines)
     await session.commit()
     await session.refresh(inv)
@@ -329,17 +303,10 @@ async def record_payment(
         reference=payload.reference,
         notes=payload.notes,
     )
-    session.add(pay)
+    _da.insert_payment(session, pay)
     await session.flush()
 
-    paid_so_far = (
-        await session.execute(
-            select(func.coalesce(func.sum(Payment.amount), 0)).where(
-                Payment.invoice_id == inv.id
-            )
-        )
-    ).scalar_one()
-    paid_so_far = Decimal(paid_so_far)
+    paid_so_far = await _da.sum_payments(session, inv.id)
     if paid_so_far >= inv.total and inv.status != InvoiceStatus.paid:
         inv.status = InvoiceStatus.paid
         inv.paid_at = datetime.now(timezone.utc)
@@ -394,19 +361,6 @@ async def void(
 # --- helpers --------------------------------------------------------------
 
 
-async def _load_lines(
-    session: AsyncSession, invoice_id: uuid.UUID
-) -> list[InvoiceLine]:
-    rows = (
-        await session.execute(
-            select(InvoiceLine)
-            .where(InvoiceLine.invoice_id == invoice_id)
-            .order_by(InvoiceLine.created_at.asc())
-        )
-    ).scalars().all()
-    return list(rows)
-
-
 def _recompute_totals(inv: Invoice, lines: list[InvoiceLine]) -> None:
     subtotal = sum((ln.line_subtotal for ln in lines), Decimal("0.00"))
     tax = sum((ln.line_total - ln.line_subtotal for ln in lines), Decimal("0.00"))
@@ -415,30 +369,6 @@ def _recompute_totals(inv: Invoice, lines: list[InvoiceLine]) -> None:
     inv.subtotal = subtotal.quantize(Decimal("0.01"))
     inv.tax_amount = tax.quantize(Decimal("0.01"))
     inv.total = total if total > 0 else Decimal("0.00")
-
-
-async def _next_invoice_number(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> int:
-    """Atomically allocate the next per-org invoice number.
-
-    Uses INSERT ... ON CONFLICT DO UPDATE so the row is created on
-    first issue, and `RETURNING last_number` gives the freshly
-    incremented value. The composite (insert OR update) acquires a row
-    lock for the duration of the transaction — concurrent issuers
-    serialize at the org level, which is fine for POS throughput.
-    """
-    stmt = (
-        pg_insert(OrgInvoiceSeq)
-        .values(org_id=org_id, last_number=1)
-        .on_conflict_do_update(
-            index_elements=[OrgInvoiceSeq.org_id],
-            set_={"last_number": OrgInvoiceSeq.last_number + 1},
-        )
-        .returning(OrgInvoiceSeq.last_number)
-    )
-    result = await session.execute(stmt)
-    return int(result.scalar_one())
 
 
 __all__ = [

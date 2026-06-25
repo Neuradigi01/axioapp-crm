@@ -17,11 +17,10 @@ import uuid
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
+from src.app.core.catalog import data_access as _da
 from src.app.core.catalog.models import CatalogItem
 from src.app.core.catalog.schemas import (
     CatalogItemCreate,
@@ -29,7 +28,6 @@ from src.app.core.catalog.schemas import (
 )
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.custom_fields import validate_custom_data
-from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 from src.app.shared.files import (
     ImageValidationError,
@@ -64,10 +62,7 @@ def _snapshot(item: CatalogItem) -> dict[str, Any]:
 async def get_item(
     session: AsyncSession, item_id: uuid.UUID
 ) -> Optional[CatalogItem]:
-    result = await session.execute(
-        select(CatalogItem).where(CatalogItem.id == item_id)
-    )
-    return result.scalar_one_or_none()
+    return await _da.get_catalog_item_by_id(session, item_id)
 
 
 async def create_item(
@@ -92,7 +87,7 @@ async def create_item(
         is_active=payload.is_active,
         custom_data=cleaned_custom,
     )
-    session.add(item)
+    _da.insert_catalog_item(session, item)
     try:
         await session.commit()
     except IntegrityError as exc:
@@ -148,7 +143,7 @@ async def delete_item(session: AsyncSession, *, item_id: uuid.UUID) -> None:
     item = ensure_found(await get_item(session, item_id), entity="catalog item")
     before = _snapshot(item)
     item_uuid = item.id
-    await session.delete(item)
+    await _da.delete_catalog_item_row(session, item)
     await session.commit()
 
     await log_entity_change(
@@ -213,24 +208,14 @@ async def list_items(
     size: int = 50,
 ) -> tuple[list[CatalogItem], int]:
     """Paginated filtered list. `q` ILIKEs across name + sku."""
-    filters: list[Any] = []
-    if q:
-        like = f"%{q}%"
-        filters.append(
-            or_(CatalogItem.name.ilike(like), CatalogItem.sku.ilike(like))
-        )
-    if category:
-        filters.append(CatalogItem.category == category)
-    if active_only:
-        filters.append(CatalogItem.is_active.is_(True))
-
-    where = and_(*filters) if filters else None
-    base = select(CatalogItem)
-    if where is not None:
-        base = base.where(where)
-    base = base.order_by(CatalogItem.name.asc(), CatalogItem.sku.asc())
-
-    return await paginate(session, base, page=page, size=size)
+    return await _da.list_catalog_items_query(
+        session,
+        q=q,
+        category=category,
+        active_only=active_only,
+        page=page,
+        size=size,
+    )
 
 
 __all__ = [

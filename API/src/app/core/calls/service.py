@@ -21,14 +21,13 @@ from datetime import date as Date
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, cast, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.types import Date as SADate
 
 from src.app.core import audit
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
+from src.app.core.calls import data_access as _da
 from src.app.core.calls.models import (
     Call,
     CallDirection,
@@ -43,18 +42,14 @@ from src.app.core.calls.schemas import (
     CallUpdate,
 )
 from src.app.shared.audit import log_entity_change
-from src.app.shared.db.pagination import paginate
-from src.app.shared.db.queries import get_or_404
+from src.app.shared.db.queries import ensure_found
 
 
 # --- Outcomes -------------------------------------------------------------
 
 
 async def list_outcomes(session: AsyncSession) -> list[CallOutcome]:
-    stmt = select(CallOutcome).order_by(
-        CallOutcome.display_order.asc(), CallOutcome.label.asc()
-    )
-    return list((await session.execute(stmt)).scalars().all())
+    return await _da.list_outcomes_query(session)
 
 
 async def create_outcome(
@@ -70,7 +65,7 @@ async def create_outcome(
         color=payload.color,
         display_order=payload.display_order,
     )
-    session.add(outcome)
+    _da.insert_outcome(session, outcome)
     try:
         await session.commit()
     except IntegrityError:
@@ -125,7 +120,7 @@ async def delete_outcome(
 ) -> None:
     outcome = await _get_outcome(session, outcome_id)
     before = _outcome_snapshot(outcome)
-    await session.delete(outcome)
+    await _da.delete_outcome_row(session, outcome)
     await session.commit()
     await log_entity_change(
         action="calls.outcome_deleted",
@@ -138,7 +133,9 @@ async def delete_outcome(
 async def _get_outcome(
     session: AsyncSession, outcome_id: uuid.UUID
 ) -> CallOutcome:
-    return await get_or_404(session, CallOutcome, outcome_id, entity="call outcome")
+    return ensure_found(
+        await _da.get_outcome_by_id(session, outcome_id), entity="call outcome"
+    )
 
 
 # --- Calls CRUD ------------------------------------------------------------
@@ -153,25 +150,20 @@ async def list_calls(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Call], int]:
-    filters: list[Any] = []
-    if contact_id is not None:
-        filters.append(Call.contact_id == contact_id)
-    if direction is not None:
-        filters.append(Call.direction == direction)
-    if assigned_to_id is not None:
-        filters.append(Call.assigned_to_id == assigned_to_id)
-
-    where = and_(*filters) if filters else None
-    base = select(Call)
-    if where is not None:
-        base = base.where(where)
-    base = base.order_by(Call.started_at.desc(), Call.created_at.desc())
-
-    return await paginate(session, base, page=page, size=size)
+    return await _da.list_calls_query(
+        session,
+        contact_id=contact_id,
+        direction=direction,
+        assigned_to_id=assigned_to_id,
+        page=page,
+        size=size,
+    )
 
 
 async def get_call(session: AsyncSession, call_id: uuid.UUID) -> Call:
-    return await get_or_404(session, Call, call_id, entity="call")
+    return ensure_found(
+        await _da.get_call_by_id(session, call_id), entity="call"
+    )
 
 
 async def create_call(
@@ -193,7 +185,7 @@ async def create_call(
         assigned_to_id=payload.assigned_to_id,
         custom_data=payload.custom_data,
     )
-    session.add(call)
+    _da.insert_call(session, call)
     await session.commit()
     await session.refresh(call)
 
@@ -265,7 +257,7 @@ async def update_call(
 async def delete_call(session: AsyncSession, *, call_id: uuid.UUID) -> None:
     call = await get_call(session, call_id)
     before = _call_snapshot(call)
-    await session.delete(call)
+    await _da.delete_call_row(session, call)
     await session.commit()
     await log_entity_change(
         action="calls.deleted",
@@ -281,11 +273,7 @@ async def delete_call(session: AsyncSession, *, call_id: uuid.UUID) -> None:
 async def get_transcript(
     session: AsyncSession, *, call_id: uuid.UUID
 ) -> Optional[CallTranscript]:
-    return (
-        await session.execute(
-            select(CallTranscript).where(CallTranscript.call_id == call_id)
-        )
-    ).scalar_one_or_none()
+    return await _da.get_transcript_for_call(session, call_id=call_id)
 
 
 async def upsert_transcript(
@@ -311,7 +299,7 @@ async def upsert_transcript(
             text=payload.text,
             language=payload.language,
         )
-        session.add(transcript)
+        _da.insert_transcript(session, transcript)
     else:
         existing.text = payload.text
         existing.language = payload.language
@@ -344,30 +332,6 @@ async def analytics(
             detail="`to` must be on or after `from`",
         )
 
-    started_date = cast(Call.started_at, SADate)
-    window = and_(started_date >= from_dt, started_date <= to_dt)
-
-    # 1. Outcomes distribution — left-join to outcome row for label/color.
-    outcomes_stmt = (
-        select(
-            Call.outcome_id,
-            CallOutcome.key,
-            CallOutcome.label,
-            CallOutcome.color,
-            func.count(Call.id).label("count"),
-        )
-        .select_from(Call)
-        .join(
-            CallOutcome,
-            CallOutcome.id == Call.outcome_id,
-            isouter=True,
-        )
-        .where(window)
-        .group_by(
-            Call.outcome_id, CallOutcome.key, CallOutcome.label, CallOutcome.color
-        )
-        .order_by(func.count(Call.id).desc())
-    )
     outcomes_rows = [
         {
             "outcome_id": r.outcome_id,
@@ -376,30 +340,23 @@ async def analytics(
             "outcome_color": r.color,
             "count": int(r.count),
         }
-        for r in (await session.execute(outcomes_stmt)).all()
+        for r in await _da.outcomes_distribution_query(
+            session, from_dt=from_dt, to_dt=to_dt
+        )
     ]
 
-    # 2. Daily volume.
-    daily_stmt = (
-        select(started_date.label("day"), func.count(Call.id).label("count"))
-        .where(window)
-        .group_by(started_date)
-        .order_by(started_date.asc())
-    )
     daily_rows = [
         {"day": r.day, "count": int(r.count)}
-        for r in (await session.execute(daily_stmt)).all()
+        for r in await _da.daily_volume_query(
+            session, from_dt=from_dt, to_dt=to_dt
+        )
     ]
 
-    # 3. Direction split.
-    direction_stmt = (
-        select(Call.direction, func.count(Call.id).label("count"))
-        .where(window)
-        .group_by(Call.direction)
-    )
     direction_rows = [
         {"direction": r.direction, "count": int(r.count)}
-        for r in (await session.execute(direction_stmt)).all()
+        for r in await _da.direction_split_query(
+            session, from_dt=from_dt, to_dt=to_dt
+        )
     ]
 
     return {
