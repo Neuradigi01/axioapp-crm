@@ -93,6 +93,52 @@ furniture-crm/
 9. **No skipping verification.** After each step: stop, summary, checklist, **wait for the user to say "proceed"** before the next step. Never batch.
 10. **No "I'll fix it later."** No TODOs, no hardcoded shortcuts, no commented-out code. Every step leaves the codebase clean and runnable.
 
+## Backend module layout (Router → Service → DAL)
+
+**Manager spec 2026-06-25 — locked.** Every backend module under `api/src/app/core/<module>/` and `api/src/app/packs/<pack>/modules/<module>/` follows the same five-file domain-driven layout. One responsibility per file. Optional helper files only when needed.
+
+```
+<module>/
+├── __init__.py
+├── models.py          ← SQLAlchemy ORM only (tables, columns, relationships, indexes)
+├── schemas.py         ← Pydantic request/response models
+├── router.py          ← HTTP endpoints only — receives request, calls service, returns response
+├── service.py         ← Business logic + the ONLY layer that touches transactions
+└── data_access.py     ← Pure CRUD (SELECT/INSERT/UPDATE/DELETE) — no transactions, no business logic
+```
+
+Optional (add only when needed): `utils.py` (pure helpers, no DB), `constants.py` (module enums/constants), `exceptions.py` (custom exception classes), `dependencies.py` (reusable FastAPI `Depends`).
+
+**Layer responsibilities:**
+
+- **`router.py`** — receptionist. Defines endpoints, resolves auth dependency, calls a service, returns response. NEVER executes SQL, calls `db.query / select() / insert() / update() / delete() / db.add / db.commit / db.rollback / db.flush / db.refresh`. NEVER calls another router. NEVER imports another module's DAL — go through that module's service.
+- **`service.py`** — brain. Owns business logic, validations, permission + ownership checks, transaction control, response shaping. May call other services (avoid cycles — extract shared logic into utils). Calls own DAL for queries. **ONLY layer that calls `db.commit() / db.rollback() / db.flush() / db.refresh()`.**
+- **`data_access.py`** — database assistant. Pure CRUD. One function per DB operation. Allowed: `db.add`, `db.delete`, `db.query`, `db.execute`, returning ORM objects or Core statements. NEVER commits, flushes, refreshes, or rolls back. NEVER contains business logic or permission checks. NEVER imports from `service.py` or `router.py`.
+
+**Allowed communication edges:**
+
+```
+HTTP Request → router.py → service.py → data_access.py → Database
+                              ↕
+                       other module services
+```
+
+Forbidden: Router→Router, Router→DB, Router→DAL, DAL→Service, DAL→Router.
+
+**Transaction discipline (zero exceptions):**
+
+```python
+# service.py
+def create_template_service(db, payload):
+    template = data_access.insert_template(db, payload)
+    db.flush()
+    db.commit()
+    db.refresh(template)
+    return template
+```
+
+**Backfill track:** Most existing modules query straight from `service.py` or use a `data_access/` folder (older convention from 2026-06-23, now retired). The [`tasks/dal-backfill/`](tasks/dal-backfill/README.md) side track aligns the whole codebase to this layout module-by-module. A CI pin-test (final step of the track) will fail the build if `db.commit / rollback / refresh / flush` appears outside `service.py`.
+
 ## Reuse-vs-restructure exceptions (agreed with user)
 
 These are project-specific deviations from a clean-slate build:

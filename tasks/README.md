@@ -74,8 +74,9 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [WhatsApp Platform Upgrade](whatsapp-platform-upgrade/README.md) | 29 | Core (side track — Embedded Signup + full WhatsApp UI uplift) |
 | — | [Template Library](template-library/README.md) | 14 | Core (side track — central multi-channel template library; precursor to `automation-engine`) |
 | — | [Automation Engine](automation-engine/README.md) | 14 | Core (side track — event-triggered automation; depends on `template-library`) |
+| — | [DAL Backfill](dal-backfill/README.md) | 14 | Core (side track — align every module to Router → Service → DAL; manager spec 2026-06-25) |
 
-**Total: 155 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides + Lead-Capture (4 tracks) + Pricing-and-Billing side tracks).
+**Total: 169 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides + Lead-Capture (4 tracks) + Pricing-and-Billing side tracks).
 
 Phase 5 was restructured to gather **all core CRM v1 work** (features + polish + hardening) so the path to a shipped template is one phase. Phase 6 was reshaped to hold **all furniture-pack-specific work** that's irrelevant to a generic CRM template adopter.
 
@@ -273,6 +274,22 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 
 ### Promote Integrations to Sidebar (side track — registry flip + route + tab cleanup)
 - [Step 1: Promote Integrations module — backend descriptor + frontend route + tab cleanup + redirect](promote-integrations-to-sidebar/step-1-promote-and-cleanup.md) — Done
+
+### DAL Backfill (side track — align every module to Router → Service → DAL; manager spec 2026-06-25)
+- [Step 1: Fix router transaction violations — inventory, leads, dev](dal-backfill/step-1-fix-router-transaction-violations.md) — Pending
+- [Step 2: Flatten `data_access/` folder → `data_access.py` — auth, campaigns, contacts, email_sequences](dal-backfill/step-2-flatten-dal-folder-batch-1.md) — Pending
+- [Step 3: Flatten `data_access/` folder → `data_access.py` — templates, tenants, users, integrations/whatsapp](dal-backfill/step-3-flatten-dal-folder-batch-2.md) — Pending
+- [Step 4: Backfill DAL — activities, appointments, audit](dal-backfill/step-4-backfill-activities-appointments-audit.md) — Pending
+- [Step 5: Backfill DAL — billing, calls, catalog](dal-backfill/step-5-backfill-billing-calls-catalog.md) — Pending
+- [Step 6: Backfill DAL — conversations, custom_fields, email](dal-backfill/step-6-backfill-conversations-custom-fields-email.md) — Pending
+- [Step 7: Backfill DAL — embed, integrations, invitations](dal-backfill/step-7-backfill-embed-integrations-invitations.md) — Pending
+- [Step 8: Backfill DAL — leads, notifications, packs](dal-backfill/step-8-backfill-leads-notifications-packs.md) — Pending
+- [Step 9: Backfill DAL — permissions, pipelines, reviews](dal-backfill/step-9-backfill-permissions-pipelines-reviews.md) — Pending
+- [Step 10: Backfill DAL — saved_views, settings, staff](dal-backfill/step-10-backfill-saved-views-settings-staff.md) — Pending
+- [Step 11: Backfill DAL — staff_portal, standard_fields, subscriptions](dal-backfill/step-11-backfill-staff-portal-standard-fields-subscriptions.md) — Pending
+- [Step 12: Backfill DAL — tasks, walk_ins](dal-backfill/step-12-backfill-tasks-walkins.md) — Pending
+- [Step 13: Backfill DAL — packs/custom_orders, packs/field_ops](dal-backfill/step-13-backfill-pack-modules.md) — Pending
+- [Step 14: CI guard pin-test + final audit](dal-backfill/step-14-ci-guard-and-final-audit.md) — Pending
 
 ---
 
