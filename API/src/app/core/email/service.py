@@ -20,10 +20,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.email import data_access as _da
 from src.app.core.email.models import (
     EmailAccount,
     EmailAccountProvider,
@@ -60,11 +60,7 @@ async def list_accounts(
     RLS authorises the org scope via the ORM tenant filter — no
     explicit `org_id` WHERE clause needed.
     """
-    stmt = select(EmailAccount).order_by(EmailAccount.connected_at.desc())
-    if user_id is not None:
-        stmt = stmt.where(EmailAccount.user_id == user_id)
-    rows = (await session.execute(stmt)).scalars().all()
-    return list(rows)
+    return await _da.list_accounts_query(session, user_id=user_id)
 
 
 async def get_account(
@@ -72,11 +68,7 @@ async def get_account(
 ) -> Optional[EmailAccount]:
     """Single row by id (RLS-scoped). None if missing OR if the
     caller's org cannot see it (RLS hides cross-tenant rows)."""
-    return (
-        await session.execute(
-            select(EmailAccount).where(EmailAccount.id == account_id)
-        )
-    ).scalar_one_or_none()
+    return await _da.get_account_by_id(session, account_id=account_id)
 
 
 async def get_account_unscoped(
@@ -86,62 +78,13 @@ async def get_account_unscoped(
     Step 4's Celery tasks which have no JWT and need to learn the
     org from the row itself before setting context.
 
-    Uses raw SQL to defeat the `do_orm_execute` auto-filter (which
-    is a no-op when `RequestContext.org_id is None` anyway, but
-    being explicit defends against a future tightening that would
-    deny rows in the unscoped case).
-
     Mirrors the same pattern as `core.integrations.service.
     get_by_webhook_secret` and `core.email.gmail.push.
     find_account_by_email` — both load cross-tenant for webhook /
     daemon entry points that have no JWT to derive context from.
     """
-    from sqlalchemy import text
-
-    sql = text(
-        """
-        SELECT id, org_id, user_id, provider, external_account_id,
-               email_address, display_name, access_token_enc,
-               refresh_token_enc, token_expires_at, scopes_granted,
-               sync_cursor, sync_state, last_sync_at, last_sync_error,
-               daily_sent_count, daily_sent_reset_at, connected_at,
-               disconnected_at, disconnected_by
-        FROM tbl_email_accounts
-        WHERE id = :account_id
-        LIMIT 1
-        """
-    )
-    row = (
-        await session.execute(sql, {"account_id": str(account_id)})
-    ).mappings().first()
-    if row is None:
-        return None
-    from src.app.core.email.models import (
-        EmailAccountProvider,
-        EmailAccountSyncState,
-    )
-
-    return EmailAccount(
-        id=row["id"],
-        org_id=row["org_id"],
-        user_id=row["user_id"],
-        provider=EmailAccountProvider(row["provider"]),
-        external_account_id=row["external_account_id"],
-        email_address=row["email_address"],
-        display_name=row["display_name"],
-        access_token_enc=row["access_token_enc"],
-        refresh_token_enc=row["refresh_token_enc"],
-        token_expires_at=row["token_expires_at"],
-        scopes_granted=row["scopes_granted"] or [],
-        sync_cursor=row["sync_cursor"],
-        sync_state=EmailAccountSyncState(row["sync_state"]),
-        last_sync_at=row["last_sync_at"],
-        last_sync_error=row["last_sync_error"],
-        daily_sent_count=row["daily_sent_count"],
-        daily_sent_reset_at=row["daily_sent_reset_at"],
-        connected_at=row["connected_at"],
-        disconnected_at=row["disconnected_at"],
-        disconnected_by=row["disconnected_by"],
+    return await _da.get_account_by_id_unscoped(
+        session, account_id=account_id
     )
 
 
@@ -172,17 +115,12 @@ async def upsert(
     Emits `email.account.connected` (best-effort).
     """
     provider_enum = EmailAccountProvider(payload.provider)
-    existing = (
-        await session.execute(
-            select(EmailAccount)
-            .where(EmailAccount.user_id == user_id)
-            .where(EmailAccount.provider == provider_enum)
-            .where(
-                EmailAccount.external_account_id
-                == payload.external_account_id
-            )
-        )
-    ).scalar_one_or_none()
+    existing = await _da.find_account_for_external(
+        session,
+        user_id=user_id,
+        provider=provider_enum,
+        external_account_id=payload.external_account_id,
+    )
 
     access_enc = encrypt(payload.access_token)
     refresh_enc = encrypt_optional(payload.refresh_token)
@@ -206,7 +144,7 @@ async def upsert(
             disconnected_at=None,
             disconnected_by=None,
         )
-        session.add(row)
+        _da.insert_account(session, row)
     else:
         existing.email_address = payload.email_address
         existing.display_name = payload.display_name

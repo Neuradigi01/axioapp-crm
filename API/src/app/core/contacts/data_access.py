@@ -52,4 +52,12 @@ async def get_contact_by_phone(
     return result.scalar_one_or_none()
 
 
-__all__ = ["get_contact", "get_contact_by_phone"]
+def insert_contact(session: AsyncSession, contact: Contact) -> None:
+    """Register an already-constructed Contact for INSERT. Caller
+    commits or flushes. Used by webhook intake paths that need to
+    materialise a placeholder contact for an unknown phone number
+    (conversations, walk-ins)."""
+    session.add(contact)
+
+
+__all__ = ["get_contact", "get_contact_by_phone", "insert_contact"]

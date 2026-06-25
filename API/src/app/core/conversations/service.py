@@ -31,7 +31,6 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -39,6 +38,7 @@ from src.app.core.contacts import data_access
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
 from src.app.core.contacts.models import Contact
+from src.app.core.conversations import data_access as _da
 from src.app.core.conversations.adapters import InboundMessage
 from src.app.core.conversations.models import (
     Conversation,
@@ -53,8 +53,7 @@ from src.app.core.conversations.adapters.whatsapp import (
 from src.app.core.conversations.registry import resolve
 from src.app.core.conversations.schemas import ConversationPatch
 from src.app.core.notifications.service import notify
-from src.app.shared.db.pagination import paginate
-from src.app.shared.db.queries import get_or_404
+from src.app.shared.db.queries import ensure_found
 
 
 # Channels whose `external_id` is a phone number; the webhook intake
@@ -77,69 +76,49 @@ async def list_conversations(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Conversation], int]:
-    filters: list[Any] = []
-    if channel is not None:
-        filters.append(Conversation.channel == channel)
-    if status_filter is not None:
-        filters.append(Conversation.status == status_filter)
     # `assigned_to` may be a UUID string (filter to that owner),
     # the sentinel `'unassigned'` (rows with `assigned_to_id IS NULL`),
     # or absent (no filter). Anything else raises 422.
+    assigned_to_id: Optional[uuid.UUID] = None
+    assigned_to_unassigned = False
     if assigned_to is not None:
         if assigned_to == "unassigned":
-            filters.append(Conversation.assigned_to_id.is_(None))
+            assigned_to_unassigned = True
         else:
             try:
-                owner_uuid = uuid.UUID(assigned_to)
+                assigned_to_id = uuid.UUID(assigned_to)
             except ValueError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="assigned_to must be a UUID or 'unassigned'",
                 ) from exc
-            filters.append(Conversation.assigned_to_id == owner_uuid)
-    if q:
-        filters.append(Conversation.external_id.ilike(f"%{q}%"))
-    # Step 14 — OR-semantic tag filter. A conversation matches when it
-    # carries AT LEAST ONE of the listed tag ids.
-    if tag_ids:
-        from src.app.core.conversations.models import (
-            ConversationTagAssignment,
-        )
 
-        tagged_subquery = (
-            select(ConversationTagAssignment.conversation_id)
-            .where(ConversationTagAssignment.tag_id.in_(tag_ids))
-            .scalar_subquery()
-        )
-        filters.append(Conversation.id.in_(tagged_subquery))
-
-    where = and_(*filters) if filters else None
-    base = select(Conversation)
-    if where is not None:
-        base = base.where(where)
-    base = base.order_by(
-        Conversation.last_message_at.desc().nullslast(),
-        Conversation.created_at.desc(),
+    return await _da.list_conversations_query(
+        session,
+        channel=channel,
+        status_filter=status_filter,
+        assigned_to_id=assigned_to_id,
+        assigned_to_unassigned=assigned_to_unassigned,
+        q=q,
+        tag_ids=tag_ids,
+        page=page,
+        size=size,
     )
-
-    return await paginate(session, base, page=page, size=size)
 
 
 async def get_conversation(
     session: AsyncSession, conversation_id: uuid.UUID
 ) -> Conversation:
-    return await get_or_404(session, Conversation, conversation_id, entity="conversation")
+    return ensure_found(
+        await _da.get_conversation_by_id(session, conversation_id),
+        entity="conversation",
+    )
 
 
 async def list_messages(
     session: AsyncSession, conversation_id: uuid.UUID
 ) -> list[Message]:
-    stmt = (
-        select(Message)
-        .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at.asc())
-    )
-    return list((await session.execute(stmt)).scalars().all())
+    return await _da.list_messages_for_conversation(session, conversation_id)
 
 
 # --- writes ----------------------------------------------------------------
@@ -206,11 +185,7 @@ async def send_outbound(
     # still in flight) raise ValueError → 400.
     reply_to_wamid: str | None = None
     if reply_to_message_id is not None:
-        target = (
-            await session.execute(
-                select(Message).where(Message.id == reply_to_message_id)
-            )
-        ).scalar_one_or_none()
+        target = await _da.get_message_by_id(session, reply_to_message_id)
         if target is None or target.conversation_id != conv.id:
             raise ValueError(
                 "reply_to_message_id does not belong to this conversation."
@@ -221,7 +196,12 @@ async def send_outbound(
             )
         reply_to_wamid = target.channel_message_id
 
-    is_first_outbound = await _is_first_outbound(session, conversation_id)
+    is_first_outbound = (
+        await _da.count_outbound_messages_for_conversation(
+            session, conversation_id
+        )
+        == 0
+    )
 
     # Pass `interactive` only when supplied so the registry-based
     # adapters (which haven't opted into the kwarg) don't break.
@@ -252,7 +232,7 @@ async def send_outbound(
         payload={"adapter_ref": ref.channel_message_id},
         sent_at=sent_at,
     )
-    session.add(msg)
+    _da.insert_message(session, msg)
     conv.last_message_at = sent_at
     await session.commit()
     await session.refresh(msg)
@@ -400,15 +380,11 @@ async def receive_webhook(
     # to an earlier message" without the snippet.
     reply_to_uuid: uuid.UUID | None = None
     if parsed.reply_to_channel_message_id:
-        target = (
-            await session.execute(
-                select(Message).where(
-                    Message.channel_message_id
-                    == parsed.reply_to_channel_message_id,
-                    Message.conversation_id == conv.id,
-                )
-            )
-        ).scalar_one_or_none()
+        target = await _da.get_message_by_channel_message_id(
+            session,
+            channel_message_id=parsed.reply_to_channel_message_id,
+            conversation_id=conv.id,
+        )
         if target is not None:
             reply_to_uuid = target.id
 
@@ -423,7 +399,7 @@ async def receive_webhook(
         payload=parsed.raw,
         sent_at=sent_at,
     )
-    session.add(msg)
+    _da.insert_message(session, msg)
     conv.last_message_at = sent_at
     # whatsapp-platform-upgrade Step 15 — bump the session-window
     # pivot. Every inbound customer message resets the 24-hour clock.
@@ -671,11 +647,7 @@ async def react_to_message(
             "Reactions are only supported on WhatsApp conversations."
         )
 
-    target = (
-        await session.execute(
-            select(Message).where(Message.id == message_id)
-        )
-    ).scalar_one_or_none()
+    target = await _da.get_message_by_id(session, message_id)
     if target is None or target.conversation_id != conv.id:
         raise ValueError(
             "message_id does not belong to this conversation."
@@ -739,14 +711,11 @@ async def _apply_inbound_reaction(
     match any of our message rows — Meta occasionally replays old
     reactions for messages we never persisted (e.g. sent through a
     different system)."""
-    target = (
-        await session.execute(
-            select(Message).where(
-                Message.channel_message_id == target_wamid,
-                Message.conversation_id == conversation_id,
-            )
-        )
-    ).scalar_one_or_none()
+    target = await _da.get_message_by_channel_message_id(
+        session,
+        channel_message_id=target_wamid,
+        conversation_id=conversation_id,
+    )
     if target is None:
         return
     actor = reactor_external_id or "external"
@@ -792,18 +761,6 @@ async def patch_conversation(
 # --- helpers ---------------------------------------------------------------
 
 
-async def _is_first_outbound(
-    session: AsyncSession, conversation_id: uuid.UUID
-) -> bool:
-    stmt = (
-        select(func.count())
-        .select_from(Message)
-        .where(Message.conversation_id == conversation_id)
-        .where(Message.direction == MessageDirection.out)
-    )
-    return ((await session.execute(stmt)).scalar_one() or 0) == 0
-
-
 async def _find_or_create_conversation(
     session: AsyncSession,
     *,
@@ -811,13 +768,9 @@ async def _find_or_create_conversation(
     external_id: str,
     received_via_phone_id: str | None = None,
 ) -> Conversation:
-    existing = (
-        await session.execute(
-            select(Conversation)
-            .where(Conversation.channel == channel)
-            .where(Conversation.external_id == external_id)
-        )
-    ).scalar_one_or_none()
+    existing = await _da.find_conversation_for_channel_external(
+        session, channel=channel, external_id=external_id
+    )
     if existing is not None:
         return existing
 
@@ -874,7 +827,7 @@ async def _find_or_create_conversation(
         # silently rewritten by a webhook from a different number.
         received_via_phone_id=received_via_phone_id,
     )
-    session.add(conv)
+    _da.insert_conversation(session, conv)
     await session.flush()
     return conv
 
@@ -900,7 +853,7 @@ async def _resolve_or_create_contact_by_phone(
         phone=phone,
         source="whatsapp",
     )
-    session.add(contact)
+    data_access.insert_contact(session, contact)
     await session.flush()
     return contact.id
 

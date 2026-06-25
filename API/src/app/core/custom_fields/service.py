@@ -15,12 +15,11 @@ import uuid
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
 from src.app.shared.audit import log_entity_change
+from src.app.core.custom_fields import data_access as _da
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldSource,
@@ -63,10 +62,7 @@ async def get_field(
     session: AsyncSession, field_id: uuid.UUID
 ) -> CustomFieldDefinition | None:
     """Return a single definition by id, scoped to the active tenant."""
-    result = await session.execute(
-        select(CustomFieldDefinition).where(CustomFieldDefinition.id == field_id)
-    )
-    return result.scalar_one_or_none()
+    return await _da.get_field_by_id(session, field_id)
 
 
 async def list_fields(
@@ -76,17 +72,9 @@ async def list_fields(
     include_hidden: bool = False,
 ) -> list[CustomFieldDefinition]:
     """List definitions for one entity, ordered for stable rendering."""
-    stmt = select(CustomFieldDefinition).where(
-        CustomFieldDefinition.entity_type == entity_type
+    return await _da.list_fields_query(
+        session, entity_type=entity_type, include_hidden=include_hidden
     )
-    if not include_hidden:
-        stmt = stmt.where(CustomFieldDefinition.is_hidden.is_(False))
-    stmt = stmt.order_by(
-        CustomFieldDefinition.display_order,
-        CustomFieldDefinition.field_key,
-    )
-    result = await session.execute(stmt)
-    return list(result.scalars().all())
 
 
 async def render_fields(
@@ -119,7 +107,7 @@ async def create_user_field(
         pack_id=None,
         validation=payload.validation,
     )
-    session.add(field)
+    _da.insert_field(session, field)
     try:
         await session.commit()
     except IntegrityError as exc:
@@ -188,7 +176,7 @@ async def create_managed_field(
         pack_id=pack_id,
         validation=validation,
     )
-    session.add(field)
+    _da.insert_field(session, field)
     try:
         await session.commit()
     except IntegrityError as exc:
@@ -311,7 +299,7 @@ async def delete_field(
 
     before = _snapshot(field)
     field_uuid = field.id
-    await session.delete(field)
+    await _da.delete_field_row(session, field)
     await session.commit()
 
     await log_entity_change(

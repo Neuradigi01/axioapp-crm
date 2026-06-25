@@ -281,7 +281,8 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 3: Flatten `data_access/` folder → `data_access.py` — templates, tenants, users, integrations/whatsapp](dal-backfill/step-3-flatten-dal-folder-batch-2.md) — Done
 - [Step 4: Backfill DAL — activities, appointments, audit](dal-backfill/step-4-backfill-activities-appointments-audit.md) — Done
 - [Step 5: Backfill DAL — billing, calls, catalog](dal-backfill/step-5-backfill-billing-calls-catalog.md) — Done
-- [Step 6: Backfill DAL — conversations, custom_fields, email](dal-backfill/step-6-backfill-conversations-custom-fields-email.md) — Pending
+- [Step 6: Backfill DAL — custom_fields, email](dal-backfill/step-6-backfill-conversations-custom-fields-email.md) — Done
+- [Step 6a: Backfill DAL — conversations + its helper services](dal-backfill/step-6a-backfill-conversations.md) — Done
 - [Step 7: Backfill DAL — embed, integrations, invitations](dal-backfill/step-7-backfill-embed-integrations-invitations.md) — Pending
 - [Step 8: Backfill DAL — leads, notifications, packs](dal-backfill/step-8-backfill-leads-notifications-packs.md) — Pending
 - [Step 9: Backfill DAL — permissions, pipelines, reviews](dal-backfill/step-9-backfill-permissions-pipelines-reviews.md) — Pending

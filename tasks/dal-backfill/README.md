@@ -61,7 +61,8 @@ Plus a CI guard (pin-test) at the end so this drift can't recur silently.
 | 3 | [Flatten DAL folder → file — templates, tenants, users, integrations/whatsapp](step-3-flatten-dal-folder-batch-2.md) | **COMPLETED** | ~0.5 days |
 | 4 | [Backfill DAL — activities, appointments, audit](step-4-backfill-activities-appointments-audit.md) | **COMPLETED** | ~0.5 days |
 | 5 | [Backfill DAL — billing, calls, catalog](step-5-backfill-billing-calls-catalog.md) | **COMPLETED** | ~0.5 days |
-| 6 | [Backfill DAL — conversations, custom_fields, email](step-6-backfill-conversations-custom-fields-email.md) | **Pending** | ~0.75 days |
+| 6 | [Backfill DAL — custom_fields, email](step-6-backfill-conversations-custom-fields-email.md) | **COMPLETED** | ~0.5 days |
+| 6a | [Backfill DAL — conversations + its helper services](step-6a-backfill-conversations.md) | **COMPLETED** | ~1 day |
 | 7 | [Backfill DAL — embed, integrations, invitations](step-7-backfill-embed-integrations-invitations.md) | **Pending** | ~0.5 days |
 | 8 | [Backfill DAL — leads, notifications, packs](step-8-backfill-leads-notifications-packs.md) | **Pending** | ~0.75 days |
 | 9 | [Backfill DAL — permissions, pipelines, reviews](step-9-backfill-permissions-pipelines-reviews.md) | **Pending** | ~0.5 days |

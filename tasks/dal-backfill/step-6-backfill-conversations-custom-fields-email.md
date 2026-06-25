@@ -1,9 +1,10 @@
-# Step 6 — Backfill DAL (conversations, custom_fields, email)
+# Step 6 — Backfill DAL (custom_fields, email)
 
-**Goal:** Create `data_access.py` in three core modules. Move all SQL/ORM out of `service.py`. Behaviour unchanged.
-**Status:** Pending
+**Goal:** Create `data_access.py` in two core modules. Move all SQL/ORM out of `service.py`. Behaviour unchanged.
+**Status:** COMPLETED
 **Depends on:** Step 5.
-**Effort:** ~0.75 days (conversations is query-heavy).
+**Effort:** ~0.5 days.
+**Split note:** Originally scoped as 3 modules (conversations + custom_fields + email). Conversations was deferred to [Step 6a](step-6a-backfill-conversations.md) on 2026-06-25 — the per-step size warning in this file's "Plan" section triggered (the conversations service tree is 2,043 lines across 6 service files vs the soft 400-line cap).
 
 ---
 

@@ -24,16 +24,15 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.conversations import data_access as _da
 from src.app.core.conversations.models import (
-    Conversation,
     ConversationTag,
     ConversationTagAssignment,
 )
@@ -52,25 +51,7 @@ async def list_tags(
     """Return all tags for the active org, sorted by name. The result
     carries `usage_count` (number of conversations the tag is on) so
     the manager UI can show "5 conversations" alongside the chip."""
-    base = (
-        select(
-            ConversationTag.id,
-            ConversationTag.name,
-            ConversationTag.color,
-            ConversationTag.created_by_user_id,
-            ConversationTag.created_at,
-            func.count(ConversationTagAssignment.id).label("usage_count"),
-        )
-        .outerjoin(
-            ConversationTagAssignment,
-            ConversationTagAssignment.tag_id == ConversationTag.id,
-        )
-        .group_by(ConversationTag.id)
-        .order_by(ConversationTag.name.asc())
-    )
-    if search:
-        base = base.where(ConversationTag.name.ilike(f"%{search}%"))
-    rows = (await session.execute(base)).all()
+    rows = await _da.list_tags_with_usage(session, search=search)
     return [
         {
             "id": r.id,
@@ -87,11 +68,7 @@ async def list_tags(
 async def get_tag_or_404(
     session: AsyncSession, tag_id: uuid.UUID
 ) -> ConversationTag:
-    row = (
-        await session.execute(
-            select(ConversationTag).where(ConversationTag.id == tag_id)
-        )
-    ).scalar_one_or_none()
+    row = await _da.get_tag_by_id(session, tag_id)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -106,23 +83,9 @@ async def list_tags_for_conversation(
 ) -> list[dict[str, Any]]:
     """Embedded `tags[]` for the conversation detail view. Returns
     `[{id, name, color}, ...]` ordered by name."""
-    rows = (
-        await session.execute(
-            select(
-                ConversationTag.id,
-                ConversationTag.name,
-                ConversationTag.color,
-            )
-            .join(
-                ConversationTagAssignment,
-                ConversationTagAssignment.tag_id == ConversationTag.id,
-            )
-            .where(
-                ConversationTagAssignment.conversation_id == conversation_id
-            )
-            .order_by(ConversationTag.name.asc())
-        )
-    ).all()
+    rows = await _da.list_tag_chips_for_conversation(
+        session, conversation_id
+    )
     return [
         {"id": r.id, "name": r.name, "color": r.color} for r in rows
     ]
@@ -134,26 +97,9 @@ async def bulk_tags_for_conversations(
 ) -> dict[uuid.UUID, list[dict[str, Any]]]:
     """One-shot fetch of tags for many conversations — used by the
     list endpoint so we don't N+1-query the chip data."""
-    if not conversation_ids:
-        return {}
-    rows = (
-        await session.execute(
-            select(
-                ConversationTagAssignment.conversation_id,
-                ConversationTag.id,
-                ConversationTag.name,
-                ConversationTag.color,
-            )
-            .join(
-                ConversationTag,
-                ConversationTag.id == ConversationTagAssignment.tag_id,
-            )
-            .where(
-                ConversationTagAssignment.conversation_id.in_(conversation_ids)
-            )
-            .order_by(ConversationTag.name.asc())
-        )
-    ).all()
+    rows = await _da.bulk_list_tag_chips_for_conversations(
+        session, conversation_ids
+    )
     out: dict[uuid.UUID, list[dict[str, Any]]] = {}
     for r in rows:
         out.setdefault(r.conversation_id, []).append(
@@ -182,7 +128,7 @@ async def create_tag(
         color=color,
         created_by_user_id=actor_id,
     )
-    session.add(tag)
+    _da.insert_tag(session, tag)
     try:
         await session.commit()
     except IntegrityError as exc:
@@ -250,7 +196,7 @@ async def delete_tag(
     FK has ``ON DELETE CASCADE`` so we just drop the parent row."""
     tag = await get_tag_or_404(session, tag_id)
     snapshot = {"name": tag.name, "color": tag.color}
-    await session.delete(tag)
+    await _da.delete_tag_row(session, tag)
     await session.commit()
     await audit.log(
         "conversations.tag_deleted",
@@ -275,11 +221,7 @@ async def assign_tag(
     # Confirm both rows exist + belong to the active org (RLS already
     # filters; explicit lookup gives a friendlier 404 than relying on
     # the unique-violation surface).
-    conv = (
-        await session.execute(
-            select(Conversation).where(Conversation.id == conversation_id)
-        )
-    ).scalar_one_or_none()
+    conv = await _da.get_conversation_by_id(session, conversation_id)
     if conv is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -287,22 +229,18 @@ async def assign_tag(
         )
     await get_tag_or_404(session, tag_id)
 
-    existing = (
-        await session.execute(
-            select(ConversationTagAssignment).where(
-                ConversationTagAssignment.conversation_id == conversation_id,
-                ConversationTagAssignment.tag_id == tag_id,
-            )
-        )
-    ).scalar_one_or_none()
+    existing = await _da.get_tag_assignment(
+        session, conversation_id=conversation_id, tag_id=tag_id
+    )
     if existing is None:
-        session.add(
+        _da.insert_tag_assignment(
+            session,
             ConversationTagAssignment(
                 org_id=org_id,
                 conversation_id=conversation_id,
                 tag_id=tag_id,
                 tagged_by_user_id=actor_id,
-            )
+            ),
         )
         await session.commit()
         await audit.log(
@@ -325,13 +263,10 @@ async def unassign_tag(
     """Remove the assignment. Idempotent — unassigning a tag that
     isn't currently applied is a silent success. Returns the updated
     tag list."""
-    result = await session.execute(
-        delete(ConversationTagAssignment).where(
-            ConversationTagAssignment.conversation_id == conversation_id,
-            ConversationTagAssignment.tag_id == tag_id,
-        )
+    removed = await _da.delete_tag_assignment(
+        session, conversation_id=conversation_id, tag_id=tag_id
     )
-    if result.rowcount and result.rowcount > 0:
+    if removed > 0:
         await session.commit()
         await audit.log(
             "conversations.tag_unassigned",

@@ -23,17 +23,15 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.conversations import data_access as _da
 from src.app.core.conversations.models import (
-    Conversation,
     Message,
     MessageDirection,
 )
 from src.app.core.notifications.service import notify
-from src.app.core.users.models import OrganizationMember, User, UserInfo
 
 logger = logging.getLogger(__name__)
 
@@ -51,28 +49,13 @@ async def _validate_mentions(
     Unknown ids surface as a 400 — the operator's UI should only
     have shown valid pickable users, so a stale id is an integrity
     bug worth telling them about.
-
-    The query bypasses RLS on `tbl_organization_members` because the
-    notes router runs inside the active org's tenant context already;
-    no extra filter needed."""
+    """
     if not mentioned_user_ids:
         return []
 
-    rows = (
-        await session.execute(
-            select(User.legacy_uuid, UserInfo.first_name, UserInfo.last_name)
-            .join(UserInfo, UserInfo.member_id == User.id)
-            .join(
-                OrganizationMember,
-                OrganizationMember.user_member_id == User.id,
-            )
-            .where(
-                OrganizationMember.organization_id == org_id,
-                OrganizationMember.is_active.is_(True),
-                User.legacy_uuid.in_(mentioned_user_ids),
-            )
-        )
-    ).all()
+    rows = await _da.list_active_members_with_names(
+        session, org_id=org_id, user_uuids=mentioned_user_ids
+    )
 
     found = {
         row[0]: f"{row[1] or ''} {row[2] or ''}".strip() or "User"
@@ -103,11 +86,7 @@ async def post_note(
     Returns the new `Message` row so the frontend can swap its
     optimistic placeholder for the real id + timestamps. Does NOT
     touch any channel adapter — notes are an in-CRM-only surface."""
-    conv = (
-        await session.execute(
-            select(Conversation).where(Conversation.id == conversation_id)
-        )
-    ).scalar_one_or_none()
+    conv = await _da.get_conversation_by_id(session, conversation_id)
     if conv is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -136,7 +115,7 @@ async def post_note(
         sent_at=now,
         payload={"internal_note": True},
     )
-    session.add(note)
+    _da.insert_message(session, note)
     # Notes don't bump unread_count (the inbox-list badge tracks
     # customer-driven attention, not internal chatter), but DO move
     # the conversation to the top so the author's teammates see it
