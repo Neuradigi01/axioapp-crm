@@ -44,7 +44,7 @@ from src.app.core.email_sequences.schemas import (
     EmailSequenceUpdate,
     EnrollmentResultRow,
 )
-from src.app.core.email_templates.models import EmailTemplate
+from src.app.core.email_sequences import data_access as email_seq_da
 
 
 # --- Helpers --------------------------------------------------------------
@@ -56,31 +56,28 @@ async def _validate_template_ids(
     org_id: uuid.UUID,
     template_ids: list[uuid.UUID],
 ) -> None:
-    """Reject if any template id is cross-org or soft-deleted.
+    """Reject if any template id doesn't point at a live email
+    template in the active org.
 
-    The check runs against the live `email_templates` table — tenant
-    RLS would already cull cross-org ids, but the explicit count check
-    here surfaces a clear 400 rather than an opaque "step missing".
+    Post-Step-10 of ``tasks/template-library``: queries the central
+    ``tbl_message_templates`` table via the email-sequences DAL.
+    Tenant RLS would already cull cross-org ids, but the explicit
+    count check surfaces a clear 400 rather than an opaque "step
+    missing" at fire time.
     """
     if not template_ids:
         return
-    rows = (
-        await session.execute(
-            select(EmailTemplate.id).where(
-                EmailTemplate.id.in_(set(template_ids)),
-                EmailTemplate.deleted_at.is_(None),
-            )
-        )
-    ).all()
-    found = {r.id for r in rows}
+    found = await email_seq_da.list_valid_email_template_ids(
+        session, list(template_ids)
+    )
     missing = sorted(set(template_ids) - found)
     if missing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Unknown or deleted template ids: {missing}. "
-                "Every step.template_id must point to a live template "
-                "in this workspace."
+                f"Unknown or archived template ids: {missing}. "
+                "Every step.template_id must point to a published "
+                "email template in this workspace."
             ),
         )
 

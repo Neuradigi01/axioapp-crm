@@ -97,30 +97,14 @@ export const userRoutes: Routes = [
           ),
       },
       {
-        // App-updates Email Step 10 — Settings tab for the email
-        // template library. The list lives inside the settings page
-        // (tab=email-templates); /new + /:id/edit route to standalone
-        // editor pages.
+        // tasks/template-library Step 10 — the Settings → Email
+        // Templates tab moved to the central `/user/templates`
+        // library. Three legacy routes (`settings/email-templates`,
+        // `/new`, `/:id/edit`) collapsed into a single prefix
+        // redirect for muscle-memory bookmarks.
         path: 'settings/email-templates',
-        data: { tab: 'email-templates' },
-        loadComponent: () =>
-          import('./core/settings/settings-page.component').then(
-            (m) => m.SettingsPageComponent,
-          ),
-      },
-      {
-        path: 'settings/email-templates/new',
-        loadComponent: () =>
-          import(
-            './core/settings/email-templates/template-editor.page'
-          ).then((m) => m.EmailTemplateEditorPageComponent),
-      },
-      {
-        path: 'settings/email-templates/:id/edit',
-        loadComponent: () =>
-          import(
-            './core/settings/email-templates/template-editor.page'
-          ).then((m) => m.EmailTemplateEditorPageComponent),
+        redirectTo: '/user/templates',
+        pathMatch: 'prefix',
       },
       {
         // App-updates Email Step 11a — sequence library list lives

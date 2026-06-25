@@ -1,30 +1,34 @@
 /**
- * Typed HTTP wrappers for the email-templates surface.
+ * DEPRECATION SHIM — legacy email-templates API.
  *
- * Endpoints (all under `${apiBaseUrl}/email/templates`):
+ * Step 10 of `tasks/template-library` folded the `core/email_templates/`
+ * backend into the central `core/templates/` library. The backend
+ * endpoint `/api/v1/email/templates/*` no longer exists. This file
+ * stays around so the picker + sequence-builder + compose-bar (which
+ * import `EmailTemplate` / `EmailTemplateRenderResponse` /
+ * `EmailTemplatesApiService` from here) keep working unchanged —
+ * the underlying calls now hit `/api/v1/templates/*`.
  *
- *  - `list(filters?)` — paginated GET with optional `q` + `is_active`.
- *  - `get(id)`        — single read; 404 when soft-deleted or absent.
- *  - `create(payload)`— POST; backend runs save-time variable
- *                       validation, derives `body_text` from
- *                       `body_html` when missing.
- *  - `update(id, payload)` — PATCH (partial).
- *  - `delete(id)`     — soft delete (preserves `email_sequence_steps`
- *                       FK references from Step 7).
- *  - `render(id, ctx)`— POST preview render against a real contact +
- *                       optional lead.
- *  - `variables()`    — GET the variable registry (static system
- *                       fields + the org's custom_field_definitions
- *                       for contacts/leads).
+ * Removed in a follow-up cleanup PR once the consumers migrate to
+ * the central `TemplatesApiService` directly.
  *
- * Auth: global `authInterceptor` injects the JWT; `retryInterceptor`
- * handles transient failures on GETs.
+ * Shape contract preserved:
+ *   - `EmailTemplate` keeps `body_html` + `body_text` fields so
+ *     existing consumers compile unchanged. `body_html` is mapped
+ *     from the central row's `body_text` (the central library
+ *     stores one body per template; HTML vs text is the renderer's
+ *     concern).
+ *   - `EmailTemplateRenderResponse` is unchanged.
  */
-import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map, switchMap } from 'rxjs';
 
-import { environment } from '../../../../../environments/environment';
+import {
+  PreviewResponse,
+  TemplateListResponse,
+  TemplateRead,
+  TemplatesApiService,
+} from '../templates/templates-api.service';
 
 
 export interface EmailTemplate {
@@ -84,74 +88,125 @@ export interface VariableRegistryEntry {
 }
 
 
+function _adapt(row: TemplateRead): EmailTemplate {
+  return {
+    id: row.id,
+    org_id: row.org_id,
+    name: row.name,
+    subject: row.subject ?? '',
+    body_html: row.body_text,
+    body_text: row.body_text,
+    variables_used: row.variables ?? [],
+    is_active: row.internal_status !== 'archived',
+    created_by: row.created_by_user_id ?? '',
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+
 @Injectable({ providedIn: 'root' })
 export class EmailTemplatesApiService {
-  private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiBaseUrl}/email/templates`;
+  private readonly central = inject(TemplatesApiService);
 
-  /** Paginated list. `q` ILIKEs on name; `is_active` toggles between
-   *  active-only / inactive-only / all (omit). */
   list(filters?: {
     q?: string;
     is_active?: boolean;
     page?: number;
     size?: number;
   }): Observable<EmailTemplateListResponse> {
-    let params = new HttpParams();
-    if (filters?.q) params = params.set('q', filters.q);
-    if (filters?.is_active !== undefined) {
-      params = params.set('is_active', String(filters.is_active));
-    }
-    if (filters?.page) params = params.set('page', String(filters.page));
-    if (filters?.size) params = params.set('size', String(filters.size));
-    return this.http.get<EmailTemplateListResponse>(this.base, { params });
+    const page = filters?.page ?? 1;
+    const size = filters?.size ?? 50;
+    const offset = (page - 1) * size;
+    const internal_status =
+      filters?.is_active === false ? ('archived' as const) : undefined;
+    return this.central
+      .list({
+        channel: 'email',
+        internal_status,
+        q: filters?.q,
+        limit: size,
+        offset,
+      })
+      .pipe(
+        map((resp: TemplateListResponse) => ({
+          items: resp.items
+            .map(_adapt)
+            .filter((t) =>
+              filters?.is_active === true ? t.is_active : true,
+            ),
+          total: resp.total,
+          page,
+          size,
+        })),
+      );
   }
 
   get(templateId: string): Observable<EmailTemplate> {
-    return this.http.get<EmailTemplate>(`${this.base}/${templateId}`);
+    return this.central.get(templateId).pipe(map(_adapt));
   }
 
   create(payload: EmailTemplateCreatePayload): Observable<EmailTemplate> {
-    return this.http.post<EmailTemplate>(this.base, payload);
+    return this.central
+      .create({
+        name: payload.name,
+        channel: 'email',
+        body_text: payload.body_html,
+        subject: payload.subject,
+      })
+      .pipe(map(_adapt));
   }
 
   update(
     templateId: string,
     payload: EmailTemplateUpdatePayload,
   ): Observable<EmailTemplate> {
-    return this.http.patch<EmailTemplate>(
-      `${this.base}/${templateId}`,
-      payload,
-    );
+    return this.central
+      .update(templateId, {
+        name: payload.name,
+        body_text: payload.body_html,
+        subject: payload.subject,
+      })
+      .pipe(map(_adapt));
   }
 
   delete(templateId: string): Observable<EmailTemplate> {
-    // Backend soft-deletes — returns the deleted row.
-    return this.http.delete<EmailTemplate>(`${this.base}/${templateId}`);
+    return this.central
+      .archive(templateId)
+      .pipe(
+        switchMap(() => this.central.get(templateId)),
+        map(_adapt),
+      );
   }
 
-  /** Preview render. `lead_id` is optional; passing one resolves
-   *  `lead.*` variables in the template. Missing variables surface
-   *  as a 400 with the offending paths listed. */
   render(
     templateId: string,
     ctx: { contactId: string; leadId?: string },
   ): Observable<EmailTemplateRenderResponse> {
-    let params = new HttpParams().set('contact_id', ctx.contactId);
-    if (ctx.leadId) params = params.set('lead_id', ctx.leadId);
-    return this.http.post<EmailTemplateRenderResponse>(
-      `${this.base}/${templateId}/render`,
-      {},
-      { params },
-    );
+    return this.central
+      .preview(templateId, {
+        context: { contact: { id: ctx.contactId } },
+      })
+      .pipe(
+        map((p: PreviewResponse) => ({
+          subject: p.subject ?? '',
+          body_html: p.body,
+          body_text: p.body,
+          variables_used: [],
+        })),
+      );
   }
 
-  /** Variable registry — static system fields + the org's custom
-   *  field definitions for contacts and leads. The editor sidebar
-   *  groups by `category`. */
   variables(): Observable<VariableRegistryEntry[]> {
-    return this.http.get<VariableRegistryEntry[]>(
-      `${this.base}/variables`,
+    return this.central.variables('email').pipe(
+      map((rows) =>
+        rows.map((v) => ({
+          path: v.key,
+          label: v.label,
+          category: v.key.split('.', 1)[0] ?? 'other',
+          source: 'system' as const,
+        })),
+      ),
     );
   }
 }

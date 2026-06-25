@@ -49,7 +49,6 @@ from src.app.core.embed.router import (
 from src.app.core.email.router import router as email_router
 from src.app.core.email.tracking.router import router as email_tracking_router
 from src.app.core.email_sequences.router import router as email_sequences_router
-from src.app.core.email_templates.router import router as email_templates_router
 from src.app.core.templates.router import router as templates_router
 from src.app.core.integrations.router import router as integrations_router
 from src.app.core.integrations.whatsapp.templates_router import (
@@ -220,12 +219,11 @@ app.include_router(lead_imports_router, prefix="/api/v1")
 app.include_router(embed_keys_router, prefix="/api/v1")
 app.include_router(embed_public_router, prefix="/api/v1")
 app.include_router(email_router, prefix="/api/v1")
-app.include_router(email_templates_router, prefix="/api/v1")
 app.include_router(email_sequences_router, prefix="/api/v1")
 # tasks/template-library Step 3 — central multi-channel template
-# library (Email + WhatsApp + SMS + FB / IG / push). Lives alongside
-# `email_templates_router` for one release; Step 10 of the same track
-# merges the email-specific router away.
+# library (Email + WhatsApp + SMS + FB / IG / push). Step 10 dropped
+# the legacy email_templates_router; sequences + the picker now
+# render against the central tables.
 app.include_router(templates_router, prefix="/api/v1")
 # Step 8 — public tracking endpoints (open pixel, click redirect,
 # unsubscribe landing). Intentionally unauthenticated — the recipient's

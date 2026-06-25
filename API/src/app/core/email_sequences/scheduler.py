@@ -63,8 +63,11 @@ from src.app.core.email_sequences.models import (
     EmailSequenceStep,
     EnrollmentState,
 )
-from src.app.core.email_templates import service as templates_service
-from src.app.core.email_templates.models import EmailTemplate
+from src.app.core.templates import render as templates_render
+from src.app.core.templates.models import (
+    MessageTemplate,
+    TemplateInternalStatus,
+)
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import User
 from src.app.shared.context import RequestContext, reset_context, set_context
@@ -215,13 +218,16 @@ async def _process_one_locked(
 
     template = (
         await session.execute(
-            select(EmailTemplate).where(
-                EmailTemplate.id == step_def.template_id
+            select(MessageTemplate).where(
+                MessageTemplate.id == step_def.template_id
             )
         )
     ).scalar_one_or_none()
-    if template is None or template.deleted_at is not None:
-        _skip(step_row, "template_deleted")
+    if (
+        template is None
+        or template.internal_status == TemplateInternalStatus.archived
+    ):
+        _skip(step_row, "template_archived")
         await session.commit()
         return
 
@@ -259,7 +265,7 @@ async def _process_one_locked(
         )
     ).scalar_one_or_none()
     try:
-        context = await templates_service.build_context(
+        context = await templates_render.build_context(
             session,
             org=org,
             contact_id=enrollment.contact_id,
@@ -270,7 +276,7 @@ async def _process_one_locked(
             sender_email=getattr(sender, "email", None),
             sender_signature=None,
         )
-        rendered = templates_service.render_template(template, context)
+        rendered = templates_render.render_email_template(template, context)
     except Exception:
         log.exception(
             "email_sequences: render failed step_row=%s", step_row.id

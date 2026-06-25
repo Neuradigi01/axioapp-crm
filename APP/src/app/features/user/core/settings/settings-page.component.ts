@@ -5,7 +5,6 @@ import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { EmailAccountsTabComponent } from './email-accounts/email-accounts-tab.component';
 import { EmailSequencesListComponent } from './email-sequences/sequence-list.component';
-import { EmailTemplatesListComponent } from './email-templates/template-list.component';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
@@ -27,7 +26,6 @@ type SettingsTab =
   | 'team'
   | 'roles'
   | 'email-accounts'
-  | 'email-templates'
   | 'email-sequences'
   | 'notifications'
   | 'ai'
@@ -68,16 +66,10 @@ const TABS: ReadonlyArray<TabDef> = [
     permission: 'email.accounts.manage',
   },
   {
-    // App-updates Email Step 10 — template library. Anyone with
-    // `email.read` (every role per Step 6 grants) sees the tab to
-    // browse and use templates; `email.templates.manage` (Owner /
-    // Admin / Sales Manager) is required for the Edit / Delete
-    // affordances — gated inside the list component.
-    id: 'email-templates',
-    label: 'Email Templates',
-    permission: 'email.read',
-  },
-  {
+    // tasks/template-library Step 10 — the standalone Email Templates
+    // tab moved into the central `/user/templates` library. The
+    // sequence-builder still uses email templates via the central
+    // API; the tab itself is gone.
     // App-updates Email Step 11a — sequence library. Visible to
     // anyone with `email.read`; Create / Edit / Delete affordances
     // gate on `email.sequences.manage` inside the list component.
@@ -121,7 +113,6 @@ const TABS: ReadonlyArray<TabDef> = [
     StandardFieldsTabComponent,
     EmbedIntegrationsTabComponent,
     EmailAccountsTabComponent,
-    EmailTemplatesListComponent,
     EmailSequencesListComponent,
   ],
   templateUrl: './settings-page.component.html',

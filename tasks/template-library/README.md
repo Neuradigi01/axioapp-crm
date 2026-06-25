@@ -61,7 +61,7 @@ Steps 1-8 ship the new module end-to-end with only WA + Email channels usable. S
 | 7 | [Templates editor UI (WA + Email sub-forms)](step-7-templates-editor-ui.md) | **COMPLETED** | ~1.5 days |
 | 8 | [Review modal + versions drawer + test-send modal](step-8-templates-review-and-versions-ui.md) | **COMPLETED** | ~1 day |
 | 9 | [WhatsApp adapter migration](step-9-whatsapp-adapter-migration.md) | **COMPLETED** | ~1 day |
-| 10 | [Email templates merge + UI move](step-10-email-templates-merge-and-ui-move.md) | **Pending** | ~1 day |
+| 10 | [Email templates merge + UI move](step-10-email-templates-merge-and-ui-move.md) | **COMPLETED** | ~1 day |
 | 11 | [Campaigns refactor — generic template_id](step-11-campaigns-refactor.md) | **Pending** | ~1 day |
 | 12 | [SMS adapter stub + DLT fields](step-12-sms-adapter-stub.md) | **Pending** | ~0.5 days |
 | 13 | [FB / IG / push sub-forms + stub adapters](step-13-fb-ig-push-adapter-stubs.md) | **Pending** | ~0.5 days |
