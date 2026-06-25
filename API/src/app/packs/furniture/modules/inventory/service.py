@@ -7,14 +7,9 @@ Three concerns:
    search filters, plus the standard create/update/delete.
 3. Movements — `record_movement(item, type, qty, …)` atomically
    updates `qty_on_hand`, inserts the ledger row, and recomputes
-   stock alerts. Sign rules:
-     - receipt   : qty positive, on_hand += qty
-     - dispatch  : qty positive, on_hand -= qty  (rejected if negative)
-     - transfer  : qty positive, on_hand -= qty  (caller pairs with a receipt elsewhere)
-     - adjust    : qty signed (positive or negative), on_hand += qty
+   stock alerts.
 4. Alerts — `recompute_alerts(item)` opens / closes a row depending on
-   `qty_on_hand` vs `reorder_level`. Idempotent: if an alert already
-   matches the current state we don't churn it.
+   `qty_on_hand` vs `reorder_level`. Idempotent.
 
 All mutations route through the caller's `AsyncSession` so the
 movement + qty update + alert recompute happen in one transaction.
@@ -23,15 +18,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.catalog.models import CatalogItem
+from src.app.packs.furniture.modules.inventory import data_access as _da
 from src.app.packs.furniture.modules.inventory.models import (
     AlertPriority,
     AlertSeverity,
@@ -49,7 +44,7 @@ from src.app.packs.furniture.modules.inventory.schemas import (
     WarehouseCreate,
     WarehouseUpdate,
 )
-from src.app.shared.db.queries import get_or_404
+from src.app.shared.db.queries import ensure_found
 from src.app.shared.storage import get_storage
 
 
@@ -57,16 +52,16 @@ from src.app.shared.storage import get_storage
 
 
 async def list_warehouses(session: AsyncSession) -> list[Warehouse]:
-    stmt = select(Warehouse).order_by(
-        Warehouse.is_default.desc(), Warehouse.name.asc()
-    )
-    return list((await session.execute(stmt)).scalars().all())
+    return await _da.list_warehouses_query(session)
 
 
 async def get_warehouse(
     session: AsyncSession, warehouse_id: uuid.UUID
 ) -> Warehouse:
-    return await get_or_404(session, Warehouse, warehouse_id, entity="warehouse")
+    return ensure_found(
+        await _da.get_warehouse_by_id(session, warehouse_id),
+        entity="warehouse",
+    )
 
 
 async def create_warehouse(
@@ -82,7 +77,7 @@ async def create_warehouse(
         contact_phone=payload.contact_phone,
         is_default=payload.is_default,
     )
-    session.add(w)
+    _da.insert_warehouse(session, w)
     try:
         await session.commit()
     except IntegrityError:
@@ -131,7 +126,7 @@ async def delete_warehouse(
     session: AsyncSession, *, warehouse_id: uuid.UUID
 ) -> None:
     w = await get_warehouse(session, warehouse_id)
-    await session.delete(w)
+    await _da.delete_warehouse_row(session, w)
     try:
         await session.commit()
     except IntegrityError:
@@ -155,57 +150,23 @@ async def list_items(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[InventoryItem], int]:
-    filters: list[Any] = []
-    if warehouse_id is not None:
-        filters.append(InventoryItem.warehouse_id == warehouse_id)
-    if active_only:
-        filters.append(InventoryItem.is_active.is_(True))
-
-    base = select(InventoryItem)
-    total_base = select(func.count()).select_from(InventoryItem)
-
-    if category is not None or q is not None:
-        base = base.join(
-            CatalogItem,
-            CatalogItem.id == InventoryItem.catalog_item_id,
-            isouter=True,
-        )
-        total_base = total_base.join(
-            CatalogItem,
-            CatalogItem.id == InventoryItem.catalog_item_id,
-            isouter=True,
-        )
-        if category is not None:
-            filters.append(CatalogItem.category == category)
-        if q is not None:
-            like = f"%{q}%"
-            filters.append(
-                or_(
-                    InventoryItem.sku.ilike(like),
-                    CatalogItem.name.ilike(like),
-                )
-            )
-
-    where = and_(*filters) if filters else None
-    if where is not None:
-        base = base.where(where)
-        total_base = total_base.where(where)
-    base = base.order_by(InventoryItem.sku.asc())
-
-    total = (await session.execute(total_base)).scalar_one()
-    offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
+    return await _da.list_items_query(
+        session,
+        warehouse_id=warehouse_id,
+        category=category,
+        q=q,
+        active_only=active_only,
+        page=page,
+        size=size,
     )
-    return list(rows), int(total)
 
 
 async def get_item(
     session: AsyncSession, item_id: uuid.UUID
 ) -> InventoryItem:
-    return await get_or_404(session, InventoryItem, item_id, entity="item")
+    return ensure_found(
+        await _da.get_item_by_id(session, item_id), entity="item"
+    )
 
 
 async def create_item(
@@ -218,9 +179,13 @@ async def create_item(
     # but a 404 is friendlier than a generic 500).
     await get_warehouse(session, payload.warehouse_id)
     if payload.catalog_item_id is not None:
-        await get_or_404(
-            session, CatalogItem, payload.catalog_item_id, entity="catalog_item_id"
-        )
+        if not await _da.catalog_item_exists_in_org(
+            session, payload.catalog_item_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"catalog_item_id {payload.catalog_item_id} not found",
+            )
 
     item = InventoryItem(
         org_id=org_id,
@@ -236,7 +201,7 @@ async def create_item(
         is_best_seller=payload.is_best_seller,
         is_active=payload.is_active,
     )
-    session.add(item)
+    _da.insert_item(session, item)
     try:
         await session.commit()
     except IntegrityError:
@@ -258,16 +223,9 @@ async def create_item_full(
     payload: InventoryItemFullCreate,
 ) -> InventoryItem:
     """Atomic create: a catalog row + an inventory row in one
-    transaction. Used by the Add Product modal — either both rows
-    land, or neither does (no half-created products).
-
-    `description` is stored on `catalog_items.custom_data.description`.
-    """
-    # 1. Validate the warehouse exists in this org (404 friendlier than
-    # a generic FK violation).
+    transaction. Used by the Add Product modal."""
     wh = await get_warehouse(session, payload.warehouse_id)
 
-    # 2. Create the catalog row first.
     catalog = CatalogItem(
         org_id=org_id,
         sku=payload.sku.strip().upper(),
@@ -279,7 +237,7 @@ async def create_item_full(
         ),
         is_active=payload.is_active,
     )
-    session.add(catalog)
+    _da.insert_catalog_item(session, catalog)
     try:
         await session.flush()
     except IntegrityError:
@@ -289,8 +247,6 @@ async def create_item_full(
             detail=f"catalog SKU '{payload.sku}' already exists for this org",
         )
 
-    # 3. Create the inventory row referencing the freshly-created
-    # catalog row. Same transaction → both succeed or both rollback.
     inv = InventoryItem(
         org_id=org_id,
         catalog_item_id=catalog.id,
@@ -304,7 +260,7 @@ async def create_item_full(
         is_best_seller=payload.is_best_seller,
         is_active=payload.is_active,
     )
-    session.add(inv)
+    _da.insert_item(session, inv)
     try:
         await session.commit()
     except IntegrityError:
@@ -331,8 +287,7 @@ async def set_item_cover(
 ) -> str:
     """Persist a cover image for `item_id`, save to storage backend,
     write the served URL to `inventory_items.cover_url`, and return
-    that URL.
-    """
+    that URL."""
     if not file_bytes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -407,7 +362,7 @@ async def delete_item(
     session: AsyncSession, *, item_id: uuid.UUID
 ) -> None:
     item = await get_item(session, item_id)
-    await session.delete(item)
+    await _da.delete_item_row(session, item)
     await session.commit()
 
 
@@ -425,18 +380,7 @@ async def record_movement(
     reference_id: Optional[uuid.UUID] = None,
     notes: Optional[str] = None,
 ) -> InventoryMovement:
-    """Atomically apply a stock movement.
-
-    Sign of `qty` is derived from `type_`:
-      receipt   →  +qty   (must be positive)
-      dispatch  →  -qty   (must be positive; rejects negative on_hand)
-      transfer  →  -qty   (must be positive; caller pairs with a receipt)
-      adjust    →  +qty as supplied (caller passes signed delta)
-
-    Persists a `InventoryMovement` row, updates `InventoryItem.qty_on_hand`
-    and `last_received_at`, then runs `recompute_alerts`. Failure to
-    satisfy the qty_on_hand >= 0 CHECK constraint is translated to 400.
-    """
+    """Atomically apply a stock movement."""
     item = await get_item(session, item_id)
 
     if type_ in (MovementType.receipt, MovementType.dispatch, MovementType.transfer):
@@ -479,7 +423,7 @@ async def record_movement(
         notes=notes,
         user_id=user_id,
     )
-    session.add(movement)
+    _da.insert_movement(session, movement)
     item.qty_on_hand = new_on_hand
     if type_ == MovementType.receipt:
         item.last_received_at = datetime.now(timezone.utc)
@@ -517,13 +461,9 @@ async def list_movements(
     item_id: uuid.UUID,
     limit: int = 100,
 ) -> list[InventoryMovement]:
-    stmt = (
-        select(InventoryMovement)
-        .where(InventoryMovement.item_id == item_id)
-        .order_by(InventoryMovement.created_at.desc())
-        .limit(limit)
+    return await _da.list_movements_for_item(
+        session, item_id=item_id, limit=limit
     )
-    return list((await session.execute(stmt)).scalars().all())
 
 
 # --- alerts -------------------------------------------------------------
@@ -532,23 +472,10 @@ async def list_movements(
 async def recompute_alerts(
     session: AsyncSession, *, item_id: uuid.UUID
 ) -> None:
-    """Open or close the open alert for `item` so it matches current qty.
-
-    Logic:
-      qty_on_hand == 0     and reorder_level > 0  → alert(severity=out,  priority=high)
-      qty_on_hand <= rl    and rl > 0             → alert(severity=low,  priority=med)
-      otherwise                                    → close any open alert
-    """
+    """Open or close the open alert for `item` so it matches current qty."""
     item = await get_item(session, item_id)
 
-    open_alert = (
-        await session.execute(
-            select(StockAlert)
-            .where(StockAlert.item_id == item.id)
-            .where(StockAlert.status == AlertStatus.open)
-            .limit(1)
-        )
-    ).scalar_one_or_none()
+    open_alert = await _da.get_open_alert_for_item(session, item.id)
 
     desired_severity: AlertSeverity | None
     desired_priority: AlertPriority
@@ -576,14 +503,15 @@ async def recompute_alerts(
         return
 
     if open_alert is None:
-        session.add(
+        _da.insert_alert(
+            session,
             StockAlert(
                 org_id=item.org_id,
                 item_id=item.id,
                 severity=desired_severity,
                 priority=desired_priority,
                 suggested_reorder_qty=suggested,
-            )
+            ),
         )
         await session.commit()
         return
@@ -612,32 +540,13 @@ async def list_alerts(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[StockAlert], int]:
-    filters: list[Any] = []
-    if severity is not None:
-        filters.append(StockAlert.severity == severity)
-    if status_filter is not None:
-        filters.append(StockAlert.status == status_filter)
-    where = and_(*filters) if filters else None
-
-    base = select(StockAlert)
-    if where is not None:
-        base = base.where(where)
-    base = base.order_by(
-        StockAlert.priority.desc(), StockAlert.created_at.desc()
+    return await _da.list_alerts_query(
+        session,
+        severity=severity,
+        status_filter=status_filter,
+        page=page,
+        size=size,
     )
-
-    total_stmt = select(func.count()).select_from(StockAlert)
-    if where is not None:
-        total_stmt = total_stmt.where(where)
-    total = (await session.execute(total_stmt)).scalar_one()
-
-    offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
-    )
-    return list(rows), int(total)
 
 
 async def update_alert_status(
@@ -646,7 +555,9 @@ async def update_alert_status(
     alert_id: uuid.UUID,
     new_status: AlertStatus,
 ) -> StockAlert:
-    alert = await get_or_404(session, StockAlert, alert_id, entity="alert")
+    alert = ensure_found(
+        await _da.get_alert_by_id(session, alert_id), entity="alert"
+    )
     alert.status = new_status
     if new_status == AlertStatus.closed and alert.closed_at is None:
         alert.closed_at = datetime.now(timezone.utc)

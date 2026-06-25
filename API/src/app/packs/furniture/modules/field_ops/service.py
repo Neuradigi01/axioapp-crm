@@ -20,25 +20,25 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.shared.audit import log_entity_change
+from src.app.core.appointments import data_access as appointments_da
 from src.app.core.appointments.models import Appointment, AppointmentStatus
 from src.app.core.appointments.service import (
     create_appointment as core_create_appointment,
 )
-from src.app.packs.furniture.modules.custom_orders.models import CustomOrder
 from src.app.packs.furniture.modules.custom_orders.service import (
     add_measurement as co_add_measurement,
 )
 from src.app.packs.furniture.modules.custom_orders.schemas import (
     MeasurementCreate,
 )
+from src.app.packs.furniture.modules.field_ops import data_access as _da
 from src.app.packs.furniture.modules.field_ops.models import (
     FieldVisit,
     FieldVisitPhoto,
@@ -49,6 +49,7 @@ from src.app.packs.furniture.modules.field_ops.schemas import (
     FieldVisitCreate,
     FieldVisitUpdate,
 )
+from src.app.shared.db.queries import ensure_found
 from src.app.shared.storage import get_storage
 
 
@@ -65,60 +66,22 @@ async def list_visits(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[FieldVisit], int]:
-    """Server-side filters.
-
-    `completed=True` returns visits whose `completed_at IS NOT NULL`;
-    `False` returns the still-open ones. `None` returns both.
-
-    `assigned_to_id` joins via the underlying appointment so the staff
-    portal can pull only "my visits" cheaply.
-    """
-    filters: list[Any] = []
-    if purpose is not None:
-        filters.append(FieldVisit.purpose == purpose)
-    if completed is True:
-        filters.append(FieldVisit.completed_at.is_not(None))
-    elif completed is False:
-        filters.append(FieldVisit.completed_at.is_(None))
-    if custom_order_id is not None:
-        filters.append(FieldVisit.custom_order_id == custom_order_id)
-
-    base = select(FieldVisit)
-    count_stmt = select(func.count()).select_from(FieldVisit)
-
-    if assigned_to_id is not None:
-        # Join via appointments to filter by assignee.
-        base = base.join(
-            Appointment, Appointment.id == FieldVisit.appointment_id
-        ).where(Appointment.assigned_to_id == assigned_to_id)
-        count_stmt = count_stmt.join(
-            Appointment, Appointment.id == FieldVisit.appointment_id
-        ).where(Appointment.assigned_to_id == assigned_to_id)
-
-    if filters:
-        where = and_(*filters)
-        base = base.where(where)
-        count_stmt = count_stmt.where(where)
-
-    base = base.order_by(FieldVisit.created_at.desc())
-    total = (await session.execute(count_stmt)).scalar_one()
-    offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
+    """Server-side filters."""
+    return await _da.list_visits_query(
+        session,
+        assigned_to_id=assigned_to_id,
+        purpose=purpose,
+        completed=completed,
+        custom_order_id=custom_order_id,
+        page=page,
+        size=size,
     )
-    return list(rows), int(total)
 
 
 async def get_visit(
     session: AsyncSession, visit_id: uuid.UUID
 ) -> FieldVisit:
-    row = (
-        await session.execute(
-            select(FieldVisit).where(FieldVisit.id == visit_id)
-        )
-    ).scalar_one_or_none()
+    row = await _da.get_visit_by_id(session, visit_id)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -130,11 +93,9 @@ async def get_visit(
 async def get_appointment_for_visit(
     session: AsyncSession, visit: FieldVisit
 ) -> Appointment:
-    appt = (
-        await session.execute(
-            select(Appointment).where(Appointment.id == visit.appointment_id)
-        )
-    ).scalar_one_or_none()
+    appt = await appointments_da.get_appointment_by_id(
+        session, visit.appointment_id
+    )
     if appt is None:
         # Schema-level CASCADE means this should never happen, but the
         # caller wants an Appointment to merge into the response.
@@ -177,7 +138,7 @@ async def create_visit(
         notes=payload.notes,
         custom_data=payload.custom_data,
     )
-    session.add(visit)
+    _da.insert_visit(session, visit)
     await session.commit()
     await session.refresh(visit)
 
@@ -229,7 +190,7 @@ async def delete_visit(
     session: AsyncSession, *, visit_id: uuid.UUID
 ) -> None:
     visit = await get_visit(session, visit_id)
-    await session.delete(visit)
+    await _da.delete_visit_row(session, visit)
     await session.commit()
 
 
@@ -305,12 +266,7 @@ async def complete_visit(
 async def list_photos(
     session: AsyncSession, *, visit_id: uuid.UUID
 ) -> list[FieldVisitPhoto]:
-    stmt = (
-        select(FieldVisitPhoto)
-        .where(FieldVisitPhoto.visit_id == visit_id)
-        .order_by(FieldVisitPhoto.created_at.desc())
-    )
-    return list((await session.execute(stmt)).scalars().all())
+    return await _da.list_photos_for_visit(session, visit_id)
 
 
 async def add_photo(
@@ -337,7 +293,7 @@ async def add_photo(
         caption=caption,
         taken_at=datetime.now(timezone.utc),
     )
-    session.add(photo)
+    _da.insert_photo(session, photo)
     await session.commit()
     await session.refresh(photo)
     return photo
@@ -349,12 +305,7 @@ async def add_photo(
 async def _ensure_custom_order_in_scope(
     session: AsyncSession, custom_order_id: uuid.UUID
 ) -> None:
-    row = (
-        await session.execute(
-            select(CustomOrder.id).where(CustomOrder.id == custom_order_id)
-        )
-    ).scalar_one_or_none()
-    if row is None:
+    if not await _da.custom_order_exists_in_org(session, custom_order_id):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"custom_order_id {custom_order_id} not found in this org",

@@ -1,7 +1,7 @@
 # Step 13 — Backfill DAL (packs/custom_orders, packs/field_ops)
 
 **Goal:** Create `data_access.py` in the two furniture-pack modules that need it. Move all SQL/ORM out of `service.py`. Behaviour unchanged.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 12. (Inventory's router violation was already fixed in Step 1; inventory still needs a DAL backfill — included here as a third slot.)
 
 ---

@@ -15,15 +15,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
-from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
 from src.app.shared.audit import log_entity_change
 from src.app.core.pipelines.service import move_card as pipeline_move_card
+from src.app.packs.furniture.modules.custom_orders import data_access as _da
 from src.app.packs.furniture.modules.custom_orders.models import (
     CustomOrder,
     CustomOrderMeasurement,
@@ -35,7 +33,7 @@ from src.app.packs.furniture.modules.custom_orders.schemas import (
     CustomOrderUpdate,
     MeasurementCreate,
 )
-from src.app.shared.db.queries import get_or_404
+from src.app.shared.db.queries import ensure_found
 from src.app.shared.storage import get_storage
 
 
@@ -56,38 +54,22 @@ async def list_orders(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[CustomOrder], int]:
-    filters: list[Any] = []
-    if stage is not None:
-        filters.append(CustomOrder.pipeline_stage == stage)
-    if assigned_to_id is not None:
-        filters.append(CustomOrder.assigned_to_id == assigned_to_id)
-    if contact_id is not None:
-        filters.append(CustomOrder.contact_id == contact_id)
-
-    where = and_(*filters) if filters else None
-    base = select(CustomOrder)
-    if where is not None:
-        base = base.where(where)
-    base = base.order_by(CustomOrder.created_at.desc())
-
-    total_stmt = select(func.count()).select_from(CustomOrder)
-    if where is not None:
-        total_stmt = total_stmt.where(where)
-    total = (await session.execute(total_stmt)).scalar_one()
-
-    offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
+    return await _da.list_orders_query(
+        session,
+        stage=stage,
+        assigned_to_id=assigned_to_id,
+        contact_id=contact_id,
+        page=page,
+        size=size,
     )
-    return list(rows), int(total)
 
 
 async def get_order(
     session: AsyncSession, order_id: uuid.UUID
 ) -> CustomOrder:
-    return await get_or_404(session, CustomOrder, order_id, entity="custom order")
+    return ensure_found(
+        await _da.get_order_by_id(session, order_id), entity="custom order"
+    )
 
 
 # --- writes ---------------------------------------------------------------
@@ -116,13 +98,14 @@ async def create_order(
         advance_paid=payload.advance_paid,
         custom_data=payload.custom_data,
     )
-    session.add(order)
+    _da.insert_order(session, order)
     await session.commit()
     await session.refresh(order)
 
     # First stage entry — records the implicit "created at
     # measurement_scheduled" transition.
-    session.add(
+    _da.insert_stage_history(
+        session,
         CustomOrderStageHistory(
             org_id=org_id,
             order_id=order.id,
@@ -130,7 +113,7 @@ async def create_order(
             to_stage=_INITIAL_STAGE,
             user_id=user_id,
             notes="order created",
-        )
+        ),
     )
     await session.commit()
 
@@ -170,7 +153,7 @@ async def delete_order(
     session: AsyncSession, *, order_id: uuid.UUID
 ) -> None:
     order = await get_order(session, order_id)
-    await session.delete(order)
+    await _da.delete_order_row(session, order)
     await session.commit()
 
 
@@ -186,14 +169,7 @@ async def move_stage(
     notes: Optional[str] = None,
 ) -> CustomOrder:
     """Reuse the core pipeline engine for the transition + the per-order
-    stage history append.
-
-    `pipeline_move_card` validates the stage key against the seeded
-    pipeline, UPDATEs `fp_custom_orders.pipeline_stage`, writes a
-    `status_change` activity, and an audit row — all in the same
-    transaction. We then append a row to `fp_custom_order_stages`
-    for funnel analytics specific to this module.
-    """
+    stage history append."""
     order = await get_order(session, order_id)
     from_stage = order.pipeline_stage
 
@@ -213,7 +189,8 @@ async def move_stage(
     # `order` is now stale. Re-fetch so subsequent reads see the new
     # stage, then append the history row.
     await session.refresh(order)
-    session.add(
+    _da.insert_stage_history(
+        session,
         CustomOrderStageHistory(
             org_id=order.org_id,
             order_id=order.id,
@@ -221,7 +198,7 @@ async def move_stage(
             to_stage=to_stage,
             user_id=user_id,
             notes=notes,
-        )
+        ),
     )
     await session.commit()
     return order
@@ -233,12 +210,7 @@ async def move_stage(
 async def list_measurements(
     session: AsyncSession, *, order_id: uuid.UUID
 ) -> list[CustomOrderMeasurement]:
-    stmt = (
-        select(CustomOrderMeasurement)
-        .where(CustomOrderMeasurement.order_id == order_id)
-        .order_by(CustomOrderMeasurement.created_at.asc())
-    )
-    return list((await session.execute(stmt)).scalars().all())
+    return await _da.list_measurements_for_order(session, order_id)
 
 
 async def add_measurement(
@@ -257,7 +229,7 @@ async def add_measurement(
         height_cm=payload.height_cm,
         notes=payload.notes,
     )
-    session.add(m)
+    _da.insert_measurement(session, m)
     await session.commit()
     await session.refresh(m)
     return m
@@ -269,12 +241,7 @@ async def add_measurement(
 async def list_photos(
     session: AsyncSession, *, order_id: uuid.UUID
 ) -> list[CustomOrderPhoto]:
-    stmt = (
-        select(CustomOrderPhoto)
-        .where(CustomOrderPhoto.order_id == order_id)
-        .order_by(CustomOrderPhoto.created_at.desc())
-    )
-    return list((await session.execute(stmt)).scalars().all())
+    return await _da.list_photos_for_order(session, order_id)
 
 
 async def add_photo(
@@ -302,7 +269,7 @@ async def add_photo(
         caption=caption,
         taken_at=datetime.now(timezone.utc),
     )
-    session.add(photo)
+    _da.insert_photo(session, photo)
     await session.commit()
     await session.refresh(photo)
     return photo
@@ -314,12 +281,7 @@ async def add_photo(
 async def list_stage_history(
     session: AsyncSession, *, order_id: uuid.UUID
 ) -> list[CustomOrderStageHistory]:
-    stmt = (
-        select(CustomOrderStageHistory)
-        .where(CustomOrderStageHistory.order_id == order_id)
-        .order_by(CustomOrderStageHistory.changed_at.asc())
-    )
-    return list((await session.execute(stmt)).scalars().all())
+    return await _da.list_stage_history_for_order(session, order_id)
 
 
 __all__ = [
