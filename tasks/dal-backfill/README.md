@@ -58,8 +58,8 @@ Plus a CI guard (pin-test) at the end so this drift can't recur silently.
 |---|---|---|---|
 | 1 | [Fix router transaction violations — inventory, leads, dev](step-1-fix-router-transaction-violations.md) | **COMPLETED** | ~0.5 days |
 | 2 | [Flatten DAL folder → file — auth, campaigns, contacts, email_sequences](step-2-flatten-dal-folder-batch-1.md) | **COMPLETED** | ~0.5 days |
-| 3 | [Flatten DAL folder → file — templates, tenants, users, integrations/whatsapp](step-3-flatten-dal-folder-batch-2.md) | **Pending** | ~0.5 days |
-| 4 | [Backfill DAL — activities, appointments, audit](step-4-backfill-activities-appointments-audit.md) | **Pending** | ~0.5 days |
+| 3 | [Flatten DAL folder → file — templates, tenants, users, integrations/whatsapp](step-3-flatten-dal-folder-batch-2.md) | **COMPLETED** | ~0.5 days |
+| 4 | [Backfill DAL — activities, appointments, audit](step-4-backfill-activities-appointments-audit.md) | **COMPLETED** | ~0.5 days |
 | 5 | [Backfill DAL — billing, calls, catalog](step-5-backfill-billing-calls-catalog.md) | **Pending** | ~0.5 days |
 | 6 | [Backfill DAL — conversations, custom_fields, email](step-6-backfill-conversations-custom-fields-email.md) | **Pending** | ~0.75 days |
 | 7 | [Backfill DAL — embed, integrations, invitations](step-7-backfill-embed-integrations-invitations.md) | **Pending** | ~0.5 days |

@@ -1,7 +1,7 @@
 # Step 3 — Flatten `data_access/` folder → `data_access.py` (templates, tenants, users, integrations/whatsapp)
 
 **Goal:** Convert the remaining four `data_access/` folders to single `data_access.py` files. Pure relocation; behaviour preserved.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 2 (same mechanical pattern).
 
 ---

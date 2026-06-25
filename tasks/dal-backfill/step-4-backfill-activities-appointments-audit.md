@@ -1,7 +1,7 @@
 # Step 4 — Backfill DAL (activities, appointments, audit)
 
 **Goal:** Create `data_access.py` in three core modules. Move all SQL/ORM queries out of `service.py` into `data_access.py`. Behaviour unchanged.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 1–3.
 
 ---

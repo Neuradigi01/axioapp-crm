@@ -1,13 +1,13 @@
-"""Audit-log service: `log(...)` writer + paginated reader.
+"""Audit-log service: ``log(...)`` writer + paginated reader.
 
-`log` is best-effort by contract: it opens its own session, commits in
-isolation from the parent request transaction, and traps every
+``log`` is best-effort by contract: it opens its own session, commits
+in isolation from the parent request transaction, and traps every
 exception so an audit-storage failure never propagates into a 5xx for
 the user-facing flow. Loud failures go to the module logger (and from
-there to whatever sink `logging` is configured with).
+there to whatever sink ``logging`` is configured with).
 
-Default values for `org_id` and `user_id` come from the active
-`RequestContext`; the auth login flow passes them explicitly because
+Default values for ``org_id`` and ``user_id`` come from the active
+``RequestContext``; the auth login flow passes them explicitly because
 the JWT hasn't been issued yet at that point (so the request context
 is still empty).
 """
@@ -18,9 +18,9 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.audit import data_access as _da
 from src.app.core.audit.models import AuditLog
 from src.app.shared.context import get_context
 from src.app.shared.db import async_session
@@ -42,9 +42,9 @@ async def log(
 ) -> None:
     """Persist one audit row. Never raises.
 
-    `org_id`/`user_id`/`ip`/`ua` fall back to `RequestContext` when not
-    passed; callers like `auth.service.login` pass them explicitly
-    because they fire before the request context is populated.
+    ``org_id``/``user_id``/``ip``/``ua`` fall back to ``RequestContext``
+    when not passed; callers like ``auth.service.login`` pass them
+    explicitly because they fire before the request context is populated.
     """
     ctx = get_context()
     resolved_org_id = org_id if org_id is not None else ctx.org_id
@@ -57,18 +57,17 @@ async def log(
 
     try:
         async with async_session() as session:
-            session.add(
-                AuditLog(
-                    org_id=resolved_org_id,
-                    user_id=resolved_user_id,
-                    action=action,
-                    entity_type=entity_type,
-                    entity_id=entity_id,
-                    before=before,
-                    after=after,
-                    ip=ip,
-                    ua=ua,
-                )
+            await _da.insert_audit_log(
+                session,
+                org_id=resolved_org_id,
+                user_id=resolved_user_id,
+                action=action,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                before=before,
+                after=after,
+                ip=ip,
+                ua=ua,
             )
             await session.commit()
     except Exception:
@@ -85,22 +84,14 @@ async def list_audit_logs(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[AuditLog], int]:
-    """Return (rows, total). Tenant scoping is automatic via the ORM filter."""
-    filters = []
-    if action:
-        filters.append(AuditLog.action == action)
-    if entity_type:
-        filters.append(AuditLog.entity_type == entity_type)
-    if from_dt is not None:
-        filters.append(AuditLog.created_at >= from_dt)
-    if to_dt is not None:
-        filters.append(AuditLog.created_at <= to_dt)
-
-    base = select(AuditLog).where(*filters).order_by(AuditLog.created_at.desc())
-    count_stmt = select(func.count()).select_from(AuditLog).where(*filters)
-
-    total = (await session.execute(count_stmt)).scalar_one()
-    rows = (
-        await session.execute(base.offset((page - 1) * size).limit(size))
-    ).scalars().all()
-    return list(rows), total
+    """Return ``(rows, total)``. Tenant scoping is automatic via the ORM
+    filter."""
+    return await _da.list_audit_logs_query(
+        session,
+        action=action,
+        entity_type=entity_type,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        page=page,
+        size=size,
+    )

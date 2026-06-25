@@ -1,7 +1,15 @@
-"""WhatsApp template lookups against ``tbl_whatsapp_templates``.
+"""Data-access layer for the WhatsApp integration module.
 
-Pure reads. Tenant scoping comes from the global ``do_orm_execute``
-listener (WhatsAppTemplate is TenantScoped); callers must have
+Pure query helpers — no transactions, no audit. Leaf module; never
+imports a `service.py`.
+
+Three lookups against ``tbl_whatsapp_templates``: by own PK, by central
+template UUID (Step-9 reverse-lookup so a central template finds its
+Meta-specific extension row), and by Meta's template id (Step-8
+webhook routing for ``status_update`` events).
+
+Tenant scoping comes from the global ``do_orm_execute`` listener
+(WhatsAppTemplate is TenantScoped); callers must have
 ``RequestContext.org_id`` set.
 """
 from __future__ import annotations
@@ -52,3 +60,10 @@ async def get_by_meta_template_id(
         )
     )
     return result.scalar_one_or_none()
+
+
+__all__ = [
+    "get_by_id",
+    "get_by_message_template_id",
+    "get_by_meta_template_id",
+]

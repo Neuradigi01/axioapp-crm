@@ -278,8 +278,8 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 ### DAL Backfill (side track — align every module to Router → Service → DAL; manager spec 2026-06-25)
 - [Step 1: Fix router transaction violations — inventory, leads, dev](dal-backfill/step-1-fix-router-transaction-violations.md) — Done
 - [Step 2: Flatten `data_access/` folder → `data_access.py` — auth, campaigns, contacts, email_sequences](dal-backfill/step-2-flatten-dal-folder-batch-1.md) — Done
-- [Step 3: Flatten `data_access/` folder → `data_access.py` — templates, tenants, users, integrations/whatsapp](dal-backfill/step-3-flatten-dal-folder-batch-2.md) — Pending
-- [Step 4: Backfill DAL — activities, appointments, audit](dal-backfill/step-4-backfill-activities-appointments-audit.md) — Pending
+- [Step 3: Flatten `data_access/` folder → `data_access.py` — templates, tenants, users, integrations/whatsapp](dal-backfill/step-3-flatten-dal-folder-batch-2.md) — Done
+- [Step 4: Backfill DAL — activities, appointments, audit](dal-backfill/step-4-backfill-activities-appointments-audit.md) — Done
 - [Step 5: Backfill DAL — billing, calls, catalog](dal-backfill/step-5-backfill-billing-calls-catalog.md) — Pending
 - [Step 6: Backfill DAL — conversations, custom_fields, email](dal-backfill/step-6-backfill-conversations-custom-fields-email.md) — Pending
 - [Step 7: Backfill DAL — embed, integrations, invitations](dal-backfill/step-7-backfill-embed-integrations-invitations.md) — Pending

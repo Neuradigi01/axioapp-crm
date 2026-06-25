@@ -1,14 +1,24 @@
-"""Membership, role, and open-record lookups.
+"""Data-access layer for the users module.
 
-`tbl_organization_members` holds the per-(org, user) pair: which role,
-whether active, whether demo. Every "is user X in org Y?" check funnels
-through `get_membership` / `require_membership` so the error semantics
-(404 vs 422 vs 403) are picked by the caller, not duplicated in every
-service.
+Pure query helpers — no transactions, no audit writes, no commits.
+Leaf module; never imports a ``service.py``. That guarantees callers
+can ``from src.app.core.users import data_access`` without triggering
+a circular import.
 
-The open-record helpers are co-located here because they share the
-same per-(user, org) predicate shape and are consumed by the same
-offboarding flow as `assert_not_owner_role`.
+Three concerns kept in one file per the project's layered-architecture
+spec (manager-locked 2026-06-25):
+
+  * ``tbl_user_login`` + ``tbl_user_info`` lookups
+    (``get_user_by_uuid``, ``get_user_by_email``, ``get_user_info``,
+     ``email_exists``).
+  * ``tbl_organization_members`` + ``tbl_roles`` lookups
+    (``get_membership``, ``require_membership``, ``count_active_members``,
+     ``get_role_by_id_in_org``, ``get_role_in_org``, ``get_owner_role``,
+     ``get_admin_role``).
+  * Offboarding open-record queries
+    (``list_open_record_ids``, ``compute_open_records_counts``,
+     ``assert_not_owner_role``) — co-located here because they share
+    the same per-(user, org) predicate shape.
 """
 from __future__ import annotations
 
@@ -24,8 +34,7 @@ from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead, LeadStatus
 from src.app.core.permissions.models import Role
 from src.app.core.tasks.models import Task, TaskStatus
-from src.app.core.users.data_access.users import get_user_by_uuid
-from src.app.core.users.models import OrganizationMember, User
+from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.core.walk_ins.models import WalkIn, WalkInStatus
 
 
@@ -38,6 +47,82 @@ _WALKIN_OPEN_STATUSES = (
     WalkInStatus.interested,
     WalkInStatus.follow_up,
 )
+
+
+# --- user + profile lookups ---------------------------------------------
+
+
+async def get_user_by_uuid(
+    session: AsyncSession, user_uuid: uuid.UUID
+) -> User | None:
+    """Look up a FurnitureCRM user by their UUID identity.
+
+    `User.id` is a bigint storage PK; the UUID that JWT `sub`, audit
+    FKs, AuthSession.user_id, etc. carry around lives in
+    `User.legacy_uuid`. This helper queries against that column.
+    """
+    result = await session.execute(
+        select(User).where(User.legacy_uuid == user_uuid)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_email(
+    session: AsyncSession,
+    email: str,
+    *,
+    org_id: uuid.UUID | None = None,
+    active_only: bool = False,
+) -> User | None:
+    """Lookup by email. Email lives on `tbl_user_info` (CITEXT, case-insensitive).
+
+    - `org_id=None`        : global lookup (any user with this email).
+    - `org_id` set         : scope to users with a membership row in that org.
+    - `active_only=True`   : require `User.is_active` AND, when org-scoped,
+                             `OrganizationMember.is_active`.
+
+    The 3-table join in the org-scoped path mirrors the auth-service lookup
+    that this helper replaces — callers that previously rolled their own
+    inline JOIN get the same row back.
+    """
+    stmt = (
+        select(User)
+        .join(UserInfo, UserInfo.member_id == User.id)
+        .where(UserInfo.email == email)
+    )
+    if org_id is not None:
+        stmt = stmt.join(
+            OrganizationMember,
+            OrganizationMember.user_member_id == User.id,
+        ).where(OrganizationMember.organization_id == org_id)
+        if active_only:
+            stmt = stmt.where(OrganizationMember.is_active.is_(True))
+    if active_only:
+        stmt = stmt.where(User.is_active.is_(True))
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def get_user_info(
+    session: AsyncSession, member_id: int
+) -> UserInfo | None:
+    """Profile row lookup by `tbl_user_login.id` (bigint)."""
+    result = await session.execute(
+        select(UserInfo).where(UserInfo.member_id == member_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def email_exists(session: AsyncSession, email: str) -> bool:
+    """True if any `tbl_user_info` row carries this email.
+
+    `tbl_user_info.email` is globally unique, so this is the right
+    pre-check for `create_user` to surface a 409 before the insert.
+    """
+    result = await session.execute(
+        select(UserInfo.member_id).where(UserInfo.email == email)
+    )
+    return result.scalar_one_or_none() is not None
 
 
 # --- membership lookups -------------------------------------------------
@@ -323,3 +408,21 @@ async def assert_not_owner_role(
                 "transfer ownership first"
             ),
         )
+
+
+__all__ = [
+    "assert_not_owner_role",
+    "compute_open_records_counts",
+    "count_active_members",
+    "email_exists",
+    "get_admin_role",
+    "get_membership",
+    "get_owner_role",
+    "get_role_by_id_in_org",
+    "get_role_in_org",
+    "get_user_by_email",
+    "get_user_by_uuid",
+    "get_user_info",
+    "list_open_record_ids",
+    "require_membership",
+]

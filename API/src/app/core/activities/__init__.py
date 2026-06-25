@@ -10,6 +10,7 @@ from src.app.core.activities.service import (
     create_note,
     list_activities,
     log,
+    record_in_session,
 )
 
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     "create_note",
     "list_activities",
     "log",
+    "record_in_session",
 ]

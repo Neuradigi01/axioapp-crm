@@ -1,4 +1,7 @@
-"""Organization lookups against `tbl_organizations`.
+"""Data-access layer for the tenants module.
+
+Pure query helpers — no transactions, no audit, no commits. Leaf
+module; never imports a `service.py`.
 
 Two helpers cover every duplicate-by-shape callsite found in the
 audit: id-based (the canonical post-auth tenant fetch) and slug-based
@@ -44,3 +47,6 @@ async def get_organization_by_slug(
         select(Organization).where(Organization.slug == slug)
     )
     return result.scalar_one_or_none()
+
+
+__all__ = ["get_organization_by_id", "get_organization_by_slug"]

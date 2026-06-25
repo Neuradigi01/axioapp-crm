@@ -27,34 +27,23 @@ from datetime import date, datetime, timedelta
 from typing import Any, Literal, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import activities, audit
 from src.app.core.users import data_access
-from src.app.core.activities.models import Activity, ActivityType
+from src.app.core.activities.models import ActivityType
+from src.app.core.appointments import data_access as _da
 from src.app.core.appointments.models import Appointment, AppointmentStatus
 from src.app.core.appointments.schemas import (
     AppointmentCreate,
     AppointmentUpdate,
 )
 from src.app.core.appointments.status_workflow import ALLOWED_TRANSITIONS
-from src.app.core.contacts.models import Contact
 from src.app.core.notifications import service as notifications
-from src.app.core.users.models import OrganizationMember, User
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.context import get_context
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.queries import ensure_found
-
-
-# Server-side sort whitelist. Router validates via FastAPI Literal; the
-# service resolves key → SQLA column without exposing attribute access.
-_SORT_COLUMNS = {
-    "scheduled_at": Appointment.scheduled_at,
-    "created_at": Appointment.created_at,
-    "last_activity_at": Appointment.last_activity_at,
-}
 
 
 _APPT_ENTITY = "appointment"
@@ -101,12 +90,7 @@ async def _resolve_contact_name(
 ) -> str | None:
     if contact_id is None:
         return None
-    row = (
-        await session.execute(
-            select(Contact.full_name).where(Contact.id == contact_id)
-        )
-    ).scalar_one_or_none()
-    return row
+    return await _da.get_contact_name(session, contact_id)
 
 
 def _human_scheduled_at(when: datetime) -> str:
@@ -177,10 +161,7 @@ async def _notify_appointment_event(
 async def _ensure_contact_in_scope(
     session: AsyncSession, contact_id: uuid.UUID
 ) -> None:
-    contact = (
-        await session.execute(select(Contact.id).where(Contact.id == contact_id))
-    ).scalar_one_or_none()
-    if contact is None:
+    if not await _da.contact_exists(session, contact_id):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"contact_id {contact_id} not found in this org",
@@ -219,15 +200,13 @@ async def find_conflicts(
     """
     new_end = scheduled_at + timedelta(minutes=duration_min)
 
-    stmt = (
-        select(Appointment)
-        .where(Appointment.assigned_to_id == assigned_to_id)
-        .where(Appointment.status.not_in(_NON_BLOCKING_STATUSES))
-        .where(Appointment.scheduled_at < new_end)
+    candidates = await _da.find_overlapping_appointments(
+        session,
+        assigned_to_id=assigned_to_id,
+        scheduled_at_lt=new_end,
+        non_blocking_statuses=_NON_BLOCKING_STATUSES,
+        exclude_id=exclude_id,
     )
-    if exclude_id is not None:
-        stmt = stmt.where(Appointment.id != exclude_id)
-    candidates = (await session.execute(stmt)).scalars().all()
 
     conflicts: list[uuid.UUID] = []
     for c in candidates:
@@ -254,10 +233,7 @@ def _raise_conflict_409(conflicts: list[uuid.UUID]) -> None:
 async def get_appointment(
     session: AsyncSession, appointment_id: uuid.UUID
 ) -> Optional[Appointment]:
-    result = await session.execute(
-        select(Appointment).where(Appointment.id == appointment_id)
-    )
-    return result.scalar_one_or_none()
+    return await _da.get_appointment_by_id(session, appointment_id)
 
 
 async def create_appointment(
@@ -297,7 +273,7 @@ async def create_appointment(
         status=AppointmentStatus.scheduled,
         custom_data=cleaned_custom,
     )
-    session.add(appt)
+    _da.insert_appointment(session, appt)
     await session.commit()
     await session.refresh(appt)
 
@@ -466,7 +442,7 @@ async def delete_appointment(
     appt = ensure_found(await get_appointment(session, appointment_id), entity="appointment")
     before = _snapshot(appt)
     appt_uuid = appt.id
-    await session.delete(appt)
+    await _da.delete_appointment(session, appt)
     await session.commit()
 
     await log_entity_change(
@@ -504,33 +480,15 @@ async def list_appointments(
     or filters down via assignee/status; per-day / per-week views
     never produce result sets large enough to warrant cursor paging.
     """
-    filters: list[Any] = []
-    if from_dt is not None:
-        filters.append(Appointment.scheduled_at >= from_dt)
-    if to_dt is not None:
-        filters.append(Appointment.scheduled_at < to_dt)
-    if assigned_to is not None:
-        filters.append(Appointment.assigned_to_id == assigned_to)
-    if status_filter is not None:
-        filters.append(Appointment.status == status_filter)
-
-    stmt = select(Appointment)
-    if filters:
-        stmt = stmt.where(and_(*filters))
-
-    sort_col = _SORT_COLUMNS[sort]
-    if sort == "last_activity_at":
-        primary = (
-            sort_col.asc().nulls_last()
-            if order == "asc"
-            else sort_col.desc().nulls_last()
-        )
-    else:
-        primary = sort_col.asc() if order == "asc" else sort_col.desc()
-    stmt = stmt.order_by(primary, Appointment.id.asc())
-
-    rows = (await session.execute(stmt)).scalars().all()
-    return list(rows)
+    return await _da.list_appointments_query(
+        session,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        assigned_to=assigned_to,
+        status_filter=status_filter,
+        sort=sort,
+        order=order,
+    )
 
 
 # --- Reschedule / reassign / bulk-action -----------------------------------
@@ -543,17 +501,9 @@ async def _assert_user_in_org(
 
     Same join + check as contacts/leads/walk-ins reassign services —
     keeps the cross-tenant guard uniform across modules."""
-    result = await session.execute(
-        select(OrganizationMember.id)
-        .join(User, User.id == OrganizationMember.user_member_id)
-        .where(
-            User.legacy_uuid == user_uuid,
-            OrganizationMember.organization_id == org_id,
-            OrganizationMember.is_active.is_(True),
-        )
-        .limit(1)
-    )
-    if result.scalar_one_or_none() is None:
+    if not await _da.user_has_active_membership(
+        session, org_id=org_id, user_uuid=user_uuid
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="target user is not a member of this organisation",
@@ -621,19 +571,18 @@ async def reschedule_appointment(
     before = _snapshot(appt)
     old_at = appt.scheduled_at
     appt.scheduled_at = scheduled_at
-    session.add(
-        Activity(
-            org_id=org_id,
-            entity_type=_APPT_ENTITY,
-            entity_id=appt.id,
-            type=ActivityType.reschedule,
-            payload={
-                "from": old_at.isoformat(),
-                "to": scheduled_at.isoformat(),
-                "reason": reason,
-            },
-            user_id=actor_user_id,
-        )
+    await activities.record_in_session(
+        session,
+        org_id=org_id,
+        entity_type=_APPT_ENTITY,
+        entity_id=appt.id,
+        type=ActivityType.reschedule,
+        payload={
+            "from": old_at.isoformat(),
+            "to": scheduled_at.isoformat(),
+            "reason": reason,
+        },
+        user_id=actor_user_id,
     )
     await session.commit()
     await session.refresh(appt)
@@ -689,17 +638,16 @@ async def reassign_appointment(
 
     before = _snapshot(appt)
     appt.assigned_to_id = assigned_to_id
-    session.add(
-        Activity(
-            org_id=org_id,
-            entity_type=_APPT_ENTITY,
-            entity_id=appt.id,
-            type=ActivityType.reassign,
-            payload=_reassign_payload(
-                from_id=before_id, to_id=assigned_to_id, note=note
-            ),
-            user_id=actor_user_id,
-        )
+    await activities.record_in_session(
+        session,
+        org_id=org_id,
+        entity_type=_APPT_ENTITY,
+        entity_id=appt.id,
+        type=ActivityType.reassign,
+        payload=_reassign_payload(
+            from_id=before_id, to_id=assigned_to_id, note=note
+        ),
+        user_id=actor_user_id,
     )
     await session.commit()
     await session.refresh(appt)
@@ -760,17 +708,16 @@ async def bulk_reassign_appointments(
             continue
         before_id = appt.assigned_to_id
         appt.assigned_to_id = assigned_to_id
-        session.add(
-            Activity(
-                org_id=org_id,
-                entity_type=_APPT_ENTITY,
-                entity_id=appt.id,
-                type=ActivityType.reassign,
-                payload=_reassign_payload(
-                    from_id=before_id, to_id=assigned_to_id, note=note
-                ),
-                user_id=actor_user_id,
-            )
+        await activities.record_in_session(
+            session,
+            org_id=org_id,
+            entity_type=_APPT_ENTITY,
+            entity_id=appt.id,
+            type=ActivityType.reassign,
+            payload=_reassign_payload(
+                from_id=before_id, to_id=assigned_to_id, note=note
+            ),
+            user_id=actor_user_id,
         )
         reassigned += 1
         moved.append(appt)
@@ -820,19 +767,18 @@ async def bulk_cancel_appointments(
             continue
         before_status = appt.status.value
         appt.status = AppointmentStatus.cancelled
-        session.add(
-            Activity(
-                org_id=org_id,
-                entity_type=_APPT_ENTITY,
-                entity_id=appt.id,
-                type=ActivityType.status_change,
-                payload={
-                    "from": before_status,
-                    "to": AppointmentStatus.cancelled.value,
-                    "reason": reason,
-                },
-                user_id=actor_user_id,
-            )
+        await activities.record_in_session(
+            session,
+            org_id=org_id,
+            entity_type=_APPT_ENTITY,
+            entity_id=appt.id,
+            type=ActivityType.status_change,
+            payload={
+                "from": before_status,
+                "to": AppointmentStatus.cancelled.value,
+                "reason": reason,
+            },
+            user_id=actor_user_id,
         )
         cancelled += 1
 
