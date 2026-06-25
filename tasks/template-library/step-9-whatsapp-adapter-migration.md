@@ -51,6 +51,10 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention) — new lookups go into:
+   - `core/integrations/whatsapp/data_access/templates.py` for WA template reads + `message_template_id` joins.
+   - `core/templates/data_access/templates.py` extended with `get_by_external_provider_id(...)` for Meta-status webhook routing.
+   Service / workflow / submission helpers stay as-is for writes + Meta API calls; they delegate reads to the DAL.
 1. Migration first — backfill carefully (single transaction, dry-run on a test DB clone). Each existing WA template gets one new central row + one version row.
 2. WA service: write through to central tables on every operation. Internally use the central service for inserts/updates; the WA extension carries only the Meta-specific delta.
 3. External submission router: thin wrapper.

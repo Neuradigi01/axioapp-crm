@@ -58,6 +58,10 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention):
+   - `core/automation/data_access/suppressions.py` (NEW) — `is_suppressed(org_id, channel, address)`, `list_suppressions(org_id, *, channel?, reason?, limit, offset)`, plus the bounce-event reads (`list_bounces(...)`).
+   - `core/email/data_access/domains.py` (NEW or extend existing) — `get_domain_auth_status(org_id, domain)` for the cached DKIM/SPF/DMARC lookup.
+   - Bounce-webhook parsing + suppression-row writes + open/click tracking writes stay in `core/email/bounce_handler.py` + `core/automation/tracking.py` (service-side).
 1. Two migrations: tables + engagement columns.
 2. Bounce handler module with per-provider parsers.
 3. Webhook endpoints (HMAC-validated).

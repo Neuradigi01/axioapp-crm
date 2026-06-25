@@ -86,6 +86,18 @@ After Step 6, the "welcome on signup" and "confirm on lead-created" promises are
 | Settings → Email | DKIM / SPF / DMARC status badges per sender domain + suppression list viewer | Step 14 |
 | Settings → Roles | Three new permission keys (`automations.read / write / runs.read`) registered | Step 3 |
 
+## Convention — data-access layer (track-wide)
+
+Every backend step in this track follows the project's data-access convention (`feedback_data_access_naming.md`, manager spec 2026-06-23):
+
+- **New SQL / ORM queries go into `core/automation/data_access/<entity>.py`** — not inline in `service.py` / `dispatcher.py` / `tasks.py` / `scheduler.py`.
+- The `data_access/` folder is a **leaf** — never imports a `service.py`. Sub-files split by entity (triggers, runs, suppressions, bounce_events) and `__init__.py` re-exports.
+- **Reads** belong in the DAL. **Writes** + Celery side-effects + audit emits stay in `service.py` / `dispatcher.py` / `tasks.py`.
+- Step 1 creates `core/automation/data_access/` with `triggers.py` + `runs.py` from day one.
+- Cross-module reads (e.g. the send-guard's `tbl_contacts.whatsapp_opt_in_status` check, or the dispatcher's `tbl_message_templates` lookup for the template body) call into the OWNING module's `data_access/` (`core/contacts/data_access/`, `core/templates/data_access/`). Never duplicate the query in our DAL.
+
+The same convention is followed in `tasks/template-library/` (the predecessor track).
+
 ## The 10 rules — track-wide notes
 
 - **Rule 1** (core never imports packs): Automation engine is pure `core/`. No furniture pack hooks. ✓

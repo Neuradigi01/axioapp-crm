@@ -87,6 +87,19 @@ After this track closes, `tasks/automation-engine/` opens — single-event trigg
 | Campaign create modal | Template picker switches to generic; channel filter applied automatically | Step 11 |
 | Settings → Roles | Five new permission keys registered (`templates.read / write / review / publish / submit_external`) | Step 3 |
 
+## Convention — data-access layer (track-wide)
+
+Every backend step in this track follows the project's data-access convention (`feedback_data_access_naming.md`, manager spec 2026-06-23):
+
+- **New SQL / ORM queries go into `core/templates/data_access/<entity>.py`** — not inline in `service.py` / `workflow.py` / `test_send.py` / Celery tasks.
+- The `data_access/` folder is a **leaf** — never imports a `service.py`. Sub-files can import each other (e.g. `versions.py` may import a helper from `.templates`).
+- `data_access/__init__.py` re-exports the public API so callers write `from core.templates import data_access` and call `data_access.X`.
+- **Reads** belong in the DAL. **Writes** (commits, audit emits, transition logic) stay in `service.py` / `workflow.py` / `test_send.py`.
+- Existing data-access folders already in place from Step 2: `core/templates/data_access/templates.py` + `data_access/versions.py`. Step 9 / 10 / 11 / 12 / 14 each extend them.
+- Cross-module reads (e.g. workflow reading `OrgSettings`) belong in the **other** module's `data_access/` (e.g. `core/settings/data_access/`). Create that folder there if it doesn't exist.
+
+The same convention applies to the follow-on `tasks/automation-engine/` track.
+
 ## The 10 rules — track-wide notes
 
 - **Rule 1** (core never imports packs): Templates module is pure `core/`. No furniture pack hooks. ✓

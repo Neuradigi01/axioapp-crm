@@ -45,6 +45,9 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention):
+   - `core/templates/data_access/templates.py` extended with `list_pending_external(...)` (returns every row where `external_status in ('pending','paused')` for the org, used by the Celery beat task) and `find_by_external_provider_id(...)` (Meta-webhook reverse lookup).
+   - Sync orchestration + Meta API calls + audit emits stay in `core/templates/sync.py` (service-side).
 1. `sync.py` — channel-dispatched sync logic. WA: call `MetaGraphClient`. SMS/etc: raise `SyncNotSupported`.
 2. Celery task — wired into the existing beat schedule (per `whatsapp-platform-upgrade` Step 12 pattern). Hourly cadence.
 3. Webhook handler extension — every existing Meta `message_template_status_update` event also updates the central row + fires notifications.

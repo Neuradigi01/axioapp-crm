@@ -62,6 +62,11 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention) — during the merge:
+   - `core/email_templates/data_access/` is deleted along with the rest of the package.
+   - `core/email_sequences/data_access/` (if not present, create it) gets a `sequences.py` for the post-merge FK-by-`message_template_id` lookups the scheduler uses at fire time.
+   - `core/templates/data_access/templates.py` already covers the read path from Step 2; sequences delegate to it.
+   No new ad-hoc queries in `email_sequences/service.py` or the migration's data-fix block — extract any query that survives into the DAL.
 1. Migration: backfill central rows from `tbl_email_templates`, build the FK bridge, remap `tbl_email_sequences.template_id`, drop FK constraint, drop old table (replace with view shim).
 2. Update `core/email_sequences/` to use the new model.
 3. Delete `core/email_templates/` package files + the variables shim.

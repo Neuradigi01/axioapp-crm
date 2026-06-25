@@ -43,6 +43,7 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention): the reminder scanner reads from `tbl_appointments`. Put the windowed query in `core/appointments/data_access/appointments.py` as `find_due_for_reminder(window_start, window_end)` — NOT in the automation-engine's tasks.py (cross-module reads call the OWNING module's DAL). Create `core/appointments/data_access/` if it doesn't exist.
 1. Catalog entries.
 2. Publish call after appointment create.
 3. Beat task scanner — windowed query for upcoming reminders.

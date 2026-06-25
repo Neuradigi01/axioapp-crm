@@ -53,6 +53,11 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention) — Step 1 created `core/automation/data_access/triggers.py` empty; this step fills it with the read helpers:
+   - `list_triggers(org_id, *, event_type?, enabled?, channel?, limit, offset)`.
+   - `get_trigger(org_id, trigger_id)`.
+   - `match_enabled_triggers(org_id, event_type) → list[AutomationTrigger]` — the hot-path query the dispatcher hits per event.
+   Service-side CRUD (create / update / enable / disable / delete) stays in `service.py` (writes + audit). The condition evaluator is pure-function, no DAL.
 1. Conditions: pure-function evaluator. Tight test coverage for every operator + nested AND/OR.
 2. Recipients: resolver registry keyed by string. Each resolver is a small function reading from the payload (no DB calls for `contact.*` if the payload includes the contact dict; otherwise a lookup).
 3. Service: CRUD + match. Match runs `evaluate(condition, payload)` for every enabled trigger of the given event-type. Returns triggers in `id` ascending order so deterministic.

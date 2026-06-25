@@ -54,6 +54,10 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention):
+   - `core/templates/data_access/sms_dlt.py` (NEW sub-file) holds DLT-extension reads — `get_dlt_metadata(template_id)` + `find_by_dlt_template_id(...)`.
+   - `__init__.py` re-exports the new helpers alongside the existing `templates` + `versions` ones.
+   - DLT-metadata set/update writes stay in `core/templates/sms_extension.py` (service-side).
 1. Migration: new extension table with RLS.
 2. SMS extension model + DLT capture service.
 3. Stub adapter registered with the channel registry.

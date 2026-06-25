@@ -39,13 +39,13 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.conversations.models import ConversationChannel
+from src.app.core.templates import data_access
 from src.app.core.templates.exceptions import (
     DuplicateTemplateName,
     TemplateLocked,
@@ -77,6 +77,11 @@ _EDIT_LOCKED_STATUSES = frozenset(
 
 
 # --- reads --------------------------------------------------------------
+#
+# Reads delegate to ``core.templates.data_access`` — the service-layer
+# wrappers add the "raise TemplateNotFound on None" + the cross-tenant
+# guard (loading the parent template before its versions). Pure DAL
+# queries stay in ``data_access/`` per the project convention.
 
 
 async def get_template(
@@ -86,14 +91,9 @@ async def get_template(
     template_id: uuid.UUID,
 ) -> MessageTemplate:
     """Return the template row or raise :class:`TemplateNotFound`."""
-    row = (
-        await session.execute(
-            select(MessageTemplate).where(
-                MessageTemplate.id == template_id,
-                MessageTemplate.org_id == org_id,
-            )
-        )
-    ).scalar_one_or_none()
+    row = await data_access.get_template(
+        session, org_id=org_id, template_id=template_id
+    )
     if row is None:
         raise TemplateNotFound(str(template_id))
     return row
@@ -110,46 +110,17 @@ async def list_templates(
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[MessageTemplate], int]:
-    """Filterable + paginated list. ``q`` matches against ``name`` or
-    ``body_text`` (case-insensitive prefix on name; substring on body).
-    Returns ``(rows, total)`` so the router can render pagination
-    counters.
-    """
-    base = select(MessageTemplate).where(MessageTemplate.org_id == org_id)
-
-    if channel is not None:
-        base = base.where(MessageTemplate.channel == channel)
-    if internal_status is not None:
-        base = base.where(MessageTemplate.internal_status == internal_status)
-    if external_status is not None:
-        base = base.where(MessageTemplate.external_status == external_status)
-    if q:
-        pattern = f"%{q.lower()}%"
-        base = base.where(
-            or_(
-                func.lower(MessageTemplate.name).like(pattern),
-                func.lower(MessageTemplate.body_text).like(pattern),
-            )
-        )
-
-    total = (
-        await session.execute(
-            select(func.count()).select_from(base.subquery())
-        )
-    ).scalar_one()
-
-    rows = (
-        (
-            await session.execute(
-                base.order_by(MessageTemplate.updated_at.desc())
-                .offset(offset)
-                .limit(limit)
-            )
-        )
-        .scalars()
-        .all()
+    """Filterable + paginated list. Returns ``(rows, total)``."""
+    return await data_access.list_templates(
+        session,
+        org_id=org_id,
+        channel=channel,
+        internal_status=internal_status,
+        external_status=external_status,
+        q=q,
+        limit=limit,
+        offset=offset,
     )
-    return list(rows), int(total)
 
 
 async def list_versions(
@@ -164,20 +135,9 @@ async def list_versions(
     :class:`TemplateNotFound` when the template doesn't belong to
     this org (defends against fishing for other-org template ids)."""
     await get_template(session, org_id=org_id, template_id=template_id)
-    rows = (
-        (
-            await session.execute(
-                select(MessageTemplateVersion)
-                .where(MessageTemplateVersion.template_id == template_id)
-                .order_by(MessageTemplateVersion.version.desc())
-                .offset(offset)
-                .limit(limit)
-            )
-        )
-        .scalars()
-        .all()
+    return await data_access.list_versions(
+        session, template_id=template_id, limit=limit, offset=offset
     )
-    return list(rows)
 
 
 async def get_version(
@@ -192,14 +152,9 @@ async def get_version(
     is absent — clients shouldn't be able to distinguish the two
     failure modes."""
     await get_template(session, org_id=org_id, template_id=template_id)
-    row = (
-        await session.execute(
-            select(MessageTemplateVersion).where(
-                MessageTemplateVersion.template_id == template_id,
-                MessageTemplateVersion.version == version,
-            )
-        )
-    ).scalar_one_or_none()
+    row = await data_access.get_version(
+        session, template_id=template_id, version=version
+    )
     if row is None:
         raise TemplateNotFound(f"{template_id} v{version}")
     return row

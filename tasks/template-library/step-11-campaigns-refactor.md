@@ -46,6 +46,10 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention):
+   - `core/campaigns/data_access/` (create if absent) holds the per-campaign reads the dispatcher hits per chunk — `get_campaign_with_template(...)`, `count_messages_by_status(...)`.
+   - `core/templates/data_access/templates.get_template(...)` is reused for the dispatcher's per-channel render path.
+   - Campaign dispatch + start logic stays in `campaigns/service.py` (writes); reads delegate to DAL.
 1. Migration — careful: A/B campaigns have THREE template FKs (`template_id`, `variant_a_template_id`, `variant_b_template_id`). All three remap.
 2. `service.py`: generic load + channel-based adapter resolution. Reuse the existing `resolve_channel(...)` from `core/conversations/registry.py`.
 3. Dispatch: render via adapter, send via adapter, persist `campaign_message.channel_message_id`.

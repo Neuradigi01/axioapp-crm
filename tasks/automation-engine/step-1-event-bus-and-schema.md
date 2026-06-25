@@ -48,6 +48,10 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention): create `core/automation/data_access/` from day one with two sub-files —
+   - `triggers.py` (placeholder for Step 2's match_triggers / list / get).
+   - `runs.py` (placeholder for Step 4's idempotency check by `(trigger_id, event_id)` + run-history reads).
+   - `__init__.py` re-exports both. Step 2 + Step 4 fill in the actual query bodies; Step 1 lands the empty package so the convention is in place from the first commit.
 1. Migration: enum + two tables + RLS + indexes.
 2. Event bus: minimal pub/sub primitives. Subscribers are registered at app-start (via module init); publish call queues a Celery task per matched subscriber so DB commits land first.
 3. Models + schemas matching the migration verbatim.

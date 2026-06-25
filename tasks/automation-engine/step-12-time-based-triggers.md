@@ -44,6 +44,10 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention):
+   - `core/contacts/data_access/contacts.py` extended with `find_birthdays_today(org_id, in_tz)`.
+   - `core/leads/data_access/leads.py` extended with `find_stale(org_id, *, since)` (create the DAL folder if leads doesn't have one).
+   The scanner in `core/automation/scheduler.py` orchestrates + publishes events; reads delegate to the owning modules' DAL.
 1. Catalog entries.
 2. Scheduler: pure queries returning lists of (event_type, payload) tuples. Decoupled from the publisher so testable in isolation.
 3. Beat task: invokes scheduler per org tz, then publishes each event.

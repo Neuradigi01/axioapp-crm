@@ -53,6 +53,11 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention):
+   - `core/automation/data_access/runs.py` extended with `count_marketing_runs_for_contact(contact_id, *, since)` — the hot-path frequency-cap query.
+   - Suppression check reads from `tbl_contacts.whatsapp_opt_in_status` (Step 22 column from `whatsapp-platform-upgrade`) via `core/contacts/data_access/contacts.get_opt_in_status(...)` — extend the existing contacts DAL.
+   - Org-level quiet-hours + cap settings read goes in `core/settings/data_access/org_settings.py` as `get_send_rules(org_id)` (create the folder if absent — `core/settings/` doesn't have a data_access yet).
+   - `send_guard.evaluate(run)` is composition logic, stays in `core/automation/send_guard.py`.
 1. Migration: five columns on `tbl_organizations`.
 2. send_guard module: three pure-ish functions + composite.
 3. Wire into `deliver_run` Celery task.

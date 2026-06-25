@@ -48,6 +48,7 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention): the overdue-invoice scanner reads from `tbl_invoices`. Put `find_overdue(days_overdue: int)` in `core/billing/data_access/invoices.py` (create folder if absent) — NOT in the automation-engine tasks. Quote / invoice publish helpers in `core/billing/quotes_service.py` + `invoices_service.py` are write-side and stay where they are.
 1. Catalog entries.
 2. Publish calls in each business service after commit.
 3. Beat task for overdue invoices.

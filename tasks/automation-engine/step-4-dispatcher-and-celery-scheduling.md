@@ -48,6 +48,11 @@ Out of scope:
 
 ## Plan
 
+0. **Data-access layer** (project convention) — Step 1 created `core/automation/data_access/runs.py`; this step fills it with:
+   - `find_run_by_event_id(trigger_id, event_id) → AutomationRun | None` (idempotency check).
+   - `list_runs(trigger_id, *, status?, since?, limit, offset)` for the future run-history UI (Step 9 reads via this).
+   - `count_recent_marketing_sends_for_contact(contact_id, *, since)` placeholder for the Step-13 frequency-cap query.
+   Dispatcher logic (load trigger → resolve recipient → schedule Celery task) + Celery task body (render + send + status update) stay in `dispatcher.py` / `tasks.py`. Cross-module reads (template lookup) go through `core/templates/data_access/templates.get_template(...)` — do NOT duplicate the query.
 1. Migration: add event_id + unique index.
 2. Dispatcher: pure function — load triggers, resolve recipients, schedule tasks.
 3. Celery task: render via central template variables; send via channel adapter; update run row. Mock the adapter in tests.
