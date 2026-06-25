@@ -46,3 +46,55 @@ class TemplateLocked(TemplateError):
             f"template is locked for editing (current status: {status})"
         )
         self.status = status
+
+
+class InvalidWorkflowTransition(TemplateError):
+    """Raised by the workflow state machine when the requested action
+    is illegal from the current state (e.g. ``approve`` on a ``draft``
+    template). Router maps to 409.
+    """
+
+    def __init__(
+        self,
+        *,
+        current: str,
+        action: str,
+        hint: str | None = None,
+    ) -> None:
+        msg = (
+            f"cannot {action} a template that is currently {current!r}"
+        )
+        if hint:
+            msg = f"{msg} ({hint})"
+        super().__init__(msg)
+        self.current = current
+        self.action = action
+        self.hint = hint
+
+
+class SelfApproveBlocked(TemplateError):
+    """Raised by :func:`approve` when the reviewer is the template's
+    author and the org has not opted into self-approval. Router maps
+    to 409.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "reviewer cannot be the template's author; ask a different "
+            "reviewer to approve, or enable "
+            "template_review_self_approve_allowed in org settings"
+        )
+
+
+class PublishBlockedByExternal(TemplateError):
+    """Raised by :func:`publish` when ``external_status`` is not in
+    (``n_a``, ``approved``). The router maps to 409 with the current
+    external status so the UI can prompt the operator to wait / resubmit.
+    """
+
+    def __init__(self, *, external_status: str) -> None:
+        super().__init__(
+            "cannot publish a template whose external review status is "
+            f"{external_status!r}; resolve external review first"
+        )
+        self.external_status = external_status

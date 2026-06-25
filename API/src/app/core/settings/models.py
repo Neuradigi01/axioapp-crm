@@ -89,6 +89,20 @@ class OrgSettings(Base, TenantScoped):
         Integer, nullable=False, server_default=sql_text("24")
     )
 
+    # --- template-library review workflow (tasks/template-library Step 4) ---
+    # When True the workflow refuses ``draft → published`` shortcuts
+    # — every template must go through ``in_review → approved`` before
+    # publish. When False the operator can publish directly from draft.
+    template_review_mandatory: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("false")
+    )
+    # When False the reviewer must be a different user from the
+    # template's author. When True an Owner / Admin can approve their
+    # own drafts (useful for solo / small-team orgs).
+    template_review_self_approve_allowed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("false")
+    )
+
     # --- lead routing (Step 6) ---
     # Per-org routing config — JSONB so the schema is forward-compatible
     # with strategies we haven't built yet. v1 honours `{"strategy":

@@ -1,7 +1,7 @@
 # Step 4 — Internal review workflow
 
 **Goal:** State machine `draft → in_review → approved → published → archived` (with `rejected` returning to draft) + workflow endpoints + org-level mandatory-review toggle. Templates can only be used in campaigns / triggers when `internal_status='published'` AND `external_status in ('n_a', 'approved')`.
-**Status:** Pending
+**Status:** COMPLETED — `core/templates/workflow.py` (6 transitions: submit_for_review / approve / reject / request_changes / publish / archive; reviewer ≠ author guard via org setting; publish pre-checks external_status; mandatory-review toggle blocks draft→published shortcut). 6 new endpoints live: `POST /api/v1/templates/{id}/{submit,approve,reject,request-changes,publish,archive}`. `tbl_org_settings` extended with `template_review_mandatory` + `template_review_self_approve_allowed` (both default false) via migration `0119_template_review_toggles` (initial filename `0119_org_template_review_settings` exceeded alembic_version.version_num VARCHAR(32); renamed). Three new typed exceptions: InvalidWorkflowTransition / SelfApproveBlocked / PublishBlockedByExternal — router maps to 409. `OrgSettingsOut` + `OrgSettingsPatch` extended to surface both toggles via existing `PATCH /api/v1/settings`. 14 pytest cases in test_workflow.py (deferred run). Spec correction: bool columns went on `tbl_org_settings` (existing settings table) not `tbl_organizations` — matches the established settings pattern.
 **Depends on:** Step 1 (schema), Step 2 (service), Step 3 (router + perms).
 
 ---

@@ -33,8 +33,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.templates import service as templates_service
+from src.app.core.templates import workflow as templates_workflow
 from src.app.core.templates.exceptions import (
     DuplicateTemplateName,
+    InvalidWorkflowTransition,
+    PublishBlockedByExternal,
+    SelfApproveBlocked,
+    TemplateError,
     TemplateLocked,
     TemplateNotFound,
 )
@@ -42,13 +47,19 @@ from src.app.core.templates.models import (
     TemplateExternalStatus,
     TemplateInternalStatus,
 )
-from src.app.core.templates.permissions import PERM_READ, PERM_WRITE
+from src.app.core.templates.permissions import (
+    PERM_PUBLISH,
+    PERM_READ,
+    PERM_REVIEW,
+    PERM_WRITE,
+)
 from src.app.core.templates.schemas import (
     TemplateCreate,
     TemplateRead,
     TemplateReviewRead,
     TemplateUpdate,
     TemplateVersionRead,
+    WorkflowActionPayload,
 )
 from src.app.core.templates.variables import (
     VariableDef,
@@ -310,6 +321,168 @@ async def get_version_endpoint(
             detail="template version not found",
         ) from exc
     return TemplateVersionRead.model_validate(row)
+
+
+# --- workflow transitions ---------------------------------------------
+
+
+def _workflow_http_map(exc: TemplateError) -> HTTPException:
+    """Translate workflow exceptions into FastAPI HTTPException."""
+    if isinstance(exc, TemplateNotFound):
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="template not found",
+        )
+    if isinstance(
+        exc,
+        (InvalidWorkflowTransition, SelfApproveBlocked, PublishBlockedByExternal),
+    ):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+    # Generic note-required / other TemplateError → 422.
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+    )
+
+
+@router.post("/{template_id}/submit", response_model=TemplateRead)
+async def submit_endpoint(
+    template_id: uuid.UUID,
+    payload: WorkflowActionPayload = WorkflowActionPayload(),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> TemplateRead:
+    try:
+        template = await templates_workflow.submit_for_review(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            user_id=user.legacy_uuid,
+            note=payload.note,
+        )
+    except TemplateError as exc:
+        raise _workflow_http_map(exc) from exc
+    return TemplateRead.model_validate(template)
+
+
+@router.post("/{template_id}/approve", response_model=TemplateRead)
+async def approve_endpoint(
+    template_id: uuid.UUID,
+    payload: WorkflowActionPayload = WorkflowActionPayload(),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_REVIEW)),
+) -> TemplateRead:
+    try:
+        template = await templates_workflow.approve(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            reviewer_user_id=user.legacy_uuid,
+            note=payload.note,
+        )
+    except TemplateError as exc:
+        raise _workflow_http_map(exc) from exc
+    return TemplateRead.model_validate(template)
+
+
+@router.post("/{template_id}/reject", response_model=TemplateRead)
+async def reject_endpoint(
+    template_id: uuid.UUID,
+    payload: WorkflowActionPayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_REVIEW)),
+) -> TemplateRead:
+    if not payload.note or not payload.note.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="note is required when rejecting a template",
+        )
+    try:
+        template = await templates_workflow.reject(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            reviewer_user_id=user.legacy_uuid,
+            note=payload.note,
+        )
+    except TemplateError as exc:
+        raise _workflow_http_map(exc) from exc
+    return TemplateRead.model_validate(template)
+
+
+@router.post(
+    "/{template_id}/request-changes", response_model=TemplateRead
+)
+async def request_changes_endpoint(
+    template_id: uuid.UUID,
+    payload: WorkflowActionPayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_REVIEW)),
+) -> TemplateRead:
+    if not payload.note or not payload.note.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="note is required when requesting changes",
+        )
+    try:
+        template = await templates_workflow.request_changes(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            reviewer_user_id=user.legacy_uuid,
+            note=payload.note,
+        )
+    except TemplateError as exc:
+        raise _workflow_http_map(exc) from exc
+    return TemplateRead.model_validate(template)
+
+
+@router.post("/{template_id}/publish", response_model=TemplateRead)
+async def publish_endpoint(
+    template_id: uuid.UUID,
+    payload: WorkflowActionPayload = WorkflowActionPayload(),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_PUBLISH)),
+) -> TemplateRead:
+    try:
+        template = await templates_workflow.publish(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            user_id=user.legacy_uuid,
+            note=payload.note,
+        )
+    except TemplateError as exc:
+        raise _workflow_http_map(exc) from exc
+    return TemplateRead.model_validate(template)
+
+
+@router.post("/{template_id}/archive", response_model=TemplateRead)
+async def archive_workflow_endpoint(
+    template_id: uuid.UUID,
+    payload: WorkflowActionPayload = WorkflowActionPayload(),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> TemplateRead:
+    """Archive via the workflow (writes a review row + audits).
+
+    The Step-3 ``DELETE /templates/{id}`` route still works for
+    backwards-compat; this endpoint is the workflow-aligned twin that
+    the UI calls when the operator clicks "Archive" from the review
+    modal so the review trail captures the action with an optional
+    note."""
+    try:
+        template = await templates_workflow.archive(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            user_id=user.legacy_uuid,
+            note=payload.note,
+        )
+    except TemplateError as exc:
+        raise _workflow_http_map(exc) from exc
+    return TemplateRead.model_validate(template)
 
 
 @router.post("/{template_id}/preview", response_model=PreviewResponse)

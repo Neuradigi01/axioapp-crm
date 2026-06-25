@@ -43,6 +43,10 @@ class OrgSettingsOut(TimestampedOrgScopedOut):
     reviews_auto_request_enabled: bool
     reviews_auto_request_delay_hours: int
 
+    # Template-library Step 4 — review-workflow toggles.
+    template_review_mandatory: bool
+    template_review_self_approve_allowed: bool
+
     # Step 6 — lead routing. JSONB shape; v1 honours `{"strategy":
     # "round_robin"}` only. Mutation goes through the dedicated
     # `/api/v1/leads/routing-config` endpoints, not the generic
@@ -100,3 +104,7 @@ class OrgSettingsPatch(BaseModel):
     reviews_auto_request_delay_hours: Optional[int] = Field(
         default=None, ge=0, le=720
     )
+
+    # Template-library Step 4 — review-workflow toggles.
+    template_review_mandatory: Optional[bool] = None
+    template_review_self_approve_allowed: Optional[bool] = None

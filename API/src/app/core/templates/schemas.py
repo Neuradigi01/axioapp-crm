@@ -139,3 +139,17 @@ class TemplateTestSendRead(ORMModel):
     sent_by_user_id: Optional[uuid.UUID]
     channel_message_id: Optional[str]
     sent_at: datetime
+
+
+class WorkflowActionPayload(BaseModel):
+    """Body for the five workflow-transition endpoints.
+
+    ``note`` is mandatory for ``reject`` + ``request_changes`` —
+    enforced at the workflow layer, not here, so a single Pydantic
+    shape covers all five endpoints. The reject/request_changes
+    handlers reject empty notes with 422.
+    """
+
+    model_config = {"str_strip_whitespace": True, "extra": "forbid"}
+
+    note: Optional[str] = None
