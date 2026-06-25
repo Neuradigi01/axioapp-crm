@@ -20,16 +20,15 @@ from datetime import datetime, timezone
 from typing import Any, Literal, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import case, delete as sqla_delete, func, nulls_first, nulls_last, select
+from sqlalchemy import case, func, nulls_first, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
-from src.app.core.activities.models import Activity, ActivityType
+from src.app.core import activities
+from src.app.core.activities.models import ActivityType
+from src.app.core.tasks import data_access as _da
 from src.app.core.tasks.models import Task, TaskPriority, TaskStatus
 from src.app.core.tasks.schemas import TaskCreate, TaskUpdate
-from src.app.core.users.models import OrganizationMember, User
 from src.app.shared.audit import log_entity_change, snapshot
-from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 
 
@@ -64,12 +63,7 @@ def _apply_task_filters(
     sort_by: SortBy,
     sort_dir: SortDir,
 ):
-    """Compose the shared WHERE + ORDER clauses for `/tasks/me` and `/tasks/all`.
-
-    Returns the stmt with filters + sort applied. The base `select(Task)`
-    plus any caller-specific constraints (org_id, assigned_to) must be
-    on the stmt already.
-    """
+    """Compose the shared WHERE + ORDER clauses for `/tasks/me` and `/tasks/all`."""
     if status_filter is not None:
         stmt = stmt.where(Task.status == status_filter)
     if priority is not None:
@@ -98,15 +92,11 @@ def _apply_task_filters(
         col = Task.due_at
 
     ordered = col.asc() if sort_dir == "asc" else col.desc()
-    # Tasks with NULL `due_at` shouldn't pre-empt overdue work when
-    # sorting by due date — push nulls to the tail in both directions.
     if sort_by == "due_at":
         ordered = (
             nulls_last(col.asc()) if sort_dir == "asc"
             else nulls_first(col.desc())
         )
-    # Same trick for `last_activity_at` — never-touched tasks sink
-    # to the bottom of either direction.
     elif sort_by == "last_activity_at":
         ordered = (
             nulls_last(col.asc()) if sort_dir == "asc"
@@ -135,8 +125,7 @@ def _snapshot(t: Task) -> dict[str, Any]:
 
 async def get_task(session: AsyncSession, task_id: uuid.UUID) -> Optional[Task]:
     """Return a single task, scoped to the active tenant."""
-    result = await session.execute(select(Task).where(Task.id == task_id))
-    return result.scalar_one_or_none()
+    return await _da.get_task_by_id(session, task_id)
 
 
 async def create_task(
@@ -157,7 +146,7 @@ async def create_task(
         priority=payload.priority,
         status=TaskStatus.open,
     )
-    session.add(task)
+    _da.insert_task(session, task)
     await session.commit()
     await session.refresh(task)
 
@@ -204,7 +193,7 @@ async def delete_task(session: AsyncSession, *, task_id: uuid.UUID) -> None:
     task = ensure_found(await get_task(session, task_id), entity="task")
     before = _snapshot(task)
     task_uuid = task.id
-    await session.delete(task)
+    await _da.delete_task_row(session, task)
     await session.commit()
 
     await log_entity_change(
@@ -224,26 +213,15 @@ async def list_tasks_for_entity(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Task], int]:
-    """Tasks attached to one entity, latest-due first (with overdue at top).
-
-    `status_filter` lets the UI request only open tasks for the panel's
-    headline, or all tasks for the full history. Sort order favours the
-    "what needs my attention now" mental model: earliest due_at first,
-    nulls last (no due date).
-    """
-    filters: list[Any] = [
-        Task.related_entity_type == related_entity_type,
-        Task.related_entity_id == related_entity_id,
-    ]
-    if status_filter is not None:
-        filters.append(Task.status == status_filter)
-
-    base = (
-        select(Task)
-        .where(*filters)
-        .order_by(nulls_last(Task.due_at.asc()), Task.created_at.desc())
+    """Tasks attached to one entity, latest-due first (with overdue at top)."""
+    return await _da.list_tasks_for_entity_query(
+        session,
+        related_entity_type=related_entity_type,
+        related_entity_id=related_entity_id,
+        status_filter=status_filter,
+        page=page,
+        size=size,
     )
-    return await paginate(session, base, page=page, size=size)
 
 
 async def list_my_tasks(
@@ -259,8 +237,7 @@ async def list_my_tasks(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Task], int]:
-    """Caller's tasks. Filters mirror `/tasks/all` so the personal Tasks
-    page shares the same chip/search wiring as the org-wide view."""
+    """Caller's tasks. Filters mirror `/tasks/all`."""
     base = select(Task).where(Task.assigned_to_id == user_id)
     base = _apply_task_filters(
         base,
@@ -271,8 +248,7 @@ async def list_my_tasks(
         sort_by=sort_by,
         sort_dir=sort_dir,
     )
-
-    return await paginate(session, base, page=page, size=size)
+    return await _da.paginate_tasks_select(session, base, page=page, size=size)
 
 
 async def list_all_in_org(
@@ -289,11 +265,7 @@ async def list_all_in_org(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Task], int]:
-    """Every task in the org — gated by `users.read` at the router layer.
-
-    Always carries the explicit `Task.org_id == org_id` filter so a
-    misconfigured tenant context can't leak cross-org rows.
-    """
+    """Every task in the org — gated by `users.read` at the router layer."""
     base = select(Task).where(Task.org_id == org_id)
     if assigned_to_id is not None:
         base = base.where(Task.assigned_to_id == assigned_to_id)
@@ -306,8 +278,7 @@ async def list_all_in_org(
         sort_by=sort_by,
         sort_dir=sort_dir,
     )
-
-    return await paginate(session, base, page=page, size=size)
+    return await _da.paginate_tasks_select(session, base, page=page, size=size)
 
 
 # --- Bulk actions ----------------------------------------------------------
@@ -316,21 +287,10 @@ async def list_all_in_org(
 async def _assert_user_in_org(
     session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
 ) -> None:
-    """422 if the target user has no active membership in this org.
-
-    Same cross-tenant guard used by contacts / leads / walk-ins /
-    appointments reassign services."""
-    result = await session.execute(
-        select(OrganizationMember.id)
-        .join(User, User.id == OrganizationMember.user_member_id)
-        .where(
-            User.legacy_uuid == user_uuid,
-            OrganizationMember.organization_id == org_id,
-            OrganizationMember.is_active.is_(True),
-        )
-        .limit(1)
-    )
-    if result.scalar_one_or_none() is None:
+    """422 if the target user has no active membership in this org."""
+    if not await _da.user_has_active_membership(
+        session, org_id=org_id, user_uuid=user_uuid
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="target user is not a member of this organisation",
@@ -376,17 +336,16 @@ async def bulk_reassign_tasks(
             continue
         before_id = task.assigned_to_id
         task.assigned_to_id = assigned_to_id
-        session.add(
-            Activity(
-                org_id=org_id,
-                entity_type="task",
-                entity_id=task.id,
-                type=ActivityType.reassign,
-                payload=_reassign_payload(
-                    from_id=before_id, to_id=assigned_to_id, note=note
-                ),
-                user_id=actor_user_id,
-            )
+        await activities.record_in_session(
+            session,
+            org_id=org_id,
+            entity_type="task",
+            entity_id=task.id,
+            type=ActivityType.reassign,
+            payload=_reassign_payload(
+                from_id=before_id, to_id=assigned_to_id, note=note
+            ),
+            user_id=actor_user_id,
         )
         reassigned += 1
 
@@ -400,10 +359,7 @@ async def bulk_mark_done_tasks(
     ids: list[uuid.UUID],
     org_id: uuid.UUID,
 ) -> tuple[int, int]:
-    """Move every `open` (or `cancelled`) task in the batch to `done`.
-    Rows already in `done` are skipped — same partial-success
-    semantic as appointments bulk-cancel. Returns
-    `(done, skipped)`."""
+    """Move every `open` (or `cancelled`) task in the batch to `done`."""
     done = 0
     skipped = 0
     for tid in ids:
@@ -416,9 +372,6 @@ async def bulk_mark_done_tasks(
             skipped += 1
             continue
         task.status = TaskStatus.done
-        # Hook the bump in here as well — the activities table
-        # doesn't get a row for a bulk action, but the user still
-        # expects the closed-out task to surface in "recent activity".
         task.last_activity_at = datetime.now(timezone.utc)
         done += 1
 
@@ -432,16 +385,13 @@ async def bulk_delete_tasks(
     ids: list[uuid.UUID],
     org_id: uuid.UUID,
 ) -> int:
-    """Hard delete in bulk — matches the single-row delete semantic.
-    Uses a single DELETE statement scoped by org_id so a misconfigured
-    tenant context can't leak cross-org rows."""
-    result = await session.execute(
-        sqla_delete(Task)
-        .where(Task.org_id == org_id)
-        .where(Task.id.in_(ids))
+    """Hard delete in bulk. Single DELETE statement scoped by org_id
+    so a misconfigured tenant context can't leak cross-org rows."""
+    rowcount = await _da.bulk_delete_tasks_by_ids(
+        session, ids=ids, org_id=org_id
     )
     await session.commit()
-    return result.rowcount or 0
+    return rowcount
 
 
 # Re-export enums so callers get a stable import path through this module.

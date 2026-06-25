@@ -288,7 +288,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 - [Step 9: Backfill DAL — permissions, pipelines, reviews](dal-backfill/step-9-backfill-permissions-pipelines-reviews.md) — Done
 - [Step 10: Backfill DAL — saved_views, settings, staff](dal-backfill/step-10-backfill-saved-views-settings-staff.md) — Done
 - [Step 11: Backfill DAL — staff_portal, standard_fields, subscriptions](dal-backfill/step-11-backfill-staff-portal-standard-fields-subscriptions.md) — Done
-- [Step 12: Backfill DAL — tasks, walk_ins](dal-backfill/step-12-backfill-tasks-walkins.md) — Pending
+- [Step 12: Backfill DAL — tasks, walk_ins](dal-backfill/step-12-backfill-tasks-walkins.md) — Done
 - [Step 13: Backfill DAL — packs/custom_orders, packs/field_ops](dal-backfill/step-13-backfill-pack-modules.md) — Pending
 - [Step 14: CI guard pin-test + final audit](dal-backfill/step-14-ci-guard-and-final-audit.md) — Pending
 

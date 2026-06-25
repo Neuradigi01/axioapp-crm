@@ -68,7 +68,7 @@ Plus a CI guard (pin-test) at the end so this drift can't recur silently.
 | 9 | [Backfill DAL — permissions, pipelines, reviews](step-9-backfill-permissions-pipelines-reviews.md) | **COMPLETED** | ~0.5 days |
 | 10 | [Backfill DAL — saved_views, settings, staff](step-10-backfill-saved-views-settings-staff.md) | **COMPLETED** | ~0.5 days |
 | 11 | [Backfill DAL — staff_portal, standard_fields, subscriptions](step-11-backfill-staff-portal-standard-fields-subscriptions.md) | **COMPLETED** | ~0.5 days |
-| 12 | [Backfill DAL — tasks, walk_ins](step-12-backfill-tasks-walkins.md) | **Pending** | ~0.5 days |
+| 12 | [Backfill DAL — tasks, walk_ins](step-12-backfill-tasks-walkins.md) | **COMPLETED** | ~0.5 days |
 | 13 | [Backfill DAL — packs/custom_orders, packs/field_ops](step-13-backfill-pack-modules.md) | **Pending** | ~0.5 days |
 | 14 | [CI guard pin-test + final audit](step-14-ci-guard-and-final-audit.md) | **Pending** | ~0.5 days |
 

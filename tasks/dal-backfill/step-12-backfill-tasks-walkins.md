@@ -1,7 +1,7 @@
 # Step 12 — Backfill DAL (tasks, walk_ins)
 
 **Goal:** Create `data_access.py` in two core modules. Move all SQL/ORM out of `service.py`. Behaviour unchanged.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 11.
 
 ---
