@@ -10,10 +10,10 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.settings import data_access as _da
 from src.app.core.settings.models import OrgSettings
 from src.app.core.settings.schemas import (
     LeadRoutingConfigUpdate,
@@ -27,15 +27,11 @@ async def get_or_create(
     """Return the single settings row for `org_id`, creating it on
     first call. The defaults baked into the model (server_default) +
     the migration cover every column."""
-    existing = (
-        await session.execute(
-            select(OrgSettings).where(OrgSettings.org_id == org_id)
-        )
-    ).scalar_one_or_none()
+    existing = await _da.get_org_settings_for_org(session, org_id)
     if existing is not None:
         return existing
     row = OrgSettings(org_id=org_id)
-    session.add(row)
+    _da.insert_org_settings(session, row)
     await session.commit()
     await session.refresh(row)
     return row

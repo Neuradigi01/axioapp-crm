@@ -21,9 +21,9 @@ import uuid
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.saved_views import data_access as _da
 from src.app.core.saved_views.models import SavedView
 from src.app.core.saved_views.schemas import (
     SavedViewCreate,
@@ -38,31 +38,10 @@ async def list_views(
     user_id: uuid.UUID,
     entity: str,
 ) -> list[SavedView]:
-    """Views the current user can see for `entity`.
-
-    Returns owned views first, then shared views from other owners.
-    Within each bucket, ordered alphabetically by ``name`` (case-sensitive
-    — the existing list pages are case-sensitive too and saved view
-    names are operator-chosen, so collation surprises are rare).
-    """
-    stmt = (
-        select(SavedView)
-        .where(
-            SavedView.org_id == org_id,
-            SavedView.entity == entity,
-            or_(
-                SavedView.owner_user_id == user_id,
-                SavedView.shared.is_(True),
-            ),
-        )
-        # Owned first (False sorts before True for an "is-not-mine" flag).
-        .order_by(
-            (SavedView.owner_user_id != user_id).asc(),
-            SavedView.name.asc(),
-        )
+    """Views the current user can see for `entity`."""
+    return await _da.list_views_for_user_and_entity(
+        session, org_id=org_id, user_id=user_id, entity=entity
     )
-    result = await session.execute(stmt)
-    return list(result.scalars())
 
 
 async def get_view(
@@ -70,13 +49,8 @@ async def get_view(
     *,
     view_id: uuid.UUID,
 ) -> SavedView | None:
-    """Fetch a single view by id. RLS keeps cross-tenant rows invisible;
-    we do not enforce owner/shared here — `list_views` already filters
-    the menu, and the mutation helpers explicitly check ownership."""
-    result = await session.execute(
-        select(SavedView).where(SavedView.id == view_id)
-    )
-    return result.scalar_one_or_none()
+    """Fetch a single view by id."""
+    return await _da.get_view_by_id(session, view_id)
 
 
 async def create_view(
@@ -87,17 +61,12 @@ async def create_view(
     payload: SavedViewCreate,
 ) -> SavedView:
     """Insert a new view owned by `user_id`. Pre-checks
-    `(owner, entity, name)` and returns 409 on duplicate.
-
-    The pre-check is the primary mechanism here rather than catching
-    ``IntegrityError`` post-commit — a failed commit inside the
-    request transaction leaves the asyncpg connection in a "txn
-    aborted" state that has tripped up the test event loop in this
-    codebase before. The unique index in 0071 stays as a backstop
-    against the (rare) concurrent-insert race.
-    """
-    existing = await _find_view_by_name(
-        session, owner_user_id=user_id, entity=payload.entity, name=payload.name
+    `(owner, entity, name)` and returns 409 on duplicate."""
+    existing = await _da.find_view_by_owner_entity_name(
+        session,
+        owner_user_id=user_id,
+        entity=payload.entity,
+        name=payload.name,
     )
     if existing is not None:
         raise HTTPException(
@@ -116,7 +85,7 @@ async def create_view(
         config=_dump_config(payload.config),
         shared=payload.shared,
     )
-    session.add(view)
+    _da.insert_view(session, view)
     await session.commit()
     await session.refresh(view)
     return view
@@ -151,7 +120,7 @@ async def update_view(
     # If the rename targets a name another of this user's views already
     # holds, pre-emptively 409 — same reasoning as `create_view`.
     if "name" in changes and changes["name"] != view.name:
-        clash = await _find_view_by_name(
+        clash = await _da.find_view_by_owner_entity_name(
             session,
             owner_user_id=user_id,
             entity=view.entity,
@@ -191,28 +160,8 @@ async def delete_view(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="only the owner can delete this saved view",
         )
-    await session.delete(view)
+    await _da.delete_view_row(session, view)
     await session.commit()
-
-
-async def _find_view_by_name(
-    session: AsyncSession,
-    *,
-    owner_user_id: uuid.UUID,
-    entity: str,
-    name: str,
-) -> SavedView | None:
-    """Look up the (owner, entity, name) tuple — the unique constraint
-    on `saved_views`. Used by create / rename to surface 409 without
-    relying on the commit-side IntegrityError path."""
-    result = await session.execute(
-        select(SavedView).where(
-            SavedView.owner_user_id == owner_user_id,
-            SavedView.entity == entity,
-            SavedView.name == name,
-        )
-    )
-    return result.scalar_one_or_none()
 
 
 def _dump_config(cfg: Any) -> dict[str, Any]:

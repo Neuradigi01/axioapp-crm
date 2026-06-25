@@ -66,7 +66,7 @@ Plus a CI guard (pin-test) at the end so this drift can't recur silently.
 | 7 | [Backfill DAL — embed, integrations, invitations](step-7-backfill-embed-integrations-invitations.md) | **COMPLETED** | ~0.5 days |
 | 8 | [Backfill DAL — leads, notifications, packs](step-8-backfill-leads-notifications-packs.md) | **COMPLETED** | ~0.75 days |
 | 9 | [Backfill DAL — permissions, pipelines, reviews](step-9-backfill-permissions-pipelines-reviews.md) | **COMPLETED** | ~0.5 days |
-| 10 | [Backfill DAL — saved_views, settings, staff](step-10-backfill-saved-views-settings-staff.md) | **Pending** | ~0.5 days |
+| 10 | [Backfill DAL — saved_views, settings, staff](step-10-backfill-saved-views-settings-staff.md) | **COMPLETED** | ~0.5 days |
 | 11 | [Backfill DAL — staff_portal, standard_fields, subscriptions](step-11-backfill-staff-portal-standard-fields-subscriptions.md) | **Pending** | ~0.5 days |
 | 12 | [Backfill DAL — tasks, walk_ins](step-12-backfill-tasks-walkins.md) | **Pending** | ~0.5 days |
 | 13 | [Backfill DAL — packs/custom_orders, packs/field_ops](step-13-backfill-pack-modules.md) | **Pending** | ~0.5 days |

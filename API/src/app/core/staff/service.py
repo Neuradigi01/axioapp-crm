@@ -27,13 +27,13 @@ from decimal import Decimal
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.users import data_access
 from src.app.core.activities.models import Activity
-from src.app.core.leads.models import Lead, LeadStatus
+from src.app.core.leads.models import LeadStatus
+from src.app.core.staff import data_access as _da
 from src.app.core.staff.models import (
     Attendance,
     EmploymentStatus,
@@ -45,7 +45,7 @@ from src.app.core.staff.schemas import (
     StaffListItem,
     StaffProfileUpsert,
 )
-from src.app.core.users.models import User, UserInfo
+from src.app.core.users.models import User
 
 
 def _profile_snapshot(p: StaffProfile) -> dict[str, Any]:
@@ -89,16 +89,7 @@ async def _ensure_user_in_scope(
 
 async def list_staff(session: AsyncSession) -> list[StaffListItem]:
     """Every user in the org + their profile (if any)."""
-    # After DR.7 the user's display name lives on `tbl_user_info`, so
-    # we JOIN through it for the ordering. The JOIN is inner because
-    # every FurnitureCRM user has a profile row (post-DR.7.2 backfill).
-    stmt = (
-        select(User, StaffProfile)
-        .join(UserInfo, UserInfo.member_id == User.id)
-        .outerjoin(StaffProfile, StaffProfile.user_id == User.legacy_uuid)
-        .order_by(UserInfo.first_name.asc())
-    )
-    rows = (await session.execute(stmt)).all()
+    rows = await _da.list_users_with_profiles(session)
     out: list[StaffListItem] = []
     for user, profile in rows:
         out.append(
@@ -132,11 +123,7 @@ async def list_staff(session: AsyncSession) -> list[StaffListItem]:
 async def get_profile(
     session: AsyncSession, user_id: uuid.UUID
 ) -> Optional[StaffProfile]:
-    return (
-        await session.execute(
-            select(StaffProfile).where(StaffProfile.user_id == user_id)
-        )
-    ).scalar_one_or_none()
+    return await _da.get_staff_profile_by_user_id(session, user_id)
 
 
 async def upsert_profile(
@@ -161,7 +148,7 @@ async def upsert_profile(
             employment_status=payload.employment_status,
             joined_at=payload.joined_at or Date.today(),
         )
-        session.add(profile)
+        _da.insert_staff_profile(session, profile)
     else:
         existing.commission_rate = payload.commission_rate
         existing.monthly_target = payload.monthly_target
@@ -192,22 +179,12 @@ async def compute_performance(
 ) -> dict[str, Any]:
     await _ensure_user_in_scope(session, user_id)
 
-    leads_won = (
-        await session.execute(
-            select(func.count())
-            .select_from(Lead)
-            .where(Lead.assigned_to_id == user_id)
-            .where(Lead.status == LeadStatus.won)
-        )
-    ).scalar_one()
-    leads_active = (
-        await session.execute(
-            select(func.count())
-            .select_from(Lead)
-            .where(Lead.assigned_to_id == user_id)
-            .where(Lead.status == LeadStatus.active)
-        )
-    ).scalar_one()
+    leads_won = await _da.count_leads_for_user_by_status(
+        session, user_id=user_id, status_filter=LeadStatus.won
+    )
+    leads_active = await _da.count_leads_for_user_by_status(
+        session, user_id=user_id, status_filter=LeadStatus.active
+    )
 
     profile = await get_profile(session, user_id)
     monthly_target = profile.monthly_target if profile is not None else Decimal("0")
@@ -244,42 +221,17 @@ async def list_attendance(
     from_dt: Optional[Date] = None,
     to_dt: Optional[Date] = None,
 ) -> list[Attendance]:
-    filters: list[Any] = [Attendance.user_id == user_id]
-    if from_dt is not None:
-        filters.append(Attendance.date >= from_dt)
-    if to_dt is not None:
-        filters.append(Attendance.date <= to_dt)
-    stmt = (
-        select(Attendance)
-        .where(and_(*filters))
-        .order_by(Attendance.clock_in_at.desc())
+    return await _da.list_attendance_for_user(
+        session, user_id=user_id, from_dt=from_dt, to_dt=to_dt
     )
-    return list((await session.execute(stmt)).scalars().all())
 
 
 async def list_activities_for(
     session: AsyncSession, user_id: uuid.UUID, limit: int = 100
 ) -> list[Activity]:
-    stmt = (
-        select(Activity)
-        .where(Activity.user_id == user_id)
-        .order_by(Activity.created_at.desc())
-        .limit(limit)
+    return await _da.list_activities_for_user(
+        session, user_id=user_id, limit=limit
     )
-    return list((await session.execute(stmt)).scalars().all())
-
-
-async def _current_open_session(
-    session: AsyncSession, user_id: uuid.UUID
-) -> Optional[Attendance]:
-    """The user's currently-open attendance row, if any."""
-    return (
-        await session.execute(
-            select(Attendance)
-            .where(Attendance.user_id == user_id)
-            .where(Attendance.clock_out_at.is_(None))
-        )
-    ).scalar_one_or_none()
 
 
 async def clock_in(
@@ -291,7 +243,9 @@ async def clock_in(
 ) -> Attendance:
     await _ensure_user_in_scope(session, user_id)
 
-    if (await _current_open_session(session, user_id)) is not None:
+    if (
+        await _da.find_open_attendance_session(session, user_id)
+    ) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="user already has an open attendance session — clock out first",
@@ -305,7 +259,7 @@ async def clock_in(
         date=now.date(),
         notes=payload.notes,
     )
-    session.add(attendance)
+    _da.insert_attendance(session, attendance)
     await session.commit()
     await session.refresh(attendance)
 
@@ -326,7 +280,7 @@ async def clock_out(
 ) -> Attendance:
     await _ensure_user_in_scope(session, user_id)
 
-    open_session = await _current_open_session(session, user_id)
+    open_session = await _da.find_open_attendance_session(session, user_id)
     if open_session is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
