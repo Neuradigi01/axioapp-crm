@@ -1,7 +1,7 @@
 # Step 1 — Fix router transaction violations (inventory, leads, dev)
 
 **Goal:** Remove `db.commit / db.rollback / db.refresh / db.flush / db.execute / select()` from three router files. Move transaction logic into `service.py`; create `data_access.py` for `dev` (which currently has neither a service nor a DAL).
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Audit findings 2026-06-25.
 
 ---

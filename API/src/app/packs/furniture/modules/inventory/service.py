@@ -44,11 +44,13 @@ from src.app.packs.furniture.modules.inventory.models import (
 )
 from src.app.packs.furniture.modules.inventory.schemas import (
     InventoryItemCreate,
+    InventoryItemFullCreate,
     InventoryItemUpdate,
     WarehouseCreate,
     WarehouseUpdate,
 )
 from src.app.shared.db.queries import get_or_404
+from src.app.shared.storage import get_storage
 
 
 # --- warehouses ---------------------------------------------------------
@@ -247,6 +249,111 @@ async def create_item(
     # Open initial alert if reorder_level > 0 and qty_on_hand == 0.
     await recompute_alerts(session, item_id=item.id)
     return item
+
+
+async def create_item_full(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    payload: InventoryItemFullCreate,
+) -> InventoryItem:
+    """Atomic create: a catalog row + an inventory row in one
+    transaction. Used by the Add Product modal — either both rows
+    land, or neither does (no half-created products).
+
+    `description` is stored on `catalog_items.custom_data.description`.
+    """
+    # 1. Validate the warehouse exists in this org (404 friendlier than
+    # a generic FK violation).
+    wh = await get_warehouse(session, payload.warehouse_id)
+
+    # 2. Create the catalog row first.
+    catalog = CatalogItem(
+        org_id=org_id,
+        sku=payload.sku.strip().upper(),
+        name=payload.name,
+        category=payload.category,
+        price=payload.price,
+        custom_data=(
+            {"description": payload.description} if payload.description else {}
+        ),
+        is_active=payload.is_active,
+    )
+    session.add(catalog)
+    try:
+        await session.flush()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"catalog SKU '{payload.sku}' already exists for this org",
+        )
+
+    # 3. Create the inventory row referencing the freshly-created
+    # catalog row. Same transaction → both succeed or both rollback.
+    inv = InventoryItem(
+        org_id=org_id,
+        catalog_item_id=catalog.id,
+        warehouse_id=wh.id,
+        sku=payload.sku.strip().upper(),
+        material=payload.material,
+        color=payload.color,
+        finish=payload.finish,
+        dimensions=payload.dimensions,
+        reorder_level=payload.reorder_level,
+        is_best_seller=payload.is_best_seller,
+        is_active=payload.is_active,
+    )
+    session.add(inv)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"inventory item with SKU '{payload.sku}' already exists "
+                f"in this warehouse"
+            ),
+        )
+    await session.refresh(inv)
+    return inv
+
+
+async def set_item_cover(
+    session: AsyncSession,
+    *,
+    item_id: uuid.UUID,
+    org_id: uuid.UUID,
+    file_bytes: bytes,
+    content_type: str | None,
+    filename: str | None,
+) -> str:
+    """Persist a cover image for `item_id`, save to storage backend,
+    write the served URL to `inventory_items.cover_url`, and return
+    that URL.
+    """
+    if not file_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="uploaded file is empty",
+        )
+    item = await get_item(session, item_id)
+
+    ext = "jpg"
+    if filename and "." in filename:
+        ext = filename.rsplit(".", 1)[-1].lower()[:8]
+    storage_path = f"{org_id}/inventory/{item.id}/cover.{ext}"
+    ref = get_storage().put(
+        storage_path,
+        file_bytes,
+        content_type=content_type or "application/octet-stream",
+    )
+
+    item.cover_url = ref.url
+    await session.commit()
+    await session.refresh(item)
+    return ref.url
 
 
 async def update_item(
@@ -550,6 +657,7 @@ async def update_alert_status(
 
 __all__ = [
     "create_item",
+    "create_item_full",
     "create_warehouse",
     "delete_item",
     "delete_warehouse",
@@ -561,6 +669,7 @@ __all__ = [
     "list_warehouses",
     "record_movement",
     "recompute_alerts",
+    "set_item_cover",
     "update_alert_status",
     "update_item",
     "update_warehouse",

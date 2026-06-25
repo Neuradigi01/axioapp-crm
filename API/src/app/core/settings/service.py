@@ -15,7 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.settings.models import OrgSettings
-from src.app.core.settings.schemas import OrgSettingsPatch
+from src.app.core.settings.schemas import (
+    LeadRoutingConfigUpdate,
+    OrgSettingsPatch,
+)
 
 
 async def get_or_create(
@@ -70,6 +73,24 @@ async def patch_settings(
     return row
 
 
+async def set_lead_routing_config(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    payload: LeadRoutingConfigUpdate,
+) -> dict[str, Any]:
+    """Replace the org's lead-routing config and return the persisted
+    dict.
+
+    Owns the transaction so callers (leads router) don't.
+    """
+    row = await get_or_create(session, org_id=org_id)
+    row.lead_routing_config = payload.model_dump()
+    await session.commit()
+    await session.refresh(row)
+    return row.lead_routing_config
+
+
 def _snapshot(row: OrgSettings) -> dict[str, Any]:
     return {
         "id": str(row.id),
@@ -82,4 +103,4 @@ def _snapshot(row: OrgSettings) -> dict[str, Any]:
     }
 
 
-__all__ = ["get_or_create", "patch_settings"]
+__all__ = ["get_or_create", "patch_settings", "set_lead_routing_config"]

@@ -1,7 +1,8 @@
 """Tenant (organization) service.
 
-Helpers around the `organizations` table. Today only `create_organization`
-lives here — used by the signup flow when a brand-new visitor lands.
+Helpers around the `organizations` table. Used by signup, by every
+endpoint that needs to hydrate the tenant row off a JWT's `org_id`
+claim, and by ownership transfer.
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.tenants import data_access as tenants_data_access
 from src.app.core.tenants.models import Organization
 
 
@@ -70,3 +72,15 @@ async def create_organization(
         await session.rollback()
         raise
     return org
+
+
+async def get_organization_by_id(
+    session: AsyncSession, org_id: uuid.UUID
+) -> Organization | None:
+    """Resolve an organisation by its UUID PK.
+
+    Thin service wrapper over the tenants DAL so callers in other
+    modules don't reach into `tenants.data_access` directly. Returns
+    `None` on miss; callers decide how to surface that.
+    """
+    return await tenants_data_access.get_organization_by_id(session, org_id)

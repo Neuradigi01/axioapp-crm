@@ -28,7 +28,6 @@ from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
@@ -72,8 +71,11 @@ from src.app.core.settings.schemas import (
     LeadRoutingConfigOut,
     LeadRoutingConfigUpdate,
 )
-from src.app.core.settings.service import get_or_create as get_or_create_settings
-from src.app.core.tenants import data_access
+from src.app.core.settings.service import (
+    get_or_create as get_or_create_settings,
+    set_lead_routing_config,
+)
+from src.app.core.tenants.service import get_organization_by_id
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -252,7 +254,7 @@ async def export_leads_csv_endpoint(
         sort=sort,
     )
 
-    org = await data_access.get_organization_by_id(db, user.org_id)
+    org = await get_organization_by_id(db, user.org_id)
     assert org is not None  # authed user implies their org exists
     filename = export_filename(org.slug)
 
@@ -362,11 +364,8 @@ async def put_routing_config_endpoint(
     `strategy="round_robin"` (validated by the Literal type on
     `LeadRoutingConfigUpdate.strategy`); future strategies slot in
     here without an API break."""
-    row = await get_or_create_settings(db, org_id=user.org_id)
-    row.lead_routing_config = payload.model_dump()
-    await db.commit()
-    await db.refresh(row)
-    return LeadRoutingConfigOut.model_validate(row.lead_routing_config)
+    cfg = await set_lead_routing_config(db, org_id=user.org_id, payload=payload)
+    return LeadRoutingConfigOut.model_validate(cfg)
 
 
 @router.get("/{lead_id}", response_model=LeadOut)

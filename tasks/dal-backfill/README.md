@@ -56,7 +56,7 @@ Plus a CI guard (pin-test) at the end so this drift can't recur silently.
 
 | # | Title | Status | Effort |
 |---|---|---|---|
-| 1 | [Fix router transaction violations — inventory, leads, dev](step-1-fix-router-transaction-violations.md) | **Pending** | ~0.5 days |
+| 1 | [Fix router transaction violations — inventory, leads, dev](step-1-fix-router-transaction-violations.md) | **COMPLETED** | ~0.5 days |
 | 2 | [Flatten DAL folder → file — auth, campaigns, contacts, email_sequences](step-2-flatten-dal-folder-batch-1.md) | **Pending** | ~0.5 days |
 | 3 | [Flatten DAL folder → file — templates, tenants, users, integrations/whatsapp](step-3-flatten-dal-folder-batch-2.md) | **Pending** | ~0.5 days |
 | 4 | [Backfill DAL — activities, appointments, audit](step-4-backfill-activities-appointments-audit.md) | **Pending** | ~0.5 days |
