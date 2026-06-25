@@ -1,0 +1,105 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
+    <header class="border-b border-zinc-200 px-5 py-3">
+      <h2 class="text-sm font-semibold text-zinc-900">Send test</h2>
+      <p class="mt-0.5 text-xs text-zinc-500">
+        {{ template().name }} · {{ template().channel }}
+      </p>
+    </header>
+
+    <div class="space-y-3 px-5 py-4">
+      <label class="block">
+        <span class="text-xs font-medium text-zinc-700">{{ channelLabel() }}</span>
+        <input
+          type="text"
+          [value]="recipient()"
+          (input)="onRecipientInput($any($event.target).value)"
+          [placeholder]="placeholder()"
+          [disabled]="submitting()"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:bg-zinc-50"
+        />
+        @if (recipient() && !recipientValid()) {
+          <p class="mt-1 text-[10px] text-rose-600">
+            Doesn't look like a valid {{ template().channel }} recipient.
+          </p>
+        }
+      </label>
+
+      <button
+        type="button"
+        (click)="toggleSampleContext()"
+        class="inline-flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-900"
+      >
+        <lucide-icon
+          [name]="sampleContextOpen() ? 'chevron-down' : 'chevron-right'"
+          size="12"
+        />
+        Sample context <span class="text-zinc-400">(optional)</span>
+      </button>
+
+      @if (sampleContextOpen()) {
+        <label class="block">
+          <span class="text-[10px] text-zinc-500">
+            JSON overlay on the default sample. Example:
+            <code class="rounded bg-zinc-100 px-1 font-mono">{{ '{' }} "contact": {{ '{' }} "first_name": "Asha" {{ '}' }} {{ '}' }}</code>
+          </span>
+          <textarea
+            rows="4"
+            [value]="sampleContextText()"
+            (input)="onSampleContextInput($any($event.target).value)"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-xs focus:border-zinc-500 focus:outline-none"
+          ></textarea>
+        </label>
+      }
+
+      @if (result(); as r) {
+        <div class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+          <p class="font-medium">
+            <lucide-icon name="check" size="12" class="mr-1 inline" />
+            Sent
+          </p>
+          <p class="mt-0.5">
+            Recipient: <code class="font-mono">{{ r.sent_to }}</code>
+          </p>
+          @if (r.channel_message_id) {
+            <p class="mt-0.5">
+              Provider ID: <code class="font-mono">{{ r.channel_message_id }}</code>
+            </p>
+          }
+          <p class="mt-1 text-[10px] text-emerald-700">
+            Check the recipient's inbox / WhatsApp to confirm delivery.
+          </p>
+        </div>
+      }
+      @if (error(); as e) {
+        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {{ e }}
+        </div>
+      }
+    </div>
+
+    <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3">
+      <button
+        type="button"
+        (click)="close()"
+        [disabled]="submitting()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+      >
+        Close
+      </button>
+      @if (!result()) {
+        <button
+          type="button"
+          (click)="submit()"
+          [disabled]="!canSubmit()"
+          class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+        >
+          @if (submitting()) {
+            <lucide-icon name="loader-2" size="12" class="animate-spin" />
+          }
+          Send test
+        </button>
+      }
+    </footer>
+  </div>
+</div>

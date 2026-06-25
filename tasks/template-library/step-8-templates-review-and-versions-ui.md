@@ -1,7 +1,7 @@
 # Step 8 — Review modal + versions drawer + test-send modal
 
 **Goal:** UI for the workflow transitions (Step 4) and the test-send flow (Step 5). Plus a versions drawer for browsing the history written in Step 2.
-**Status:** Pending
+**Status:** COMPLETED — `review/template-review.modal` (3-action picker: Approve / Request Changes / Reject; note required for the latter two; calls the matching Step-4 endpoint and emits an `(updated)` signal back to the editor), `test-send/test-send.modal` (per-channel recipient validation + optional sample-context JSON overlay; emits provider message id on success), `versions/versions-drawer` (full-height right panel that re-fetches on open, "View" inlines the past version's preview via Step-7's preview-pane, "Restore" is gated on `templates.write` and PATCHes a new version row), editor page gained 6 header buttons (Versions / Test send / Submit for review / Review / Publish / Archive) wired with signal-driven visibility against `internal_status` + user permissions; `applyTransition` re-enables form controls when the workflow moves a template back to draft; `Send` Lucide icon added to `app.config.ts` registry; 4 Jest cases in `template-review.modal.spec.ts` (deferred run per locked instruction). The 3 pre-existing Lucide check failures (`bot`, `external-link`, `megaphone`) live in conversations components from a prior track — not introduced here.
 **Depends on:** Step 4 (workflow endpoints), Step 5 (test-send endpoint), Step 7 (editor page hosts the trigger buttons).
 
 ---

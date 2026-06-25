@@ -23,7 +23,9 @@ import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
 
 import { ChannelChipComponent } from '../channel-chip.component';
+import { TemplateReviewModalComponent } from '../review/template-review.modal';
 import { TemplateStatusBadgeComponent } from '../template-status-badge.component';
+import { TestSendModalComponent } from '../test-send/test-send.modal';
 import {
   TemplateChannel,
   TemplateCreatePayload,
@@ -31,6 +33,7 @@ import {
   TemplateUpdatePayload,
   TemplatesApiService,
 } from '../templates-api.service';
+import { VersionsDrawerComponent } from '../versions/versions-drawer.component';
 import { EmailFormComponent, EmailFormGroup } from './email-form.component';
 import { PreviewPaneComponent } from './preview-pane.component';
 import { VariablePickerComponent } from './variable-picker.component';
@@ -74,6 +77,9 @@ const LOCKED_STATUSES = new Set(['in_review', 'approved', 'published']);
     PreviewPaneComponent,
     WaFormComponent,
     EmailFormComponent,
+    TemplateReviewModalComponent,
+    TestSendModalComponent,
+    VersionsDrawerComponent,
   ],
   templateUrl: './template-editor.page.html',
 })
@@ -125,6 +131,53 @@ export class TemplateEditorPageComponent {
   protected readonly canWrite = computed(() =>
     this.auth.hasPermission('templates.write'),
   );
+  protected readonly canReview = computed(() =>
+    this.auth.hasPermission('templates.review'),
+  );
+  protected readonly canPublish = computed(() =>
+    this.auth.hasPermission('templates.publish'),
+  );
+
+  // --- header-button visibility (Step 8) ------------------------------
+
+  protected readonly showSubmitButton = computed(() => {
+    const t = this.template();
+    return (
+      t !== null &&
+      t.internal_status === 'draft' &&
+      this.canWrite() &&
+      !this.locked()
+    );
+  });
+  protected readonly showReviewButton = computed(() => {
+    const t = this.template();
+    return t !== null && t.internal_status === 'in_review' && this.canReview();
+  });
+  protected readonly showPublishButton = computed(() => {
+    const t = this.template();
+    return t !== null && t.internal_status === 'approved' && this.canPublish();
+  });
+  protected readonly showArchiveButton = computed(() => {
+    const t = this.template();
+    return (
+      t !== null &&
+      t.internal_status !== 'archived' &&
+      this.canWrite()
+    );
+  });
+  protected readonly showTestSendButton = computed(
+    () => this.template() !== null,
+  );
+  protected readonly showVersionsButton = computed(
+    () => this.template() !== null,
+  );
+
+  // --- modal / drawer state ------------------------------------------
+
+  protected readonly reviewModalOpen = signal<boolean>(false);
+  protected readonly testSendModalOpen = signal<boolean>(false);
+  protected readonly versionsDrawerOpen = signal<boolean>(false);
+  protected readonly transitioning = signal<string | null>(null);
 
   protected readonly currentBody = signal<string>('');
   protected readonly currentSubject = signal<string | null>(null);
@@ -349,5 +402,118 @@ export class TemplateEditorPageComponent {
 
   protected dismissToast(): void {
     this.toast.set(null);
+  }
+
+  // --- workflow header actions (Step 8) ------------------------------
+
+  protected submitForReview(): void {
+    const t = this.template();
+    if (!t || this.transitioning()) return;
+    this.transitioning.set('submit');
+    this.api
+      .submit(t.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (row) => this.applyTransition(row, 'Submitted for review'),
+        error: (err: HttpErrorResponse) => this.applyTransitionError(err),
+      });
+  }
+
+  protected publishTemplate(): void {
+    const t = this.template();
+    if (!t || this.transitioning()) return;
+    this.transitioning.set('publish');
+    this.api
+      .publish(t.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (row) => this.applyTransition(row, 'Published'),
+        error: (err: HttpErrorResponse) => this.applyTransitionError(err),
+      });
+  }
+
+  protected archiveTemplate(): void {
+    const t = this.template();
+    if (!t || this.transitioning()) return;
+    this.transitioning.set('archive');
+    this.api
+      .archiveViaWorkflow(t.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (row) => this.applyTransition(row, 'Archived'),
+        error: (err: HttpErrorResponse) => this.applyTransitionError(err),
+      });
+  }
+
+  private applyTransition(row: TemplateRead, message: string): void {
+    this.transitioning.set(null);
+    this.template.set(row);
+    if (LOCKED_STATUSES.has(row.internal_status)) {
+      this.headerForm.disable({ emitEvent: false });
+      this.waForm()?.disable({ emitEvent: false });
+      this.emailForm()?.disable({ emitEvent: false });
+    } else {
+      // Workflow may have moved a previously-locked template back to
+      // draft (reject / request-changes) — re-enable the form so
+      // editing resumes. Channel stays locked once a template exists.
+      this.headerForm.enable({ emitEvent: false });
+      this.headerForm.controls.channel.disable({ emitEvent: false });
+      this.waForm()?.enable({ emitEvent: false });
+      this.emailForm()?.enable({ emitEvent: false });
+    }
+    this.toast.set(message);
+  }
+
+  private applyTransitionError(err: HttpErrorResponse): void {
+    this.transitioning.set(null);
+    this.saveError.set(
+      extractApiError(err) ?? 'Could not complete the action.',
+    );
+  }
+
+  // --- modal / drawer triggers ---------------------------------------
+
+  protected openReviewModal(): void {
+    this.reviewModalOpen.set(true);
+  }
+  protected closeReviewModal(): void {
+    this.reviewModalOpen.set(false);
+  }
+  protected onReviewSucceeded(row: TemplateRead): void {
+    this.applyTransition(row, `Marked ${row.internal_status}`);
+  }
+
+  protected openTestSendModal(): void {
+    this.testSendModalOpen.set(true);
+  }
+  protected closeTestSendModal(): void {
+    this.testSendModalOpen.set(false);
+  }
+
+  protected openVersionsDrawer(): void {
+    this.versionsDrawerOpen.set(true);
+  }
+  protected closeVersionsDrawer(): void {
+    this.versionsDrawerOpen.set(false);
+  }
+  protected onRestoredFromVersion(row: TemplateRead): void {
+    this.applyTransition(row, `Restored — now at v${row.current_version}`);
+    if (row.channel === 'whatsapp') {
+      this.waForm()?.patchValue(
+        { body_text: row.body_text, language: row.language },
+        { emitEvent: false },
+      );
+    } else if (row.channel === 'email') {
+      this.emailForm()?.patchValue(
+        {
+          subject: row.subject ?? '',
+          preview_text: row.preview_text ?? '',
+          body_text: row.body_text,
+        },
+        { emitEvent: false },
+      );
+    }
+    this.currentBody.set(row.body_text);
+    this.currentSubject.set(row.subject ?? null);
   }
 }

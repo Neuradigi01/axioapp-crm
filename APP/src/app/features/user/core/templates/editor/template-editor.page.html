@@ -38,6 +38,81 @@
             </button>
           </div>
         }
+        @if (showVersionsButton()) {
+          <button
+            type="button"
+            (click)="openVersionsDrawer()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <lucide-icon name="history" size="12" />
+            Versions
+          </button>
+        }
+        @if (showTestSendButton()) {
+          <button
+            type="button"
+            (click)="openTestSendModal()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <lucide-icon name="send" size="12" />
+            Test send
+          </button>
+        }
+        @if (showSubmitButton()) {
+          <button
+            type="button"
+            (click)="submitForReview()"
+            [disabled]="transitioning() !== null"
+            class="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+          >
+            @if (transitioning() === 'submit') {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+            } @else {
+              <lucide-icon name="eye" size="12" />
+            }
+            Submit for review
+          </button>
+        }
+        @if (showReviewButton()) {
+          <button
+            type="button"
+            (click)="openReviewModal()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+          >
+            <lucide-icon name="check" size="12" />
+            Review
+          </button>
+        }
+        @if (showPublishButton()) {
+          <button
+            type="button"
+            (click)="publishTemplate()"
+            [disabled]="transitioning() !== null"
+            class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            @if (transitioning() === 'publish') {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+            } @else {
+              <lucide-icon name="upload-cloud" size="12" />
+            }
+            Publish
+          </button>
+        }
+        @if (showArchiveButton()) {
+          <button
+            type="button"
+            (click)="archiveTemplate()"
+            [disabled]="transitioning() !== null"
+            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          >
+            @if (transitioning() === 'archive') {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+            } @else {
+              <lucide-icon name="trash-2" size="12" />
+            }
+            Archive
+          </button>
+        }
         @if (!locked() && canWrite()) {
           <button
             type="button"
@@ -155,3 +230,26 @@
     </div>
   </section>
 </div>
+
+<!-- Step 8 modals + drawer — mounted only when their open-signal is true
+     AND a saved template exists (each requires a template id). -->
+@if (reviewModalOpen() && template(); as t) {
+  <app-template-review-modal
+    [template]="t"
+    (closed)="closeReviewModal()"
+    (updated)="onReviewSucceeded($event)"
+  />
+}
+@if (testSendModalOpen() && template(); as t) {
+  <app-test-send-modal
+    [template]="t"
+    (closed)="closeTestSendModal()"
+  />
+}
+@if (versionsDrawerOpen() && template(); as t) {
+  <app-versions-drawer
+    [template]="t"
+    (closed)="closeVersionsDrawer()"
+    (updated)="onRestoredFromVersion($event)"
+  />
+}
