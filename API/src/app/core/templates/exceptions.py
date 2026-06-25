@@ -98,3 +98,32 @@ class PublishBlockedByExternal(TemplateError):
             f"{external_status!r}; resolve external review first"
         )
         self.external_status = external_status
+
+
+class TestSendNotSupported(TemplateError):
+    """Raised when test-send is requested for a channel whose transport
+    adapter isn't wired yet (SMS / FB Messenger / IG Direct / push).
+
+    Router maps to 501 Not Implemented so the UI can distinguish "not
+    configured" from "validation failure".
+    """
+
+    def __init__(self, *, channel: str) -> None:
+        super().__init__(
+            f"test send is not yet supported for the {channel!r} "
+            "channel; transport adapter ships in a later step"
+        )
+        self.channel = channel
+
+
+class InvalidRecipient(TemplateError):
+    """Raised when the supplied recipient (email / phone / handle)
+    doesn't match the channel's expected shape. Router maps to 400."""
+
+    def __init__(self, *, channel: str, recipient: str, reason: str) -> None:
+        super().__init__(
+            f"invalid recipient {recipient!r} for channel {channel!r}: {reason}"
+        )
+        self.channel = channel
+        self.recipient = recipient
+        self.reason = reason

@@ -153,3 +153,19 @@ class WorkflowActionPayload(BaseModel):
     model_config = {"str_strip_whitespace": True, "extra": "forbid"}
 
     note: Optional[str] = None
+
+
+class TestSendPayload(BaseModel):
+    """Body for ``POST /api/v1/templates/{id}/test-send``.
+
+    ``recipient`` is the channel-shaped address (email for email
+    templates, phone E.164-without-plus for WhatsApp / SMS, channel
+    handle for FB / IG / push). ``sample_context`` overlays the
+    default sample data so the operator can preview how a specific
+    contact's variables render before going live.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    recipient: str = Field(min_length=1, max_length=255)
+    sample_context: Optional[dict[str, Any]] = None

@@ -33,15 +33,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.templates import service as templates_service
+from src.app.core.templates import test_send as templates_test_send
 from src.app.core.templates import workflow as templates_workflow
 from src.app.core.templates.exceptions import (
     DuplicateTemplateName,
+    InvalidRecipient,
     InvalidWorkflowTransition,
     PublishBlockedByExternal,
     SelfApproveBlocked,
     TemplateError,
     TemplateLocked,
     TemplateNotFound,
+    TestSendNotSupported,
 )
 from src.app.core.templates.models import (
     TemplateExternalStatus,
@@ -57,8 +60,10 @@ from src.app.core.templates.schemas import (
     TemplateCreate,
     TemplateRead,
     TemplateReviewRead,
+    TemplateTestSendRead,
     TemplateUpdate,
     TemplateVersionRead,
+    TestSendPayload,
     WorkflowActionPayload,
 )
 from src.app.core.templates.variables import (
@@ -483,6 +488,51 @@ async def archive_workflow_endpoint(
     except TemplateError as exc:
         raise _workflow_http_map(exc) from exc
     return TemplateRead.model_validate(template)
+
+
+# --- test send --------------------------------------------------------
+
+
+@router.post(
+    "/{template_id}/test-send",
+    response_model=TemplateTestSendRead,
+)
+async def test_send_endpoint(
+    template_id: uuid.UUID,
+    payload: TestSendPayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> TemplateTestSendRead:
+    """Send a one-off rendered copy of the template to a chosen
+    recipient. Used by the editor's "Test send" button (Step 8 UI).
+
+    Works on drafts — no need to publish first; the operator can test
+    a fresh template before submitting it for review."""
+    try:
+        audit_row = await templates_test_send.dispatch_test_send(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            recipient=payload.recipient,
+            user_id=user.legacy_uuid,
+            sample_context=payload.sample_context,
+        )
+    except TemplateNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="template not found",
+        ) from exc
+    except InvalidRecipient as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except TestSendNotSupported as exc:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=str(exc),
+        ) from exc
+    return TemplateTestSendRead.model_validate(audit_row)
 
 
 @router.post("/{template_id}/preview", response_model=PreviewResponse)

@@ -1,15 +1,14 @@
 """Module descriptor for the central template library.
 
 Registers the module's permission keys with the global permissions
-registry on app startup (Rule 6 — every module declares its
-permission keys). ``menu_position=None`` so this descriptor does NOT
-surface a sidebar entry yet — Step 5 of the track flips the position
-+ adds the Lucide icon + final menu copy when the test-send endpoint
-and the SPA's list page land together.
+registry on app startup (Rule 6) AND surfaces a sidebar entry for
+every role that holds ``templates.read`` — Owner / Admin / Employee
+get it via the role-template seed.
 
-The route slug (`/api/v1/templates`) and the frontend route slug
-(`/user/templates`) are declared here so they match across the rest
-of the module's surfaces even before the sidebar visibility flips on.
+The route slug (`/api/v1/templates`) is the backend mount; the
+frontend route slug (`/user/templates`) is where the SPA list page
+mounts in Step 6. Until Step 6 lands, the sidebar entry exists but
+the SPA route 404s — that's the only short-lived rough edge.
 """
 from __future__ import annotations
 
@@ -20,17 +19,17 @@ from src.app.core.templates.permissions import ALL_KEYS
 MODULE = ModuleDescriptor(
     id="templates",
     name="Templates",
-    # Icon is set here to the final Lucide id so Step 5's UI work
-    # doesn't need a follow-up edit. Sidebar visibility is gated by
-    # ``menu_position`` — None until Step 5 flips it.
     icon="file-text",
     layer="core",
     route="/api/v1/templates",
     frontend_route="/user/templates",
     permissions=list(ALL_KEYS),
-    # Step 5 sets a real menu position; until then the registry holds
-    # the module for permission discovery only.
-    menu_position=None,
+    # Step 5 — surface in the sidebar. 250 places "Templates" after
+    # the high-traffic operational modules (Contacts / Leads /
+    # Conversations sit in the 100–200 band) but before Settings /
+    # Reports (600+). Owner can drag-reorder in the future Modules UI;
+    # this is the default landing position.
+    menu_position=250,
 )
 
 registry.register(MODULE)
