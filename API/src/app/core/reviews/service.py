@@ -24,13 +24,12 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
+from src.app.core.reviews import data_access as _da
 from src.app.core.reviews.models import Review, ReviewStatus
 from src.app.core.reviews.schemas import (
     ReviewCreate,
@@ -39,8 +38,7 @@ from src.app.core.reviews.schemas import (
     ReviewUpdate,
 )
 from src.app.shared.audit import log_entity_change
-from src.app.shared.db.pagination import paginate
-from src.app.shared.db.queries import get_or_404
+from src.app.shared.db.queries import ensure_found
 
 
 # --- reads ----------------------------------------------------------------
@@ -55,25 +53,20 @@ async def list_reviews(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Review], int]:
-    filters: list[Any] = []
-    if source is not None:
-        filters.append(Review.source == source)
-    if rating is not None:
-        filters.append(Review.rating == rating)
-    if status_filter is not None:
-        filters.append(Review.status == status_filter)
-    where = and_(*filters) if filters else None
-
-    base = select(Review)
-    if where is not None:
-        base = base.where(where)
-    base = base.order_by(Review.created_at.desc())
-
-    return await paginate(session, base, page=page, size=size)
+    return await _da.list_reviews_query(
+        session,
+        source=source,
+        rating=rating,
+        status_filter=status_filter,
+        page=page,
+        size=size,
+    )
 
 
 async def get_review(session: AsyncSession, review_id: uuid.UUID) -> Review:
-    return await get_or_404(session, Review, review_id, entity="review")
+    return ensure_found(
+        await _da.get_review_by_id(session, review_id), entity="review"
+    )
 
 
 # --- writes ---------------------------------------------------------------
@@ -95,7 +88,7 @@ async def create_review(
         text=payload.text,
         tags=payload.tags,
     )
-    session.add(review)
+    _da.insert_review(session, review)
     await session.commit()
     await session.refresh(review)
 
@@ -168,7 +161,7 @@ async def delete_review(
 ) -> None:
     review = await get_review(session, review_id)
     before = _snapshot(review)
-    await session.delete(review)
+    await _da.delete_review_row(session, review)
     await session.commit()
     await log_entity_change(
         action="reviews.deleted",
@@ -243,9 +236,7 @@ async def escalate_review(
 
 
 async def stats(session: AsyncSession) -> dict[str, Any]:
-    total = (
-        await session.execute(select(func.count()).select_from(Review))
-    ).scalar_one() or 0
+    total = await _da.count_total_reviews(session)
 
     if total == 0:
         return {
@@ -257,48 +248,21 @@ async def stats(session: AsyncSession) -> dict[str, Any]:
             "alerts_last_7_days": 0,
         }
 
-    avg = (
-        await session.execute(select(func.avg(Review.rating)))
-    ).scalar_one()
-    avg = float(avg) if avg is not None else 0.0
+    avg = await _da.avg_review_rating(session)
+    avg = avg if avg is not None else 0.0
 
-    dist_rows = (
-        await session.execute(
-            select(Review.rating, func.count(Review.id))
-            .group_by(Review.rating)
-            .order_by(Review.rating.asc())
-        )
-    ).all()
+    dist_rows = await _da.review_rating_distribution(session)
     distribution = [
         {"rating": int(r.rating), "count": int(r[1])} for r in dist_rows
     ]
 
-    responded = (
-        await session.execute(
-            select(func.count())
-            .select_from(Review)
-            .where(Review.status != ReviewStatus.pending_reply)
-        )
-    ).scalar_one() or 0
+    responded = await _da.count_responded_reviews(session)
     response_rate = (responded / total) * 100 if total else 0.0
 
-    pending = (
-        await session.execute(
-            select(func.count())
-            .select_from(Review)
-            .where(Review.status == ReviewStatus.pending_reply)
-        )
-    ).scalar_one() or 0
+    pending = await _da.count_pending_reviews(session)
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-    alerts = (
-        await session.execute(
-            select(func.count())
-            .select_from(Review)
-            .where(Review.created_at >= cutoff)
-            .where(Review.rating <= 3)
-        )
-    ).scalar_one() or 0
+    alerts = await _da.count_low_rating_reviews_since(session, cutoff=cutoff)
 
     return {
         "total": int(total),

@@ -1,7 +1,7 @@
 # Step 9 — Backfill DAL (permissions, pipelines, reviews)
 
 **Goal:** Create `data_access.py` in three core modules. Move all SQL/ORM out of `service.py`. Behaviour unchanged.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 8.
 
 ---

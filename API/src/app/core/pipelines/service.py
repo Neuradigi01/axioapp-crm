@@ -30,11 +30,10 @@ import uuid
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from src.app.core import activities, audit
+from src.app.core.pipelines import data_access as _da
 from src.app.core.pipelines.models import Pipeline, PipelineStage
 from src.app.core.pipelines.schemas import StageCreate, StageUpdate
 
@@ -66,9 +65,7 @@ def register_pipeline_table(name: str) -> None:
     """Register a table name that `move_card` is allowed to UPDATE.
 
     Modules call this on import. Idempotent. Raises ValueError if the
-    name doesn't match the SQL-safe identifier pattern, because we
-    interpolate it into the UPDATE statement (bind params can't carry
-    a table name).
+    name doesn't match the SQL-safe identifier pattern.
     """
     if not _TABLE_NAME_RE.match(name):
         raise ValueError(
@@ -77,42 +74,26 @@ def register_pipeline_table(name: str) -> None:
     _PIPELINE_TRACKED_TABLES.add(name)
 
 
-def _pipeline_select_with_stages():
-    return select(Pipeline).options(selectinload(Pipeline.stages))
-
-
 async def list_pipelines(session: AsyncSession) -> list[Pipeline]:
-    result = await session.execute(
-        _pipeline_select_with_stages().order_by(Pipeline.name)
-    )
-    return list(result.scalars().all())
+    return await _da.list_pipelines_with_stages(session)
 
 
 async def get_pipeline_by_key(
     session: AsyncSession, *, key: str
 ) -> Optional[Pipeline]:
-    result = await session.execute(
-        _pipeline_select_with_stages().where(Pipeline.key == key)
-    )
-    return result.scalar_one_or_none()
+    return await _da.get_pipeline_by_key_with_stages(session, key)
 
 
 async def get_pipeline_by_id(
     session: AsyncSession, *, pipeline_id: uuid.UUID
 ) -> Optional[Pipeline]:
-    result = await session.execute(
-        _pipeline_select_with_stages().where(Pipeline.id == pipeline_id)
-    )
-    return result.scalar_one_or_none()
+    return await _da.get_pipeline_by_id_with_stages(session, pipeline_id)
 
 
 async def get_stage(
     session: AsyncSession, stage_id: uuid.UUID
 ) -> Optional[PipelineStage]:
-    result = await session.execute(
-        select(PipelineStage).where(PipelineStage.id == stage_id)
-    )
-    return result.scalar_one_or_none()
+    return await _da.get_stage_by_id(session, stage_id)
 
 
 def _stage_snapshot(s: PipelineStage) -> dict[str, Any]:
@@ -135,13 +116,7 @@ async def update_stage(
     stage_id: uuid.UUID,
     payload: StageUpdate,
 ) -> PipelineStage:
-    """Update label / color / display_order on one stage.
-
-    If `display_order` is changing and the target slot is occupied by
-    another stage in the same pipeline, we swap: the other stage gets
-    the vacated slot. The deferred unique constraint allows the swap to
-    proceed in one transaction without an intermediate constraint break.
-    """
+    """Update label / color / display_order on one stage."""
     pipeline = await get_pipeline_by_key(session, key=pipeline_key)
     if pipeline is None:
         raise HTTPException(
@@ -161,18 +136,15 @@ async def update_stage(
     if "display_order" in changes:
         new_order = changes["display_order"]
         if new_order != stage.display_order:
-            existing = (
-                await session.execute(
-                    select(PipelineStage)
-                    .where(PipelineStage.pipeline_id == pipeline.id)
-                    .where(PipelineStage.display_order == new_order)
-                    .where(PipelineStage.id != stage.id)
-                )
-            ).scalar_one_or_none()
+            existing = await _da.find_stage_at_order(
+                session,
+                pipeline_id=pipeline.id,
+                display_order=new_order,
+                exclude_id=stage.id,
+            )
             if existing is not None:
                 # "Trade places": existing stage takes the vacated slot.
                 existing.display_order = stage.display_order
-                session.add(existing)
 
     for key, value in changes.items():
         setattr(stage, key, value)
@@ -195,17 +167,7 @@ async def create_stage(
     pipeline_key: str,
     payload: StageCreate,
 ) -> PipelineStage:
-    """Insert a new stage into `pipeline_key`.
-
-    - Slugifies `payload.name` to derive `key`; rejects 422 if empty or
-      collides with an existing stage in this pipeline.
-    - If `after_stage_key` is given, places the new stage at
-      `that_stage.display_order + 1` and shifts every later stage's
-      order up by 1 (deferred-unique constraint absorbs the mid-txn
-      collision); otherwise appends at the end.
-    - `is_won`/`is_lost` are hardcoded `False`: creating terminal
-      stages from the API is a pack-level concern.
-    """
+    """Insert a new stage into `pipeline_key`."""
     pipeline = await get_pipeline_by_key(session, key=pipeline_key)
     if pipeline is None:
         raise HTTPException(
@@ -246,7 +208,6 @@ async def create_stage(
         for s in pipeline.stages:
             if s.display_order >= insert_at:
                 s.display_order = s.display_order + 1
-                session.add(s)
     else:
         max_order = max((s.display_order for s in pipeline.stages), default=-1)
         insert_at = max_order + 1
@@ -261,7 +222,7 @@ async def create_stage(
         is_won=False,
         is_lost=False,
     )
-    session.add(stage)
+    _da.insert_pipeline_stage(session, stage)
     await session.commit()
     await session.refresh(stage)
 
@@ -281,19 +242,7 @@ async def delete_stage(
     stage_id: uuid.UUID,
     move_leads_to: Optional[str] = None,
 ) -> None:
-    """Delete a stage, relocating any cards that reference its key.
-
-    Rules:
-      - Terminal stages (`is_won` / `is_lost`) cannot be deleted (409).
-      - Counts rows in every registered pipeline-tracked table where
-        `pipeline_stage = stage.key`. If the count is non-zero and
-        `move_leads_to` is not supplied, 409 with
-        `{cards_in_stage, must_provide}`.
-      - When relocation is supplied, UPDATEs all those rows to the
-        target stage's key, then DELETEs the stage — both in the
-        caller's transaction.
-      - `display_order` gaps on remaining stages are accepted.
-    """
+    """Delete a stage, relocating any cards that reference its key."""
     pipeline = await get_pipeline_by_key(session, key=pipeline_key)
     if pipeline is None:
         raise HTTPException(
@@ -332,21 +281,11 @@ async def delete_stage(
             )
 
     # Tally cards across every registered pipeline-tracked table.
-    # `_PIPELINE_TRACKED_TABLES` only ever holds names that passed the
-    # `_TABLE_NAME_RE` allowlist, so f-string interpolation is safe here.
     cards_in_stage = 0
     for table in _PIPELINE_TRACKED_TABLES:
-        row = (
-            await session.execute(
-                text(
-                    f"SELECT count(*) FROM {table} "  # noqa: S608
-                    "WHERE pipeline_stage = :key"
-                ),
-                {"key": stage.key},
-            )
-        ).first()
-        if row is not None:
-            cards_in_stage += int(row[0])
+        cards_in_stage += await _da.count_cards_in_stage_for_table(
+            session, table=table, key=stage.key
+        )
 
     if cards_in_stage > 0 and move_leads_to is None:
         raise HTTPException(
@@ -361,16 +300,14 @@ async def delete_stage(
     cards_moved_count = 0
     if cards_in_stage > 0 and move_leads_to is not None:
         for table in _PIPELINE_TRACKED_TABLES:
-            result = await session.execute(
-                text(
-                    f"UPDATE {table} SET pipeline_stage = :to_key, "  # noqa: S608
-                    "updated_at = now() WHERE pipeline_stage = :from_key"
-                ),
-                {"to_key": move_leads_to, "from_key": stage.key},
+            cards_moved_count += await _da.relocate_cards_for_table(
+                session,
+                table=table,
+                from_key=stage.key,
+                to_key=move_leads_to,
             )
-            cards_moved_count += result.rowcount or 0
 
-    await session.delete(stage)
+    await _da.delete_pipeline_stage_row(session, stage)
     await session.commit()
 
     await audit.log(
@@ -394,21 +331,7 @@ async def move_card(
     to_stage_key: str,
     user_id: Optional[uuid.UUID] = None,
 ) -> None:
-    """Generic helper: move a row in `card_table` to `to_stage_key`.
-
-    Validates that:
-      1. The table name is registered (`register_pipeline_table`).
-      2. The pipeline exists in this tenant.
-      3. The target stage key exists in that pipeline.
-
-    Then UPDATEs `card_table.pipeline_stage = :to_stage_key` for the
-    given `card_id`, writes a `status_change` activity, and an audit
-    log carrying before/after stage keys.
-
-    The caller's session is used for the UPDATE so the change shares
-    the request's transaction; the activity + audit writes are
-    intentionally best-effort (they use their own sessions).
-    """
+    """Generic helper: move a row in `card_table` to `to_stage_key`."""
     if card_table not in _PIPELINE_TRACKED_TABLES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -436,33 +359,21 @@ async def move_card(
         )
 
     # Read current stage first so we can stamp before/after on audit.
-    # `card_table` is whitelisted above so f-string interpolation is safe;
-    # `card_id` is bound as a parameter (asyncpg coerces uuid.UUID natively).
-    current_row = (
-        await session.execute(
-            text(
-                f"SELECT pipeline_stage FROM {card_table} WHERE id = :card_id"  # noqa: S608
-            ),
-            {"card_id": card_id},
-        )
-    ).first()
-    if current_row is None:
+    from_stage_key = await _da.read_card_pipeline_stage(
+        session, table=card_table, card_id=card_id
+    )
+    if from_stage_key is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"{card_table} row {card_id} not found",
         )
-    from_stage_key = current_row[0]
 
     if from_stage_key == to_stage_key:
         # Idempotent: nothing to log.
         return
 
-    await session.execute(
-        text(
-            f"UPDATE {card_table} SET pipeline_stage = :to_key, "  # noqa: S608
-            "updated_at = now() WHERE id = :card_id"
-        ),
-        {"to_key": to_stage_key, "card_id": card_id},
+    await _da.update_card_pipeline_stage(
+        session, table=card_table, card_id=card_id, to_key=to_stage_key
     )
     await session.commit()
 
