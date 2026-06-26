@@ -28,6 +28,13 @@ celery.autodiscover_tasks([
     "src.app.core.email.tasks",
     # App-updates Email Step 7 — sequence scheduler tick (every 60s).
     "src.app.core.email_sequences.tasks",
+    # whatsapp-platform-upgrade Step 12 — hourly phone-health refresh.
+    "src.app.core.integrations.whatsapp.health_tasks",
+    # tasks/template-library Step 14 — hourly external-status sync for
+    # WA templates. Without this entry the beat-scheduled task lands
+    # in the worker with `KeyError: 'src.app.core.templates.tasks.
+    # sync_external_status_all'` because autodiscover doesn't reach it.
+    "src.app.core.templates.tasks",
 ])
 
 if not CELERY_ENABLED:
