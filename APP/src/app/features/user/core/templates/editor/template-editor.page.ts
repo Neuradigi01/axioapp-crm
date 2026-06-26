@@ -208,6 +208,30 @@ export class TemplateEditorPageComponent {
       t.external_status === 'n_a' || t.external_status === 'rejected';
     return internalOk && externalOk;
   });
+  /** Step 14 — Refresh-status button. Visible for WhatsApp templates
+   *  whose external_status is anything other than n_a (i.e. they
+   *  have been submitted to Meta) AND for users with submit_external
+   *  permission. The button hits the manual /sync-external endpoint
+   *  so the operator doesn't have to wait for the hourly Celery
+   *  sweep. */
+  protected readonly showRefreshExternalButton = computed(() => {
+    const t = this.template();
+    if (t === null) return false;
+    if (t.channel !== 'whatsapp') return false;
+    if (!this.canSubmitExternal()) return false;
+    return t.external_status !== 'n_a';
+  });
+  /** Step 14 — Resubmit affordance for Meta-rejected templates. Moves
+   *  the template back to draft + clears external_status to n_a so
+   *  the operator can edit and re-submit. */
+  protected readonly showResubmitButton = computed(() => {
+    const t = this.template();
+    if (t === null) return false;
+    if (t.channel !== 'whatsapp') return false;
+    if (!this.canWrite()) return false;
+    return t.external_status === 'rejected';
+  });
+  protected readonly rejectionReason = signal<string | null>(null);
 
   // --- modal / drawer state ------------------------------------------
 
@@ -435,6 +459,15 @@ export class TemplateEditorPageComponent {
             this.smsForm()?.disable({ emitEvent: false });
             this.fbForm()?.disable({ emitEvent: false });
             this.pushForm()?.disable({ emitEvent: false });
+          }
+          // Step 14 — Meta's rejection_reason lives on the WA extension
+          // row, surfaced through GET /external-status. Fetch it when
+          // we land on a rejected WA template so the banner can render.
+          if (
+            row.channel === 'whatsapp' &&
+            row.external_status === 'rejected'
+          ) {
+            this.loadExternalStatus(row.id);
           }
         },
         error: (err: HttpErrorResponse) => {
@@ -703,6 +736,55 @@ export class TemplateEditorPageComponent {
       .subscribe({
         next: (row) => this.applyTransition(row, 'Submitted to Meta'),
         error: (err: HttpErrorResponse) => this.applyTransitionError(err),
+      });
+  }
+
+  /** Step 14 — manually refresh external_status against the provider.
+   *  Re-pulls `external-status` afterwards so the rejection_reason
+   *  banner shown for newly-rejected rows reflects Meta's payload. */
+  protected refreshExternalStatus(): void {
+    const t = this.template();
+    if (!t || this.transitioning()) return;
+    this.transitioning.set('sync_external');
+    this.api
+      .syncExternal(t.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (row) => {
+          this.applyTransition(row, `Meta status: ${row.external_status}`);
+          this.loadExternalStatus(row.id);
+        },
+        error: (err: HttpErrorResponse) => this.applyTransitionError(err),
+      });
+  }
+
+  /** Step 14 — clear a Meta rejection so the operator can edit + resubmit. */
+  protected resubmitTemplate(): void {
+    const t = this.template();
+    if (!t || this.transitioning()) return;
+    this.transitioning.set('resubmit');
+    this.api
+      .resubmit(t.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (row) => {
+          this.rejectionReason.set(null);
+          this.applyTransition(row, 'Ready to edit — fix the issue and re-submit');
+        },
+        error: (err: HttpErrorResponse) => this.applyTransitionError(err),
+      });
+  }
+
+  private loadExternalStatus(id: string): void {
+    this.api
+      .externalStatus(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => this.rejectionReason.set(res.rejection_reason),
+        error: () => {
+          // Non-fatal — the rejection banner won't render but the
+          // primary action (refresh / resubmit) already succeeded.
+        },
       });
   }
 

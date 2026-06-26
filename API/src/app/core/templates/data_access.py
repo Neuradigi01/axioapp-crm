@@ -72,6 +72,34 @@ async def get_template(
     return result.scalar_one_or_none()
 
 
+async def list_pending_external(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> list[MessageTemplate]:
+    """Every template whose ``external_status`` is still in flux
+    (``pending`` or ``paused``) for this org. Used by the Step-14
+    hourly Celery sweep to know which rows to re-check against Meta.
+
+    ``rejected`` is NOT included on purpose — once Meta rejects the
+    operator must Resubmit to move it forward; the sweep would just
+    poll a frozen value otherwise. ``approved`` rows are also stable
+    until Meta proactively pauses or disables them, which arrives via
+    the webhook path."""
+    result = await session.execute(
+        select(MessageTemplate).where(
+            MessageTemplate.org_id == org_id,
+            MessageTemplate.external_status.in_(
+                (
+                    TemplateExternalStatus.pending,
+                    TemplateExternalStatus.paused,
+                )
+            ),
+        )
+    )
+    return list(result.scalars().all())
+
+
 async def list_templates(
     session: AsyncSession,
     *,
@@ -230,6 +258,7 @@ __all__ = [
     "get_dlt_metadata",
     "get_template",
     "get_version",
+    "list_pending_external",
     "list_templates",
     "list_versions",
 ]

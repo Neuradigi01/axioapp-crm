@@ -34,6 +34,7 @@ from src.app.core.auth.dependencies import require_permissions
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.templates import external_submission as templates_external
 from src.app.core.templates import service as templates_service
+from src.app.core.templates import sync as templates_sync
 from src.app.core.templates import test_send as templates_test_send
 from src.app.core.templates import workflow as templates_workflow
 from src.app.core.templates.exceptions import (
@@ -585,6 +586,77 @@ async def external_status_endpoint(
             detail="template not found",
         ) from exc
     return ExternalStatusResponse(**payload)
+
+
+@router.post("/{template_id}/sync-external", response_model=TemplateRead)
+async def sync_external_endpoint(
+    template_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_SUBMIT_EXTERNAL)),
+) -> TemplateRead:
+    """Step 14 — manually refresh ``external_status`` against the
+    provider (Meta for WhatsApp). Counterpart to the hourly Celery
+    sweep; the operator clicks "Refresh status" in the editor and
+    sees the live verdict without waiting for the next sweep.
+
+    Same permission gate as ``/submit-external`` — the operator who
+    can submit can also re-check. Returns the updated central row."""
+    app_id, app_secret = _meta_app_credentials()
+    try:
+        template = await templates_sync.sync_external_status(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            user_id=user.legacy_uuid,
+            app_id=app_id,
+            app_secret=app_secret,
+        )
+    except TemplateNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="template not found",
+        ) from exc
+    except templates_sync.SyncNotSupported as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except templates_sync.MissingExtensionRow as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return TemplateRead.model_validate(template)
+
+
+@router.post("/{template_id}/resubmit", response_model=TemplateRead)
+async def resubmit_endpoint(
+    template_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> TemplateRead:
+    """Step 14 — "Resubmit" flow for templates Meta rejected. Moves
+    the template back to ``internal_status='draft'`` +
+    ``external_status='n_a'`` so the operator can edit the body and
+    submit again."""
+    try:
+        template = await templates_sync.prepare_resubmit(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            user_id=user.legacy_uuid,
+        )
+    except TemplateNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="template not found",
+        ) from exc
+    except TemplateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return TemplateRead.model_validate(template)
 
 
 # --- SMS DLT metadata (Step 12) ---------------------------------------

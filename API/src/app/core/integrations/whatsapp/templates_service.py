@@ -683,10 +683,16 @@ async def apply_template_status_update(
     # falls back to `external_provider_id == meta_template_id` for any
     # extension row whose link wasn't backfilled yet.
     central_external = _WA_STATUS_TO_CENTRAL_EXTERNAL.get(new_status)
+    # Step 14 — capture for the post-commit notification fan-out.
+    # Lazy import to avoid a core.integrations → core.templates cycle
+    # at module load time.
+    from src.app.core.templates.models import (
+        MessageTemplate,
+        TemplateExternalStatus,
+    )
+    central_row = None
+    central_before = None
     if central_external is not None:
-        from src.app.core.templates.models import MessageTemplate
-
-        central_row: Optional[MessageTemplate] = None
         if row.message_template_id:
             central_row = (
                 await session.execute(
@@ -706,9 +712,34 @@ async def apply_template_status_update(
                 )
             ).scalar_one_or_none()
         if central_row is not None:
+            central_before = central_row.external_status
             central_row.external_status = central_external
 
     await session.commit()
+
+    # Step 14 — fan out a notification when Meta moved the central row
+    # INTO rejected / paused. Done after commit so the notification's
+    # own session can read the freshly persisted central row state,
+    # and so a slow notification path doesn't block the webhook ack.
+    if (
+        central_row is not None
+        and central_external is not None
+        and central_before is not None
+        and central_external != central_before
+        and central_external
+        in (
+            TemplateExternalStatus.rejected,
+            TemplateExternalStatus.paused,
+        )
+    ):
+        from src.app.core.templates.sync import notify_external_status_change
+
+        await notify_external_status_change(
+            org_id=org_id,
+            template=central_row,
+            new_status=central_external,
+            rejection_reason=reason,
+        )
 
     await audit.log(
         "integration.whatsapp.template_status_synced",

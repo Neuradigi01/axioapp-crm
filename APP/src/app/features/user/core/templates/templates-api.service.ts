@@ -313,6 +313,26 @@ export class TemplatesApiService {
     }>(`${this.base}/${id}/external-status`);
   }
 
+  /** Step 14 — manually re-query the provider for the live status.
+   *  Counterpart of the hourly Celery sweep; the editor calls this
+   *  when the operator clicks the "Refresh status" button. */
+  syncExternal(id: string): Observable<TemplateRead> {
+    return this.http.post<TemplateRead>(
+      `${this.base}/${id}/sync-external`,
+      {},
+    );
+  }
+
+  /** Step 14 — "Resubmit" affordance for templates Meta rejected.
+   *  Backend resets `internal_status='draft'` + `external_status='n_a'`
+   *  so the operator can edit the body and re-submit. */
+  resubmit(id: string): Observable<TemplateRead> {
+    return this.http.post<TemplateRead>(
+      `${this.base}/${id}/resubmit`,
+      {},
+    );
+  }
+
   // --- SMS DLT metadata (Step 12) -------------------------------------
 
   getSmsMetadata(id: string): Observable<SmsDltMetadata> {

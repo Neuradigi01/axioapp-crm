@@ -478,7 +478,40 @@ class MetaGraphClient:
         )
         return body
 
-    # ----- 8. delete a template (by name) from Meta ----------------------
+    # ----- 8a. fetch a template's current status from Meta ---------------
+    # (tasks/template-library Step 14)
+
+    async def get_message_template(
+        self,
+        *,
+        token: str,
+        meta_template_id: str,
+    ) -> dict[str, Any]:
+        """``GET /{meta_template_id}?fields=status,rejected_reason,category,language,name``.
+
+        Used by the central template library's status-sync path
+        (hourly Celery sweep + manual "Refresh status" button). The
+        node-id endpoint works on the template id directly — no need
+        to scope to ``/{waba_id}/message_templates``. Meta returns
+        ``status`` (APPROVED / REJECTED / PENDING / PAUSED /
+        DISABLED), an optional ``rejected_reason``, plus the
+        identifying ``name`` + ``language`` for the caller to confirm
+        the right row is being updated.
+
+        Wrapped errors are typed as :class:`MetaGraphError` — caller
+        bubbles up to the operator verbatim.
+        """
+        return await self._request(
+            method="GET",
+            url=self._url(f"/{meta_template_id}"),
+            stage="get_message_template",
+            params={
+                "fields": "status,rejected_reason,category,language,name",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    # ----- 9. delete a template (by name) from Meta ----------------------
 
     async def delete_template(
         self,

@@ -104,6 +104,11 @@ class TemplateReviewAction(str, enum.Enum):
     request_changes = "request_changes"
     publish = "publish"
     archive = "archive"
+    # Step 14 — non-operator action emitted by the manual `/sync-external`
+    # endpoint AND the hourly Celery sync. Reviewer is null for
+    # automated syncs and the legacy operator id for manual ones; the
+    # ``note`` carries the resolved Meta status / rejection_reason.
+    external_sync = "external_sync"
 
 
 template_internal_status_enum = ENUM(

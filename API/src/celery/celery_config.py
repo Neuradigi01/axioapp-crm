@@ -106,4 +106,13 @@ beat_schedule = {
         'task': 'src.app.core.integrations.whatsapp.health_tasks.refresh_phone_health_all_orgs',
         'schedule': crontab(minute=20),
     },
+    # tasks/template-library Step 14 — hourly per-org sweep that
+    # re-asks Meta for the current status of every pending / paused
+    # central template. Webhook coverage is the primary path; this
+    # sweep is the safety net for missed events. Offset to minute=35
+    # so it doesn't contend with the other hourly Meta sweeps.
+    'templates-sync-external-status': {
+        'task': 'src.app.core.templates.tasks.sync_external_status_all',
+        'schedule': crontab(minute=35),
+    },
 }
