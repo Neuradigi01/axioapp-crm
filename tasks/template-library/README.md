@@ -66,8 +66,9 @@ Steps 1-8 ship the new module end-to-end with only WA + Email channels usable. S
 | 12 | [SMS adapter stub + DLT fields](step-12-sms-adapter-stub.md) | **COMPLETED** | ~0.5 days |
 | 13 | [FB / IG / push sub-forms + stub adapters](step-13-fb-ig-push-adapter-stubs.md) | **COMPLETED** | ~0.5 days |
 | 14 | [External status sync — Celery + webhook + UI badges](step-14-external-status-sync-polish.md) | **COMPLETED** | ~1 day |
+| 15 | [Campaigns picker reads from central library](step-15-campaigns-picker-unification.md) | **COMPLETED** | ~0.5 days |
 
-**Total: 14 steps, ~11.5 days.**
+**Total: 15 steps, ~12 days.**
 
 After this track closes, `tasks/automation-engine/` opens — single-event triggers (`user.signed_up` → welcome email, `lead.created` → confirmation, etc.) consuming this library.
 

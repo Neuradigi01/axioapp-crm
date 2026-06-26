@@ -226,15 +226,15 @@
         }
       </fieldset>
 
-      @if (isWhatsAppChannel() && templates().length > 0) {
-        <!-- WhatsApp template picker — Step 3.5.5 -->
+      @if (templates().length > 0) {
+        <!-- Step 15 — central library picker (every channel) -->
         <div class="rounded-md border border-zinc-200 p-3 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-medium text-zinc-600">
-              WhatsApp template
+              Template
             </span>
             <span class="text-[10px] text-zinc-400">
-              Synced from Meta · Settings → Integrations
+              From your template library · /user/templates
             </span>
           </div>
           <select
@@ -244,25 +244,23 @@
           >
             <option value="">— Pick a template (or use free text below) —</option>
             @for (t of templates(); track t.id) {
-              <option [value]="t.id">
-                {{ t.name }} · {{ t.language }} · {{ t.category }}
-              </option>
+              <option [value]="t.id">{{ t.name }}</option>
             }
           </select>
 
           @if (selectedTemplate(); as t) {
             <!-- Preview -->
             <div class="rounded-md bg-zinc-50 p-3 text-sm text-zinc-700 whitespace-pre-wrap font-mono text-xs">
-              @if (t.header_text) {
-                <div class="font-semibold mb-1">{{ t.header_text }}</div>
+              @if (t.subject) {
+                <div class="font-semibold mb-1">{{ t.subject }}</div>
               }
               {{ t.body }}
-              @if (t.footer_text) {
-                <div class="mt-1 text-zinc-500">{{ t.footer_text }}</div>
-              }
             </div>
 
-            <!-- Variable bindings -->
+            <!-- Variable bindings — WA-positional only.
+                 Other channels use named `{{contact.first_name}}`
+                 variables that resolve from the contact row at send
+                 time, so there's nothing for the operator to bind. -->
             @if (templateVariableNumbers().length > 0) {
               <div class="space-y-2">
                 <span class="text-xs font-medium text-zinc-600">
@@ -304,14 +302,27 @@
                   </div>
                 }
               </div>
+            } @else {
+              <p class="text-[10px] text-zinc-500">
+                Variables resolve from each contact's data at send time.
+              </p>
             }
           }
         </div>
-      } @else if (isWhatsAppChannel() && templatesLoaded() && templates().length === 0) {
+      } @else if (templatesLoaded() && templates().length === 0) {
         <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          No approved templates synced yet. Go to Settings → Integrations → WhatsApp and click "Sync templates".
+          @if (isWhatsAppChannel()) {
+            No WhatsApp templates approved by Meta yet. Create one in
+            <a routerLink="/user/templates" class="underline">/user/templates</a>,
+            publish it, then click "Submit to Meta" — once Meta approves it'll
+            appear here. Or use the free-text fallback below.
+          } @else {
+            No published templates for this channel yet. Create one in
+            <a routerLink="/user/templates" class="underline">/user/templates</a>
+            and publish it, or use the free-text fallback below.
+          }
         </div>
-      } @else if (isWhatsAppChannel() && templatesLoading()) {
+      } @else if (templatesLoading()) {
         <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
           Loading templates…
         </div>
@@ -319,7 +330,7 @@
 
       <label class="block text-sm">
         <span class="block text-xs font-medium text-zinc-600">
-          @if (isWhatsAppChannel() && selectedTemplateId()) {
+          @if (selectedTemplateId()) {
             Free-text fallback body (ignored — template selected above)
           } @else {
             Message body
@@ -332,7 +343,7 @@
           rows="4"
           formControlName="template"
           [placeholder]="templatePlaceholder"
-          [class.opacity-50]="isWhatsAppChannel() && selectedTemplateId()"
+          [class.opacity-50]="selectedTemplateId()"
           class="mt-1 block w-full resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         ></textarea>
       </label>

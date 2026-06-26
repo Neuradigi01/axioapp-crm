@@ -29,7 +29,6 @@ import {
 import {
   IntegrationsApiService,
   WhatsAppCapacity,
-  WhatsAppTemplate,
 } from '../settings/integrations/integrations-api.service';
 import {
   AudienceFilter,
@@ -37,6 +36,48 @@ import {
   CampaignsApiService,
   TemplateVariableBinding,
 } from './campaigns-api.service';
+import {
+  TemplateChannel,
+  TemplateListQuery,
+  TemplateRead,
+  TemplatesApiService,
+} from '../templates/templates-api.service';
+
+/**
+ * Step 15 — local picker row. Both the WhatsApp and non-WhatsApp
+ * branches feed into this shape so the rest of the modal compiles
+ * unchanged after the central-library swap. Body lives on `body`
+ * (mapped from the central row's ``body_text``); WA's ``{{n}}``
+ * positional placeholders are detected from this same field.
+ */
+interface PickerRow {
+  id: string;
+  name: string;
+  body: string;
+  channel: ConversationChannel;
+  subject: string | null;
+}
+
+function toPickerRow(row: TemplateRead): PickerRow {
+  return {
+    id: row.id,
+    name: row.name,
+    body: row.body_text,
+    channel: row.channel as ConversationChannel,
+    subject: row.subject,
+  };
+}
+
+/** Step 15 — the campaign channel set includes ``'web'`` for the
+ *  embedded web widget; the central template library doesn't carry
+ *  web templates. The `_loadTemplates` path short-circuits for any
+ *  channel not in this set, leaving the operator with the free-text
+ *  fallback. Push templates exist in the library (Step 13) but
+ *  aren't a campaign channel yet; they re-enter this set when push
+ *  send transport ships. */
+const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<ConversationChannel>(
+  ['whatsapp', 'email', 'sms', 'facebook', 'instagram'],
+);
 
 /**
  * Create-campaign modal.
@@ -76,6 +117,7 @@ export class CreateCampaignModalComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(CampaignsApiService);
   private readonly integrationsApi = inject(IntegrationsApiService);
+  private readonly templatesApi = inject(TemplatesApiService);
   private readonly groupsApi = inject(ContactGroupsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -116,14 +158,19 @@ export class CreateCampaignModalComponent {
   protected readonly capacity = signal<WhatsAppCapacity | null>(null);
   protected readonly capacityLoading = signal(false);
 
-  // --- WhatsApp template picker state -------------------------------
+  // --- Central template picker state (Step 15) ---------------------
 
-  protected readonly templates = signal<WhatsAppTemplate[]>([]);
+  /** Templates available for the currently-selected channel. Loaded
+   *  from the central library — `GET /api/v1/templates?channel=…
+   *  &internal_status=published(&external_status=approved for WA)`.
+   *  Replaces the legacy WA-only integrations endpoint. */
+  protected readonly templates = signal<PickerRow[]>([]);
 
-  /** Step 29 — slim id+name projection for the A/B section's
-   *  template dropdowns. The full `WhatsAppTemplate` shape is more
-   *  than the picker needs; this keeps the section component's
-   *  input contract tight. */
+  /** Per-channel cache so toggling channels doesn't refetch. Cleared
+   *  only if the modal is re-mounted. */
+  private readonly templatesCache = new Map<ConversationChannel, PickerRow[]>();
+
+  /** Slim id+name projection for the A/B section's template dropdowns. */
   protected approvedTemplatesForPicker(): Array<{
     id: string;
     name: string;
@@ -134,7 +181,11 @@ export class CreateCampaignModalComponent {
   protected readonly templatesLoaded = signal(false);
   protected readonly selectedTemplateId = signal<string | null>(null);
   /** Variable bindings per `{{n}}`. Key is the variable number as
-   *  string ('1','2',...) to match backend's JSONB shape. */
+   *  string ('1','2',...) to match backend's JSONB shape. Only
+   *  populated for WhatsApp templates (Meta's positional HSM shape).
+   *  Other channels use named `{{contact.first_name}}` variables that
+   *  the dispatcher resolves per-contact at send time — no operator
+   *  bindings to capture. */
   protected readonly variables = signal<Record<string, TemplateVariableBinding>>({});
 
   protected readonly contactFieldOptions: ReadonlyArray<{
@@ -146,7 +197,7 @@ export class CreateCampaignModalComponent {
     { value: 'email', label: 'Contact email' },
   ];
 
-  protected readonly selectedTemplate = computed<WhatsAppTemplate | null>(
+  protected readonly selectedTemplate = computed<PickerRow | null>(
     () =>
       this.templates().find((t) => t.id === this.selectedTemplateId()) ??
       null,
@@ -155,7 +206,8 @@ export class CreateCampaignModalComponent {
   protected readonly templateVariableNumbers = computed<number[]>(() => {
     const t = this.selectedTemplate();
     if (!t) return [];
-    // Match the backend's _VARIABLE_RE — distinct, sorted.
+    // Match the backend's _VARIABLE_RE — distinct, sorted. Empty for
+    // non-WA templates (they use named variables, not positional).
     const found = new Set<number>();
     const re = /\{\{(\d+)\}\}/g;
     let m: RegExpExecArray | null;
@@ -229,23 +281,25 @@ export class CreateCampaignModalComponent {
   );
 
   constructor() {
-    // Load templates whenever the channel flips to WhatsApp. Single
-    // shot — once cached we don't re-fetch on every channel toggle.
+    // Step 15 — load templates whenever the channel changes. Each
+    // channel's published templates come from the central library;
+    // the picker reset clears any stale selection from the prior
+    // channel so the operator doesn't accidentally submit an
+    // out-of-channel template_id.
     this.form.controls.channel.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((channel) => {
         this.channelSignal.set(channel);
-        if (channel === 'whatsapp' && !this.templatesLoaded()) {
-          this._loadTemplates();
-        }
+        this.selectedTemplateId.set(null);
+        this._loadTemplates(channel);
         if (channel === 'whatsapp' && this.capacity() === null) {
           this._loadCapacity();
         }
       });
 
     // Initial load — default channel is whatsapp.
+    this._loadTemplates(this.form.controls.channel.value);
     if (this.form.controls.channel.value === 'whatsapp') {
-      this._loadTemplates();
       this._loadCapacity();
     }
 
@@ -405,19 +459,56 @@ export class CreateCampaignModalComponent {
     });
   }
 
-  private _loadTemplates(): void {
+  /** Step 15 — channel-aware central-library load. WhatsApp templates
+   *  also filter on `external_status=approved` so Meta-rejected /
+   *  pending rows don't show up; every other channel only checks
+   *  `internal_status=published` (no external approval pipeline). */
+  private _loadTemplates(channel: ConversationChannel): void {
+    const cached = this.templatesCache.get(channel);
+    if (cached) {
+      this.templates.set(cached);
+      this.templatesLoaded.set(true);
+      this.templatesLoading.set(false);
+      return;
+    }
     this.templatesLoading.set(true);
-    this.integrationsApi
-      .listWhatsAppTemplates({ status: 'APPROVED' })
+    this.templatesLoaded.set(false);
+    this.templates.set([]);
+    // The campaign channel set includes 'web' for the widget; the
+    // central library doesn't carry web templates (push covers that
+    // surface — Step 13). For 'web' the picker just returns no rows,
+    // and the operator falls through to the free-text body.
+    if (!_TEMPLATE_CHANNELS.has(channel)) {
+      this.templatesLoading.set(false);
+      this.templatesLoaded.set(true);
+      this.templates.set([]);
+      return;
+    }
+    const filter: TemplateListQuery = {
+      channel: channel as TemplateChannel,
+      internal_status: 'published',
+      limit: 200,
+    };
+    if (channel === 'whatsapp') {
+      filter.external_status = 'approved';
+    }
+    this.templatesApi
+      .list(filter)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (rows) => {
+        next: (res) => {
+          const rows: PickerRow[] = res.items.map((row) =>
+            toPickerRow(row),
+          );
+          this.templatesCache.set(channel, rows);
           this.templates.set(rows);
           this.templatesLoaded.set(true);
           this.templatesLoading.set(false);
         },
         error: () => {
           this.templatesLoading.set(false);
+          this.templatesLoaded.set(true);
+          this.templates.set([]);
           // Don't block the modal on template load failure — operator
           // can still use the free-text fallback.
         },
@@ -532,12 +623,16 @@ export class CreateCampaignModalComponent {
     // 'everyone' mode leaves `audience` as {} — backend treats as
     // "all org contacts" (already the existing default behaviour).
 
-    // Decide template vs template_id mode.
-    const useTemplatePicker =
-      v.channel === 'whatsapp' && this.selectedTemplateId() !== null;
+    // Step 15 — decide template vs template_id mode. Any channel with
+    // a selected template_id sends through the central library; the
+    // free-text fallback fires only when no template is picked.
+    const useTemplatePicker = this.selectedTemplateId() !== null;
 
     if (useTemplatePicker) {
-      // Validate every variable has a non-empty value.
+      // WA's positional `{{n}}` placeholders require operator-supplied
+      // bindings before the dispatcher can render per-contact. Named
+      // variables on other channels resolve automatically from the
+      // contact row — no bindings to validate.
       const bindings = this.variables();
       for (const n of this.templateVariableNumbers()) {
         const b = bindings[String(n)];
@@ -550,7 +645,7 @@ export class CreateCampaignModalComponent {
       }
     } else if (!v.template.trim()) {
       this.submitError.set(
-        'Provide a message body or pick a WhatsApp template.',
+        'Provide a message body or pick a template.',
       );
       return;
     }
