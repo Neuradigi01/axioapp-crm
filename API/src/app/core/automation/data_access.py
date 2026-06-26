@@ -1,28 +1,159 @@
 """Data-access layer for the automation engine.
 
 Pure query helpers — no transactions, no audit, no commits. Leaf
-module; never imports a ``service.py``. Per the locked layered
-convention (single-file ``data_access.py``, manager spec 2026-06-25)
-trigger lookups + run history queries live here side-by-side.
+module; never imports a ``service.py``. Single-file per the locked
+layered convention (manager spec 2026-06-25).
 
-Step 1 lands the empty file so the convention is in place from the
-first commit. The actual query bodies arrive with the consumer
-steps:
-
-  * Step 2 — ``list_triggers`` + ``get_trigger`` + ``match_triggers``
-    (the matcher reads every enabled trigger for a given
-    ``(org_id, event_type)`` pair).
-  * Step 4 — ``insert_run`` + idempotency check by
-    ``(trigger_id, event_id)`` + ``list_runs`` for the run-history
-    endpoint.
+Step 2 fills in the trigger-side reads (list / get / matcher). Step
+4 will extend with run helpers (insert_run + idempotency check +
+list_runs for the run-history endpoint).
 
 Tenant scoping is applied automatically by the ``do_orm_execute``
 listener on every SELECT, but consumers SHOULD also pass ``org_id``
-explicitly in the WHERE clause as a belt to the suspenders —
-defends callers (Celery tasks, scripts) that forget to set
-``RequestContext.org_id``.
+explicitly in the WHERE clause as a belt-to-the-suspenders defense
+— Celery tasks + scripts that forget to set ``RequestContext.org_id``
+still get correct results.
 """
 from __future__ import annotations
 
+import uuid
 
-__all__: list[str] = []
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.app.core.automation.models import AutomationTrigger
+from src.app.core.conversations.models import ConversationChannel
+
+
+async def get_trigger(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    trigger_id: uuid.UUID,
+) -> AutomationTrigger | None:
+    """Resolve a trigger by its UUID PK. ``None`` if missing or
+    cross-tenant (callers translate to :class:`TriggerNotFound`)."""
+    result = await session.execute(
+        select(AutomationTrigger).where(
+            AutomationTrigger.id == trigger_id,
+            AutomationTrigger.org_id == org_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_trigger_by_name(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    name: str,
+) -> AutomationTrigger | None:
+    """Case-insensitive name lookup — drives the duplicate-name
+    rejection at create + update time. Uses the functional unique
+    index ``uq_automation_triggers_org_lower_name`` from Step 1."""
+    result = await session.execute(
+        select(AutomationTrigger).where(
+            AutomationTrigger.org_id == org_id,
+            func.lower(AutomationTrigger.name) == name.strip().lower(),
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def list_triggers(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    event_type: str | None = None,
+    enabled: bool | None = None,
+    channel: ConversationChannel | None = None,
+    q: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[AutomationTrigger], int]:
+    """Filterable + paginated list. ``q`` matches against ``name``
+    or ``event_type`` (case-insensitive). Returns ``(rows, total)``.
+
+    ``order by id ASC`` keeps the matcher deterministic — Step 4's
+    dispatcher relies on stable trigger ordering when an event has
+    multiple matching triggers + we want the run-rows to insert in
+    a consistent sequence."""
+    base = select(AutomationTrigger).where(AutomationTrigger.org_id == org_id)
+
+    if event_type is not None:
+        base = base.where(AutomationTrigger.event_type == event_type)
+    if enabled is not None:
+        base = base.where(AutomationTrigger.enabled.is_(enabled))
+    if channel is not None:
+        base = base.where(AutomationTrigger.channel == channel)
+    if q:
+        pattern = f"%{q.lower()}%"
+        base = base.where(
+            or_(
+                func.lower(AutomationTrigger.name).like(pattern),
+                func.lower(AutomationTrigger.event_type).like(pattern),
+            )
+        )
+
+    total = (
+        await session.execute(
+            select(func.count()).select_from(base.subquery())
+        )
+    ).scalar_one()
+
+    rows = (
+        (
+            await session.execute(
+                base.order_by(AutomationTrigger.id.asc())
+                .offset(offset)
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows), int(total)
+
+
+async def match_enabled_triggers(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    event_type: str,
+) -> list[AutomationTrigger]:
+    """Hot-path matcher query the dispatcher hits on every event
+    publish. Returns every enabled trigger for ``(org_id,
+    event_type)`` in deterministic ``id ASC`` order.
+
+    Condition evaluation happens upstream in
+    :func:`core.automation.conditions.evaluate` so this query stays
+    a simple index-covered SELECT — the
+    ``ix_automation_triggers_org_event_enabled`` covering index from
+    Step 1 makes it O(log n + match-count)."""
+    result = await session.execute(
+        select(AutomationTrigger)
+        .where(
+            AutomationTrigger.org_id == org_id,
+            AutomationTrigger.event_type == event_type,
+            AutomationTrigger.enabled.is_(True),
+        )
+        .order_by(AutomationTrigger.id.asc())
+    )
+    return list(result.scalars().all())
+
+
+def add_trigger(
+    session: AsyncSession, trigger: AutomationTrigger
+) -> AutomationTrigger:
+    """Stage a new trigger row in the unit-of-work. Service commits."""
+    session.add(trigger)
+    return trigger
+
+
+__all__ = [
+    "add_trigger",
+    "get_trigger",
+    "get_trigger_by_name",
+    "list_triggers",
+    "match_enabled_triggers",
+]
