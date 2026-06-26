@@ -24,57 +24,19 @@ filter + Postgres RLS jointly enforce org isolation.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, or_, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
 from src.app.shared.audit import log_entity_change
-from src.app.core.contacts.groups.models import (
-    ContactGroup,
-    ContactGroupMember,
-)
+from src.app.core.contacts.groups import data_access
+from src.app.core.contacts.groups.models import ContactGroup
 from src.app.core.contacts.groups.schemas import (
     GroupCreate,
     GroupFilter,
     GroupUpdate,
 )
-from src.app.core.contacts.models import Contact
-
-
-# --- predicate builder (mirrors core/contacts/service.list_contacts) ----
-
-
-def _build_contact_filter_predicates(
-    filter_json: dict[str, Any] | None,
-) -> list[Any]:
-    """Translate a `{q, source, tag}` shape into SQLAlchemy WHERE
-    predicates. Same rules the contacts list endpoint uses; kept
-    duplicated rather than imported to avoid a service-layer
-    dependency cycle (contacts → groups → contacts)."""
-    filters: list[Any] = []
-    if not filter_json:
-        return filters
-    q = filter_json.get("q")
-    if q:
-        like = f"%{q}%"
-        filters.append(
-            or_(
-                Contact.full_name.ilike(like),
-                Contact.phone.ilike(like),
-                Contact.email.ilike(like),
-            )
-        )
-    source = filter_json.get("source")
-    if source:
-        filters.append(Contact.source == source)
-    tag = filter_json.get("tag")
-    if tag:
-        filters.append(Contact.tags.contains([tag]))
-    return filters
 
 
 # --- reads ----------------------------------------------------------------
@@ -83,11 +45,7 @@ def _build_contact_filter_predicates(
 async def get_group(
     session: AsyncSession, group_id: uuid.UUID
 ) -> ContactGroup:
-    row = (
-        await session.execute(
-            select(ContactGroup).where(ContactGroup.id == group_id)
-        )
-    ).scalar_one_or_none()
+    row = await data_access.get_group_by_id(session, group_id)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -104,25 +62,12 @@ async def list_groups(
 ) -> tuple[list[ContactGroup], int]:
     """Paginated list. Returns `(rows, total)` so the API can shape
     a `GroupListResponse` directly."""
-    total = (
-        await session.execute(
-            select(func.count()).select_from(ContactGroup)
-        )
-    ).scalar_one()
+    total = await data_access.count_groups(session)
     offset = (page - 1) * size
-    rows = (
-        (
-            await session.execute(
-                select(ContactGroup)
-                .order_by(ContactGroup.created_at.desc())
-                .offset(offset)
-                .limit(size)
-            )
-        )
-        .scalars()
-        .all()
+    rows = await data_access.list_groups_page(
+        session, offset=offset, limit=size
     )
-    return list(rows), int(total)
+    return rows, total
 
 
 # --- writes ---------------------------------------------------------------
@@ -137,19 +82,21 @@ async def create_group(
 ) -> ContactGroup:
     """Insert a `contact_groups` row + (for static groups) bulk-insert
     member rows. UNIQUE(`org_id`, `name`) collisions surface as 409."""
-    group = ContactGroup(
-        org_id=org_id,
-        name=payload.name,
-        description=payload.description,
-        is_dynamic=payload.is_dynamic,
-        filter_json=(
-            payload.filter_json.model_dump(exclude_none=True)
-            if payload.filter_json is not None
-            else None
+    group = data_access.add_group(
+        session,
+        ContactGroup(
+            org_id=org_id,
+            name=payload.name,
+            description=payload.description,
+            is_dynamic=payload.is_dynamic,
+            filter_json=(
+                payload.filter_json.model_dump(exclude_none=True)
+                if payload.filter_json is not None
+                else None
+            ),
+            created_by_id=user_id,
         ),
-        created_by_id=user_id,
     )
-    session.add(group)
     try:
         await session.flush()
     except Exception:
@@ -160,7 +107,7 @@ async def create_group(
         )
 
     if not payload.is_dynamic and payload.contact_ids:
-        await _bulk_set_members(
+        await data_access.bulk_upsert_members(
             session,
             org_id=org_id,
             group_id=group.id,
@@ -220,13 +167,9 @@ async def update_group(
                 detail="Cannot set `contact_ids` on a dynamic group.",
             )
         # Replace the full member set atomically: delete old, insert new.
-        await session.execute(
-            ContactGroupMember.__table__.delete().where(
-                ContactGroupMember.group_id == group_id
-            )
-        )
+        await data_access.delete_members_for_group(session, group_id)
         if payload.contact_ids:
-            await _bulk_set_members(
+            await data_access.bulk_upsert_members(
                 session,
                 org_id=group.org_id,
                 group_id=group_id,
@@ -266,7 +209,7 @@ async def delete_group(
     with a clear error message)."""
     group = await get_group(session, group_id)
     name = group.name
-    await session.delete(group)
+    await data_access.delete_group_row(session, group)
     await session.commit()
     await log_entity_change(
         action="contacts.group.deleted",
@@ -289,19 +232,12 @@ async def resolve_group_contacts(
     Both sort the result so the downstream chunker is deterministic."""
     group = await get_group(session, group_id)
     if group.is_dynamic:
-        predicates = _build_contact_filter_predicates(group.filter_json)
-        stmt = select(Contact.id)
-        if predicates:
-            stmt = stmt.where(and_(*predicates))
-        stmt = stmt.order_by(Contact.id)
-    else:
-        stmt = (
-            select(ContactGroupMember.contact_id)
-            .where(ContactGroupMember.group_id == group_id)
-            .order_by(ContactGroupMember.contact_id)
+        return await data_access.list_contact_ids_matching_filter(
+            session, filter_json=group.filter_json
         )
-    rows = (await session.execute(stmt)).scalars().all()
-    return list(rows)
+    return await data_access.list_static_member_contact_ids(
+        session, group_id
+    )
 
 
 async def preview_audience_size(
@@ -322,48 +258,13 @@ async def preview_audience_size(
             detail="Provide exactly one of `filter_json` or `group_id`.",
         )
     if filter_json is not None:
-        predicates = _build_contact_filter_predicates(
-            filter_json.model_dump(exclude_none=True)
+        return await data_access.count_contacts_matching_filter(
+            session, filter_json=filter_json.model_dump(exclude_none=True)
         )
-        stmt = select(func.count()).select_from(Contact)
-        if predicates:
-            stmt = stmt.where(and_(*predicates))
-        return int((await session.execute(stmt)).scalar_one())
 
     # group_id path — delegate to resolver to honour static/dynamic mode.
     contact_ids = await resolve_group_contacts(session, group_id=group_id)
     return len(contact_ids)
-
-
-# --- helpers --------------------------------------------------------------
-
-
-async def _bulk_set_members(
-    session: AsyncSession,
-    *,
-    org_id: uuid.UUID,
-    group_id: uuid.UUID,
-    contact_ids: list[uuid.UUID],
-) -> None:
-    """Insert member rows in bulk with `ON CONFLICT DO NOTHING` on
-    `(group_id, contact_id)` so re-running the same setter is idempotent."""
-    if not contact_ids:
-        return
-    rows = [
-        {
-            "org_id": org_id,
-            "group_id": group_id,
-            "contact_id": cid,
-        }
-        for cid in contact_ids
-    ]
-    await session.execute(
-        pg_insert(ContactGroupMember)
-        .values(rows)
-        .on_conflict_do_nothing(
-            index_elements=["group_id", "contact_id"]
-        )
-    )
 
 
 async def get_member_count(
@@ -374,17 +275,10 @@ async def get_member_count(
     the moderate list sizes we expect; if a tenant accumulates 100s
     of groups, the UI can switch to a lazy-load pattern."""
     if group.is_dynamic:
-        predicates = _build_contact_filter_predicates(group.filter_json)
-        stmt = select(func.count()).select_from(Contact)
-        if predicates:
-            stmt = stmt.where(and_(*predicates))
-        return int((await session.execute(stmt)).scalar_one())
-    stmt = (
-        select(func.count())
-        .select_from(ContactGroupMember)
-        .where(ContactGroupMember.group_id == group.id)
-    )
-    return int((await session.execute(stmt)).scalar_one())
+        return await data_access.count_contacts_matching_filter(
+            session, filter_json=group.filter_json
+        )
+    return await data_access.count_static_members(session, group.id)
 
 
 async def get_sample_member_ids(
@@ -397,18 +291,12 @@ async def get_sample_member_ids(
     the full resolver uses, so the sample matches the head of the
     full list."""
     if group.is_dynamic:
-        predicates = _build_contact_filter_predicates(group.filter_json)
-        stmt = select(Contact.id).order_by(Contact.id).limit(limit)
-        if predicates:
-            stmt = stmt.where(and_(*predicates))
-    else:
-        stmt = (
-            select(ContactGroupMember.contact_id)
-            .where(ContactGroupMember.group_id == group.id)
-            .order_by(ContactGroupMember.contact_id)
-            .limit(limit)
+        return await data_access.list_contact_ids_matching_filter_limited(
+            session, filter_json=group.filter_json, limit=limit
         )
-    return list((await session.execute(stmt)).scalars().all())
+    return await data_access.list_static_member_contact_ids_limited(
+        session, group.id, limit=limit
+    )
 
 
 __all__ = [

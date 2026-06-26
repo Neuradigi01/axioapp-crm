@@ -20,7 +20,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import activities, audit
-from src.app.core.contacts import data_access
+from src.app.core.contacts import service as contacts_service
 from src.app.core.activities.models import ActivityType
 from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import LeadSource
@@ -79,7 +79,7 @@ async def _find_contact_by_phone(
     normalized = phone.strip()
     if not normalized:
         return None
-    return await data_access.get_contact_by_phone(session, normalized)
+    return await contacts_service.get_contact_by_phone(session, normalized)
 
 
 # --- CRUD ---
@@ -226,6 +226,45 @@ async def list_walk_ins(
     )
 
 
+async def list_walk_ins_visible_to(
+    session: AsyncSession,
+    *,
+    caller,
+    status_filter: Optional[WalkInStatus] = None,
+    assigned_to: Optional[uuid.UUID] = None,
+    open_only: bool = False,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    sort: Literal["time_in", "created_at", "last_activity_at"] = "time_in",
+    order: Literal["asc", "desc"] = "desc",
+    page: int = 1,
+    size: int = 50,
+) -> tuple[list[WalkIn], int]:
+    """Row-level visibility wrapper.
+
+    Callers without `users.read` (employees vs. managers) only see
+    walk-ins assigned to them. Any `assigned_to=<other>` they pass
+    is silently clamped to self. Business rule — moved out of the
+    router so this is the single point of enforcement.
+    """
+    from src.app.core.permissions.service import role_has_permission
+
+    if not await role_has_permission(session, caller.role_id, "users.read"):
+        assigned_to = caller.legacy_uuid
+    return await list_walk_ins(
+        session,
+        status_filter=status_filter,
+        assigned_to=assigned_to,
+        open_only=open_only,
+        date_from=date_from,
+        date_to=date_to,
+        sort=sort,
+        order=order,
+        page=page,
+        size=size,
+    )
+
+
 # --- quick_register + checkout ---
 
 
@@ -257,7 +296,7 @@ async def quick_register(
             tags=[],
             custom_data={},
         )
-        data_access.insert_contact(session, contact)
+        contacts_service.insert_contact(session, contact)
         await session.flush()
         was_created = True
 

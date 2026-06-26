@@ -14,8 +14,6 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import logging
@@ -23,8 +21,8 @@ from pathlib import Path
 
 from src.app.core import audit
 from src.app.core.auth import data_access as auth_da
-from src.app.core.tenants import data_access as tenants_da
-from src.app.core.users import data_access as users_da
+from src.app.core.tenants import service as tenants_service
+from src.app.core.users import service as users_service
 from src.app.core.auth.models import AuthSession
 from src.app.core.auth.schemas import (
     LoginResponse,
@@ -41,9 +39,7 @@ from src.app.core.packs.installer import install as install_pack
 from src.app.core.packs.loader import PackLoadError, load_pack
 from src.app.core.packs.service import get_catalog
 from src.app.core.permissions import role_templates
-from src.app.core.permissions.models import Role
 from src.app.core.subscriptions.signup_hook import create_trial_subscription
-from src.app.core.tenants.models import Organization
 from src.app.core.tenants.service import create_organization
 from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.shared.context import RequestContext, reset_context, set_context
@@ -58,26 +54,15 @@ logger = logging.getLogger(__name__)
 _BASE_PACK_FILE = Path("src/app/packs/base/pack.yaml")
 
 
-async def _resolve_org_for_email(
-    db: AsyncSession, email: str
-) -> Organization | None:
+async def resolve_org_for_email(db: AsyncSession, email: str):
     """Find the org by walking email → active membership → org.
 
-    Used when login is called without `org_slug` (the email-only flow).
-    Returns None when the email isn't known OR has no active membership —
-    the caller treats both as "invalid credentials" to avoid leaking
-    which case it was.
+    Public service wrapper around the auth DAL helper so 2FA flows
+    (switch-method, etc.) can call into the same email-to-org
+    resolution the login path uses without reaching into the DAL
+    directly.
     """
-    result = await db.execute(
-        select(Organization)
-        .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
-        .join(UserInfo, UserInfo.member_id == OrganizationMember.user_member_id)
-        .where(
-            UserInfo.email == email,
-            OrganizationMember.is_active.is_(True),
-        )
-    )
-    return result.scalar_one_or_none()
+    return await auth_da.get_organization_for_email(db, email)
 
 
 async def login(
@@ -97,14 +82,14 @@ async def login(
     )
 
     if org_slug:
-        org = await tenants_da.get_organization_by_slug(db, org_slug)
+        org = await tenants_service.get_organization_by_slug(db, org_slug)
     else:
-        org = await _resolve_org_for_email(db, email)
+        org = await auth_da.get_organization_for_email(db, email)
     if org is None:
         # No tenant known → can't attribute to a row, intentionally skip audit.
         raise invalid
 
-    user = await users_da.get_user_by_email(
+    user = await users_service.get_user_by_email(
         db, email, org_id=org.id, active_only=True
     )
     if user is None or not user.is_active:
@@ -164,7 +149,8 @@ async def login(
     # identity preserved in `user.legacy_uuid`.
     user_uuid = user.legacy_uuid
 
-    db.add(
+    auth_da.add_auth_session(
+        db,
         AuthSession(
             id=token_id,
             org_id=org.id,
@@ -172,7 +158,7 @@ async def login(
             expires_at=expires_at,
             ip=ip,
             ua=ua,
-        )
+        ),
     )
     await db.commit()
 
@@ -212,7 +198,8 @@ async def refresh(db: AsyncSession, claims: TokenClaims) -> RefreshResponse:
     session.revoked_at = now
     new_token_id = uuid.uuid4()
     new_expires_at = now + ACCESS_TOKEN_TTL
-    db.add(
+    auth_da.add_auth_session(
+        db,
         AuthSession(
             id=new_token_id,
             org_id=session.org_id,
@@ -220,7 +207,7 @@ async def refresh(db: AsyncSession, claims: TokenClaims) -> RefreshResponse:
             expires_at=new_expires_at,
             ip=session.ip,
             ua=session.ua,
-        )
+        ),
     )
     await db.commit()
 
@@ -235,11 +222,8 @@ async def refresh(db: AsyncSession, claims: TokenClaims) -> RefreshResponse:
 
 async def logout(db: AsyncSession, token_id: uuid.UUID) -> None:
     """Idempotent — sets `revoked_at` to now if the row exists and isn't already revoked."""
-    now = datetime.now(timezone.utc)
-    await db.execute(
-        update(AuthSession)
-        .where(AuthSession.id == token_id, AuthSession.revoked_at.is_(None))
-        .values(revoked_at=now)
+    await auth_da.revoke_auth_session_by_id(
+        db, token_id=token_id, now=datetime.now(timezone.utc)
     )
     await db.commit()
 
@@ -257,13 +241,9 @@ async def list_user_sessions(
     so the Settings → Login history tab can hide the Sign-out button on
     that row. RLS auto-scopes the underlying SELECT to the caller's org.
     """
-    result = await db.execute(
-        select(AuthSession)
-        .where(AuthSession.user_id == user_id)
-        .order_by(AuthSession.created_at.desc())
-        .limit(limit)
+    rows = await auth_da.list_auth_sessions_for_user(
+        db, user_id=user_id, limit=limit
     )
-    rows = list(result.scalars().all())
     return [
         {
             "id": row.id,
@@ -281,25 +261,8 @@ async def list_user_sessions(
 async def get_user_two_factor_status(
     db: AsyncSession, *, member_id: int
 ) -> tuple[bool, str | None]:
-    """Read `(enabled, method)` from `tbl_user_login` for the given user.
-
-    Goes through the legacy `UserLogin` mapping because the layered
-    `User` mapper excludes the `two_factor_*` columns. `member_id` is
-    `User.id` (the `tbl_user_login.id` bigint PK).
-    """
-    from src.models.user import UserLogin
-
-    row = (
-        await db.execute(
-            select(
-                UserLogin.two_factor_enabled,
-                UserLogin.two_factor_method,
-            ).where(UserLogin.id == member_id)
-        )
-    ).one_or_none()
-    if row is None:
-        return False, None
-    return bool(row[0]), row[1]
+    """Read `(enabled, method)` from `tbl_user_login` for the given user."""
+    return await auth_da.get_user_two_factor_flags(db, member_id=member_id)
 
 
 async def revoke_user_session(
@@ -326,11 +289,6 @@ async def revoke_user_session(
     return True
 
 
-async def _email_taken(db: AsyncSession, email: str) -> bool:
-    result = await db.execute(select(UserInfo.id).where(UserInfo.email == email))
-    return result.scalar_one_or_none() is not None
-
-
 async def register_with_new_org(
     db: AsyncSession,
     *,
@@ -344,7 +302,7 @@ async def register_with_new_org(
     the newly-created Owner, ready to be carried by the frontend into
     `/user/dashboard`.
     """
-    if await _email_taken(db, req.email):
+    if await users_service.email_exists(db, req.email):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists.",
@@ -407,24 +365,18 @@ async def register_with_new_org(
             detail="role template install did not produce an Owner role",
         )
 
-    # `User` (layered mapper) hides legacy `user_id` / 2FA columns. Bypass
-    # the exclusion by inserting via `pg_insert(User)` — same trick the
-    # seed scripts use — then fetch the bigint id by `legacy_uuid`.
+    # `User` (layered mapper) hides legacy `user_id` / 2FA columns —
+    # the DAL inserts at the table level so we can populate them.
     user_uuid = uuid.uuid4()
-    await db.execute(
-        pg_insert(User).values(
-            {
-                "legacy_uuid": user_uuid,
-                "user_id": f"usr_{user_uuid.hex}",
-                "password": hash_password(req.password),
-                "is_active": True,
-                "two_factor_enabled": False,
-            }
-        )
+    bigint_id = await users_service.insert_user_login_row(
+        db,
+        legacy_uuid=user_uuid,
+        user_handle=f"usr_{user_uuid.hex}",
+        password_hash=hash_password(req.password),
     )
-    bigint_id = (await users_da.get_user_by_uuid(db, user_uuid)).id
 
-    db.add(
+    users_service.add_user_info(
+        db,
         UserInfo(
             member_id=bigint_id,
             first_name=req.first_name.strip(),
@@ -433,9 +385,10 @@ async def register_with_new_org(
             mobile_no=req.phone,
             is_email_verified=False,
             is_mobile_verified=False,
-        )
+        ),
     )
-    db.add(
+    users_service.add_organization_member(
+        db,
         OrganizationMember(
             organization_id=org.id,
             user_member_id=bigint_id,
@@ -443,7 +396,7 @@ async def register_with_new_org(
             status="active",
             is_active=True,
             is_demo=False,
-        )
+        ),
     )
 
     # Pricing-and-Billing Step 6 — every new org starts a 14-day trial.
@@ -455,7 +408,8 @@ async def register_with_new_org(
     token_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
     expires_at = now + ACCESS_TOKEN_TTL
-    db.add(
+    auth_da.add_auth_session(
+        db,
         AuthSession(
             id=token_id,
             org_id=org.id,
@@ -463,7 +417,7 @@ async def register_with_new_org(
             expires_at=expires_at,
             ip=ip,
             ua=ua,
-        )
+        ),
     )
 
     await db.commit()
@@ -534,7 +488,7 @@ async def register_user_only(
     which renames the org, sets a real `template_id`, and runs the
     matching pack installer.
     """
-    if await _email_taken(db, req.email):
+    if await users_service.email_exists(db, req.email):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists.",
@@ -572,20 +526,15 @@ async def register_user_only(
         )
 
     user_uuid = uuid.uuid4()
-    await db.execute(
-        pg_insert(User).values(
-            {
-                "legacy_uuid": user_uuid,
-                "user_id": f"usr_{user_uuid.hex}",
-                "password": hash_password(req.password),
-                "is_active": True,
-                "two_factor_enabled": False,
-            }
-        )
+    bigint_id = await users_service.insert_user_login_row(
+        db,
+        legacy_uuid=user_uuid,
+        user_handle=f"usr_{user_uuid.hex}",
+        password_hash=hash_password(req.password),
     )
-    bigint_id = (await users_da.get_user_by_uuid(db, user_uuid)).id
 
-    db.add(
+    users_service.add_user_info(
+        db,
         UserInfo(
             member_id=bigint_id,
             first_name=req.first_name.strip(),
@@ -594,9 +543,10 @@ async def register_user_only(
             mobile_no=req.phone,
             is_email_verified=False,
             is_mobile_verified=False,
-        )
+        ),
     )
-    db.add(
+    users_service.add_organization_member(
+        db,
         OrganizationMember(
             organization_id=org.id,
             user_member_id=bigint_id,
@@ -604,7 +554,7 @@ async def register_user_only(
             status="active",
             is_active=True,
             is_demo=False,
-        )
+        ),
     )
 
     # Pricing-and-Billing Step 6 — every new org starts a 14-day trial,
@@ -616,7 +566,8 @@ async def register_user_only(
     token_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
     expires_at = now + ACCESS_TOKEN_TTL
-    db.add(
+    auth_da.add_auth_session(
+        db,
         AuthSession(
             id=token_id,
             org_id=org.id,
@@ -624,7 +575,7 @@ async def register_user_only(
             expires_at=expires_at,
             ip=ip,
             ua=ua,
-        )
+        ),
     )
 
     await db.commit()
@@ -701,7 +652,7 @@ async def complete_onboarding(
     """
     tile = _validate_template_choice(req.template_id)
 
-    org = await tenants_da.get_organization_by_id(db, user.org_id)
+    org = await tenants_service.get_organization_by_id(db, user.org_id)
     if org is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -758,18 +709,14 @@ async def complete_onboarding(
     # token reflects the onboarded state so the frontend route guard
     # passes on next navigation.
     now = datetime.now(timezone.utc)
-    await db.execute(
-        update(AuthSession)
-        .where(
-            AuthSession.id == current_token_id,
-            AuthSession.revoked_at.is_(None),
-        )
-        .values(revoked_at=now)
+    await auth_da.revoke_auth_session_by_id(
+        db, token_id=current_token_id, now=now
     )
 
     new_token_id = uuid.uuid4()
     new_expires_at = now + ACCESS_TOKEN_TTL
-    db.add(
+    auth_da.add_auth_session(
+        db,
         AuthSession(
             id=new_token_id,
             org_id=org.id,
@@ -777,7 +724,7 @@ async def complete_onboarding(
             expires_at=new_expires_at,
             ip=ip,
             ua=ua,
-        )
+        ),
     )
 
     await db.commit()
@@ -819,10 +766,8 @@ async def complete_onboarding(
         now=now,
     )
     role_name = (
-        await db.execute(
-            select(Role.name).where(Role.id == user.role_id)
-        )
-    ).scalar_one_or_none() or ""
+        await users_service.get_role_name_by_id(db, user.role_id) or ""
+    )
     return OnboardingCompleteResponse(
         access_token=encoded,
         expires_at=exp,

@@ -27,12 +27,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.contacts import data_access
+from src.app.core.contacts import service as contacts_service
+from src.app.core.campaigns import data_access as campaigns_da
 from src.app.core.campaigns.models import (
     Campaign,
     CampaignMessage,
@@ -76,23 +75,12 @@ CHUNK_SIZE = 50
 async def list_campaigns(
     session: AsyncSession, *, page: int = 1, size: int = 50
 ) -> tuple[list[Campaign], int]:
-    total = (
-        await session.execute(select(func.count()).select_from(Campaign))
-    ).scalar_one()
+    total = await campaigns_da.count_all_campaigns(session)
     offset = (page - 1) * size
-    rows = (
-        (
-            await session.execute(
-                select(Campaign)
-                .order_by(Campaign.created_at.desc())
-                .offset(offset)
-                .limit(size)
-            )
-        )
-        .scalars()
-        .all()
+    rows = await campaigns_da.list_campaigns_page(
+        session, offset=offset, limit=size
     )
-    return list(rows), int(total)
+    return rows, total
 
 
 async def get_campaign(
@@ -118,10 +106,10 @@ async def _validate_template_channel_match(
     template's channel differs or the id doesn't resolve in this org.
     Skipped when no template ids are supplied (free-text campaign).
     """
-    from src.app.core.templates import data_access as templates_da
+    from src.app.core.templates import service as templates_service
 
     for tid in template_ids:
-        row = await templates_da.get_template(
+        row = await templates_service.find_template(
             session, org_id=org_id, template_id=tid
         )
         if row is None:
@@ -193,7 +181,7 @@ async def create_campaign(
         status=CampaignStatus.draft,
         created_by_id=user_id,
     )
-    session.add(campaign)
+    campaigns_da.add_campaign(session, campaign)
     await session.commit()
     await session.refresh(campaign)
     await log_entity_change(
@@ -270,7 +258,7 @@ async def delete_campaign(
             detail=f"cannot delete a {campaign.status.value} campaign",
         )
     before = _snapshot(campaign)
-    await session.delete(campaign)
+    await campaigns_da.delete_campaign_row(session, campaign)
     await session.commit()
     await log_entity_change(
         action="campaigns.deleted",
@@ -318,28 +306,9 @@ async def resolve_audience(
 
     # Filter mode (q / source / tag) — falls through to "" empty
     # filter = "everyone" by intentional design.
-    filters: list[Any] = []
-    if af.q:
-        like = f"%{af.q}%"
-        from sqlalchemy import or_
-
-        filters.append(
-            or_(
-                Contact.full_name.ilike(like),
-                Contact.phone.ilike(like),
-                Contact.email.ilike(like),
-            )
-        )
-    if af.source:
-        filters.append(Contact.source == af.source)
-    if af.tag:
-        filters.append(Contact.tags.contains([af.tag]))
-
-    where = and_(*filters) if filters else None
-    stmt = select(Contact.id)
-    if where is not None:
-        stmt = stmt.where(where)
-    return [row for (row,) in (await session.execute(stmt)).all()]
+    return await campaigns_da.list_contact_ids_for_audience(
+        session, q=af.q, source=af.source, tag=af.tag
+    )
 
 
 # --- start + dispatch ----------------------------------------------------
@@ -528,12 +497,8 @@ async def _queue_chunk_rows(
     ]
     if not rows:
         return
-    await session.execute(
-        pg_insert(CampaignMessage)
-        .values(rows)
-        .on_conflict_do_nothing(
-            index_elements=["campaign_id", "contact_id"]
-        )
+    await campaigns_da.bulk_upsert_queued_campaign_messages(
+        session, rows=rows
     )
     await session.commit()
 
@@ -596,14 +561,9 @@ async def dispatch_chunk(
             )
             if tid is not None
         ]
-        rows = (
-            await session.execute(
-                select(WhatsAppTemplate).where(
-                    WhatsAppTemplate.message_template_id.in_(ids)
-                )
-            )
-        ).scalars().all()
-        by_central = {r.message_template_id: r for r in rows}
+        by_central = await campaigns_da.get_wa_extensions_for_template_ids(
+            session, ids
+        )
         template_a_row = by_central.get(campaign.variant_a_template_id)
         template_b_row = by_central.get(campaign.variant_b_template_id)
         if template_a_row is None or template_b_row is None:
@@ -632,12 +592,10 @@ async def dispatch_chunk(
         # (the campaign's `template_id` now points at the central
         # library, not the WA extension).
         template_row = (
-            await session.execute(
-                select(WhatsAppTemplate).where(
-                    WhatsAppTemplate.message_template_id == campaign.template_id
-                )
+            await campaigns_da.get_wa_extension_for_campaign_template(
+                session, campaign.template_id
             )
-        ).scalar_one_or_none()
+        )
         if template_row is None:
             for cid in contact_ids:
                 await _mark_message(
@@ -678,7 +636,7 @@ async def dispatch_chunk(
     )
 
     for cid in contact_ids:
-        contact = await data_access.get_contact(session, cid)
+        contact = await contacts_service.get_contact(session, cid)
         if contact is None or not contact.phone:
             await _mark_message(
                 session,
@@ -849,7 +807,8 @@ async def dispatch_chunk(
             continue
 
         now = datetime.now(timezone.utc)
-        session.add(
+        campaigns_da.add_outbound_message(
+            session,
             Message(
                 org_id=campaign.org_id,
                 conversation_id=conversation.id,
@@ -860,7 +819,7 @@ async def dispatch_chunk(
                 channel_message_id=ref.channel_message_id,
                 payload={"campaign_id": str(campaign.id)},
                 sent_at=ref.sent_at or now,
-            )
+            ),
         )
         conversation.last_message_at = ref.sent_at or now
         await _mark_message(
@@ -877,15 +836,10 @@ async def dispatch_chunk(
         )
 
     # If this was the last queued chunk, flip the campaign to `done`.
-    pending = (
-        await session.execute(
-            select(func.count())
-            .select_from(CampaignMessage)
-            .where(CampaignMessage.campaign_id == campaign_id)
-            .where(CampaignMessage.status == CampaignMessageStatus.queued)
-        )
-    ).scalar_one()
-    if (pending or 0) == 0 and campaign.status == CampaignStatus.running:
+    pending = await campaigns_da.count_queued_messages_for_campaign(
+        session, campaign_id
+    )
+    if pending == 0 and campaign.status == CampaignStatus.running:
         campaign.status = CampaignStatus.done
         await session.commit()
 
@@ -898,22 +852,20 @@ async def _find_or_create_conversation(
     external_id: str,
     contact_id: uuid.UUID,
 ) -> Conversation:
-    existing = (
-        await session.execute(
-            select(Conversation)
-            .where(Conversation.channel == channel)
-            .where(Conversation.external_id == external_id)
-        )
-    ).scalar_one_or_none()
+    existing = await campaigns_da.get_conversation_by_external_id(
+        session, channel=channel, external_id=external_id
+    )
     if existing is not None:
         return existing
-    conv = Conversation(
-        org_id=org_id,
-        channel=channel,
-        external_id=external_id,
-        contact_id=contact_id,
+    conv = campaigns_da.add_conversation(
+        session,
+        Conversation(
+            org_id=org_id,
+            channel=channel,
+            external_id=external_id,
+            contact_id=contact_id,
+        ),
     )
-    session.add(conv)
     await session.flush()
     return conv
 
@@ -929,13 +881,9 @@ async def _mark_message(
     sent_at: datetime | None = None,
     variant: str | None = None,
 ) -> None:
-    row = (
-        await session.execute(
-            select(CampaignMessage)
-            .where(CampaignMessage.campaign_id == campaign_id)
-            .where(CampaignMessage.contact_id == contact_id)
-        )
-    ).scalar_one_or_none()
+    row = await campaigns_da.get_campaign_message_for_contact(
+        session, campaign_id=campaign_id, contact_id=contact_id
+    )
     if row is None:
         return
     row.status = new_status
@@ -1115,13 +1063,9 @@ async def apply_meta_status(
         # Unknown Meta status; nothing to do but don't crash.
         return False
 
-    row = (
-        await session.execute(
-            select(CampaignMessage).where(
-                CampaignMessage.channel_message_id == channel_message_id
-            )
-        )
-    ).scalar_one_or_none()
+    row = await campaigns_da.get_campaign_message_by_channel_id(
+        session, channel_message_id
+    )
     if row is None:
         return False
 
@@ -1203,31 +1147,18 @@ async def list_messages(
     """Per-message rows for a campaign's detail view."""
     await get_campaign(session, campaign_id)
 
-    filters: list[Any] = [CampaignMessage.campaign_id == campaign_id]
-    if status_filter is not None:
-        filters.append(CampaignMessage.status == status_filter)
-    where = and_(*filters)
-
-    total = (
-        await session.execute(
-            select(func.count()).select_from(CampaignMessage).where(where)
-        )
-    ).scalar_one()
-    offset = (page - 1) * size
-    rows = (
-        (
-            await session.execute(
-                select(CampaignMessage)
-                .where(where)
-                .order_by(CampaignMessage.created_at.asc())
-                .offset(offset)
-                .limit(size)
-            )
-        )
-        .scalars()
-        .all()
+    total = await campaigns_da.count_messages_filtered(
+        session, campaign_id=campaign_id, status_filter=status_filter
     )
-    return list(rows), int(total)
+    offset = (page - 1) * size
+    rows = await campaigns_da.list_messages_page(
+        session,
+        campaign_id=campaign_id,
+        status_filter=status_filter,
+        offset=offset,
+        limit=size,
+    )
+    return rows, total
 
 
 async def retry_message(
@@ -1242,13 +1173,9 @@ async def retry_message(
     await get_campaign(session, campaign_id)
 
     msg = ensure_found(
-        (
-            await session.execute(
-                select(CampaignMessage)
-                .where(CampaignMessage.id == message_id)
-                .where(CampaignMessage.campaign_id == campaign_id)
-            )
-        ).scalar_one_or_none(),
+        await campaigns_da.get_campaign_message_in_campaign(
+            session, campaign_id=campaign_id, message_id=message_id
+        ),
         entity="campaign message",
     )
     if msg.status != CampaignMessageStatus.failed:
@@ -1271,14 +1198,10 @@ async def stats(
     session: AsyncSession, *, campaign_id: uuid.UUID
 ) -> dict[str, Any]:
     campaign = await get_campaign(session, campaign_id)
-    rows = (
-        await session.execute(
-            select(CampaignMessage.status, func.count(CampaignMessage.id))
-            .where(CampaignMessage.campaign_id == campaign_id)
-            .group_by(CampaignMessage.status)
-        )
-    ).all()
-    by_status: dict[str, int] = {r[0].value: int(r[1]) for r in rows}
+    rows = await campaigns_da.stats_by_status(
+        session, campaign_id=campaign_id
+    )
+    by_status: dict[str, int] = {r[0].value: r[1] for r in rows}
     audience_size = sum(by_status.values())
     return {
         "campaign_id": campaign.id,

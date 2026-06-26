@@ -61,12 +61,12 @@ from src.app.core.contacts.service import (
     create_contact,
     delete_contact,
     export_contacts_csv_rows,
+    get_contact,
     list_contacts,
     reassign_contact,
     update_contact,
 )
-from src.app.core.contacts import data_access as contacts_da
-from src.app.core.tenants import data_access as tenants_da
+from src.app.core.tenants import service as tenants_service
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -186,7 +186,7 @@ async def export_csv_endpoint(
     # often signed into multiple orgs and the file is more useful when
     # named per-org; (2) keeps separate per-tenant exports from
     # colliding on disk.
-    org = await tenants_da.get_organization_by_id(db, user.org_id)
+    org = await tenants_service.get_organization_by_id(db, user.org_id)
     assert org is not None  # authed user implies their org exists
 
     today = datetime.now(timezone.utc).date().isoformat()
@@ -245,7 +245,7 @@ async def get_contact_endpoint(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("contacts.read")),
 ) -> ContactOut:
-    contact = await contacts_da.get_contact(db, contact_id)
+    contact = await get_contact(db, contact_id)
     if contact is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
@@ -412,7 +412,7 @@ async def get_opt_in_endpoint(
     gate is the standard `contacts.read` — every staffer with
     access to the contact can see the consent state. Manual
     overrides are gated separately on `whatsapp.opt_in.manage`."""
-    contact = await contacts_da.get_contact(db, contact_id)
+    contact = await get_contact(db, contact_id)
     if contact is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
@@ -443,7 +443,7 @@ async def post_opt_in_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("whatsapp.opt_in.manage")),
 ) -> ConsentEventOut:
-    contact = await contacts_da.get_contact(db, contact_id)
+    contact = await get_contact(db, contact_id)
     if contact is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
@@ -491,7 +491,7 @@ async def post_opt_out_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("whatsapp.opt_in.manage")),
 ) -> ConsentEventOut:
-    contact = await contacts_da.get_contact(db, contact_id)
+    contact = await get_contact(db, contact_id)
     if contact is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"

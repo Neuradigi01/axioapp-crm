@@ -44,7 +44,7 @@ from src.app.core.subscriptions.schemas import (
     SeatPreview,
     SubscriptionCurrentResponse,
 )
-from src.app.core.users import data_access
+from src.app.core.users import service as users_service
 
 
 # Cycle lengths used when projecting `first_renewal_at` in the preview.
@@ -82,7 +82,7 @@ async def compose_current_subscription_response(
         raise RuntimeError(
             f"subscription {sub.id} references unknown plan {sub.plan_code!r}"
         )
-    seats_in_use = await data_access.count_active_members(session, org_id)
+    seats_in_use = await users_service.count_active_members(session, org_id)
     usage_snap = await usage_service.snapshot(
         session, org_id, list(RESOURCE_PERIOD_KIND.keys())
     )
@@ -133,7 +133,7 @@ async def change_plan(
         )
 
     effective_seats = seats if seats is not None else sub.seats_purchased
-    seats_in_use = await data_access.count_active_members(session, org_id)
+    seats_in_use = await users_service.count_active_members(session, org_id)
     _validate_change(target_plan, effective_seats, seats_in_use)
 
     if (
@@ -331,7 +331,7 @@ async def change_seats(
     if total_seats == sub.seats_purchased:
         return NoChangeResponse(outcome="no_change")
 
-    seats_in_use = await data_access.count_active_members(session, org_id)
+    seats_in_use = await users_service.count_active_members(session, org_id)
 
     if total_seats < sub.seats_purchased:
         bundle_min = 1
@@ -567,7 +567,7 @@ async def create_direct_checkout(
             detail={"error": "unknown_plan", "to_plan": to_plan},
         )
 
-    seats_in_use = await data_access.count_active_members(session, org_id)
+    seats_in_use = await users_service.count_active_members(session, org_id)
     _validate_change(target_plan, seats, seats_in_use)
 
     customer_id = await ensure_stripe_customer(

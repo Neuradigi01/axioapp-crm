@@ -58,7 +58,8 @@ from src.app.core.leads.service import (
     delete_lead,
     delete_scoring_rule,
     get_lead,
-    list_leads,
+    get_lead_visible_to,
+    list_leads_visible_to,
     list_leads_where,
     list_scoring_rules,
     move_stage_for_lead,
@@ -66,7 +67,6 @@ from src.app.core.leads.service import (
     update_lead,
     update_scoring_rule,
 )
-from src.app.core.permissions.service import role_has_permission
 from src.app.core.settings.schemas import (
     LeadRoutingConfigOut,
     LeadRoutingConfigUpdate,
@@ -144,16 +144,10 @@ async def list_leads_endpoint(
     db: AsyncSession = Depends(get_db),
     caller: User = Depends(require_permissions("leads.read")),
 ) -> LeadListResponse:
-    # Row-level visibility: callers without `users.read` (employees,
-    # not managers) can only see leads assigned to them. Any
-    # `?assigned_to=<other>` they pass is silently clamped to self.
-    # Same convention the dashboard uses to decide org-vs-personal scope.
-    if not await role_has_permission(db, caller.role_id, "users.read"):
-        assigned_to = caller.legacy_uuid
-
     filter_dsl_payload = _parse_filter_param(filter_param)
-    rows, total, next_cursor = await list_leads(
+    rows, total, next_cursor = await list_leads_visible_to(
         db,
+        caller=caller,
         stage=stage,
         status_filter=status_filter,
         assigned_to=assigned_to,
@@ -374,21 +368,7 @@ async def get_lead_endpoint(
     db: AsyncSession = Depends(get_db),
     caller: User = Depends(require_permissions("leads.read")),
 ) -> LeadOut:
-    lead = await get_lead(db, lead_id)
-    if lead is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
-        )
-    # Row-level visibility: non-privileged callers can only fetch their
-    # own leads. We return 404 (not 403) so the endpoint doesn't leak
-    # existence of leads outside the caller's book.
-    if (
-        lead.assigned_to_id != caller.legacy_uuid
-        and not await role_has_permission(db, caller.role_id, "users.read")
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
-        )
+    lead = await get_lead_visible_to(db, caller=caller, lead_id=lead_id)
     return LeadOut.model_validate(lead)
 
 

@@ -10,7 +10,6 @@ import re
 import secrets
 import uuid
 
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,13 +23,6 @@ _SLUG_CLEAN = re.compile(r"[^a-z0-9]+")
 def _slugify(name: str) -> str:
     base = _SLUG_CLEAN.sub("-", name.lower()).strip("-")
     return base[:48] or "workspace"
-
-
-async def _slug_taken(session: AsyncSession, slug: str) -> bool:
-    result = await session.execute(
-        select(Organization.id).where(Organization.slug == slug)
-    )
-    return result.scalar_one_or_none() is not None
 
 
 async def create_organization(
@@ -52,20 +44,22 @@ async def create_organization(
     base_slug = _slugify(name)
     slug = base_slug
     for _ in range(8):
-        if not await _slug_taken(session, slug):
+        if not await tenants_data_access.slug_taken(session, slug):
             break
         slug = f"{base_slug}-{secrets.token_hex(2)}"
     else:
         slug = f"{base_slug}-{secrets.token_hex(4)}"
 
-    org = Organization(
-        id=uuid.uuid4(),
-        name=name,
-        slug=slug,
-        template_id=template_id,
-        created_via=created_via,
+    org = tenants_data_access.add_organization(
+        session,
+        Organization(
+            id=uuid.uuid4(),
+            name=name,
+            slug=slug,
+            template_id=template_id,
+            created_via=created_via,
+        ),
     )
-    session.add(org)
     try:
         await session.flush()
     except IntegrityError:
@@ -84,3 +78,16 @@ async def get_organization_by_id(
     `None` on miss; callers decide how to surface that.
     """
     return await tenants_data_access.get_organization_by_id(session, org_id)
+
+
+async def get_organization_by_slug(
+    session: AsyncSession, slug: str
+) -> Organization | None:
+    """Resolve an organisation by URL slug.
+
+    Public service wrapper so router code never reaches into the
+    tenants DAL directly. Returns `None` for unknown slugs — the
+    caller (auth login / staff portal) surfaces an "invalid
+    credentials" response to avoid leaking which slugs exist.
+    """
+    return await tenants_data_access.get_organization_by_slug(session, slug)

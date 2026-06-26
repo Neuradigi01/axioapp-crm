@@ -21,15 +21,14 @@ import uuid
 from typing import Any, Iterable, Literal
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.activities import service as activities_service
+from src.app.core.activities.models import ActivityType
 from src.app.core.contacts import data_access
-from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.contacts.models import Contact
 from src.app.core.contacts.schemas import ContactCreate, ContactUpdate
-from src.app.core.users.models import OrganizationMember, User
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.pagination import paginate
@@ -65,6 +64,33 @@ _SNAPSHOT_FIELDS = (
 def _snapshot(contact: Contact) -> dict[str, Any]:
     """JSONB-friendly snapshot for audit `before`/`after`."""
     return snapshot(contact, fields=_SNAPSHOT_FIELDS)
+
+
+async def get_contact(
+    session: AsyncSession, contact_id: uuid.UUID
+) -> Contact | None:
+    """Public lookup-by-id wrapper. Thin pass-through to the DAL so
+    other modules' routers (e.g. notes / activities / files endpoints
+    that hang off a contact) don't reach into `contacts.data_access`
+    directly."""
+    return await data_access.get_contact(session, contact_id)
+
+
+async def get_contact_by_phone(
+    session: AsyncSession, phone: str
+) -> Contact | None:
+    """Public lookup-by-phone wrapper. Used by inbound
+    conversation routing and walk-in reception to resolve an
+    incoming number to a contact."""
+    return await data_access.get_contact_by_phone(session, phone)
+
+
+def insert_contact(session: AsyncSession, contact: Contact) -> None:
+    """Public contact-stage wrapper for webhook intake paths that
+    need to materialise a placeholder contact (conversations,
+    walk-ins) without going through the full create_contact validation
+    pipeline."""
+    data_access.insert_contact(session, contact)
 
 
 async def create_contact(
@@ -103,7 +129,7 @@ async def create_contact(
         custom_data=cleaned_custom,
         assigned_to_id=payload.assigned_to_id,
     )
-    session.add(contact)
+    data_access.insert_contact(session, contact)
     await session.commit()
     await session.refresh(contact)
 
@@ -164,7 +190,7 @@ async def delete_contact(
     contact = ensure_found(await data_access.get_contact(session, contact_id), entity="contact")
     before = _snapshot(contact)
     contact_uuid = contact.id
-    await session.delete(contact)
+    await data_access.delete_contact_row(session, contact)
     await session.commit()
 
     await log_entity_change(
@@ -205,41 +231,16 @@ async def list_contacts(
       `last_activity_at desc` appends `NULLS LAST` so never-touched
       contacts sink to the bottom.
     """
-    filters: list[Any] = []
-
-    if q:
-        like = f"%{q}%"
-        filters.append(
-            or_(
-                Contact.full_name.ilike(like),
-                Contact.phone.ilike(like),
-                Contact.email.ilike(like),
-            )
-        )
-    if source:
-        filters.append(Contact.source == source)
-    if tag:
-        filters.append(Contact.tags.contains([tag]))
-    if assigned_to_id is not None:
-        filters.append(Contact.assigned_to_id == assigned_to_id)
-    for key, value in custom_filters:
-        filters.append(Contact.custom_data[key].astext == value)
-
-    where = and_(*filters) if filters else None
-    base = select(Contact)
-    if where is not None:
-        base = base.where(where)
-
-    sort_col = _SORT_COLUMNS[sort]
-    if sort == "last_activity_at":
-        primary = sort_col.asc().nulls_last() if order == "asc" else sort_col.desc().nulls_last()
-    else:
-        primary = sort_col.asc() if order == "asc" else sort_col.desc()
-    # Stable tiebreaker on `id` so paginated pages don't shuffle when
-    # multiple rows share the same sort key (e.g. created in the same
-    # transaction, or `last_activity_at IS NULL` on multiple rows).
-    base = base.order_by(primary, Contact.id.desc())
-
+    base = data_access.build_contact_list_query(
+        q=q,
+        source=source,
+        tag=tag,
+        assigned_to_id=assigned_to_id,
+        custom_filters=custom_filters,
+        sort_column=_SORT_COLUMNS[sort],
+        sort=sort,
+        order=order,
+    )
     return await paginate(session, base, page=page, size=size)
 
 
@@ -255,17 +256,10 @@ async def _assert_user_in_org(
     on Org A submitting a user UUID belonging only to Org B should be
     rejected before we mutate the row.
     """
-    result = await session.execute(
-        select(OrganizationMember.id)
-        .join(User, User.id == OrganizationMember.user_member_id)
-        .where(
-            User.legacy_uuid == user_uuid,
-            OrganizationMember.organization_id == org_id,
-            OrganizationMember.is_active.is_(True),
-        )
-        .limit(1)
+    is_member = await data_access.is_user_active_member_of_org(
+        session, user_uuid=user_uuid, org_id=org_id
     )
-    if result.scalar_one_or_none() is None:
+    if not is_member:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="target user is not a member of this organisation",
@@ -314,17 +308,16 @@ async def reassign_contact(
     before = _snapshot(contact)
     contact.assigned_to_id = assigned_to_id
 
-    session.add(
-        Activity(
-            org_id=org_id,
-            entity_type="contact",
-            entity_id=contact.id,
-            type=ActivityType.reassign,
-            payload=_reassign_payload(
-                from_id=before_id, to_id=assigned_to_id, note=note
-            ),
-            user_id=actor_user_id,
-        )
+    await activities_service.record_in_session(
+        session,
+        org_id=org_id,
+        entity_type="contact",
+        entity_id=contact.id,
+        type=ActivityType.reassign,
+        payload=_reassign_payload(
+            from_id=before_id, to_id=assigned_to_id, note=note
+        ),
+        user_id=actor_user_id,
     )
 
     if commit:
@@ -370,17 +363,16 @@ async def bulk_reassign_contacts(
             continue
         before_id = contact.assigned_to_id
         contact.assigned_to_id = assigned_to_id
-        session.add(
-            Activity(
-                org_id=org_id,
-                entity_type="contact",
-                entity_id=contact.id,
-                type=ActivityType.reassign,
-                payload=_reassign_payload(
-                    from_id=before_id, to_id=assigned_to_id, note=note
-                ),
-                user_id=actor_user_id,
-            )
+        await activities_service.record_in_session(
+            session,
+            org_id=org_id,
+            entity_type="contact",
+            entity_id=contact.id,
+            type=ActivityType.reassign,
+            payload=_reassign_payload(
+                from_id=before_id, to_id=assigned_to_id, note=note
+            ),
+            user_id=actor_user_id,
         )
         reassigned += 1
 
@@ -399,11 +391,11 @@ async def bulk_delete_contacts(
     `org_id` is enforced in the WHERE clause as a belt to the tenant RLS
     policy — the auto ORM tenant filter only injects on SELECTs.
     """
-    result = await session.execute(
-        delete(Contact).where(Contact.id.in_(ids), Contact.org_id == org_id)
+    deleted = await data_access.delete_contacts_in_org(
+        session, ids=ids, org_id=org_id
     )
     await session.commit()
-    return int(result.rowcount or 0)
+    return deleted
 
 
 async def bulk_add_tag_contacts(
@@ -424,14 +416,11 @@ async def bulk_add_tag_contacts(
         return 0
     # `tags = CASE WHEN clean = ANY(tags) THEN tags ELSE array_append(tags, clean) END`
     # via SQLAlchemy text expression — keeps the per-row decision in PG.
-    result = await session.execute(
-        update(Contact)
-        .where(Contact.id.in_(ids), Contact.org_id == org_id)
-        .where(~Contact.tags.contains([clean]))
-        .values(tags=func.array_append(Contact.tags, clean))
+    rowcount = await data_access.bulk_append_tag(
+        session, ids=ids, tag=clean, org_id=org_id
     )
     await session.commit()
-    return int(result.rowcount or 0)
+    return rowcount
 
 
 # --- Duplicate check + CSV export -------------------------------------------
@@ -477,44 +466,17 @@ async def check_duplicate(
     if not has_phone and not has_email:
         return []
 
-    or_filters: list[Any] = []
-    if has_phone:
-        suffix = _normalise_phone_suffix(phone or "")
-        if suffix is not None:
-            # `regexp_replace(phone, '\D', '', 'g')` strips non-digits at
-            # query time — keeps existing rows usable even if they were
-            # saved with formatting. `LIKE '%' || suffix` matches the
-            # last-10 suffix only. Trigram GIN doesn't help here, but
-            # the result set is small enough that a per-tenant index scan
-            # is acceptable; the phone column itself is already indexed
-            # per tenant by `ix_contacts_org_phone`.
-            or_filters.append(
-                func.regexp_replace(Contact.phone, r"\D", "", "g").like(
-                    f"%{suffix}"
-                )
-            )
-    if has_email:
-        # Case-insensitive exact match. Email column is indexed per
-        # tenant by `ix_contacts_org_email` — index won't help with
-        # `lower()` unless we add a functional index, but volume is
-        # small enough at v1 scale.
-        or_filters.append(func.lower(Contact.email) == (email or "").strip().lower())
-
-    if not or_filters:
-        return []
-
-    stmt = (
-        select(Contact)
-        .where(Contact.org_id == org_id)
-        .where(or_(*or_filters))
-        .order_by(Contact.created_at.desc())
-        .limit(10)
+    phone_suffix = (
+        _normalise_phone_suffix(phone or "") if has_phone else None
     )
-    if exclude_id is not None:
-        stmt = stmt.where(Contact.id != exclude_id)
-
-    rows = (await session.execute(stmt)).scalars().all()
-    return list(rows)
+    email_lower = (email or "").strip().lower() if has_email else None
+    return await data_access.find_duplicate_candidates(
+        session,
+        org_id=org_id,
+        phone_suffix=phone_suffix,
+        email_lower=email_lower,
+        exclude_id=exclude_id,
+    )
 
 
 async def export_contacts_csv_rows(
@@ -533,31 +495,14 @@ async def export_contacts_csv_rows(
     422 when the result set exceeds the cap so the caller can prompt
     the user to narrow.
     """
-    filters: list[Any] = []
-    if q:
-        like = f"%{q}%"
-        filters.append(
-            or_(
-                Contact.full_name.ilike(like),
-                Contact.phone.ilike(like),
-                Contact.email.ilike(like),
-            )
-        )
-    if source:
-        filters.append(Contact.source == source)
-    if tag:
-        filters.append(Contact.tags.contains([tag]))
-    if assigned_to_id is not None:
-        filters.append(Contact.assigned_to_id == assigned_to_id)
-    for key, value in custom_filters:
-        filters.append(Contact.custom_data[key].astext == value)
-
-    where = and_(*filters) if filters else None
-
-    count_stmt = select(func.count()).select_from(Contact)
-    if where is not None:
-        count_stmt = count_stmt.where(where)
-    total = int((await session.execute(count_stmt)).scalar_one())
+    total = await data_access.count_contacts_filtered(
+        session,
+        q=q,
+        source=source,
+        tag=tag,
+        assigned_to_id=assigned_to_id,
+        custom_filters=custom_filters,
+    )
     if total > EXPORT_CSV_MAX_ROWS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -567,8 +512,11 @@ async def export_contacts_csv_rows(
             ),
         )
 
-    stmt = select(Contact).order_by(Contact.created_at.desc(), Contact.id.desc())
-    if where is not None:
-        stmt = stmt.where(where)
-    rows = (await session.execute(stmt)).scalars().all()
-    return list(rows)
+    return await data_access.list_contacts_for_export(
+        session,
+        q=q,
+        source=source,
+        tag=tag,
+        assigned_to_id=assigned_to_id,
+        custom_filters=custom_filters,
+    )

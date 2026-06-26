@@ -20,13 +20,10 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.users import data_access
-from src.app.core.auth.models import AuthSession
 from src.app.core.permissions.models import Role
 from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.core.users.schemas import MeUpdate, UserCreate, UserUpdate
@@ -44,28 +41,213 @@ async def list_users(
     limit: int = 50,
     offset: int = 0,
 ) -> list[User]:
-    """List FurnitureCRM users, optionally scoped to an org membership.
-
-    After DR.7 the email + org_membership live on separate tables, so
-    we JOIN through tbl_user_info (for ordering by email) and
-    tbl_organization_members (for the org filter + active flag).
-    """
-    stmt = (
-        select(User)
-        .join(UserInfo, UserInfo.member_id == User.id)
-        .join(
-            OrganizationMember,
-            OrganizationMember.user_member_id == User.id,
-        )
-        .where(OrganizationMember.is_active.is_(True))
-        .order_by(func.lower(UserInfo.email))
-        .limit(limit)
-        .offset(offset)
+    """List CRM users, optionally scoped to an org membership."""
+    return await data_access.list_users_in_org(
+        session, org_id=org_id, limit=limit, offset=offset
     )
-    if org_id is not None:
-        stmt = stmt.where(OrganizationMember.organization_id == org_id)
-    result = await session.execute(stmt)
-    return list(result.scalars().all())
+
+
+async def get_user_by_email(
+    session: AsyncSession,
+    email: str,
+    *,
+    org_id: uuid.UUID | None = None,
+    active_only: bool = False,
+) -> User | None:
+    """Public lookup-by-email wrapper. Thin pass-through to the DAL so
+    other modules' routers (e.g. the 2FA switch-method endpoint) don't
+    reach into `users.data_access` directly."""
+    return await data_access.get_user_by_email(
+        session, email, org_id=org_id, active_only=active_only
+    )
+
+
+async def get_user_by_uuid(
+    session: AsyncSession, user_uuid: uuid.UUID
+) -> User | None:
+    """Public lookup-by-uuid wrapper. Used by other modules
+    (appointments, staff) to resolve a user without reaching into
+    `users.data_access` directly."""
+    return await data_access.get_user_by_uuid(session, user_uuid)
+
+
+async def email_exists(session: AsyncSession, email: str) -> bool:
+    """Public email-exists check. Used by signup paths to surface a
+    409 before insert."""
+    return await data_access.email_exists(session, email)
+
+
+async def insert_user_login_row(
+    session: AsyncSession,
+    *,
+    legacy_uuid: uuid.UUID,
+    user_handle: str,
+    password_hash: str,
+) -> int:
+    """Public table-level user insert wrapper. Used by the auth
+    signup flow which constructs a user as part of org creation."""
+    return await data_access.insert_user_login_row(
+        session,
+        legacy_uuid=legacy_uuid,
+        user_handle=user_handle,
+        password_hash=password_hash,
+    )
+
+
+def add_user_info(session: AsyncSession, info):
+    """Public user_info stage wrapper for signup flows."""
+    return data_access.add_user_info(session, info)
+
+
+def add_organization_member(session: AsyncSession, member):
+    """Public membership stage wrapper for signup flows."""
+    return data_access.add_organization_member(session, member)
+
+
+async def get_role_name_by_id(
+    session: AsyncSession, role_id: uuid.UUID
+) -> str | None:
+    """Public role-name lookup wrapper. Used by auth's onboarding
+    response to project the role name into the JWT response."""
+    return await data_access.get_role_name_by_id(session, role_id)
+
+
+async def get_role_in_org(
+    session: AsyncSession, *, role_id: uuid.UUID, org_id: uuid.UUID
+):
+    """Validate that `role_id` exists in `org_id`. Raises 422 if not —
+    used by user-create / user-update / invitation-accept to gate
+    the chosen role assignment before persisting it.
+
+    Business rule (422 vs 404 vs returning None) lives here, not in
+    the DAL; DAL just answers "does this row exist".
+    """
+    role = await data_access.get_role_by_id_in_org(
+        session, role_id=role_id, org_id=org_id
+    )
+    if role is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"role_id {role_id} not found in this org",
+        )
+    return role
+
+
+async def require_membership(
+    session: AsyncSession,
+    *,
+    user_uuid: uuid.UUID,
+    org_id: uuid.UUID,
+    active_only: bool = False,
+    on_missing: int = status.HTTP_404_NOT_FOUND,
+    not_found_detail: str | None = None,
+    not_member_detail: str | None = None,
+):
+    """Resolve user-UUID → User → OrganizationMember in this org.
+
+    Raises `HTTPException(status_code=on_missing, ...)` if the user
+    doesn't exist or has no matching membership. Returns the
+    `(User, OrganizationMember)` pair so callers can keep working with
+    both without re-querying.
+
+    `on_missing` controls the response code:
+      - 404 (default) : for admin CRUD paths.
+      - 422           : validation failure (ownership-transfer target,
+                        offboarding target).
+      - 403           : authorization failure (caller has no membership).
+
+    Business rule lives here in service; DAL only answers "does this
+    row exist".
+    """
+    user = await data_access.get_user_by_uuid(session, user_uuid)
+    if user is None:
+        raise HTTPException(
+            status_code=on_missing,
+            detail=not_found_detail or f"user {user_uuid} not found",
+        )
+    membership = await data_access.get_membership(
+        session,
+        user_member_id=user.id,
+        org_id=org_id,
+        active_only=active_only,
+    )
+    if membership is None:
+        raise HTTPException(
+            status_code=on_missing,
+            detail=not_member_detail
+            or f"user {user_uuid} is not a member of this org",
+        )
+    return user, membership
+
+
+async def assert_not_owner_role(
+    session: AsyncSession,
+    *,
+    user_uuid: uuid.UUID,
+    org_id: uuid.UUID,
+) -> None:
+    """Refuse Owner deactivation.
+
+    Business rule: the workspace Owner must transfer ownership before
+    being deactivated. Raises 403 (not 422) — authorisation-level
+    invariant the caller can't bypass regardless of input. Silent on
+    user-not-found / not-in-org so the upstream 404 wins.
+    """
+    user = await data_access.get_user_by_uuid(session, user_uuid)
+    if user is None:
+        return
+    membership = await data_access.get_membership(
+        session, user_member_id=user.id, org_id=org_id
+    )
+    if membership is None:
+        return
+    role = await data_access.get_role_by_id(session, membership.role_id)
+    if role is None:
+        return
+    if role.name == "Owner" and role.is_system:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "the workspace Owner cannot be deactivated — "
+                "transfer ownership first"
+            ),
+        )
+
+
+async def get_role_by_id_in_org(
+    session: AsyncSession, *, role_id: uuid.UUID, org_id: uuid.UUID
+):
+    """Public role lookup that returns None on miss. Used by
+    permissions service for guard-checks where the caller picks
+    the HTTP status."""
+    return await data_access.get_role_by_id_in_org(
+        session, role_id=role_id, org_id=org_id
+    )
+
+
+async def count_active_members(
+    session: AsyncSession, org_id: uuid.UUID
+) -> int:
+    """Public active-seats counter. Used by the subscriptions
+    service to compute `seats.in_use`."""
+    return await data_access.count_active_members(session, org_id)
+
+
+async def compute_open_records_counts(
+    session: AsyncSession,
+    *,
+    user_uuid: uuid.UUID,
+    org_id: uuid.UUID,
+) -> dict[str, int]:
+    """Per-entity open-record counts for the deactivation modal.
+
+    Public service wrapper around the offboarding query helper so
+    routers go through the service layer per the layered-architecture
+    contract.
+    """
+    return await data_access.compute_open_records_counts(
+        session, user_uuid=user_uuid, org_id=org_id
+    )
 
 
 # --- write paths (admin CRUD) -------------------------------------------
@@ -92,7 +274,7 @@ async def create_user(
     we write a random unguessable password so the bcrypt verify path
     can never short-circuit on an empty/NULL hash.
     """
-    await data_access.get_role_in_org(
+    await get_role_in_org(
         session, role_id=payload.role_id, org_id=org_id
     )
 
@@ -105,48 +287,42 @@ async def create_user(
     # The layered `User` mapper excludes the legacy `user_id` text
     # handle and the `two_factor_*` columns (they live on the legacy
     # `UserLogin` mapper) — but both are NOT NULL on `tbl_user_login`.
-    # Insert at the table level via `pg_insert` so we can populate
-    # them, then load the freshly-inserted row through the layered
-    # mapper to get the relationships hydrated.
+    # DAL inserts at the table level, then we load the freshly-inserted
+    # row through the layered mapper to get the relationships hydrated.
     new_uuid = uuid.uuid4()
-    inserted = (
-        await session.execute(
-            pg_insert(User.__table__)
-            .values(
-                legacy_uuid=new_uuid,
-                user_id="usr_" + new_uuid.hex,
-                password=hash_password(secrets.token_urlsafe(32)),
-                is_active=True,
-                two_factor_enabled=False,
-            )
-            .returning(User.__table__.c.id)
-        )
-    ).scalar_one()
-    login = (
-        await session.execute(select(User).where(User.id == inserted))
-    ).scalar_one()
+    new_id = await data_access.insert_user_login_row(
+        session,
+        legacy_uuid=new_uuid,
+        user_handle="usr_" + new_uuid.hex,
+        password_hash=hash_password(secrets.token_urlsafe(32)),
+    )
+    login = await data_access.get_user_by_id(session, new_id)
+    assert login is not None  # we just inserted it
 
     first, last = _split_full_name(payload.full_name)
-    profile = UserInfo(
-        member_id=login.id,
-        first_name=first,
-        last_name=last,
-        email=payload.email,
-        mobile_no=payload.phone,
-        is_email_verified=False,
-        is_mobile_verified=False,
+    data_access.add_user_info(
+        session,
+        UserInfo(
+            member_id=login.id,
+            first_name=first,
+            last_name=last,
+            email=payload.email,
+            mobile_no=payload.phone,
+            is_email_verified=False,
+            is_mobile_verified=False,
+        ),
     )
-    session.add(profile)
-
-    membership = OrganizationMember(
-        organization_id=org_id,
-        user_member_id=login.id,
-        role_id=payload.role_id,
-        status="active",
-        is_active=True,
-        is_demo=False,
+    data_access.add_organization_member(
+        session,
+        OrganizationMember(
+            organization_id=org_id,
+            user_member_id=login.id,
+            role_id=payload.role_id,
+            status="active",
+            is_active=True,
+            is_demo=False,
+        ),
     )
-    session.add(membership)
 
     await session.commit()
     await session.refresh(login)
@@ -176,7 +352,7 @@ async def update_user(
     Raises 404 if the user doesn't have a membership in `org_id`.
     `user_id` is the UUID identity (`tbl_user_login.legacy_uuid`).
     """
-    user, membership = await data_access.require_membership(
+    user, membership = await require_membership(
         session,
         user_uuid=user_id,
         org_id=org_id,
@@ -211,7 +387,7 @@ async def update_user(
     if "phone" in changes:
         profile.mobile_no = changes["phone"]
     if "role_id" in changes and changes["role_id"] is not None:
-        new_role = await data_access.get_role_in_org(
+        new_role = await get_role_in_org(
             session, role_id=changes["role_id"], org_id=org_id
         )
         if membership.role_id != changes["role_id"]:
@@ -238,11 +414,9 @@ async def update_user(
     # auditor can query role-assignment history without parsing every
     # `users.updated` diff.
     if role_changed and new_role is not None:
-        before_role_name = (
-            await session.execute(
-                select(Role.name).where(Role.id == before_role_id)
-            )
-        ).scalar_one_or_none()
+        before_role_name = await data_access.get_role_name_by_id(
+            session, before_role_id
+        )
         await audit.log(
             "roles.assigned_to_user",
             entity_type="user",
@@ -277,7 +451,7 @@ async def set_user_status(
       - the target still has open records (409) — the caller must
         run `POST /users/{id}/transfer-records` to a new owner first.
     """
-    user, membership = await data_access.require_membership(
+    user, membership = await require_membership(
         session,
         user_uuid=user_id,
         org_id=org_id,
@@ -286,7 +460,7 @@ async def set_user_status(
 
     if not is_active:
         # Owner guard first — the most authoritative refusal.
-        await data_access.assert_not_owner_role(
+        await assert_not_owner_role(
             session, user_uuid=user_id, org_id=org_id
         )
         counts = await data_access.compute_open_records_counts(
@@ -310,14 +484,8 @@ async def set_user_status(
 
     if not is_active:
         # Revoke open sessions so existing JWTs stop working.
-        now = datetime.now(timezone.utc)
-        await session.execute(
-            update(AuthSession)
-            .where(
-                AuthSession.user_id == user_id,
-                AuthSession.revoked_at.is_(None),
-            )
-            .values(revoked_at=now)
+        await data_access.revoke_user_auth_sessions(
+            session, user_uuid=user_id, now=datetime.now(timezone.utc)
         )
 
     await session.commit()
@@ -412,27 +580,18 @@ async def change_password(
 
     # tbl_user_login.password is mapped as `password` on the layered
     # User model (the `password_hash` attribute is a read-only @property
-    # alias). Write through the bigint table-level update.
-    new_hash = hash_password(new_password)
-    await session.execute(
-        update(User.__table__)
-        .where(User.__table__.c.id == user.id)
-        .values(password=new_hash)
+    # alias). DAL writes through the bigint table-level update.
+    await data_access.update_user_password(
+        session, member_id=user.id, new_hash=hash_password(new_password)
     )
 
     if sign_out_others:
-        now = datetime.now(timezone.utc)
-        stmt = (
-            update(AuthSession)
-            .where(
-                AuthSession.user_id == user.legacy_uuid,
-                AuthSession.revoked_at.is_(None),
-            )
-            .values(revoked_at=now)
+        await data_access.revoke_user_auth_sessions(
+            session,
+            user_uuid=user.legacy_uuid,
+            now=datetime.now(timezone.utc),
+            except_token_id=current_token_id,
         )
-        if current_token_id is not None:
-            stmt = stmt.where(AuthSession.id != current_token_id)
-        await session.execute(stmt)
 
     await session.commit()
 

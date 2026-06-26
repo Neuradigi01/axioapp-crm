@@ -12,13 +12,16 @@ spec (manager-locked 2026-06-25):
     (``get_user_by_uuid``, ``get_user_by_email``, ``get_user_info``,
      ``email_exists``).
   * ``tbl_organization_members`` + ``tbl_roles`` lookups
-    (``get_membership``, ``require_membership``, ``count_active_members``,
-     ``get_role_by_id_in_org``, ``get_role_in_org``, ``get_owner_role``,
-     ``get_admin_role``).
+    (``get_membership``, ``count_active_members``,
+     ``get_role_by_id_in_org``, ``get_role_by_id``, ``get_owner_role``,
+     ``get_admin_role``). Raising / business-rule wrappers
+     (``require_membership``, ``get_role_in_org``,
+     ``assert_not_owner_role``) live in ``users.service`` — DAL is
+     pure CRUD.
   * Offboarding open-record queries
-    (``list_open_record_ids``, ``compute_open_records_counts``,
-     ``assert_not_owner_role``) — co-located here because they share
-    the same per-(user, org) predicate shape.
+    (``list_open_record_ids``, ``compute_open_records_counts``) —
+    co-located here because they share the same per-(user, org)
+    predicate shape.
 """
 from __future__ import annotations
 
@@ -29,7 +32,11 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
 from src.app.core.appointments.models import Appointment, AppointmentStatus
+from src.app.core.auth.models import AuthSession
 from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead, LeadStatus
 from src.app.core.permissions.models import Role
@@ -55,7 +62,7 @@ _WALKIN_OPEN_STATUSES = (
 async def get_user_by_uuid(
     session: AsyncSession, user_uuid: uuid.UUID
 ) -> User | None:
-    """Look up a FurnitureCRM user by their UUID identity.
+    """Look up a CRM user by their UUID identity.
 
     `User.id` is a bigint storage PK; the UUID that JWT `sub`, audit
     FKs, AuthSession.user_id, etc. carry around lives in
@@ -151,53 +158,6 @@ async def get_membership(
     return result.scalar_one_or_none()
 
 
-async def require_membership(
-    session: AsyncSession,
-    *,
-    user_uuid: uuid.UUID,
-    org_id: uuid.UUID,
-    active_only: bool = False,
-    on_missing: int = status.HTTP_404_NOT_FOUND,
-    not_found_detail: str | None = None,
-    not_member_detail: str | None = None,
-) -> tuple[User, OrganizationMember]:
-    """Resolve user-UUID → User → OrganizationMember in this org.
-
-    Raises `HTTPException(status_code=on_missing, ...)` if the user
-    doesn't exist or has no matching membership. Returns the
-    `(User, OrganizationMember)` pair so callers can keep working with
-    both without re-querying.
-
-    `on_missing` controls the response code:
-      - 404 (default) : "user X not found" / "not a member of this org"
-                        — for admin CRUD paths where the caller has the
-                        right to know whether the resource exists.
-      - 422           : validation failure — used by ownership-transfer
-                        target validation, offboarding's target check.
-      - 403           : authorization failure — caller themselves has no
-                        membership in the org they're trying to act on.
-    """
-    user = await get_user_by_uuid(session, user_uuid)
-    if user is None:
-        raise HTTPException(
-            status_code=on_missing,
-            detail=not_found_detail or f"user {user_uuid} not found",
-        )
-    membership = await get_membership(
-        session,
-        user_member_id=user.id,
-        org_id=org_id,
-        active_only=active_only,
-    )
-    if membership is None:
-        raise HTTPException(
-            status_code=on_missing,
-            detail=not_member_detail
-            or f"user {user_uuid} is not a member of this org",
-        )
-    return user, membership
-
-
 async def count_active_members(
     session: AsyncSession, org_id: uuid.UUID
 ) -> int:
@@ -226,9 +186,8 @@ async def get_role_by_id_in_org(
 ) -> Role | None:
     """Resolve `role_id` within `org_id` — returns None on miss.
 
-    The non-raising sibling of `get_role_in_org`. Callers that need
-    a specific HTTP status (e.g. 404 for the role-CRUD endpoints, 422
-    for assignment validation) build the right exception themselves.
+    Pure CRUD primitive. Service-layer callers turn None into the
+    HTTP status they need (404 for role-CRUD, 422 for assignment).
     """
     result = await session.execute(
         select(Role).where(Role.id == role_id, Role.org_id == org_id)
@@ -236,23 +195,18 @@ async def get_role_by_id_in_org(
     return result.scalar_one_or_none()
 
 
-async def get_role_in_org(
-    session: AsyncSession, *, role_id: uuid.UUID, org_id: uuid.UUID
-) -> Role:
-    """Resolve `role_id` within `org_id`. Raises 422 if not found.
+async def get_role_by_id(
+    session: AsyncSession, role_id: uuid.UUID
+) -> Role | None:
+    """Resolve a role row by id without an org predicate.
 
-    Used by user-create / user-update to validate the caller's chosen
-    role assignment before persisting it.
+    Used by `users.service.assert_not_owner_role` to check a
+    membership's role name when the org is already implicit.
     """
-    role = await get_role_by_id_in_org(
-        session, role_id=role_id, org_id=org_id
+    result = await session.execute(
+        select(Role).where(Role.id == role_id)
     )
-    if role is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"role_id {role_id} not found in this org",
-        )
-    return role
+    return result.scalar_one_or_none()
 
 
 async def get_owner_role(
@@ -371,58 +325,157 @@ async def compute_open_records_counts(
     return counts
 
 
-async def assert_not_owner_role(
+async def list_users_in_org(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID | None,
+    limit: int,
+    offset: int,
+) -> list[User]:
+    """List active users, optionally scoped to one org's active members.
+
+    Joins through `tbl_user_info` to order by email and through
+    `tbl_organization_members` to filter on the active flag (and on
+    `org_id` if supplied).
+    """
+    stmt = (
+        select(User)
+        .join(UserInfo, UserInfo.member_id == User.id)
+        .join(
+            OrganizationMember,
+            OrganizationMember.user_member_id == User.id,
+        )
+        .where(OrganizationMember.is_active.is_(True))
+        .order_by(func.lower(UserInfo.email))
+        .limit(limit)
+        .offset(offset)
+    )
+    if org_id is not None:
+        stmt = stmt.where(OrganizationMember.organization_id == org_id)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def insert_user_login_row(
+    session: AsyncSession,
+    *,
+    legacy_uuid: uuid.UUID,
+    user_handle: str,
+    password_hash: str,
+) -> int:
+    """Insert a `tbl_user_login` row via pg_insert.
+
+    The layered `User` mapper excludes the legacy `user_id` text handle
+    and the `two_factor_*` columns (they live on the legacy `UserLogin`
+    mapper), but both are NOT NULL on the table. Insert at the table
+    level so we can populate them; returns the new bigint PK.
+    """
+    result = await session.execute(
+        pg_insert(User.__table__)
+        .values(
+            legacy_uuid=legacy_uuid,
+            user_id=user_handle,
+            password=password_hash,
+            is_active=True,
+            two_factor_enabled=False,
+        )
+        .returning(User.__table__.c.id)
+    )
+    return int(result.scalar_one())
+
+
+async def get_user_by_id(
+    session: AsyncSession, member_id: int
+) -> User | None:
+    """Load the layered `User` mapper for a given `tbl_user_login.id`."""
+    result = await session.execute(
+        select(User).where(User.id == member_id)
+    )
+    return result.scalar_one_or_none()
+
+
+def add_user_info(session: AsyncSession, info: UserInfo) -> UserInfo:
+    """Stage a `tbl_user_info` insert in the current unit-of-work."""
+    session.add(info)
+    return info
+
+
+def add_organization_member(
+    session: AsyncSession, member: OrganizationMember
+) -> OrganizationMember:
+    """Stage a `tbl_organization_members` insert in the current unit-of-work."""
+    session.add(member)
+    return member
+
+
+async def get_role_name_by_id(
+    session: AsyncSession, role_id: uuid.UUID
+) -> str | None:
+    """Resolve `role_id` to its name. Used by audit-log diff builders."""
+    result = await session.execute(
+        select(Role.name).where(Role.id == role_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def update_user_password(
+    session: AsyncSession,
+    *,
+    member_id: int,
+    new_hash: str,
+) -> None:
+    """Write a new bcrypt hash to `tbl_user_login.password` by bigint PK."""
+    await session.execute(
+        update(User.__table__)
+        .where(User.__table__.c.id == member_id)
+        .values(password=new_hash)
+    )
+
+
+async def revoke_user_auth_sessions(
     session: AsyncSession,
     *,
     user_uuid: uuid.UUID,
-    org_id: uuid.UUID,
+    now: datetime,
+    except_token_id: uuid.UUID | None = None,
 ) -> None:
-    """Refuse deactivation of the Owner. Mirrors the `rbac-ownership/`
-    rule: the Owner must transfer ownership before being deactivated.
+    """Mark every non-revoked `auth_sessions` row for this user as revoked.
 
-    Raises 403 (not 422) because this is an authorisation-level
-    invariant — the caller can't bypass it regardless of input.
-    Silent-returns on user-not-found / not-in-org so the upstream guard
-    can surface those with its own (typically 404) error.
+    `except_token_id` lets the caller spare the request's own session
+    when only "sign out other devices" is wanted.
     """
-    user = await get_user_by_uuid(session, user_uuid)
-    if user is None:
-        return
-    membership = await get_membership(
-        session, user_member_id=user.id, org_id=org_id
+    stmt = (
+        update(AuthSession)
+        .where(
+            AuthSession.user_id == user_uuid,
+            AuthSession.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
     )
-    if membership is None:
-        return
-    role = (
-        await session.execute(
-            select(Role).where(Role.id == membership.role_id)
-        )
-    ).scalar_one_or_none()
-    if role is None:
-        return
-    if role.name == "Owner" and role.is_system:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "the workspace Owner cannot be deactivated — "
-                "transfer ownership first"
-            ),
-        )
+    if except_token_id is not None:
+        stmt = stmt.where(AuthSession.id != except_token_id)
+    await session.execute(stmt)
 
 
 __all__ = [
-    "assert_not_owner_role",
+    "add_organization_member",
+    "add_user_info",
     "compute_open_records_counts",
     "count_active_members",
     "email_exists",
     "get_admin_role",
     "get_membership",
     "get_owner_role",
+    "get_role_by_id",
     "get_role_by_id_in_org",
-    "get_role_in_org",
+    "get_role_name_by_id",
     "get_user_by_email",
+    "get_user_by_id",
     "get_user_by_uuid",
     "get_user_info",
+    "insert_user_login_row",
     "list_open_record_ids",
-    "require_membership",
+    "list_users_in_org",
+    "revoke_user_auth_sessions",
+    "update_user_password",
 ]

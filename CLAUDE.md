@@ -1,16 +1,21 @@
-# FurnitureCRM — AI Agent Instructions
+# CRM — AI Agent Instructions
 
-This is **FurnitureCRM**, a multi-tenant SaaS CRM for Indian furniture retail stores. It is being built incrementally on top of an existing FastAPI + Angular template (auth preserved, everything else replaced).
+This is **Core CRM**, a multi-tenant SaaS CRM platform. It is being built incrementally on top of an existing FastAPI + Angular template (auth preserved, everything else replaced).
 
-The single source of truth for the build is the master prompt at [`furniture-crm-agent-prompt.md`](furniture-crm-agent-prompt.md). The 76-step task tree under [`tasks/`](tasks/) breaks that prompt into self-contained, individually verifiable steps. Always start at [`tasks/README.md`](tasks/README.md).
+> **Current focus: Layer 1 — Core CRM only.** All active work is on the universal CRM platform (`core/` modules: auth, tenants, users, contacts, leads, pipelines, activities, tasks, campaigns, templates, automation, billing, etc.). The furniture vertical pack (`packs/furniture/`) is Layer 2 — a future workstream. Do **not** add furniture-pack code, seed furniture-specific defaults, or design "for the pack" in the current phase unless the step file explicitly says so. Treat any furniture-specific references in this file or in `tasks/` as background context for the eventual Layer 2 build, not as current scope.
+
+In conversation, refer to the project as **"Core CRM"** (or plain "CRM"). Code, paths, and identifiers (e.g. `packs/furniture/`, `furnicrm` DOM classes, the master-prompt filename) stay as-is — renaming them is a breaking change.
+
+The single source of truth for the build is the master prompt at [`crm-agent-prompt.md`](crm-agent-prompt.md). The 76-step task tree under [`tasks/`](tasks/) breaks that prompt into self-contained, individually verifiable steps. Always start at [`tasks/README.md`](tasks/README.md).
 
 ## Project status snapshot
 
 The repo is in the middle of a structural migration. As of this writing:
 
-- **Old template still in place** (`API/`, `APP/`, `Flutter/`) — the existing app that this build is reusing auth from. Step 1.1 renames `API/` → `api/`, `APP/` → `app/`, deletes the non-auth scaffolding, and drops the new layered `core/`+`packs/furniture/` skeleton in place. **`Flutter/` is left untouched** (no Flutter component in FurnitureCRM).
-- **`tasks/` already populated** with the full 76-step plan (Phase 1 → Phase 6).
-- **No code changes yet** — waiting for the user to say "begin" before Step 1.1.
+- **Active workstream: Core CRM (Layer 1).** Backend modules under `api/src/app/core/` are being filled in one at a time following the layered Router → Service → DAL convention.
+- **Old template still in place** (`API/`, `APP/`, `Flutter/`) — the existing app this build is reusing auth from. Step 1.1 renames `API/` → `api/`, `APP/` → `app/`, deletes the non-auth scaffolding, and drops the new layered `core/`+`packs/furniture/` skeleton in place. **`Flutter/` is left untouched** (not part of this product).
+- **`packs/furniture/` is scaffolded but parked.** Layer 2 work is deferred until Layer 1 stabilises.
+- **`tasks/` already populated** with the full 76-step plan (Phase 1 → Phase 6). Current iteration is on Phase 1/2 Core work.
 
 ## Target repository structure (after Step 1.1)
 
@@ -59,18 +64,18 @@ furniture-crm/
 │       │       ├── layout/             ← FurnitureCRM main app shell (sidebar+header)
 │       │       └── user.routes.ts      ← thin route tree wiring core/ + packs/
 │       └── staff-portal/               ← Separate route tree (PIN tablet login, Phase 3)
-├── Flutter/                            ← UNTOUCHED (not part of FurnitureCRM)
+├── Flutter/                            ← UNTOUCHED (not part of this product)
 ├── tasks/                              ← 76-step build plan
-├── furniture-crm-agent-prompt.md       ← master prompt
+├── furniture-crm-agent-prompt.md       ← master prompt (filename retained — do not rename)
 └── CLAUDE.md                           ← this file
 ```
 
 ### URL surfaces
 
-- `/accounts/login` — login page (existing, PrimeNG/Material visuals, untouched).
-- `/admin/...` — legacy template admin panel (untouched, idle for FurnitureCRM).
-- `/user/...` — **FurnitureCRM main app** for all seven roles (Owner, Store Manager, Senior/Sales/Junior Sales Executive, Design Consultant, Warehouse Manager). What each role sees in the sidebar is permission-gated.
-- `/staff-portal/...` — PIN-login tablet UI for shop-floor staff (built in Phase 3).
+- `/accounts/login` — login page (existing, migrated to Tailwind).
+- `/admin/...` — legacy template admin panel (untouched, idle — not part of Core CRM).
+- `/user/...` — **Core CRM main app**. All roles (Owner, Admin, Employee, plus custom roles) log in and land here; sidebar contents are permission-gated by RBAC.
+- `/staff-portal/...` — PIN-login tablet UI for shop-floor staff (future, Phase 3).
 
 ## Locked stack — DO NOT substitute without asking
 
@@ -88,7 +93,7 @@ furniture-crm/
 4. **Forms render dynamically from field definitions.** Frontend asks `GET /api/{entity}/fields` and renders. Never hardcode form fields.
 5. **The sidebar/menu is a registry.** Modules register themselves; core does not know about furniture-specific menu items at compile time.
 6. **Permissions are a registry.** Each module registers its permission keys; core RBAC composes them.
-7. **Pack manifest (`pack.yaml`) is the source of truth** for furniture-specific defaults (pipeline stages, custom fields, roles, lead sources, call outcomes, INR/GST 18%, AI defaults). Seed/install logic reads from it — no hardcoded furniture values in core.
+7. **Pack manifest (`pack.yaml`) is the source of truth** for any future vertical-pack defaults (pipeline stages, custom fields, roles, lead sources, call outcomes, currency/tax, AI defaults). Seed/install logic reads from it — no hardcoded vertical values in core. *(Not in scope for the current Core CRM phase; rule recorded so core stays vertical-agnostic.)*
 8. **Step size is small and human-verifiable.** Every step runnable, visually inspectable, reviewable in under 30 minutes. > ~10 files or > ~400 lines → split it.
 9. **No skipping verification.** After each step: stop, summary, checklist, **wait for the user to say "proceed"** before the next step. Never batch.
 10. **No "I'll fix it later."** No TODOs, no hardcoded shortcuts, no commented-out code. Every step leaves the codebase clean and runnable.
@@ -137,7 +142,24 @@ def create_template_service(db, payload):
     return template
 ```
 
-**Convention enforced by CI pin-test:** [`API/tests/test_layered_architecture_convention.py`](API/tests/test_layered_architecture_convention.py) walks every file under `src/app/core/` and `src/app/packs/` and fails CI if (1) `db.commit / rollback / refresh / flush` appears outside `service.py` / `*_service.py`, (2) `db.execute / add / delete / query` or a sqlalchemy CRUD constructor import (`select`, `insert`, `update`, `delete`) appears in `router.py`, or (3) `data_access.py` calls `db.commit / rollback / refresh / flush`. Out-of-scope legacy helpers (Celery workers, webhook handlers, integration sub-modules) have a documented exception list inside the test. New backend code should never need to add to it.
+**Convention enforced by CI pin-test:** [`API/tests/test_layered_architecture_convention.py`](API/tests/test_layered_architecture_convention.py) walks every file under `src/app/core/` and `src/app/packs/` and fails CI if any of the following drift in:
+
+1. `db.commit / rollback / refresh / flush` appears outside `service.py` / `*_service.py`.
+2. `db.execute / add / add_all / delete / query / merge` or a sqlalchemy CRUD constructor import (`select`, `insert`, `update`, `delete`) appears in `router.py`.
+3. `data_access.py` calls `db.commit / rollback / refresh / flush`.
+4. `service.py` / `*_service.py` runs SQL directly (`db.execute / add / ...`). Statement *composition* (building a `select(...)` and passing it to a DAL paginate helper) stays allowed; only execution is banned.
+5. `router.py` imports another module's `data_access` (Router → Service only).
+6. `data_access.py` imports any `service` or `router` (DAL never depends upward).
+7. **CRUD lives in DAL.** Any helper file under `core/` or `packs/` that calls `db.execute / add / ...` must be `data_access.py`. Helper modules (Celery workers, schedulers, webhook handlers, integration sub-modules) inherited from before the layered layout are in a documented exception list — new helpers must route their SQL through a DAL function.
+
+New backend code should never need to add to any exception list.
+
+**Cross-module data access from `service.py` (preference, not mechanical):** A service may:
+- ✓ Call its own `data_access`.
+- ✓ Call another module's `service.py`.
+- ✓ Call another module's `data_access.py` — *but only when it's a plain read/write with no business rules / permissions / validation at stake.*
+
+When the other module's `service.py` enforces a permission, ownership rule, or validation, go through the service so the rule fires. When it's a pure lookup or stage-an-INSERT helper, calling the other module's DAL directly is acceptable. Code review catches the judgment call; the pin-test deliberately does not enforce this.
 
 ## Reuse-vs-restructure exceptions (agreed with user)
 
@@ -145,12 +167,12 @@ These are project-specific deviations from a clean-slate build:
 
 - **Auth logic is preserved**, not rebuilt — JWT bearer with `token_id` session invalidation, password hashing, login history, refresh, forgot/reset password, all three 2FA methods (Google Authenticator + Email OTP + SMS OTP). It is **re-housed** under `api/src/app/core/auth/` (backend) in Steps 1.5/1.6, but the working logic comes from `api/src/...` legacy modules.
 - **`org_id` is added** to existing user/role/session tables as part of the migration (existing tables are single-tenant today).
-- **`features/admin/` is left UNTOUCHED indefinitely.** It is the legacy template's admin panel and is not part of FurnitureCRM. Do not modify, delete, or repurpose any file inside it. The login form's "Admin login" button continues to work and redirects to `/admin/dashboard` (legacy). FurnitureCRM does not use this path.
-- **`features/user/` hosts the FurnitureCRM frontend.** All Layer 1 (`core/`) and Layer 2 (`packs/furniture/`) module code lives at `app/src/app/features/user/core/...` and `app/src/app/features/user/packs/furniture/...`. The seven FurnitureCRM roles all log in via the user-login button and land at `/user/...`.
+- **`features/admin/` is left UNTOUCHED indefinitely.** It is the legacy template's admin panel and is not part of Core CRM. Do not modify, delete, or repurpose any file inside it. The login form's "Admin login" button continues to work and redirects to `/admin/dashboard` (legacy). Core CRM does not use this path.
+- **`features/user/` hosts the Core CRM frontend.** All Layer 1 (`core/`) module code lives at `app/src/app/features/user/core/...`. Layer 2 pack code (`app/src/app/features/user/packs/furniture/...`) is scaffolded but not the current focus. Core CRM roles log in via the user-login button and land at `/user/...`.
 - **`staff-portal/` is a separate top-level route tree** at `app/src/app/staff-portal/` for PIN tablet login. NOT under `features/user/`.
-- **Auth pages were migrated to Tailwind** to match the FurnitureCRM user app. The accounts pages (login, register, forgot/reset password, two-factor, verify-email, email-verification-notice), the shared accounts layout, and the shared captcha component were rebuilt in Tailwind (zinc palette, white `rounded-xl border border-zinc-200 shadow-sm` cards, `bg-zinc-900` primary button) so login no longer reads as a different product from the dashboard. **All auth/registration logic is unchanged** — only markup + styling. Notes: the accounts-layout theme toggle was removed (the user app is light-only with no toggle); register's country/state `mat-select` (with in-panel search) became a Tailwind-styled native `<select>` (native type-ahead, no search box); error toasts still use `MatSnackBar`. `features/admin/` is untouched and keeps its Material visuals. **All pages now use Tailwind only.** (This supersedes the earlier option (a) — "keep Material visuals" — chosen by the user.)
+- **Auth pages were migrated to Tailwind** to match the Core CRM user app. The accounts pages (login, register, forgot/reset password, two-factor, verify-email, email-verification-notice), the shared accounts layout, and the shared captcha component were rebuilt in Tailwind (zinc palette, white `rounded-xl border border-zinc-200 shadow-sm` cards, `bg-zinc-900` primary button) so login no longer reads as a different product from the dashboard. **All auth/registration logic is unchanged** — only markup + styling. Notes: the accounts-layout theme toggle was removed (the user app is light-only with no toggle); register's country/state `mat-select` (with in-panel search) became a Tailwind-styled native `<select>` (native type-ahead, no search box); error toasts still use `MatSnackBar`. `features/admin/` is untouched and keeps its Material visuals. **All pages now use Tailwind only.**
 - **Folders renamed lowercase:** `API/` → `api/`, `APP/` → `app/`. **`Flutter/` untouched** (not part of this product).
-- **Old template docs** under `api/docs/` and `app/docs/` remain as **reference** for the existing auth code's patterns. They do **not** describe FurnitureCRM and should not drive new code.
+- **Old template docs** under `api/docs/` and `app/docs/` remain as **reference** for the existing auth code's patterns. They describe the legacy template, not Core CRM, and should not drive new code.
 
 ## Step execution discipline
 
@@ -191,11 +213,11 @@ If anything is ambiguous, **stop and ask one concrete question** with 2–3 opti
 | Per-step tasks | [`tasks/README.md`](tasks/README.md) → phase folder → step file |
 | The 10 rules | this file (above) and `tasks/README.md` |
 | Existing auth code (reference) | [`API/src/routers/auth/`](API/src/routers/auth/), [`API/src/services/auth/`](API/src/services/auth/), [`APP/src/app/features/accounts/`](APP/src/app/features/accounts/) |
-| Existing template docs (reference only) | [`API/docs/`](API/docs/), [`APP/docs/`](APP/docs/) — describe the old template, not FurnitureCRM |
+| Existing template docs (reference only) | [`API/docs/`](API/docs/), [`APP/docs/`](APP/docs/) — describe the legacy template, not Core CRM |
 | Pack manifest (after Phase 4.2) | `api/src/app/packs/furniture/pack.yaml` |
 
 ## What this file is NOT
 
 - It is **not** a substitute for reading `tasks/README.md` and the relevant step file before working a step.
 - It does **not** describe the existing template's API endpoints or component conventions — those live under `API/docs/` and `APP/docs/` and apply only to the auth code being preserved.
-- It does **not** authorise starting Step 1.1. The user must say "begin."
+- It does **not** define vertical-pack scope. Anything under `packs/furniture/` is Layer 2 and out of scope for the current Core CRM phase.

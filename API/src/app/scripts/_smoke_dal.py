@@ -145,7 +145,7 @@ def main() -> int:
                 local_failures += 1
                 return local_failures
 
-            u_, m_ = await users_da.require_membership(
+            u_, m_ = await users_service.require_membership(
                 s, user_uuid=user_uuid, org_id=SMOKE_ORG_ID, active_only=True
             )
             if not step(
@@ -171,7 +171,7 @@ def main() -> int:
                 f"users.get_admin_role -> {admin.name if admin else None} (may be None if Owner deleted Admin row)",
             )
 
-            r_ = await users_da.get_role_in_org(s, role_id=mem.role_id, org_id=SMOKE_ORG_ID)
+            r_ = await users_service.get_role_in_org(s, role_id=mem.role_id, org_id=SMOKE_ORG_ID)
             if not step(r_ is not None, f"users.get_role_in_org(current role) -> {r_.name}"):
                 local_failures += 1
             r_none = await users_da.get_role_by_id_in_org(
@@ -194,7 +194,7 @@ def main() -> int:
                 from fastapi import HTTPException
                 raised_403 = False
                 try:
-                    await users_da.assert_not_owner_role(
+                    await users_service.assert_not_owner_role(
                         s, user_uuid=user_uuid, org_id=SMOKE_ORG_ID
                     )
                 except HTTPException as ex:

@@ -24,8 +24,7 @@ from src.app.core.permissions.service import (
     list_permissions_for_role,
 )
 from src.app.core.users.models import User
-from src.app.core.tenants import data_access as tenants_da
-from src.app.core.users import data_access as users_da
+from src.app.core.tenants import service as tenants_service
 from src.app.core.users.offboarding import transfer_records
 from src.app.core.users.schemas import (
     MeUpdate,
@@ -42,6 +41,7 @@ from src.app.core.users.schemas import (
 )
 from src.app.core.users.service import (
     change_password,
+    compute_open_records_counts,
     create_user,
     list_users,
     set_user_status,
@@ -90,7 +90,7 @@ async def get_me(
 ) -> UserMe:
     role = await get_role_by_id(session, user.role_id)
     permissions = await list_permissions_for_role(session, user.role_id)
-    org = await tenants_da.get_organization_by_id(session, user.org_id)
+    org = await tenants_service.get_organization_by_id(session, user.org_id)
     assert org is not None  # authed user implies their org exists
     return UserMe(
         # `user.id` is the bigint storage PK of tbl_user_login (DR.6.3).
@@ -184,7 +184,7 @@ async def open_records_counts_endpoint(
     transferred. The five entities counted: contacts, leads,
     walk_ins, appointments, tasks. See `users.data_access` for the
     "open" predicates."""
-    counts = await users_da.compute_open_records_counts(
+    counts = await compute_open_records_counts(
         session, user_uuid=user_id, org_id=_user.org_id
     )
     return OpenRecordsCounts(

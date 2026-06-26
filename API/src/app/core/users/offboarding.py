@@ -31,6 +31,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.users import data_access
+from src.app.core.users import service as users_service
 from src.app.core.appointments.service import bulk_reassign_appointments
 from src.app.core.contacts.service import bulk_reassign_contacts
 from src.app.core.leads.service import bulk_reassign_leads
@@ -82,7 +83,7 @@ async def transfer_records(
     in a single `async with session.begin()` block without further
     changes here.
     """
-    await data_access.require_membership(
+    await users_service.require_membership(
         session,
         user_uuid=to_user_uuid,
         org_id=org_id,

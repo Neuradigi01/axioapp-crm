@@ -12,7 +12,7 @@ import uuid
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.users import data_access
+from src.app.core.users import service as users_service
 from src.app.shared.audit import log_entity_change
 from src.app.core.permissions import data_access as _da
 from src.app.core.permissions.models import Permission, Role
@@ -174,7 +174,7 @@ async def update_role(
     payload: RoleUpdate,
 ) -> Role:
     """Rename a role and/or replace its permission grants."""
-    role = await data_access.get_role_by_id_in_org(
+    role = await users_service.get_role_by_id_in_org(
         session, role_id=role_id, org_id=org_id
     )
     if role is None:
@@ -263,7 +263,7 @@ async def delete_role(
     org_id: uuid.UUID,
 ) -> None:
     """Delete a custom role. 409 if anyone currently has it."""
-    role = await data_access.get_role_by_id_in_org(
+    role = await users_service.get_role_by_id_in_org(
         session, role_id=role_id, org_id=org_id
     )
     if role is None:

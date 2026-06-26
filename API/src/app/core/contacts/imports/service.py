@@ -6,15 +6,11 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.contacts.groups.models import (
-    ContactGroup,
-    ContactGroupMember,
-)
+from src.app.core.contacts.groups.models import ContactGroup
+from src.app.core.contacts.imports import data_access
 from src.app.core.contacts.imports.models import (
     ContactImport,
     ContactImportStatus,
@@ -53,11 +49,7 @@ def _normalise_phone(raw: str) -> str:
 async def _get_import(
     session: AsyncSession, import_id: uuid.UUID
 ) -> ContactImport:
-    row = (
-        await session.execute(
-            select(ContactImport).where(ContactImport.id == import_id)
-        )
-    ).scalar_one_or_none()
+    row = await data_access.get_import_by_id(session, import_id)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -125,18 +117,20 @@ async def upload_file(
 
     mapping = suggest_mapping(headers)
 
-    row = ContactImport(
-        id=import_id,
-        org_id=org_id,
-        filename=filename,
-        storage_path=storage_path,
-        uploaded_by_id=user_id,
-        row_count=total,
-        headers=headers,
-        suggested_mapping=mapping,
-        status=ContactImportStatus.uploaded,
+    row = data_access.add_import(
+        session,
+        ContactImport(
+            id=import_id,
+            org_id=org_id,
+            filename=filename,
+            storage_path=storage_path,
+            uploaded_by_id=user_id,
+            row_count=total,
+            headers=headers,
+            suggested_mapping=mapping,
+            status=ContactImportStatus.uploaded,
+        ),
     )
-    session.add(row)
     await session.commit()
     await session.refresh(row)
 
@@ -269,16 +263,18 @@ async def commit_import(
             if mapped.get("tag") and mapped["tag"].strip()
             else []
         )
-        contact = Contact(
-            id=contact_id,
-            org_id=org_id,
-            full_name=full_name,
-            phone=mapped.get("phone") or None,
-            email=mapped.get("email") or None,
-            source=mapped.get("source") or None,
-            tags=tags,
+        data_access.add_contact(
+            session,
+            Contact(
+                id=contact_id,
+                org_id=org_id,
+                full_name=full_name,
+                phone=mapped.get("phone") or None,
+                email=mapped.get("email") or None,
+                source=mapped.get("source") or None,
+                tags=tags,
+            ),
         )
-        session.add(contact)
         inserted_ids.append(contact_id)
         if phone_norm:
             seen_phones_in_file.add(phone_norm)
@@ -294,33 +290,25 @@ async def commit_import(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="`group_name` is required when `create_group=true`.",
             )
-        group = ContactGroup(
-            id=uuid.uuid4(),
-            org_id=org_id,
-            name=group_name,
-            description=f"From import: {row.filename}",
-            is_dynamic=False,
-            filter_json=None,
-            created_by_id=user_id,
+        group = data_access.add_group(
+            session,
+            ContactGroup(
+                id=uuid.uuid4(),
+                org_id=org_id,
+                name=group_name,
+                description=f"From import: {row.filename}",
+                is_dynamic=False,
+                filter_json=None,
+                created_by_id=user_id,
+            ),
         )
-        session.add(group)
         await session.flush()
         created_group_id = group.id
-        await session.execute(
-            pg_insert(ContactGroupMember)
-            .values(
-                [
-                    {
-                        "org_id": org_id,
-                        "group_id": group.id,
-                        "contact_id": cid,
-                    }
-                    for cid in inserted_ids
-                ]
-            )
-            .on_conflict_do_nothing(
-                index_elements=["group_id", "contact_id"]
-            )
+        await data_access.bulk_upsert_group_members(
+            session,
+            org_id=org_id,
+            group_id=group.id,
+            contact_ids=inserted_ids,
         )
 
     row.applied_mapping = dict(mapping)
@@ -376,11 +364,7 @@ async def _load_existing_phone_set(session: AsyncSession) -> set[str]:
     """All existing phone numbers for the active tenant, normalised
     the same way `_normalise_phone` does. Used by dry-run + commit
     for dedupe detection without N+1 queries."""
-    rows = (
-        await session.execute(
-            select(Contact.phone).where(Contact.phone.is_not(None))
-        )
-    ).scalars().all()
+    rows = await data_access.list_all_non_null_phones(session)
     return {_normalise_phone(p) for p in rows if p}
 
 

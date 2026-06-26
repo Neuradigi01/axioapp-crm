@@ -31,8 +31,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.tenants import data_access as tenants_da
-from src.app.core.users import data_access as users_da
+from src.app.core.tenants import service as tenants_service
+from src.app.core.users import service as users_service
 from src.app.core.auth.models import AuthSession
 from src.app.core.auth.tokens import ACCESS_TOKEN_TTL, encode_token
 from src.app.core.invitations import data_access as _da
@@ -65,7 +65,7 @@ async def create_invitation(
     ua: str | None = None,
 ) -> tuple[Invitation, str]:
     """Issue an invitation. Returns (row, raw_accept_link)."""
-    role = await users_da.get_role_in_org(
+    role = await users_service.get_role_in_org(
         session, role_id=payload.role_id, org_id=org_id
     )
 
@@ -107,7 +107,7 @@ async def create_invitation(
         f"{frontend_url.rstrip('/')}/accounts/accept-invite?token={raw_token}"
     )
 
-    org = await tenants_da.get_organization_by_id(session, org_id)
+    org = await tenants_service.get_organization_by_id(session, org_id)
     assert org is not None  # caller validated org_id upstream
 
     body = (
@@ -212,7 +212,7 @@ async def lookup_invitation(
 
     role = await _da.get_role_by_id(session, inv.role_id)
     assert role is not None  # invitation FK guarantees role exists
-    org = await tenants_da.get_organization_by_id(session, inv.org_id)
+    org = await tenants_service.get_organization_by_id(session, inv.org_id)
     assert org is not None  # invitation FK guarantees org exists
 
     return {

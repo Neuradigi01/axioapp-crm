@@ -24,11 +24,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.custom_fields.models import CustomFieldDefinition
+from src.app.core.leads.imports import data_access
 from src.app.core.leads.imports.models import LeadImport, LeadImportStatus
 from src.app.core.leads.imports.schemas import SourcePlatform
 from src.app.shared.storage import get_storage
@@ -191,20 +190,22 @@ async def upload(
     )
 
     label = name or f"{source_platform} import — {filename}"
-    row = LeadImport(
-        id=import_id,
-        org_id=org_id,
-        uploaded_by=uploader_id,
-        name=label,
-        source_platform=source_platform,
-        original_filename=filename,
-        storage_path=storage_path,
-        byte_size=len(data),
-        row_count_estimate=row_count,
-        mime_type=content_type or "application/octet-stream",
-        status=LeadImportStatus.awaiting_mapping,
+    row = data_access.add_import(
+        session,
+        LeadImport(
+            id=import_id,
+            org_id=org_id,
+            uploaded_by=uploader_id,
+            name=label,
+            source_platform=source_platform,
+            original_filename=filename,
+            storage_path=storage_path,
+            byte_size=len(data),
+            row_count_estimate=row_count,
+            mime_type=content_type or "application/octet-stream",
+            status=LeadImportStatus.awaiting_mapping,
+        ),
     )
-    session.add(row)
     await session.commit()
     await session.refresh(row)
 
@@ -229,11 +230,7 @@ async def get_import(
     """Fetch one import row. Tenant filter scopes to the caller's org —
     a foreign-org id surfaces as None (the router maps that to 404).
     """
-    return (
-        await session.execute(
-            select(LeadImport).where(LeadImport.id == import_id)
-        )
-    ).scalar_one_or_none()
+    return await data_access.get_import_by_id(session, import_id)
 
 
 async def list_imports(
@@ -250,23 +247,19 @@ async def list_imports(
     narrows to one source CRM. Both feed the Step 6 history page's
     filter controls. Tenant filter is automatic via `TenantScoped`.
     """
-    base = select(LeadImport)
-    count_stmt = select(func.count()).select_from(LeadImport)
-    if status_filter is not None:
-        base = base.where(LeadImport.status == status_filter)
-        count_stmt = count_stmt.where(LeadImport.status == status_filter)
-    if source_platform:
-        base = base.where(LeadImport.source_platform == source_platform)
-        count_stmt = count_stmt.where(
-            LeadImport.source_platform == source_platform
-        )
-    base = base.order_by(LeadImport.created_at.desc(), LeadImport.id.desc())
-
-    total = (await session.execute(count_stmt)).scalar_one()
-    rows = (
-        await session.execute(base.offset((page - 1) * size).limit(size))
-    ).scalars().all()
-    return list(rows), int(total)
+    total = await data_access.count_imports_filtered(
+        session,
+        status_filter=status_filter,
+        source_platform=source_platform,
+    )
+    rows = await data_access.list_imports_page(
+        session,
+        status_filter=status_filter,
+        source_platform=source_platform,
+        offset=(page - 1) * size,
+        limit=size,
+    )
+    return rows, total
 
 
 def read_source_file(import_row: LeadImport) -> bytes:
@@ -294,14 +287,8 @@ async def _allowed_custom_targets(session: AsyncSession) -> set[str]:
     or 'contact' and emits `custom_data.<field_key>` for each. The
     ORM filter scopes to the active org automatically.
     """
-    rows = (
-        await session.execute(
-            select(CustomFieldDefinition.field_key).where(
-                CustomFieldDefinition.entity_type.in_(("contact", "lead"))
-            )
-        )
-    ).all()
-    return {f"custom_data.{r.field_key}" for r in rows}
+    keys = await data_access.list_custom_field_keys(session)
+    return {f"custom_data.{k}" for k in keys}
 
 
 async def commit_mapping(
@@ -319,11 +306,7 @@ async def commit_mapping(
     - 422 if the mapping targets are invalid (system-managed targets,
       unknown custom fields, missing the required full_name target).
     """
-    row = (
-        await session.execute(
-            select(LeadImport).where(LeadImport.id == import_id)
-        )
-    ).scalar_one_or_none()
+    row = await data_access.get_import_by_id(session, import_id)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
@@ -399,11 +382,7 @@ async def cancel_import(
     """User-driven cancel. Allowed only from `awaiting_mapping` or
     `mapping_committed` — once `processing` we don't kill the worker;
     once terminal there's nothing to do."""
-    row = (
-        await session.execute(
-            select(LeadImport).where(LeadImport.id == import_id)
-        )
-    ).scalar_one_or_none()
+    row = await data_access.get_import_by_id(session, import_id)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="import not found"

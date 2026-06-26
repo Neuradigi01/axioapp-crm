@@ -155,6 +155,33 @@ async def get_lead(session: AsyncSession, lead_id: uuid.UUID) -> Optional[Lead]:
     return await _da.get_lead_by_id(session, lead_id)
 
 
+async def get_lead_visible_to(
+    session: AsyncSession, *, caller, lead_id: uuid.UUID
+) -> Lead:
+    """Fetch a lead with row-level visibility enforced.
+
+    Raises 404 when the lead doesn't exist OR when the caller lacks
+    `users.read` and the lead isn't theirs. Returning 404 (not 403)
+    on the visibility miss avoids leaking the existence of leads in
+    other reps' books.
+    """
+    from src.app.core.permissions.service import role_has_permission
+
+    lead = await _da.get_lead_by_id(session, lead_id)
+    if lead is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
+        )
+    if (
+        lead.assigned_to_id != caller.legacy_uuid
+        and not await role_has_permission(session, caller.role_id, "users.read")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
+        )
+    return lead
+
+
 async def _ensure_contact_in_scope(
     session: AsyncSession, contact_id: uuid.UUID
 ) -> None:
@@ -418,6 +445,61 @@ def _decode_cursor(
                 detail="invalid cursor",
             ) from exc
     return str(v_raw), lead_id
+
+
+async def list_leads_visible_to(
+    session: AsyncSession,
+    *,
+    caller,
+    stage: Optional[str] = None,
+    status_filter: Optional[LeadStatus] = None,
+    assigned_to: Optional[uuid.UUID] = None,
+    q: Optional[str] = None,
+    source: Optional[str] = None,
+    last_activity_lt: Optional[datetime] = None,
+    last_activity_gt: Optional[datetime] = None,
+    sort: Literal[
+        "created_at", "last_activity_at", "lead_score", "contact_name"
+    ] = "created_at",
+    order: Literal["asc", "desc"] = "desc",
+    custom_filters: Iterable[tuple[str, str]] = (),
+    filter_dsl_payload: Optional[dict[str, Any]] = None,
+    page: int = 1,
+    size: int = _LIMIT_DEFAULT,
+    cursor: Optional[str] = None,
+    limit: Optional[int] = None,
+    with_total: bool = True,
+) -> tuple[list[Lead], Optional[int], Optional[str]]:
+    """Row-level visibility wrapper.
+
+    Callers without `users.read` (employees vs. managers) only see
+    leads assigned to them. Any `assigned_to=<other>` they pass is
+    silently clamped to self. Business rule — moved out of the
+    router so this is the single point of enforcement.
+    """
+    from src.app.core.permissions.service import role_has_permission
+
+    if not await role_has_permission(session, caller.role_id, "users.read"):
+        assigned_to = caller.legacy_uuid
+    return await list_leads(
+        session,
+        stage=stage,
+        status_filter=status_filter,
+        assigned_to=assigned_to,
+        q=q,
+        source=source,
+        last_activity_lt=last_activity_lt,
+        last_activity_gt=last_activity_gt,
+        sort=sort,
+        order=order,
+        custom_filters=custom_filters,
+        filter_dsl_payload=filter_dsl_payload,
+        page=page,
+        size=size,
+        cursor=cursor,
+        limit=limit,
+        with_total=with_total,
+    )
 
 
 async def list_leads(

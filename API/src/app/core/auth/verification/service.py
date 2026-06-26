@@ -5,11 +5,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 import orjson
-from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import EMAIL_ENABLED, OTP_EXPIRY_MINUTES, SMS_ENABLED
-from src.models.user import UserInfo, UserLogin
+from src.app.core.auth.verification import data_access
 from src.providers import email_provider, sms_provider
 from src.utilities.app_utils import generate_otp
 from src.utilities.fernet_util import fernet
@@ -126,21 +125,12 @@ async def verify_email_token(db: AsyncSession, token: str) -> None:
     user_id = payload.get("user_id")
     email_in_token = payload.get("value", "")
 
-    user_row = (
-        await db.execute(
-            select(UserLogin.id, UserInfo.email)
-            .join(UserInfo, UserInfo.member_id == UserLogin.id)
-            .where(UserLogin.user_id == user_id)
-        )
-    ).first()
-    if user_row is None:
+    row = await data_access.get_user_id_and_email_by_handle(db, user_id)
+    if row is None:
         raise VerificationError("User not found", status_code=404)
-    if user_row.email.lower() != email_in_token.lower():
+    member_id, email = row
+    if not email or email.lower() != email_in_token.lower():
         raise VerificationError("Verification email does not match")
 
-    await db.execute(
-        update(UserInfo)
-        .where(UserInfo.member_id == user_row.id)
-        .values(is_email_verified=True)
-    )
+    await data_access.mark_email_verified(db, member_id=member_id)
     await db.commit()

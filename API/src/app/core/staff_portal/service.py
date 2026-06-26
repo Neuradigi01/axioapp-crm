@@ -29,7 +29,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.tenants import data_access
+from src.app.core.tenants import service as tenants_service
 from src.app.core.auth.tokens import STAFF_TOKEN_TTL, encode_token
 from src.app.core.staff.models import EmploymentStatus
 from src.app.core.staff_portal import data_access as _da
@@ -75,7 +75,7 @@ def reset_rate_limit() -> None:
 
 
 async def _resolve_org(session: AsyncSession, org_slug: str) -> Organization:
-    org = await data_access.get_organization_by_slug(session, org_slug)
+    org = await tenants_service.get_organization_by_slug(session, org_slug)
     if org is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

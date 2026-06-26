@@ -16,6 +16,33 @@ if any new code in `src/app/core/` or `src/app/packs/` violates:
   * **DAL purity.** ``data_access.py`` must not commit. (Its SELECTs
     and ORM adds are expected.)
 
+  * **Service cleanliness.** ``service.py`` (and ``*_service.py``
+    helpers) must not run SQL directly — every ``session.execute /
+    session.add`` lives behind a ``data_access.py`` function. Filter
+    *composition* in service is fine; what's forbidden is the actual
+    DB round-trip / staging call.
+
+  * **Layer-direction imports.** ``router.py`` may not import any
+    other module's ``data_access`` (Router → Service only).
+    ``data_access.py`` may not import any module's ``service`` or
+    ``router`` (DAL never depends upward).
+
+  * **CRUD lives in DAL.** Any file under ``core/`` or ``packs/``
+    that calls ``session.execute / add / add_all / delete / query
+    / merge`` must be ``data_access.py``. Helper modules (Celery
+    workers, webhook handlers, schedulers, integration sub-
+    modules) inherited from before the layered layout are in a
+    documented exception list — new helpers must route their SQL
+    through a DAL function.
+
+Note on cross-module data access from `service.py`: the project's
+*preference* (manager call 2026-06-26) is for service files to route
+data access through the target module's `service.py` when business
+rules / permissions / validation live there, and to call another
+module's `data_access.py` directly only when the operation is a
+plain read/write with no business rules at stake. This is style, not
+mechanically enforced — code review catches the judgment calls.
+
 The full spec is in `CLAUDE.md` (Backend module layout section) and
 `feedback_backend_layered_architecture.md` in user memory.
 
@@ -156,6 +183,134 @@ _ROUTER_IMPORT_EXCEPTIONS: dict[str, str] = {
 }
 
 
+# Files allowed to call `session.execute / add / delete / query` despite
+# being a `service.py`. Read-only aggregation modules whose entire job
+# is composing ad-hoc analytical queries — moving each into a single-
+# use DAL function would be busywork without changing the architecture
+# meaningfully (no transaction discipline, no router boundary).
+# Files allowed to import another module's `data_access` from inside a
+# `router.py`. Only legacy `*_router.py`-style files + webhook handlers
+# that pre-date the layered layout — same set as `_ROUTER_EXCEPTIONS`,
+# kept separate so the two rules can drift independently if needed.
+_ROUTER_DAL_IMPORT_EXCEPTIONS: dict[str, str] = {
+    "core/email/tracking/router.py": "Email open/click tracker (pre-layout)",
+    "core/subscriptions/webhooks/router.py": "Stripe webhook router",
+    "packs/furniture/modules/billing/router.py": "Pack billing PDF stub",
+}
+
+
+# Files allowed to import another module's `service` from inside a
+# `data_access.py`. Should always be empty — DAL never depends upward.
+# This list exists so a future deliberate carve-out can be documented
+# rather than landing as silent drift.
+_DAL_SERVICE_IMPORT_EXCEPTIONS: dict[str, str] = {}
+
+
+# Helper files (Celery workers, schedulers, webhook handlers,
+# integration sub-modules) allowed to run SQL directly even though
+# they aren't `data_access.py`. Inherited from before the layered
+# layout was established — the dal-backfill track deliberately left
+# them out of scope. A future polish track moves their SQL into
+# their module's DAL; until then this list locks the known state.
+#
+# New helper code under core/ or packs/ should call into a
+# `data_access.py` function, not do its own SQL. If you find yourself
+# needing to add an entry here, ask whether you should be writing a
+# DAL helper instead.
+_HELPER_CRUD_EXCEPTIONS: dict[str, str] = {
+    # --- FastAPI dependency that loads the current user
+    "core/auth/dependencies.py": "Auth dependency (loads current user from JWT)",
+    # --- Campaigns engine helpers
+    "core/campaigns/ab_decider.py": "A/B winner decider (own session)",
+    "core/campaigns/tasks.py": "Celery campaign worker",
+    # --- Contacts CSV export
+    "core/contacts/data_export.py": "Contacts CSV exporter",
+    # --- Conversation adapter (inbound email)
+    "core/conversations/adapters/email.py": "Email adapter (own session)",
+    # --- Email module helpers
+    "core/email/gmail/push.py": "Gmail push subscriptions",
+    "core/email/gmail/sync.py": "Gmail message sync",
+    "core/email/microsoft/sync.py": "Outlook message sync",
+    "core/email/microsoft/webhook.py": "Outlook webhook handler",
+    "core/email/tasks.py": "Celery email worker",
+    "core/email_sequences/scheduler.py": "Email sequence scheduler (Celery beat)",
+    # --- Integrations
+    "core/integrations/dlq.py": "Webhook DLQ writer",
+    "core/integrations/google/tasks.py": "Celery Google Ads worker",
+    "core/integrations/meta/ads_lookup.py": "Meta ads lookup helper",
+    "core/integrations/meta/data_deletion.py": "Meta data-deletion handler",
+    "core/integrations/meta/subscriptions.py": "Meta webhook subscription manager",
+    "core/integrations/meta/tasks.py": "Celery Meta worker",
+    "core/integrations/status.py": "Integration health-status reader",
+    # --- WhatsApp integration sub-modules
+    "core/integrations/whatsapp/ai_handler.py": "WA AI reply pipeline",
+    "core/integrations/whatsapp/assignment_engine.py": "WA assignment engine",
+    "core/integrations/whatsapp/auto_reply.py": "WA auto-reply dispatcher",
+    "core/integrations/whatsapp/automation_router.py": "WA automation sub-router",
+    "core/integrations/whatsapp/block_list.py": "WA block-list writer",
+    "core/integrations/whatsapp/connect.py": "WA active-config helper",
+    "core/integrations/whatsapp/embedded_signup.py": "WA Embedded Signup flow",
+    "core/integrations/whatsapp/flows_router.py": "WA Flows sub-router",
+    "core/integrations/whatsapp/health_tasks.py": "WA health-check tasks",
+    "core/integrations/whatsapp/keyword_engine.py": "WA keyword engine",
+    "core/integrations/whatsapp/quick_links.py": "QR / wa.me attribution",
+    "core/integrations/whatsapp/quick_links_router.py": "WA quick-links sub-router",
+    "core/integrations/whatsapp/status.py": "WA status webhook handler",
+    "core/integrations/whatsapp/templates.py": "WA template submission helper",
+    "core/integrations/whatsapp/templates_analytics.py": "WA template analytics",
+    # --- Leads helpers
+    "core/leads/csv_export.py": "Leads CSV exporter",
+    "core/leads/dedup.py": "Lead dedupe checker",
+    "core/leads/imports/dedup.py": "Bulk-import dedupe",
+    "core/leads/imports/presets.py": "Lead-import preset CRUD helper",
+    "core/leads/imports/targets.py": "Lead-import target resolver",
+    "core/leads/imports/tasks.py": "Bulk-import Celery worker",
+    "core/leads/routing.py": "Lead round-robin router",
+    "core/leads/scoring.py": "Lead scoring recomputer",
+    # --- Packs installer
+    "core/packs/installer.py": "Pack installer (own txn semantics)",
+    # --- Permissions seeder
+    "core/permissions/role_templates.py": "Role template seeder",
+    # --- Reporting analytics
+    "core/reporting/ad_attribution.py": "Ad-attribution analytics",
+    "core/reporting/campaign_analytics.py": "Campaign analytics",
+    "core/reporting/whatsapp_analytics.py": "WhatsApp analytics",
+    # --- Subscriptions
+    "core/subscriptions/lifecycle.py": "Subscription lifecycle helper",
+    "core/subscriptions/middleware.py": "Subscription gating middleware",
+    "core/subscriptions/notifications.py": "Subscription notifications",
+    "core/subscriptions/signup_hook.py": "Trial subscription on signup",
+    "core/subscriptions/tasks.py": "Celery subscription rollover worker",
+    "core/subscriptions/webhooks/handlers/__init__.py": "Stripe webhook handlers __init__",
+    "core/subscriptions/webhooks/handlers/checkout_completed.py": "Stripe checkout completed",
+    "core/subscriptions/webhooks/handlers/invoice_failed.py": "Stripe invoice failed",
+    "core/subscriptions/webhooks/handlers/invoice_paid.py": "Stripe invoice paid",
+    "core/subscriptions/webhooks/handlers/subscription_cancelled.py": "Stripe sub cancelled",
+    "core/subscriptions/webhooks/handlers/subscription_updated.py": "Stripe sub updated",
+    # --- Templates helpers
+    "core/templates/render.py": "Template render helper",
+    "core/templates/sms_extension.py": "SMS DLT extension writer",
+    "core/templates/test_send.py": "Template test-send",
+    "core/templates/workflow.py": "Template review workflow",
+    # --- Tenants ownership transfer
+    "core/tenants/ownership.py": "Ownership-transfer flow",
+}
+
+
+_SERVICE_SQL_EXCEPTIONS: dict[str, str] = {
+    "core/dashboard/service.py": "Dashboard widget aggregations (read-only, no models)",
+    "core/reporting/service.py": "Reporting aggregations (read-only, no models)",
+    # --- WhatsApp integration helper services
+    # Deferred along with the rest of the WhatsApp tree (see
+    # `_TRANSACTION_EXCEPTIONS` above); a future integrations polish
+    # track refactors them through a proper DAL.
+    "core/contacts/consent_service.py": "Consent helper (pre-layout)",
+    "core/integrations/whatsapp/flows_service.py": "WA Flows helper (pre-layout)",
+    "core/integrations/whatsapp/health_service.py": "WA health helper (pre-layout)",
+    "core/integrations/whatsapp/templates_service.py": "WA templates helper (pre-layout)",
+}
+
+
 class _Violation(NamedTuple):
     path: str
     line: int
@@ -202,6 +357,15 @@ class _ArchitectureVisitor(ast.NodeVisitor):
         self.transaction_calls: list[tuple[str, int]] = []
         self.crud_attr_calls: list[tuple[str, int]] = []
         self.sqlalchemy_crud_imports: list[tuple[str, int]] = []
+        # Layer-direction imports we track:
+        #   * `from src.app.{core,packs}.<x>.data_access import ...`
+        #   * `from src.app.{core,packs}.<x> import data_access`
+        #   * `from src.app.{core,packs}.<x>.service import ...`
+        #   * `from src.app.{core,packs}.<x> import service`
+        #   * same shape for `router`
+        # Each entry is `(target_layer, full_module_path, lineno)` where
+        # `target_layer` is one of `"data_access"`, `"service"`, `"router"`.
+        self.layer_imports: list[tuple[str, str, int]] = []
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         if node.module and (
@@ -213,6 +377,20 @@ class _ArchitectureVisitor(ast.NodeVisitor):
                     self.sqlalchemy_crud_imports.append(
                         (alias.name, node.lineno)
                     )
+        if node.module and node.module.startswith("src.app."):
+            mod = node.module
+            # Form 1: `from ...x.data_access import ...`
+            for layer in ("data_access", "service", "router"):
+                if mod.endswith(f".{layer}") or mod == f"src.app.{layer}":
+                    self.layer_imports.append((layer, mod, node.lineno))
+                    break
+            else:
+                # Form 2: `from ...x import data_access` (etc.)
+                for alias in node.names:
+                    if alias.name in ("data_access", "service", "router"):
+                        self.layer_imports.append(
+                            (alias.name, f"{mod}.{alias.name}", node.lineno)
+                        )
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
@@ -227,6 +405,17 @@ class _ArchitectureVisitor(ast.NodeVisitor):
                     self.transaction_calls.append((attr, node.lineno))
                 elif attr in _ROUTER_FORBIDDEN_ATTRS:
                     self.crud_attr_calls.append((attr, node.lineno))
+        # `session.add_all(...)` is the bulk variant of `session.add`
+        # — treat it the same way (forbidden in routers, fine in DAL
+        # via wrapper, allowed in DAL directly).
+        if isinstance(func, ast.Attribute) and isinstance(
+            func.value, ast.Name
+        ):
+            if (
+                func.value.id in _SESSION_VARS
+                and func.attr == "add_all"
+            ):
+                self.crud_attr_calls.append(("add_all", node.lineno))
         self.generic_visit(node)
 
 
@@ -300,6 +489,38 @@ def _collect_violations() -> list[_Violation]:
                             )
                         )
 
+            # --- CRUD-in-DAL rule (whole-tree).
+            #
+            # Catches helper modules (Celery workers, schedulers,
+            # webhook handlers, integration sub-modules) that run
+            # SQL outside the 5-file layered layout. The router and
+            # service rules above already handle their respective
+            # files; this rule fires on everything else.
+            is_layered = (
+                _is_router_file(path)
+                or _is_service_file(path)
+                or _is_dal_file(path)
+            )
+            if (
+                not is_layered
+                and visitor.crud_attr_calls
+                and rel not in _HELPER_CRUD_EXCEPTIONS
+            ):
+                for attr, lineno in visitor.crud_attr_calls:
+                    violations.append(
+                        _Violation(
+                            path=rel,
+                            line=lineno,
+                            kind="crud_outside_dal",
+                            detail=(
+                                f"`db.{attr}()` in `{path.name}` — "
+                                "CRUD belongs in data_access.py. "
+                                "Move the query into the module's "
+                                "DAL and call it from here."
+                            ),
+                        )
+                    )
+
             # --- DAL purity rule.
             if _is_dal_file(path):
                 for attr, lineno in visitor.transaction_calls:
@@ -312,6 +533,72 @@ def _collect_violations() -> list[_Violation]:
                                 f"`db.{attr}()` is not allowed in "
                                 "data_access.py — caller (service) "
                                 "owns the transaction."
+                            ),
+                        )
+                    )
+
+            # --- Layer-direction import rules.
+            if (
+                _is_router_file(path)
+                and rel not in _ROUTER_DAL_IMPORT_EXCEPTIONS
+            ):
+                for layer, mod, lineno in visitor.layer_imports:
+                    if layer == "data_access":
+                        violations.append(
+                            _Violation(
+                                path=rel,
+                                line=lineno,
+                                kind="dal_import_in_router",
+                                detail=(
+                                    f"`{mod}` imported in router.py — "
+                                    "Router → Service only. Add a "
+                                    "service wrapper and call that."
+                                ),
+                            )
+                        )
+            if (
+                _is_dal_file(path)
+                and rel not in _DAL_SERVICE_IMPORT_EXCEPTIONS
+            ):
+                for layer, mod, lineno in visitor.layer_imports:
+                    if layer in ("service", "router"):
+                        violations.append(
+                            _Violation(
+                                path=rel,
+                                line=lineno,
+                                kind=f"{layer}_import_in_dal",
+                                detail=(
+                                    f"`{mod}` imported in "
+                                    "data_access.py — DAL never "
+                                    "depends upward on service / "
+                                    "router."
+                                ),
+                            )
+                        )
+
+            # --- Service cleanliness rule.
+            #
+            # Only the *execution* side is enforced — `session.execute`,
+            # `session.add`, `session.add_all`, `session.delete`,
+            # `session.merge`, `session.query`. Composition (importing
+            # `select` to build a statement the DAL then executes via a
+            # paginate-style wrapper) stays allowed: it's the "filter
+            # DSL gray area" the dal-backfill track explicitly left in
+            # service for leads/tasks pipeline reads.
+            if (
+                _is_service_file(path)
+                and rel not in _SERVICE_SQL_EXCEPTIONS
+            ):
+                for attr, lineno in visitor.crud_attr_calls:
+                    violations.append(
+                        _Violation(
+                            path=rel,
+                            line=lineno,
+                            kind="orm_crud_in_service",
+                            detail=(
+                                f"`db.{attr}()` is not allowed in "
+                                "service.py — wrap in a "
+                                "data_access.py helper."
                             ),
                         )
                     )

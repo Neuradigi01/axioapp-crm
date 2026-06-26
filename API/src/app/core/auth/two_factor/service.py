@@ -3,11 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import EMAIL_ENABLED, SMS_ENABLED
-from src.models.user import UserLogin
+from src.app.core.auth.two_factor import data_access
 from src.providers import otp_provider, two_factor_provider
 
 # `purpose` value written to `tbl_otps.purpose` so the otp lookup in
@@ -46,18 +45,11 @@ def _available_methods(state: TwoFactorState, email: str | None, mobile: str | N
 
 
 async def _load_state(db: AsyncSession, member_id: int) -> TwoFactorState:
-    row = (
-        await db.execute(
-            select(
-                UserLogin.two_factor_enabled,
-                UserLogin.two_factor_method,
-                UserLogin.two_factor_secret,
-            ).where(UserLogin.id == member_id)
-        )
-    ).one_or_none()
+    row = await data_access.get_two_factor_columns(db, member_id=member_id)
     if row is None:
         return TwoFactorState(enabled=False, method=None, secret=None)
-    return TwoFactorState(enabled=bool(row[0]), method=row[1], secret=row[2])
+    enabled, method, secret = row
+    return TwoFactorState(enabled=enabled, method=method, secret=secret)
 
 
 async def _send_or_noop(

@@ -99,6 +99,20 @@ async def get_template(
     return row
 
 
+async def find_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+) -> MessageTemplate | None:
+    """Non-raising public lookup. Returns None on miss — callers
+    (campaigns / automation) that want their own error message use
+    this instead of :func:`get_template`."""
+    return await data_access.get_template(
+        session, org_id=org_id, template_id=template_id
+    )
+
+
 async def list_templates(
     session: AsyncSession,
     *,
@@ -181,23 +195,25 @@ async def create_template(
     reject_jinja_statements(payload.body_text)
     variables = extract_variable_paths(payload.body_text)
 
-    template = MessageTemplate(
-        org_id=org_id,
-        channel=payload.channel,
-        name=payload.name,
-        category=payload.category,
-        language=payload.language,
-        body_text=payload.body_text,
-        subject=payload.subject,
-        preview_text=payload.preview_text,
-        variables=variables,
-        internal_status=TemplateInternalStatus.draft,
-        external_status=TemplateExternalStatus.n_a,
-        current_version=1,
-        created_by_user_id=user_id,
-        updated_by_user_id=user_id,
+    template = data_access.add_template(
+        session,
+        MessageTemplate(
+            org_id=org_id,
+            channel=payload.channel,
+            name=payload.name,
+            category=payload.category,
+            language=payload.language,
+            body_text=payload.body_text,
+            subject=payload.subject,
+            preview_text=payload.preview_text,
+            variables=variables,
+            internal_status=TemplateInternalStatus.draft,
+            external_status=TemplateExternalStatus.n_a,
+            current_version=1,
+            created_by_user_id=user_id,
+            updated_by_user_id=user_id,
+        ),
     )
-    session.add(template)
     try:
         await session.flush()
     except IntegrityError as exc:
@@ -206,17 +222,19 @@ async def create_template(
             name=payload.name, channel=payload.channel.value
         ) from exc
 
-    initial_version = MessageTemplateVersion(
-        org_id=org_id,
-        template_id=template.id,
-        version=1,
-        body_text=payload.body_text,
-        subject=payload.subject,
-        variables=variables,
-        changed_by_user_id=user_id,
-        change_note="Initial version",
+    data_access.add_template_version(
+        session,
+        MessageTemplateVersion(
+            org_id=org_id,
+            template_id=template.id,
+            version=1,
+            body_text=payload.body_text,
+            subject=payload.subject,
+            variables=variables,
+            changed_by_user_id=user_id,
+            change_note="Initial version",
+        ),
     )
-    session.add(initial_version)
     await session.commit()
     await session.refresh(template)
     logger.info(
@@ -301,17 +319,19 @@ async def update_template(
     template.updated_by_user_id = user_id
     template.updated_at = func.now()
 
-    version_row = MessageTemplateVersion(
-        org_id=org_id,
-        template_id=template.id,
-        version=new_version,
-        body_text=template.body_text,
-        subject=template.subject,
-        variables=template.variables,
-        changed_by_user_id=user_id,
-        change_note=payload.change_note,
+    data_access.add_template_version(
+        session,
+        MessageTemplateVersion(
+            org_id=org_id,
+            template_id=template.id,
+            version=new_version,
+            body_text=template.body_text,
+            subject=template.subject,
+            variables=template.variables,
+            changed_by_user_id=user_id,
+            change_note=payload.change_note,
+        ),
     )
-    session.add(version_row)
     try:
         await session.commit()
     except IntegrityError as exc:

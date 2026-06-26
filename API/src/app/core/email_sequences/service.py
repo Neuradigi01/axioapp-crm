@@ -27,7 +27,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -87,14 +86,9 @@ async def _load_steps(
 ) -> list[EmailSequenceStep]:
     """Steps in `step_order` ASC — used by `EmailSequenceRead` and
     by the scheduler when advancing to the next step."""
-    rows = (
-        await session.execute(
-            select(EmailSequenceStep)
-            .where(EmailSequenceStep.sequence_id == sequence_id)
-            .order_by(EmailSequenceStep.step_order.asc())
-        )
-    ).scalars().all()
-    return list(rows)
+    return await email_seq_da.list_steps_in_order(
+        session, sequence_id=sequence_id
+    )
 
 
 # --- Sequence CRUD --------------------------------------------------------
@@ -109,36 +103,24 @@ async def list_sequences(
     size: int = 50,
 ) -> tuple[list[EmailSequence], int]:
     """Paginated list, soft-deleted rows excluded."""
-    filters: list[Any] = [EmailSequence.deleted_at.is_(None)]
-    if is_active is not None:
-        filters.append(EmailSequence.is_active.is_(is_active))
-    if q:
-        filters.append(EmailSequence.name.ilike(f"%{q}%"))
-
-    count_stmt = (
-        select(func.count()).select_from(EmailSequence).where(*filters)
+    total = await email_seq_da.count_sequences_filtered(
+        session, q=q, is_active=is_active
     )
-    total = (await session.execute(count_stmt)).scalar_one()
-    base = (
-        select(EmailSequence)
-        .where(*filters)
-        .order_by(EmailSequence.updated_at.desc())
-        .offset((page - 1) * size)
-        .limit(size)
+    rows = await email_seq_da.list_sequences_page(
+        session,
+        q=q,
+        is_active=is_active,
+        offset=(page - 1) * size,
+        limit=size,
     )
-    rows = (await session.execute(base)).scalars().all()
-    return list(rows), int(total or 0)
+    return rows, total
 
 
 async def get_sequence(
     session: AsyncSession, *, sequence_id: uuid.UUID
 ) -> EmailSequence:
     """Load a single sequence. 404 when missing or soft-deleted."""
-    row = (
-        await session.execute(
-            select(EmailSequence).where(EmailSequence.id == sequence_id)
-        )
-    ).scalar_one_or_none()
+    row = await email_seq_da.get_sequence_by_id(session, sequence_id)
     if row is None or row.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -172,13 +154,15 @@ async def create_sequence(
         session, org_id=org_id, template_ids=template_ids
     )
 
-    seq = EmailSequence(
-        org_id=org_id,
-        name=payload.name,
-        is_active=payload.is_active,
-        created_by=actor_id,
+    seq = email_seq_da.add_sequence(
+        session,
+        EmailSequence(
+            org_id=org_id,
+            name=payload.name,
+            is_active=payload.is_active,
+            created_by=actor_id,
+        ),
     )
-    session.add(seq)
     try:
         await session.flush()
     except Exception:
@@ -194,7 +178,7 @@ async def create_sequence(
     steps = _materialise_steps(
         org_id=org_id, sequence_id=seq.id, payload_steps=payload.steps
     )
-    session.add_all(steps)
+    email_seq_da.add_sequence_steps(session, steps)
     await session.commit()
     await session.refresh(seq)
     for s in steps:
@@ -265,23 +249,10 @@ async def update_sequence(
         # rows for in-flight enrollments by NOT deleting steps an
         # enrollment_step still references. Practical safety: refuse
         # update when any active enrollment exists.
-        active_enrollments = (
-            await session.execute(
-                select(func.count())
-                .select_from(EmailSequenceEnrollment)
-                .where(
-                    EmailSequenceEnrollment.sequence_id == seq.id,
-                    EmailSequenceEnrollment.state.in_(
-                        [
-                            EnrollmentState.active.value,
-                            EnrollmentState.paused_on_reply.value,
-                            EnrollmentState.paused_manual.value,
-                        ]
-                    ),
-                )
-            )
-        ).scalar_one()
-        if int(active_enrollments or 0) > 0:
+        active_enrollments = await email_seq_da.count_non_terminal_enrollments(
+            session, seq.id
+        )
+        if active_enrollments > 0:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
@@ -290,17 +261,13 @@ async def update_sequence(
                     "those enrollments first, or create a new sequence."
                 ),
             )
-        await session.execute(
-            delete(EmailSequenceStep).where(
-                EmailSequenceStep.sequence_id == seq.id
-            )
-        )
+        await email_seq_da.delete_steps_for_sequence(session, seq.id)
         new_steps = _materialise_steps(
             org_id=seq.org_id,
             sequence_id=seq.id,
             payload_steps=payload.steps,
         )
-        session.add_all(new_steps)
+        email_seq_da.add_sequence_steps(session, new_steps)
 
     try:
         await session.commit()
@@ -406,27 +373,9 @@ async def enroll(
     # Dedupe: any non-terminal enrollment of (sequence, contact_id)
     # blocks a re-enroll. Completed / cancelled enrollments do NOT
     # block — operators can re-run a finished sequence.
-    existing_rows = (
-        await session.execute(
-            select(
-                EmailSequenceEnrollment.contact_id,
-                EmailSequenceEnrollment.id,
-            ).where(
-                EmailSequenceEnrollment.sequence_id == seq.id,
-                EmailSequenceEnrollment.contact_id.in_(set(contact_ids)),
-                EmailSequenceEnrollment.state.in_(
-                    [
-                        EnrollmentState.active.value,
-                        EnrollmentState.paused_on_reply.value,
-                        EnrollmentState.paused_manual.value,
-                    ]
-                ),
-            )
-        )
-    ).all()
-    blocked: dict[uuid.UUID, uuid.UUID] = {
-        r.contact_id: r.id for r in existing_rows
-    }
+    blocked = await email_seq_da.list_active_enrollment_ids_for_contacts(
+        session, sequence_id=seq.id, contact_ids=contact_ids
+    )
 
     step1 = steps[0]
     now = datetime.now(timezone.utc)
@@ -452,29 +401,33 @@ async def enroll(
             if lead_ids is not None and idx < len(lead_ids)
             else None
         )
-        enrollment = EmailSequenceEnrollment(
-            org_id=org_id,
-            sequence_id=seq.id,
-            contact_id=contact_id,
-            lead_id=lead_id,
-            enrolled_by=actor_id,
-            enrolled_at=now,
-            state=EnrollmentState.active.value,
-            state_changed_at=now,
-            current_step_order=1,
+        enrollment = email_seq_da.add_enrollment(
+            session,
+            EmailSequenceEnrollment(
+                org_id=org_id,
+                sequence_id=seq.id,
+                contact_id=contact_id,
+                lead_id=lead_id,
+                enrolled_by=actor_id,
+                enrolled_at=now,
+                state=EnrollmentState.active.value,
+                state_changed_at=now,
+                current_step_order=1,
+            ),
         )
-        session.add(enrollment)
         await session.flush()
 
         # Step 1 is scheduled at now() so the next beat tick fires it
         # (60s latency floor per spec).
-        es = EmailSequenceEnrollmentStep(
-            org_id=org_id,
-            enrollment_id=enrollment.id,
-            step_id=step1.id,
-            scheduled_at=now,
+        es = email_seq_da.add_enrollment_step(
+            session,
+            EmailSequenceEnrollmentStep(
+                org_id=org_id,
+                enrollment_id=enrollment.id,
+                step_id=step1.id,
+                scheduled_at=now,
+            ),
         )
-        session.add(es)
         new_enrollment_rows.append((enrollment, es, contact_id))
 
     await session.commit()
@@ -507,13 +460,7 @@ async def enroll(
 async def get_enrollment(
     session: AsyncSession, *, enrollment_id: uuid.UUID
 ) -> EmailSequenceEnrollment:
-    row = (
-        await session.execute(
-            select(EmailSequenceEnrollment).where(
-                EmailSequenceEnrollment.id == enrollment_id
-            )
-        )
-    ).scalar_one_or_none()
+    row = await email_seq_da.get_enrollment_by_id(session, enrollment_id)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -531,29 +478,21 @@ async def list_enrollments(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[EmailSequenceEnrollment], int]:
-    filters: list[Any] = []
-    if sequence_id is not None:
-        filters.append(EmailSequenceEnrollment.sequence_id == sequence_id)
-    if contact_id is not None:
-        filters.append(EmailSequenceEnrollment.contact_id == contact_id)
-    if state is not None:
-        filters.append(EmailSequenceEnrollment.state == state)
-
-    count_stmt = (
-        select(func.count())
-        .select_from(EmailSequenceEnrollment)
-        .where(*filters)
+    total = await email_seq_da.count_enrollments_filtered(
+        session,
+        sequence_id=sequence_id,
+        contact_id=contact_id,
+        state=state,
     )
-    total = (await session.execute(count_stmt)).scalar_one()
-    base = (
-        select(EmailSequenceEnrollment)
-        .where(*filters)
-        .order_by(EmailSequenceEnrollment.enrolled_at.desc())
-        .offset((page - 1) * size)
-        .limit(size)
+    rows = await email_seq_da.list_enrollments_page(
+        session,
+        sequence_id=sequence_id,
+        contact_id=contact_id,
+        state=state,
+        offset=(page - 1) * size,
+        limit=size,
     )
-    rows = (await session.execute(base)).scalars().all()
-    return list(rows), int(total or 0)
+    return rows, total
 
 
 async def pause_enrollment(
@@ -586,14 +525,10 @@ async def pause_enrollment(
     # Skip any pending step rows so the scheduler won't pick them up
     # while the enrollment is paused. Resume re-inserts a fresh step
     # row at the appropriate time.
-    await session.execute(
-        EmailSequenceEnrollmentStep.__table__.update()
-        .where(
-            EmailSequenceEnrollmentStep.enrollment_id == enrollment.id,
-            EmailSequenceEnrollmentStep.sent_at.is_(None),
-            EmailSequenceEnrollmentStep.skipped.is_(False),
-        )
-        .values(skipped=True, skip_reason="enrollment_paused")
+    await email_seq_da.skip_pending_enrollment_steps(
+        session,
+        enrollment_id=enrollment.id,
+        skip_reason="enrollment_paused",
     )
     await session.commit()
     await session.refresh(enrollment)
@@ -652,13 +587,15 @@ async def resume_enrollment(
     enrollment.state_changed_at = now
 
     # Insert a fresh pending step row scheduled at now + delay_days.
-    es = EmailSequenceEnrollmentStep(
-        org_id=enrollment.org_id,
-        enrollment_id=enrollment.id,
-        step_id=current.id,
-        scheduled_at=now + timedelta(days=current.delay_days),
+    email_seq_da.add_enrollment_step(
+        session,
+        EmailSequenceEnrollmentStep(
+            org_id=enrollment.org_id,
+            enrollment_id=enrollment.id,
+            step_id=current.id,
+            scheduled_at=now + timedelta(days=current.delay_days),
+        ),
     )
-    session.add(es)
     await session.commit()
     await session.refresh(enrollment)
     await audit.log(
@@ -684,14 +621,10 @@ async def cancel_enrollment(
     now = datetime.now(timezone.utc)
     enrollment.state = EnrollmentState.cancelled.value
     enrollment.state_changed_at = now
-    await session.execute(
-        EmailSequenceEnrollmentStep.__table__.update()
-        .where(
-            EmailSequenceEnrollmentStep.enrollment_id == enrollment.id,
-            EmailSequenceEnrollmentStep.sent_at.is_(None),
-            EmailSequenceEnrollmentStep.skipped.is_(False),
-        )
-        .values(skipped=True, skip_reason="enrollment_cancelled")
+    await email_seq_da.skip_pending_enrollment_steps(
+        session,
+        enrollment_id=enrollment.id,
+        skip_reason="enrollment_cancelled",
     )
     await session.commit()
     await session.refresh(enrollment)

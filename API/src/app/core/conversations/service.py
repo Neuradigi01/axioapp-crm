@@ -34,7 +34,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.contacts import data_access
+from src.app.core.contacts import service as contacts_service
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
 from src.app.core.contacts.models import Contact
@@ -515,7 +515,7 @@ async def receive_webhook(
         from src.app.core.contacts.consent_service import (
             auto_flip_on_inbound,
         )
-        from src.app.core.contacts.data_access import get_contact
+        from src.app.core.contacts.service import get_contact
 
         try:
             contact = await get_contact(session, conv.contact_id)
@@ -844,7 +844,7 @@ async def _resolve_or_create_contact_by_phone(
     the phone string is empty."""
     if not phone:
         return None
-    existing = await data_access.get_contact_by_phone(session, phone)
+    existing = await contacts_service.get_contact_by_phone(session, phone)
     if existing is not None:
         return existing.id
     contact = Contact(
@@ -853,7 +853,7 @@ async def _resolve_or_create_contact_by_phone(
         phone=phone,
         source="whatsapp",
     )
-    data_access.insert_contact(session, contact)
+    contacts_service.insert_contact(session, contact)
     await session.flush()
     return contact.id
 

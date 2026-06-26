@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.shared.audit import log_entity_change
-from src.app.core.appointments import data_access as appointments_da
+from src.app.core.appointments import service as appointments_service
 from src.app.core.appointments.models import Appointment, AppointmentStatus
 from src.app.core.appointments.service import (
     create_appointment as core_create_appointment,
@@ -93,7 +93,7 @@ async def get_visit(
 async def get_appointment_for_visit(
     session: AsyncSession, visit: FieldVisit
 ) -> Appointment:
-    appt = await appointments_da.get_appointment_by_id(
+    appt = await appointments_service.get_appointment(
         session, visit.appointment_id
     )
     if appt is None:

@@ -49,4 +49,25 @@ async def get_organization_by_slug(
     return result.scalar_one_or_none()
 
 
-__all__ = ["get_organization_by_id", "get_organization_by_slug"]
+async def slug_taken(session: AsyncSession, slug: str) -> bool:
+    """True iff an organisation already uses this slug."""
+    result = await session.execute(
+        select(Organization.id).where(Organization.slug == slug)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+def add_organization(
+    session: AsyncSession, organization: Organization
+) -> Organization:
+    """Stage a new `tbl_organizations` row in the unit-of-work."""
+    session.add(organization)
+    return organization
+
+
+__all__ = [
+    "add_organization",
+    "get_organization_by_id",
+    "get_organization_by_slug",
+    "slug_taken",
+]

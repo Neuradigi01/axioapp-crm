@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
@@ -30,11 +30,9 @@ from src.app.core.email.gmail.router import router as gmail_router
 from src.app.core.email.microsoft.router import router as microsoft_router
 from src.app.core.email.schemas import EmailAccountRead
 from src.app.core.email.service import (
-    disconnect as disconnect_account,
-    get_account,
-    list_accounts,
+    disconnect_as_caller,
+    list_accounts_visible_to,
 )
-from src.app.core.permissions.service import list_permissions_for_role
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -54,14 +52,6 @@ router.include_router(gmail_router)
 router.include_router(microsoft_router)
 
 
-async def _has_admin(db: AsyncSession, user: User) -> bool:
-    """Does the caller hold the org-wide admin scope?"""
-    granted = {
-        p.key for p in await list_permissions_for_role(db, user.role_id)
-    }
-    return "email.accounts.admin" in granted
-
-
 @router.get("/accounts", response_model=list[EmailAccountRead])
 async def list_email_accounts_endpoint(
     db: AsyncSession = Depends(get_db),
@@ -73,9 +63,7 @@ async def list_email_accounts_endpoint(
       the org, regardless of which rep connected it.
     - Rep (`email.accounts.manage` only): just their own.
     """
-    admin = await _has_admin(db, user)
-    user_filter = None if admin else user.legacy_uuid
-    rows = await list_accounts(db, user_id=user_filter)
+    rows = await list_accounts_visible_to(db, caller=user)
     return [EmailAccountRead.model_validate(r) for r in rows]
 
 
@@ -96,44 +84,5 @@ async def disconnect_email_account_endpoint(
     A rep without `email.accounts.admin` can only disconnect their
     own accounts; trying to disconnect another rep's account 403s.
     """
-    row = await get_account(db, account_id=account_id)
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Email account not found.",
-        )
-    admin = await _has_admin(db, user)
-    if not admin and row.user_id != user.legacy_uuid:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only disconnect your own email accounts.",
-        )
-    # Best-effort provider tear-down BEFORE we null the tokens —
-    # otherwise the watch call cannot authenticate. Failures are
-    # logged and ignored: the local disconnect must always succeed.
-    await _teardown_provider_watch(row, db)
-    await disconnect_account(
-        db, account_id=account_id, actor_id=user.legacy_uuid
-    )
+    await disconnect_as_caller(db, caller=user, account_id=account_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-async def _teardown_provider_watch(row, db: AsyncSession) -> None:
-    """Dispatch to the provider-specific teardown (e.g. Gmail's
-    `users.stop` or Microsoft's `subscriptions.delete`). New
-    providers add a branch here when they ship. Centralised so
-    Step 1's generic router doesn't import every provider
-    sub-package at module-load time."""
-    if row.provider.value == "gmail":
-        from src.app.core.email.gmail import push as gmail_push
-
-        await gmail_push.stop_watch_quiet(row, db)
-    elif row.provider.value == "microsoft":
-        from src.app.core.email.microsoft import webhook as ms_webhook
-
-        # Microsoft subscriptions are tracked in `sync_cursor` for
-        # Step 3's v1 (see webhook.py docstring); pass it through
-        # so the unsubscribe call can hit the right id.
-        await ms_webhook.unsubscribe_quiet(
-            row, db, subscription_id=row.sync_cursor
-        )

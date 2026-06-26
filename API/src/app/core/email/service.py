@@ -176,6 +176,76 @@ async def upsert(
     return row
 
 
+async def list_accounts_visible_to(
+    session: AsyncSession,
+    *,
+    caller,
+) -> list[EmailAccount]:
+    """List email accounts the caller can see.
+
+    Business rule: callers with `email.accounts.admin` see every
+    account in the org; callers with only `email.accounts.manage`
+    see just their own. Moved out of the router so the rule is in
+    one place.
+    """
+    from src.app.core.permissions.service import list_permissions_for_role
+
+    granted = await list_permissions_for_role(session, caller.role_id)
+    has_admin = any(p.key == "email.accounts.admin" for p in granted)
+    user_filter = None if has_admin else caller.legacy_uuid
+    return await list_accounts(session, user_id=user_filter)
+
+
+async def disconnect_as_caller(
+    session: AsyncSession,
+    *,
+    caller,
+    account_id: uuid.UUID,
+):
+    """Single entry point for the disconnect endpoint.
+
+    Business rules consolidated here (out of the router):
+      1. 404 when the row is missing or RLS-hidden.
+      2. Non-admin callers may only disconnect their own accounts (403).
+      3. Best-effort provider teardown (Gmail / Microsoft) before
+         nulling local tokens — failures are swallowed so the local
+         disconnect always succeeds.
+      4. Delegate the actual state change to :func:`disconnect`.
+    """
+    from fastapi import HTTPException, status as _http_status
+    from src.app.core.permissions.service import list_permissions_for_role
+
+    row = await get_account(session, account_id=account_id)
+    if row is None:
+        raise HTTPException(
+            status_code=_http_status.HTTP_404_NOT_FOUND,
+            detail="Email account not found.",
+        )
+
+    granted = await list_permissions_for_role(session, caller.role_id)
+    has_admin = any(p.key == "email.accounts.admin" for p in granted)
+    if not has_admin and row.user_id != caller.legacy_uuid:
+        raise HTTPException(
+            status_code=_http_status.HTTP_403_FORBIDDEN,
+            detail="You can only disconnect your own email accounts.",
+        )
+
+    if row.provider.value == "gmail":
+        from src.app.core.email.gmail import push as gmail_push
+
+        await gmail_push.stop_watch_quiet(row, session)
+    elif row.provider.value == "microsoft":
+        from src.app.core.email.microsoft import webhook as ms_webhook
+
+        await ms_webhook.unsubscribe_quiet(
+            row, session, subscription_id=row.sync_cursor
+        )
+
+    return await disconnect(
+        session, account_id=account_id, actor_id=caller.legacy_uuid
+    )
+
+
 async def disconnect(
     session: AsyncSession,
     *,

@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.users import data_access
+from src.app.core.users import service as users_service
 from src.app.core.permissions.models import Role
 from src.app.core.users.models import OrganizationMember, User
 
@@ -67,7 +68,7 @@ async def transfer_ownership(
         raise _Invalid("Cannot transfer ownership to yourself.")
 
     # Resolve target user + active membership in one shot.
-    _, target_membership = await data_access.require_membership(
+    _, target_membership = await users_service.require_membership(
         session,
         user_uuid=target_user_uuid,
         org_id=org_id,

@@ -206,7 +206,25 @@ async def find_by_dlt_template_id(
     return result.scalar_one_or_none()
 
 
+def add_template(
+    session: AsyncSession, template: MessageTemplate
+) -> MessageTemplate:
+    """Stage a new `tbl_message_templates` row in the unit-of-work."""
+    session.add(template)
+    return template
+
+
+def add_template_version(
+    session: AsyncSession, version: MessageTemplateVersion
+) -> MessageTemplateVersion:
+    """Stage a new `tbl_message_template_versions` row in the unit-of-work."""
+    session.add(version)
+    return version
+
+
 __all__ = [
+    "add_template",
+    "add_template_version",
     "find_by_dlt_template_id",
     "get_by_external_provider_id",
     "get_dlt_metadata",

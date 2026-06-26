@@ -21,7 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.contacts.schemas import ContactOut
-from src.app.core.permissions.service import role_has_permission
 from src.app.core.users.models import User
 from src.app.core.walk_ins.models import WalkInStatus
 from src.app.core.walk_ins.schemas import (
@@ -46,7 +45,7 @@ from src.app.core.walk_ins.service import (
     create_walk_in,
     delete_walk_in,
     get_walk_in,
-    list_walk_ins,
+    list_walk_ins_visible_to,
     quick_register,
     reassign_walk_in,
     update_walk_in,
@@ -73,13 +72,9 @@ async def list_walk_ins_endpoint(
     db: AsyncSession = Depends(get_db),
     caller: User = Depends(require_permissions("walkins.read")),
 ) -> list[WalkInOut]:
-    # Row-level visibility: callers without `users.read` (employees,
-    # not managers) can only see walk-ins assigned to them. Any
-    # `?assigned_to=<other>` they pass is silently clamped to self.
-    if not await role_has_permission(db, caller.role_id, "users.read"):
-        assigned_to = caller.legacy_uuid
-    rows, _ = await list_walk_ins(
+    rows, _ = await list_walk_ins_visible_to(
         db,
+        caller=caller,
         status_filter=status_filter,
         assigned_to=assigned_to,
         open_only=open_only,
