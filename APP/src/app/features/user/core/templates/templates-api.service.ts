@@ -23,7 +23,7 @@ export type TemplateChannel =
   | 'sms'
   | 'facebook'
   | 'instagram'
-  | 'web';
+  | 'push';
 
 export type TemplateInternalStatus =
   | 'draft'

@@ -43,7 +43,7 @@ const DESCRIPTORS: Record<TemplateChannel, ChannelDescriptor> = {
     icon: 'message-circle',
     classes: 'bg-pink-50 text-pink-700 ring-pink-200',
   },
-  web: {
+  push: {
     label: 'Push',
     icon: 'bell',
     classes: 'bg-amber-50 text-amber-700 ring-amber-200',

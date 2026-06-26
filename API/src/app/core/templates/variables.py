@@ -227,8 +227,10 @@ ALLOWED_VARIABLES_BY_CHANNEL: dict[ConversationChannel, list[VariableDef]] = {
         *_ORG_VARS,
         *_LEAD_VARS,
     ],
-    # Web push / in-app — title + body only, tiny variable set.
-    ConversationChannel.web: [
+    # Push notifications — title + body only, tiny variable set.
+    # Step 13 split this off the placeholder ``web`` value; ``web``
+    # is reserved for the embedded web-widget conversations channel.
+    ConversationChannel.push: [
         VariableDef("contact.first_name", "Contact first name"),
         VariableDef("org.name", "Organisation name"),
     ],

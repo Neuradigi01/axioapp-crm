@@ -48,6 +48,11 @@ class ConversationChannel(str, enum.Enum):
     web = "web"
     sms = "sms"
     email = "email"
+    # tasks/template-library Step 13 — push notifications as a
+    # first-class template channel. No transport behind it; the
+    # registered adapter raises ``PushNotConfigured`` on send until a
+    # provider (Firebase / OneSignal / APNS) is wired.
+    push = "push"
 
 
 class ConversationStatus(str, enum.Enum):

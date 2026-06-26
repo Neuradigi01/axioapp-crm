@@ -197,6 +197,9 @@
               <option value="email">Email</option>
               <option value="whatsapp">WhatsApp</option>
               <option value="sms">SMS</option>
+              <option value="facebook">Facebook Messenger</option>
+              <option value="instagram">Instagram Direct</option>
+              <option value="push">Push notification</option>
             </select>
             @if (template()) {
               <p class="mt-1 text-[10px] text-zinc-400">
@@ -217,6 +220,14 @@
         } @else if (channel() === 'sms' && smsForm(); as f) {
           <div class="rounded-lg border border-zinc-200 bg-white p-4">
             <app-sms-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
+          </div>
+        } @else if ((channel() === 'facebook' || channel() === 'instagram') && fbForm(); as f) {
+          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+            <app-fb-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
+          </div>
+        } @else if (channel() === 'push' && pushForm(); as f) {
+          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+            <app-push-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
           </div>
         } @else {
           <div class="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-500">

@@ -36,7 +36,9 @@ import {
 } from '../templates-api.service';
 import { VersionsDrawerComponent } from '../versions/versions-drawer.component';
 import { EmailFormComponent, EmailFormGroup } from './email-form.component';
+import { FbFormComponent, FbFormGroup } from './fb-form.component';
 import { PreviewPaneComponent } from './preview-pane.component';
+import { PushFormComponent, PushFormGroup } from './push-form.component';
 import { SmsFormComponent, SmsFormGroup } from './sms-form.component';
 import { VariablePickerComponent } from './variable-picker.component';
 import { WaFormComponent, WaFormGroup } from './wa-form.component';
@@ -59,7 +61,14 @@ import { WaFormComponent, WaFormGroup } from './wa-form.component';
  * reviewers via reject) which Step 8's review modal handles. v1 just
  * shows the banner — the unlock path lives in Step 8.
  */
-type ChannelOption = '' | 'whatsapp' | 'email' | 'sms';
+type ChannelOption =
+  | ''
+  | 'whatsapp'
+  | 'email'
+  | 'sms'
+  | 'facebook'
+  | 'instagram'
+  | 'push';
 
 const LOCKED_STATUSES = new Set(['in_review', 'approved', 'published']);
 
@@ -80,6 +89,8 @@ const LOCKED_STATUSES = new Set(['in_review', 'approved', 'published']);
     WaFormComponent,
     EmailFormComponent,
     SmsFormComponent,
+    FbFormComponent,
+    PushFormComponent,
     TemplateReviewModalComponent,
     TestSendModalComponent,
     VersionsDrawerComponent,
@@ -111,6 +122,10 @@ export class TemplateEditorPageComponent {
   protected readonly waForm = signal<WaFormGroup | null>(null);
   protected readonly emailForm = signal<EmailFormGroup | null>(null);
   protected readonly smsForm = signal<SmsFormGroup | null>(null);
+  // Step 13 — fb-form is reused for both Facebook Messenger AND
+  // Instagram Direct (Meta's Messaging API is the same surface).
+  protected readonly fbForm = signal<FbFormGroup | null>(null);
+  protected readonly pushForm = signal<PushFormGroup | null>(null);
 
   // --- loaded template (null for /new) --------------------------------
 
@@ -230,6 +245,15 @@ export class TemplateEditorPageComponent {
       if (channel === 'sms' && this.smsForm() === null) {
         this.smsForm.set(SmsFormComponent.build());
       }
+      if (
+        (channel === 'facebook' || channel === 'instagram') &&
+        this.fbForm() === null
+      ) {
+        this.fbForm.set(FbFormComponent.build());
+      }
+      if (channel === 'push' && this.pushForm() === null) {
+        this.pushForm.set(PushFormComponent.build());
+      }
     });
 
     // Wire body / subject signals from whichever sub-form is active so
@@ -290,6 +314,50 @@ export class TemplateEditorPageComponent {
           subBody.unsubscribe();
           subDlt.unsubscribe();
         });
+      } else if (channel === 'facebook' || channel === 'instagram') {
+        const f = this.fbForm();
+        if (!f) return;
+        const subBody = f.controls.body_text.valueChanges
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe((v) => {
+            this.currentBody.set(v ?? '');
+            this.scheduleAutoSave();
+          });
+        // Quick-reply add/remove/edit also schedules the auto-save.
+        const subQr = f.controls.quick_replies.valueChanges
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe(() => this.scheduleAutoSave());
+        this.currentBody.set(f.controls.body_text.value);
+        this.currentSubject.set(null);
+        onCleanup(() => {
+          subBody.unsubscribe();
+          subQr.unsubscribe();
+        });
+      } else if (channel === 'push') {
+        const f = this.pushForm();
+        if (!f) return;
+        const subTitle = f.controls.title.valueChanges
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe((v) => {
+            this.currentSubject.set(v ?? '');
+            this.scheduleAutoSave();
+          });
+        const subBody = f.controls.body_text.valueChanges
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe((v) => {
+            this.currentBody.set(v ?? '');
+            this.scheduleAutoSave();
+          });
+        const subUrl = f.controls.action_url.valueChanges
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe(() => this.scheduleAutoSave());
+        this.currentBody.set(f.controls.body_text.value);
+        this.currentSubject.set(f.controls.title.value);
+        onCleanup(() => {
+          subTitle.unsubscribe();
+          subBody.unsubscribe();
+          subUrl.unsubscribe();
+        });
       }
     });
 
@@ -339,12 +407,34 @@ export class TemplateEditorPageComponent {
             f.patchValue({ body_text: row.body_text });
             this.smsForm.set(f);
             this.loadSmsDltMetadata(row.id);
+          } else if (
+            row.channel === 'facebook' ||
+            row.channel === 'instagram'
+          ) {
+            // Step 13 — quick replies aren't persisted at the central
+            // model level yet; they'll round-trip once the FB/IG
+            // adapter ships. body_text is the source of truth in v1.
+            const f = this.fbForm() ?? FbFormComponent.build();
+            f.patchValue({ body_text: row.body_text });
+            this.fbForm.set(f);
+          } else if (row.channel === 'push') {
+            // Push title repurposes the central `subject` column per
+            // the models docstring. action_url isn't persisted yet —
+            // it'll round-trip when the push provider adapter lands.
+            const f = this.pushForm() ?? PushFormComponent.build();
+            f.patchValue({
+              title: row.subject ?? '',
+              body_text: row.body_text,
+            });
+            this.pushForm.set(f);
           }
           if (this.locked()) {
             this.headerForm.disable({ emitEvent: false });
             this.waForm()?.disable({ emitEvent: false });
             this.emailForm()?.disable({ emitEvent: false });
             this.smsForm()?.disable({ emitEvent: false });
+            this.fbForm()?.disable({ emitEvent: false });
+            this.pushForm()?.disable({ emitEvent: false });
           }
         },
         error: (err: HttpErrorResponse) => {
@@ -426,6 +516,26 @@ export class TemplateEditorPageComponent {
         body_text: f?.controls.body_text.value ?? '',
       };
     }
+    if (channel === 'facebook' || channel === 'instagram') {
+      const f = this.fbForm();
+      return {
+        name: this.headerForm.controls.name.value,
+        channel,
+        language: 'en',
+        body_text: f?.controls.body_text.value ?? '',
+      };
+    }
+    if (channel === 'push') {
+      const f = this.pushForm();
+      return {
+        name: this.headerForm.controls.name.value,
+        channel: 'push' as const,
+        language: 'en',
+        body_text: f?.controls.body_text.value ?? '',
+        // Push title rides on the central `subject` column.
+        subject: f?.controls.title.value ?? '',
+      };
+    }
     // Email.
     const f = this.emailForm();
     return {
@@ -465,7 +575,11 @@ export class TemplateEditorPageComponent {
         ? this.waForm()
         : channel === 'sms'
           ? this.smsForm()
-          : this.emailForm();
+          : channel === 'facebook' || channel === 'instagram'
+            ? this.fbForm()
+            : channel === 'push'
+              ? this.pushForm()
+              : this.emailForm();
     if (this.headerForm.invalid || subForm?.invalid) {
       this.headerForm.markAllAsTouched();
       subForm?.markAllAsTouched();
@@ -600,6 +714,8 @@ export class TemplateEditorPageComponent {
       this.waForm()?.disable({ emitEvent: false });
       this.emailForm()?.disable({ emitEvent: false });
       this.smsForm()?.disable({ emitEvent: false });
+      this.fbForm()?.disable({ emitEvent: false });
+      this.pushForm()?.disable({ emitEvent: false });
     } else {
       // Workflow may have moved a previously-locked template back to
       // draft (reject / request-changes) — re-enable the form so
@@ -609,6 +725,8 @@ export class TemplateEditorPageComponent {
       this.waForm()?.enable({ emitEvent: false });
       this.emailForm()?.enable({ emitEvent: false });
       this.smsForm()?.enable({ emitEvent: false });
+      this.fbForm()?.enable({ emitEvent: false });
+      this.pushForm()?.enable({ emitEvent: false });
     }
     this.toast.set(message);
   }
@@ -664,6 +782,16 @@ export class TemplateEditorPageComponent {
     } else if (row.channel === 'sms') {
       this.smsForm()?.patchValue(
         { body_text: row.body_text },
+        { emitEvent: false },
+      );
+    } else if (row.channel === 'facebook' || row.channel === 'instagram') {
+      this.fbForm()?.patchValue(
+        { body_text: row.body_text },
+        { emitEvent: false },
+      );
+    } else if (row.channel === 'push') {
+      this.pushForm()?.patchValue(
+        { title: row.subject ?? '', body_text: row.body_text },
         { emitEvent: false },
       );
     }

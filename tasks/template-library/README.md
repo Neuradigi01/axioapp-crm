@@ -64,7 +64,7 @@ Steps 1-8 ship the new module end-to-end with only WA + Email channels usable. S
 | 10 | [Email templates merge + UI move](step-10-email-templates-merge-and-ui-move.md) | **COMPLETED** | ~1 day |
 | 11 | [Campaigns refactor — generic template_id](step-11-campaigns-refactor.md) | **COMPLETED** | ~1 day |
 | 12 | [SMS adapter stub + DLT fields](step-12-sms-adapter-stub.md) | **COMPLETED** | ~0.5 days |
-| 13 | [FB / IG / push sub-forms + stub adapters](step-13-fb-ig-push-adapter-stubs.md) | **Pending** | ~0.5 days |
+| 13 | [FB / IG / push sub-forms + stub adapters](step-13-fb-ig-push-adapter-stubs.md) | **COMPLETED** | ~0.5 days |
 | 14 | [External status sync — Celery + webhook + UI badges](step-14-external-status-sync-polish.md) | **Pending** | ~1 day |
 
 **Total: 14 steps, ~11.5 days.**

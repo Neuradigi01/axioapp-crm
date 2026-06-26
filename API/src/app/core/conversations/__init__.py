@@ -31,6 +31,12 @@ import src.app.core.conversations.adapters.email  # noqa: F401
 # crashing with `ChannelNotRegistered`. Sending still fails with
 # `SMSNotConfigured` until a real provider lands in the SMS track.
 import src.app.core.conversations.adapters.sms  # noqa: F401
+# Step 13 (template-library) — same pattern for Facebook Messenger,
+# Instagram Direct, and Push. Each adapter raises its own
+# `*NotConfigured` exception until a real provider is wired.
+import src.app.core.conversations.adapters.facebook  # noqa: F401
+import src.app.core.conversations.adapters.instagram  # noqa: F401
+import src.app.core.conversations.adapters.push  # noqa: F401
 
 __all__ = [
     "get_conversation",

@@ -47,8 +47,8 @@ const CHANNEL_OPTIONS: Array<{ value: '' | TemplateChannel; label: string }> = [
   { value: 'email', label: 'Email' },
   { value: 'sms', label: 'SMS' },
   { value: 'facebook', label: 'Facebook Messenger' },
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'web', label: 'Push' },
+  { value: 'instagram', label: 'Instagram Direct' },
+  { value: 'push', label: 'Push notification' },
 ];
 
 const STATUS_OPTIONS: Array<{
