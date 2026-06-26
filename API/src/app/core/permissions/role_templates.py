@@ -119,6 +119,12 @@ _CORE_ADMIN_KEYS: list[str] = [
     "templates.review",
     "templates.publish",
     "templates.submit_external",
+    # tasks/automation-engine Step 3 — single-event trigger engine.
+    # Admin authors triggers (write) + inspects run history (runs.read).
+    # Read keeps the sidebar entry visible for read-only Employees.
+    "automations.read",
+    "automations.write",
+    "automations.runs.read",
 ]
 
 
@@ -173,6 +179,10 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     # template-pick action work) but cannot author, review, publish,
     # or submit externally. Owner/Admin holds the rest.
     "templates.read",
+    # tasks/automation-engine Step 3 — Employees see the Settings →
+    # Automations sidebar entry as read-only. Mutation + run-history
+    # inspection stay Admin/Owner.
+    "automations.read",
 ]
 
 

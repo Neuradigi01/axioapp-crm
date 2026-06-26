@@ -21,7 +21,13 @@ import uuid
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.automation.models import AutomationTrigger
+from datetime import datetime
+
+from src.app.core.automation.models import (
+    AutomationRun,
+    AutomationRunStatus,
+    AutomationTrigger,
+)
 from src.app.core.conversations.models import ConversationChannel
 
 
@@ -150,10 +156,61 @@ def add_trigger(
     return trigger
 
 
+# --- tbl_automation_runs ------------------------------------------------
+
+
+async def list_runs(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    trigger_id: uuid.UUID | None = None,
+    status: AutomationRunStatus | None = None,
+    since: datetime | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[AutomationRun], int]:
+    """Filterable + paginated run history. Drives the Step-9 UI's
+    "what fired for this trigger" view + the per-contact timeline
+    (filter by ``contact_id`` once Step 4 wires it on the runs row
+    — Step 3's contract is trigger-scoped).
+
+    ``order by scheduled_at DESC`` so newest fires sit at the top —
+    matches the partial index from Step 1
+    (``ix_automation_runs_trigger_scheduled_desc``)."""
+    base = select(AutomationRun).where(AutomationRun.org_id == org_id)
+
+    if trigger_id is not None:
+        base = base.where(AutomationRun.trigger_id == trigger_id)
+    if status is not None:
+        base = base.where(AutomationRun.status == status)
+    if since is not None:
+        base = base.where(AutomationRun.scheduled_at >= since)
+
+    total = (
+        await session.execute(
+            select(func.count()).select_from(base.subquery())
+        )
+    ).scalar_one()
+
+    rows = (
+        (
+            await session.execute(
+                base.order_by(AutomationRun.scheduled_at.desc())
+                .offset(offset)
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows), int(total)
+
+
 __all__ = [
     "add_trigger",
     "get_trigger",
     "get_trigger_by_name",
+    "list_runs",
     "list_triggers",
     "match_enabled_triggers",
 ]

@@ -50,6 +50,7 @@ from src.app.core.email.router import router as email_router
 from src.app.core.email.tracking.router import router as email_tracking_router
 from src.app.core.email_sequences.router import router as email_sequences_router
 from src.app.core.templates.router import router as templates_router
+from src.app.core.automation.router import router as automations_router
 from src.app.core.integrations.router import router as integrations_router
 from src.app.core.integrations.whatsapp.templates_router import (
     router as whatsapp_templates_router,
@@ -225,6 +226,9 @@ app.include_router(email_sequences_router, prefix="/api/v1")
 # the legacy email_templates_router; sequences + the picker now
 # render against the central tables.
 app.include_router(templates_router, prefix="/api/v1")
+# tasks/automation-engine Step 3 — single-event trigger engine.
+# CRUD + run-history + event-type discovery under /api/v1/automations.
+app.include_router(automations_router, prefix="/api/v1")
 # Step 8 — public tracking endpoints (open pixel, click redirect,
 # unsubscribe landing). Intentionally unauthenticated — the recipient's
 # email client fetches them with no JWT. Rate limiting is inside the
