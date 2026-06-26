@@ -56,7 +56,7 @@ After Step 6, the "welcome on signup" and "confirm on lead-created" promises are
 
 | # | Title | Status | Effort |
 |---|---|---|---|
-| 1 | [Event bus + automation schema](step-1-event-bus-and-schema.md) | **Pending** | ~1 day |
+| 1 | [Event bus + automation schema](step-1-event-bus-and-schema.md) | **COMPLETED** | ~1 day |
 | 2 | [Trigger service + condition evaluator](step-2-trigger-service-and-conditions.md) | **Pending** | ~1 day |
 | 3 | [Trigger router + permissions](step-3-trigger-router-and-permissions.md) | **Pending** | ~0.5 days |
 | 4 | [Dispatcher + Celery scheduling](step-4-dispatcher-and-celery-scheduling.md) | **Pending** | ~1 day |
