@@ -121,24 +121,40 @@ _register(
         event_type="lead.created",
         label="Lead created",
         description=(
-            "A new lead lands from ANY source — form widget, "
-            "Google Ads, Meta Ads, CSV import, manual entry, "
-            "WhatsApp inbound, walk-in, API."
+            "A new lead lands from ANY source — manual entry / API, "
+            "embed widget, Google Ads webhook, Meta Ads webhook, "
+            "CSV bulk import. Every source goes through "
+            "``core.leads.service.create_lead`` so a single publish "
+            "call at the chokepoint covers them all."
         ),
         sample_payload={
+            # Flat top-level keys so condition AST paths like
+            # `field='source'` work without nesting. Snapshots below
+            # carry the variable renderer's lookups.
+            "lead_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "source": "widget",
+            "created_at": "2026-06-29T13:00:00+00:00",
             "lead": {
                 "id": "00000000-0000-0000-0000-000000000000",
-                "source": "website",
-                "estimated_value": 45000,
-                "owner_user_id": None,
+                "source": "widget",
+                "status": "active",
+                "pipeline_stage": "new",
+                "assigned_to_id": None,
+                "budget": None,
+                "attribution": {"utm_source": "google"},
             },
             "contact": {
                 "id": "00000000-0000-0000-0000-000000000000",
-                "first_name": "Asha",
+                "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
             },
-            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
         },
     )
 )

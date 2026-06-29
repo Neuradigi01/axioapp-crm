@@ -247,7 +247,95 @@ async def create_lead(
         entity_id=lead.id,
         after=_snapshot(lead),
     )
+
+    # tasks/automation-engine Step 6 — every lead-creation source
+    # (manual / API, embed widget, Google Ads, Meta Ads, bulk CSV
+    # import) lands here through `ingest_lead → create_lead`, so a
+    # single publish at this chokepoint fires the seeded "Lead
+    # Confirmation" trigger uniformly regardless of source. The
+    # helper swallows any subscriber failure — the lead is already
+    # committed; a misbehaving handler can't roll it back.
+    await _publish_lead_created(session, org_id=org_id, lead=lead)
+
     return lead
+
+
+async def _publish_lead_created(
+    session: AsyncSession, *, org_id: uuid.UUID, lead: Lead
+) -> None:
+    """Build the ``lead.created`` envelope + publish via the bus.
+    Snapshot's the contact + org so the recipient resolver + the
+    template renderer have everything they need without per-handler
+    DB hits."""
+    try:
+        from sqlalchemy import select
+
+        from src.app.core.contacts.models import Contact
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        contact = (
+            await session.execute(
+                select(Contact).where(Contact.id == lead.contact_id)
+            )
+        ).scalar_one_or_none()
+        org = (
+            await session.execute(
+                select(Organization).where(Organization.id == org_id)
+            )
+        ).scalar_one_or_none()
+
+        payload: dict = {
+            "lead_id": str(lead.id),
+            "contact_id": str(lead.contact_id),
+            "source": str(lead.source) if lead.source else None,
+            "created_at": (
+                lead.created_at.isoformat() if lead.created_at else None
+            ),
+            "lead": {
+                "id": str(lead.id),
+                "source": str(lead.source) if lead.source else None,
+                "status": (
+                    lead.status.value
+                    if hasattr(lead.status, "value")
+                    else str(lead.status)
+                ),
+                "pipeline_stage": lead.pipeline_stage,
+                "assigned_to_id": (
+                    str(lead.assigned_to_id) if lead.assigned_to_id else None
+                ),
+                "budget": float(lead.budget) if lead.budget is not None else None,
+                "attribution": lead.attribution or {},
+            },
+        }
+        if contact is not None:
+            payload["contact"] = {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+            }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+            }
+
+        await events_publish(
+            "lead.created",
+            payload,
+            org_id=org_id,
+            event_id=f"lead_created:{lead.id}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "leads.create publish_lead_created_failed org=%s lead=%s",
+            org_id,
+            lead.id,
+        )
 
 
 async def update_lead(

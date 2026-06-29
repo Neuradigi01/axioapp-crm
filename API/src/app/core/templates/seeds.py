@@ -53,6 +53,17 @@ _USER_WELCOME_BODY = (
     "— The {{ org.name }} team"
 )
 
+_LEAD_CONFIRMATION_NAME = "Lead Confirmation"
+_LEAD_CONFIRMATION_SUBJECT = "Thanks for reaching out, {{ contact.full_name }}"
+_LEAD_CONFIRMATION_BODY = (
+    "Hi {{ contact.full_name }},\n\n"
+    "Thanks for reaching out to {{ org.name }} — we've received your "
+    "details and a team member will follow up shortly.\n\n"
+    "In the meantime, feel free to reply to this email with any "
+    "additional context or questions.\n\n"
+    "— The {{ org.name }} team"
+)
+
 
 async def seed_user_welcome_template(
     session: AsyncSession,
@@ -117,4 +128,63 @@ async def seed_user_welcome_template(
     return template
 
 
-__all__ = ["seed_user_welcome_template"]
+async def seed_lead_confirmation_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """Insert (or return the existing) "Lead Confirmation" email
+    template — the body the seeded Step-6 trigger renders for
+    every new ``lead.created`` event regardless of source.
+
+    Idempotent on ``(org_id, lower(name), channel='email')``. Same
+    pattern as :func:`seed_user_welcome_template`."""
+    existing = (
+        await session.execute(
+            select(MessageTemplate).where(
+                MessageTemplate.org_id == org_id,
+                func.lower(MessageTemplate.name) == _LEAD_CONFIRMATION_NAME.lower(),
+                MessageTemplate.channel == ConversationChannel.email,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    template = MessageTemplate(
+        org_id=org_id,
+        channel=ConversationChannel.email,
+        name=_LEAD_CONFIRMATION_NAME,
+        category=TemplateCategory.transactional,
+        language="en",
+        body_text=_LEAD_CONFIRMATION_BODY,
+        subject=_LEAD_CONFIRMATION_SUBJECT,
+        variables=["contact.full_name", "org.name"],
+        internal_status=TemplateInternalStatus.published,
+        external_status=TemplateExternalStatus.n_a,
+        current_version=1,
+    )
+    session.add(template)
+    await session.flush()
+
+    version = MessageTemplateVersion(
+        org_id=org_id,
+        template_id=template.id,
+        version=1,
+        body_text=template.body_text,
+        subject=template.subject,
+        variables=template.variables,
+        change_note="seeded by automation-engine Step 6 (Lead Confirmation)",
+    )
+    session.add(version)
+    await session.flush()
+
+    logger.info(
+        "templates.seed lead_confirmation org=%s template=%s",
+        org_id,
+        template.id,
+    )
+    return template
+
+
+__all__ = ["seed_lead_confirmation_template", "seed_user_welcome_template"]
