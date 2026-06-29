@@ -49,6 +49,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from src.app.core.events import bus as events_bus
+from src.app.core.events.conditions import evaluate_safe
 from src.app.core.events.event_catalog import ALL_EVENTS
 from src.app.core.workflows import data_access as _da
 from src.app.core.workflows.models import (
@@ -141,6 +142,25 @@ async def _on_event(envelope: dict[str, Any]) -> None:
 
         for workflow in workflows:
             try:
+                # Step 6 — evaluate the trigger node's conditions
+                # against the published envelope BEFORE any DB writes
+                # land. A False verdict → log the rejection + skip
+                # enrolment. No run row + no step_run row is created
+                # (the spec's "audit row in step_runs" breadcrumb
+                # would require a schema change since step_runs.run_id
+                # is NOT NULL; the v1 surface is the log line, the
+                # Step-19 diagnostics view will lift it when ready).
+                if not _trigger_conditions_match(workflow, trigger_payload):
+                    logger.info(
+                        "workflows._on_event condition_failed org=%s "
+                        "workflow=%s event=%s contact=%s",
+                        org_id,
+                        workflow.id,
+                        event_type,
+                        contact_id,
+                    )
+                    continue
+
                 effective_workflow = _split_for_ab(workflow)
                 await _maybe_start_run(
                     session,
@@ -239,6 +259,36 @@ async def _maybe_start_run(
         trigger_event_id=trigger_event_id,
         trigger_payload=trigger_payload,
     )
+
+
+def _trigger_conditions_match(
+    workflow: Workflow, payload: dict[str, Any]
+) -> bool:
+    """Step 6 — evaluate the trigger node's ``config.conditions``
+    against the published envelope. Empty / missing conditions
+    evaluate to True (the "always match" default for fresh
+    workflows + the seeded defaults). Malformed conditions
+    evaluate to False via ``evaluate_safe`` — one bad workflow
+    can't poison every event publish."""
+    graph = workflow.graph or {}
+    nodes = graph.get("nodes") or []
+    trigger_node = next(
+        (
+            n
+            for n in nodes
+            if str(n.get("type", "")).startswith("trigger")
+        ),
+        None,
+    )
+    if trigger_node is None:
+        # Defensive — should be caught at validation time, but if a
+        # workflow somehow loses its trigger we fail closed.
+        return False
+
+    conditions = (trigger_node.get("config") or {}).get("conditions")
+    if conditions is None or conditions == {}:
+        return True
+    return evaluate_safe(conditions, payload)
 
 
 def _split_for_ab(workflow: Workflow) -> Workflow:

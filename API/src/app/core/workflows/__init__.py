@@ -41,3 +41,9 @@ go through the OWNING module's data_access (Rule from manager spec
 from src.app.core.workflows.trigger_handlers import register_subscribers
 
 register_subscribers()
+
+# tasks/workflows Step 6 — side-effect: register the branch + switch
+# action handlers so the engine resolves ``branch.if`` / ``branch.switch``
+# nodes without a special case. Import-only — the module's top-level
+# ``register()`` fires automatically.
+from src.app.core.workflows.actions import flow_control  # noqa: F401

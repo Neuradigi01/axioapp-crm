@@ -42,6 +42,10 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from typing import Any
 
+from src.app.core.events.conditions import (
+    InvalidCondition,
+    validate as validate_conditions,
+)
 from src.app.core.workflows.actions import (
     ActionNotRegistered,
     is_registered,
@@ -177,15 +181,28 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
         outbound_by_source[e.source].append(e)
     for n in nodes:
         if n.type in _BRANCH_TYPES:
-            labelled = [
-                e
+            outbound_labels = {
+                str(e.label).strip()
                 for e in outbound_by_source.get(n.id, [])
                 if e.label is not None and str(e.label).strip() != ""
-            ]
-            if not labelled:
+            }
+            if not outbound_labels:
                 raise InvalidGraph(
                     f"branch node '{n.id}' must have at least one outbound "
                     "edge with a non-null label"
+                )
+            # Step 6 — every branch / switch node MUST have an
+            # explicit fallback edge so unmatched cases don't
+            # silently terminate the run. ``branch.if`` → `else`;
+            # ``branch.switch`` → `default`.
+            fallback = (
+                "default" if n.type == "branch.switch" else "else"
+            )
+            if fallback not in outbound_labels:
+                raise InvalidGraph(
+                    f"branch node '{n.id}' (type='{n.type}') must have "
+                    f"an outbound edge labelled '{fallback}' as the "
+                    "fallback when no branch matches"
                 )
 
     # --- 8. Wait-for-event max_wait_seconds bound --------------------
@@ -233,6 +250,60 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
                     f"condition node '{n.id}' missing config.conditions "
                     "(expected JSONB object)"
                 )
+
+    # --- 11. Step 6 — condition AST shape validation -----------------
+    # Trigger nodes, condition nodes, and branch.if's per-branch
+    # conditions all run through the shared AST. The validator
+    # surfaces operator-friendly reasons at publish time so a
+    # malformed condition can't sneak past into the runtime path.
+    for n in nodes:
+        cfg = n.config or {}
+        # Trigger nodes carry conditions directly under config.
+        if n.type.startswith(_TRIGGER_TYPE):
+            conds = cfg.get("conditions")
+            if conds is not None:
+                try:
+                    validate_conditions(conds)
+                except InvalidCondition as exc:
+                    raise InvalidGraph(
+                        f"trigger node '{n.id}' has invalid conditions: "
+                        f"{exc}"
+                    )
+        # Condition nodes — already required to carry conditions
+        # above; validate the AST shape.
+        if n.type in _CONDITION_TYPES:
+            conds = cfg.get("conditions")
+            try:
+                validate_conditions(conds)
+            except InvalidCondition as exc:
+                raise InvalidGraph(
+                    f"condition node '{n.id}' has invalid conditions: "
+                    f"{exc}"
+                )
+        # Branch nodes — validate each branch's conditions.
+        if n.type == "branch.if":
+            branches = cfg.get("branches") or []
+            if not isinstance(branches, list):
+                raise InvalidGraph(
+                    f"branch node '{n.id}' config.branches must be a list"
+                )
+            for i, branch in enumerate(branches):
+                if not isinstance(branch, dict):
+                    raise InvalidGraph(
+                        f"branch node '{n.id}' branches[{i}] must be a dict"
+                    )
+                branch_conds = branch.get("conditions")
+                if branch_conds is None:
+                    # Empty conditions are fine — they always match
+                    # (useful for a final catch-all branch).
+                    continue
+                try:
+                    validate_conditions(branch_conds)
+                except InvalidCondition as exc:
+                    raise InvalidGraph(
+                        f"branch node '{n.id}' branches[{i}] has invalid "
+                        f"conditions: {exc}"
+                    )
 
 
 async def validate_graph_with_db(
