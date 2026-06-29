@@ -25,7 +25,19 @@ See :mod:`core.events.bus` for the canonical event-type taxonomy
 strings (``user.signed_up``, ``lead.created``, …) — handlers SHOULD
 import the constants from there rather than hardcoding strings.
 """
-from src.app.core.events.bus import publish, subscribe, unsubscribe
+from src.app.core.events.bus import (
+    publish,
+    subscribe,
+    subscribe_all,
+    unsubscribe,
+    unsubscribe_all,
+)
 
 
-__all__ = ["publish", "subscribe", "unsubscribe"]
+__all__ = [
+    "publish",
+    "subscribe",
+    "subscribe_all",
+    "unsubscribe",
+    "unsubscribe_all",
+]

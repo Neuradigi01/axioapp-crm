@@ -200,6 +200,16 @@ class AutomationRun(Base, TenantScoped):
         ForeignKey("tbl_automation_triggers.id", ondelete="CASCADE"),
         nullable=False,
     )
+    # Step 4 — idempotency key. Publisher-supplied (typically the
+    # originating row's PK); the bus auto-fills a fresh UUID when
+    # the publisher omits it. Unique on (trigger_id, event_id) via
+    # the partial index `uq_automation_runs_trigger_event_id` from
+    # migration 0128.
+    event_id: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=sql_text("gen_random_uuid()::text"),
+    )
     event_payload: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=sql_text("'{}'::jsonb")
     )

@@ -85,6 +85,7 @@ class RunRead(BaseModel):
     id: uuid.UUID
     org_id: uuid.UUID
     trigger_id: uuid.UUID
+    event_id: str
     event_payload: dict[str, Any]
     contact_id: uuid.UUID | None
     user_id: uuid.UUID | None

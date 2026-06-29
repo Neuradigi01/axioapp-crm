@@ -159,6 +159,65 @@ def add_trigger(
 # --- tbl_automation_runs ------------------------------------------------
 
 
+async def get_run(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run_id: uuid.UUID,
+) -> AutomationRun | None:
+    """Resolve a single run by id. ``None`` if missing or cross-tenant."""
+    result = await session.execute(
+        select(AutomationRun).where(
+            AutomationRun.id == run_id,
+            AutomationRun.org_id == org_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_run_by_id_unscoped(
+    session: AsyncSession, *, run_id: uuid.UUID
+) -> AutomationRun | None:
+    """Tenant-agnostic lookup — Celery worker tasks call this
+    because they don't carry a ``RequestContext``. Sets the org
+    context internally before reading; safe to use ONLY from the
+    Celery delivery path."""
+    result = await session.execute(
+        select(AutomationRun).where(AutomationRun.id == run_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def find_run_by_event_id(
+    session: AsyncSession,
+    *,
+    trigger_id: uuid.UUID,
+    event_id: str,
+) -> AutomationRun | None:
+    """Idempotency check — returns the prior run if the same
+    publisher event already fired for this trigger. The dispatcher
+    short-circuits when a row exists so at-least-once delivery
+    doesn't double-send.
+
+    Backed by the unique partial index
+    ``uq_automation_runs_trigger_event_id`` from migration 0128."""
+    result = await session.execute(
+        select(AutomationRun).where(
+            AutomationRun.trigger_id == trigger_id,
+            AutomationRun.event_id == event_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+def add_run(
+    session: AsyncSession, run: AutomationRun
+) -> AutomationRun:
+    """Stage a new run row in the unit-of-work. Dispatcher commits."""
+    session.add(run)
+    return run
+
+
 async def list_runs(
     session: AsyncSession,
     *,
@@ -207,7 +266,11 @@ async def list_runs(
 
 
 __all__ = [
+    "add_run",
     "add_trigger",
+    "find_run_by_event_id",
+    "get_run",
+    "get_run_by_id_unscoped",
     "get_trigger",
     "get_trigger_by_name",
     "list_runs",

@@ -86,8 +86,16 @@ EventHandler = Callable[[dict[str, Any]], Union[None, Awaitable[None]]]
 
 
 # Process-local registry. Keyed by exact event-type string match;
-# wildcard patterns are NOT supported (would invite surprise fan-out).
+# wildcard patterns are NOT supported (would invite surprise fan-out)
+# beyond the explicit `subscribe_all` shape below.
 _subscribers: dict[str, list[EventHandler]] = {}
+
+# Step 4 — wildcard subscribers. The automation engine's dispatcher
+# registers here so a single coroutine fans every event into the
+# match-triggers flow without needing 30+ explicit subscribe() calls.
+# Keep this list small (one or two entries at most); per-event
+# subscribers stay the dominant pattern for per-type handlers.
+_wildcard_subscribers: list[EventHandler] = []
 
 
 def subscribe(event_type: str, handler: EventHandler) -> None:
@@ -117,39 +125,69 @@ def unsubscribe(event_type: str, handler: EventHandler) -> None:
         return
 
 
+def subscribe_all(handler: EventHandler) -> None:
+    """Register ``handler`` to fire on **every** published event,
+    regardless of event_type. Used by the automation dispatcher to
+    fan all events into the match-triggers flow without enumerating
+    every catalog entry. Idempotent on the same handler reference."""
+    if handler in _wildcard_subscribers:
+        return
+    _wildcard_subscribers.append(handler)
+
+
+def unsubscribe_all(handler: EventHandler) -> None:
+    """Remove a wildcard handler. Test helper + symmetry with the
+    per-event ``unsubscribe`` helper."""
+    try:
+        _wildcard_subscribers.remove(handler)
+    except ValueError:
+        return
+
+
 async def publish(
     event_type: str,
     payload: dict[str, Any],
     *,
     org_id: uuid.UUID,
+    event_id: str | None = None,
 ) -> None:
     """Fire ``event_type`` with ``payload`` to every registered
     handler. The published envelope is the caller's payload merged
-    with ``{"org_id": org_id, "event_type": event_type}`` so
-    handlers always see who fired what.
+    with ``{"org_id": org_id, "event_type": event_type, "event_id":
+    event_id}`` so handlers always see who fired what + can dedupe
+    on replays.
 
-    Each handler is awaited in turn. A handler raising is logged and
-    swallowed so one bad subscriber doesn't block the next one (and
-    so the publisher's transaction completes regardless).
+    ``event_id`` is the publisher-supplied idempotency key. When
+    omitted, a fresh UUID is generated — idempotency then becomes
+    per-fire (no dedupe across replays). Origin modules SHOULD pass
+    a stable id (typically the originating row's PK) so the
+    automation dispatcher's ``(trigger_id, event_id)`` unique index
+    absorbs at-least-once delivery.
 
-    No handlers registered → no-op + a debug log line. Origin
-    modules can publish forward-compatible event types before the
-    consumer module subscribes.
+    Per-event-type subscribers fire first (deterministic registry
+    order), then wildcard subscribers. Each handler is awaited in
+    turn; failures are logged and swallowed so one bad subscriber
+    doesn't poison the rest + the publisher's transaction completes
+    regardless.
     """
+    if event_id is None:
+        event_id = str(uuid.uuid4())
     envelope: dict[str, Any] = {
         **payload,
         "org_id": org_id,
         "event_type": event_type,
+        "event_id": event_id,
     }
-    handlers = list(_subscribers.get(event_type, ()))
-    if not handlers:
+    typed = list(_subscribers.get(event_type, ()))
+    wildcard = list(_wildcard_subscribers)
+    if not typed and not wildcard:
         logger.debug(
             "events.publish no_subscribers event_type=%s org_id=%s",
             event_type,
             org_id,
         )
         return
-    for handler in handlers:
+    for handler in (*typed, *wildcard):
         try:
             result = handler(envelope)
             if inspect.isawaitable(result):
@@ -163,10 +201,18 @@ async def publish(
 
 
 def _clear_subscribers_for_tests() -> None:
-    """Test helper — wipes the registry between cases so subscribers
-    from one test don't bleed into the next. NOT exported via
-    ``__all__``; intentionally underscore-prefixed."""
+    """Test helper — wipes both registries between cases so
+    subscribers from one test don't bleed into the next. NOT
+    exported via ``__all__``; intentionally underscore-prefixed."""
     _subscribers.clear()
+    _wildcard_subscribers.clear()
 
 
-__all__ = ["EventHandler", "publish", "subscribe", "unsubscribe"]
+__all__ = [
+    "EventHandler",
+    "publish",
+    "subscribe",
+    "subscribe_all",
+    "unsubscribe",
+    "unsubscribe_all",
+]

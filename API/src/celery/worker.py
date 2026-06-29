@@ -35,6 +35,10 @@ celery.autodiscover_tasks([
     # in the worker with `KeyError: 'src.app.core.templates.tasks.
     # sync_external_status_all'` because autodiscover doesn't reach it.
     "src.app.core.templates.tasks",
+    # tasks/automation-engine Step 4 — deliver_run task fires once
+    # per queued automation run. The dispatcher .apply_async()'s the
+    # run id; without this entry the worker can't find the task.
+    "src.app.core.automation.tasks",
 ])
 
 if not CELERY_ENABLED:
