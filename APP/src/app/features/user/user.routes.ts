@@ -368,6 +368,18 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // tasks/automation-engine Step 7 — single-event trigger
+        // list. Read-gated; "New automation" + inline
+        // enable/disable affordances inside the page hide for
+        // read-only Employees via the runtime permission check.
+        path: 'automations',
+        canActivate: [permissionGuard('automations.read')],
+        loadComponent: () =>
+          import('./core/automations/automations.page').then(
+            (m) => m.AutomationsPageComponent,
+          ),
+      },
+      {
         // tasks/template-library Step 7 — channel-aware editor.
         // `/new` for create, `/:id` for edit. Save / save-and-submit
         // affordances inside are gated on `templates.write` —
