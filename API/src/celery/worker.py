@@ -49,6 +49,11 @@ celery.autodiscover_tasks([
     # than 7 days. Without this entry the beat scheduler can't find
     # the task.
     "src.app.core.billing.tasks",
+    # tasks/workflows Step 4 — workflow execution engine. Two tasks:
+    # process_step (re-enqueued per hop) + sweep_waits (60s beat).
+    # Without this entry the engine can't dispatch + parked waits
+    # never resume.
+    "src.app.core.workflows.tasks",
 ])
 
 if not CELERY_ENABLED:

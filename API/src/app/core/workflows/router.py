@@ -39,7 +39,7 @@ from src.app.core.workflows.exceptions import (
     WorkflowLocked,
     WorkflowNotFound,
 )
-from src.app.core.workflows.models import WorkflowStatus
+from src.app.core.workflows.models import WorkflowRunStatus, WorkflowStatus
 from src.app.core.workflows.permissions import (
     PERM_ACTIVATE,
     PERM_CLONE,
@@ -51,8 +51,11 @@ from src.app.core.workflows.schemas import (
     WorkflowFolderCreate,
     WorkflowFolderRead,
     WorkflowRead,
+    WorkflowRunRead,
+    WorkflowStepRunRead,
     WorkflowUpdate,
 )
+from src.app.core.workflows import data_access as _workflows_da
 from src.app.shared.context import get_context
 from src.app.shared.db import get_db
 
@@ -224,6 +227,62 @@ async def delete_folder_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+# --- run-history endpoints (Step 4) --------------------------------------
+# Mounted BEFORE /{workflow_id} so '/workflows/runs/{run_id}' doesn't get
+# swallowed by the UUID matcher on the workflow-detail route.
+
+
+class WorkflowRunListOut(BaseModel):
+    """Paginated run-history envelope."""
+
+    items: list[WorkflowRunRead]
+    total: int
+
+
+@router.get(
+    "/runs/{run_id}",
+    response_model=WorkflowRunRead,
+)
+async def get_run_endpoint(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_READ)),
+) -> WorkflowRunRead:
+    """Single-row hydrate for the run-detail drawer."""
+    org_id = _require_org_id()
+    run = await _workflows_da.get_run(db, org_id=org_id, run_id=run_id)
+    if run is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="run not found"
+        )
+    return WorkflowRunRead.model_validate(run)
+
+
+@router.get(
+    "/runs/{run_id}/steps",
+    response_model=list[WorkflowStepRunRead],
+)
+async def list_run_steps_endpoint(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_READ)),
+) -> list[WorkflowStepRunRead]:
+    """Ordered step timeline for one run — drives Step 19's
+    per-run drill-down."""
+    org_id = _require_org_id()
+    # 404 the steps endpoint if the parent run doesn't exist so the
+    # UI doesn't render an empty drawer.
+    run = await _workflows_da.get_run(db, org_id=org_id, run_id=run_id)
+    if run is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="run not found"
+        )
+    rows = await _workflows_da.list_step_runs(
+        db, org_id=org_id, run_id=run_id
+    )
+    return [WorkflowStepRunRead.model_validate(r) for r in rows]
+
+
 # --- workflow CRUD --------------------------------------------------------
 
 
@@ -315,6 +374,47 @@ async def get_workflow_endpoint(
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     return WorkflowRead.model_validate(workflow)
+
+
+@router.get(
+    "/{workflow_id}/runs",
+    response_model=WorkflowRunListOut,
+)
+async def list_workflow_runs_endpoint(
+    workflow_id: uuid.UUID,
+    status_filter: str | None = Query(default=None, alias="status"),
+    contact_id: uuid.UUID | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_READ)),
+) -> WorkflowRunListOut:
+    """Paginated run list for one workflow. Drives the Step-19
+    analytics + run-history list. Filter by status + contact_id."""
+    org_id = _require_org_id()
+    run_status: WorkflowRunStatus | None = None
+    if status_filter is not None:
+        try:
+            run_status = WorkflowRunStatus(status_filter)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"invalid run status '{status_filter}'",
+            ) from exc
+
+    rows, total = await _workflows_da.list_runs(
+        db,
+        org_id=org_id,
+        workflow_id=workflow_id,
+        contact_id=contact_id,
+        status=run_status,
+        limit=limit,
+        offset=offset,
+    )
+    return WorkflowRunListOut(
+        items=[WorkflowRunRead.model_validate(r) for r in rows],
+        total=total,
+    )
 
 
 @router.patch(

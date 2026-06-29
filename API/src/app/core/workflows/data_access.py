@@ -14,6 +14,8 @@ Celery tasks + scripts without a context get correct results.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +23,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.workflows.models import (
     Workflow,
     WorkflowFolder,
+    WorkflowRun,
+    WorkflowRunStatus,
     WorkflowStatus,
+    WorkflowStepRun,
     WorkflowVersion,
 )
 
@@ -227,6 +232,173 @@ async def delete_folder(
     await session.delete(folder)
 
 
+# --- run helpers (Step 4) ----------------------------------------------
+
+
+def insert_run(session: AsyncSession, run: WorkflowRun) -> WorkflowRun:
+    """Stage a new WorkflowRun for INSERT. Caller commits."""
+    session.add(run)
+    return run
+
+
+def insert_step_run(
+    session: AsyncSession, step_run: WorkflowStepRun
+) -> WorkflowStepRun:
+    """Stage a new WorkflowStepRun for INSERT. Caller commits."""
+    session.add(step_run)
+    return step_run
+
+
+async def get_run_unscoped(
+    session: AsyncSession, *, run_id: uuid.UUID
+) -> WorkflowRun | None:
+    """Cross-tenant single-row read by PK. The Celery worker calls
+    this BEFORE setting ``RequestContext.org_id`` — once it has
+    the run, it reads ``run.org_id`` and sets the context for the
+    rest of the dispatch."""
+    result = await session.execute(
+        select(WorkflowRun).where(WorkflowRun.id == run_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_run_for_processing(
+    session: AsyncSession, *, run_id: uuid.UUID
+) -> WorkflowRun | None:
+    """Locked single-row read used by the Celery step processor.
+    Acquires a row-level lock via ``SELECT ... FOR UPDATE SKIP
+    LOCKED`` so two concurrent workers can't process the same run
+    in parallel — the loser gets ``None`` + bails out cleanly.
+
+    Caller's transaction holds the lock until commit / rollback.
+    """
+    stmt = (
+        select(WorkflowRun)
+        .where(WorkflowRun.id == run_id)
+        .with_for_update(skip_locked=True)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def list_runs_due_for_resume(
+    session: AsyncSession,
+    *,
+    now: datetime,
+    limit: int = 100,
+) -> list[WorkflowRun]:
+    """``WHERE status='pending' AND next_step_at <= now()`` for the
+    Celery beat sweep that resumes parked wait-nodes. Backed by the
+    partial index ``ix_workflow_runs_pending_sweep`` from migration
+    0136 so the scan stays cheap even at million-run scale."""
+    stmt = (
+        select(WorkflowRun)
+        .where(
+            WorkflowRun.status == WorkflowRunStatus.pending,
+            WorkflowRun.next_step_at.is_not(None),
+            WorkflowRun.next_step_at <= now,
+        )
+        .order_by(WorkflowRun.next_step_at.asc())
+        .limit(limit)
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def list_runs(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID | None = None,
+    contact_id: uuid.UUID | None = None,
+    status: WorkflowRunStatus | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[WorkflowRun], int]:
+    """Paginated run history. Drives the Step-19 analytics +
+    diagnostics views; the per-workflow + per-contact filters cover
+    "what fired" + "what fired for this contact" surface."""
+    base = select(WorkflowRun).where(WorkflowRun.org_id == org_id)
+
+    if workflow_id is not None:
+        base = base.where(WorkflowRun.workflow_id == workflow_id)
+    if contact_id is not None:
+        base = base.where(WorkflowRun.contact_id == contact_id)
+    if status is not None:
+        base = base.where(WorkflowRun.status == status)
+
+    total = (
+        await session.execute(
+            select(func.count()).select_from(base.subquery())
+        )
+    ).scalar_one()
+
+    rows = (
+        (
+            await session.execute(
+                base.order_by(WorkflowRun.started_at.desc())
+                .offset(offset)
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows), int(total)
+
+
+async def get_run(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run_id: uuid.UUID,
+) -> WorkflowRun | None:
+    """Tenant-scoped single-row read used by the
+    ``GET /workflows/runs/{run_id}`` endpoint."""
+    result = await session.execute(
+        select(WorkflowRun).where(
+            WorkflowRun.id == run_id,
+            WorkflowRun.org_id == org_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def list_step_runs(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run_id: uuid.UUID,
+) -> list[WorkflowStepRun]:
+    """Append-only step timeline for one run, ordered by
+    ``step_index`` ASC. Step 19's per-run drill-down shows this as
+    the executed-step list."""
+    result = await session.execute(
+        select(WorkflowStepRun)
+        .where(
+            WorkflowStepRun.org_id == org_id,
+            WorkflowStepRun.run_id == run_id,
+        )
+        .order_by(WorkflowStepRun.step_index.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def next_step_index(
+    session: AsyncSession,
+    *,
+    run_id: uuid.UUID,
+) -> int:
+    """Allocate the next monotonic ``step_index`` for a run. The
+    unique ``(run_id, step_index)`` constraint enforces strict
+    ordering; collisions surface as IntegrityError + the engine's
+    catch-all marks the run errored."""
+    result = await session.execute(
+        select(func.coalesce(func.max(WorkflowStepRun.step_index), -1))
+        .where(WorkflowStepRun.run_id == run_id)
+    )
+    return int(result.scalar_one()) + 1
+
+
 __all__ = [
     "add_folder",
     "add_version",
@@ -234,9 +406,18 @@ __all__ = [
     "count_workflows_in_folder",
     "delete_folder",
     "get_folder",
+    "get_run",
+    "get_run_for_processing",
+    "get_run_unscoped",
     "get_workflow",
     "get_workflow_by_name",
+    "insert_run",
+    "insert_step_run",
     "list_folders",
+    "list_runs",
+    "list_runs_due_for_resume",
+    "list_step_runs",
     "list_versions",
     "list_workflows",
+    "next_step_index",
 ]

@@ -144,4 +144,12 @@ beat_schedule = {
         'task': 'src.app.core.automation.tasks.daily_time_based_scan',
         'schedule': crontab(hour=3, minute=30),
     },
+    # tasks/workflows Step 4 — every-60s sweep that re-dispatches
+    # parked wait-node runs whose next_step_at <= now(). Matches the
+    # email-sequences-tick cadence (60s) — same operator-visible
+    # responsiveness for time-based hops.
+    'workflows-sweep-waits': {
+        'task': 'src.app.core.workflows.tasks.sweep_waits',
+        'schedule': 60.0,
+    },
 }

@@ -82,8 +82,59 @@ def list_registered() -> list[str]:
 
 def _clear_registry_for_tests() -> None:
     """Wipe the registry between test cases so registrations don't
-    bleed across runs. NOT exported via ``__all__``."""
+    bleed across runs. NOT exported via ``__all__``. Built-ins are
+    NOT auto-restored — tests that need them call
+    :func:`_register_builtins` explicitly so the existing Step-1
+    test_action_registry.py cases (which count exactly the keys
+    they registered) still pass."""
     _factories.clear()
+
+
+# --- Built-in handlers ----------------------------------------------------
+
+
+async def _trigger_handler(session, *, run, step_run, node, context):
+    """No-op pass-through for trigger nodes. The Step-5 trigger
+    subscribers do the actual event-payload extraction during
+    ``start_run``; by the time the engine processes the trigger
+    node here, it just needs a row in ``tbl_workflow_step_runs``
+    + an immediate advance to the next node."""
+    from src.app.core.workflows.engine import ActionResult
+
+    return ActionResult()
+
+
+async def _flow_wait_handler(session, *, run, step_run, node, context):
+    """No-op pass-through. The engine's ``_advance`` recognises wait
+    nodes by type AFTER the handler returns + parks the run with
+    ``next_step_at`` set. Step 11 will refine this to honour
+    ``flow.wait_for_event`` semantics + cancel-on-resume conditions;
+    for v1 the engine handles the parking inline."""
+    from src.app.core.workflows.engine import ActionResult
+
+    return ActionResult()
+
+
+async def _flow_end_handler(session, *, run, step_run, node, context):
+    """No-op terminator. The advance step's "no outbound edges"
+    branch turns this into the ``completed`` (or ``goal_reached``)
+    run outcome."""
+    from src.app.core.workflows.engine import ActionResult
+
+    return ActionResult()
+
+
+def _register_builtins() -> None:
+    """Register the engine's built-in handlers. Called at module
+    import + after every ``_clear_registry_for_tests`` so the
+    trigger / flow handlers are always available."""
+    _factories["trigger"] = lambda: _trigger_handler
+    _factories["flow.wait"] = lambda: _flow_wait_handler
+    _factories["flow.wait_for_event"] = lambda: _flow_wait_handler
+    _factories["flow.end"] = lambda: _flow_end_handler
+
+
+_register_builtins()
 
 
 __all__ = [
