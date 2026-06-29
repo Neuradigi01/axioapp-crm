@@ -60,3 +60,10 @@ from src.app.core.workflows.actions import send  # noqa: F401
 # handlers are placeholders that raise ActionNotImplemented until
 # core/quotes + core/orders ship.
 from src.app.core.workflows.actions import records  # noqa: F401
+
+# tasks/workflows Step 9 — side-effect: register the five Routing
+# action handlers (round_robin / least_loaded / territory / skill /
+# specific_user). Round-robin pointer state lives on
+# ``tbl_org_settings.routing_state`` (column added by migration
+# 0138_org_settings_routing_state).
+from src.app.core.workflows.actions import routing  # noqa: F401

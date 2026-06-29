@@ -115,6 +115,20 @@ class OrgSettings(Base, TenantScoped):
         server_default=sql_text("'{\"strategy\":\"round_robin\"}'::jsonb"),
     )
 
+    # --- workflow routing state (tasks/workflows Step 9) ---
+    # Per-pool round-robin pointer state. Keyed by ``pool_spec``
+    # string (e.g. ``"role:Sales"``) → ``{"last_picked_user_id":
+    # "<uuid>", "last_picked_at": "<iso>"}``. Mutated under a
+    # ``SELECT ... FOR UPDATE`` row lock on this row so concurrent
+    # workflow firings can't double-assign or skip a user. Kept
+    # tiny — one entry per (org, pool_spec) the operator's
+    # workflows reference.
+    routing_state: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sql_text("'{}'::jsonb"),
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
