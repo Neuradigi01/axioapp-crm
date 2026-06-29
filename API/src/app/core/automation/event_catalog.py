@@ -207,14 +207,40 @@ _register(
     CatalogEntry(
         event_type="appointment.booked",
         label="Appointment booked",
-        description="A new appointment is scheduled.",
+        description=(
+            "A new appointment is scheduled. Fires once at "
+            "``core.appointments.service.create_appointment`` after "
+            "commit; ``event_id=appointment_booked:{id}`` deduplicates "
+            "replays."
+        ),
         sample_payload={
+            # Flat top-level keys so condition AST paths like
+            # `field='location'` work without nesting; the nested
+            # `appointment` / `contact` / `org` dicts carry the
+            # template renderer's variable lookups.
+            "appointment_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "scheduled_at": "2026-07-01T10:00:00+05:30",
+            "location": "Bengaluru Showroom",
             "appointment": {
                 "id": "00000000-0000-0000-0000-000000000000",
+                "title": "Showroom walk-through",
+                "purpose": "showroom_visit",
                 "scheduled_at": "2026-07-01T10:00:00+05:30",
+                "duration_min": 60,
                 "location": "Bengaluru Showroom",
             },
-            "contact": {"first_name": "Asha"},
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
         },
     )
 )
@@ -222,10 +248,35 @@ _register(
     CatalogEntry(
         event_type="appointment.reminder_24h",
         label="Appointment reminder (24h)",
-        description="Daily sweep fires 24 hours before scheduled time.",
+        description=(
+            "Celery beat sweep at every 15min fires 24h before the "
+            "scheduled time. ``event_id=appointment_reminder_24h:{id}`` "
+            "deduplicates across overlapping sweep ticks."
+        ),
         sample_payload={
-            "appointment": {"scheduled_at": "2026-07-01T10:00:00+05:30"},
-            "contact": {"first_name": "Asha"},
+            "appointment_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "scheduled_at": "2026-07-01T10:00:00+05:30",
+            "location": "Bengaluru Showroom",
+            "appointment": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "title": "Showroom walk-through",
+                "purpose": "showroom_visit",
+                "scheduled_at": "2026-07-01T10:00:00+05:30",
+                "duration_min": 60,
+                "location": "Bengaluru Showroom",
+            },
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
         },
     )
 )
@@ -233,10 +284,35 @@ _register(
     CatalogEntry(
         event_type="appointment.reminder_1h",
         label="Appointment reminder (1h)",
-        description="Hourly sweep fires 1 hour before scheduled time.",
+        description=(
+            "Celery beat sweep at every 15min fires 1h before the "
+            "scheduled time. ``event_id=appointment_reminder_1h:{id}`` "
+            "deduplicates across overlapping sweep ticks."
+        ),
         sample_payload={
-            "appointment": {"scheduled_at": "2026-07-01T10:00:00+05:30"},
-            "contact": {"first_name": "Asha"},
+            "appointment_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "scheduled_at": "2026-07-01T10:00:00+05:30",
+            "location": "Bengaluru Showroom",
+            "appointment": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "title": "Showroom walk-through",
+                "purpose": "showroom_visit",
+                "scheduled_at": "2026-07-01T10:00:00+05:30",
+                "duration_min": 60,
+                "location": "Bengaluru Showroom",
+            },
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
         },
     )
 )

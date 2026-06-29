@@ -309,6 +309,16 @@ async def create_appointment(
             event_type="appointment.assigned",
         )
 
+    # tasks/automation-engine Step 10 — publish the
+    # ``appointment.booked`` domain event so the seeded
+    # "Appointment Booked" automation trigger fires the booking
+    # confirmation message. After-commit so a publish failure can't
+    # roll back the appointment write. Handler exceptions are logged
+    # + swallowed inside ``events.bus.publish``.
+    await _publish_appointment_booked(
+        session=session, org_id=org_id, appt=appt
+    )
+
     return appt
 
 
@@ -784,6 +794,92 @@ async def bulk_cancel_appointments(
 
     await session.commit()
     return cancelled, skipped
+
+
+# --- Step-10 event publisher ----------------------------------------------
+
+
+async def _publish_appointment_booked(
+    *,
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    appt: Appointment,
+) -> None:
+    """Build the ``appointment.booked`` envelope + ship via the bus.
+
+    Snapshots the contact + organisation into the payload so the
+    automation-engine's recipient resolver + template renderer have
+    everything they need without per-handler DB hits. Mirrors the
+    Step-6 ``leads._publish_lead_created`` shape so subscribers see a
+    uniform "flat top-level keys + nested entity dicts" envelope
+    across event types.
+
+    The bus is fire-and-forget — handler exceptions are caught by the
+    bus itself; we also swallow at this layer so a missing
+    ``core.events.bus`` import (e.g. during a partial test fixture
+    load) can't roll back the freshly-committed appointment.
+    """
+    try:
+        from sqlalchemy import select as _select
+
+        from src.app.core.contacts.models import Contact
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        contact = (
+            await session.execute(
+                _select(Contact).where(Contact.id == appt.contact_id)
+            )
+        ).scalar_one_or_none()
+        org = (
+            await session.execute(
+                _select(Organization).where(Organization.id == org_id)
+            )
+        ).scalar_one_or_none()
+
+        payload: dict[str, Any] = {
+            "appointment_id": str(appt.id),
+            "contact_id": str(appt.contact_id),
+            "scheduled_at": appt.scheduled_at.isoformat(),
+            "location": appt.location,
+            "appointment": {
+                "id": str(appt.id),
+                "title": appt.title,
+                "purpose": appt.purpose,
+                "scheduled_at": appt.scheduled_at.isoformat(),
+                "duration_min": appt.duration_min,
+                "location": appt.location,
+            },
+        }
+        if contact is not None:
+            payload["contact"] = {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+            }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+            }
+
+        await events_publish(
+            "appointment.booked",
+            payload,
+            org_id=org_id,
+            event_id=f"appointment_booked:{appt.id}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "appointments.create publish_appointment_booked_failed "
+            "org=%s appt=%s",
+            org_id,
+            appt.id,
+        )
 
 
 __all__ = [

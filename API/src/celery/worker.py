@@ -39,6 +39,11 @@ celery.autodiscover_tasks([
     # per queued automation run. The dispatcher .apply_async()'s the
     # run id; without this entry the worker can't find the task.
     "src.app.core.automation.tasks",
+    # tasks/automation-engine Step 10 — every-15-min sweep that
+    # publishes appointment.reminder_24h + appointment.reminder_1h
+    # events for upcoming appointments. Without this entry the beat
+    # scheduler can't find the task.
+    "src.app.core.appointments.tasks",
 ])
 
 if not CELERY_ENABLED:

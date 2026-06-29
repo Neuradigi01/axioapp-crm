@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 
 _USER_WELCOME_TRIGGER_NAME = "User Welcome"
 _LEAD_CONFIRMATION_TRIGGER_NAME = "Lead Confirmation"
+_APPOINTMENT_BOOKED_TRIGGER_NAME = "Appointment Booked"
+_APPOINTMENT_REMINDER_24H_TRIGGER_NAME = "Appointment Reminder 24h"
+_APPOINTMENT_REMINDER_1H_TRIGGER_NAME = "Appointment Reminder 1h"
 
 
 async def seed_user_welcome_trigger(
@@ -127,6 +130,106 @@ async def seed_lead_confirmation_trigger(
     return trigger
 
 
+async def _seed_appointment_trigger(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    name: str,
+    event_type: str,
+    template_id: uuid.UUID,
+) -> AutomationTrigger:
+    """Shared shaper for the three Step-10 appointment-cycle triggers.
+
+    All three seed identically: WhatsApp channel, no conditions, no
+    delay, recipient resolved off ``contact.phone``. The only
+    difference between them is the trigger ``name`` + the
+    ``event_type`` it subscribes to. Idempotent on
+    ``(org_id, lower(name))``."""
+    existing = await data_access.get_trigger_by_name(
+        session, org_id=org_id, name=name
+    )
+    if existing is not None:
+        return existing
+
+    trigger = AutomationTrigger(
+        org_id=org_id,
+        name=name,
+        enabled=True,
+        event_type=event_type,
+        conditions={},
+        channel=ConversationChannel.whatsapp,
+        template_id=template_id,
+        delay_seconds=0,
+        recipient_resolver="contact.phone",
+        recipient_resolver_config={},
+        created_by_user_id=None,
+        updated_by_user_id=None,
+    )
+    session.add(trigger)
+    await session.flush()
+    logger.info(
+        "automation.seed appointment_trigger org=%s name=%s "
+        "trigger=%s template=%s",
+        org_id,
+        name,
+        trigger.id,
+        template_id,
+    )
+    return trigger
+
+
+async def seed_appointment_booked_trigger(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+) -> AutomationTrigger:
+    """Fires when ``core.appointments.service.create_appointment``
+    commits a new row + publishes ``appointment.booked``."""
+    return await _seed_appointment_trigger(
+        session,
+        org_id=org_id,
+        name=_APPOINTMENT_BOOKED_TRIGGER_NAME,
+        event_type="appointment.booked",
+        template_id=template_id,
+    )
+
+
+async def seed_appointment_reminder_24h_trigger(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+) -> AutomationTrigger:
+    """Fires when the Celery beat sweep
+    (``core.appointments.tasks.scan_for_reminders``) finds an
+    appointment whose ``scheduled_at`` is ~24 hours away."""
+    return await _seed_appointment_trigger(
+        session,
+        org_id=org_id,
+        name=_APPOINTMENT_REMINDER_24H_TRIGGER_NAME,
+        event_type="appointment.reminder_24h",
+        template_id=template_id,
+    )
+
+
+async def seed_appointment_reminder_1h_trigger(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+) -> AutomationTrigger:
+    """Fires when the Celery beat sweep finds an appointment whose
+    ``scheduled_at`` is ~1 hour away."""
+    return await _seed_appointment_trigger(
+        session,
+        org_id=org_id,
+        name=_APPOINTMENT_REMINDER_1H_TRIGGER_NAME,
+        event_type="appointment.reminder_1h",
+        template_id=template_id,
+    )
+
+
 async def install_default_org_seeds(
     session: AsyncSession, *, org_id: uuid.UUID
 ) -> dict:
@@ -135,10 +238,18 @@ async def install_default_org_seeds(
 
     * Welcome — fires on ``user.signed_up`` (Step 5).
     * Lead Confirmation — fires on ``lead.created`` (Step 6).
+    * Appointment Booked — fires on ``appointment.booked`` (Step 10).
+    * Appointment Reminder 24h — fires on
+      ``appointment.reminder_24h`` (Step 10).
+    * Appointment Reminder 1h — fires on
+      ``appointment.reminder_1h`` (Step 10).
 
     Returns the seeded ids so backfill migrations can log per-org.
     All seeders are idempotent — safe to re-run."""
     from src.app.core.templates.seeds import (
+        seed_appointment_booked_template,
+        seed_appointment_reminder_1h_template,
+        seed_appointment_reminder_24h_template,
         seed_lead_confirmation_template,
         seed_user_welcome_template,
     )
@@ -157,16 +268,50 @@ async def install_default_org_seeds(
         session, org_id=org_id, template_id=lead_template.id
     )
 
+    booked_template = await seed_appointment_booked_template(
+        session, org_id=org_id
+    )
+    booked_trigger = await seed_appointment_booked_trigger(
+        session, org_id=org_id, template_id=booked_template.id
+    )
+
+    reminder_24h_template = await seed_appointment_reminder_24h_template(
+        session, org_id=org_id
+    )
+    reminder_24h_trigger = await seed_appointment_reminder_24h_trigger(
+        session,
+        org_id=org_id,
+        template_id=reminder_24h_template.id,
+    )
+
+    reminder_1h_template = await seed_appointment_reminder_1h_template(
+        session, org_id=org_id
+    )
+    reminder_1h_trigger = await seed_appointment_reminder_1h_trigger(
+        session,
+        org_id=org_id,
+        template_id=reminder_1h_template.id,
+    )
+
     return {
         "welcome_template_id": str(welcome_template.id),
         "welcome_trigger_id": str(welcome_trigger.id),
         "lead_template_id": str(lead_template.id),
         "lead_trigger_id": str(lead_trigger.id),
+        "appointment_booked_template_id": str(booked_template.id),
+        "appointment_booked_trigger_id": str(booked_trigger.id),
+        "appointment_reminder_24h_template_id": str(reminder_24h_template.id),
+        "appointment_reminder_24h_trigger_id": str(reminder_24h_trigger.id),
+        "appointment_reminder_1h_template_id": str(reminder_1h_template.id),
+        "appointment_reminder_1h_trigger_id": str(reminder_1h_trigger.id),
     }
 
 
 __all__ = [
     "install_default_org_seeds",
+    "seed_appointment_booked_trigger",
+    "seed_appointment_reminder_1h_trigger",
+    "seed_appointment_reminder_24h_trigger",
     "seed_lead_confirmation_trigger",
     "seed_user_welcome_trigger",
 ]

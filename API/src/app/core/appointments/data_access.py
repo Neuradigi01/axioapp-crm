@@ -170,6 +170,33 @@ async def list_appointments_query(
     return list((await session.execute(stmt)).scalars().all())
 
 
+async def find_due_for_reminder(
+    session: AsyncSession,
+    *,
+    window_start: datetime,
+    window_end: datetime,
+) -> list[Appointment]:
+    """Return every :class:`Appointment` whose ``scheduled_at`` falls
+    inside ``[window_start, window_end)`` and whose status is
+    ``scheduled`` (the only state that warrants a reminder — cancelled
+    / no_show / completed don't).
+
+    Used by ``core.appointments.tasks.scan_for_reminders`` to drive the
+    24h + 1h reminder events. The Celery scanner is cross-tenant — it
+    opens a session WITHOUT setting ``RequestContext.org_id`` so the
+    ``do_orm_execute`` tenant filter is a no-op + the scan returns
+    every org's rows in one pass. The consumer then reads ``appt.org_id``
+    off each row + supplies it when publishing.
+    """
+    stmt = (
+        select(Appointment)
+        .where(Appointment.status == AppointmentStatus.scheduled)
+        .where(Appointment.scheduled_at >= window_start)
+        .where(Appointment.scheduled_at < window_end)
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
 async def user_has_active_membership(
     session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
 ) -> bool:
@@ -194,6 +221,7 @@ async def user_has_active_membership(
 __all__ = [
     "contact_exists",
     "delete_appointment",
+    "find_due_for_reminder",
     "find_overlapping_appointments",
     "get_appointment_by_id",
     "get_contact_name",

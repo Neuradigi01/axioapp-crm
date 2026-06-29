@@ -115,4 +115,15 @@ beat_schedule = {
         'task': 'src.app.core.templates.tasks.sync_external_status_all',
         'schedule': crontab(minute=35),
     },
+    # tasks/automation-engine Step 10 — every-15-minute sweep across
+    # tbl_appointments that publishes appointment.reminder_24h and
+    # appointment.reminder_1h events for rows whose scheduled_at
+    # falls inside the matching ±30min bracket. The dispatcher's
+    # (trigger_id, event_id) uniqueness absorbs the bracket overlap
+    # between ticks so a given appointment fires each reminder at
+    # most once.
+    'appointments-scan-for-reminders': {
+        'task': 'src.app.core.appointments.tasks.scan_for_reminders',
+        'schedule': crontab(minute='*/15'),
+    },
 }

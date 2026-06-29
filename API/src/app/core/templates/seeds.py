@@ -64,6 +64,39 @@ _LEAD_CONFIRMATION_BODY = (
     "— The {{ org.name }} team"
 )
 
+# ---------------------------------------------------------------------------
+# Step 10 — appointment-cycle templates (WhatsApp channel by default).
+# WhatsApp is the manager's chosen channel for appointment messages
+# — confirmations + reminders land more reliably in the recipient's
+# attention than email. The dispatcher will skip + record a `failed`
+# run if the org hasn't connected WA yet; the operator can either
+# (a) connect WA via Settings → Integrations → WhatsApp, or
+# (b) flip the trigger's channel to email via the trigger editor.
+# ---------------------------------------------------------------------------
+
+_APPOINTMENT_BOOKED_NAME = "Appointment Booked"
+_APPOINTMENT_BOOKED_BODY = (
+    "Hi {{ contact.full_name }}, your appointment with {{ org.name }} is "
+    "confirmed for {{ appointment.scheduled_at }}"
+    " at {{ appointment.location }}. Reply to this message if you need "
+    "to reschedule. — {{ org.name }}"
+)
+
+_APPOINTMENT_REMINDER_24H_NAME = "Appointment Reminder 24h"
+_APPOINTMENT_REMINDER_24H_BODY = (
+    "Hi {{ contact.full_name }}, this is a reminder that your appointment "
+    "with {{ org.name }} is tomorrow at {{ appointment.scheduled_at }} "
+    "({{ appointment.location }}). Reply to this message if anything "
+    "changes. — {{ org.name }}"
+)
+
+_APPOINTMENT_REMINDER_1H_NAME = "Appointment Reminder 1h"
+_APPOINTMENT_REMINDER_1H_BODY = (
+    "Hi {{ contact.full_name }}, just a heads-up — your appointment with "
+    "{{ org.name }} starts in about an hour at {{ appointment.location }}. "
+    "See you soon! — {{ org.name }}"
+)
+
 
 async def seed_user_welcome_template(
     session: AsyncSession,
@@ -187,4 +220,151 @@ async def seed_lead_confirmation_template(
     return template
 
 
-__all__ = ["seed_lead_confirmation_template", "seed_user_welcome_template"]
+async def _seed_whatsapp_appointment_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    name: str,
+    body: str,
+    variables: list[str],
+    change_note: str,
+) -> MessageTemplate:
+    """Shared shaper for the three Step-10 WhatsApp appointment seeds.
+
+    WhatsApp business templates require Meta approval before they can
+    be sent on a verified phone number, but seeded templates are
+    inserted with ``external_status=n_a`` so the dispatcher's
+    template-state gate doesn't refuse them on day one. Operators who
+    want Meta-approved versions can clone + submit through the normal
+    templates editor; the seeded row is the operator's free starting
+    point.
+    """
+    existing = (
+        await session.execute(
+            select(MessageTemplate).where(
+                MessageTemplate.org_id == org_id,
+                func.lower(MessageTemplate.name) == name.lower(),
+                MessageTemplate.channel == ConversationChannel.whatsapp,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    template = MessageTemplate(
+        org_id=org_id,
+        channel=ConversationChannel.whatsapp,
+        name=name,
+        category=TemplateCategory.transactional,
+        language="en",
+        body_text=body,
+        # WA templates don't carry an email-style `subject`; the
+        # column is nullable so leave it None.
+        subject=None,
+        variables=variables,
+        internal_status=TemplateInternalStatus.published,
+        external_status=TemplateExternalStatus.n_a,
+        current_version=1,
+    )
+    session.add(template)
+    await session.flush()
+
+    version = MessageTemplateVersion(
+        org_id=org_id,
+        template_id=template.id,
+        version=1,
+        body_text=template.body_text,
+        subject=template.subject,
+        variables=template.variables,
+        change_note=change_note,
+    )
+    session.add(version)
+    await session.flush()
+
+    logger.info(
+        "templates.seed appointment_template org=%s name=%s template=%s",
+        org_id,
+        name,
+        template.id,
+    )
+    return template
+
+
+async def seed_appointment_booked_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """WhatsApp confirmation message — fires after a new appointment
+    row commits (``appointment.booked``)."""
+    return await _seed_whatsapp_appointment_template(
+        session,
+        org_id=org_id,
+        name=_APPOINTMENT_BOOKED_NAME,
+        body=_APPOINTMENT_BOOKED_BODY,
+        variables=[
+            "contact.full_name",
+            "org.name",
+            "appointment.scheduled_at",
+            "appointment.location",
+        ],
+        change_note=(
+            "seeded by automation-engine Step 10 (Appointment Booked)"
+        ),
+    )
+
+
+async def seed_appointment_reminder_24h_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """WhatsApp reminder — fires 24h before the appointment via the
+    Celery beat sweep (``appointment.reminder_24h``)."""
+    return await _seed_whatsapp_appointment_template(
+        session,
+        org_id=org_id,
+        name=_APPOINTMENT_REMINDER_24H_NAME,
+        body=_APPOINTMENT_REMINDER_24H_BODY,
+        variables=[
+            "contact.full_name",
+            "org.name",
+            "appointment.scheduled_at",
+            "appointment.location",
+        ],
+        change_note=(
+            "seeded by automation-engine Step 10 (Appointment Reminder 24h)"
+        ),
+    )
+
+
+async def seed_appointment_reminder_1h_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """WhatsApp reminder — fires 1h before the appointment via the
+    Celery beat sweep (``appointment.reminder_1h``)."""
+    return await _seed_whatsapp_appointment_template(
+        session,
+        org_id=org_id,
+        name=_APPOINTMENT_REMINDER_1H_NAME,
+        body=_APPOINTMENT_REMINDER_1H_BODY,
+        variables=[
+            "contact.full_name",
+            "org.name",
+            "appointment.location",
+        ],
+        change_note=(
+            "seeded by automation-engine Step 10 (Appointment Reminder 1h)"
+        ),
+    )
+
+
+__all__ = [
+    "seed_appointment_booked_template",
+    "seed_appointment_reminder_1h_template",
+    "seed_appointment_reminder_24h_template",
+    "seed_lead_confirmation_template",
+    "seed_user_welcome_template",
+]
