@@ -135,4 +135,13 @@ beat_schedule = {
         'task': 'src.app.core.billing.tasks.scan_for_overdue',
         'schedule': crontab(hour=9, minute=0),
     },
+    # tasks/automation-engine Step 12 — daily 03:30 UTC (~9am IST)
+    # sweep that publishes contact.birthday for today's birthdays +
+    # lead.stale_30d for every active lead with no activity in 30d.
+    # event_id idempotency (year-stamped birthdays, first-stale-date
+    # stamped staleness) means re-running the task is a no-op.
+    'automation-daily-time-based-scan': {
+        'task': 'src.app.core.automation.tasks.daily_time_based_scan',
+        'schedule': crontab(hour=3, minute=30),
+    },
 }

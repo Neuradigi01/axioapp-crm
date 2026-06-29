@@ -28,14 +28,15 @@ SQLAlchemy clause / column expressions and just executes them.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import delete, func, select, tuple_
+from sqlalchemy import delete, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import BinaryExpression, ClauseElement
 
 from src.app.core.contacts.models import Contact
-from src.app.core.leads.models import Lead, LeadScoringRule
+from src.app.core.leads.models import Lead, LeadScoringRule, LeadStatus
 from src.app.core.users.models import OrganizationMember, User
 
 
@@ -205,6 +206,48 @@ async def user_has_active_membership(
     return result.scalar_one_or_none() is not None
 
 
+# --- Stale-lead scanner ------------------------------------------------
+
+
+async def find_stale_leads(
+    session: AsyncSession,
+    *,
+    inactive_since: datetime,
+) -> list[Lead]:
+    """Return every Lead whose ``last_activity_at`` is at or before
+    ``inactive_since`` AND whose ``status`` is still ``active`` —
+    used by the Step-12 daily stale-lead scan
+    (``core.automation.scheduler.scan_stale_leads``).
+
+    Leads in ``won`` or ``lost`` status are excluded — the deal is
+    closed and a "still interested?" nudge would be inappropriate.
+    Leads whose ``last_activity_at`` is NULL (never had activity)
+    are treated as stale only if their ``created_at`` predates the
+    threshold — a freshly-created lead in the same scan window
+    shouldn't immediately trip the trigger.
+
+    The scanner is cross-tenant — it opens a session WITHOUT setting
+    ``RequestContext.org_id`` so the ``do_orm_execute`` tenant filter
+    is a no-op + the scan returns every org's stale leads in one
+    pass. The caller reads ``lead.org_id`` off each row + supplies
+    it when publishing the per-org ``lead.stale_30d`` event.
+    """
+    stmt = (
+        select(Lead)
+        .where(Lead.status == LeadStatus.active)
+        .where(
+            or_(
+                Lead.last_activity_at <= inactive_since,
+                # Never-touched leads: count the create timestamp
+                # as the "last activity" for staleness purposes.
+                (Lead.last_activity_at.is_(None))
+                & (Lead.created_at <= inactive_since),
+            )
+        )
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
 # --- Cursor-mode keyset helper -----------------------------------------
 
 
@@ -232,6 +275,7 @@ __all__ = [
     "count_leads_with_where",
     "delete_lead_row",
     "delete_scoring_rule_row",
+    "find_stale_leads",
     "get_lead_by_id",
     "get_scoring_rule_by_id",
     "insert_lead",

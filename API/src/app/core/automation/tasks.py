@@ -126,6 +126,16 @@ async def _deliver_run_async(run_id: str) -> dict[str, Any]:
         org_id = run.org_id
         token = set_context(RequestContext(org_id=org_id, user_id=None))
         try:
+            # tasks/automation-engine Step 13 — send-guard
+            # compliance check fires BEFORE we flip status to
+            # dispatched. Marketing-category runs may be skipped
+            # (DPDP / frequency cap) or deferred (quiet hours);
+            # transactional + service categories short-circuit to
+            # allow.
+            guard_result = await _run_send_guard(session, run)
+            if guard_result is not None:
+                return guard_result
+
             run.status = AutomationRunStatus.dispatched
             run.dispatched_at = datetime.now(timezone.utc)
             await session.commit()
@@ -146,6 +156,143 @@ async def _deliver_run_async(run_id: str) -> dict[str, Any]:
             return {"status": "sent", "channel_message_id": channel_message_id}
         finally:
             reset_context(token)
+
+
+async def _run_send_guard(session, run) -> dict[str, Any] | None:
+    """Run the Step-13 send-guard layer for ``run``. Returns a
+    terminal status dict when the guard short-circuited the send
+    (skipped or deferred), or ``None`` when the run should proceed
+    to dispatch normally.
+
+    A deferred run is re-queued via
+    ``deliver_run.apply_async(args=(run_id,), eta=defer_until)``;
+    the row stays ``queued`` so the next pick-up resumes the same
+    code path.
+
+    A skipped run is written terminal as ``status='skipped'`` +
+    ``error=skip_reason`` so the Run-History UI surfaces the
+    rejection cause to the operator.
+    """
+    from sqlalchemy import select as _select
+
+    from src.app.core.automation import data_access as automation_da
+    from src.app.core.automation import send_guard
+    from src.app.core.automation.models import AutomationRunStatus
+    from src.app.core.contacts.models import Contact
+    from src.app.core.tenants.models import Organization
+    from src.app.core.templates import data_access as templates_da
+
+    trigger = await automation_da.get_trigger(
+        session, org_id=run.org_id, trigger_id=run.trigger_id
+    )
+    if trigger is None:
+        # Let the downstream _execute_send path surface the missing
+        # trigger as a permanent failure — keeps error-shape in one
+        # place.
+        return None
+
+    template = await templates_da.get_template(
+        session, org_id=run.org_id, template_id=trigger.template_id
+    )
+    if template is None:
+        return None
+
+    org = (
+        await session.execute(
+            _select(Organization).where(Organization.id == run.org_id)
+        )
+    ).scalar_one_or_none()
+    if org is None:
+        return None
+
+    contact = None
+    if run.contact_id is not None:
+        contact = (
+            await session.execute(
+                _select(Contact).where(Contact.id == run.contact_id)
+            )
+        ).scalar_one_or_none()
+
+    now_utc = datetime.now(timezone.utc)
+    decision = await send_guard.evaluate(
+        session,
+        org=org,
+        template=template,
+        contact=contact,
+        contact_id=run.contact_id,
+        channel=str(trigger.channel.value if hasattr(trigger.channel, "value") else trigger.channel),
+        now_utc=now_utc,
+    )
+
+    if decision.allow:
+        return None
+
+    if decision.skip_reason is not None:
+        run.status = AutomationRunStatus.skipped
+        run.error = decision.skip_reason
+        run.completed_at = now_utc
+        await session.commit()
+        try:
+            from src.app.core import audit
+
+            await audit.log(
+                f"automations.send_blocked_{decision.skip_reason}",
+                entity_type="automation_run",
+                entity_id=run.id,
+                after={
+                    "skip_reason": decision.skip_reason,
+                    "trigger_id": str(run.trigger_id),
+                    "contact_id": (
+                        str(run.contact_id) if run.contact_id else None
+                    ),
+                },
+            )
+        except Exception:
+            logger.exception(
+                "automation.deliver_run audit_emit_failed run=%s reason=%s",
+                run.id,
+                decision.skip_reason,
+            )
+        return {"status": "skipped", "error": decision.skip_reason}
+
+    if decision.defer_until is not None:
+        # Push the run scheduled_at forward + re-queue the task so
+        # the worker picks it up at the right time. Status stays
+        # `queued`.
+        run.scheduled_at = decision.defer_until
+        await session.commit()
+        try:
+            deliver_run.apply_async(
+                args=(str(run.id),), eta=decision.defer_until
+            )
+        except Exception:
+            logger.exception(
+                "automation.deliver_run defer_reschedule_failed run=%s",
+                run.id,
+            )
+        try:
+            from src.app.core import audit
+
+            await audit.log(
+                "automations.send_deferred_quiet_hours",
+                entity_type="automation_run",
+                entity_id=run.id,
+                after={
+                    "defer_until": decision.defer_until.isoformat(),
+                    "trigger_id": str(run.trigger_id),
+                },
+            )
+        except Exception:
+            logger.exception(
+                "automation.deliver_run audit_emit_failed run=%s",
+                run.id,
+            )
+        return {
+            "status": "deferred",
+            "defer_until": decision.defer_until.isoformat(),
+        }
+
+    return None
 
 
 class _PermanentSendError(Exception):
@@ -241,4 +388,18 @@ def _is_permanent_adapter_error(exc: BaseException) -> bool:
     ).__name__.endswith("NotConnected") or isinstance(exc, NotImplementedError)
 
 
-__all__ = ["deliver_run"]
+@_shared_task(
+    name="src.app.core.automation.tasks.daily_time_based_scan",
+)
+def daily_time_based_scan() -> dict[str, int]:
+    """Beat-scheduled daily sweep — fires ``contact.birthday`` for
+    today's birthdays + ``lead.stale_30d`` for every lead with no
+    activity in 30 days. Delegates the actual scan + publish loop to
+    :func:`core.automation.scheduler.run_daily_time_based_scan` so
+    the logic stays unit-testable without a worker."""
+    from src.app.core.automation.scheduler import run_daily_time_based_scan
+
+    return asyncio.run(run_daily_time_based_scan())
+
+
+__all__ = ["daily_time_based_scan", "deliver_run"]

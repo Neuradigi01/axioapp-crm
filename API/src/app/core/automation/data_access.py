@@ -267,9 +267,72 @@ async def list_runs(
     return list(rows), int(total)
 
 
+async def count_marketing_runs_for_contact(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    contact_id: uuid.UUID,
+    since: datetime,
+) -> int:
+    """Count marketing-category automation runs sent to a contact in
+    the rolling ``since → now`` window. Powers the Step-13
+    frequency-cap send-guard check.
+
+    A run counts only when:
+
+      * its status is ``sent`` or ``dispatched`` (i.e. the message
+        actually went out — queued + skipped + failed don't count
+        toward the cap)
+      * its ``completed_at`` (for ``sent``) or ``dispatched_at``
+        (for ``dispatched`` but not yet completed) is at or after
+        ``since``
+      * the trigger's template has ``category='marketing'`` (joined
+        via ``trigger.template_id → tbl_message_templates.category``)
+
+    Backed by the partial index
+    ``ix_automation_runs_contact_completed`` from migration 0134.
+    """
+    from src.app.core.templates.models import (
+        MessageTemplate,
+        TemplateCategory,
+    )
+
+    stmt = (
+        select(func.count())
+        .select_from(AutomationRun)
+        .join(
+            AutomationTrigger,
+            AutomationTrigger.id == AutomationRun.trigger_id,
+        )
+        .join(
+            MessageTemplate,
+            MessageTemplate.id == AutomationTrigger.template_id,
+        )
+        .where(AutomationRun.org_id == org_id)
+        .where(AutomationRun.contact_id == contact_id)
+        .where(MessageTemplate.category == TemplateCategory.marketing)
+        .where(
+            AutomationRun.status.in_(
+                (
+                    AutomationRunStatus.sent,
+                    AutomationRunStatus.dispatched,
+                )
+            )
+        )
+        .where(
+            or_(
+                AutomationRun.completed_at >= since,
+                AutomationRun.dispatched_at >= since,
+            )
+        )
+    )
+    return int((await session.execute(stmt)).scalar_one())
+
+
 __all__ = [
     "add_run",
     "add_trigger",
+    "count_marketing_runs_for_contact",
     "find_run_by_event_id",
     "get_run",
     "get_run_by_id_unscoped",

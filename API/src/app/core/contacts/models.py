@@ -26,10 +26,10 @@ called out in the step spec.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -78,6 +78,15 @@ class Contact(Base, TenantScoped):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # tasks/automation-engine Step 12 — birthday trigger anchor.
+    # Year stored alongside month + day so age computation works,
+    # but the daily scanner only matches on (month, day) so leap-day
+    # birthdays still fire annually (Feb 29 → Mar 1 in non-leap years
+    # is left as a future enhancement; the scanner just skips them).
+    date_of_birth: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+    )
     source: Mapped[str | None] = mapped_column(String(64), nullable=True)
     tags: Mapped[list[str]] = mapped_column(
         ARRAY(String(64)),

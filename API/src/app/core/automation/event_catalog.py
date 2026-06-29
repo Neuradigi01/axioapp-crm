@@ -188,13 +188,66 @@ _register(
     CatalogEntry(
         event_type="contact.birthday",
         label="Contact birthday",
-        description="The daily sweep finds a contact whose birthday is today.",
+        description=(
+            "Daily Celery beat sweep finds contacts whose "
+            "``date_of_birth`` matches today (month + day) in the "
+            "org's timezone. ``event_id=contact_birthday:{contact_id}:{year}`` "
+            "deduplicates intraday replays + ensures one fire per "
+            "contact per year."
+        ),
         sample_payload={
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "age_turning": 35,
+            "date_of_birth": "1991-06-29",
             "contact": {
                 "id": "00000000-0000-0000-0000-000000000000",
-                "first_name": "Asha",
-                "birthday": "2026-06-26",
-            }
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+                "date_of_birth": "1991-06-29",
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
+        },
+    )
+)
+_register(
+    CatalogEntry(
+        event_type="lead.stale_30d",
+        label="Lead has been stale for 30 days",
+        description=(
+            "Daily Celery beat sweep finds leads with no activity in "
+            "the last 30 days whose status is not ``won`` / ``lost``. "
+            "``event_id=lead_stale_30d:{lead_id}:{first_stale_date}`` "
+            "uses the first-stale date so daily re-scans don't refire "
+            "until the lead becomes active again."
+        ),
+        sample_payload={
+            "lead_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "days_since_last_activity": 31,
+            "last_activity_at": "2026-05-29T10:00:00+00:00",
+            "lead": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "status": "active",
+                "pipeline_stage": "qualified",
+                "assigned_to_id": "00000000-0000-0000-0000-000000000000",
+                "last_activity_at": "2026-05-29T10:00:00+00:00",
+            },
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
         },
     )
 )

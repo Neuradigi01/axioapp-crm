@@ -132,6 +132,32 @@ _INVOICE_PAID_BODY = (
     "— The {{ org.name }} team"
 )
 
+# ---------------------------------------------------------------------------
+# Step 12 — time-based templates.
+# Birthday: WhatsApp (personal, more eyeballs than email).
+# Stale-lead: email (longer-form ask, salesperson signature).
+# ---------------------------------------------------------------------------
+
+_CONTACT_BIRTHDAY_NAME = "Contact Birthday"
+_CONTACT_BIRTHDAY_BODY = (
+    "Happy birthday, {{ contact.full_name }}! Wishing you a "
+    "wonderful year ahead from everyone at {{ org.name }}. — "
+    "{{ org.name }}"
+)
+
+_LEAD_STALE_30D_NAME = "Lead Stale 30d"
+_LEAD_STALE_30D_SUBJECT = "Still interested, {{ contact.full_name }}?"
+_LEAD_STALE_30D_BODY = (
+    "Hi {{ contact.full_name }},\n\n"
+    "It's been a few weeks since we last connected. I wanted to "
+    "check in — are you still interested in working with "
+    "{{ org.name }}? If now isn't the right time, just let me "
+    "know and I'll follow up later.\n\n"
+    "Otherwise, happy to answer any questions or jump on a quick "
+    "call.\n\n"
+    "— The {{ org.name }} team"
+)
+
 _INVOICE_OVERDUE_NAME = "Invoice Overdue 7d"
 _INVOICE_OVERDUE_SUBJECT = (
     "Reminder: invoice #{{ invoice.number }} is now overdue"
@@ -554,13 +580,62 @@ async def seed_invoice_overdue_template(
     )
 
 
+async def seed_contact_birthday_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """WhatsApp birthday wish — fires from the daily scheduler when
+    a contact's ``date_of_birth`` matches today (``contact.birthday``).
+
+    Routed through the shared WhatsApp shaper used by the
+    appointment seeders so the same ``external_status=n_a`` +
+    ``subject=None`` shape applies."""
+    return await _seed_whatsapp_appointment_template(
+        session,
+        org_id=org_id,
+        name=_CONTACT_BIRTHDAY_NAME,
+        body=_CONTACT_BIRTHDAY_BODY,
+        variables=["contact.full_name", "org.name"],
+        change_note=(
+            "seeded by automation-engine Step 12 (Contact Birthday)"
+        ),
+    )
+
+
+async def seed_lead_stale_30d_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """Email nudge — fires from the daily scheduler when a lead has
+    had no activity in 30 days (``lead.stale_30d``).
+
+    Routed through the shared email-invoice shaper because the
+    column shape is identical (transactional category, subject set,
+    ``external_status=n_a``)."""
+    return await _seed_email_invoice_template(
+        session,
+        org_id=org_id,
+        name=_LEAD_STALE_30D_NAME,
+        subject=_LEAD_STALE_30D_SUBJECT,
+        body=_LEAD_STALE_30D_BODY,
+        variables=["contact.full_name", "org.name"],
+        change_note=(
+            "seeded by automation-engine Step 12 (Lead Stale 30d)"
+        ),
+    )
+
+
 __all__ = [
     "seed_appointment_booked_template",
     "seed_appointment_reminder_1h_template",
     "seed_appointment_reminder_24h_template",
+    "seed_contact_birthday_template",
     "seed_invoice_overdue_template",
     "seed_invoice_paid_template",
     "seed_invoice_sent_template",
     "seed_lead_confirmation_template",
+    "seed_lead_stale_30d_template",
     "seed_user_welcome_template",
 ]

@@ -36,6 +36,8 @@ _APPOINTMENT_REMINDER_1H_TRIGGER_NAME = "Appointment Reminder 1h"
 _INVOICE_SENT_TRIGGER_NAME = "Invoice Sent"
 _INVOICE_PAID_TRIGGER_NAME = "Invoice Paid"
 _INVOICE_OVERDUE_TRIGGER_NAME = "Invoice Overdue 7d"
+_CONTACT_BIRTHDAY_TRIGGER_NAME = "Contact Birthday"
+_LEAD_STALE_30D_TRIGGER_NAME = "Lead Stale 30d"
 
 
 async def seed_user_welcome_trigger(
@@ -332,6 +334,88 @@ async def seed_invoice_overdue_trigger(
     )
 
 
+async def seed_contact_birthday_trigger(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+) -> AutomationTrigger:
+    """Fires when ``core.automation.scheduler.scan_birthdays`` finds
+    a contact whose ``date_of_birth`` matches today + publishes
+    ``contact.birthday``. WhatsApp channel + ``contact.phone``
+    resolver."""
+    existing = await data_access.get_trigger_by_name(
+        session, org_id=org_id, name=_CONTACT_BIRTHDAY_TRIGGER_NAME
+    )
+    if existing is not None:
+        return existing
+
+    trigger = AutomationTrigger(
+        org_id=org_id,
+        name=_CONTACT_BIRTHDAY_TRIGGER_NAME,
+        enabled=True,
+        event_type="contact.birthday",
+        conditions={},
+        channel=ConversationChannel.whatsapp,
+        template_id=template_id,
+        delay_seconds=0,
+        recipient_resolver="contact.phone",
+        recipient_resolver_config={},
+        created_by_user_id=None,
+        updated_by_user_id=None,
+    )
+    session.add(trigger)
+    await session.flush()
+    logger.info(
+        "automation.seed contact_birthday org=%s trigger=%s template=%s",
+        org_id,
+        trigger.id,
+        template_id,
+    )
+    return trigger
+
+
+async def seed_lead_stale_30d_trigger(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+) -> AutomationTrigger:
+    """Fires when ``core.automation.scheduler.scan_stale_leads``
+    finds an active lead with no activity in 30 days + publishes
+    ``lead.stale_30d``. Email channel + ``contact.email`` resolver
+    (longer-form ask, salesperson signature)."""
+    existing = await data_access.get_trigger_by_name(
+        session, org_id=org_id, name=_LEAD_STALE_30D_TRIGGER_NAME
+    )
+    if existing is not None:
+        return existing
+
+    trigger = AutomationTrigger(
+        org_id=org_id,
+        name=_LEAD_STALE_30D_TRIGGER_NAME,
+        enabled=True,
+        event_type="lead.stale_30d",
+        conditions={},
+        channel=ConversationChannel.email,
+        template_id=template_id,
+        delay_seconds=0,
+        recipient_resolver="contact.email",
+        recipient_resolver_config={},
+        created_by_user_id=None,
+        updated_by_user_id=None,
+    )
+    session.add(trigger)
+    await session.flush()
+    logger.info(
+        "automation.seed lead_stale_30d org=%s trigger=%s template=%s",
+        org_id,
+        trigger.id,
+        template_id,
+    )
+    return trigger
+
+
 async def install_default_org_seeds(
     session: AsyncSession, *, org_id: uuid.UUID
 ) -> dict:
@@ -348,6 +432,8 @@ async def install_default_org_seeds(
     * Invoice Sent — fires on ``invoice.sent`` (Step 11).
     * Invoice Paid — fires on ``invoice.paid`` (Step 11).
     * Invoice Overdue 7d — fires on ``invoice.overdue_7d`` (Step 11).
+    * Contact Birthday — fires on ``contact.birthday`` (Step 12).
+    * Lead Stale 30d — fires on ``lead.stale_30d`` (Step 12).
 
     Returns the seeded ids so backfill migrations can log per-org.
     All seeders are idempotent — safe to re-run."""
@@ -355,10 +441,12 @@ async def install_default_org_seeds(
         seed_appointment_booked_template,
         seed_appointment_reminder_1h_template,
         seed_appointment_reminder_24h_template,
+        seed_contact_birthday_template,
         seed_invoice_overdue_template,
         seed_invoice_paid_template,
         seed_invoice_sent_template,
         seed_lead_confirmation_template,
+        seed_lead_stale_30d_template,
         seed_user_welcome_template,
     )
 
@@ -428,6 +516,24 @@ async def install_default_org_seeds(
         template_id=invoice_overdue_template.id,
     )
 
+    birthday_template = await seed_contact_birthday_template(
+        session, org_id=org_id
+    )
+    birthday_trigger = await seed_contact_birthday_trigger(
+        session,
+        org_id=org_id,
+        template_id=birthday_template.id,
+    )
+
+    stale_30d_template = await seed_lead_stale_30d_template(
+        session, org_id=org_id
+    )
+    stale_30d_trigger = await seed_lead_stale_30d_trigger(
+        session,
+        org_id=org_id,
+        template_id=stale_30d_template.id,
+    )
+
     return {
         "welcome_template_id": str(welcome_template.id),
         "welcome_trigger_id": str(welcome_trigger.id),
@@ -445,6 +551,10 @@ async def install_default_org_seeds(
         "invoice_paid_trigger_id": str(invoice_paid_trigger.id),
         "invoice_overdue_template_id": str(invoice_overdue_template.id),
         "invoice_overdue_trigger_id": str(invoice_overdue_trigger.id),
+        "contact_birthday_template_id": str(birthday_template.id),
+        "contact_birthday_trigger_id": str(birthday_trigger.id),
+        "lead_stale_30d_template_id": str(stale_30d_template.id),
+        "lead_stale_30d_trigger_id": str(stale_30d_trigger.id),
     }
 
 
@@ -453,9 +563,11 @@ __all__ = [
     "seed_appointment_booked_trigger",
     "seed_appointment_reminder_1h_trigger",
     "seed_appointment_reminder_24h_trigger",
+    "seed_contact_birthday_trigger",
     "seed_invoice_overdue_trigger",
     "seed_invoice_paid_trigger",
     "seed_invoice_sent_trigger",
     "seed_lead_confirmation_trigger",
+    "seed_lead_stale_30d_trigger",
     "seed_user_welcome_trigger",
 ]

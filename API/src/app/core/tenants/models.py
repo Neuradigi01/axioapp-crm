@@ -8,10 +8,10 @@ This model uses SQLAlchemy 2.x typed-Mapped style and registers on the
 shared `Base` so Alembic autogenerate picks it up alongside legacy models.
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Numeric, String, text
+from sqlalchemy import Boolean, DateTime, Integer, Numeric, String, Text, Time, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -50,4 +50,44 @@ class Organization(Base):
         DateTime(timezone=True),
         nullable=False,
         server_default=text("now()"),
+    )
+    # tasks/automation-engine Step 13 — send-time compliance controls.
+    # The marketing-send guard checks these before dispatching any
+    # marketing-category automation run:
+    #   * Quiet hours: marketing sends in the window
+    #     ``[quiet_hours_start, quiet_hours_end)`` (in
+    #     ``quiet_hours_timezone``) are deferred to ``quiet_hours_end``
+    #     of the same or next day. The default 21:00–09:00 IST matches
+    #     the DPDP guidance + standard "don't message after dinner"
+    #     courtesy window operators expect.
+    #   * Frequency cap: when ``marketing_frequency_cap_enabled`` is
+    #     true, no contact receives more than
+    #     ``marketing_frequency_cap_per_week`` marketing sends in any
+    #     rolling 7-day window. Cap = 0 means "no marketing sends".
+    # Transactional + service templates bypass all three checks; only
+    # ``TemplateCategory.marketing`` runs hit the guard.
+    quiet_hours_start: Mapped[time] = mapped_column(
+        Time,
+        nullable=False,
+        server_default=text("'21:00:00'"),
+    )
+    quiet_hours_end: Mapped[time] = mapped_column(
+        Time,
+        nullable=False,
+        server_default=text("'09:00:00'"),
+    )
+    quiet_hours_timezone: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=text("'Asia/Kolkata'"),
+    )
+    marketing_frequency_cap_per_week: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("3"),
+    )
+    marketing_frequency_cap_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
     )

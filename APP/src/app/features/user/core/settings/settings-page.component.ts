@@ -7,6 +7,7 @@ import { EmailAccountsTabComponent } from './email-accounts/email-accounts-tab.c
 import { EmailSequencesListComponent } from './email-sequences/sequence-list.component';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
+import { AutomationSettingsTabComponent } from './tabs/automation-settings-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
 import { LoginHistoryTabComponent } from './tabs/login-history-tab.component';
 import { NotificationsTabComponent } from './tabs/notifications-tab.component';
@@ -29,6 +30,7 @@ type SettingsTab =
   | 'email-sequences'
   | 'notifications'
   | 'ai'
+  | 'send-rules'
   | 'custom-fields'
   | 'standard-fields'
   | 'embed';
@@ -79,6 +81,14 @@ const TABS: ReadonlyArray<TabDef> = [
   },
   { id: 'ai', label: 'AI Settings', permission: 'settings.write' },
   {
+    // tasks/automation-engine Step 13 — quiet hours, frequency cap,
+    // DPDP marketing-consent note. Owner / Admin only via
+    // `settings.write`.
+    id: 'send-rules',
+    label: 'Send Rules',
+    permission: 'settings.write',
+  },
+  {
     id: 'custom-fields',
     label: 'Custom Fields',
     permission: 'custom_fields.write',
@@ -109,6 +119,7 @@ const TABS: ReadonlyArray<TabDef> = [
     RolesTabComponent,
     NotificationsTabComponent,
     AiSettingsTabComponent,
+    AutomationSettingsTabComponent,
     CustomFieldsPageComponent,
     StandardFieldsTabComponent,
     EmbedIntegrationsTabComponent,

@@ -263,6 +263,36 @@ async def count_contacts_filtered(
     return int((await session.execute(stmt)).scalar_one())
 
 
+async def find_birthdays_on(
+    session: AsyncSession,
+    *,
+    month: int,
+    day: int,
+) -> list[Contact]:
+    """Return every Contact whose ``date_of_birth`` matches the
+    ``(month, day)`` pair — used by the Step-12 daily birthday scan
+    (``core.automation.scheduler.scan_birthdays``).
+
+    The scanner is cross-tenant — it opens a session WITHOUT setting
+    ``RequestContext.org_id`` so the ``do_orm_execute`` tenant filter
+    is a no-op + the scan returns every org's birthdays in one pass.
+    The caller reads ``contact.org_id`` off each row + supplies it
+    when publishing the per-org ``contact.birthday`` event.
+
+    Leap-day birthdays (Feb 29) are handled by matching the literal
+    pair — in non-leap years those contacts simply don't surface;
+    the operator can choose to add a "rolled to Mar 1" condition in
+    the trigger if desired.
+    """
+    stmt = (
+        select(Contact)
+        .where(Contact.date_of_birth.is_not(None))
+        .where(func.extract("month", Contact.date_of_birth) == month)
+        .where(func.extract("day", Contact.date_of_birth) == day)
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
 async def list_contacts_for_export(
     session: AsyncSession,
     *,
