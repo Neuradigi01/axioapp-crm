@@ -63,15 +63,26 @@ _register(
     CatalogEntry(
         event_type="user.signed_up",
         label="User signed up",
-        description="A new Owner finishes the self-signup flow + email verification.",
+        description="A new Owner finishes the self-signup flow.",
         sample_payload={
+            # Step 5 publisher emits this shape verbatim — keep
+            # in sync. The flat `user_id` lives at the top level
+            # so `recipient_resolver='user.email'` works without
+            # additional config; the nested `user` dict carries
+            # the variable values the seeded "User Welcome"
+            # template's body references (``{{ user.full_name }}``).
+            "user_id": "00000000-0000-0000-0000-000000000000",
             "user": {
                 "id": "00000000-0000-0000-0000-000000000000",
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
-                "role": "Owner",
             },
-            "org_id": "00000000-0000-0000-0000-000000000000",
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
+            "signed_up_at": "2026-06-29T12:30:00+00:00",
         },
     )
 )

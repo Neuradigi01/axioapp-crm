@@ -595,6 +595,18 @@ async def register_user_only(
         ua=ua,
     )
 
+    # tasks/automation-engine Step 5 — publish the user.signed_up
+    # event AFTER commit so a publish failure doesn't roll back the
+    # signup. The bus is fire-and-forget — handler exceptions are
+    # logged + swallowed inside ``events.bus.publish``. The seeded
+    # Welcome trigger picks this up + dispatches the welcome email.
+    await _publish_user_signed_up(
+        org=org,
+        user_uuid=user_uuid,
+        email=req.email,
+        full_name=f"{req.first_name.strip()} {req.last_name.strip()}",
+    )
+
     encoded, exp = encode_token(
         user_id=user_uuid, org_id=org.id, token_id=token_id, now=now
     )
@@ -606,6 +618,47 @@ async def register_user_only(
         role_name=owner_role.name,
         needs_onboarding=True,
     )
+
+
+async def _publish_user_signed_up(
+    *,
+    org,
+    user_uuid: uuid.UUID,
+    email: str,
+    full_name: str,
+) -> None:
+    """Wrapper around ``events.bus.publish`` that catches every
+    exception so a misbehaving subscriber + a missing bus module
+    can't roll back the freshly-committed signup. Mirrors the
+    audit.log call-site pattern."""
+    try:
+        from src.app.core.events.bus import publish as events_publish
+
+        await events_publish(
+            "user.signed_up",
+            {
+                "user_id": str(user_uuid),
+                "user": {
+                    "id": str(user_uuid),
+                    "full_name": full_name,
+                    "email": email,
+                },
+                "org": {
+                    "id": str(org.id),
+                    "name": org.name,
+                    "slug": org.slug,
+                },
+                "signed_up_at": datetime.now(timezone.utc).isoformat(),
+            },
+            org_id=org.id,
+            event_id=f"signup:{user_uuid}",
+        )
+    except Exception:
+        logger.exception(
+            "auth.signup events_publish_failed org=%s user=%s",
+            org.id,
+            user_uuid,
+        )
 
 
 def _validate_template_choice(template_id: str) -> dict:

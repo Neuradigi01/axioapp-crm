@@ -65,6 +65,16 @@ async def create_organization(
     except IntegrityError:
         await session.rollback()
         raise
+
+    # tasks/automation-engine Step 5 — install default automation
+    # seeds inside the same transaction. A signup that later rolls
+    # back also rolls back the seeded template + trigger. Idempotent
+    # — re-runs (from the backfill migration's pre-existing-org
+    # sweep) never duplicate.
+    from src.app.core.automation.seeds import install_default_org_seeds
+
+    await install_default_org_seeds(session, org_id=org.id)
+
     return org
 
 
