@@ -278,7 +278,22 @@ class WorkflowFolderRead(ORMModel):
     updated_at: datetime
 
 
+class EventWaitRead(ORMModel):
+    """Step-11 read shape for the ``tbl_workflow_event_waits`` table.
+    Drives the per-run wait-status view on Step-19's diagnostics
+    surface."""
+
+    id: uuid.UUID
+    run_id: uuid.UUID
+    node_id: str
+    event_type: str
+    contact_id: uuid.UUID | None
+    expires_at: datetime
+    created_at: datetime
+
+
 __all__ = [
+    "EventWaitRead",
     "GraphEdge",
     "GraphNode",
     "NodePosition",

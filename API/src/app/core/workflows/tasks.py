@@ -98,4 +98,63 @@ async def _sweep_waits_async() -> dict[str, int]:
     return await engine.resume_after_wait()
 
 
-__all__ = ["process_step", "sweep_waits"]
+@_shared_task(
+    name="src.app.core.workflows.tasks.expire_waits",
+)
+def expire_waits() -> dict[str, Any]:
+    """Beat-scheduled every 2 minutes. Finds parked
+    ``flow_control.wait_for_event`` waits whose ``expires_at <=
+    now()`` + resumes each run on the ``timeout`` outbound edge,
+    then deletes the wait row."""
+    return asyncio.run(_expire_waits_async())
+
+
+async def _expire_waits_async() -> dict[str, Any]:
+    from src.app.core.workflows import (
+        data_access as _wf_da,
+        engine as _engine,
+    )
+    from src.app.shared.db import async_session
+
+    resumed = 0
+    deleted = 0
+    failed = 0
+
+    async with async_session() as session:
+        expired = await _wf_da.list_expired_waits(session, limit=200)
+        for wait in expired:
+            # Delete first so a hair-late event publish doesn't
+            # also resume the same wait.
+            try:
+                await _wf_da.delete_event_wait(session, wait)
+                await session.commit()
+                deleted += 1
+            except Exception:
+                logger.exception(
+                    "workflows.expire_waits delete_failed wait=%s", wait.id
+                )
+                failed += 1
+                continue
+
+            try:
+                await _engine.resume_run(
+                    wait.run_id, output_edge_label="timeout"
+                )
+                resumed += 1
+            except Exception:
+                logger.exception(
+                    "workflows.expire_waits resume_failed wait=%s run=%s",
+                    wait.id,
+                    wait.run_id,
+                )
+                failed += 1
+
+    return {
+        "found": len(expired),
+        "deleted": deleted,
+        "resumed": resumed,
+        "failed": failed,
+    }
+
+
+__all__ = ["expire_waits", "process_step", "sweep_waits"]

@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.workflows.models import (
     Workflow,
+    WorkflowEventWait,
     WorkflowFolder,
     WorkflowRun,
     WorkflowRunStatus,
@@ -457,6 +458,104 @@ async def find_existing_run(
     return result.scalar_one_or_none()
 
 
+def insert_event_wait(
+    session: AsyncSession, wait: WorkflowEventWait
+) -> WorkflowEventWait:
+    """Stage a new event-wait row for INSERT. Caller commits."""
+    session.add(wait)
+    return wait
+
+
+async def find_waits_for_event(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    event_type: str,
+    contact_id: uuid.UUID | None,
+    now: datetime | None = None,
+) -> list[WorkflowEventWait]:
+    """Hot-path resume lookup hit on every published event by the
+    trigger handler. Returns every wait row in ``org_id`` matching
+    ``event_type`` whose ``expires_at`` is still in the future.
+
+    Contact matching: when the wait row's ``contact_id`` is NULL,
+    the wait matches ANY event of the type (org-wide events like
+    ``time.daily_tick``). When the wait row's ``contact_id`` is
+    set, the published event's ``contact_id`` must equal it.
+
+    Backed by the partial index ``ix_workflow_event_waits_lookup``
+    so the per-event check stays cheap even as the table grows.
+    """
+    from sqlalchemy import or_ as _or
+
+    now = now or datetime.utcnow()
+    stmt = (
+        select(WorkflowEventWait)
+        .where(WorkflowEventWait.org_id == org_id)
+        .where(WorkflowEventWait.event_type == event_type)
+        .where(WorkflowEventWait.expires_at > now)
+    )
+    if contact_id is None:
+        # Only wildcard-contact waits match.
+        stmt = stmt.where(WorkflowEventWait.contact_id.is_(None))
+    else:
+        # Either explicit match or wildcard wait.
+        stmt = stmt.where(
+            _or(
+                WorkflowEventWait.contact_id == contact_id,
+                WorkflowEventWait.contact_id.is_(None),
+            )
+        )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def list_expired_waits(
+    session: AsyncSession,
+    *,
+    now: datetime | None = None,
+    limit: int = 200,
+) -> list[WorkflowEventWait]:
+    """Beat-driven sweep target — waits whose ``expires_at <= now``.
+    The sweep resumes each on its node's ``timeout`` outbound edge
+    + deletes the row.
+
+    Cross-tenant — caller opens a session WITHOUT setting
+    ``RequestContext.org_id`` so the partial-index scan returns
+    every org's expired waits in one pass."""
+    now = now or datetime.utcnow()
+    stmt = (
+        select(WorkflowEventWait)
+        .where(WorkflowEventWait.expires_at <= now)
+        .order_by(WorkflowEventWait.expires_at.asc())
+        .limit(limit)
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def delete_event_wait(
+    session: AsyncSession, wait: WorkflowEventWait
+) -> None:
+    """Hard-delete a wait row. Caller commits. Used after a
+    successful resume so the same wait can't fire twice."""
+    await session.delete(wait)
+
+
+async def list_waits_for_run(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run_id: uuid.UUID,
+) -> list[WorkflowEventWait]:
+    """All parked waits for one run — drives Step 19's run-detail
+    drawer ("this run is waiting on event X until Y")."""
+    stmt = (
+        select(WorkflowEventWait)
+        .where(WorkflowEventWait.org_id == org_id)
+        .where(WorkflowEventWait.run_id == run_id)
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
 async def next_step_index(
     session: AsyncSession,
     *,
@@ -478,22 +577,27 @@ __all__ = [
     "add_version",
     "add_workflow",
     "count_workflows_in_folder",
+    "delete_event_wait",
     "delete_folder",
     "find_existing_run",
+    "find_waits_for_event",
     "get_folder",
     "get_run",
     "get_run_for_processing",
     "get_run_unscoped",
     "get_workflow",
     "get_workflow_by_name",
+    "insert_event_wait",
     "insert_run",
     "insert_step_run",
     "list_active_workflows_for_event",
+    "list_expired_waits",
     "list_folders",
     "list_runs",
     "list_runs_due_for_resume",
     "list_step_runs",
     "list_versions",
+    "list_waits_for_run",
     "list_workflows",
     "next_step_index",
 ]

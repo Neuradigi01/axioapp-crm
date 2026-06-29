@@ -87,7 +87,24 @@ logger = logging.getLogger(__name__)
 
 # Node-type prefixes the engine recognises for routing.
 _TRIGGER_PREFIX = "trigger"
-_WAIT_TYPES = frozenset({"flow.wait", "flow.wait_for_event"})
+# Wait-node type set. The Step-11 ``flow_control.wait_for_event``
+# variant is handled differently — its action handler writes a row
+# to ``tbl_workflow_event_waits`` + sets ``next_step_at`` itself,
+# so we don't double-park it here. The vanilla ``flow_control.wait``
+# (delay only) IS post-parked by ``_advance`` so the engine's
+# ``next_step_at`` is the source of truth.
+_WAIT_TYPES = frozenset(
+    {
+        "flow.wait",
+        "flow.wait_for_event",
+        "flow_control.wait",
+    }
+)
+# Wait-for-event variants — handler self-parks; engine should NOT
+# advance past them automatically.
+_WAIT_FOR_EVENT_TYPES = frozenset(
+    {"flow.wait_for_event", "flow_control.wait_for_event"}
+)
 
 # Status set that means "engine should not advance this run further".
 _TERMINAL_STATUSES = frozenset(
@@ -315,6 +332,15 @@ async def _execute_current_node(
         merged = dict(run.state or {})
         merged.update(result.output)
         run.state = merged
+
+    # Step 11 — wait-for-event handlers self-park the run by
+    # inserting a row in tbl_workflow_event_waits + setting
+    # next_step_at. Don't advance past them; the matching event
+    # publish OR the timeout beat sweep calls ``resume_run`` to
+    # follow the appropriate edge.
+    if node.get("type") in _WAIT_FOR_EVENT_TYPES:
+        await session.commit()
+        return {"status": run.status.value}
 
     await _advance(
         session,
@@ -559,10 +585,135 @@ def _schedule_process_step(run_id: uuid.UUID) -> None:
         )
 
 
+# --- resume_run (Step 11 — wait-for-event resume entrypoint) -------------
+
+
+async def resume_run(
+    run_id: uuid.UUID,
+    *,
+    output_edge_label: str,
+) -> dict[str, Any]:
+    """Wake a parked run on a specific outbound edge. Called by the
+    Step-5 trigger handler when a matching event arrives at a
+    parked ``flow_control.wait_for_event`` node, AND by the
+    Step-11 beat sweep when the wait expires (on the ``timeout``
+    edge).
+
+    Mechanics:
+
+      1. Locks the run via ``FOR UPDATE SKIP LOCKED``. If another
+         worker grabbed it, this call no-ops.
+      2. Loads the workflow + current node (must be the wait node
+         being resumed).
+      3. Writes a step_run row marking the wait as completed with
+         ``output_edge_label`` set so the timeline shows whether
+         this resume came from the matching event or the timeout.
+      4. Calls ``_advance`` to follow the chosen edge.
+      5. Re-enqueues ``process_step`` for the next hop.
+
+    Returns ``{"status": "<run_status>"}`` — the same shape as
+    ``process_step`` so the caller can log a uniform line.
+    """
+    from src.app.shared.context import (
+        RequestContext,
+        reset_context,
+        set_context,
+    )
+    from src.app.shared.db import async_session
+
+    async with async_session() as session:
+        run = await _da.get_run_for_processing(session, run_id=run_id)
+        if run is None:
+            logger.info(
+                "workflows.engine.resume_run missing_or_locked run_id=%s",
+                run_id,
+            )
+            return {"status": "skipped_or_locked"}
+        if run.status in _TERMINAL_STATUSES:
+            logger.info(
+                "workflows.engine.resume_run already_terminal run=%s "
+                "status=%s",
+                run.id,
+                run.status.value,
+            )
+            return {"status": run.status.value}
+
+        token = set_context(RequestContext(org_id=run.org_id, user_id=None))
+        try:
+            workflow = await _da.get_workflow(
+                session, org_id=run.org_id, workflow_id=run.workflow_id
+            )
+            if workflow is None:
+                _mark_run_errored(run, error="workflow not found")
+                await session.commit()
+                return {"status": "errored", "reason": "workflow_missing"}
+
+            nodes_by_id = workflow.graph_nodes_by_id
+            current_id = run.current_node_id
+            if current_id is None or current_id not in nodes_by_id:
+                _mark_run_errored(
+                    run,
+                    error=f"current_node '{current_id}' not in graph",
+                )
+                await session.commit()
+                return {"status": "errored", "reason": "node_missing"}
+
+            # Validate the edge label exists out of the wait node.
+            edges = (workflow.graph or {}).get("edges") or []
+            outbound_labels = {
+                e.get("label")
+                for e in edges
+                if e.get("source") == current_id and e.get("label")
+            }
+            if output_edge_label not in outbound_labels:
+                _mark_run_errored(
+                    run,
+                    error=(
+                        f"resume edge '{output_edge_label}' not found out of "
+                        f"wait node '{current_id}'"
+                    ),
+                )
+                await session.commit()
+                return {"status": "errored", "reason": "edge_missing"}
+
+            # Persist the resume step_run so the timeline shows the
+            # wait completed + which path it took.
+            step_index = await _da.next_step_index(session, run_id=run.id)
+            wait_node = nodes_by_id[current_id]
+            step_run = WorkflowStepRun(
+                org_id=run.org_id,
+                run_id=run.id,
+                node_id=current_id,
+                step_index=step_index,
+                status=WorkflowStepRunStatus.completed,
+                payload=wait_node.get("config") or {},
+                output_edge_label=output_edge_label,
+                completed_at=datetime.now(timezone.utc),
+            )
+            _da.insert_step_run(session, step_run)
+
+            run.status = WorkflowRunStatus.running
+            run.next_step_at = None
+            await session.commit()
+            await session.refresh(run)
+
+            await _advance(
+                session,
+                workflow=workflow,
+                run=run,
+                nodes_by_id=nodes_by_id,
+                output_edge_label=output_edge_label,
+            )
+            return {"status": run.status.value}
+        finally:
+            reset_context(token)
+
+
 __all__ = [
     "ActionHandler",
     "ActionResult",
     "process_step",
     "resume_after_wait",
+    "resume_run",
     "start_run",
 ]

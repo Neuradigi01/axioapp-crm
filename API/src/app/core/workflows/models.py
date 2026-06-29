@@ -435,8 +435,52 @@ class WorkflowStepRun(Base, TenantScoped):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class WorkflowEventWait(Base, TenantScoped):
+    """Step-11 wait-for-event registry. One row per parked
+    ``flow_control.wait_for_event`` node. The trigger handler
+    (Step 5) checks this table on every published event + resumes
+    matching runs on the ``event_received`` outbound edge; the
+    beat sweep handles the timeout path.
+
+    ``contact_id`` is nullable — when set, only that specific
+    contact's event resumes; when null, ANY event of the type
+    resumes (useful for org-wide events like ``time.daily_tick``).
+
+    Cascade-delete on parent run so canceling a run cleans up its
+    parked waits automatically."""
+
+    __tablename__ = "tbl_workflow_event_waits"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_workflow_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    node_id: Mapped[str] = mapped_column(Text, nullable=False)
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+
+
 __all__ = [
     "Workflow",
+    "WorkflowEventWait",
     "WorkflowFolder",
     "WorkflowReEnrollmentRule",
     "WorkflowRun",

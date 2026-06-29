@@ -124,6 +124,17 @@ async def _on_event(envelope: dict[str, Any]) -> None:
             workflows = await _da.list_active_workflows_for_event(
                 session, org_id=org_id, event_type=event_type
             )
+            # Step 11 — also resume any parked wait_for_event nodes
+            # whose event_type + contact_id matches this publish.
+            # Runs on every event, independent of the trigger-match
+            # path; one event may both start new runs AND resume
+            # existing ones for different workflows.
+            await _resume_matching_waits(
+                session,
+                org_id=org_id,
+                event_type=event_type,
+                contact_id=contact_id,
+            )
         finally:
             reset_context(token)
 
@@ -317,6 +328,59 @@ def unregister_subscribers() -> None:
     registered for the process lifetime."""
     for event_type in ALL_EVENTS:
         events_bus.unsubscribe(event_type, _on_event)
+
+
+async def _resume_matching_waits(
+    session,
+    *,
+    org_id: uuid.UUID,
+    event_type: str,
+    contact_id: uuid.UUID | None,
+) -> None:
+    """Step 11 — find every parked ``flow_control.wait_for_event``
+    node whose event_type + contact_id matches the incoming event +
+    resume the run on the ``event_received`` outbound edge.
+
+    The DAL's ``find_waits_for_event`` already filters out expired
+    waits via the partial index — so a hair-late event whose
+    ``expires_at`` already lapsed won't double-fire alongside the
+    beat sweep's timeout path. The sweep handles that wait
+    exclusively.
+    """
+    from src.app.core.workflows import engine as workflows_engine
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    matches = await _da.find_waits_for_event(
+        session,
+        org_id=org_id,
+        event_type=event_type,
+        contact_id=contact_id,
+        now=now,
+    )
+
+    for wait in matches:
+        try:
+            # Delete the wait FIRST so a concurrent event publish
+            # doesn't double-resume the same run.
+            await _da.delete_event_wait(session, wait)
+            await session.commit()
+        except Exception:
+            logger.exception(
+                "workflows._resume_matching_waits delete_failed wait=%s",
+                wait.id,
+            )
+            continue
+        try:
+            await workflows_engine.resume_run(
+                wait.run_id, output_edge_label="event_received"
+            )
+        except Exception:
+            logger.exception(
+                "workflows._resume_matching_waits resume_failed wait=%s run=%s",
+                wait.id,
+                wait.run_id,
+            )
 
 
 __all__ = [

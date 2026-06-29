@@ -152,4 +152,13 @@ beat_schedule = {
         'task': 'src.app.core.workflows.tasks.sweep_waits',
         'schedule': 60.0,
     },
+    # tasks/workflows Step 11 — every-2-min sweep that fires the
+    # ``timeout`` outbound edge on parked ``flow_control.wait_for_event``
+    # nodes whose ``expires_at`` has lapsed. Distinct from the
+    # sweep_waits sweep above (which handles fixed-delay waits) —
+    # the wait_for_event path lives on tbl_workflow_event_waits.
+    'workflows-expire-waits': {
+        'task': 'src.app.core.workflows.tasks.expire_waits',
+        'schedule': crontab(minute='*/2'),
+    },
 }
