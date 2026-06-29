@@ -92,7 +92,7 @@ The `actions/` sub-package is the only one allowed beyond the single-file conven
 
 | # | Title | Status | Effort |
 |---|---|---|---|
-| 1 | [Workflow schema + models + node graph tables](step-1-schema-and-models.md) | **Pending** | ~1 day |
+| 1 | [Workflow schema + models + node graph tables](step-1-schema-and-models.md) | **COMPLETED** | ~1 day |
 | 2 | [Workflow service + graph validator](step-2-service-and-graph-validator.md) | **Pending** | ~1 day |
 | 3 | [Workflow router + permissions registry](step-3-router-and-permissions.md) | **Pending** | ~0.5 days |
 | 4 | [Execution engine + Celery step processor](step-4-execution-engine.md) | **Pending** | ~1.5 days |

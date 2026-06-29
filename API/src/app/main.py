@@ -107,6 +107,10 @@ from src.app.packs.furniture.modules.billing.router import (
 # Import the pack's billing __init__ so its PDF renderer registers
 # itself with `core.billing.pdf_registry` at startup.
 import src.app.packs.furniture.modules.billing  # noqa: F401
+# tasks/workflows Step 1 — side-effect import so the five workflow
+# tables register with `Base.metadata` before the FastAPI app's
+# tables-create + Alembic autogenerate sweep run.
+import src.app.core.workflows.models  # noqa: F401
 from src.app.core.module_registry import discover_modules, registry
 from src.app.core.modules_router import router as modules_router
 from src.app.core.invitations.router import router as invitations_router

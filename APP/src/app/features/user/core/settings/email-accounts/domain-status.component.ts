@@ -6,6 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Observable } from 'rxjs';
@@ -36,7 +37,7 @@ interface DomainStatus {
   selector: 'app-email-domain-status',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [DecimalPipe, ReactiveFormsModule],
   templateUrl: './domain-status.component.html',
 })
 export class DomainStatusComponent {
