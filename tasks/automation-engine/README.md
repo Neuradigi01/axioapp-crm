@@ -64,7 +64,7 @@ After Step 6, the "welcome on signup" and "confirm on lead-created" promises are
 | 6 | [lead.created from everywhere + Lead Confirmation seed](step-6-lead-created-trigger-everywhere.md) | **COMPLETED** | ~1.5 days |
 | 7 | [Automations list UI](step-7-automations-list-ui.md) | **COMPLETED** | ~1 day |
 | 8 | [Trigger editor UI](step-8-trigger-editor-ui.md) | **COMPLETED** | ~1.5 days |
-| 9 | [Run history UI + per-contact timeline](step-9-run-history-ui.md) | **Pending** | ~1 day |
+| 9 | [Run history UI + per-contact timeline](step-9-run-history-ui.md) | **COMPLETED** | ~1 day |
 | 10 | [Appointment triggers (booked + reminders)](step-10-appointment-triggers.md) | **Pending** | ~1 day |
 | 11 | [Quote + invoice triggers](step-11-quote-and-invoice-triggers.md) | **Pending** | ~1 day |
 | 12 | [Time-based triggers (birthday, stale-lead)](step-12-time-based-triggers.md) | **Pending** | ~1 day |

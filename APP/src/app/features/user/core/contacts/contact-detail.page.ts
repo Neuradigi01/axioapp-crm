@@ -16,6 +16,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { ActivityTimelineComponent } from '../activities/activity-timeline.component';
 import { AddNoteComponent } from '../activities/add-note.component';
 import { Activity } from '../activities/activities-api.service';
+import { ContactAutomationsTabComponent } from './contact-detail/automations-tab.component';
 import { TasksPanelComponent } from '../tasks/tasks-panel.component';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
@@ -38,13 +39,15 @@ import { OptInSectionComponent } from './opt-in/opt-in-section.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
 
-type DetailTab = 'overview' | 'activities' | 'notes' | 'tasks';
+type DetailTab = 'overview' | 'activities' | 'notes' | 'tasks' | 'automations';
 
 const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: string | null }> = [
   { id: 'overview', label: 'Overview', placeholderStep: null },
   { id: 'activities', label: 'Activities', placeholderStep: null },
   { id: 'notes', label: 'Notes', placeholderStep: 'later' },
   { id: 'tasks', label: 'Tasks', placeholderStep: null },
+  // tasks/automation-engine Step 9 — per-contact run history.
+  { id: 'automations', label: 'Automations', placeholderStep: null },
 ];
 
 @Component({
@@ -57,6 +60,7 @@ const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: strin
     ContactFormModalComponent,
     ActivityTimelineComponent,
     AddNoteComponent,
+    ContactAutomationsTabComponent,
     TasksPanelComponent,
     RelativeTimePipe,
     ReassignModalComponent,

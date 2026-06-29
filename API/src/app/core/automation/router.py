@@ -327,6 +327,165 @@ async def list_event_types_endpoint(
     ]
 
 
+# --- per-contact run list + retry + run-now (Step 9) ---------------
+
+
+@router.get("/runs", response_model=RunListResponse)
+async def list_runs_by_filters_endpoint(
+    contact_id: Optional[uuid.UUID] = Query(default=None),
+    trigger_id: Optional[uuid.UUID] = Query(default=None),
+    run_status: Optional[AutomationRunStatus] = Query(
+        default=None, alias="status"
+    ),
+    since: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_RUNS_READ)),
+) -> RunListResponse:
+    """Step 9 — general run-history filter. Drives the per-contact
+    "Automations" tab on the contact detail page (callers pass
+    ``contact_id``) + future cross-trigger admin views. Gated on
+    the same `automations.runs.read` permission as the per-trigger
+    run list."""
+    rows, total = await data_access.list_runs(
+        db,
+        org_id=user.org_id,
+        trigger_id=trigger_id,
+        contact_id=contact_id,
+        status=run_status,
+        since=since,
+        limit=limit,
+        offset=offset,
+    )
+    return RunListResponse(
+        items=[RunRead.model_validate(r) for r in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.post("/runs/{run_id}/retry", response_model=RunRead)
+async def retry_run_endpoint(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> RunRead:
+    """Step 9 — re-queue a failed run via the same Celery task path.
+    Refuses anything other than `status='failed'`:
+
+    * ``queued`` / ``dispatched`` → 409 (already in flight).
+    * ``sent`` → 409 (no-op; use Run-now for a fresh send).
+    * ``skipped`` → 409 (the dispatcher decided this one shouldn't
+      fire — operator should fix the root cause + use Run-now).
+    """
+    from datetime import datetime as _dt
+    from datetime import timezone as _tz
+
+    from src.app.core.automation import tasks as automation_tasks
+    from src.app.core.automation.models import AutomationRunStatus
+
+    run = await data_access.get_run(
+        db, org_id=user.org_id, run_id=run_id
+    )
+    if run is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="run not found",
+        )
+    if run.status != AutomationRunStatus.failed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "automation.run_not_retryable",
+                "message": (
+                    f"only failed runs can be retried (this one is "
+                    f"'{run.status.value}')"
+                ),
+            },
+        )
+
+    # Reset for the next dispatch — clear the failure markers + flip
+    # back to queued so the deliver_run task picks it up on Celery.
+    run.status = AutomationRunStatus.queued
+    run.error = None
+    run.dispatched_at = None
+    run.completed_at = None
+    run.channel_message_id = None
+    run.scheduled_at = _dt.now(_tz.utc)
+    await db.commit()
+    await db.refresh(run)
+
+    automation_tasks.deliver_run.apply_async(
+        args=(str(run.id),), countdown=0
+    )
+
+    return RunRead.model_validate(run)
+
+
+class RunNowPayload(BaseModel):
+    """Body for ``POST /triggers/{id}/run-now``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    payload: dict
+
+
+@router.post("/triggers/{trigger_id}/run-now", response_model=RunRead)
+async def run_now_endpoint(
+    trigger_id: uuid.UUID,
+    payload: RunNowPayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> RunRead:
+    """Step 9 — manual fire for a saved trigger.
+
+    Routes through the standard dispatcher (so conditions DO still
+    evaluate + the recipient resolver runs); writes a fresh run row
+    with a synthetic ``event_id=manual:{trigger_id}:{uuid}`` so it
+    doesn't collide with real events on the
+    ``(trigger_id, event_id)`` uniqueness check.
+
+    Returns 409 if the payload doesn't satisfy the trigger's
+    conditions — the operator should either adjust the payload OR
+    use the trigger editor's Save & Test (dry-run) modal first to
+    iterate without writing run rows.
+    """
+    from src.app.core.automation import dispatcher
+
+    try:
+        trigger = await automation_service.get_trigger(
+            db, org_id=user.org_id, trigger_id=trigger_id
+        )
+    except AutomationError as exc:
+        raise _automation_http_map(exc) from exc
+
+    manual_event_id = f"manual:{trigger_id}:{uuid.uuid4()}"
+
+    runs = await dispatcher.dispatch_event(
+        db,
+        org_id=user.org_id,
+        event_type=trigger.event_type,
+        payload=payload.payload,
+        event_id=manual_event_id,
+    )
+    target = next((r for r in runs if r.trigger_id == trigger.id), None)
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "automation.run_now_no_match",
+                "message": (
+                    "trigger conditions did not match the supplied "
+                    "payload — adjust the payload or the trigger's "
+                    "conditions"
+                ),
+            },
+        )
+    return RunRead.model_validate(target)
+
+
 # --- dry-run (Step 8) ----------------------------------------------
 
 

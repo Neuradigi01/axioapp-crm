@@ -218,4 +218,47 @@ export class AutomationsApiService {
       { payload },
     );
   }
+
+  /** Step 9 — re-queue a failed run. Refuses non-failed states
+   *  server-side with 409 + a structured error code. */
+  retry(runId: string): Observable<RunRead> {
+    return this.http.post<RunRead>(
+      `${this.base}/runs/${runId}/retry`,
+      {},
+    );
+  }
+
+  /** Step 9 — manually fire a saved trigger with the supplied
+   *  payload. Writes a fresh run row with a synthetic
+   *  `event_id='manual:...'`. */
+  runNow(
+    triggerId: string,
+    payload: Record<string, unknown>,
+  ): Observable<RunRead> {
+    return this.http.post<RunRead>(
+      `${this.base}/triggers/${triggerId}/run-now`,
+      { payload },
+    );
+  }
+
+  /** Step 9 — general run-history filter; the contact detail
+   *  Automations tab passes ``contact_id``. */
+  listRunsByFilters(query: {
+    contact_id?: string;
+    trigger_id?: string;
+    status?: AutomationRunStatus;
+    since?: string;
+    limit?: number;
+    offset?: number;
+  }): Observable<RunListResponse> {
+    const params = buildHttpParams({
+      contact_id: query.contact_id,
+      trigger_id: query.trigger_id,
+      status: query.status,
+      since: query.since,
+      limit: query.limit,
+      offset: query.offset,
+    });
+    return this.http.get<RunListResponse>(`${this.base}/runs`, { params });
+  }
 }

@@ -223,6 +223,7 @@ async def list_runs(
     *,
     org_id: uuid.UUID,
     trigger_id: uuid.UUID | None = None,
+    contact_id: uuid.UUID | None = None,
     status: AutomationRunStatus | None = None,
     since: datetime | None = None,
     limit: int = 50,
@@ -230,8 +231,7 @@ async def list_runs(
 ) -> tuple[list[AutomationRun], int]:
     """Filterable + paginated run history. Drives the Step-9 UI's
     "what fired for this trigger" view + the per-contact timeline
-    (filter by ``contact_id`` once Step 4 wires it on the runs row
-    — Step 3's contract is trigger-scoped).
+    (filter by ``contact_id``).
 
     ``order by scheduled_at DESC`` so newest fires sit at the top —
     matches the partial index from Step 1
@@ -240,6 +240,8 @@ async def list_runs(
 
     if trigger_id is not None:
         base = base.where(AutomationRun.trigger_id == trigger_id)
+    if contact_id is not None:
+        base = base.where(AutomationRun.contact_id == contact_id)
     if status is not None:
         base = base.where(AutomationRun.status == status)
     if since is not None:

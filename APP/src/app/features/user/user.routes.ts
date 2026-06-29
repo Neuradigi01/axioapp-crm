@@ -400,6 +400,18 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // tasks/automation-engine Step 9 — per-trigger run-history
+        // page. Retry button gated on automations.write inside the
+        // component; list read gated tighter on
+        // automations.runs.read server-side.
+        path: 'automations/:id/runs',
+        canActivate: [permissionGuard('automations.runs.read')],
+        loadComponent: () =>
+          import('./core/automations/runs/run-history.page').then(
+            (m) => m.RunHistoryPageComponent,
+          ),
+      },
+      {
         // tasks/template-library Step 7 — channel-aware editor.
         // `/new` for create, `/:id` for edit. Save / save-and-submit
         // affordances inside are gated on `templates.write` —
