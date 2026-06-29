@@ -327,4 +327,110 @@ async def list_event_types_endpoint(
     ]
 
 
+# --- dry-run (Step 8) ----------------------------------------------
+
+
+class DryRunPayload(BaseModel):
+    """Body for ``POST /triggers/{id}/dry-run``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    payload: dict
+
+
+class DryRunResult(BaseModel):
+    """Wire shape the editor's Save & Test modal renders."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    would_match: bool
+    skip_reason: Optional[str] = None
+    would_send_to: Optional[str] = None
+    rendered_subject: Optional[str] = None
+    rendered_body: Optional[str] = None
+
+
+@router.post(
+    "/triggers/{trigger_id}/dry-run", response_model=DryRunResult
+)
+async def dry_run_endpoint(
+    trigger_id: uuid.UUID,
+    payload: DryRunPayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> DryRunResult:
+    """Step 8 — run the dispatcher path against the supplied payload
+    WITHOUT inserting a run row or sending a real message. Returns
+    the match decision + the would-be recipient + the rendered
+    subject/body so the editor's Save & Test modal can show the
+    operator exactly what would happen.
+
+    Same compliance gates as the live path are NOT applied here —
+    operators see the un-gated render so they can verify the
+    template variables resolve correctly; Step 13's compliance
+    enforcement only matters at real-send time."""
+    from src.app.core.automation import conditions, recipients
+    from src.app.core.templates import data_access as templates_da
+    from src.app.core.templates.variables import resolve as render_variables
+
+    try:
+        trigger = await automation_service.get_trigger(
+            db, org_id=user.org_id, trigger_id=trigger_id
+        )
+    except AutomationError as exc:
+        raise _automation_http_map(exc) from exc
+
+    # 1. Condition evaluation — same evaluator the matcher uses.
+    matches = conditions.evaluate(trigger.conditions, payload.payload)
+    if not matches:
+        return DryRunResult(
+            would_match=False,
+            skip_reason="condition_failed",
+        )
+
+    # 2. Recipient resolution.
+    try:
+        recipient = await recipients.resolve(
+            trigger.recipient_resolver,
+            db,
+            payload=payload.payload,
+            config=trigger.recipient_resolver_config or {},
+        )
+    except recipients.UnknownResolver:
+        return DryRunResult(
+            would_match=True,
+            skip_reason="unknown_resolver",
+        )
+    if not recipient:
+        return DryRunResult(
+            would_match=True,
+            skip_reason="no_recipient",
+        )
+
+    # 3. Template render.
+    template = await templates_da.get_template(
+        db, org_id=user.org_id, template_id=trigger.template_id
+    )
+    if template is None:
+        return DryRunResult(
+            would_match=True,
+            would_send_to=recipient,
+            skip_reason="template_missing",
+        )
+
+    rendered_body = render_variables(template.body_text, payload.payload)
+    rendered_subject = (
+        render_variables(template.subject, payload.payload)
+        if template.subject
+        else None
+    )
+
+    return DryRunResult(
+        would_match=True,
+        would_send_to=recipient,
+        rendered_subject=rendered_subject,
+        rendered_body=rendered_body,
+    )
+
+
 __all__ = ["router"]

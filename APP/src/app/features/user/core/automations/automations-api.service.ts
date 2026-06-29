@@ -128,6 +128,14 @@ export interface EventCatalogEntry {
   sample_payload: Record<string, unknown>;
 }
 
+export interface DryRunResult {
+  would_match: boolean;
+  skip_reason: string | null;
+  would_send_to: string | null;
+  rendered_subject: string | null;
+  rendered_body: string | null;
+}
+
 
 @Injectable({ providedIn: 'root' })
 export class AutomationsApiService {
@@ -196,5 +204,18 @@ export class AutomationsApiService {
 
   listEventTypes(): Observable<EventCatalogEntry[]> {
     return this.http.get<EventCatalogEntry[]>(`${this.base}/event-types`);
+  }
+
+  /** Step 8 — run the dispatcher path against a paste-in payload
+   *  WITHOUT writing a run row or sending. Powers the editor's
+   *  "Save & Test" modal. */
+  dryRun(
+    triggerId: string,
+    payload: Record<string, unknown>,
+  ): Observable<DryRunResult> {
+    return this.http.post<DryRunResult>(
+      `${this.base}/triggers/${triggerId}/dry-run`,
+      { payload },
+    );
   }
 }

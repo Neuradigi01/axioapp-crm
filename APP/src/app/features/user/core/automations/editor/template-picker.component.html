@@ -1,0 +1,110 @@
+<div
+  class="fixed inset-0 z-40 flex items-start justify-center bg-zinc-900/40 px-4 py-12"
+  (click)="onClose()"
+>
+  <div
+    class="w-full max-w-2xl rounded-lg border border-zinc-200 bg-white shadow-xl"
+    (click)="$event.stopPropagation()"
+  >
+    <header class="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
+      <div>
+        <h2 class="text-sm font-semibold text-zinc-900">
+          Pick a template
+        </h2>
+        <p class="text-[11px] text-zinc-500">
+          Showing published {{ channel() }} templates
+          @if (channel() === 'whatsapp') {
+            approved by Meta
+          }
+          in your org.
+        </p>
+      </div>
+      <button
+        type="button"
+        (click)="onClose()"
+        class="rounded-md border border-zinc-300 bg-white p-1 text-zinc-500 hover:bg-zinc-50"
+        aria-label="Close"
+      >
+        <lucide-icon name="x" size="14" />
+      </button>
+    </header>
+
+    <div class="border-b border-zinc-200 bg-zinc-50 px-4 py-2">
+      <div class="relative">
+        <lucide-icon
+          name="search"
+          size="12"
+          class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400"
+        />
+        <input
+          type="search"
+          [value]="searchQuery()"
+          (input)="onSearch($any($event.target).value)"
+          placeholder="Search by name…"
+          class="w-full rounded-md border border-zinc-300 bg-white py-1.5 pl-7 pr-3 text-xs text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none"
+        />
+      </div>
+    </div>
+
+    <div class="max-h-[60vh] overflow-y-auto">
+      @if (loading()) {
+        <p class="px-4 py-6 text-center text-xs text-zinc-500">Loading templates…</p>
+      } @else if (loadError(); as err) {
+        <p class="px-4 py-6 text-center text-xs text-rose-600">{{ err }}</p>
+      } @else if (filtered().length === 0) {
+        <div class="px-4 py-6 text-center text-xs text-zinc-500">
+          No published {{ channel() }} templates match.
+          @if (channel() === 'whatsapp') {
+            (WhatsApp triggers require Meta-approved templates.)
+          }
+          <div class="mt-3">
+            <a
+              routerLink="/user/templates/new"
+              target="_blank"
+              class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+            >
+              <lucide-icon name="plus" size="10" />
+              Open templates module
+            </a>
+          </div>
+        </div>
+      } @else {
+        <ul class="divide-y divide-zinc-100">
+          @for (t of filtered(); track t.id) {
+            <li class="flex items-center justify-between px-4 py-2.5 hover:bg-zinc-50">
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium text-zinc-900">
+                  {{ t.name }}
+                </p>
+                @if (t.subject) {
+                  <p class="truncate text-xs text-zinc-500">
+                    Subject: {{ t.subject }}
+                  </p>
+                }
+              </div>
+              <div class="flex items-center gap-2">
+                <a
+                  [routerLink]="['/user/templates', t.id]"
+                  target="_blank"
+                  class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50"
+                  title="Open template editor in new tab"
+                  (click)="$event.stopPropagation()"
+                >
+                  <lucide-icon name="external-link" size="10" />
+                  Open
+                </a>
+                <button
+                  type="button"
+                  (click)="onPick(t)"
+                  class="inline-flex items-center gap-1 rounded-md bg-zinc-900 px-2 py-1 text-[11px] font-semibold text-white hover:bg-zinc-800"
+                >
+                  Use
+                </button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </div>
+</div>

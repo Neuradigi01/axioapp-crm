@@ -380,6 +380,26 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // tasks/automation-engine Step 8 — trigger editor for
+        // create (/new) + edit (/:id). Save / Save & Test inside
+        // are gated on `automations.write`; Employees see a
+        // read-only editor.
+        path: 'automations/new',
+        canActivate: [permissionGuard('automations.read')],
+        loadComponent: () =>
+          import('./core/automations/editor/automation-editor.page').then(
+            (m) => m.AutomationEditorPageComponent,
+          ),
+      },
+      {
+        path: 'automations/:id',
+        canActivate: [permissionGuard('automations.read')],
+        loadComponent: () =>
+          import('./core/automations/editor/automation-editor.page').then(
+            (m) => m.AutomationEditorPageComponent,
+          ),
+      },
+      {
         // tasks/template-library Step 7 — channel-aware editor.
         // `/new` for create, `/:id` for edit. Save / save-and-submit
         // affordances inside are gated on `templates.write` —
