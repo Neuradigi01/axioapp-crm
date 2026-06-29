@@ -22,11 +22,13 @@ import {
  * locale. Submits only the dirty keys via PATCH (strict-key on the
  * backend side too).
  */
+import { ComplianceSettingsComponent } from '../general/compliance-settings.component';
+
 @Component({
   selector: 'app-settings-store-profile-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ComplianceSettingsComponent],
   templateUrl: './store-profile-tab.component.html',
 })
 export class StoreProfileTabComponent {

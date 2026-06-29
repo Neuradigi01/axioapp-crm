@@ -103,7 +103,7 @@ The `actions/` sub-package is the only one allowed beyond the single-file conven
 | 9 | [Routing actions (round-robin / least-loaded / territory)](step-9-routing-actions.md) | **COMPLETED** | ~1 day |
 | 10 | [Tagging + lifecycle actions](step-10-tagging-lifecycle-actions.md) | **COMPLETED** | ~0.5 days |
 | 11 | [Flow control (wait / if-else / switch / A/B / goal / wait-for-event)](step-11-flow-control-actions.md) | **COMPLETED** | ~1 day |
-| 12 | [Marketing consent + quiet hours + frequency cap compliance](step-12-compliance-gates.md) | **Pending** | ~1 day |
+| 12 | [Marketing consent + quiet hours + frequency cap compliance](step-12-compliance-gates.md) | **COMPLETED** | ~1 day |
 | 13 | [Workflow list UI + folders/categories](step-13-workflow-list-ui.md) | **Pending** | ~1 day |
 | 14 | [Workflow canvas UI (node palette + drag-drop)](step-14-workflow-canvas-ui.md) | **Pending** | ~2 days |
 | 15 | [Node editor drawers (per-node config)](step-15-node-editor-drawers.md) | **Pending** | ~1.5 days |

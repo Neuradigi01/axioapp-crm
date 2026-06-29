@@ -556,6 +556,85 @@ async def list_waits_for_run(
     return list((await session.execute(stmt)).scalars().all())
 
 
+async def count_recent_marketing_sends(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    contact_id: uuid.UUID,
+    since: datetime,
+) -> int:
+    """Step 12 — frequency-cap counter. Returns the total number of
+    marketing sends to ``contact_id`` since ``since``, across BOTH
+    workflow send actions (``tbl_workflow_step_runs`` whose
+    ``payload.category='marketing'`` + ``status='completed'``) AND
+    campaign blasts (``tbl_campaign_messages`` whose parent campaign
+    has the marketing flag + status='sent').
+
+    Both sub-counts are computed with explicit ``org_id`` filters
+    even though the ``do_orm_execute`` listener auto-filters
+    TenantScoped models — keeps the query correct when the Celery
+    worker calls into the compliance check without an active
+    RequestContext.
+    """
+    from sqlalchemy import func as _func
+
+    from src.app.core.campaigns.models import (
+        CampaignMessage,
+        CampaignMessageStatus,
+    )
+    from src.app.core.workflows.models import (
+        WorkflowStepRun,
+        WorkflowStepRunStatus,
+    )
+
+    # Workflow side: completed step_runs whose payload tagged the
+    # send as marketing-category. The payload column is JSONB so the
+    # filter goes through the ``->>`` text accessor.
+    workflow_count = (
+        await session.execute(
+            select(_func.count(WorkflowStepRun.id))
+            .join(WorkflowRun, WorkflowRun.id == WorkflowStepRun.run_id)
+            .where(WorkflowStepRun.org_id == org_id)
+            .where(WorkflowRun.contact_id == contact_id)
+            .where(
+                WorkflowStepRun.status == WorkflowStepRunStatus.completed
+            )
+            .where(WorkflowStepRun.started_at >= since)
+            .where(
+                WorkflowStepRun.payload["category"].astext == "marketing"
+            )
+        )
+    ).scalar_one()
+
+    # Campaign side: every CampaignMessage row (status='sent' or
+    # 'delivered' / 'read') addressed to this contact since
+    # ``since``. Campaigns are categorised at the parent row, but
+    # in v1 every campaign is treated as marketing — the
+    # compliance check just counts campaign sends regardless of
+    # category (matches HubSpot's "campaigns count toward the cap"
+    # rule).
+    campaign_count = (
+        await session.execute(
+            select(_func.count(CampaignMessage.id))
+            .where(CampaignMessage.org_id == org_id)
+            .where(CampaignMessage.contact_id == contact_id)
+            .where(
+                CampaignMessage.status.in_(
+                    (
+                        CampaignMessageStatus.sent,
+                        CampaignMessageStatus.delivered,
+                        CampaignMessageStatus.read,
+                    )
+                )
+            )
+            .where(CampaignMessage.sent_at.is_not(None))
+            .where(CampaignMessage.sent_at >= since)
+        )
+    ).scalar_one()
+
+    return int(workflow_count) + int(campaign_count)
+
+
 async def next_step_index(
     session: AsyncSession,
     *,
@@ -576,6 +655,7 @@ __all__ = [
     "add_folder",
     "add_version",
     "add_workflow",
+    "count_recent_marketing_sends",
     "count_workflows_in_folder",
     "delete_event_wait",
     "delete_folder",

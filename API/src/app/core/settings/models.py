@@ -12,7 +12,7 @@ Tenant-scoped, RLS on.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 from typing import Any
 
@@ -23,6 +23,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    Time,
     UniqueConstraint,
 )
 from sqlalchemy import text as sql_text
@@ -113,6 +114,40 @@ class OrgSettings(Base, TenantScoped):
         JSONB,
         nullable=False,
         server_default=sql_text("'{\"strategy\":\"round_robin\"}'::jsonb"),
+    )
+
+    # --- compliance gates (tasks/workflows Step 12) ---
+    # DPDP / India-default quiet hours + frequency cap settings for
+    # marketing-category sends. Transactional sends (quote / invoice
+    # receipts) bypass per the documented legitimate-interest
+    # carve-out. The Step-12 ``core/workflows/compliance.py`` helper
+    # reads these on every Send action's pre-flight.
+    quiet_hours_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("true")
+    )
+    quiet_hours_start: Mapped[time] = mapped_column(
+        Time, nullable=False, server_default=sql_text("'21:00:00'")
+    )
+    quiet_hours_end: Mapped[time] = mapped_column(
+        Time, nullable=False, server_default=sql_text("'09:00:00'")
+    )
+    quiet_hours_timezone: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=sql_text("'Asia/Kolkata'")
+    )
+    frequency_cap_marketing_per_week: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=sql_text("5")
+    )
+    frequency_cap_marketing_per_day: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=sql_text("2")
+    )
+    transactional_bypass_quiet_hours: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("true")
+    )
+    transactional_bypass_frequency_cap: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("true")
+    )
+    unsubscribe_link_required_in_marketing_email: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("true")
     )
 
     # --- workflow routing state (tasks/workflows Step 9) ---

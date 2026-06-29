@@ -27,6 +27,16 @@ export interface OrgSettings {
   ai_welcome_message: string | null;
   reviews_auto_request_enabled: boolean;
   reviews_auto_request_delay_hours: number;
+  // tasks/workflows Step 12 — compliance gate settings.
+  quiet_hours_enabled?: boolean;
+  quiet_hours_start?: string;
+  quiet_hours_end?: string;
+  quiet_hours_timezone?: string;
+  frequency_cap_marketing_per_week?: number;
+  frequency_cap_marketing_per_day?: number;
+  transactional_bypass_quiet_hours?: boolean;
+  transactional_bypass_frequency_cap?: boolean;
+  unsubscribe_link_required_in_marketing_email?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -52,6 +62,16 @@ export type OrgSettingsPatch = Partial<{
   ai_welcome_message: string | null;
   reviews_auto_request_enabled: boolean;
   reviews_auto_request_delay_hours: number;
+  // tasks/workflows Step 12 — compliance gates.
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+  quiet_hours_timezone: string;
+  frequency_cap_marketing_per_week: number;
+  frequency_cap_marketing_per_day: number;
+  transactional_bypass_quiet_hours: boolean;
+  transactional_bypass_frequency_cap: boolean;
+  unsubscribe_link_required_in_marketing_email: boolean;
 }>;
 
 @Injectable({ providedIn: 'root' })

@@ -7,7 +7,7 @@ sneaky `org_id` / `id` / `created_at` mutations.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 from typing import Any, Literal, Optional
 
@@ -53,6 +53,18 @@ class OrgSettingsOut(TimestampedOrgScopedOut):
     # settings PATCH, so the Settings UI can render a specialised
     # editor while still surfacing the value in the read-only profile.
     lead_routing_config: dict[str, Any]
+
+    # tasks/workflows Step 12 — compliance gates for marketing
+    # sends. Surface on the Settings → Compliance UI section.
+    quiet_hours_enabled: bool
+    quiet_hours_start: time
+    quiet_hours_end: time
+    quiet_hours_timezone: str
+    frequency_cap_marketing_per_week: int
+    frequency_cap_marketing_per_day: int
+    transactional_bypass_quiet_hours: bool
+    transactional_bypass_frequency_cap: bool
+    unsubscribe_link_required_in_marketing_email: bool
 
 
 class LeadRoutingConfigOut(BaseModel):
@@ -108,3 +120,18 @@ class OrgSettingsPatch(BaseModel):
     # Template-library Step 4 — review-workflow toggles.
     template_review_mandatory: Optional[bool] = None
     template_review_self_approve_allowed: Optional[bool] = None
+
+    # tasks/workflows Step 12 — compliance gates.
+    quiet_hours_enabled: Optional[bool] = None
+    quiet_hours_start: Optional[time] = None
+    quiet_hours_end: Optional[time] = None
+    quiet_hours_timezone: Optional[str] = Field(default=None, max_length=64)
+    frequency_cap_marketing_per_week: Optional[int] = Field(
+        default=None, ge=0, le=1000
+    )
+    frequency_cap_marketing_per_day: Optional[int] = Field(
+        default=None, ge=0, le=1000
+    )
+    transactional_bypass_quiet_hours: Optional[bool] = None
+    transactional_bypass_frequency_cap: Optional[bool] = None
+    unsubscribe_link_required_in_marketing_email: Optional[bool] = None

@@ -54,13 +54,88 @@ logger = logging.getLogger(__name__)
 # --- Internal helpers ---------------------------------------------------
 
 
-async def _compliance_check(run, node: dict[str, Any]) -> str | None:
-    """Step 12 hook. Returns a skip reason when the send should be
-    refused (DPDP / quiet hours / frequency cap); returns ``None``
-    when the send may proceed.
+async def _compliance_check(
+    session,
+    *,
+    run,
+    node: dict[str, Any],
+    recipient: str | None,
+    channel: str,
+):
+    """Step 12 — composite compliance pre-flight.
 
-    Step 7 ships the no-op placeholder so the action signature stays
-    stable across the eventual Step-12 swap."""
+    Returns one of three :class:`core.workflows.compliance` objects:
+
+      * ``Allow``  — proceed with the send.
+      * ``Skip(reason)`` — caller returns
+        ``_result_skipped(reason)``.
+      * ``Defer(until, reason)`` — caller sets
+        ``run.next_step_at = until`` + leaves the run as ``pending``
+        so the beat sweep resumes the same node.
+
+    Per-node ``config.category`` (``marketing | transactional |
+    service``) overrides the workflow-level marketing flag — lets
+    a transactional invoice receipt inside a marketing workflow
+    bypass the DPDP / quiet-hours / freq-cap gates per the
+    legitimate-interest carve-out."""
+    from src.app.core.workflows.compliance import check_send
+
+    cfg = node.get("config") or {}
+    category = cfg.get("category", "marketing")
+    return await check_send(
+        session,
+        run=run,
+        node=node,
+        recipient=recipient,
+        channel=channel,
+        category=category,
+    )
+
+
+async def _gate_or_skip(
+    *,
+    session,
+    run,
+    node: dict[str, Any],
+    recipient: str | None,
+    channel: str,
+):
+    """Helper: run the compliance pre-flight + translate the
+    decision into either ``None`` (proceed) or an
+    :class:`ActionResult` the Send handler returns immediately.
+
+    ``Defer`` self-parks the run by setting ``next_step_at`` and
+    leaving ``status='pending'``; the beat sweep at every 60s
+    resumes the same node when the wait lands."""
+    from src.app.core.workflows.compliance import Allow, Defer, Skip
+    from src.app.core.workflows.engine import ActionResult
+    from src.app.core.workflows.models import WorkflowRunStatus
+
+    decision = await _compliance_check(
+        session,
+        run=run,
+        node=node,
+        recipient=recipient,
+        channel=channel,
+    )
+    if isinstance(decision, Allow):
+        return None
+    if isinstance(decision, Skip):
+        return ActionResult(
+            skip_reason=decision.reason,
+            output={"skip_reason": decision.reason},
+        )
+    if isinstance(decision, Defer):
+        run.status = WorkflowRunStatus.pending
+        run.next_step_at = decision.until
+        await session.commit()
+        return ActionResult(
+            skip_reason=decision.reason,
+            output={
+                "skip_reason": decision.reason,
+                "deferred_until": decision.until.isoformat(),
+            },
+        )
     return None
 
 
@@ -186,9 +261,15 @@ async def _send_email(session, *, run, step_run, node, context):
     if skip is not None:
         return _result_skipped(skip)
 
-    compliance_skip = await _compliance_check(run, node)
-    if compliance_skip is not None:
-        return _result_skipped(compliance_skip)
+    gated = await _gate_or_skip(
+        session=session,
+        run=run,
+        node=node,
+        recipient=recipient,
+        channel="email",
+    )
+    if gated is not None:
+        return gated
 
     cfg = node.get("config") or {}
     template, skip = await _load_template(
@@ -198,6 +279,18 @@ async def _send_email(session, *, run, step_run, node, context):
         return _result_skipped(skip)
 
     rendered_body, rendered_subject = _render_template(template, context)
+
+    # Step 12 — auto-inject unsubscribe footer when missing on a
+    # marketing email send.
+    from src.app.core.workflows.compliance import ensure_unsubscribe_link
+
+    rendered_body, footer_injected = await ensure_unsubscribe_link(
+        session,
+        org_id=run.org_id,
+        category=cfg.get("category", "marketing"),
+        channel="email",
+        body=rendered_body,
+    )
 
     from src.app.shared.email import Email, get_email_backend
 
@@ -234,9 +327,15 @@ async def _send_whatsapp(session, *, run, step_run, node, context):
     if skip is not None:
         return _result_skipped(skip)
 
-    compliance_skip = await _compliance_check(run, node)
-    if compliance_skip is not None:
-        return _result_skipped(compliance_skip)
+    gated = await _gate_or_skip(
+        session=session,
+        run=run,
+        node=node,
+        recipient=recipient,
+        channel="whatsapp",
+    )
+    if gated is not None:
+        return gated
 
     cfg = node.get("config") or {}
     template, skip = await _load_template(
@@ -295,9 +394,15 @@ def _make_adapter_send(channel_name: str, channel_enum):
         if skip is not None:
             return _result_skipped(skip)
 
-        compliance_skip = await _compliance_check(run, node)
-        if compliance_skip is not None:
-            return _result_skipped(compliance_skip)
+        gated = await _gate_or_skip(
+            session=session,
+            run=run,
+            node=node,
+            recipient=recipient,
+            channel=channel_name,
+        )
+        if gated is not None:
+            return gated
 
         cfg = node.get("config") or {}
         template, skip = await _load_template(
@@ -363,9 +468,15 @@ async def _send_slack(session, *, run, step_run, node, context):
     ):
         return _result_skipped("slack_webhook_missing")
 
-    compliance_skip = await _compliance_check(run, node)
-    if compliance_skip is not None:
-        return _result_skipped(compliance_skip)
+    gated = await _gate_or_skip(
+        session=session,
+        run=run,
+        node=node,
+        recipient=webhook_url,
+        channel="slack",
+    )
+    if gated is not None:
+        return gated
 
     template, skip = await _load_template(
         session, run=run, template_id_raw=cfg.get("template_id")
