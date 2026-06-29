@@ -219,6 +219,10 @@
       </div>
     }
   </section>
+
+  <!-- tasks/automation-engine Step 14 — deliverability panels. -->
+  <app-email-domain-status />
+  <app-email-suppression-list />
 </div>
 
 @if (disconnectTarget(); as target) {
@@ -229,3 +233,4 @@
     (cancelled)="cancelDisconnect()"
   />
 }
+

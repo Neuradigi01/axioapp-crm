@@ -351,6 +351,30 @@ async def _execute_send(session, run) -> str | None:
 
     if trigger.channel == ConversationChannel.email:
         from src.app.shared.email import Email, get_email_backend
+        from src.app.core.automation.tracking import (
+            inject_tracking_pixel_and_links,
+        )
+        import os
+
+        # Step 14 — wrap the plain-text body in a minimal HTML
+        # envelope + inject the open-pixel + click-rewrites. The
+        # plain-text part stays untouched so privacy-conscious
+        # clients (text-only readers) get the original message
+        # without any tracking artefacts.
+        public_base_url = os.environ.get(
+            "PUBLIC_API_BASE_URL", "http://localhost:8000"
+        )
+        html_skeleton = (
+            f"<html><body>"
+            f"<pre style=\"font-family:inherit;white-space:pre-wrap\">"
+            f"{rendered_body}"
+            f"</pre></body></html>"
+        )
+        body_html = inject_tracking_pixel_and_links(
+            run_id=run.id,
+            html_body=html_skeleton,
+            public_base_url=public_base_url,
+        )
 
         backend = get_email_backend()
         await backend.send(
@@ -358,7 +382,7 @@ async def _execute_send(session, run) -> str | None:
                 to=recipient,
                 subject=rendered_subject or template.name,
                 body_text=rendered_body,
-                body_html=None,
+                body_html=body_html,
             )
         )
         return None

@@ -241,3 +241,139 @@ class AutomationRun(Base, TenantScoped):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Step 14 — engagement tracking. First open + first click only;
+    # multi-event tracking deferred (the timestamps stay on the run
+    # row for fast contact-timeline reads). Populated by the
+    # ``/api/v1/automations/track/open/{token}`` (pixel beacon) and
+    # ``/api/v1/automations/track/click/{token}`` (redirect) public
+    # endpoints — both HMAC-signed on the run id to prevent guessing.
+    opened_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    clicked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class SuppressionReason(str, enum.Enum):
+    """Why a recipient was added to the suppression list.
+
+    ``hard_bounce`` — provider returned 5xx (invalid mailbox).
+    ``complaint``   — provider received a spam complaint
+                     (Mailgun ``complained``, SendGrid ``spamreport``,
+                     SES ``Complaint``, Postmark ``SpamComplaint``).
+    ``unsubscribe`` — provider's unsubscribe webhook + the
+                     CRM's own one-click unsubscribe header click.
+    ``manual``      — operator added via the Settings → Email
+                     suppression list UI.
+    """
+
+    hard_bounce = "hard_bounce"
+    complaint = "complaint"
+    unsubscribe = "unsubscribe"
+    manual = "manual"
+
+
+suppression_reason_enum = ENUM(
+    SuppressionReason,
+    name="automation_suppression_reason",
+    values_callable=lambda obj: [m.value for m in obj],
+)
+
+
+class AutomationSuppression(Base, TenantScoped):
+    """One row per (org, channel, address) pair the send-guard must
+    refuse. Populated by the bounce-handler webhooks (hard-bounce /
+    complaint / unsubscribe) + the Settings → Email "Add to
+    suppression list" manual action.
+
+    The unique ``(org_id, channel, address)`` constraint means a
+    contact who hits multiple suppression reasons keeps the FIRST
+    entry (e.g. complaint > unsubscribe — the complaint stays on
+    record). Operators "rehabilitate" an address via DELETE on the
+    row, not by inserting a fresh one."""
+
+    __tablename__ = "tbl_automation_suppressions"
+    __table_args__ = (
+        Index(
+            "uq_automation_suppressions_org_channel_address",
+            "org_id",
+            "channel",
+            "address",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    channel: Mapped[ConversationChannel] = mapped_column(
+        conversation_channel_enum, nullable=False
+    )
+    address: Mapped[str] = mapped_column(Text, nullable=False)
+    reason: Mapped[SuppressionReason] = mapped_column(
+        suppression_reason_enum, nullable=False
+    )
+    source_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+
+
+class EmailBounceEvent(Base, TenantScoped):
+    """Append-only audit log of every bounce / complaint /
+    unsubscribe webhook the CRM has received from any provider.
+
+    ``provider_event_id`` is unique across the whole table so that
+    a provider re-delivery of the same webhook doesn't create a
+    duplicate row. The raw provider payload is preserved verbatim
+    on ``raw_payload`` so operators have a paper trail for any
+    suppression decision.
+
+    Lives in the automation models module rather than core/email/
+    because the suppression write — the side effect of the bounce —
+    is automation-engine state. Email module's bounce_handler
+    parses the provider payload, normalises it, and calls into the
+    automation DAL to write the row + the suppression."""
+
+    __tablename__ = "tbl_email_bounce_events"
+    __table_args__ = (
+        Index(
+            "ix_email_bounce_events_org_address",
+            "org_id",
+            "email_address",
+        ),
+        Index(
+            "uq_email_bounce_events_provider_event_id",
+            "provider_event_id",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    email_address: Mapped[str] = mapped_column(Text, nullable=False)
+    # 'hard', 'soft', 'complaint', 'unsubscribe'. Stored as text
+    # (not enum) so a future provider's specific bounce sub-type
+    # ('spamtrap', 'block', ...) lands without an ALTER TYPE
+    # migration.
+    bounce_type: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_event_id: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sql_text("'{}'::jsonb")
+    )
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )

@@ -48,6 +48,8 @@ import {
 } from '../../services/email-accounts-api.service';
 import { ConnectAccountCardComponent } from './connect-account-card.component';
 import { DisconnectConfirmDialogComponent } from './disconnect-confirm-dialog.component';
+import { DomainStatusComponent } from './domain-status.component';
+import { SuppressionListComponent } from './suppression-list.component';
 
 
 /** Hard cap matches the backend `DEFAULT_HARD_CAP` constant in
@@ -76,6 +78,8 @@ const TRANSIENT_STATES = new Set<EmailAccount['sync_state']>([
     LucideAngularModule,
     ConnectAccountCardComponent,
     DisconnectConfirmDialogComponent,
+    DomainStatusComponent,
+    SuppressionListComponent,
   ],
   templateUrl: './email-accounts-tab.component.html',
 })

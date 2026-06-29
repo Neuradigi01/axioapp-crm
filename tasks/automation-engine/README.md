@@ -69,7 +69,7 @@ After Step 6, the "welcome on signup" and "confirm on lead-created" promises are
 | 11 | [Quote + invoice triggers](step-11-quote-and-invoice-triggers.md) | **COMPLETED** | ~1 day |
 | 12 | [Time-based triggers (birthday, stale-lead)](step-12-time-based-triggers.md) | **COMPLETED** | ~1 day |
 | 13 | [Frequency cap + quiet hours + DPDP suppression](step-13-frequency-cap-and-quiet-hours.md) | **COMPLETED** | ~1 day |
-| 14 | [Bounce/complaint webhooks + DKIM/SPF surface](step-14-deliverability-and-bounces.md) | **Pending** | ~1.5 days |
+| 14 | [Bounce/complaint webhooks + DKIM/SPF surface](step-14-deliverability-and-bounces.md) | **COMPLETED** | ~1.5 days |
 
 **Total: 14 steps, ~13 days.**
 

@@ -273,6 +273,55 @@ def check_quiet_hours(
     return SendDecision(allow=False, defer_until=defer_until)
 
 
+# --- Suppression list ----------------------------------------------------
+
+
+async def check_suppression(
+    session,
+    *,
+    org_id: uuid.UUID,
+    channel: str,
+    recipient: Optional[str],
+) -> SendDecision:
+    """Return ``allow=False`` when ``recipient`` is on the org's
+    suppression list for ``channel`` — populated by the Step-14
+    bounce-handler webhooks (hard bounce / complaint / unsubscribe)
+    and the operator's manual "Add to suppression list" action.
+
+    The check is per (org_id, channel, address) so a contact who
+    bounced on email can still receive WhatsApp messages, and vice
+    versa. Missing recipient or empty channel string falls through
+    to allow — the upstream resolver normally guarantees both, but
+    a forgiving check keeps the dispatcher resilient.
+    """
+    if not recipient or not channel:
+        return _ALLOW
+
+    from sqlalchemy import select as _select
+
+    from src.app.core.automation.models import AutomationSuppression
+    from src.app.core.conversations.models import ConversationChannel
+
+    try:
+        channel_enum = ConversationChannel(channel.lower())
+    except ValueError:
+        return _ALLOW
+
+    address = recipient.strip().lower() if "@" in recipient else recipient.strip()
+    row = (
+        await session.execute(
+            _select(AutomationSuppression.id).where(
+                AutomationSuppression.org_id == org_id,
+                AutomationSuppression.channel == channel_enum,
+                AutomationSuppression.address == address,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return _ALLOW
+    return SendDecision(allow=False, skip_reason="suppressed")
+
+
 # --- Composite -----------------------------------------------------------
 
 
@@ -290,17 +339,39 @@ async def evaluate(
     or ``SendDecision(allow=True)`` if all three checks pass.
 
     Order:
-      1. DPDP suppression  → ``skip_reason='dpdp_suppressed'``
-      2. Frequency cap     → ``skip_reason='frequency_cap_exceeded'``
-      3. Quiet hours       → ``defer_until=<utc>``
+      1. **Hard suppression** (Step 14)  → ``skip_reason='suppressed'``
+         Applies to ALL categories (transactional too) because a
+         hard-bounced address means the mailbox doesn't exist — no
+         point firing a receipt at a dead inbox.
+      2. DPDP suppression  → ``skip_reason='dpdp_suppressed'``  (marketing only)
+      3. Frequency cap     → ``skip_reason='frequency_cap_exceeded'``  (marketing only)
+      4. Quiet hours       → ``defer_until=<utc>``  (marketing only)
 
-    Transactional + service templates short-circuit to allow without
-    running any check — legitimate-interest basis under DPDP +
-    business courtesy."""
+    Transactional + service templates short-circuit past 2/3/4 —
+    legitimate-interest basis under DPDP + business courtesy."""
     from src.app.core.templates.models import TemplateCategory
 
     if now_utc is None:
         now_utc = datetime.now(timezone.utc)
+
+    # 1) Hard suppression check — runs for every category. A
+    # hard-bounced address can't receive ANYTHING, including
+    # transactional receipts.
+    recipient = None
+    if contact is not None:
+        if channel.lower() == "email":
+            recipient = getattr(contact, "email", None)
+        elif channel.lower() == "whatsapp":
+            recipient = getattr(contact, "phone", None)
+    if recipient is not None:
+        suppression = await check_suppression(
+            session,
+            org_id=org.id,
+            channel=channel,
+            recipient=recipient,
+        )
+        if not suppression.allow:
+            return suppression
 
     category = getattr(template, "category", None)
     if category != TemplateCategory.marketing:
@@ -328,5 +399,6 @@ __all__ = [
     "check_dpdp_suppression",
     "check_frequency_cap",
     "check_quiet_hours",
+    "check_suppression",
     "evaluate",
 ]

@@ -51,6 +51,7 @@ from src.app.core.email.tracking.router import router as email_tracking_router
 from src.app.core.email_sequences.router import router as email_sequences_router
 from src.app.core.templates.router import router as templates_router
 from src.app.core.automation.router import router as automations_router
+from src.app.core.automation.tracking import router as automation_tracking_router
 from src.app.core.integrations.router import router as integrations_router
 from src.app.core.integrations.whatsapp.templates_router import (
     router as whatsapp_templates_router,
@@ -233,6 +234,11 @@ app.include_router(templates_router, prefix="/api/v1")
 # tasks/automation-engine Step 3 — single-event trigger engine.
 # CRUD + run-history + event-type discovery under /api/v1/automations.
 app.include_router(automations_router, prefix="/api/v1")
+# tasks/automation-engine Step 14 — public open + click tracking
+# endpoints. Tokens are HMAC-signed on (run_id, action) so external
+# actors can't fabricate hits. No auth required; mail clients can't
+# carry session cookies.
+app.include_router(automation_tracking_router, prefix="/api/v1")
 # Step 8 — public tracking endpoints (open pixel, click redirect,
 # unsubscribe landing). Intentionally unauthenticated — the recipient's
 # email client fetches them with no JWT. Rate limiting is inside the
