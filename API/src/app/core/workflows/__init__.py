@@ -30,4 +30,14 @@ The runtime concept map:
 This module never imports from ``packs/`` (Rule 1). Every table
 carries ``org_id`` + RLS from day one (Rule 2). Cross-module reads
 go through the OWNING module's data_access (Rule from manager spec
-2026-06-25)."""
+2026-06-25).
+"""
+# tasks/workflows Step 5 — side-effect: register the universal
+# event-bus subscriber against every catalog event the moment the
+# workflows package is imported. The Step-4 engine then walks
+# matching workflows on every published event. Idempotent — re-runs
+# of the registration loop are no-ops via the bus's per-handler
+# idempotency check.
+from src.app.core.workflows.trigger_handlers import register_subscribers
+
+register_subscribers()

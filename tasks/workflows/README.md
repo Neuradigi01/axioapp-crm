@@ -96,7 +96,7 @@ The `actions/` sub-package is the only one allowed beyond the single-file conven
 | 2 | [Workflow service + graph validator](step-2-service-and-graph-validator.md) | **COMPLETED** | ~1 day |
 | 3 | [Workflow router + permissions registry](step-3-router-and-permissions.md) | **COMPLETED** | ~0.5 days |
 | 4 | [Execution engine + Celery step processor](step-4-execution-engine.md) | **COMPLETED** | ~1.5 days |
-| 5 | [Trigger subscriptions + re-enrollment rules](step-5-trigger-subscriptions.md) | **Pending** | ~1 day |
+| 5 | [Trigger subscriptions + re-enrollment rules](step-5-trigger-subscriptions.md) | **COMPLETED** | ~1 day |
 | 6 | [Condition AST + branch evaluator](step-6-conditions-and-branches.md) | **Pending** | ~0.5 days |
 | 7 | [Send actions (email / WA / SMS / FB / IG / push / Slack)](step-7-send-actions.md) | **Pending** | ~1 day |
 | 8 | [Record actions (update fields, create task/note/quote/invoice)](step-8-record-actions.md) | **Pending** | ~1 day |

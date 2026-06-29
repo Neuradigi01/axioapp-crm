@@ -383,6 +383,80 @@ async def list_step_runs(
     return list(result.scalars().all())
 
 
+async def list_active_workflows_for_event(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    event_type: str,
+) -> list[Workflow]:
+    """Matcher query — every ``active`` workflow in ``org_id`` whose
+    trigger node listens on ``event_type``. Hits the GIN index
+    ``ix_workflows_event_types_gin`` on
+    ``tbl_workflows.enabled_event_types`` so the array filter
+    stays cheap even with hundreds of workflows per org.
+
+    The denormalised ``enabled_event_types`` column is maintained
+    by the service layer (``update_enabled_event_types_from_graph``)
+    so the matcher never has to walk the JSONB ``graph`` payload.
+    """
+    stmt = (
+        select(Workflow)
+        .where(Workflow.org_id == org_id)
+        .where(Workflow.status == WorkflowStatus.active)
+        .where(Workflow.enabled_event_types.any(event_type))
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def find_existing_run(
+    session: AsyncSession,
+    *,
+    workflow_id: uuid.UUID,
+    contact_id: uuid.UUID | None,
+    since_started_at: datetime | None = None,
+    trigger_event_id: str | None = None,
+) -> WorkflowRun | None:
+    """Re-enrollment + idempotency dedupe query.
+
+    Three modes:
+
+      * ``trigger_event_id`` non-None: exact lookup on
+        ``(workflow_id, trigger_event_id)``. Replays of the same
+        event hit this branch and refuse the duplicate enrolment
+        regardless of re-enrollment rule.
+      * ``since_started_at`` set: re-enrollment ``daily`` mode —
+        find any run for ``(workflow_id, contact_id)`` started on
+        or after the supplied boundary.
+      * Neither: re-enrollment ``once`` mode — any prior run for
+        ``(workflow_id, contact_id)`` that isn't ``canceled``.
+
+    ``canceled`` runs never block re-enrollment per the Step-5
+    spec ("future-version-publishes-re-enrollment-eligible-contacts
+    pattern").
+    """
+    stmt = select(WorkflowRun).where(WorkflowRun.workflow_id == workflow_id)
+
+    if trigger_event_id is not None:
+        stmt = stmt.where(WorkflowRun.trigger_event_id == trigger_event_id)
+    else:
+        if contact_id is None:
+            # Without a contact_id and without a trigger_event_id
+            # there's no dedupe key — treat as "no prior run".
+            stmt = stmt.where(WorkflowRun.contact_id.is_(None))
+        else:
+            stmt = stmt.where(WorkflowRun.contact_id == contact_id)
+        # Canceled runs do not block re-enrollment.
+        stmt = stmt.where(
+            WorkflowRun.status != WorkflowRunStatus.canceled
+        )
+        if since_started_at is not None:
+            stmt = stmt.where(WorkflowRun.started_at >= since_started_at)
+
+    stmt = stmt.order_by(WorkflowRun.started_at.desc()).limit(1)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
 async def next_step_index(
     session: AsyncSession,
     *,
@@ -405,6 +479,7 @@ __all__ = [
     "add_workflow",
     "count_workflows_in_folder",
     "delete_folder",
+    "find_existing_run",
     "get_folder",
     "get_run",
     "get_run_for_processing",
@@ -413,6 +488,7 @@ __all__ = [
     "get_workflow_by_name",
     "insert_run",
     "insert_step_run",
+    "list_active_workflows_for_event",
     "list_folders",
     "list_runs",
     "list_runs_due_for_resume",

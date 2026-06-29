@@ -463,6 +463,33 @@ async def delete_folder(
     await session.commit()
 
 
+async def update_enabled_event_types_from_graph(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+) -> list[str]:
+    """Re-read the workflow's graph + rewrite
+    ``tbl_workflows.enabled_event_types`` so the Step-5 matcher's
+    ``ANY(enabled_event_types)`` filter stays in sync with the
+    actual trigger nodes in the JSONB graph.
+
+    Called by :func:`update_workflow` (Step 2 extended in Step 5)
+    so every save propagates the change. The hook is idempotent +
+    safe to call manually from a migration / repair script too.
+
+    Returns the new list for caller introspection.
+    """
+    workflow = await get_workflow(
+        session, org_id=org_id, workflow_id=workflow_id
+    )
+    graph_obj = WorkflowGraph.model_validate(workflow.graph)
+    workflow.enabled_event_types = _extract_event_types(graph_obj)
+    await session.commit()
+    await session.refresh(workflow)
+    return list(workflow.enabled_event_types)
+
+
 __all__ = [
     "archive_workflow",
     "change_status",
@@ -473,5 +500,6 @@ __all__ = [
     "list_folders",
     "list_workflows",
     "patch_folder",
+    "update_enabled_event_types_from_graph",
     "update_workflow",
 ]
