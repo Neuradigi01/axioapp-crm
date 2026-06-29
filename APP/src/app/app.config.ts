@@ -15,6 +15,7 @@ import { provideServiceWorker } from '@angular/service-worker';
 import {
   LucideAngularModule,
   AlertTriangle,
+  Archive,
   Armchair,
   ArrowLeft,
   ArrowRight,
@@ -52,7 +53,10 @@ import {
   EyeOff,
   FileSpreadsheet,
   FileText,
+  Folder,
+  FolderPlus,
   Footprints,
+  GitBranch,
   GraduationCap,
   GripVertical,
   HeartPulse,
@@ -136,6 +140,7 @@ export const appConfig: ApplicationConfig = {
     importProvidersFrom(
       LucideAngularModule.pick({
         AlertTriangle,
+        Archive,
         Armchair,
         ArrowLeft,
         ArrowRight,
@@ -173,7 +178,10 @@ export const appConfig: ApplicationConfig = {
         EyeOff,
         FileSpreadsheet,
         FileText,
+        Folder,
+        FolderPlus,
         Footprints,
+        GitBranch,
         GraduationCap,
         GripVertical,
         HeartPulse,

@@ -1,0 +1,128 @@
+<aside class="flex w-56 shrink-0 flex-col border-r border-zinc-200 bg-white">
+  <header class="flex items-center justify-between border-b border-zinc-200 px-3 py-2">
+    <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      Folders
+    </h2>
+    @if (canWrite()) {
+      <button
+        type="button"
+        (click)="onNewFolder()"
+        class="inline-flex items-center gap-1 rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+        title="New folder"
+      >
+        <lucide-icon name="folder-plus" size="14" />
+      </button>
+    }
+  </header>
+
+  @if (mutationError(); as err) {
+    <div class="border-b border-rose-100 bg-rose-50 px-3 py-1.5 text-[11px] text-rose-700">
+      {{ err }}
+    </div>
+  }
+
+  <nav class="flex-1 overflow-y-auto px-2 py-2">
+    <button
+      type="button"
+      (click)="selectAll()"
+      class="mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-100"
+      [class.bg-zinc-100]="selectedFolderId() === null"
+      [class.font-semibold]="selectedFolderId() === null"
+    >
+      <lucide-icon name="list" size="14" class="text-zinc-500" />
+      <span class="flex-1">All workflows</span>
+    </button>
+
+    <div cdkDropList (cdkDropListDropped)="onDrop($event)">
+      @for (folder of topLevel(); track trackById($index, folder)) {
+        <div cdkDrag>
+          <div
+            class="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-zinc-100"
+            [class.bg-zinc-100]="selectedFolderId() === folder.id"
+          >
+            @if (canWrite()) {
+              <button
+                type="button"
+                cdkDragHandle
+                class="cursor-grab text-zinc-300 hover:text-zinc-500"
+                title="Drag to reorder"
+              >
+                <lucide-icon name="grip-vertical" size="12" />
+              </button>
+            }
+            <lucide-icon name="folder" size="14" class="text-zinc-500" />
+
+            @if (editingId() === folder.id) {
+              <input
+                #renameInput
+                [value]="editingValue()"
+                (input)="onRenameInput($any($event.target).value)"
+                (blur)="commitRename(folder)"
+                (keydown.enter)="commitRename(folder)"
+                (keydown.escape)="cancelRename()"
+                class="flex-1 rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-sm focus:border-zinc-500 focus:outline-none"
+                autofocus
+              />
+            } @else {
+              <button
+                type="button"
+                (click)="select(folder.id)"
+                (dblclick)="beginRename(folder, $event)"
+                class="flex-1 truncate text-left"
+                [class.font-semibold]="selectedFolderId() === folder.id"
+                [title]="folder.name"
+              >
+                {{ folder.name }}
+              </button>
+              @if (canWrite()) {
+                <button
+                  type="button"
+                  (click)="onDelete(folder, $event)"
+                  class="invisible rounded p-0.5 text-zinc-400 hover:text-rose-600 group-hover:visible"
+                  title="Delete folder"
+                >
+                  <lucide-icon name="trash-2" size="12" />
+                </button>
+              }
+            }
+          </div>
+
+          @for (child of childrenOf(folder.id); track trackById($index, child)) {
+            <div
+              class="group ml-5 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-zinc-100"
+              [class.bg-zinc-100]="selectedFolderId() === child.id"
+            >
+              <lucide-icon name="folder" size="13" class="text-zinc-400" />
+              <button
+                type="button"
+                (click)="select(child.id)"
+                (dblclick)="beginRename(child, $event)"
+                class="flex-1 truncate text-left"
+                [class.font-semibold]="selectedFolderId() === child.id"
+                [title]="child.name"
+              >
+                {{ child.name }}
+              </button>
+              @if (canWrite()) {
+                <button
+                  type="button"
+                  (click)="onDelete(child, $event)"
+                  class="invisible rounded p-0.5 text-zinc-400 hover:text-rose-600 group-hover:visible"
+                  title="Delete folder"
+                >
+                  <lucide-icon name="trash-2" size="12" />
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    @if (topLevel().length === 0) {
+      <p class="px-2 py-3 text-[11px] text-zinc-500">
+        No folders yet. Group workflows by team or channel.
+      </p>
+    }
+  </nav>
+</aside>

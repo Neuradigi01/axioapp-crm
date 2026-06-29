@@ -1,7 +1,7 @@
 # Step 13 — Workflow list UI + folders/categories
 
 **Goal:** First Angular surface — `/user/workflows` list page with channel/category/status filters, folders sidebar, status badges, per-row analytics summary, "Create from template" CTA, and "New workflow" button. Mirrors `/user/templates` and `/user/campaigns` styling.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 3 (router endpoints + sidebar entry + permission `workflows.read`).
 
 ---

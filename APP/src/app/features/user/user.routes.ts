@@ -368,6 +368,20 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // tasks/workflows Step 13 — workflow list + folders + run
+        // history drawer. Read-gated; "New workflow" + bulk
+        // activate / pause / archive affordances inside the page
+        // hide for read-only Employees via the runtime permission
+        // check. Step 14 ships the canvas editor at /:id; Step 16
+        // the templates gallery at /new.
+        path: 'workflows',
+        canActivate: [permissionGuard('workflows.read')],
+        loadComponent: () =>
+          import('./core/workflows/workflows.page').then(
+            (m) => m.WorkflowsPageComponent,
+          ),
+      },
+      {
         // tasks/automation-engine Step 7 — single-event trigger
         // list. Read-gated; "New automation" + inline
         // enable/disable affordances inside the page hide for
