@@ -77,7 +77,26 @@ class ActivationBlocked(WorkflowError):
         self.reason = reason
 
 
+class ActionNotImplemented(WorkflowError):
+    """The action handler is registered (so the graph validator
+    accepts it) but the underlying CRM module hasn't shipped yet.
+    Step 8 uses this for ``record.create_order`` + ``record.create_quote``
+    — the modules will land in future tracks; until then the handler
+    raises so the run-history view shows ``error='action_not_implemented'``
+    instead of silently no-oping."""
+
+    def __init__(self, action_type: str, reason: str | None = None) -> None:
+        message = (
+            f"action '{action_type}' not implemented"
+            + (f": {reason}" if reason else "")
+        )
+        super().__init__(message)
+        self.action_type = action_type
+        self.reason = reason
+
+
 __all__ = [
+    "ActionNotImplemented",
     "ActivationBlocked",
     "DuplicateWorkflowName",
     "FolderHasWorkflows",

@@ -52,3 +52,11 @@ from src.app.core.workflows.actions import flow_control  # noqa: F401
 # action handlers (email / WhatsApp / SMS / Facebook / Instagram /
 # push / Slack). Same import-only pattern as flow_control.
 from src.app.core.workflows.actions import send  # noqa: F401
+
+# tasks/workflows Step 8 — side-effect: register the nine Record
+# action handlers (update_contact_field / update_lead_field /
+# update_lead_stage / create_task / create_note / create_appointment /
+# create_quote / create_invoice / create_order). The quote + order
+# handlers are placeholders that raise ActionNotImplemented until
+# core/quotes + core/orders ship.
+from src.app.core.workflows.actions import records  # noqa: F401
