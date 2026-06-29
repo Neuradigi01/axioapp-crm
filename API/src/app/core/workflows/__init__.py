@@ -47,3 +47,8 @@ register_subscribers()
 # nodes without a special case. Import-only — the module's top-level
 # ``register()`` fires automatically.
 from src.app.core.workflows.actions import flow_control  # noqa: F401
+
+# tasks/workflows Step 7 — side-effect: register the seven Send
+# action handlers (email / WhatsApp / SMS / Facebook / Instagram /
+# push / Slack). Same import-only pattern as flow_control.
+from src.app.core.workflows.actions import send  # noqa: F401

@@ -1,0 +1,434 @@
+"""Send-action handlers for the workflows engine — Step 7.
+
+Seven handlers, one per channel, all conforming to the
+:class:`core.workflows.engine.ActionHandler` shape:
+
+  ``async def handle(session, *, run, step_run, node, context) -> ActionResult``
+
+Each handler:
+
+  1. Resolves the recipient via the
+     :mod:`core.workflows.recipients` registry. Missing recipient →
+     ``ActionResult(skip_reason='recipient_not_found')``.
+  2. Hits the Step-12 compliance gate placeholder
+     (:func:`_compliance_check` — currently a no-op). When Step 12
+     wires the real check it'll return a skip reason for marketing
+     sends blocked by DPDP / quiet hours / frequency cap.
+  3. Loads the template referenced by ``node.config.template_id``
+     from :mod:`core.templates.data_access`. Missing template →
+     ``ActionResult(skip_reason='template_missing')``.
+  4. Renders body + subject via the templates module's lenient
+     :func:`render` (template-library Step 2).
+  5. Ships via the matching channel transport. Email goes through
+     :func:`shared.email.get_email_backend`; WhatsApp / SMS /
+     Facebook / Instagram / push go through the conversations
+     adapter registry; Slack uses the minimal client at
+     :mod:`core.integrations.slack`.
+  6. Returns ``ActionResult`` with ``output={'channel_message_id',
+     'rendered_subject', 'rendered_body'}`` so the run-history view
+     can show the exact send.
+
+Errors from the channel transport are caught + persisted as
+``skip_reason='channel_error'`` with the error message in
+``output['error']`` so the run continues (the engine's outer
+exception path is reserved for un-typed runtime crashes; a Slack
+500 is a routine outage that we surface to the operator rather
+than killing the workflow).
+"""
+from __future__ import annotations
+
+import logging
+import uuid
+from typing import Any
+
+from src.app.core.workflows.actions import register_action
+from src.app.core.workflows.recipients import (
+    UnknownResolver,
+    resolve as resolve_recipient,
+)
+
+
+logger = logging.getLogger(__name__)
+
+
+# --- Internal helpers ---------------------------------------------------
+
+
+async def _compliance_check(run, node: dict[str, Any]) -> str | None:
+    """Step 12 hook. Returns a skip reason when the send should be
+    refused (DPDP / quiet hours / frequency cap); returns ``None``
+    when the send may proceed.
+
+    Step 7 ships the no-op placeholder so the action signature stays
+    stable across the eventual Step-12 swap."""
+    return None
+
+
+async def _resolve_recipient_or_skip(
+    session, *, run, node: dict[str, Any], context: dict[str, Any]
+):
+    """Pull the recipient string out of the resolver registry +
+    return either ``(recipient, None)`` or ``(None, skip_reason)``
+    so the caller can early-return cleanly."""
+    cfg = node.get("config") or {}
+    raw = cfg.get("recipient")
+    if isinstance(raw, str) and raw:
+        kind = raw
+    elif isinstance(raw, dict):
+        kind = raw.get("kind")
+    else:
+        kind = None
+    if not isinstance(kind, str) or not kind:
+        return None, "recipient_kind_missing"
+
+    try:
+        recipient = await resolve_recipient(
+            kind, session, run=run, node=node, context=context
+        )
+    except UnknownResolver as exc:
+        logger.warning(
+            "workflows.send unknown_resolver kind=%s node=%s",
+            kind,
+            node.get("id"),
+        )
+        return None, f"unknown_resolver:{exc.name}"
+
+    if not recipient:
+        return None, "recipient_not_found"
+    return recipient, None
+
+
+async def _load_template(session, *, run, template_id_raw: Any):
+    """Resolve the template referenced by the node's config.
+    Returns ``(template, None)`` or ``(None, skip_reason)``."""
+    if template_id_raw is None:
+        return None, "template_id_missing"
+    try:
+        template_id = (
+            template_id_raw
+            if isinstance(template_id_raw, uuid.UUID)
+            else uuid.UUID(str(template_id_raw))
+        )
+    except (ValueError, TypeError):
+        return None, "template_id_malformed"
+
+    from src.app.core.templates import data_access as templates_da
+
+    template = await templates_da.get_template(
+        session, org_id=run.org_id, template_id=template_id
+    )
+    if template is None:
+        return None, "template_missing"
+    return template, None
+
+
+def _render_template(template, context: dict[str, Any]) -> tuple[str, str | None]:
+    """Lenient render via the templates module's resolver — missing
+    variables substitute to empty strings so a slightly-stale
+    payload doesn't crash the send."""
+    from src.app.core.templates.variables import resolve as render
+
+    rendered_body = render(template.body_text or "", context)
+    rendered_subject = (
+        render(template.subject, context) if template.subject else None
+    )
+    return rendered_body, rendered_subject
+
+
+def _result_sent(
+    channel_message_id: str | None,
+    rendered_subject: str | None,
+    rendered_body: str,
+):
+    """Build the success ActionResult with the standard output
+    shape."""
+    from src.app.core.workflows.engine import ActionResult
+
+    return ActionResult(
+        output={
+            "channel_message_id": channel_message_id,
+            "rendered_subject": rendered_subject,
+            "rendered_body": rendered_body,
+        }
+    )
+
+
+def _result_skipped(reason: str, **extra: Any):
+    from src.app.core.workflows.engine import ActionResult
+
+    output: dict[str, Any] = dict(extra) if extra else {}
+    output["skip_reason"] = reason
+    return ActionResult(skip_reason=reason, output=output)
+
+
+def _result_channel_error(reason: str, error_msg: str):
+    """Channel transport failed (Slack outage, WhatsApp 24h-window,
+    SMS not configured, …). Persist as skipped with the verbatim
+    error so the run-history drawer can show it."""
+    from src.app.core.workflows.engine import ActionResult
+
+    return ActionResult(
+        skip_reason="channel_error",
+        output={
+            "skip_reason": reason,
+            "error": error_msg,
+        },
+    )
+
+
+# --- send.email ---------------------------------------------------------
+
+
+async def _send_email(session, *, run, step_run, node, context):
+    recipient, skip = await _resolve_recipient_or_skip(
+        session, run=run, node=node, context=context
+    )
+    if skip is not None:
+        return _result_skipped(skip)
+
+    compliance_skip = await _compliance_check(run, node)
+    if compliance_skip is not None:
+        return _result_skipped(compliance_skip)
+
+    cfg = node.get("config") or {}
+    template, skip = await _load_template(
+        session, run=run, template_id_raw=cfg.get("template_id")
+    )
+    if skip is not None:
+        return _result_skipped(skip)
+
+    rendered_body, rendered_subject = _render_template(template, context)
+
+    from src.app.shared.email import Email, get_email_backend
+
+    backend = get_email_backend()
+    try:
+        await backend.send(
+            Email(
+                to=recipient,
+                subject=rendered_subject or template.name,
+                body_text=rendered_body,
+                body_html=None,
+            )
+        )
+    except Exception as exc:
+        logger.warning(
+            "workflows.send.email failed node=%s recipient=%s error=%s",
+            node.get("id"),
+            recipient,
+            exc,
+        )
+        return _result_channel_error("email_send_failed", str(exc))
+
+    # SMTP-style backends don't return a message id — leave None.
+    return _result_sent(None, rendered_subject, rendered_body)
+
+
+# --- send.whatsapp ------------------------------------------------------
+
+
+async def _send_whatsapp(session, *, run, step_run, node, context):
+    recipient, skip = await _resolve_recipient_or_skip(
+        session, run=run, node=node, context=context
+    )
+    if skip is not None:
+        return _result_skipped(skip)
+
+    compliance_skip = await _compliance_check(run, node)
+    if compliance_skip is not None:
+        return _result_skipped(compliance_skip)
+
+    cfg = node.get("config") or {}
+    template, skip = await _load_template(
+        session, run=run, template_id_raw=cfg.get("template_id")
+    )
+    if skip is not None:
+        return _result_skipped(skip)
+
+    rendered_body, _ = _render_template(template, context)
+
+    from src.app.core.conversations.models import ConversationChannel
+    from src.app.core.conversations.registry import (
+        ChannelNotRegistered,
+        resolve as resolve_adapter,
+    )
+
+    try:
+        adapter = resolve_adapter(ConversationChannel.whatsapp)
+    except ChannelNotRegistered as exc:
+        return _result_channel_error("whatsapp_not_configured", str(exc))
+
+    try:
+        ref = await adapter.send(
+            org_id=run.org_id,
+            external_id=recipient,
+            text=rendered_body,
+            attachments=[],
+        )
+    except Exception as exc:
+        logger.warning(
+            "workflows.send.whatsapp failed node=%s recipient=%s error=%s",
+            node.get("id"),
+            recipient,
+            exc,
+        )
+        return _result_channel_error("whatsapp_send_failed", str(exc))
+
+    return _result_sent(
+        getattr(ref, "channel_message_id", None), None, rendered_body
+    )
+
+
+# --- send.sms / send.facebook / send.instagram / send.push --------------
+
+
+def _make_adapter_send(channel_name: str, channel_enum):
+    """Factory — the four "shipped via the conversations adapter"
+    channels share the same dispatch shape; differences live in
+    the channel enum + the friendly error label.
+    """
+
+    async def _handler(session, *, run, step_run, node, context):
+        recipient, skip = await _resolve_recipient_or_skip(
+            session, run=run, node=node, context=context
+        )
+        if skip is not None:
+            return _result_skipped(skip)
+
+        compliance_skip = await _compliance_check(run, node)
+        if compliance_skip is not None:
+            return _result_skipped(compliance_skip)
+
+        cfg = node.get("config") or {}
+        template, skip = await _load_template(
+            session, run=run, template_id_raw=cfg.get("template_id")
+        )
+        if skip is not None:
+            return _result_skipped(skip)
+
+        rendered_body, _ = _render_template(template, context)
+
+        from src.app.core.conversations.registry import (
+            ChannelNotRegistered,
+            resolve as resolve_adapter,
+        )
+
+        try:
+            adapter = resolve_adapter(channel_enum)
+        except ChannelNotRegistered as exc:
+            return _result_channel_error(
+                f"{channel_name}_not_configured", str(exc)
+            )
+
+        try:
+            ref = await adapter.send(
+                org_id=run.org_id,
+                external_id=recipient,
+                text=rendered_body,
+                attachments=[],
+            )
+        except Exception as exc:
+            logger.warning(
+                "workflows.send.%s failed node=%s recipient=%s error=%s",
+                channel_name,
+                node.get("id"),
+                recipient,
+                exc,
+            )
+            return _result_channel_error(
+                f"{channel_name}_send_failed", str(exc)
+            )
+
+        return _result_sent(
+            getattr(ref, "channel_message_id", None), None, rendered_body
+        )
+
+    _handler.__name__ = f"_send_{channel_name}"
+    return _handler
+
+
+# --- send.slack ---------------------------------------------------------
+
+
+async def _send_slack(session, *, run, step_run, node, context):
+    """Slack uses an incoming-webhook URL rather than a channel
+    adapter. The node config carries the webhook URL OR a flag
+    ``use_org_default`` to look it up from
+    ``tbl_integrations.slack_webhook`` (the latter is a future
+    enhancement — Step 7 ships the literal-URL path only)."""
+    cfg = node.get("config") or {}
+    webhook_url = cfg.get("webhook_url")
+    if not isinstance(webhook_url, str) or not webhook_url.startswith(
+        "https://"
+    ):
+        return _result_skipped("slack_webhook_missing")
+
+    compliance_skip = await _compliance_check(run, node)
+    if compliance_skip is not None:
+        return _result_skipped(compliance_skip)
+
+    template, skip = await _load_template(
+        session, run=run, template_id_raw=cfg.get("template_id")
+    )
+    if skip is not None:
+        return _result_skipped(skip)
+
+    rendered_body, _ = _render_template(template, context)
+
+    from src.app.core.integrations.slack import (
+        SlackError,
+        post_message,
+    )
+
+    try:
+        await post_message(
+            webhook_url,
+            rendered_body,
+            idempotency_key=str(step_run.id) if step_run else None,
+        )
+    except SlackError as exc:
+        return _result_channel_error("slack_send_failed", str(exc))
+
+    return _result_sent(None, None, rendered_body)
+
+
+# --- Registration -------------------------------------------------------
+
+
+def register() -> None:
+    """Register the seven Send handlers into the action registry.
+    Idempotent — the registry's ``register_action`` overwrites on
+    duplicate so this is safe to call multiple times."""
+    # Local import deferred until registration so the
+    # conversations enum is available without forcing an import
+    # cycle at module import.
+    from src.app.core.conversations.models import ConversationChannel
+
+    register_action("send.email", lambda: _send_email)
+    register_action("send.whatsapp", lambda: _send_whatsapp)
+    register_action(
+        "send.sms",
+        lambda: _make_adapter_send("sms", ConversationChannel.sms),
+    )
+    register_action(
+        "send.facebook",
+        lambda: _make_adapter_send("facebook", ConversationChannel.facebook),
+    )
+    register_action(
+        "send.instagram",
+        lambda: _make_adapter_send("instagram", ConversationChannel.instagram),
+    )
+    register_action(
+        "send.push",
+        lambda: _make_adapter_send("push", ConversationChannel.push),
+    )
+    register_action("send.slack", lambda: _send_slack)
+
+
+# Side-effect registration on import. The workflows package init
+# imports this module so the registry is populated before the
+# engine ever dispatches.
+register()
+
+
+__all__ = ["register"]
