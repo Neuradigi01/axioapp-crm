@@ -72,6 +72,7 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [Update Conversations Page](update-conversations-page/README.md) | 3 | Core (side track — surface assignee + sender) |
 | — | [Promote Integrations to Sidebar](promote-integrations-to-sidebar/README.md) | 1 | Core (side track — sidebar promotion) |
 | — | [WhatsApp Platform Upgrade](whatsapp-platform-upgrade/README.md) | 29 | Core (side track — Embedded Signup + full WhatsApp UI uplift) |
+| — | [WhatsApp Unofficial (Baileys)](whatsapp-unofficial/README.md) | 8 | Core (side track — second provider via Baileys sidecar; coexists with Cloud) |
 | — | [Template Library](template-library/README.md) | 14 | Core (side track — central multi-channel template library; precursor to `automation-engine`) |
 | — | [Automation Engine](automation-engine/README.md) | 14 | Core (side track — event-triggered automation; depends on `template-library`) |
 | — | [DAL Backfill](dal-backfill/README.md) | 14 | Core (side track — align every module to Router → Service → DAL; manager spec 2026-06-25) |
