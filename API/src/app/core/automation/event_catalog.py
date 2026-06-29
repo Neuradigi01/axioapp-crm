@@ -325,14 +325,35 @@ _register(
     CatalogEntry(
         event_type="quote.sent",
         label="Quote sent",
-        description="A quote is sent to a contact.",
+        description=(
+            "A quote is sent to a contact. Forward-compatible — the "
+            "publisher lands when the quotes module ships; the catalog "
+            "entry is here today so seeded triggers + the editor's "
+            "event picker include the slot."
+        ),
         sample_payload={
+            "quote_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "total_amount": "45000.00",
+            "currency": "INR",
             "quote": {
                 "id": "00000000-0000-0000-0000-000000000000",
-                "total_amount": 45000,
+                "total_amount": "45000.00",
                 "currency": "INR",
+                "pdf_url": "https://example.com/quotes/abc.pdf",
+                "expires_at": "2026-07-29T00:00:00+00:00",
             },
-            "contact": {"first_name": "Asha"},
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
         },
     )
 )
@@ -340,10 +361,32 @@ _register(
     CatalogEntry(
         event_type="quote.accepted",
         label="Quote accepted",
-        description="The contact accepts the quote.",
+        description=(
+            "The contact accepts the quote (signature flow / portal "
+            "action). Forward-compatible — see ``quote.sent``."
+        ),
         sample_payload={
-            "quote": {"id": "00000000-0000-0000-0000-000000000000", "total_amount": 45000},
-            "contact": {"first_name": "Asha"},
+            "quote_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "total_amount": "45000.00",
+            "currency": "INR",
+            "accepted_at": "2026-06-30T10:00:00+05:30",
+            "quote": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "total_amount": "45000.00",
+                "currency": "INR",
+            },
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
         },
     )
 )
@@ -351,10 +394,78 @@ _register(
     CatalogEntry(
         event_type="invoice.sent",
         label="Invoice sent",
-        description="An invoice is sent to a contact.",
+        description=(
+            "An invoice is issued + sent to a contact. Fires from "
+            "``core.billing.service.issue`` after commit; "
+            "``event_id=invoice_sent:{invoice_id}`` deduplicates "
+            "replays."
+        ),
         sample_payload={
-            "invoice": {"id": "INV-2026-0421", "total_amount": 45000},
-            "contact": {"first_name": "Asha"},
+            "invoice_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "total_amount": "45000.00",
+            "currency": "INR",
+            "due_date": "2026-07-29",
+            "invoice": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "number": 4021,
+                "total_amount": "45000.00",
+                "currency": "INR",
+                "issued_at": "2026-06-29T12:00:00+00:00",
+                "due_date": "2026-07-29",
+                "pdf_url": None,
+            },
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
+        },
+    )
+)
+_register(
+    CatalogEntry(
+        event_type="invoice.paid",
+        label="Invoice paid",
+        description=(
+            "An invoice's outstanding balance reaches zero. Fires from "
+            "``core.billing.service.record_payment`` once the cumulative "
+            "payment sum meets the invoice total; "
+            "``event_id=invoice_paid:{invoice_id}`` ensures only one "
+            "publish per invoice even on payment-recording replays."
+        ),
+        sample_payload={
+            "invoice_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "total_amount": "45000.00",
+            "currency": "INR",
+            "paid_at": "2026-06-30T14:00:00+00:00",
+            "payment_method": "upi",
+            "invoice": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "number": 4021,
+                "total_amount": "45000.00",
+                "currency": "INR",
+                "paid_at": "2026-06-30T14:00:00+00:00",
+                "payment_method": "upi",
+            },
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
         },
     )
 )
@@ -362,10 +473,38 @@ _register(
     CatalogEntry(
         event_type="invoice.overdue_7d",
         label="Invoice overdue (7d)",
-        description="Daily sweep finds invoices 7 days past due.",
+        description=(
+            "Daily Celery beat sweep finds ``issued`` invoices whose "
+            "``issued_at`` is more than 7 days ago. "
+            "``event_id=invoice_overdue_7d:{invoice_id}`` deduplicates "
+            "across daily ticks so each invoice gets at most one "
+            "overdue-reminder fire."
+        ),
         sample_payload={
-            "invoice": {"id": "INV-2026-0421", "due_date": "2026-06-19"},
-            "contact": {"first_name": "Asha"},
+            "invoice_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "total_amount": "45000.00",
+            "currency": "INR",
+            "issued_at": "2026-06-19T12:00:00+00:00",
+            "days_overdue": 7,
+            "invoice": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "number": 4021,
+                "total_amount": "45000.00",
+                "currency": "INR",
+                "issued_at": "2026-06-19T12:00:00+00:00",
+            },
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
         },
     )
 )

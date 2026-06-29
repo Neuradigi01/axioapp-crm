@@ -18,6 +18,7 @@ and audit emits all live in ``service.py``.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -118,6 +119,37 @@ async def list_payments_query(
         )
     ).scalars().all()
     return list(rows)
+
+
+async def find_overdue(
+    session: AsyncSession,
+    *,
+    days_overdue: int,
+) -> list[Invoice]:
+    """Return ``issued`` invoices whose ``issued_at`` is more than
+    ``days_overdue`` days ago.
+
+    Used by ``core.billing.tasks.scan_for_overdue`` to drive
+    ``invoice.overdue_7d`` events. The scanner is cross-tenant — it
+    opens a session WITHOUT setting ``RequestContext.org_id`` so the
+    ``do_orm_execute`` tenant filter is a no-op + the scan returns
+    every org's rows in one pass; the caller reads ``inv.org_id`` off
+    each row + supplies it when publishing.
+
+    Invoices in ``draft`` / ``paid`` / ``void`` are excluded — only
+    open issued invoices warrant an overdue reminder. Without a
+    dedicated ``due_date`` column on ``tbl_invoices`` we treat
+    ``issued_at + days_overdue`` as the overdue threshold (industry
+    default Net-7 / Net-30 alignment).
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days_overdue)
+    stmt = (
+        select(Invoice)
+        .where(Invoice.status == InvoiceStatus.issued)
+        .where(Invoice.issued_at.is_not(None))
+        .where(Invoice.issued_at < cutoff)
+    )
+    return list((await session.execute(stmt)).scalars().all())
 
 
 async def sum_payments(

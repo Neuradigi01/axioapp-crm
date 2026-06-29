@@ -97,6 +97,55 @@ _APPOINTMENT_REMINDER_1H_BODY = (
     "See you soon! — {{ org.name }}"
 )
 
+# ---------------------------------------------------------------------------
+# Step 11 — invoice-cycle templates (email channel by default).
+# Invoices carry a PDF + currency value that's easier to surface in
+# an email than a WhatsApp message; the seeded templates use
+# ``{{ invoice.* }}`` variables registered in
+# :mod:`core.templates.variables`. Operators who want a WhatsApp
+# variant can clone via the editor.
+# ---------------------------------------------------------------------------
+
+_INVOICE_SENT_NAME = "Invoice Sent"
+_INVOICE_SENT_SUBJECT = "Invoice #{{ invoice.number }} from {{ org.name }}"
+_INVOICE_SENT_BODY = (
+    "Hi {{ contact.full_name }},\n\n"
+    "Your invoice #{{ invoice.number }} from {{ org.name }} is "
+    "attached — the total is {{ invoice.currency }} "
+    "{{ invoice.total_amount }}.\n\n"
+    "Please review and let us know if you have any questions. We "
+    "appreciate your business.\n\n"
+    "— The {{ org.name }} team"
+)
+
+_INVOICE_PAID_NAME = "Invoice Paid"
+_INVOICE_PAID_SUBJECT = (
+    "Payment received — invoice #{{ invoice.number }}"
+)
+_INVOICE_PAID_BODY = (
+    "Hi {{ contact.full_name }},\n\n"
+    "Thanks — we've received your payment for invoice "
+    "#{{ invoice.number }} ({{ invoice.currency }} "
+    "{{ invoice.total_amount }}). This email is your receipt.\n\n"
+    "If you need a formal receipt with our GST details, just reply "
+    "and we'll send one over.\n\n"
+    "— The {{ org.name }} team"
+)
+
+_INVOICE_OVERDUE_NAME = "Invoice Overdue 7d"
+_INVOICE_OVERDUE_SUBJECT = (
+    "Reminder: invoice #{{ invoice.number }} is now overdue"
+)
+_INVOICE_OVERDUE_BODY = (
+    "Hi {{ contact.full_name }},\n\n"
+    "This is a friendly reminder that invoice #{{ invoice.number }} "
+    "from {{ org.name }} for {{ invoice.currency }} "
+    "{{ invoice.total_amount }} is now more than 7 days overdue.\n\n"
+    "If you've already arranged payment, please ignore this message "
+    "— otherwise, reply to this email and we'll be happy to help.\n\n"
+    "— The {{ org.name }} team"
+)
+
 
 async def seed_user_welcome_template(
     session: AsyncSession,
@@ -361,10 +410,157 @@ async def seed_appointment_reminder_1h_template(
     )
 
 
+async def _seed_email_invoice_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    name: str,
+    subject: str,
+    body: str,
+    variables: list[str],
+    change_note: str,
+) -> MessageTemplate:
+    """Shared shaper for the three Step-11 invoice email seeds.
+
+    Mirrors :func:`seed_user_welcome_template` / :func:`seed_lead_confirmation_template`
+    — email channel, transactional category, ``internal_status='published'``
+    so the dispatcher can use the template without an internal review
+    cycle. Idempotent on ``(org_id, lower(name), channel='email')``.
+    """
+    existing = (
+        await session.execute(
+            select(MessageTemplate).where(
+                MessageTemplate.org_id == org_id,
+                func.lower(MessageTemplate.name) == name.lower(),
+                MessageTemplate.channel == ConversationChannel.email,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    template = MessageTemplate(
+        org_id=org_id,
+        channel=ConversationChannel.email,
+        name=name,
+        category=TemplateCategory.transactional,
+        language="en",
+        body_text=body,
+        subject=subject,
+        variables=variables,
+        internal_status=TemplateInternalStatus.published,
+        external_status=TemplateExternalStatus.n_a,
+        current_version=1,
+    )
+    session.add(template)
+    await session.flush()
+
+    version = MessageTemplateVersion(
+        org_id=org_id,
+        template_id=template.id,
+        version=1,
+        body_text=template.body_text,
+        subject=template.subject,
+        variables=template.variables,
+        change_note=change_note,
+    )
+    session.add(version)
+    await session.flush()
+
+    logger.info(
+        "templates.seed invoice_template org=%s name=%s template=%s",
+        org_id,
+        name,
+        template.id,
+    )
+    return template
+
+
+async def seed_invoice_sent_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """Email customers receive when their invoice is issued
+    (``invoice.sent``)."""
+    return await _seed_email_invoice_template(
+        session,
+        org_id=org_id,
+        name=_INVOICE_SENT_NAME,
+        subject=_INVOICE_SENT_SUBJECT,
+        body=_INVOICE_SENT_BODY,
+        variables=[
+            "contact.full_name",
+            "org.name",
+            "invoice.number",
+            "invoice.total_amount",
+            "invoice.currency",
+        ],
+        change_note=(
+            "seeded by automation-engine Step 11 (Invoice Sent)"
+        ),
+    )
+
+
+async def seed_invoice_paid_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """Receipt email customers receive once an invoice's outstanding
+    balance reaches zero (``invoice.paid``)."""
+    return await _seed_email_invoice_template(
+        session,
+        org_id=org_id,
+        name=_INVOICE_PAID_NAME,
+        subject=_INVOICE_PAID_SUBJECT,
+        body=_INVOICE_PAID_BODY,
+        variables=[
+            "contact.full_name",
+            "org.name",
+            "invoice.number",
+            "invoice.total_amount",
+            "invoice.currency",
+        ],
+        change_note=(
+            "seeded by automation-engine Step 11 (Invoice Paid)"
+        ),
+    )
+
+
+async def seed_invoice_overdue_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """Reminder email customers receive when an invoice has been
+    open for more than 7 days (``invoice.overdue_7d``)."""
+    return await _seed_email_invoice_template(
+        session,
+        org_id=org_id,
+        name=_INVOICE_OVERDUE_NAME,
+        subject=_INVOICE_OVERDUE_SUBJECT,
+        body=_INVOICE_OVERDUE_BODY,
+        variables=[
+            "contact.full_name",
+            "org.name",
+            "invoice.number",
+            "invoice.total_amount",
+            "invoice.currency",
+        ],
+        change_note=(
+            "seeded by automation-engine Step 11 (Invoice Overdue 7d)"
+        ),
+    )
+
+
 __all__ = [
     "seed_appointment_booked_template",
     "seed_appointment_reminder_1h_template",
     "seed_appointment_reminder_24h_template",
+    "seed_invoice_overdue_template",
+    "seed_invoice_paid_template",
+    "seed_invoice_sent_template",
     "seed_lead_confirmation_template",
     "seed_user_welcome_template",
 ]

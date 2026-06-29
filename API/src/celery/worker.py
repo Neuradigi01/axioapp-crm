@@ -44,6 +44,11 @@ celery.autodiscover_tasks([
     # events for upcoming appointments. Without this entry the beat
     # scheduler can't find the task.
     "src.app.core.appointments.tasks",
+    # tasks/automation-engine Step 11 — daily overdue-invoice sweep
+    # that publishes invoice.overdue_7d for issued invoices older
+    # than 7 days. Without this entry the beat scheduler can't find
+    # the task.
+    "src.app.core.billing.tasks",
 ])
 
 if not CELERY_ENABLED:

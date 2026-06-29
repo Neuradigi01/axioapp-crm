@@ -33,6 +33,9 @@ _LEAD_CONFIRMATION_TRIGGER_NAME = "Lead Confirmation"
 _APPOINTMENT_BOOKED_TRIGGER_NAME = "Appointment Booked"
 _APPOINTMENT_REMINDER_24H_TRIGGER_NAME = "Appointment Reminder 24h"
 _APPOINTMENT_REMINDER_1H_TRIGGER_NAME = "Appointment Reminder 1h"
+_INVOICE_SENT_TRIGGER_NAME = "Invoice Sent"
+_INVOICE_PAID_TRIGGER_NAME = "Invoice Paid"
+_INVOICE_OVERDUE_TRIGGER_NAME = "Invoice Overdue 7d"
 
 
 async def seed_user_welcome_trigger(
@@ -230,6 +233,105 @@ async def seed_appointment_reminder_1h_trigger(
     )
 
 
+async def _seed_invoice_trigger(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    name: str,
+    event_type: str,
+    template_id: uuid.UUID,
+) -> AutomationTrigger:
+    """Shared shaper for the three Step-11 invoice-cycle triggers.
+
+    All three seed identically: email channel, no conditions, no
+    delay, recipient resolved off ``contact.email``. The only
+    difference is the trigger ``name`` + the ``event_type`` it
+    subscribes to. Idempotent on ``(org_id, lower(name))``."""
+    existing = await data_access.get_trigger_by_name(
+        session, org_id=org_id, name=name
+    )
+    if existing is not None:
+        return existing
+
+    trigger = AutomationTrigger(
+        org_id=org_id,
+        name=name,
+        enabled=True,
+        event_type=event_type,
+        conditions={},
+        channel=ConversationChannel.email,
+        template_id=template_id,
+        delay_seconds=0,
+        recipient_resolver="contact.email",
+        recipient_resolver_config={},
+        created_by_user_id=None,
+        updated_by_user_id=None,
+    )
+    session.add(trigger)
+    await session.flush()
+    logger.info(
+        "automation.seed invoice_trigger org=%s name=%s "
+        "trigger=%s template=%s",
+        org_id,
+        name,
+        trigger.id,
+        template_id,
+    )
+    return trigger
+
+
+async def seed_invoice_sent_trigger(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+) -> AutomationTrigger:
+    """Fires when ``core.billing.service.issue`` commits + publishes
+    ``invoice.sent``."""
+    return await _seed_invoice_trigger(
+        session,
+        org_id=org_id,
+        name=_INVOICE_SENT_TRIGGER_NAME,
+        event_type="invoice.sent",
+        template_id=template_id,
+    )
+
+
+async def seed_invoice_paid_trigger(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+) -> AutomationTrigger:
+    """Fires when ``core.billing.service.record_payment`` flips an
+    invoice to ``paid`` + publishes ``invoice.paid``."""
+    return await _seed_invoice_trigger(
+        session,
+        org_id=org_id,
+        name=_INVOICE_PAID_TRIGGER_NAME,
+        event_type="invoice.paid",
+        template_id=template_id,
+    )
+
+
+async def seed_invoice_overdue_trigger(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+) -> AutomationTrigger:
+    """Fires when ``core.billing.tasks.scan_for_overdue`` finds an
+    ``issued`` invoice older than 7 days + publishes
+    ``invoice.overdue_7d``."""
+    return await _seed_invoice_trigger(
+        session,
+        org_id=org_id,
+        name=_INVOICE_OVERDUE_TRIGGER_NAME,
+        event_type="invoice.overdue_7d",
+        template_id=template_id,
+    )
+
+
 async def install_default_org_seeds(
     session: AsyncSession, *, org_id: uuid.UUID
 ) -> dict:
@@ -243,6 +345,9 @@ async def install_default_org_seeds(
       ``appointment.reminder_24h`` (Step 10).
     * Appointment Reminder 1h — fires on
       ``appointment.reminder_1h`` (Step 10).
+    * Invoice Sent — fires on ``invoice.sent`` (Step 11).
+    * Invoice Paid — fires on ``invoice.paid`` (Step 11).
+    * Invoice Overdue 7d — fires on ``invoice.overdue_7d`` (Step 11).
 
     Returns the seeded ids so backfill migrations can log per-org.
     All seeders are idempotent — safe to re-run."""
@@ -250,6 +355,9 @@ async def install_default_org_seeds(
         seed_appointment_booked_template,
         seed_appointment_reminder_1h_template,
         seed_appointment_reminder_24h_template,
+        seed_invoice_overdue_template,
+        seed_invoice_paid_template,
+        seed_invoice_sent_template,
         seed_lead_confirmation_template,
         seed_user_welcome_template,
     )
@@ -293,6 +401,33 @@ async def install_default_org_seeds(
         template_id=reminder_1h_template.id,
     )
 
+    invoice_sent_template = await seed_invoice_sent_template(
+        session, org_id=org_id
+    )
+    invoice_sent_trigger = await seed_invoice_sent_trigger(
+        session,
+        org_id=org_id,
+        template_id=invoice_sent_template.id,
+    )
+
+    invoice_paid_template = await seed_invoice_paid_template(
+        session, org_id=org_id
+    )
+    invoice_paid_trigger = await seed_invoice_paid_trigger(
+        session,
+        org_id=org_id,
+        template_id=invoice_paid_template.id,
+    )
+
+    invoice_overdue_template = await seed_invoice_overdue_template(
+        session, org_id=org_id
+    )
+    invoice_overdue_trigger = await seed_invoice_overdue_trigger(
+        session,
+        org_id=org_id,
+        template_id=invoice_overdue_template.id,
+    )
+
     return {
         "welcome_template_id": str(welcome_template.id),
         "welcome_trigger_id": str(welcome_trigger.id),
@@ -304,6 +439,12 @@ async def install_default_org_seeds(
         "appointment_reminder_24h_trigger_id": str(reminder_24h_trigger.id),
         "appointment_reminder_1h_template_id": str(reminder_1h_template.id),
         "appointment_reminder_1h_trigger_id": str(reminder_1h_trigger.id),
+        "invoice_sent_template_id": str(invoice_sent_template.id),
+        "invoice_sent_trigger_id": str(invoice_sent_trigger.id),
+        "invoice_paid_template_id": str(invoice_paid_template.id),
+        "invoice_paid_trigger_id": str(invoice_paid_trigger.id),
+        "invoice_overdue_template_id": str(invoice_overdue_template.id),
+        "invoice_overdue_trigger_id": str(invoice_overdue_trigger.id),
     }
 
 
@@ -312,6 +453,9 @@ __all__ = [
     "seed_appointment_booked_trigger",
     "seed_appointment_reminder_1h_trigger",
     "seed_appointment_reminder_24h_trigger",
+    "seed_invoice_overdue_trigger",
+    "seed_invoice_paid_trigger",
+    "seed_invoice_sent_trigger",
     "seed_lead_confirmation_trigger",
     "seed_user_welcome_trigger",
 ]

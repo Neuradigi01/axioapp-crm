@@ -126,4 +126,13 @@ beat_schedule = {
         'task': 'src.app.core.appointments.tasks.scan_for_reminders',
         'schedule': crontab(minute='*/15'),
     },
+    # tasks/automation-engine Step 11 — daily 9:00 UTC sweep across
+    # tbl_invoices that publishes invoice.overdue_7d for any
+    # `issued` invoice whose issued_at is more than 7 days ago. The
+    # deterministic event_id (`invoice_overdue_7d:{invoice_id}`)
+    # dedupes daily ticks so each invoice gets at most one fire.
+    'billing-scan-for-overdue': {
+        'task': 'src.app.core.billing.tasks.scan_for_overdue',
+        'schedule': crontab(hour=9, minute=0),
+    },
 }

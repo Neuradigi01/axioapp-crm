@@ -276,6 +276,18 @@ async def issue(
         after={"number": inv.number, "total": str(inv.total)},
         user_id=user_id,
     )
+
+    # tasks/automation-engine Step 11 — publish ``invoice.sent`` so
+    # the seeded "Invoice Sent" trigger fires the customer email.
+    # After-commit so a publish failure can't roll back the issue.
+    await _publish_invoice_event(
+        session=session,
+        inv=inv,
+        event_type="invoice.sent",
+        event_id_prefix="invoice_sent",
+        extra=None,
+    )
+
     return inv
 
 
@@ -307,11 +319,13 @@ async def record_payment(
     await session.flush()
 
     paid_so_far = await _da.sum_payments(session, inv.id)
+    flipped_to_paid = False
     if paid_so_far >= inv.total and inv.status != InvoiceStatus.paid:
         inv.status = InvoiceStatus.paid
         inv.paid_at = datetime.now(timezone.utc)
         # Persist the dominant payment method when the invoice closes.
         inv.payment_method = payload.method
+        flipped_to_paid = True
     await session.commit()
     await session.refresh(pay)
     await session.refresh(inv)
@@ -328,6 +342,28 @@ async def record_payment(
         },
         user_id=user_id,
     )
+
+    # tasks/automation-engine Step 11 — publish ``invoice.paid`` once
+    # the cumulative payment sum closes the invoice. The
+    # ``flipped_to_paid`` gate ensures a partial-payment record
+    # doesn't fire the event; the deterministic ``event_id`` absorbs
+    # any belt-and-braces double-call by the operator.
+    if flipped_to_paid:
+        await _publish_invoice_event(
+            session=session,
+            inv=inv,
+            event_type="invoice.paid",
+            event_id_prefix="invoice_paid",
+            extra={
+                "paid_at": (
+                    inv.paid_at.isoformat() if inv.paid_at else None
+                ),
+                "payment_method": (
+                    inv.payment_method.value if inv.payment_method else None
+                ),
+            },
+        )
+
     return pay
 
 
@@ -369,6 +405,106 @@ def _recompute_totals(inv: Invoice, lines: list[InvoiceLine]) -> None:
     inv.subtotal = subtotal.quantize(Decimal("0.01"))
     inv.tax_amount = tax.quantize(Decimal("0.01"))
     inv.total = total if total > 0 else Decimal("0.00")
+
+
+# --- Step-11 event publisher ---------------------------------------------
+
+
+async def _publish_invoice_event(
+    *,
+    session: AsyncSession,
+    inv: Invoice,
+    event_type: str,
+    event_id_prefix: str,
+    extra: dict | None,
+) -> None:
+    """Build the ``invoice.*`` envelope + publish via the bus.
+
+    Hydrates Contact + Organization so the recipient resolver +
+    template renderer have everything they need at dispatch time
+    without a per-handler DB hit. Mirrors the Step 5/6/10
+    ``_publish_*`` helpers: try/except wrapper around the entire body
+    so a misbehaving subscriber + a missing bus module can never roll
+    back the freshly-committed billing write.
+
+    The ``extra`` dict folds into the top-level payload + the
+    nested ``invoice`` dict — used for the ``paid_at`` /
+    ``payment_method`` keys that only ``invoice.paid`` carries.
+    """
+    try:
+        from sqlalchemy import select as _select
+
+        from src.app.core.contacts.models import Contact
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        contact = None
+        if inv.contact_id is not None:
+            contact = (
+                await session.execute(
+                    _select(Contact).where(Contact.id == inv.contact_id)
+                )
+            ).scalar_one_or_none()
+        org = (
+            await session.execute(
+                _select(Organization).where(Organization.id == inv.org_id)
+            )
+        ).scalar_one_or_none()
+
+        payload: dict = {
+            "invoice_id": str(inv.id),
+            "contact_id": (
+                str(inv.contact_id) if inv.contact_id else None
+            ),
+            "total_amount": str(inv.total),
+            "currency": inv.currency,
+            "invoice": {
+                "id": str(inv.id),
+                "number": inv.number,
+                "total_amount": str(inv.total),
+                "currency": inv.currency,
+                "issued_at": (
+                    inv.issued_at.isoformat() if inv.issued_at else None
+                ),
+            },
+        }
+        if extra:
+            payload.update(extra)
+            # Mirror the extras into the nested invoice dict so the
+            # template renderer can use either path
+            # (`{{ paid_at }}` OR `{{ invoice.paid_at }}`).
+            payload["invoice"].update(extra)
+
+        if contact is not None:
+            payload["contact"] = {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+            }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+            }
+
+        await events_publish(
+            event_type,
+            payload,
+            org_id=inv.org_id,
+            event_id=f"{event_id_prefix}:{inv.id}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "billing publish_invoice_event_failed org=%s invoice=%s "
+            "event=%s",
+            inv.org_id,
+            inv.id,
+            event_type,
+        )
 
 
 __all__ = [
