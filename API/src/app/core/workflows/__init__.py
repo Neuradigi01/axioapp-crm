@@ -67,3 +67,14 @@ from src.app.core.workflows.actions import records  # noqa: F401
 # ``tbl_org_settings.routing_state`` (column added by migration
 # 0138_org_settings_routing_state).
 from src.app.core.workflows.actions import routing  # noqa: F401
+
+# tasks/workflows Step 10 — side-effect: register the five tagging
+# handlers (add_tag / remove_tag / add_to_list / remove_from_list /
+# set_lead_score) and the eight lifecycle handlers (mark_converted /
+# mark_unsubscribed / block_contact / archive_contact /
+# enroll_in_workflow / enroll_in_sequence / remove_from_workflow /
+# remove_from_sequence). add_to_list / remove_from_list /
+# block_contact / archive_contact are placeholders that raise
+# ActionNotImplemented until the underlying CRM modules ship.
+from src.app.core.workflows.actions import tagging  # noqa: F401
+from src.app.core.workflows.actions import lifecycle  # noqa: F401
