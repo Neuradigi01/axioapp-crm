@@ -1,0 +1,509 @@
+"""HTTP routes for the workflows module.
+
+Twelve endpoints under ``/api/v1/workflows`` — CRUD, status
+transitions, folder CRUD, clone. Engine + run-history endpoints
+land in Step 4; analytics + diagnostics in Step 19; trigger
+subscription is internal (Step 5).
+
+Standard exception → HTTP mapping (see :func:`_workflow_http_map`):
+
+  * :class:`WorkflowNotFound`        → 404
+  * :class:`DuplicateWorkflowName`   → 409
+  * :class:`WorkflowLocked`          → 409
+  * :class:`FolderHasWorkflows`      → 409 (carries ``count``)
+  * :class:`InvalidGraph`            → 422 (carries ``reason``)
+  * :class:`ActivationBlocked`       → 409 (carries ``reason``)
+  * ``ValueError`` (invalid transition)  → 409
+
+The router never executes SQL directly — every read + write goes
+through :mod:`core.workflows.service` (manager spec 2026-06-25:
+"router never imports another module's DAL").
+"""
+from __future__ import annotations
+
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.app.core.auth.dependencies import get_current_user, require_permissions
+from src.app.core.users.models import User
+from src.app.core.workflows import service as workflows_service
+from src.app.core.workflows.exceptions import (
+    ActivationBlocked,
+    DuplicateWorkflowName,
+    FolderHasWorkflows,
+    InvalidGraph,
+    WorkflowError,
+    WorkflowLocked,
+    WorkflowNotFound,
+)
+from src.app.core.workflows.models import WorkflowStatus
+from src.app.core.workflows.permissions import (
+    PERM_ACTIVATE,
+    PERM_CLONE,
+    PERM_READ,
+    PERM_WRITE,
+)
+from src.app.core.workflows.schemas import (
+    WorkflowCreate,
+    WorkflowFolderCreate,
+    WorkflowFolderRead,
+    WorkflowRead,
+    WorkflowUpdate,
+)
+from src.app.shared.context import get_context
+from src.app.shared.db import get_db
+
+
+router = APIRouter(prefix="/workflows", tags=["Workflows"])
+
+
+# --- helpers -------------------------------------------------------------
+
+
+def _workflow_http_map(exc: WorkflowError) -> HTTPException:
+    """Translate workflow domain exceptions into FastAPI
+    HTTPException with the canonical status code per the Step-3
+    spec. Carries ``reason`` for InvalidGraph + ActivationBlocked
+    so the editor can render the specific failure mode."""
+    if isinstance(exc, WorkflowNotFound):
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="workflow not found",
+        )
+    if isinstance(exc, DuplicateWorkflowName):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+    if isinstance(exc, WorkflowLocked):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        )
+    if isinstance(exc, FolderHasWorkflows):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "folder_has_workflows",
+                "message": str(exc),
+                "count": exc.count,
+            },
+        )
+    if isinstance(exc, InvalidGraph):
+        return HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "invalid_graph",
+                "reason": exc.reason,
+            },
+        )
+    if isinstance(exc, ActivationBlocked):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "activation_blocked",
+                "reason": exc.reason,
+            },
+        )
+    # Generic catch-all (subclasses of WorkflowError we forgot to
+    # special-case land here as 422 with the message verbatim).
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=str(exc),
+    )
+
+
+def _require_org_id() -> uuid.UUID:
+    """Read the active request's org_id off the request context.
+    Behind ``require_permissions`` it's guaranteed populated, but
+    we 400 defensively rather than crash if the middleware skipped."""
+    ctx = get_context()
+    if ctx.org_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="no organisation in request context",
+        )
+    return ctx.org_id
+
+
+class _CloneBody(BaseModel):
+    """POST body for ``/workflows/{id}/clone``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(..., min_length=1, max_length=200)
+
+
+class _FolderPatchBody(BaseModel):
+    """PATCH body for ``/workflows/folders/{id}`` — every field
+    optional."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    parent_folder_id: uuid.UUID | None = None
+    display_order: int | None = Field(default=None, ge=0)
+
+
+# --- folder endpoints (mounted FIRST so '/workflows/folders'
+# doesn't get swallowed by the '/workflows/{id}' path) ---------------------
+
+
+@router.get(
+    "/folders",
+    response_model=list[WorkflowFolderRead],
+)
+async def list_folders_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_READ)),
+) -> list[WorkflowFolderRead]:
+    org_id = _require_org_id()
+    rows = await workflows_service.list_folders(db, org_id=org_id)
+    return [WorkflowFolderRead.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/folders",
+    response_model=WorkflowFolderRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_folder_endpoint(
+    payload: WorkflowFolderCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_WRITE)),
+) -> WorkflowFolderRead:
+    org_id = _require_org_id()
+    folder = await workflows_service.create_folder(
+        db, org_id=org_id, payload=payload
+    )
+    return WorkflowFolderRead.model_validate(folder)
+
+
+@router.patch(
+    "/folders/{folder_id}",
+    response_model=WorkflowFolderRead,
+)
+async def patch_folder_endpoint(
+    folder_id: uuid.UUID,
+    payload: _FolderPatchBody,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_WRITE)),
+) -> WorkflowFolderRead:
+    org_id = _require_org_id()
+    try:
+        folder = await workflows_service.patch_folder(
+            db,
+            org_id=org_id,
+            folder_id=folder_id,
+            name=payload.name,
+            parent_folder_id=payload.parent_folder_id,
+            display_order=payload.display_order,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowFolderRead.model_validate(folder)
+
+
+@router.delete(
+    "/folders/{folder_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_folder_endpoint(
+    folder_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_WRITE)),
+) -> Response:
+    org_id = _require_org_id()
+    try:
+        await workflows_service.delete_folder(
+            db, org_id=org_id, folder_id=folder_id
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- workflow CRUD --------------------------------------------------------
+
+
+class WorkflowListOut(BaseModel):
+    """Paginated list envelope."""
+
+    items: list[WorkflowRead]
+    total: int
+
+
+@router.get(
+    "",
+    response_model=WorkflowListOut,
+)
+async def list_workflows_endpoint(
+    status_filter: str | None = Query(default=None, alias="status"),
+    category: str | None = Query(default=None),
+    folder_id: uuid.UUID | None = Query(default=None),
+    q: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_READ)),
+) -> WorkflowListOut:
+    org_id = _require_org_id()
+    status_enum: WorkflowStatus | None = None
+    if status_filter is not None:
+        try:
+            status_enum = WorkflowStatus(status_filter)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"invalid status filter '{status_filter}'",
+            ) from exc
+
+    rows, total = await workflows_service.list_workflows(
+        db,
+        org_id=org_id,
+        status=status_enum,
+        category=category,
+        folder_id=folder_id,
+        q=q,
+        limit=limit,
+        offset=offset,
+    )
+    return WorkflowListOut(
+        items=[WorkflowRead.model_validate(r) for r in rows],
+        total=total,
+    )
+
+
+@router.post(
+    "",
+    response_model=WorkflowRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_workflow_endpoint(
+    payload: WorkflowCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> WorkflowRead:
+    org_id = _require_org_id()
+    try:
+        workflow = await workflows_service.create_workflow(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            payload=payload,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowRead.model_validate(workflow)
+
+
+@router.get(
+    "/{workflow_id}",
+    response_model=WorkflowRead,
+)
+async def get_workflow_endpoint(
+    workflow_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_READ)),
+) -> WorkflowRead:
+    org_id = _require_org_id()
+    try:
+        workflow = await workflows_service.get_workflow(
+            db, org_id=org_id, workflow_id=workflow_id
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowRead.model_validate(workflow)
+
+
+@router.patch(
+    "/{workflow_id}",
+    response_model=WorkflowRead,
+)
+async def patch_workflow_endpoint(
+    workflow_id: uuid.UUID,
+    payload: WorkflowUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> WorkflowRead:
+    org_id = _require_org_id()
+    try:
+        workflow = await workflows_service.update_workflow(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            workflow_id=workflow_id,
+            payload=payload,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    except ValueError as exc:
+        # Invalid status transition (state-machine reject).
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
+    return WorkflowRead.model_validate(workflow)
+
+
+@router.delete(
+    "/{workflow_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_workflow_endpoint(
+    workflow_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> Response:
+    """Soft-archive — never hard delete. Outstanding runs continue
+    under the archived version."""
+    org_id = _require_org_id()
+    try:
+        await workflows_service.archive_workflow(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            workflow_id=workflow_id,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- status transitions ---------------------------------------------------
+
+
+@router.post(
+    "/{workflow_id}/activate",
+    response_model=WorkflowRead,
+)
+async def activate_workflow_endpoint(
+    workflow_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_ACTIVATE)),
+) -> WorkflowRead:
+    """Flip a workflow to ``status='active'``. Re-runs the graph
+    validator so a broken draft can't go live."""
+    org_id = _require_org_id()
+    try:
+        workflow = await workflows_service.change_status(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            workflow_id=workflow_id,
+            new_status=WorkflowStatus.active,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
+    return WorkflowRead.model_validate(workflow)
+
+
+@router.post(
+    "/{workflow_id}/pause",
+    response_model=WorkflowRead,
+)
+async def pause_workflow_endpoint(
+    workflow_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_ACTIVATE)),
+) -> WorkflowRead:
+    org_id = _require_org_id()
+    try:
+        workflow = await workflows_service.change_status(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            workflow_id=workflow_id,
+            new_status=WorkflowStatus.paused,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
+    return WorkflowRead.model_validate(workflow)
+
+
+@router.post(
+    "/{workflow_id}/archive",
+    response_model=WorkflowRead,
+)
+async def archive_workflow_endpoint(
+    workflow_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_WRITE)),
+) -> WorkflowRead:
+    org_id = _require_org_id()
+    try:
+        workflow = await workflows_service.archive_workflow(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            workflow_id=workflow_id,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowRead.model_validate(workflow)
+
+
+# --- clone ----------------------------------------------------------------
+
+
+@router.post(
+    "/{workflow_id}/clone",
+    response_model=WorkflowRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def clone_workflow_endpoint(
+    workflow_id: uuid.UUID,
+    payload: _CloneBody,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_CLONE)),
+) -> WorkflowRead:
+    """Clone an existing workflow as a fresh draft. Copies the
+    graph + the user-tunable scalar fields; the new row gets
+    ``status='draft'``, ``current_version=1``, and a fresh v1
+    version row in ``tbl_workflow_versions``."""
+    from src.app.core.workflows.schemas import WorkflowGraph
+
+    org_id = _require_org_id()
+    try:
+        source = await workflows_service.get_workflow(
+            db, org_id=org_id, workflow_id=workflow_id
+        )
+        new_payload = WorkflowCreate(
+            name=payload.name,
+            description=source.description,
+            category=source.category,
+            folder_id=source.folder_id,
+            is_marketing=source.is_marketing,
+            re_enrollment_rule=(
+                source.re_enrollment_rule.value
+                if hasattr(source.re_enrollment_rule, "value")
+                else str(source.re_enrollment_rule)
+            ),
+            graph=WorkflowGraph.model_validate(source.graph),
+            goal_node_id=source.goal_node_id,
+            cost_per_run_cents=source.cost_per_run_cents,
+        )
+        clone = await workflows_service.create_workflow(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            payload=new_payload,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowRead.model_validate(clone)
+
+
+__all__ = ["router"]

@@ -52,6 +52,10 @@ from src.app.core.email_sequences.router import router as email_sequences_router
 from src.app.core.templates.router import router as templates_router
 from src.app.core.automation.router import router as automations_router
 from src.app.core.automation.tracking import router as automation_tracking_router
+from src.app.core.workflows.router import router as workflows_router
+# Side-effect import so the workflows MODULE descriptor lands on
+# the module registry before the lifespan permission-fanout sweep.
+import src.app.core.workflows.module  # noqa: F401
 from src.app.core.integrations.router import router as integrations_router
 from src.app.core.integrations.whatsapp.templates_router import (
     router as whatsapp_templates_router,
@@ -243,6 +247,11 @@ app.include_router(automations_router, prefix="/api/v1")
 # actors can't fabricate hits. No auth required; mail clients can't
 # carry session cookies.
 app.include_router(automation_tracking_router, prefix="/api/v1")
+# tasks/workflows Step 3 — multi-step branching workflows. CRUD +
+# status transitions + folder CRUD + clone under /api/v1/workflows.
+# Engine + run-history endpoints land in Step 4; analytics +
+# diagnostics in Step 19.
+app.include_router(workflows_router, prefix="/api/v1")
 # Step 8 — public tracking endpoints (open pixel, click redirect,
 # unsubscribe landing). Intentionally unauthenticated — the recipient's
 # email client fetches them with no JWT. Rate limiting is inside the

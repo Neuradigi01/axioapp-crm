@@ -125,6 +125,17 @@ _CORE_ADMIN_KEYS: list[str] = [
     "automations.read",
     "automations.write",
     "automations.runs.read",
+    # tasks/workflows Step 3 — multi-step branching workflows. Admin
+    # gets all six keys: list/get (read), create/patch/archive
+    # (write), draft→active (activate), clone, view analytics, view
+    # diagnostics. Diagnostics exposes per-contact payload + rule
+    # logic so it's a separate key + Owner/Admin only.
+    "workflows.read",
+    "workflows.write",
+    "workflows.activate",
+    "workflows.clone",
+    "workflows.view_analytics",
+    "workflows.view_diagnostics",
 ]
 
 
@@ -183,6 +194,12 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     # Automations sidebar entry as read-only. Mutation + run-history
     # inspection stay Admin/Owner.
     "automations.read",
+    # tasks/workflows Step 3 — Employees see the Workflows sidebar
+    # entry + analytics dashboards as read-only. Mutation, activation,
+    # clone, and the sensitive "why didn't this fire?" diagnostics
+    # tool stay Admin/Owner.
+    "workflows.read",
+    "workflows.view_analytics",
 ]
 
 
