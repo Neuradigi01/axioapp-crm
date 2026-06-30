@@ -44,6 +44,7 @@ SQLAlchemy SQL expressions, callers must JOIN through `UserInfo` and
 tenant scoping must JOIN through `OrganizationMember` and filter on
 `OrganizationMember.organization_id`.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -69,7 +70,6 @@ from src.app.shared.db import Base
 # layered code can `from src.app.core.users.models import UserInfo`
 # without setting up a duplicate mapper.
 from src.models.user import UserInfo  # noqa: F401
-
 
 # Placeholder `users` Table in MetaData. The `User` model below maps
 # `tbl_user_login` (DR.6.3+), so the legacy `users` Table is no longer
@@ -130,9 +130,7 @@ class User(Base):
     # demo_credentials, JWT sub) is a UUID, and `legacy_uuid` is what
     # those FKs ultimately resolve against until a future migration
     # retargets them to `tbl_user_login.id` (bigint).
-    legacy_uuid: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    legacy_uuid: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     # Relationships introduced in DR.7.3 — the three-table split.
     # `info` is the profile row on `tbl_user_info` (one per user).
@@ -140,7 +138,7 @@ class User(Base):
     # `tbl_organization_members`. Use `selectin` loading so a single
     # `select(User)` always pulls the joined profile + memberships in
     # one extra query — avoids N+1 on /me and similar.
-    info: Mapped["UserInfo | None"] = relationship(
+    info: Mapped[UserInfo | None] = relationship(
         "UserInfo",
         primaryjoin="User.id == UserInfo.member_id",
         foreign_keys="UserInfo.member_id",
@@ -148,7 +146,7 @@ class User(Base):
         viewonly=True,
         lazy="selectin",
     )
-    memberships: Mapped[list["OrganizationMember"]] = relationship(
+    memberships: Mapped[list[OrganizationMember]] = relationship(
         "OrganizationMember",
         primaryjoin="User.id == OrganizationMember.user_member_id",
         foreign_keys="OrganizationMember.user_member_id",
@@ -157,7 +155,7 @@ class User(Base):
     )
 
     @property
-    def active_membership(self) -> "OrganizationMember | None":
+    def active_membership(self) -> OrganizationMember | None:
         """The user's currently-active org membership.
 
         Enforced at the DB level by the partial unique index
@@ -243,9 +241,7 @@ class OrganizationMember(Base):
 
     __tablename__ = "tbl_organization_members"
 
-    id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True
-    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_organizations.id", ondelete="RESTRICT"),
@@ -263,15 +259,9 @@ class OrganizationMember(Base):
         ForeignKey("tbl_roles.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    status: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default=text("'active'")
-    )
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
-    is_demo: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

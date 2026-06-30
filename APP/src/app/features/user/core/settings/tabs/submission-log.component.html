@@ -3,7 +3,9 @@
   @if (summaryLoading()) {
     <p class="text-sm text-zinc-500">Loading summary…</p>
   } @else if (summaryError(); as err) {
-    <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ err }}</p>
+    <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ err }}
+    </p>
   } @else if (summary(); as s) {
     <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
       <div class="rounded-md border border-zinc-200 bg-white p-4">
@@ -81,11 +83,16 @@
     @if (listLoading()) {
       <p class="text-sm text-zinc-500">Loading log…</p>
     } @else if (listError(); as err) {
-      <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ err }}</p>
+      <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ err }}
+      </p>
     } @else if (listResponse(); as resp) {
       @if (resp.items.length === 0) {
-        <div class="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-500">
-          No submissions in this range. Once your widget is live on a customer site, every attempt — accepted or blocked — will show up here.
+        <div
+          class="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-500"
+        >
+          No submissions in this range. Once your widget is live on a customer site, every attempt —
+          accepted or blocked — will show up here.
         </div>
       } @else {
         <div class="overflow-hidden rounded-md border border-zinc-200 bg-white">
@@ -105,17 +112,28 @@
               @for (row of resp.items; track trackById($index, row)) {
                 @let badge = outcomeBadge(row.outcome);
                 <tr>
-                  <td class="px-3 py-2 text-xs text-zinc-600" [title]="formatAbsolute(row.created_at)">
+                  <td
+                    class="px-3 py-2 text-xs text-zinc-600"
+                    [title]="formatAbsolute(row.created_at)"
+                  >
                     {{ relativeTime(row.created_at) }}
                   </td>
                   <td class="px-3 py-2">
-                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1" [class]="badge.cls">
+                    <span
+                      class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1"
+                      [class]="badge.cls"
+                    >
                       {{ badge.label }}
                     </span>
                   </td>
                   <td class="px-3 py-2 text-xs">
                     @if (row.landing_url) {
-                      <a [href]="row.landing_url" target="_blank" rel="noopener" class="text-zinc-700 hover:text-zinc-900 hover:underline">
+                      <a
+                        [href]="row.landing_url"
+                        target="_blank"
+                        rel="noopener"
+                        class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                      >
                         {{ hostOf(row.landing_url) }}
                       </a>
                     } @else {
@@ -133,7 +151,10 @@
                   </td>
                   <td class="px-3 py-2 text-right">
                     @if (row.outcome === 'accepted' && row.lead_id) {
-                      <a [routerLink]="['/user/leads', row.lead_id]" class="text-xs text-zinc-700 underline hover:text-zinc-900">
+                      <a
+                        [routerLink]="['/user/leads', row.lead_id]"
+                        class="text-xs text-zinc-700 underline hover:text-zinc-900"
+                      >
                         View lead
                       </a>
                     }
@@ -146,7 +167,10 @@
 
         <div class="flex items-center justify-between text-xs text-zinc-500">
           <span>
-            Showing {{ (resp.page - 1) * resp.page_size + 1 }}–{{ (resp.page - 1) * resp.page_size + resp.items.length }} of {{ resp.total }}
+            Showing {{ (resp.page - 1) * resp.page_size + 1 }}–{{
+              (resp.page - 1) * resp.page_size + resp.items.length
+            }}
+            of {{ resp.total }}
           </span>
           <div class="flex items-center gap-2">
             <button

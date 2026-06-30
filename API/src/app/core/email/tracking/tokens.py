@@ -23,6 +23,7 @@ The signing key comes from `TRACKING_HMAC_KEY` env var; missing or
 empty key in dev raises on first encode/decode so misconfiguration is
 loud, not silent.
 """
+
 from __future__ import annotations
 
 import base64
@@ -30,8 +31,7 @@ import hmac
 import os
 import uuid
 from hashlib import sha256
-from typing import Literal, Optional
-
+from typing import Literal
 
 TokenKind = Literal["o", "c", "u"]
 _VALID_KINDS: tuple[TokenKind, ...] = ("o", "c", "u")
@@ -72,13 +72,11 @@ def encode(*, message_id: uuid.UUID, kind: TokenKind) -> str:
         raise ValueError(f"Unknown token kind: {kind!r}")
     payload = message_id.bytes + b":" + kind.encode("ascii")
     payload_b64 = _b64(payload)
-    sig = hmac.new(
-        _get_key(), payload_b64.encode("ascii"), sha256
-    ).digest()[:_SIG_BYTES]
+    sig = hmac.new(_get_key(), payload_b64.encode("ascii"), sha256).digest()[:_SIG_BYTES]
     return f"{payload_b64}.{_b64(sig)}"
 
 
-def decode(token: str) -> Optional[dict[str, object]]:
+def decode(token: str) -> dict[str, object] | None:
     """Decode + verify a token. Returns `{message_id, kind}` on success
     or `None` on any failure (malformed, tampered, unknown kind).
 
@@ -94,9 +92,9 @@ def decode(token: str) -> Optional[dict[str, object]]:
         return None
 
     try:
-        expected_sig = hmac.new(
-            _get_key(), payload_b64.encode("ascii"), sha256
-        ).digest()[:_SIG_BYTES]
+        expected_sig = hmac.new(_get_key(), payload_b64.encode("ascii"), sha256).digest()[
+            :_SIG_BYTES
+        ]
         provided_sig = _b64_decode(sig_b64)
     except (_MissingKey, ValueError):
         return None

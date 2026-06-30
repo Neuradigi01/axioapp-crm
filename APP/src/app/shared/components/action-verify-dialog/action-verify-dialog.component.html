@@ -21,7 +21,8 @@
         [disabled]="isLoading()"
         (input)="onDigitInput($index, $event)"
         (keydown)="onDigitKeydown($index, $event)"
-        autocomplete="one-time-code" />
+        autocomplete="one-time-code"
+      />
     }
   </div>
 
@@ -45,7 +46,8 @@
         mat-button
         type="button"
         [disabled]="resendCooldown() > 0 || isLoading()"
-        (click)="resendCode()">
+        (click)="resendCode()"
+      >
         @if (resendCooldown() > 0) {
           Resend code in {{ resendCooldown() }}s
         } @else {
@@ -63,7 +65,8 @@
         type="button"
         class="action-verify__try-another-toggle"
         (click)="toggleMethodOptions()"
-        [disabled]="isLoading()">
+        [disabled]="isLoading()"
+      >
         Try another way
       </button>
 
@@ -75,11 +78,18 @@
               type="button"
               class="action-verify__method-btn"
               [disabled]="isLoading()"
-              (click)="selectMethod(m)">
+              (click)="selectMethod(m)"
+            >
               <mat-icon>
                 {{ m === 'authenticator' ? 'phonelink_lock' : m === 'email' ? 'email' : 'sms' }}
               </mat-icon>
-              {{ m === 'authenticator' ? 'Authenticator App' : m === 'email' ? 'Email OTP' : 'SMS OTP' }}
+              {{
+                m === 'authenticator'
+                  ? 'Authenticator App'
+                  : m === 'email'
+                    ? 'Email OTP'
+                    : 'SMS OTP'
+              }}
             </button>
           }
         </div>
@@ -89,7 +99,5 @@
 </mat-dialog-content>
 
 <mat-dialog-actions class="action-verify__actions" align="end">
-  <button mat-button type="button" (click)="onCancel()" [disabled]="isLoading()">
-    Cancel
-  </button>
+  <button mat-button type="button" (click)="onCancel()" [disabled]="isLoading()">Cancel</button>
 </mat-dialog-actions>

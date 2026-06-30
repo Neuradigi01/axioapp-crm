@@ -6,6 +6,7 @@ local subscription from `active` to `past_due`. The
 SubscriptionStateMiddleware (Step 10) then blocks writes until the
 customer fixes their payment method and `invoice.paid` arrives.
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,7 +26,8 @@ log = logging.getLogger(__name__)
 
 
 async def on_invoice_failed(
-    db: AsyncSession, event: dict[str, Any],
+    db: AsyncSession,
+    event: dict[str, Any],
 ) -> None:
     invoice = event.get("data", {}).get("object", {}) or {}
     sub = await _upsert_invoice(db, invoice, force_status="open")

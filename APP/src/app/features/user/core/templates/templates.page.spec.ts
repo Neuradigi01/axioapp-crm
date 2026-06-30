@@ -13,12 +13,8 @@ describe('TemplatesPageComponent', () => {
   let authStub: { hasPermission: (k: string) => boolean };
 
   function makeFixture(): ComponentFixture<TemplatesPageComponent> {
-    apiSpy = jasmine.createSpyObj<TemplatesApiService>('TemplatesApiService', [
-      'list',
-    ]);
-    apiSpy.list.and.returnValue(
-      of({ items: [], total: 0, limit: 25, offset: 0 }),
-    );
+    apiSpy = jasmine.createSpyObj<TemplatesApiService>('TemplatesApiService', ['list']);
+    apiSpy.list.and.returnValue(of({ items: [], total: 0, limit: 25, offset: 0 }));
     authStub = { hasPermission: (_k: string) => true };
 
     TestBed.configureTestingModule({

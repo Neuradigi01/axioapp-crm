@@ -29,20 +29,18 @@ the receiver learns the tenant from the integration row it just
 authenticated. The Celery task pushes the tenant context for
 subsequent reads/writes.
 """
+
 from __future__ import annotations
 
 import logging
-import uuid
 
 from fastapi import APIRouter, Body, Path, Request, status
 from fastapi.responses import JSONResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.integrations.models import IntegrationStatus
 from src.app.core.integrations.service import get_by_webhook_secret
 from src.app.shared.db import async_session
-
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +68,7 @@ async def google_webhook(
 
     # 1. Path secret must resolve to a connected integration.
     async with async_session() as session:
-        integration = await get_by_webhook_secret(
-            session, webhook_secret=webhook_key
-        )
+        integration = await get_by_webhook_secret(session, webhook_secret=webhook_key)
 
     if integration is None:
         # 401 here is deliberate — Google's docs say a 4xx tells them
@@ -156,8 +152,7 @@ async def google_webhook(
             # retry-storm because we 5xx'd. Operator should see the
             # exception trace in container logs.
             logger.exception(
-                "google webhook: failed to enqueue task for "
-                "integration_id=%s",
+                "google webhook: failed to enqueue task for integration_id=%s",
                 integration.id,
             )
     else:
@@ -166,13 +161,10 @@ async def google_webhook(
         # MUST have celery installed; tests cover the eager case via
         # task_always_eager.
         try:
-            await process_google_lead_async(
-                integration_id=integration.id, payload=body
-            )
+            await process_google_lead_async(integration_id=integration.id, payload=body)
         except Exception:
             logger.exception(
-                "google webhook: inline async processing failed for "
-                "integration_id=%s",
+                "google webhook: inline async processing failed for integration_id=%s",
                 integration.id,
             )
 

@@ -16,24 +16,26 @@ Three scenarios exercised end-to-end through the layered FastAPI app:
 Run with:
   ``uv run pytest tests/test_dashboard_trend_endpoint.py -v``.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead, LeadStatus
 from src.app.core.permissions.models import Role, RolePermission
 from src.app.core.permissions.service import register_permission
-from src.app.core.tenants.models import Organization
 from src.app.core.users.models import OrganizationMember, User
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.security.password import hash_password
-from src.models.user import UserInfo as LegacyUserInfo, UserLogin
+from src.models.user import UserInfo as LegacyUserInfo
+from src.models.user import UserLogin
 
 
 async def _grant(role_id: uuid.UUID, *keys: str) -> None:
@@ -47,9 +49,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -185,18 +185,14 @@ async def test_trend_series_length_and_zero_fill(layered_client, seeded_admin):
     headers = {"Authorization": f"Bearer {token}"}
 
     contact_id = await _make_contact(org.id, full_name="Anchor")
-    now = datetime.now(timezone.utc)
-    today_noon = datetime(
-        now.year, now.month, now.day, 12, 0, tzinfo=timezone.utc
-    )
+    now = datetime.now(UTC)
+    today_noon = datetime(now.year, now.month, now.day, 12, 0, tzinfo=UTC)
 
     # 2 leads today, 1 lead three days ago. Days -1, -2, -4, -5, -6
     # remain empty and must come back zero-filled.
     await _make_lead(org.id, contact_id=contact_id, created_at=today_noon)
     await _make_lead(org.id, contact_id=contact_id, created_at=today_noon)
-    await _make_lead(
-        org.id, contact_id=contact_id, created_at=today_noon - timedelta(days=3)
-    )
+    await _make_lead(org.id, contact_id=contact_id, created_at=today_noon - timedelta(days=3))
 
     res = await layered_client.get(
         "/api/v1/dashboard/trend?metric=leads_created&range=7d",
@@ -223,8 +219,10 @@ async def test_trend_series_length_and_zero_fill(layered_client, seeded_admin):
 
     # Five remaining buckets are zero-filled.
     zero_buckets = [
-        v for d, v in by_date.items()
-        if d not in {
+        v
+        for d, v in by_date.items()
+        if d
+        not in {
             today_noon.date().isoformat(),
             (today_noon.date() - timedelta(days=3)).isoformat(),
         }
@@ -249,10 +247,8 @@ async def test_trend_scope_split(layered_client, seeded_admin):
     second_user = second["user"]
 
     contact_id = await _make_contact(org.id, full_name="Anchor")
-    now = datetime.now(timezone.utc)
-    today_noon = datetime(
-        now.year, now.month, now.day, 12, 0, tzinfo=timezone.utc
-    )
+    now = datetime.now(UTC)
+    today_noon = datetime(now.year, now.month, now.day, 12, 0, tzinfo=UTC)
 
     # 5 leads owned by admin, 5 by the second user, all today.
     for _ in range(5):
@@ -316,12 +312,8 @@ async def test_trend_rejects_bad_metric_and_range(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    res = await layered_client.get(
-        "/api/v1/dashboard/trend?range=99d", headers=headers
-    )
+    res = await layered_client.get("/api/v1/dashboard/trend?range=99d", headers=headers)
     assert res.status_code == 422
 
-    res = await layered_client.get(
-        "/api/v1/dashboard/trend?metric=banana", headers=headers
-    )
+    res = await layered_client.get("/api/v1/dashboard/trend?metric=banana", headers=headers)
     assert res.status_code == 422

@@ -36,7 +36,9 @@
         class="mt-1 w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
       />
     }
-    @if (!state().recipient || (state().recipient === 'custom' && !state().customRecipient.trim())) {
+    @if (
+      !state().recipient || (state().recipient === 'custom' && !state().customRecipient.trim())
+    ) {
       <p class="text-[10px] text-rose-600 mt-1">Recipient is required.</p>
     }
   </div>
@@ -60,9 +62,7 @@
   </div>
 
   <fieldset class="border border-zinc-200 rounded p-2">
-    <legend class="text-[10px] uppercase tracking-wider text-zinc-500 px-1">
-      Tracking
-    </legend>
+    <legend class="text-[10px] uppercase tracking-wider text-zinc-500 px-1">Tracking</legend>
     <label class="flex items-center gap-2 text-xs">
       <input
         type="checkbox"

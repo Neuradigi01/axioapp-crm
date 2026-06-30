@@ -3,6 +3,7 @@
 Exercises create / get / list-for-entity / patch / delete plus the
 permission gates and the "related entity is paired" validator.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -25,9 +26,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -89,21 +88,15 @@ async def test_create_list_patch_delete(layered_client, seeded_admin):
     assert patch.status_code == 200, patch.text
     assert patch.json()["status"] == "done"
 
-    delete = await layered_client.delete(
-        f"/api/v1/tasks/{task_id}", headers=headers
-    )
+    delete = await layered_client.delete(f"/api/v1/tasks/{task_id}", headers=headers)
     assert delete.status_code == 204
 
-    after = await layered_client.get(
-        f"/api/v1/tasks/{task_id}", headers=headers
-    )
+    after = await layered_client.get(f"/api/v1/tasks/{task_id}", headers=headers)
     assert after.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_related_pair_must_be_both_or_neither(
-    layered_client, seeded_admin
-):
+async def test_related_pair_must_be_both_or_neither(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "tasks.read", "tasks.write")

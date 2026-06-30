@@ -76,7 +76,7 @@ export class ThemeService {
 
   private setStylesheetEnabled(bundleName: string, enabled: boolean): void {
     let link = document.querySelector(
-      `link[rel="stylesheet"][href*="${bundleName}"]`
+      `link[rel="stylesheet"][href*="${bundleName}"]`,
     ) as HTMLLinkElement | null;
 
     if (!link && enabled) {
@@ -92,9 +92,7 @@ export class ThemeService {
   }
 
   private getSystemPreference(): Theme {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? THEME_DARK
-      : THEME_LIGHT;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? THEME_DARK : THEME_LIGHT;
   }
 
   private bindSystemListener(): void {

@@ -23,10 +23,11 @@ verify the signature instead of accepting a JWT. The subscription
 state middleware (Step 10) does not block this path because POST on
 an unauthenticated path has no `ctx.org_id` to gate against.
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -39,6 +40,22 @@ from src.app.core.subscriptions.models import StripeWebhookEvent
 from src.app.core.subscriptions.payment_provider import PaymentProvider
 from src.app.core.subscriptions.providers.stripe_provider import (
     InvalidWebhookSignature,
+)
+from src.app.core.subscriptions.webhooks.handlers.checkout_completed import (
+    on_checkout_completed,
+)
+from src.app.core.subscriptions.webhooks.handlers.invoice_failed import (
+    on_invoice_failed,
+)
+from src.app.core.subscriptions.webhooks.handlers.invoice_paid import (
+    on_invoice_finalized,
+    on_invoice_paid,
+)
+from src.app.core.subscriptions.webhooks.handlers.subscription_cancelled import (
+    on_subscription_cancelled,
+)
+from src.app.core.subscriptions.webhooks.handlers.subscription_updated import (
+    on_subscription_updated,
 )
 from src.app.shared.db import get_db
 
@@ -78,7 +95,7 @@ async def stripe_webhook(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"error": "invalid_signature"},
-        )
+        ) from None
 
     event_id = event.get("id")
     event_type = event.get("type", "")
@@ -88,7 +105,7 @@ async def stripe_webhook(
             detail={"error": "missing_event_id"},
         )
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
 
     # Dedup: insert the ledger row; ON CONFLICT means we've seen this
     # event ID before. The "before" might be still-in-flight (race
@@ -110,7 +127,8 @@ async def stripe_webhook(
     if (result.rowcount or 0) == 0:
         log.info(
             "Stripe webhook event %s (%s) deduped — already in ledger",
-            event_id, event_type,
+            event_id,
+            event_type,
         )
         return {"received": True, "duplicate": True}
 
@@ -121,7 +139,8 @@ async def stripe_webhook(
     except Exception as exc:  # noqa: BLE001 — handler error surface
         log.exception(
             "Stripe webhook handler raised for event %s (%s)",
-            event_id, event_type,
+            event_id,
+            event_type,
         )
         # Persist the error on the ledger row so the operator has a
         # clue without re-running. `processed_at` stays NULL so a
@@ -136,12 +155,12 @@ async def stripe_webhook(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": "handler_failed"},
-        )
+        ) from exc
 
     await db.execute(
         update(StripeWebhookEvent)
         .where(StripeWebhookEvent.stripe_event_id == event_id)
-        .values(processed_at=datetime.now(tz=timezone.utc))
+        .values(processed_at=datetime.now(tz=UTC))
     )
     await db.commit()
     return {"received": True, "duplicate": False, "type": event_type}
@@ -169,24 +188,6 @@ async def _no_op(
     )
 
 
-from src.app.core.subscriptions.webhooks.handlers.checkout_completed import (
-    on_checkout_completed,
-)
-from src.app.core.subscriptions.webhooks.handlers.invoice_failed import (
-    on_invoice_failed,
-)
-from src.app.core.subscriptions.webhooks.handlers.invoice_paid import (
-    on_invoice_finalized,
-    on_invoice_paid,
-)
-from src.app.core.subscriptions.webhooks.handlers.subscription_cancelled import (
-    on_subscription_cancelled,
-)
-from src.app.core.subscriptions.webhooks.handlers.subscription_updated import (
-    on_subscription_updated,
-)
-
-
 # Mapping event type → async handler. Each handler accepts
 # `(db, event_dict)` and returns `None`. Tests assert on this table
 # directly to verify wiring, and `monkeypatch.setitem` is the
@@ -202,7 +203,9 @@ _HANDLERS: dict[str, Any] = {
 
 
 async def _dispatch(
-    db: AsyncSession, event_type: str, event: dict[str, Any],
+    db: AsyncSession,
+    event_type: str,
+    event: dict[str, Any],
 ) -> None:
     handler = _HANDLERS.get(event_type, _no_op)
     await handler(db, event)

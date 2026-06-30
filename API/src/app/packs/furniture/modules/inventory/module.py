@@ -9,8 +9,8 @@ searches.
 frontend's sidebar component reads this and can render pack entries
 under a separate section if desired.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="inventory",

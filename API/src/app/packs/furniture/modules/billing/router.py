@@ -18,13 +18,14 @@ Permissions:
   - `pos.use`    → run the checkout
   - `pos.refund` → reserved for the void-after-checkout flow (future)
 """
+
 from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,18 +35,19 @@ from src.app.core.billing.models import PaymentMethod
 from src.app.core.billing.schemas import (
     InvoiceCreate,
     InvoiceLineCreate,
-    InvoiceWithLines,
-    InvoiceOut,
     InvoiceLineOut,
+    InvoiceOut,
+    InvoiceWithLines,
     PaymentCreate,
 )
-from src.app.shared.schemas import ORMModel
 from src.app.core.billing.service import (
     add_line,
     create_draft,
     get_invoice_with_lines,
-    issue as issue_invoice,
     record_payment,
+)
+from src.app.core.billing.service import (
+    issue as issue_invoice,
 )
 from src.app.core.contacts.models import Contact
 from src.app.core.users.models import User
@@ -56,7 +58,7 @@ from src.app.packs.furniture.modules.inventory.models import (
 )
 from src.app.packs.furniture.modules.inventory.service import record_movement
 from src.app.shared.db import get_db
-
+from src.app.shared.schemas import ORMModel
 
 router = APIRouter(prefix="/pos", tags=["POS"])
 
@@ -65,7 +67,7 @@ router = APIRouter(prefix="/pos", tags=["POS"])
 
 
 class CheckoutLine(BaseModel):
-    catalog_item_id: Optional[uuid.UUID] = None
+    catalog_item_id: uuid.UUID | None = None
     description: str = Field(min_length=1, max_length=255)
     qty: int = Field(ge=1)
     unit_price: Decimal = Field(ge=0)
@@ -73,12 +75,12 @@ class CheckoutLine(BaseModel):
 
 class CheckoutPayload(BaseModel):
     contact_phone: str = Field(min_length=3, max_length=32)
-    contact_name: Optional[str] = Field(default=None, max_length=255)
+    contact_name: str | None = Field(default=None, max_length=255)
     lines: list[CheckoutLine] = Field(min_length=1)
     payment_method: PaymentMethod
-    payment_reference: Optional[str] = Field(default=None, max_length=128)
+    payment_reference: str | None = Field(default=None, max_length=128)
     discount_amount: Decimal = Field(default=Decimal("0"), ge=0)
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class CheckoutResponse(ORMModel):
@@ -177,8 +179,7 @@ async def checkout_endpoint(
                     "item_id": str(inv_item.id),
                     "skipped": True,
                     "reason": (
-                        f"insufficient stock: on_hand={inv_item.qty_on_hand}, "
-                        f"requested={ln.qty}"
+                        f"insufficient stock: on_hand={inv_item.qty_on_hand}, requested={ln.qty}"
                     ),
                 }
             )
@@ -224,9 +225,7 @@ async def _find_or_create_contact(
 ) -> Contact:
     existing = (
         await session.execute(
-            select(Contact).where(
-                Contact.org_id == org_id, Contact.phone == phone
-            )
+            select(Contact).where(Contact.org_id == org_id, Contact.phone == phone)
         )
     ).scalar_one_or_none()
     if existing is not None:
@@ -249,7 +248,7 @@ async def _resolve_inventory_item(
     *,
     org_id: uuid.UUID,
     catalog_item_id: uuid.UUID,
-) -> Optional[InventoryItem]:
+) -> InventoryItem | None:
     """Resolve catalog → inventory row at the org's default warehouse.
 
     Falls back to ANY warehouse in the org if no `is_default=True`

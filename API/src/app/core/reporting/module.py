@@ -13,8 +13,8 @@ The legacy ``/reports/workload`` endpoint stays gated on
 ``users.read`` (it's the staff-workload sidebar tile inside Settings,
 not a Reporting page) so it is intentionally **not** listed here.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="reporting",

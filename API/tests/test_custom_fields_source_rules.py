@@ -10,6 +10,7 @@ then exercise the HTTP routes to confirm:
     forbids that surface; we still verify the 403 path).
   - a user without `custom_fields.write` is 403 on every mutation.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -82,9 +83,7 @@ async def test_system_field_cannot_be_deleted(layered_client, seeded_admin):
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "custom_fields.read", "custom_fields.write")
 
-    sys_id = await _insert_managed(
-        org.id, source=FieldSource.system, field_key="email_canonical"
-    )
+    sys_id = await _insert_managed(org.id, source=FieldSource.system, field_key="email_canonical")
     token = await _login(
         layered_client,
         org_slug=org.slug,
@@ -121,17 +120,13 @@ async def test_pack_field_cannot_be_deleted(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_system_field_label_is_editable_hidden_is_not(
-    layered_client, seeded_admin
-):
+async def test_system_field_label_is_editable_hidden_is_not(layered_client, seeded_admin):
     """`system`: label/order/required/validation OK; is_hidden rejected."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "custom_fields.read", "custom_fields.write")
 
-    sys_id = await _insert_managed(
-        org.id, source=FieldSource.system, field_key="email_canonical"
-    )
+    sys_id = await _insert_managed(org.id, source=FieldSource.system, field_key="email_canonical")
     token = await _login(
         layered_client,
         org_slug=org.slug,
@@ -158,9 +153,7 @@ async def test_system_field_label_is_editable_hidden_is_not(
 
 
 @pytest.mark.asyncio
-async def test_pack_field_hidden_is_editable_required_is_not(
-    layered_client, seeded_admin
-):
+async def test_pack_field_hidden_is_editable_required_is_not(layered_client, seeded_admin):
     """`pack`: label/order/is_hidden/validation OK; is_required rejected."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -201,9 +194,7 @@ async def test_user_role_without_write_perm_is_blocked(layered_client, seeded_ad
     # No write grant — only read.
     await _grant(seeded_admin["role"].id, "custom_fields.read")
 
-    user_id = await _insert_managed(
-        org.id, source=FieldSource.user, field_key="some_pref"
-    )
+    user_id = await _insert_managed(org.id, source=FieldSource.user, field_key="some_pref")
 
     token = await _login(
         layered_client,
@@ -220,7 +211,5 @@ async def test_user_role_without_write_perm_is_blocked(layered_client, seeded_ad
     )
     assert patch.status_code == 403, patch.text
 
-    delete = await layered_client.delete(
-        f"/api/v1/custom-fields/{user_id}", headers=headers
-    )
+    delete = await layered_client.delete(f"/api/v1/custom-fields/{user_id}", headers=headers)
     assert delete.status_code == 403, delete.text

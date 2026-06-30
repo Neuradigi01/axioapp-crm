@@ -1,14 +1,13 @@
 """Pydantic schemas for the contact-imports API surface."""
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.shared.schemas import ORMModel
-
 
 # Contact-field targets the operator can map a column to. Mirrors
 # the Contact model's settable fields. `custom_data.<key>` is a
@@ -49,7 +48,7 @@ class ImportDryRunIn(BaseModel):
 
     mapping: dict[str, str]
     create_group: bool = False
-    group_name: Optional[str] = Field(default=None, max_length=255)
+    group_name: str | None = Field(default=None, max_length=255)
 
 
 class RowError(BaseModel):
@@ -79,7 +78,7 @@ class ImportCommitOut(BaseModel):
     row_count: int
     success_count: int
     error_count: int
-    created_group_id: Optional[uuid.UUID] = None
+    created_group_id: uuid.UUID | None = None
 
 
 __all__ = [

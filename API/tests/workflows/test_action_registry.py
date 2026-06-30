@@ -9,6 +9,7 @@ Covers:
   * ``is_registered`` + ``list_registered`` reflect the live state.
   * ``unregister_action`` removes a previously registered handler.
 """
+
 from __future__ import annotations
 
 import pytest

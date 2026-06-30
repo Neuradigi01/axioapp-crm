@@ -15,6 +15,7 @@ Four `fp_*` tables, all TenantScoped + RLS-on:
   `status_change` activity on the contact timeline; this table is
   the per-order audit trail.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -27,7 +28,6 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
-    Integer,
     Numeric,
     String,
     Text,
@@ -80,9 +80,7 @@ class CustomOrder(Base, TenantScoped):
         UUID(as_uuid=True),
         nullable=True,
     )
-    expected_delivery_date: Mapped[date | None] = mapped_column(
-        Date, nullable=True
-    )
+    expected_delivery_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     total_amount: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False, server_default=sql_text("0")
     )
@@ -107,9 +105,7 @@ class CustomOrder(Base, TenantScoped):
 
 class CustomOrderMeasurement(Base, TenantScoped):
     __tablename__ = "tbl_fp_custom_order_measurements"
-    __table_args__ = (
-        Index("ix_fp_custom_order_measurements_order", "order_id"),
-    )
+    __table_args__ = (Index("ix_fp_custom_order_measurements_order", "order_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -122,15 +118,9 @@ class CustomOrderMeasurement(Base, TenantScoped):
         nullable=False,
     )
     item_label: Mapped[str] = mapped_column(String(128), nullable=False)
-    length_cm: Mapped[Decimal | None] = mapped_column(
-        Numeric(8, 2), nullable=True
-    )
-    width_cm: Mapped[Decimal | None] = mapped_column(
-        Numeric(8, 2), nullable=True
-    )
-    height_cm: Mapped[Decimal | None] = mapped_column(
-        Numeric(8, 2), nullable=True
-    )
+    length_cm: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    width_cm: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    height_cm: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -141,9 +131,7 @@ class CustomOrderMeasurement(Base, TenantScoped):
 
 class CustomOrderPhoto(Base, TenantScoped):
     __tablename__ = "tbl_fp_custom_order_photos"
-    __table_args__ = (
-        Index("ix_fp_custom_order_photos_order", "order_id"),
-    )
+    __table_args__ = (Index("ix_fp_custom_order_photos_order", "order_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -157,9 +145,7 @@ class CustomOrderPhoto(Base, TenantScoped):
     )
     url: Mapped[str] = mapped_column(String(512), nullable=False)
     caption: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    taken_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -187,9 +173,7 @@ class CustomOrderStageHistory(Base, TenantScoped):
         ForeignKey("tbl_fp_custom_orders.id", ondelete="CASCADE"),
         nullable=False,
     )
-    from_stage: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
+    from_stage: Mapped[str | None] = mapped_column(String(64), nullable=True)
     to_stage: Mapped[str] = mapped_column(String(64), nullable=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

@@ -1,23 +1,14 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CanvasNode } from '../canvas-state.service';
-
 
 const UNITS = [
   { value: 'minutes', label: 'minute(s)', multiplier: 60 },
   { value: 'hours', label: 'hour(s)', multiplier: 3600 },
   { value: 'days', label: 'day(s)', multiplier: 86400 },
 ] as const;
-
 
 @Component({
   selector: 'app-wait-editor',
@@ -33,12 +24,8 @@ export class WaitEditorComponent {
 
   readonly units = UNITS;
 
-  readonly amount = computed<number>(
-    () => (this.node().config?.['amount'] as number) ?? 1,
-  );
-  readonly unit = computed<string>(
-    () => (this.node().config?.['unit'] as string) ?? 'hours',
-  );
+  readonly amount = computed<number>(() => (this.node().config?.['amount'] as number) ?? 1);
+  readonly unit = computed<string>(() => (this.node().config?.['unit'] as string) ?? 'hours');
   readonly delaySeconds = computed<number>(() => {
     const u = UNITS.find((x) => x.value === this.unit());
     return Math.max(1, this.amount()) * (u?.multiplier ?? 3600);

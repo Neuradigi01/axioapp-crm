@@ -14,6 +14,7 @@ When a placeholder pack is fully built (manifest + installer + modules
 + UI), its `pack.yaml` is auto-discovered and the same entry here
 flips to `status="available"` — no edit required.
 """
+
 from __future__ import annotations
 
 from typing import Final, TypedDict
@@ -35,8 +36,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
         "template_id": "base",
         "name": "Core CRM",
         "description": (
-            "Universal CRM for any business — contacts, leads, "
-            "pipelines, tasks, billing."
+            "Universal CRM for any business — contacts, leads, pipelines, tasks, billing."
         ),
         "icon": "briefcase",
         "default_currency": "INR",
@@ -54,8 +54,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
         "template_id": "furniture",
         "name": "Furniture CRM",
         "description": (
-            "Built for furniture retail — inventory, custom orders, "
-            "field ops, POS billing."
+            "Built for furniture retail — inventory, custom orders, field ops, POS billing."
         ),
         "icon": "armchair",
         "default_currency": "INR",
@@ -71,9 +70,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
     {
         "template_id": "real_estate",
         "name": "Real Estate CRM",
-        "description": (
-            "Site visits, RERA tracking, channel partners, brokerage."
-        ),
+        "description": ("Site visits, RERA tracking, channel partners, brokerage."),
         "icon": "home",
         "default_currency": "INR",
         "default_tax_rate": 5.0,
@@ -88,9 +85,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
     {
         "template_id": "clinic",
         "name": "Clinic / Dental CRM",
-        "description": (
-            "Patient records, appointments, treatment plans, recalls."
-        ),
+        "description": ("Patient records, appointments, treatment plans, recalls."),
         "icon": "heart-pulse",
         "default_currency": "INR",
         "default_tax_rate": 0.0,
@@ -105,9 +100,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
     {
         "template_id": "sales",
         "name": "Sales CRM",
-        "description": (
-            "Generic B2B sales — deals, quotes, forecasting, territory."
-        ),
+        "description": ("Generic B2B sales — deals, quotes, forecasting, territory."),
         "icon": "trending-up",
         "default_currency": "INR",
         "default_tax_rate": 18.0,
@@ -122,9 +115,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
     {
         "template_id": "automotive",
         "name": "Automotive CRM",
-        "description": (
-            "Dealerships and service centers — test drives, service, AMC."
-        ),
+        "description": ("Dealerships and service centers — test drives, service, AMC."),
         "icon": "car",
         "default_currency": "INR",
         "default_tax_rate": 28.0,
@@ -154,9 +145,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
     {
         "template_id": "fitness",
         "name": "Fitness CRM",
-        "description": (
-            "Gym memberships, trainer schedules, attendance, diet plans."
-        ),
+        "description": ("Gym memberships, trainer schedules, attendance, diet plans."),
         "icon": "dumbbell",
         "default_currency": "INR",
         "default_tax_rate": 18.0,
@@ -171,9 +160,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
     {
         "template_id": "education",
         "name": "Education CRM",
-        "description": (
-            "Coaching and schools — admissions, batches, fees, parent comms."
-        ),
+        "description": ("Coaching and schools — admissions, batches, fees, parent comms."),
         "icon": "graduation-cap",
         "default_currency": "INR",
         "default_tax_rate": 0.0,
@@ -188,9 +175,7 @@ CATALOG_PACKS: Final[list[CatalogTileConfig]] = [
     {
         "template_id": "hospitality",
         "name": "Hospitality CRM",
-        "description": (
-            "Hotels and restaurants — reservations, guests, loyalty, feedback."
-        ),
+        "description": ("Hotels and restaurants — reservations, guests, loyalty, feedback."),
         "icon": "utensils",
         "default_currency": "INR",
         "default_tax_rate": 18.0,

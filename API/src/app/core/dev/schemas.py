@@ -1,4 +1,5 @@
 """Pydantic schemas for the dev module."""
+
 from __future__ import annotations
 
 from src.app.shared.schemas import ORMModel

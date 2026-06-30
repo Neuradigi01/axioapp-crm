@@ -4,8 +4,8 @@ Sidebar entry at `menu_position=450` (after Catalog, before
 Reporting). Permission keys `staff.read`, `staff.write`,
 `attendance.write` register on startup.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="staff",

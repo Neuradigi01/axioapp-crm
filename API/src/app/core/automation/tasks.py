@@ -23,21 +23,20 @@ Retry policy:
     dispatcher before the task is queued, so this task never sees
     a missing recipient on first attempt.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
 
 try:
     from celery import shared_task as _shared_task
 
     HAS_CELERY = True
 except ImportError:  # pragma: no cover — celery absent in dev shells
-
     HAS_CELERY = False
 
     def _shared_task(*decorator_args: Any, **decorator_kwargs: Any):
@@ -107,9 +106,7 @@ async def _deliver_run_async(run_id: str) -> dict[str, Any]:
     from src.app.shared.db import async_session
 
     async with async_session() as session:
-        run = await data_access.get_run_by_id_unscoped(
-            session, run_id=uuid.UUID(run_id)
-        )
+        run = await data_access.get_run_by_id_unscoped(session, run_id=uuid.UUID(run_id))
         if run is None:
             logger.warning("automation.deliver_run missing_run run_id=%s", run_id)
             return {"status": "missing"}
@@ -137,7 +134,7 @@ async def _deliver_run_async(run_id: str) -> dict[str, Any]:
                 return guard_result
 
             run.status = AutomationRunStatus.dispatched
-            run.dispatched_at = datetime.now(timezone.utc)
+            run.dispatched_at = datetime.now(UTC)
             await session.commit()
             await session.refresh(run)
 
@@ -146,12 +143,12 @@ async def _deliver_run_async(run_id: str) -> dict[str, Any]:
             except _PermanentSendError as exc:
                 run.status = AutomationRunStatus.failed
                 run.error = str(exc)
-                run.completed_at = datetime.now(timezone.utc)
+                run.completed_at = datetime.now(UTC)
                 await session.commit()
                 return {"status": "failed", "error": str(exc)}
             run.status = AutomationRunStatus.sent
             run.channel_message_id = channel_message_id
-            run.completed_at = datetime.now(timezone.utc)
+            run.completed_at = datetime.now(UTC)
             await session.commit()
             return {"status": "sent", "channel_message_id": channel_message_id}
         finally:
@@ -179,12 +176,10 @@ async def _run_send_guard(session, run) -> dict[str, Any] | None:
     from src.app.core.automation import send_guard
     from src.app.core.automation.models import AutomationRunStatus
     from src.app.core.contacts.models import Contact
-    from src.app.core.tenants.models import Organization
     from src.app.core.templates import data_access as templates_da
+    from src.app.core.tenants.models import Organization
 
-    trigger = await automation_da.get_trigger(
-        session, org_id=run.org_id, trigger_id=run.trigger_id
-    )
+    trigger = await automation_da.get_trigger(session, org_id=run.org_id, trigger_id=run.trigger_id)
     if trigger is None:
         # Let the downstream _execute_send path surface the missing
         # trigger as a permanent failure — keeps error-shape in one
@@ -198,9 +193,7 @@ async def _run_send_guard(session, run) -> dict[str, Any] | None:
         return None
 
     org = (
-        await session.execute(
-            _select(Organization).where(Organization.id == run.org_id)
-        )
+        await session.execute(_select(Organization).where(Organization.id == run.org_id))
     ).scalar_one_or_none()
     if org is None:
         return None
@@ -208,19 +201,19 @@ async def _run_send_guard(session, run) -> dict[str, Any] | None:
     contact = None
     if run.contact_id is not None:
         contact = (
-            await session.execute(
-                _select(Contact).where(Contact.id == run.contact_id)
-            )
+            await session.execute(_select(Contact).where(Contact.id == run.contact_id))
         ).scalar_one_or_none()
 
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     decision = await send_guard.evaluate(
         session,
         org=org,
         template=template,
         contact=contact,
         contact_id=run.contact_id,
-        channel=str(trigger.channel.value if hasattr(trigger.channel, "value") else trigger.channel),
+        channel=str(
+            trigger.channel.value if hasattr(trigger.channel, "value") else trigger.channel
+        ),
         now_utc=now_utc,
     )
 
@@ -242,9 +235,7 @@ async def _run_send_guard(session, run) -> dict[str, Any] | None:
                 after={
                     "skip_reason": decision.skip_reason,
                     "trigger_id": str(run.trigger_id),
-                    "contact_id": (
-                        str(run.contact_id) if run.contact_id else None
-                    ),
+                    "contact_id": (str(run.contact_id) if run.contact_id else None),
                 },
             )
         except Exception:
@@ -262,9 +253,7 @@ async def _run_send_guard(session, run) -> dict[str, Any] | None:
         run.scheduled_at = decision.defer_until
         await session.commit()
         try:
-            deliver_run.apply_async(
-                args=(str(run.id),), eta=decision.defer_until
-            )
+            deliver_run.apply_async(args=(str(run.id),), eta=decision.defer_until)
         except Exception:
             logger.exception(
                 "automation.deliver_run defer_reschedule_failed run=%s",
@@ -317,14 +306,14 @@ async def _execute_send(session, run) -> str | None:
     from src.app.core.conversations.models import ConversationChannel
     from src.app.core.conversations.registry import (
         ChannelNotRegistered,
+    )
+    from src.app.core.conversations.registry import (
         resolve as resolve_adapter,
     )
     from src.app.core.templates import data_access as templates_da
     from src.app.core.templates.variables import resolve as render
 
-    trigger = await automation_da.get_trigger(
-        session, org_id=run.org_id, trigger_id=run.trigger_id
-    )
+    trigger = await automation_da.get_trigger(session, org_id=run.org_id, trigger_id=run.trigger_id)
     if trigger is None:
         raise _PermanentSendError("trigger missing")
 
@@ -340,9 +329,7 @@ async def _execute_send(session, run) -> str | None:
         raise _PermanentSendError("no_recipient_at_dispatch")
 
     rendered_body = render(template.body_text, payload)
-    rendered_subject = (
-        render(template.subject, payload) if template.subject else None
-    )
+    rendered_subject = render(template.subject, payload) if template.subject else None
 
     try:
         adapter = resolve_adapter(trigger.channel)
@@ -350,23 +337,22 @@ async def _execute_send(session, run) -> str | None:
         raise _PermanentSendError(f"channel_not_registered: {exc}") from exc
 
     if trigger.channel == ConversationChannel.email:
-        from src.app.shared.email import Email, get_email_backend
+        import os
+
         from src.app.core.automation.tracking import (
             inject_tracking_pixel_and_links,
         )
-        import os
+        from src.app.shared.email import Email, get_email_backend
 
         # Step 14 — wrap the plain-text body in a minimal HTML
         # envelope + inject the open-pixel + click-rewrites. The
         # plain-text part stays untouched so privacy-conscious
         # clients (text-only readers) get the original message
         # without any tracking artefacts.
-        public_base_url = os.environ.get(
-            "PUBLIC_API_BASE_URL", "http://localhost:8000"
-        )
+        public_base_url = os.environ.get("PUBLIC_API_BASE_URL", "http://localhost:8000")
         html_skeleton = (
             f"<html><body>"
-            f"<pre style=\"font-family:inherit;white-space:pre-wrap\">"
+            f'<pre style="font-family:inherit;white-space:pre-wrap">'
             f"{rendered_body}"
             f"</pre></body></html>"
         )
@@ -407,9 +393,11 @@ def _is_permanent_adapter_error(exc: BaseException) -> bool:
     exceptions whose names end in ``NotConfigured`` — those are
     permanent (no transport wired). Anything else falls through to
     Celery's autoretry policy."""
-    return type(exc).__name__.endswith("NotConfigured") or type(
-        exc
-    ).__name__.endswith("NotConnected") or isinstance(exc, NotImplementedError)
+    return (
+        type(exc).__name__.endswith("NotConfigured")
+        or type(exc).__name__.endswith("NotConnected")
+        or isinstance(exc, NotImplementedError)
+    )
 
 
 @_shared_task(

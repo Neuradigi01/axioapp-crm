@@ -1,4 +1,5 @@
 import asyncio
+
 from celery import shared_task
 from src.celery.helpers.tasks_collections import run_every_2_minutes, run_every_day
 

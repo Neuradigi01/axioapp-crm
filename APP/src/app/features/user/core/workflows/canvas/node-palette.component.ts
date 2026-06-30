@@ -1,10 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -14,7 +9,6 @@ import {
   WorkflowNodeCategory,
   WorkflowNodeType,
 } from './node-type-registry';
-
 
 /**
  * Left-rail palette. Sections for triggers / send / record / routing /
@@ -26,7 +20,6 @@ import {
  * 42-item list isn't huge but the filter helps once operators learn
  * the type names by heart.
  */
-
 
 @Component({
   selector: 'app-node-palette',
@@ -40,9 +33,7 @@ export class NodePaletteComponent {
 
   readonly sections = PALETTE_SECTIONS;
 
-  readonly itemsByCategory = computed<
-    Record<WorkflowNodeCategory, WorkflowNodeType[]>
-  >(() => {
+  readonly itemsByCategory = computed<Record<WorkflowNodeCategory, WorkflowNodeType[]>>(() => {
     const q = this.query().trim().toLowerCase();
     const filtered = q
       ? NODE_TYPES.filter(

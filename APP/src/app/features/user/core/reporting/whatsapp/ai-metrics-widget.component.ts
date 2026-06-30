@@ -12,11 +12,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  AIMetricsReport,
-  ReportRange,
-  WhatsAppReportsService,
-} from './whatsapp-reports.service';
+import { AIMetricsReport, ReportRange, WhatsAppReportsService } from './whatsapp-reports.service';
 
 /**
  * AI metrics widget (Step 21).
@@ -40,9 +36,7 @@ import {
     <div class="rounded-md border border-zinc-200 bg-white p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            AI metrics
-          </p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">AI metrics</p>
           <p class="text-[11px] text-zinc-500">
             Bot adoption, hand-off rate, and unattended completions.
           </p>
@@ -60,21 +54,16 @@ import {
         <div class="mb-4 grid grid-cols-3 gap-2">
           <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
             <p class="text-[10px] uppercase text-zinc-500">AI response rate</p>
-            <p class="text-lg font-semibold text-violet-700">
-              {{ percent(r.ai_response_rate) }}%
-            </p>
+            <p class="text-lg font-semibold text-violet-700">{{ percent(r.ai_response_rate) }}%</p>
             <p class="text-[10px] text-zinc-500">
               {{ r.ai_replies }} AI / {{ r.human_replies }} human
             </p>
           </div>
           <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
             <p class="text-[10px] uppercase text-zinc-500">Escalation rate</p>
-            <p class="text-lg font-semibold text-amber-700">
-              {{ percent(r.escalation_rate) }}%
-            </p>
+            <p class="text-lg font-semibold text-amber-700">{{ percent(r.escalation_rate) }}%</p>
             <p class="text-[10px] text-zinc-500">
-              {{ r.escalated_conversations }} of
-              {{ r.ai_handled_conversations }} convs
+              {{ r.escalated_conversations }} of {{ r.ai_handled_conversations }} convs
             </p>
           </div>
           <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
@@ -102,8 +91,7 @@ import {
           </div>
         } @else if (r.escalated_conversations === 0) {
           <p class="text-xs text-zinc-500">
-            No escalations in this window — the bot handled every flagged
-            conversation.
+            No escalations in this window — the bot handled every flagged conversation.
           </p>
         }
       }
@@ -131,9 +119,7 @@ export class AIMetricsWidgetComponent {
     return Math.round((ratio || 0) * 100);
   }
 
-  protected escalationReasonRows(
-    r: AIMetricsReport,
-  ): { reason: string; count: number }[] {
+  protected escalationReasonRows(r: AIMetricsReport): { reason: string; count: number }[] {
     return Object.entries(r.escalation_reasons)
       .map(([reason, count]) => ({ reason, count: count as number }))
       .sort((a, b) => b.count - a.count);
@@ -169,9 +155,7 @@ export class AIMetricsWidgetComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not load AI metrics.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load AI metrics.');
         },
       });
   }

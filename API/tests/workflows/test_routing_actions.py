@@ -6,26 +6,26 @@ DB to have real User + OrganizationMember + Role rows; the
 fixtures here build a 3-rep "Sales" pool so the round-robin +
 least-loaded paths can be observed.
 """
+
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import text as sql_text
 
 from src.app.core.leads.models import Lead, LeadStatus
 from src.app.core.workflows.actions import (
     _clear_registry_for_tests,
     _register_builtins,
+)
+from src.app.core.workflows.actions import (
     resolve as resolve_action,
 )
 from src.app.core.workflows.actions import routing as routing_module
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -50,10 +50,7 @@ async def org_with_settings(test_db):
     bump can SELECT FOR UPDATE against it."""
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -61,10 +58,7 @@ async def org_with_settings(test_db):
         },
     )
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_org_settings (id, org_id) "
-            "VALUES (:id, :org_id)"
-        ),
+        sql_text("INSERT INTO tbl_org_settings (id, org_id) VALUES (:id, :org_id)"),
         {"id": str(uuid.uuid4()), "org_id": str(org_id)},
     )
     await test_db.commit()
@@ -106,9 +100,7 @@ async def _seed_membership(test_db, *, org_id, user_uuid, role_id) -> None:
     # Find the bigint user id by legacy_uuid + insert membership.
     user_id = (
         await test_db.execute(
-            sql_text(
-                "SELECT id FROM tbl_user_login WHERE legacy_uuid = :uuid"
-            ),
+            sql_text("SELECT id FROM tbl_user_login WHERE legacy_uuid = :uuid"),
             {"uuid": str(user_uuid)},
         )
     ).scalar_one()
@@ -135,9 +127,7 @@ async def _seed_sales_pool(test_db, *, org_id) -> tuple[list[uuid.UUID], uuid.UU
     users = []
     for label in ("a-asha", "b-rahul", "c-priya"):
         u = await _seed_user(test_db, email=f"{label}@example.com")
-        await _seed_membership(
-            test_db, org_id=org_id, user_uuid=u, role_id=role_id
-        )
+        await _seed_membership(test_db, org_id=org_id, user_uuid=u, role_id=role_id)
         users.append(u)
     # Sort by str(uuid) — matches `_bump_routing_pointer`'s sort.
     users.sort(key=str)
@@ -149,8 +139,7 @@ async def _seed_lead(test_db, *, org_id, contact_id=None) -> Lead:
         contact_id = uuid.uuid4()
         await test_db.execute(
             sql_text(
-                "INSERT INTO tbl_contacts (id, org_id, full_name) "
-                "VALUES (:id, :org_id, :name)"
+                "INSERT INTO tbl_contacts (id, org_id, full_name) VALUES (:id, :org_id, :name)"
             ),
             {"id": str(contact_id), "org_id": str(org_id), "name": "Asha"},
         )
@@ -234,9 +223,7 @@ async def test_round_robin_single_user_pool(test_db, org_with_settings):
     org_id = org_with_settings
     role_id = await _seed_role(test_db, org_id=org_id, name="Solo")
     only_user = await _seed_user(test_db, email="solo@example.com")
-    await _seed_membership(
-        test_db, org_id=org_id, user_uuid=only_user, role_id=role_id
-    )
+    await _seed_membership(test_db, org_id=org_id, user_uuid=only_user, role_id=role_id)
 
     lead = await _seed_lead(test_db, org_id=org_id)
     run = _run_for(org_id, contact_id=lead.contact_id)
@@ -296,9 +283,7 @@ async def test_round_robin_empty_pool_skips(test_db, org_with_settings):
 # ---------------------------------------------------------------------------
 
 
-async def test_least_loaded_picks_user_with_fewest_open_leads(
-    test_db, org_with_settings
-):
+async def test_least_loaded_picks_user_with_fewest_open_leads(test_db, org_with_settings):
     org_id = org_with_settings
     users, _ = await _seed_sales_pool(test_db, org_id=org_id)
     asha, rahul, priya = users
@@ -386,9 +371,7 @@ async def test_territory_matches_by_region(test_db, org_with_settings):
     assert result.output["assignment_method"] == "territory"
 
 
-async def test_territory_falls_through_to_round_robin(
-    test_db, org_with_settings
-):
+async def test_territory_falls_through_to_round_robin(test_db, org_with_settings):
     """No territory map entry matches 'pune' → fallback round_robin."""
     org_id = org_with_settings
     users, _ = await _seed_sales_pool(test_db, org_id=org_id)
@@ -479,9 +462,7 @@ async def test_skill_matches_by_skill_required(test_db, org_with_settings):
 # ---------------------------------------------------------------------------
 
 
-async def test_specific_user_assigns_to_configured_uuid(
-    test_db, org_with_settings
-):
+async def test_specific_user_assigns_to_configured_uuid(test_db, org_with_settings):
     org_id = org_with_settings
     users, _ = await _seed_sales_pool(test_db, org_id=org_id)
     target_user = users[1]
@@ -514,9 +495,7 @@ async def test_specific_user_assigns_to_configured_uuid(
     assert result.output["pool_size"] == 1
 
 
-async def test_specific_user_missing_user_id_validation_failed(
-    test_db, org_with_settings
-):
+async def test_specific_user_missing_user_id_validation_failed(test_db, org_with_settings):
     org_id = org_with_settings
     lead = await _seed_lead(test_db, org_id=org_id)
     run = _run_for(org_id, contact_id=lead.contact_id)
@@ -541,9 +520,7 @@ async def test_specific_user_missing_user_id_validation_failed(
 # ---------------------------------------------------------------------------
 
 
-async def test_assignment_writes_timeline_activity(
-    test_db, org_with_settings
-):
+async def test_assignment_writes_timeline_activity(test_db, org_with_settings):
     """The reassign helper writes an ``Activity(type=reassign)`` row;
     the routing wrapper passes the workflow-author note. Asserts the
     timeline got the entry."""

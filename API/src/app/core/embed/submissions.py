@@ -41,14 +41,14 @@ That made the audit event useless (no org_id) and meant the per-org
 indexed lookup per bot submission — cheap relative to the value of
 per-org tuning + proper audit visibility.
 """
+
 from __future__ import annotations
 
 import logging
 import math
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 
@@ -68,12 +68,11 @@ from src.app.core.embed.schemas import (
 )
 from src.app.core.embed.service import find_by_plain_key
 from src.app.core.leads.imports.dedup import find_existing_contact
+from src.app.core.leads.ingest import ingest as ingest_lead
 from src.app.core.leads.models import LeadSource
 from src.app.core.leads.schemas import LeadCreate
-from src.app.core.leads.ingest import ingest as ingest_lead
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
-
 
 logger = logging.getLogger(__name__)
 
@@ -90,15 +89,15 @@ _RENDERED_AT_MAX_AGE = timedelta(hours=24)
 class SubmissionResult:
     """What the router converts to a `EmbedSubmissionResponse`."""
 
-    accepted: bool                       # True = lead created
-    lead_id: Optional[uuid.UUID]         # None for silent-drop / honeypot
-    thank_you_url: Optional[str]         # Step 3's widget config will populate
+    accepted: bool  # True = lead created
+    lead_id: uuid.UUID | None  # None for silent-drop / honeypot
+    thank_you_url: str | None  # Step 3's widget config will populate
 
 
 async def submit(
     *,
     payload: EmbedSubmission,
-    header_key: Optional[str],
+    header_key: str | None,
     ip: str,
 ) -> SubmissionResult:
     """Process one widget submission. Raises HTTPException on auth /
@@ -169,9 +168,7 @@ async def submit(
             reason="honeypot",
             ip=ip,
         )
-        return SubmissionResult(
-            accepted=False, lead_id=None, thank_you_url=None
-        )
+        return SubmissionResult(accepted=False, lead_id=None, thank_you_url=None)
 
     # 6. Min-fill-time check. Skip entirely when the org has set
     # `min_fill_time_ms=0` (escape hatch for low-traffic test orgs).
@@ -187,9 +184,7 @@ async def submit(
                 reason="min_time",
                 ip=ip,
             )
-            return SubmissionResult(
-                accepted=False, lead_id=None, thank_you_url=None
-            )
+            return SubmissionResult(accepted=False, lead_id=None, thank_you_url=None)
 
     # 7. reCAPTCHA check (only when the org has enabled it).
     if spam.recaptcha_enabled:
@@ -201,9 +196,7 @@ async def submit(
             ip=ip,
         )
         if not ok:
-            return SubmissionResult(
-                accepted=False, lead_id=None, thank_you_url=None
-            )
+            return SubmissionResult(accepted=False, lead_id=None, thank_you_url=None)
 
     # 8. Validate payload against the org's widget config.
     try:
@@ -243,14 +236,12 @@ async def submit(
                 # Combine interest + notes into the contact's notes
                 # field so we don't lose the data Step 3's widget
                 # config hasn't decided where to land yet.
-                combined_notes = _combine_notes(
-                    payload.interest, payload.notes
-                )
+                combined_notes = _combine_notes(payload.interest, payload.notes)
                 # Split custom_data into contact vs lead buckets based
                 # on each field's `entity` in the org's widget config.
                 # Empties dropped so they don't land as "" in JSONB.
-                contact_custom_data, lead_custom_data = (
-                    _split_custom_data(payload.custom_data or {}, document)
+                contact_custom_data, lead_custom_data = _split_custom_data(
+                    payload.custom_data or {}, document
                 )
                 contact = await create_contact(
                     session,
@@ -298,19 +289,14 @@ async def submit(
                             request_evidence={
                                 "embed_key_id": str(key_id),
                                 "embed_key_prefix": key_row.prefix,
-                                "referrer": (
-                                    payload.attribution.referrer
-                                ),
-                                "landing_url": (
-                                    payload.attribution.landing_url
-                                ),
+                                "referrer": (payload.attribution.referrer),
+                                "landing_url": (payload.attribution.landing_url),
                             },
                             commit=False,
                         )
                 except Exception:  # noqa: BLE001
                     logger.exception(
-                        "embed submission opt-in capture failed for "
-                        "contact %s",
+                        "embed submission opt-in capture failed for contact %s",
                         contact_id,
                     )
 
@@ -328,9 +314,7 @@ async def submit(
                 lead_payload=LeadCreate(
                     contact_id=contact_id,
                     source=LeadSource.widget,
-                    attribution=payload.attribution.model_dump(
-                        exclude_none=False
-                    ),
+                    attribution=payload.attribution.model_dump(exclude_none=False),
                     custom_data=lead_custom_data,
                 ),
                 actor_user_id=None,
@@ -364,16 +348,14 @@ async def submit(
             landing_url=payload.attribution.landing_url,
             lead_id=lead_id,
         )
-        return SubmissionResult(
-            accepted=True, lead_id=lead_id, thank_you_url=None
-        )
+        return SubmissionResult(accepted=True, lead_id=lead_id, thank_you_url=None)
     finally:
         reset_context(ctx_token)
 
 
 def _passes_min_fill_time(
     *,
-    rendered_at: Optional[datetime],
+    rendered_at: datetime | None,
     min_fill_time_ms: int,
 ) -> bool:
     """True iff the submission was rendered at least `min_fill_time_ms`
@@ -386,12 +368,8 @@ def _passes_min_fill_time(
     """
     if rendered_at is None:
         return False
-    now = datetime.now(timezone.utc)
-    rendered = (
-        rendered_at
-        if rendered_at.tzinfo is not None
-        else rendered_at.replace(tzinfo=timezone.utc)
-    )
+    now = datetime.now(UTC)
+    rendered = rendered_at if rendered_at.tzinfo is not None else rendered_at.replace(tzinfo=UTC)
     delta = now - rendered
     if delta < timedelta(0):
         # Future timestamps — clock-skewed bot or forged payload.
@@ -515,9 +493,7 @@ def _split_custom_data(
     shouldn't reach here.
     """
     entity_by_key: dict[str, str] = {
-        f.key: f.entity
-        for f in document.fields
-        if f.field_source == "custom"
+        f.key: f.entity for f in document.fields if f.field_source == "custom"
     }
     contact_bucket: dict[str, object] = {}
     lead_bucket: dict[str, object] = {}
@@ -532,9 +508,7 @@ def _split_custom_data(
     return contact_bucket, lead_bucket
 
 
-def _combine_notes(
-    interest: Optional[str], notes: Optional[str]
-) -> Optional[str]:
+def _combine_notes(interest: str | None, notes: str | None) -> str | None:
     """Fold the widget's `interest` + `notes` into a single notes
     string so neither value is lost in v1. A future improvement
     could route these to dedicated standard / custom fields per
@@ -578,7 +552,7 @@ def _validate_payload_against_config(
     # — we only need to gate the OPTIONAL ones (phone / email / interest
     # / notes) against the per-org config. full_name is always required
     # by the schema.
-    supplied_standard: dict[str, Optional[str]] = {
+    supplied_standard: dict[str, str | None] = {
         "phone": payload.phone,
         "email": payload.email,
         "interest": payload.interest,
@@ -614,7 +588,7 @@ def _validate_payload_against_config(
 
     # Rule 2: required fields per config must be present. Pulls values
     # from both standard (top-level) and custom (custom_data) buckets.
-    visitor_values: dict[str, Optional[object]] = {
+    visitor_values: dict[str, object | None] = {
         "full_name": payload.full_name,
         **supplied_standard,
         **{k: v for k, v in (payload.custom_data or {}).items()},
@@ -631,9 +605,7 @@ def _validate_payload_against_config(
     if missing_required:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=(
-                f"Required field(s) missing: {missing_required}."
-            ),
+            detail=(f"Required field(s) missing: {missing_required}."),
         )
 
     # Rule 3: select-typed fields must use a configured option.
@@ -649,10 +621,7 @@ def _validate_payload_against_config(
     ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=(
-                f"interest must be one of {interest_def.options}, "
-                f"got {payload.interest!r}."
-            ),
+            detail=(f"interest must be one of {interest_def.options}, got {payload.interest!r}."),
         )
     for field in custom_fields.values():
         if field.field_type != "select" or not field.options:
@@ -662,8 +631,7 @@ def _validate_payload_against_config(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=(
-                    f"Custom field '{field.key}' must be one of "
-                    f"{field.options}, got {value!r}."
+                    f"Custom field '{field.key}' must be one of {field.options}, got {value!r}."
                 ),
             )
 

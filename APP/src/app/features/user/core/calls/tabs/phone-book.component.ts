@@ -1,24 +1,12 @@
-﻿import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+﻿import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
-import {
-  ContactListItem,
-  ContactsApiService,
-} from '../../contacts/contacts-api.service';
-import {
-  CallOutcome,
-  CallsApiService,
-} from '../calls-api.service';
+import { ContactListItem, ContactsApiService } from '../../contacts/contacts-api.service';
+import { CallOutcome, CallsApiService } from '../calls-api.service';
 import { LogCallModalComponent } from '../log-call-modal.component';
 import { initials } from '@core/services/text.util';
 import { extractApiError } from '@core/services/api-error.util';
@@ -63,14 +51,9 @@ export class CallPhoneBookTabComponent {
         },
       });
     this.searchControl.valueChanges
-      .pipe(
-        debounceTime(200),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef),
-      )
+      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.reload());
   }
-
 
   protected avatarBg(id: string): string {
     const palette = [
@@ -118,11 +101,8 @@ export class CallPhoneBookTabComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load phone book.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load phone book.');
         },
       });
   }
-
 }

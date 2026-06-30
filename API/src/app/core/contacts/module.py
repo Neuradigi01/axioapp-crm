@@ -5,8 +5,8 @@ sweep in `main.py`'s lifespan imports this `MODULE` constant, registers
 the descriptor with the module registry, and also persists
 `contacts.read` / `contacts.write` into the `permissions` table.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="contacts",

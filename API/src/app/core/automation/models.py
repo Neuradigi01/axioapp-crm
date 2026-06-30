@@ -25,6 +25,7 @@ Tenant scoping via :class:`TenantScoped`. RLS policies installed in
 the matching migration so the database itself blocks cross-tenant
 reads even when an SQL caller forgets to filter.
 """
+
 from __future__ import annotations
 
 import enum
@@ -114,9 +115,7 @@ class AutomationTrigger(Base, TenantScoped):
         server_default=sql_text("gen_random_uuid()"),
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=sql_text("true")
-    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sql_text("true"))
     event_type: Mapped[str] = mapped_column(Text, nullable=False)
     # Free-shape predicate the matcher walks at fire time. Empty
     # dict means "always match" (the trigger fires for every event
@@ -124,9 +123,7 @@ class AutomationTrigger(Base, TenantScoped):
     conditions: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=sql_text("'{}'::jsonb")
     )
-    channel: Mapped[ConversationChannel] = mapped_column(
-        conversation_channel_enum, nullable=False
-    )
+    channel: Mapped[ConversationChannel] = mapped_column(conversation_channel_enum, nullable=False)
     template_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_message_templates.id", ondelete="RESTRICT"),
@@ -148,12 +145,8 @@ class AutomationTrigger(Base, TenantScoped):
     recipient_resolver_config: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=sql_text("'{}'::jsonb")
     )
-    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
-    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -218,41 +211,29 @@ class AutomationRun(Base, TenantScoped):
         ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
         nullable=True,
     )
-    user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     status: Mapped[AutomationRunStatus] = mapped_column(
         automation_run_status_enum,
         nullable=False,
         server_default=sql_text("'queued'"),
     )
-    channel_message_id: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )
+    channel_message_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     scheduled_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=sql_text("now()"),
     )
-    dispatched_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Step 14 — engagement tracking. First open + first click only;
     # multi-event tracking deferred (the timestamps stay on the run
     # row for fast contact-timeline reads). Populated by the
     # ``/api/v1/automations/track/open/{token}`` (pixel beacon) and
     # ``/api/v1/automations/track/click/{token}`` (redirect) public
     # endpoints — both HMAC-signed on the run id to prevent guessing.
-    opened_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    clicked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    clicked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class SuppressionReason(str, enum.Enum):
@@ -309,16 +290,10 @@ class AutomationSuppression(Base, TenantScoped):
         primary_key=True,
         server_default=sql_text("gen_random_uuid()"),
     )
-    channel: Mapped[ConversationChannel] = mapped_column(
-        conversation_channel_enum, nullable=False
-    )
+    channel: Mapped[ConversationChannel] = mapped_column(conversation_channel_enum, nullable=False)
     address: Mapped[str] = mapped_column(Text, nullable=False)
-    reason: Mapped[SuppressionReason] = mapped_column(
-        suppression_reason_enum, nullable=False
-    )
-    source_event_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    reason: Mapped[SuppressionReason] = mapped_column(suppression_reason_enum, nullable=False)
+    source_event_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

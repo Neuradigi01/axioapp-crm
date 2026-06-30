@@ -4,10 +4,11 @@ Catches typos in :mod:`core.templates.models` + :mod:`core.templates.schemas`
 before Step 2 builds on top of them. The actual CRUD + RLS path is
 covered by Step 2's ``test_service.py``.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.templates.models import (
@@ -139,7 +140,7 @@ def test_template_create_schema_non_email_rejects_subject():
 
 def test_template_read_round_trip_from_model():
     """``TemplateRead.model_validate`` reads from a ``MessageTemplate`` row."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     row = MessageTemplate(
         id=uuid.uuid4(),
         org_id=uuid.uuid4(),

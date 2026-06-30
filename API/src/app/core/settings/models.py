@@ -9,6 +9,7 @@ no furniture-specific defaults in core).
 
 Tenant-scoped, RLS on.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -36,9 +37,7 @@ from src.app.shared.orm import TenantScoped
 
 class OrgSettings(Base, TenantScoped):
     __tablename__ = "tbl_org_settings"
-    __table_args__ = (
-        UniqueConstraint("org_id", name="uq_org_settings_org_id"),
-    )
+    __table_args__ = (UniqueConstraint("org_id", name="uq_org_settings_org_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -78,9 +77,7 @@ class OrgSettings(Base, TenantScoped):
         Boolean, nullable=False, server_default=sql_text("false")
     )
     ai_personality: Mapped[str | None] = mapped_column(Text, nullable=True)
-    ai_welcome_message: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )
+    ai_welcome_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # --- reviews automation ---
     reviews_auto_request_enabled: Mapped[bool] = mapped_column(
@@ -113,7 +110,7 @@ class OrgSettings(Base, TenantScoped):
     lead_routing_config: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
-        server_default=sql_text("'{\"strategy\":\"round_robin\"}'::jsonb"),
+        server_default=sql_text('\'{"strategy":"round_robin"}\'::jsonb'),
     )
 
     # --- compliance gates (tasks/workflows Step 12) ---

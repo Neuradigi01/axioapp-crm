@@ -8,6 +8,7 @@ Rate limit: 10 login attempts per IP per minute (in-memory bucket from
 `src.app.shared.rate_limit`). Refresh and logout are not rate-limited
 — they require a valid bearer token already.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -17,7 +18,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth import service as auth_service
+from src.app.core.auth.admin_login.router import router as admin_login_router
+from src.app.core.auth.captcha.router import router as captcha_router
 from src.app.core.auth.dependencies import get_current_user
+from src.app.core.auth.password.router import router as password_router
 from src.app.core.auth.schemas import (
     LoginRequest,
     LoginResponse,
@@ -34,9 +38,6 @@ from src.app.core.auth.schemas import (
     TwoFactorStatusResponse,
 )
 from src.app.core.auth.tokens import InvalidToken, TokenClaims, decode_token
-from src.app.core.auth.admin_login.router import router as admin_login_router
-from src.app.core.auth.captcha.router import router as captcha_router
-from src.app.core.auth.password.router import router as password_router
 from src.app.core.auth.two_factor.router import router as two_factor_router
 from src.app.core.auth.verification.router import router as verification_router
 from src.app.core.users.models import User
@@ -71,7 +72,7 @@ def _claims_from_bearer(creds: HTTPAuthorizationCredentials | None) -> TokenClai
     except InvalidToken:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
+        ) from None
 
 
 @router.post("/login", response_model=None)
@@ -197,14 +198,10 @@ async def list_sessions(
         user_id=user.legacy_uuid,
         current_token_id=ctx.token_id,
     )
-    return SessionListResponse(
-        sessions=[SessionOut(**row) for row in rows]
-    )
+    return SessionListResponse(sessions=[SessionOut(**row) for row in rows])
 
 
-@router.post(
-    "/sessions/{session_id}/revoke", response_model=SessionRevokeResponse
-)
+@router.post("/sessions/{session_id}/revoke", response_model=SessionRevokeResponse)
 async def revoke_session(
     session_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -253,7 +250,5 @@ async def two_factor_status(
     re-auth proofs + TOTP secret rotation, which are out of scope here.
     Today's enrol path is "log out → sign in → 2FA enforcement screen."
     """
-    enabled, method = await auth_service.get_user_two_factor_status(
-        db, member_id=user.id
-    )
+    enabled, method = await auth_service.get_user_two_factor_status(db, member_id=user.id)
     return TwoFactorStatusResponse(enabled=enabled, method=method)

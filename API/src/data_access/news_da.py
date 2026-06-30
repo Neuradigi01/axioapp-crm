@@ -1,5 +1,6 @@
-from sqlalchemy import select, func, delete, or_
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.models.news import News
 
 
@@ -34,10 +35,7 @@ async def get_news_paginated(
     total = (await db.execute(count_stmt)).scalar()
 
     items_stmt = (
-        base
-        .order_by(News.created_at.desc())
-        .offset(page_index * page_size)
-        .limit(page_size)
+        base.order_by(News.created_at.desc()).offset(page_index * page_size).limit(page_size)
     )
     items = list((await db.execute(items_stmt)).scalars().all())
 

@@ -10,8 +10,8 @@ Registers two permission keys with the core RBAC registry:
 No top-level sidebar entry — the sequences surface is the Settings →
 Email Sequences tab in Step 11. `menu_position=None`.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="email_sequences",

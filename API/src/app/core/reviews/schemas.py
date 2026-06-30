@@ -1,9 +1,9 @@
 """Pydantic v2 schemas for the reviews module."""
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -13,20 +13,20 @@ from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 class ReviewCreate(BaseModel):
     source: str = Field(min_length=1, max_length=32)
-    source_id: Optional[str] = Field(default=None, max_length=255)
-    contact_id: Optional[uuid.UUID] = None
+    source_id: str | None = Field(default=None, max_length=255)
+    contact_id: uuid.UUID | None = None
     rating: int = Field(ge=1, le=5)
-    text: Optional[str] = None
+    text: str | None = None
     tags: list[str] = Field(default_factory=list)
 
 
 class ReviewUpdate(BaseModel):
-    source: Optional[str] = Field(default=None, min_length=1, max_length=32)
-    source_id: Optional[str] = Field(default=None, max_length=255)
-    contact_id: Optional[uuid.UUID] = None
-    rating: Optional[int] = Field(default=None, ge=1, le=5)
-    text: Optional[str] = None
-    tags: Optional[list[str]] = None
+    source: str | None = Field(default=None, min_length=1, max_length=32)
+    source_id: str | None = Field(default=None, max_length=255)
+    contact_id: uuid.UUID | None = None
+    rating: int | None = Field(default=None, ge=1, le=5)
+    text: str | None = None
+    tags: list[str] | None = None
 
 
 class ReviewReplyPayload(BaseModel):
@@ -34,21 +34,20 @@ class ReviewReplyPayload(BaseModel):
 
 
 class ReviewEscalatePayload(BaseModel):
-    reason: Optional[str] = Field(default=None, max_length=512)
+    reason: str | None = Field(default=None, max_length=512)
 
 
 class ReviewOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     source: str
-    source_id: Optional[str]
-    contact_id: Optional[uuid.UUID]
+    source_id: str | None
+    contact_id: uuid.UUID | None
     rating: int
-    text: Optional[str]
-    reply_text: Optional[str]
-    replied_at: Optional[datetime]
-    replied_by_id: Optional[uuid.UUID]
+    text: str | None
+    reply_text: str | None
+    replied_at: datetime | None
+    replied_by_id: uuid.UUID | None
     status: ReviewStatus
     tags: list[str]
     created_at: datetime

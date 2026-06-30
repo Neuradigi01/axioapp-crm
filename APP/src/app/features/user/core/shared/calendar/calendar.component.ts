@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 import {
   addMonths,
@@ -58,9 +52,7 @@ export class CalendarComponent {
 
   readonly weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  readonly monthLabel = computed(() =>
-    format(this.viewMonth(), 'MMMM yyyy'),
-  );
+  readonly monthLabel = computed(() => format(this.viewMonth(), 'MMMM yyyy'));
 
   /** Quick lookup: ISO yyyy-mm-dd → count of events on that day. */
   readonly eventsByDayKey = computed<Map<string, number>>(() => {

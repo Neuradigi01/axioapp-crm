@@ -5,6 +5,7 @@ on-disk pack discovery (`packs/*/pack.yaml`). Real packs surface as
 `status="available"`; configured-but-not-built packs surface as
 `status="coming_soon"`.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -56,9 +57,7 @@ async def test_catalog_marks_placeholders_coming_soon(layered_client):
         "education",
         "hospitality",
     ):
-        assert placeholder_id in by_id, (
-            f"placeholder {placeholder_id} missing from catalog"
-        )
+        assert placeholder_id in by_id, f"placeholder {placeholder_id} missing from catalog"
         assert by_id[placeholder_id]["status"] == "coming_soon", (
             f"{placeholder_id} should be coming_soon (no pack.yaml exists)"
         )

@@ -15,6 +15,7 @@ Caching:
   - The Stripe provider is process-cached via `@lru_cache` so the YAML
     price map is read once at boot, not per request.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache

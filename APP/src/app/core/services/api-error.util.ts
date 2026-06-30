@@ -16,8 +16,8 @@ export function extractApiError(err: HttpErrorResponse): string | null {
   if (typeof body === 'string') return body;
   if (body && typeof body === 'object') {
     const candidate =
-      (body as { message?: string; detail?: unknown }).message
-      ?? (body as { detail?: unknown }).detail;
+      (body as { message?: string; detail?: unknown }).message ??
+      (body as { detail?: unknown }).detail;
     if (typeof candidate === 'string') return candidate;
   }
   return null;

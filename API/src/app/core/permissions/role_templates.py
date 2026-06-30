@@ -23,6 +23,7 @@ The seeded demo orgs (`demo`, `core-demo`) use their own hand-rolled
 inserts in `scripts/seed_*.py`. The template registry here is the
 canonical source for *self-signup* orgs.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -44,27 +45,48 @@ class OwnerAlreadyExists(RuntimeError):
 
 
 _CORE_ADMIN_KEYS: list[str] = [
-    "users.read", "users.write",
-    "roles.read", "roles.write",
+    "users.read",
+    "users.write",
+    "roles.read",
+    "roles.write",
     "audit.read",
-    "custom_fields.read", "custom_fields.write",
-    "settings.read", "settings.write",
+    "custom_fields.read",
+    "custom_fields.write",
+    "settings.read",
+    "settings.write",
     "settings.standard_fields.manage",
     "settings.integrations.manage",
     "settings.integrations.embed.manage",
-    "contacts.read", "contacts.write", "contacts.reassign",
-    "leads.read", "leads.write", "leads.import", "leads.reassign",
+    "contacts.read",
+    "contacts.write",
+    "contacts.reassign",
+    "leads.read",
+    "leads.write",
+    "leads.import",
+    "leads.reassign",
     "leads.export",
-    "appointments.read", "appointments.write", "appointments.reassign",
-    "walkins.read", "walkins.write", "walkins.reassign",
-    "walk_ins.read", "walk_ins.write",
-    "catalog.read", "catalog.write",
-    "conversations.read", "conversations.write",
+    "appointments.read",
+    "appointments.write",
+    "appointments.reassign",
+    "walkins.read",
+    "walkins.write",
+    "walkins.reassign",
+    "walk_ins.read",
+    "walk_ins.write",
+    "catalog.read",
+    "catalog.write",
+    "conversations.read",
+    "conversations.write",
     # whatsapp-platform-upgrade Step 14 — tag CRUD. Owner + Admin only.
     "settings.conversations.manage",
-    "calls.read", "calls.write", "calls.outcomes.manage",
-    "reviews.read", "reviews.write",
-    "campaigns.read", "campaigns.write", "campaigns.send",
+    "calls.read",
+    "calls.write",
+    "calls.outcomes.manage",
+    "reviews.read",
+    "reviews.write",
+    "campaigns.read",
+    "campaigns.write",
+    "campaigns.send",
     # whatsapp-platform-upgrade Step 8 — Admin manages templates and
     # may submit to Meta. Junior roles get `whatsapp.templates.read`
     # via the picker but not write/submit by default.
@@ -91,12 +113,18 @@ _CORE_ADMIN_KEYS: list[str] = [
     # forms) library. Same Owner/Admin-only default as the rest of
     # the WhatsApp admin surfaces; junior roles don't see the page.
     "whatsapp.flows.manage",
-    "tasks.read", "tasks.write",
-    "pipelines.read", "pipelines.manage", "pipelines.write",
-    "activities.read", "activities.write",
-    "staff.read", "staff.write",
+    "tasks.read",
+    "tasks.write",
+    "pipelines.read",
+    "pipelines.manage",
+    "pipelines.write",
+    "activities.read",
+    "activities.write",
+    "staff.read",
+    "staff.write",
     "attendance.write",
-    "billing.read", "billing.write",
+    "billing.read",
+    "billing.write",
     "saved_views.use",
     # Reps connect their own mailbox; Admin also holds the org-wide
     # admin scope so they can see + disconnect any rep's account.
@@ -154,16 +182,25 @@ _CORE_OWNER_KEYS: list[str] = _CORE_ADMIN_KEYS + [
 
 
 _CORE_EMPLOYEE_KEYS: list[str] = [
-    "contacts.read", "contacts.write",
-    "leads.read", "leads.write",
-    "activities.read", "activities.write",
-    "tasks.read", "tasks.write",
-    "appointments.read", "appointments.write",
-    "walkins.read", "walkins.write",
-    "walk_ins.read", "walk_ins.write",
+    "contacts.read",
+    "contacts.write",
+    "leads.read",
+    "leads.write",
+    "activities.read",
+    "activities.write",
+    "tasks.read",
+    "tasks.write",
+    "appointments.read",
+    "appointments.write",
+    "walkins.read",
+    "walkins.write",
+    "walk_ins.read",
+    "walk_ins.write",
     "catalog.read",
-    "conversations.read", "conversations.write",
-    "calls.read", "calls.write",
+    "conversations.read",
+    "conversations.write",
+    "calls.read",
+    "calls.write",
     "pipelines.read",
     # whatsapp-platform-upgrade Step 8 — Employees can READ templates
     # (they use them from compose) but cannot author or submit. Write +
@@ -209,16 +246,33 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
 # the team; a Support Agent talks to customers but doesn't touch the
 # pipeline shape or billing.
 _CORE_SALES_MANAGER_KEYS: list[str] = [
-    "contacts.read", "contacts.write", "contacts.reassign",
-    "leads.read", "leads.write", "leads.reassign", "leads.export",
-    "appointments.read", "appointments.write", "appointments.reassign",
-    "walkins.read", "walkins.write", "walkins.reassign",
-    "walk_ins.read", "walk_ins.write",
-    "tasks.read", "tasks.write",
-    "activities.read", "activities.write",
-    "pipelines.read", "pipelines.manage",
-    "calls.read", "calls.write", "calls.outcomes.manage",
-    "campaigns.read", "campaigns.write", "campaigns.send",
+    "contacts.read",
+    "contacts.write",
+    "contacts.reassign",
+    "leads.read",
+    "leads.write",
+    "leads.reassign",
+    "leads.export",
+    "appointments.read",
+    "appointments.write",
+    "appointments.reassign",
+    "walkins.read",
+    "walkins.write",
+    "walkins.reassign",
+    "walk_ins.read",
+    "walk_ins.write",
+    "tasks.read",
+    "tasks.write",
+    "activities.read",
+    "activities.write",
+    "pipelines.read",
+    "pipelines.manage",
+    "calls.read",
+    "calls.write",
+    "calls.outcomes.manage",
+    "campaigns.read",
+    "campaigns.write",
+    "campaigns.send",
     "reviews.read",
     "catalog.read",
     "staff.read",
@@ -237,12 +291,18 @@ _CORE_SALES_MANAGER_KEYS: list[str] = [
 
 
 _CORE_SUPPORT_AGENT_KEYS: list[str] = [
-    "contacts.read", "contacts.write",
-    "conversations.read", "conversations.write",
-    "calls.read", "calls.write",
-    "reviews.read", "reviews.write",
-    "tasks.read", "tasks.write",
-    "activities.read", "activities.write",
+    "contacts.read",
+    "contacts.write",
+    "conversations.read",
+    "conversations.write",
+    "calls.read",
+    "calls.write",
+    "reviews.read",
+    "reviews.write",
+    "tasks.read",
+    "tasks.write",
+    "activities.read",
+    "activities.write",
     "catalog.read",
     "walkins.read",
     "walk_ins.read",
@@ -326,9 +386,7 @@ ROLE_TEMPLATES: dict[str, RoleTemplate] = {
 }
 
 
-async def _resolve_keys(
-    session: AsyncSession, template: RoleTemplate
-) -> list[uuid.UUID]:
+async def _resolve_keys(session: AsyncSession, template: RoleTemplate) -> list[uuid.UUID]:
     """Map a template's permission_keys list to ids.
 
     Skips keys that aren't in the live registry (rather than raising)
@@ -339,17 +397,13 @@ async def _resolve_keys(
     if not keys:
         return []
     rows = (
-        await session.execute(
-            select(Permission.id, Permission.key).where(Permission.key.in_(keys))
-        )
+        await session.execute(select(Permission.id, Permission.key).where(Permission.key.in_(keys)))
     ).all()
     found = {r.key: r.id for r in rows}
     return [found[k] for k in keys if k in found]
 
 
-async def _install_one(
-    session: AsyncSession, *, org_id: uuid.UUID, template: RoleTemplate
-) -> Role:
+async def _install_one(session: AsyncSession, *, org_id: uuid.UUID, template: RoleTemplate) -> Role:
     if template.is_owner:
         existing_owner = (
             await session.execute(
@@ -359,14 +413,10 @@ async def _install_one(
             )
         ).scalar_one_or_none()
         if existing_owner is not None:
-            raise OwnerAlreadyExists(
-                f"org {org_id} already has an Owner role"
-            )
+            raise OwnerAlreadyExists(f"org {org_id} already has an Owner role")
 
     existing = (
-        await session.execute(
-            select(Role).where(Role.org_id == org_id, Role.name == template.name)
-        )
+        await session.execute(select(Role).where(Role.org_id == org_id, Role.name == template.name))
     ).scalar_one_or_none()
     if existing is not None:
         return existing
@@ -379,21 +429,14 @@ async def _install_one(
     if permission_ids:
         await session.execute(
             pg_insert(RolePermission)
-            .values(
-                [
-                    {"role_id": role.id, "permission_id": pid}
-                    for pid in permission_ids
-                ]
-            )
+            .values([{"role_id": role.id, "permission_id": pid} for pid in permission_ids])
             .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
         )
 
     return role
 
 
-async def installed_template_names(
-    session: AsyncSession, org_id: uuid.UUID
-) -> set[str]:
+async def installed_template_names(session: AsyncSession, org_id: uuid.UUID) -> set[str]:
     """Names of `roles` rows in this org that match any template name.
 
     Used by the Roles page to mark templates as `installed=true` when
@@ -404,9 +447,7 @@ async def installed_template_names(
     template_names = {t.name for t in ROLE_TEMPLATES.values()}
     rows = (
         await session.execute(
-            select(Role.name).where(
-                Role.org_id == org_id, Role.name.in_(template_names)
-            )
+            select(Role.name).where(Role.org_id == org_id, Role.name.in_(template_names))
         )
     ).all()
     return {r.name for r in rows}
@@ -430,16 +471,12 @@ async def install(
     out the Owner row to assign on `tbl_organization_members.role_id`.
     """
     if template_keys is None:
-        template_keys = [
-            k for k, t in ROLE_TEMPLATES.items() if t.auto_install_on_org_create
-        ]
+        template_keys = [k for k, t in ROLE_TEMPLATES.items() if t.auto_install_on_org_create]
 
     installed: dict[str, Role] = {}
     for key in template_keys:
         template = ROLE_TEMPLATES.get(key)
         if template is None:
             raise UnknownPermissionKey(f"unknown role template: {key!r}")
-        installed[key] = await _install_one(
-            session, org_id=org_id, template=template
-        )
+        installed[key] = await _install_one(session, org_id=org_id, template=template)
     return installed

@@ -11,18 +11,17 @@ extra projection — the `mapping` / `counts` / `error_report_path`
 columns are NULL at this step and surface as null until the Step 2/3
 flows populate them.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
-
 from src.app.core.leads.imports.models import LeadImportStatus
-
+from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
 
 SourcePlatform = Literal[
     "zoho",
@@ -35,7 +34,6 @@ SourcePlatform = Literal[
 
 
 class LeadImportRead(TimestampedOrgScopedOut):
-
     id: uuid.UUID
     uploaded_by: uuid.UUID
     name: str
@@ -46,9 +44,9 @@ class LeadImportRead(TimestampedOrgScopedOut):
     row_count_estimate: int
     mime_type: str
     status: LeadImportStatus
-    mapping: Optional[dict[str, Any]] = None
-    counts: Optional[dict[str, Any]] = None
-    error_report_path: Optional[str] = None
+    mapping: dict[str, Any] | None = None
+    counts: dict[str, Any] | None = None
+    error_report_path: str | None = None
 
 
 LeadImportListResponse = PaginatedResponse[LeadImportRead]
@@ -65,7 +63,7 @@ class LeadImportCommit(BaseModel):
     cannot create a contact.
     """
 
-    mapping: dict[str, Optional[str]] = Field(default_factory=dict)
+    mapping: dict[str, str | None] = Field(default_factory=dict)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -78,22 +76,21 @@ class PresetCreate(BaseModel):
     and is validated against the same target whitelist.
     """
 
-    name: Optional[str] = Field(default=None, max_length=128)
+    name: str | None = Field(default=None, max_length=128)
     source_platform: SourcePlatform
-    mapping: dict[str, Optional[str]] = Field(default_factory=dict)
+    mapping: dict[str, str | None] = Field(default_factory=dict)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class PresetRead(ORMModel):
-
     id: uuid.UUID
-    org_id: Optional[uuid.UUID]            # None for system presets
+    org_id: uuid.UUID | None  # None for system presets
     source_platform: str
     name: str
-    mapping: dict[str, Optional[str]]
+    mapping: dict[str, str | None]
     is_system: bool
-    created_by: Optional[uuid.UUID]
+    created_by: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 
@@ -106,11 +103,11 @@ class MappingTarget(BaseModel):
     targets visually.
     """
 
-    key: str                   # e.g. "contact.full_name" or "custom_data.industry"
-    label: str                 # human label, e.g. "Full name"
-    field_type: str            # "text" / "tel" / "email" / "number" / ...
-    required: bool             # backend-required (cannot be omitted)
-    custom: bool               # True for `custom_data.<key>`, False for canonical
+    key: str  # e.g. "contact.full_name" or "custom_data.industry"
+    label: str  # human label, e.g. "Full name"
+    field_type: str  # "text" / "tel" / "email" / "number" / ...
+    required: bool  # backend-required (cannot be omitted)
+    custom: bool  # True for `custom_data.<key>`, False for canonical
 
 
 class PreviewResponse(BaseModel):
@@ -123,7 +120,7 @@ class PreviewResponse(BaseModel):
     """
 
     columns: list[str]
-    rows: list[list[Optional[str]]]
+    rows: list[list[str | None]]
 
 
 __all__ = [

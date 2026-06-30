@@ -5,12 +5,8 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { AutomationsPageComponent } from './automations.page';
-import {
-  AutomationsApiService,
-  TriggerRead,
-} from './automations-api.service';
+import { AutomationsApiService, TriggerRead } from './automations-api.service';
 import { FurnitureAuthService } from '../auth/auth.service';
-
 
 function makeTrigger(overrides: Partial<TriggerRead> = {}): TriggerRead {
   return {
@@ -33,7 +29,6 @@ function makeTrigger(overrides: Partial<TriggerRead> = {}): TriggerRead {
   };
 }
 
-
 describe('AutomationsPageComponent', () => {
   let apiSpy: jasmine.SpyObj<AutomationsApiService>;
   let authStub: { hasPermission: (k: string) => boolean };
@@ -41,10 +36,12 @@ describe('AutomationsPageComponent', () => {
   function makeFixture(
     initialRows: TriggerRead[] = [],
   ): ComponentFixture<AutomationsPageComponent> {
-    apiSpy = jasmine.createSpyObj<AutomationsApiService>(
-      'AutomationsApiService',
-      ['list', 'listEventTypes', 'enable', 'disable'],
-    );
+    apiSpy = jasmine.createSpyObj<AutomationsApiService>('AutomationsApiService', [
+      'list',
+      'listEventTypes',
+      'enable',
+      'disable',
+    ]);
     apiSpy.list.and.returnValue(
       of({
         items: initialRows,
@@ -54,12 +51,8 @@ describe('AutomationsPageComponent', () => {
       }),
     );
     apiSpy.listEventTypes.and.returnValue(of([]));
-    apiSpy.enable.and.callFake((id: string) =>
-      of(makeTrigger({ id, enabled: true })),
-    );
-    apiSpy.disable.and.callFake((id: string) =>
-      of(makeTrigger({ id, enabled: false })),
-    );
+    apiSpy.enable.and.callFake((id: string) => of(makeTrigger({ id, enabled: true })));
+    apiSpy.disable.and.callFake((id: string) => of(makeTrigger({ id, enabled: false })));
 
     authStub = { hasPermission: (_k: string) => true };
 

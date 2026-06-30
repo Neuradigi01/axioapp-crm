@@ -4,6 +4,7 @@ The "at most one open session per user" invariant is enforced
 service-side (not a DB constraint) so the test verifies it through
 the public 409 contract.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -27,9 +28,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -44,14 +43,10 @@ async def _login(client, *, org_slug: str, email: str, password: str) -> str:
 
 
 @pytest.mark.asyncio
-async def test_clock_in_then_clock_out_records_hours(
-    layered_client, seeded_admin
-):
+async def test_clock_in_then_clock_out_records_hours(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "staff.read", "attendance.write"
-    )
+    await _grant(seeded_admin["role"].id, "staff.read", "attendance.write")
     token = await _login(
         layered_client,
         org_slug=org.slug,
@@ -88,9 +83,7 @@ async def test_clock_in_then_clock_out_records_hours(
 
 
 @pytest.mark.asyncio
-async def test_second_clock_in_while_open_returns_409(
-    layered_client, seeded_admin
-):
+async def test_second_clock_in_while_open_returns_409(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "attendance.write")
@@ -102,9 +95,7 @@ async def test_second_clock_in_while_open_returns_409(
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    first = await layered_client.post(
-        f"/api/v1/staff/{user.id}/clock-in", json={}, headers=headers
-    )
+    first = await layered_client.post(f"/api/v1/staff/{user.id}/clock-in", json={}, headers=headers)
     assert first.status_code == 201, first.text
 
     second = await layered_client.post(
@@ -114,9 +105,7 @@ async def test_second_clock_in_while_open_returns_409(
 
 
 @pytest.mark.asyncio
-async def test_clock_out_without_open_session_returns_404(
-    layered_client, seeded_admin
-):
+async def test_clock_out_without_open_session_returns_404(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "attendance.write")
@@ -136,14 +125,10 @@ async def test_clock_out_without_open_session_returns_404(
 
 
 @pytest.mark.asyncio
-async def test_attendance_history_listed_newest_first(
-    layered_client, seeded_admin
-):
+async def test_attendance_history_listed_newest_first(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "staff.read", "attendance.write"
-    )
+    await _grant(seeded_admin["role"].id, "staff.read", "attendance.write")
     token = await _login(
         layered_client,
         org_slug=org.slug,
@@ -163,9 +148,7 @@ async def test_attendance_history_listed_newest_first(
         )
         assert out_.status_code == 200
 
-    resp = await layered_client.get(
-        f"/api/v1/staff/{user.id}/attendance", headers=headers
-    )
+    resp = await layered_client.get(f"/api/v1/staff/{user.id}/attendance", headers=headers)
     assert resp.status_code == 200, resp.text
     rows = resp.json()
     assert len(rows) == 2
@@ -173,9 +156,7 @@ async def test_attendance_history_listed_newest_first(
 
 
 @pytest.mark.asyncio
-async def test_clock_in_requires_attendance_write(
-    layered_client, seeded_admin
-):
+async def test_clock_in_requires_attendance_write(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     # Only read perm granted — no attendance.write

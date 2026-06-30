@@ -23,11 +23,11 @@ Strategy:
   * `X` is base64-url-encoded and appended as `?u=` so the click
     handler can decode the target without storing it server-side.
 """
+
 from __future__ import annotations
 
 import base64
 import re
-
 
 # Matches `<a … href="X" …>` or `<a … href='X' …>`. Greedy `[^"']*`
 # stops at the matching quote so we don't span the next href on a
@@ -52,9 +52,7 @@ def _should_skip(url: str, *, tracker_prefix: str) -> bool:
     if not stripped:
         return True
     lower = stripped.lower()
-    if lower.startswith(
-        ("mailto:", "tel:", "sms:", "data:", "javascript:")
-    ):
+    if lower.startswith(("mailto:", "tel:", "sms:", "data:", "javascript:")):
         return True
     if stripped.startswith("#"):
         return True
@@ -65,11 +63,7 @@ def _should_skip(url: str, *, tracker_prefix: str) -> bool:
 
 
 def _b64url(raw: str) -> str:
-    return (
-        base64.urlsafe_b64encode(raw.encode("utf-8"))
-        .rstrip(b"=")
-        .decode("ascii")
-    )
+    return base64.urlsafe_b64encode(raw.encode("utf-8")).rstrip(b"=").decode("ascii")
 
 
 def rewrite(body_html: str, *, token: str, base_url: str) -> str:

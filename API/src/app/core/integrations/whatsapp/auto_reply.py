@@ -28,13 +28,14 @@ Variable substitution supports ``{{contact.first_name}}``,
 ``{{contact.full_name}}``, and ``{{org.name}}``. Unknown placeholders
 are left as-is so a typo doesn't render a broken message.
 """
+
 from __future__ import annotations
 
 import logging
 import re
 import uuid
-from datetime import datetime, time, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, time, timedelta
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -76,8 +77,8 @@ _VARIABLE_RE = re.compile(r"\{\{\s*([\w.]+)\s*\}\}")
 def substitute_variables(
     text: str,
     *,
-    contact: Optional[Contact] = None,
-    org: Optional[Organization] = None,
+    contact: Contact | None = None,
+    org: Organization | None = None,
 ) -> str:
     """Replace ``{{contact.first_name}}`` / ``{{contact.full_name}}`` /
     ``{{org.name}}`` placeholders with the contact / org values.
@@ -86,11 +87,9 @@ def substitute_variables(
     if not text:
         return text
 
-    first_name = (
-        (contact.full_name.split(" ", 1)[0] if contact and contact.full_name else "")
-    )
-    full_name = (contact.full_name if contact and contact.full_name else "")
-    org_name = (org.name if org and org.name else "")
+    first_name = contact.full_name.split(" ", 1)[0] if contact and contact.full_name else ""
+    full_name = contact.full_name if contact and contact.full_name else ""
+    org_name = org.name if org and org.name else ""
 
     values: dict[str, str] = {
         "contact.first_name": first_name,
@@ -109,9 +108,9 @@ def substitute_variables(
 
 
 def is_within_business_hours(
-    hours: Optional[list[dict[str, Any]]],
+    hours: list[dict[str, Any]] | None,
     *,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> bool:
     """Return True if `now` falls inside any open interval of the
     operator-configured business hours.
@@ -128,7 +127,7 @@ def is_within_business_hours(
     in the same TZ they read them in."""
     if not hours:
         return True
-    current = now or datetime.now(timezone.utc)
+    current = now or datetime.now(UTC)
     weekday = current.weekday()  # 0=Mon..6=Sun
     current_time = current.time()
     for day in hours:
@@ -184,9 +183,7 @@ async def _recent_auto_reply_exists(
         .where(Message.conversation_id == conversation_id)
         .where(Message.direction == MessageDirection.out)
         .where(Message.sent_at >= cutoff)
-        .where(
-            Message.payload["auto_reply_type"].astext == auto_reply_type
-        )
+        .where(Message.payload["auto_reply_type"].astext == auto_reply_type)
         .limit(1)
     )
     row = (await session.execute(stmt)).scalar_one_or_none()
@@ -197,7 +194,7 @@ async def _is_first_inbound(
     session: AsyncSession,
     *,
     conversation_id: uuid.UUID,
-    excluding_message_id: Optional[uuid.UUID] = None,
+    excluding_message_id: uuid.UUID | None = None,
 ) -> bool:
     """True when the conversation has no prior inbound messages aside
     from the one we just persisted. The just-inserted row is
@@ -238,7 +235,7 @@ async def _send_auto_reply_text(
         text=text,
         attachments=[],
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     sent_at = ref.sent_at or now
     msg = Message(
         org_id=conversation.org_id,
@@ -291,7 +288,7 @@ async def _send_auto_reply_template(
         header_type=template.header_type,
         header_text=template.header_text,
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     sent_at = ref.sent_at or now
     msg = Message(
         org_id=conversation.org_id,
@@ -323,8 +320,8 @@ async def _send_auto_reply_template(
 
 
 async def _resolve_template(
-    session: AsyncSession, template_id: Optional[uuid.UUID]
-) -> Optional[WhatsAppTemplate]:
+    session: AsyncSession, template_id: uuid.UUID | None
+) -> WhatsAppTemplate | None:
     if template_id is None:
         return None
     return (
@@ -367,24 +364,16 @@ async def dispatch_auto_replies(
     if not config.greeting_enabled and not config.away_enabled:
         return fired
 
-    now = datetime.now(timezone.utc)
-    session_state = compute_session_state(
-        conversation.last_customer_message_at, now=now
-    )
+    now = datetime.now(UTC)
+    session_state = compute_session_state(conversation.last_customer_message_at, now=now)
     in_session = session_state["in_session"]
 
     # Resolve contact + org once for variable substitution.
-    contact: Optional[Contact] = None
+    contact: Contact | None = None
     if conversation.contact_id is not None:
-        contact = await data_access.get_contact(
-            session, conversation.contact_id
-        )
+        contact = await data_access.get_contact(session, conversation.contact_id)
     org = (
-        await session.execute(
-            select(Organization).where(
-                Organization.id == conversation.org_id
-            )
-        )
+        await session.execute(select(Organization).where(Organization.id == conversation.org_id))
     ).scalar_one_or_none()
 
     # --- Greeting branch -----------------------------------------------
@@ -415,9 +404,7 @@ async def dispatch_auto_replies(
                     )
                     fired.append("greeting")
                 elif not in_session:
-                    template = await _resolve_template(
-                        session, config.greeting_template_id
-                    )
+                    template = await _resolve_template(session, config.greeting_template_id)
                     if template is not None:
                         await _send_auto_reply_template(
                             session,
@@ -437,9 +424,7 @@ async def dispatch_auto_replies(
             )
 
     # --- Away branch ----------------------------------------------------
-    if config.away_enabled and not is_within_business_hours(
-        config.business_hours, now=now
-    ):
+    if config.away_enabled and not is_within_business_hours(config.business_hours, now=now):
         try:
             cooled = await _recent_auto_reply_exists(
                 session,
@@ -449,9 +434,7 @@ async def dispatch_auto_replies(
             )
             if not cooled:
                 if in_session and config.away_message:
-                    rendered = substitute_variables(
-                        config.away_message, contact=contact, org=org
-                    )
+                    rendered = substitute_variables(config.away_message, contact=contact, org=org)
                     await _send_auto_reply_text(
                         session,
                         config=config,
@@ -461,9 +444,7 @@ async def dispatch_auto_replies(
                     )
                     fired.append("away")
                 elif not in_session:
-                    template = await _resolve_template(
-                        session, config.away_template_id
-                    )
+                    template = await _resolve_template(session, config.away_template_id)
                     if template is not None:
                         await _send_auto_reply_template(
                             session,
@@ -476,9 +457,7 @@ async def dispatch_auto_replies(
         except WhatsAppNotConnected:
             logger.info("auto_reply.away skipped: org not connected")
         except Exception:
-            logger.exception(
-                "auto_reply.away send failed for conv %s", conversation.id
-            )
+            logger.exception("auto_reply.away send failed for conv %s", conversation.id)
 
     return fired
 

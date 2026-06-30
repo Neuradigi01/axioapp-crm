@@ -1,6 +1,8 @@
 import csv
 import os
+
 from sqlalchemy import select
+
 from src.core.db import async_session
 from src.models.location import Country, State
 
@@ -25,7 +27,7 @@ async def seed_countries():
             seen_iso2.add(row[0])
             seen_iso3.add(row[1])
 
-        with open(csv_path, "r", encoding="utf-8") as f:
+        with open(csv_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
                 iso2 = row["iso2"].strip()
@@ -42,17 +44,23 @@ async def seed_countries():
                 seen_iso2.add(iso2)
                 seen_iso3.add(iso3)
 
-                db.add(Country(
-                    id=int(row["id"]),
-                    name=row["name"].strip(),
-                    iso2=iso2,
-                    iso3=iso3,
-                    calling_code=row["calling_code"].strip() if row.get("calling_code") else None,
-                    currency=row["currency"].strip() if row.get("currency") else None,
-                    currency_code=row["currency_code"].strip() if row.get("currency_code") else None,
-                    capital=row["capital"].strip() if row.get("capital") else None,
-                    is_active=row.get("is_active", "true").strip().lower() == "true",
-                ))
+                db.add(
+                    Country(
+                        id=int(row["id"]),
+                        name=row["name"].strip(),
+                        iso2=iso2,
+                        iso3=iso3,
+                        calling_code=row["calling_code"].strip()
+                        if row.get("calling_code")
+                        else None,
+                        currency=row["currency"].strip() if row.get("currency") else None,
+                        currency_code=row["currency_code"].strip()
+                        if row.get("currency_code")
+                        else None,
+                        capital=row["capital"].strip() if row.get("capital") else None,
+                        is_active=row.get("is_active", "true").strip().lower() == "true",
+                    )
+                )
                 created += 1
 
         await db.commit()
@@ -71,18 +79,14 @@ async def seed_states():
         seen = set()
 
         # Load valid country IDs from DB
-        valid_country_ids = set(
-            row[0] for row in (await db.execute(select(Country.id))).all()
-        )
+        valid_country_ids = set(row[0] for row in (await db.execute(select(Country.id))).all())
 
         # Load existing states from DB
-        existing_rows = (await db.execute(
-            select(State.country_id, State.name)
-        )).all()
+        existing_rows = (await db.execute(select(State.country_id, State.name))).all()
         for row in existing_rows:
             seen.add((row[0], row[1]))
 
-        with open(csv_path, "r", encoding="utf-8") as f:
+        with open(csv_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
                 country_id = int(row["country_id"])
@@ -97,14 +101,16 @@ async def seed_states():
                     continue
                 seen.add((country_id, name))
 
-                db.add(State(
-                    id=int(row["srno"]),
-                    country_id=country_id,
-                    name=name,
-                    code=row["code"].strip() if row.get("code") else None,
-                    adm1_code=row["adm1_code"].strip() if row.get("adm1_code") else None,
-                    is_active=row.get("is_active", "true").strip().lower() == "true",
-                ))
+                db.add(
+                    State(
+                        id=int(row["srno"]),
+                        country_id=country_id,
+                        name=name,
+                        code=row["code"].strip() if row.get("code") else None,
+                        adm1_code=row["adm1_code"].strip() if row.get("adm1_code") else None,
+                        is_active=row.get("is_active", "true").strip().lower() == "true",
+                    )
+                )
                 created += 1
 
         await db.commit()

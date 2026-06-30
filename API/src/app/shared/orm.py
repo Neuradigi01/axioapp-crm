@@ -15,6 +15,7 @@ The listener uses `with_loader_criteria(..., include_aliases=True)` so
 the predicate is applied wherever the class appears in a statement —
 including joins and subqueries.
 """
+
 from __future__ import annotations
 
 import uuid

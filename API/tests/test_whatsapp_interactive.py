@@ -12,6 +12,7 @@ Covers:
 
 Pure-Python — no Meta, no DB, no FastAPI TestClient.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -28,7 +29,6 @@ from src.app.core.conversations.schemas import (
     MessageSendPayload,
     ReplyButtonsPayload,
 )
-
 
 _PHONE_ID = "12345"
 _TOKEN = "EAA_test_token"
@@ -65,9 +65,7 @@ def _stub_factory(*, body: dict | None = None):
             calls.append({"url": url, "json": json})
             return httpx.Response(
                 200,
-                json=body
-                if body is not None
-                else {"messages": [{"id": "wamid.interactive"}]},
+                json=body if body is not None else {"messages": [{"id": "wamid.interactive"}]},
             )
 
     factory = lambda: _Client()  # noqa: E731
@@ -271,9 +269,7 @@ class TestSchemaLimits:
             ReplyButtonsPayload(
                 kind="reply_buttons",
                 body="Pick",
-                buttons=[
-                    {"id": f"b{i}", "title": f"T{i}"} for i in range(4)
-                ],
+                buttons=[{"id": f"b{i}", "title": f"T{i}"} for i in range(4)],
             )
 
     def test_overlong_button_title_rejected(self):
@@ -308,10 +304,7 @@ class TestSchemaLimits:
                 sections=[
                     {
                         "title": "S1",
-                        "rows": [
-                            {"id": f"r{i}", "title": f"R{i}"}
-                            for i in range(11)
-                        ],
+                        "rows": [{"id": f"r{i}", "title": f"R{i}"} for i in range(11)],
                     }
                 ],
             )

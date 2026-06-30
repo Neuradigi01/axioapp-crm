@@ -9,12 +9,12 @@ compatibility with the Step-3 callers.
 Google Celery task. Meta's replay (if/when added) lives in
 `meta/dlq.py`.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +27,6 @@ from src.app.core.integrations.models import (
 )
 from src.app.core.integrations.service import get_dlq
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -35,7 +34,7 @@ async def record_dlq(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    integration_id: Optional[uuid.UUID],
+    integration_id: uuid.UUID | None,
     payload: dict,
     error_message: str,
     retries_attempted: int = 0,
@@ -59,7 +58,7 @@ async def replay_dlq(
     session: AsyncSession,
     *,
     dlq_id: uuid.UUID,
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
 ) -> IntegrationDLQ:
     """Re-enqueue a DLQ payload through `process_google_lead`. Marks
     the row as replayed (does NOT delete). Raises 404 if the row is
@@ -83,8 +82,7 @@ async def replay_dlq(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "Original integration was deleted — cannot replay. "
-                "Reconnect the provider first."
+                "Original integration was deleted — cannot replay. Reconnect the provider first."
             ),
         )
 
@@ -92,11 +90,9 @@ async def replay_dlq(
     # dlq → tasks) doesn't fire at module-load time.
     from src.app.core.integrations.google.tasks import process_google_lead
 
-    process_google_lead.delay(
-        str(row.integration_id), row.payload
-    )
+    process_google_lead.delay(str(row.integration_id), row.payload)
 
-    row.replayed_at = datetime.now(timezone.utc)
+    row.replayed_at = datetime.now(UTC)
     row.replayed_by = actor_id
     await session.commit()
     await session.refresh(row)

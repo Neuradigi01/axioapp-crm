@@ -29,15 +29,16 @@ The registry is the same shape as
 string, raise :class:`UnknownResolver` when the key is unknown so a
 typo in the trigger config doesn't silently send nowhere.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any, Awaitable, Callable, Optional
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class UnknownResolver(Exception):
 # Resolver signature — coroutine returning the address string or None.
 Resolver = Callable[
     [AsyncSession, dict[str, Any], dict[str, Any]],
-    Awaitable[Optional[str]],
+    Awaitable[str | None],
 ]
 
 
@@ -76,7 +77,7 @@ async def resolve(
     *,
     payload: dict[str, Any],
     config: dict[str, Any] | None = None,
-) -> Optional[str]:
+) -> str | None:
     """Look up + invoke the resolver. Unknown names raise
     :class:`UnknownResolver`."""
     fn = _resolvers.get(name)
@@ -92,7 +93,7 @@ async def _contact_email(
     session: AsyncSession,
     payload: dict[str, Any],
     _config: dict[str, Any],
-) -> Optional[str]:
+) -> str | None:
     contact = payload.get("contact")
     if isinstance(contact, dict):
         email = contact.get("email")
@@ -114,7 +115,7 @@ async def _contact_phone(
     session: AsyncSession,
     payload: dict[str, Any],
     _config: dict[str, Any],
-) -> Optional[str]:
+) -> str | None:
     contact = payload.get("contact")
     if isinstance(contact, dict):
         phone = contact.get("phone")
@@ -136,7 +137,7 @@ async def _user_email(
     session: AsyncSession,
     payload: dict[str, Any],
     _config: dict[str, Any],
-) -> Optional[str]:
+) -> str | None:
     user = payload.get("user")
     if isinstance(user, dict):
         email = user.get("email")
@@ -158,7 +159,7 @@ async def _custom(
     _session: AsyncSession,
     payload: dict[str, Any],
     config: dict[str, Any],
-) -> Optional[str]:
+) -> str | None:
     path = config.get("path")
     if not isinstance(path, str) or not path:
         return None
@@ -177,31 +178,25 @@ async def _custom(
 
 async def _lookup_contact_field(
     session: AsyncSession, contact_id: uuid.UUID, field: str
-) -> Optional[str]:
+) -> str | None:
     from src.app.core.contacts.models import Contact
 
     column = getattr(Contact, field, None)
     if column is None:
         return None
     row = (
-        await session.execute(
-            select(column).where(Contact.id == contact_id)
-        )
+        await session.execute(select(column).where(Contact.id == contact_id))
     ).scalar_one_or_none()
     if isinstance(row, str) and row.strip():
         return row.strip()
     return None
 
 
-async def _lookup_user_email(
-    session: AsyncSession, user_uuid: uuid.UUID
-) -> Optional[str]:
+async def _lookup_user_email(session: AsyncSession, user_uuid: uuid.UUID) -> str | None:
     from src.app.core.users.models import User
 
     row = (
-        await session.execute(
-            select(User.email).where(User.legacy_uuid == user_uuid)
-        )
+        await session.execute(select(User.email).where(User.legacy_uuid == user_uuid))
     ).scalar_one_or_none()
     if isinstance(row, str) and row.strip():
         return row.strip()

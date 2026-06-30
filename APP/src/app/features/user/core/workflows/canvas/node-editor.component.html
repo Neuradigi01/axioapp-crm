@@ -3,10 +3,7 @@
   <header class="px-4 py-3 border-b border-zinc-200 space-y-2">
     <div class="flex items-center gap-2">
       @if (nodeType()) {
-        <lucide-icon
-          [name]="nodeType()!.icon"
-          class="w-4 h-4 text-zinc-600 shrink-0"
-        ></lucide-icon>
+        <lucide-icon [name]="nodeType()!.icon" class="w-4 h-4 text-zinc-600 shrink-0"></lucide-icon>
       }
       <input
         type="text"
@@ -240,7 +237,8 @@
       @default {
         <p class="text-xs text-zinc-500 italic">
           No editor registered for node type
-          <code>{{ node().type }}</code>.
+          <code>{{ node().type }}</code
+          >.
         </p>
       }
     }

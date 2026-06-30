@@ -15,10 +15,11 @@ Operations grouped by concern:
       user_has_active_membership — User ⋈ OrganizationMember check
         used by the reassign target validator
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import delete, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,13 +29,10 @@ from src.app.core.tasks.models import Task, TaskStatus
 from src.app.core.users.models import OrganizationMember, User
 from src.app.shared.db.pagination import paginate
 
-
 # --- Single-row reads ---------------------------------------------------
 
 
-async def get_task_by_id(
-    session: AsyncSession, task_id: uuid.UUID
-) -> Optional[Task]:
+async def get_task_by_id(session: AsyncSession, task_id: uuid.UUID) -> Task | None:
     """Single-row read by PK. ``None`` on miss (or cross-tenant — the
     ORM filter applies)."""
     result = await session.execute(select(Task).where(Task.id == task_id))
@@ -49,7 +47,7 @@ async def list_tasks_for_entity_query(
     *,
     related_entity_type: str,
     related_entity_id: uuid.UUID,
-    status_filter: Optional[TaskStatus] = None,
+    status_filter: TaskStatus | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Task], int]:
@@ -64,9 +62,7 @@ async def list_tasks_for_entity_query(
         filters.append(Task.status == status_filter)
 
     base = (
-        select(Task)
-        .where(*filters)
-        .order_by(nulls_last(Task.due_at.asc()), Task.created_at.desc())
+        select(Task).where(*filters).order_by(nulls_last(Task.due_at.asc()), Task.created_at.desc())
     )
     return await paginate(session, base, page=page, size=size)
 
@@ -106,9 +102,7 @@ async def bulk_delete_tasks_by_ids(
     """Hard-delete N tasks. Belt + suspenders: ``org_id`` in WHERE
     alongside the per-tenant RLS policy. Returns rowcount; caller
     commits."""
-    result = await session.execute(
-        delete(Task).where(Task.org_id == org_id, Task.id.in_(ids))
-    )
+    result = await session.execute(delete(Task).where(Task.org_id == org_id, Task.id.in_(ids)))
     return int(result.rowcount or 0)
 
 

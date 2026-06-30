@@ -1,16 +1,8 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CanvasNode } from '../canvas-state.service';
-
 
 /**
  * Slack send — diverges from the other channels because the
@@ -18,7 +10,6 @@ import { CanvasNode } from '../canvas-state.service';
  * not a contact recipient. `template_id` still points at a central
  * message template — Slack's bot reads the rendered text + posts it.
  */
-
 
 @Component({
   selector: 'app-send-slack-editor',
@@ -47,6 +38,10 @@ export class SendSlackEditorComponent {
     );
   }
 
-  onTemplateChange(v: string): void { this.configChange.emit({ template_id: v }); }
-  onChannelChange(v: string): void { this.configChange.emit({ slack_channel: v }); }
+  onTemplateChange(v: string): void {
+    this.configChange.emit({ template_id: v });
+  }
+  onChannelChange(v: string): void {
+    this.configChange.emit({ slack_channel: v });
+  }
 }

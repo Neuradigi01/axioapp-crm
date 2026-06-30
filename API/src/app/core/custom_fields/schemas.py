@@ -6,18 +6,17 @@ prompt mandates: lowercase ASCII letter + 1–49 of letters/digits/`_`.
 non-empty strings; that validation lives here so the router rejects
 bad payloads before reaching the service.
 """
+
 from __future__ import annotations
 
 import re
 import uuid
-from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.app.core.custom_fields.models import FieldSource, FieldType
 from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
-
 
 FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{1,49}$")
 _FIELD_KEY_HINT = (
@@ -40,12 +39,8 @@ def _validate_options(field_type: FieldType, options: dict[str, Any] | None) -> 
                 "as a non-empty list of strings"
             )
         choices = options["choices"]
-        if not choices or not all(
-            isinstance(c, str) and c.strip() for c in choices
-        ):
-            raise ValueError(
-                "options.choices must be a non-empty list of non-empty strings"
-            )
+        if not choices or not all(isinstance(c, str) and c.strip() for c in choices):
+            raise ValueError("options.choices must be a non-empty list of non-empty strings")
 
 
 class CustomFieldCreate(BaseModel):
@@ -78,7 +73,7 @@ class CustomFieldCreate(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def _check_options(self) -> "CustomFieldCreate":
+    def _check_options(self) -> CustomFieldCreate:
         _validate_options(self.field_type, self.options)
         return self
 

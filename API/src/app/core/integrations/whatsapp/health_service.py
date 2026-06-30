@@ -26,12 +26,14 @@ Recovery-checklist keys are computed here so the frontend stays dumb:
   * ``name_status_pending`` — Meta hasn't approved the verified name yet
   * ``low_tier``         — tier is TIER_50 or TIER_250 (room to grow)
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import httpx
 from sqlalchemy import select
@@ -82,23 +84,17 @@ async def _fetch_phone_health(
     back verbatim. Throws `WhatsAppNotConnected` mirroring the
     capacity-lookup path so the router maps everything to 409
     consistently."""
-    url = (
-        f"https://graph.facebook.com/{api_version}/{phone_id}"
-        f"?fields={_PHONE_HEALTH_FIELDS}"
-    )
+    url = f"https://graph.facebook.com/{api_version}/{phone_id}?fields={_PHONE_HEALTH_FIELDS}"
     headers = {"Authorization": f"Bearer {token}"}
     async with http_client_factory() as client:
         response = await client.get(url, headers=headers)
     if response.status_code >= 400:
         raise WhatsAppNotConnected(
-            f"Meta API rejected the phone-health lookup: "
-            f"{_extract_meta_error(response)}"
+            f"Meta API rejected the phone-health lookup: {_extract_meta_error(response)}"
         )
     body = response.json()
     if not isinstance(body, dict):
-        raise WhatsAppNotConnected(
-            f"Unexpected Meta response shape: {body!r}"
-        )
+        raise WhatsAppNotConnected(f"Unexpected Meta response shape: {body!r}")
     return body
 
 
@@ -120,11 +116,11 @@ def _extract_meta_error(response: httpx.Response) -> str:
 def _diff_fields(
     *,
     config: WhatsAppAccountConfig,
-    new_quality: Optional[str],
-    new_tier: Optional[str],
-    new_name_status: Optional[str],
-    new_throughput: Optional[int],
-    new_restrictions: Optional[list[dict[str, Any]]],
+    new_quality: str | None,
+    new_tier: str | None,
+    new_name_status: str | None,
+    new_throughput: int | None,
+    new_restrictions: list[dict[str, Any]] | None,
 ) -> list[tuple[WhatsAppPhoneHealthEventType, Any, Any]]:
     """Build the list of (event_type, old, new) tuples for fields
     that actually changed. Returns an empty list when the cached row
@@ -164,12 +160,8 @@ def _diff_fields(
     # operator just needs to know "something changed").
     old_restrictions = config.restrictions or []
     new_list = new_restrictions or []
-    old_types = {
-        r.get("restriction_type") for r in old_restrictions if isinstance(r, dict)
-    }
-    new_types = {
-        r.get("restriction_type") for r in new_list if isinstance(r, dict)
-    }
+    old_types = {r.get("restriction_type") for r in old_restrictions if isinstance(r, dict)}
+    new_types = {r.get("restriction_type") for r in new_list if isinstance(r, dict)}
     if new_types - old_types:
         events.append(
             (
@@ -207,16 +199,12 @@ async def _write_events(
                 phone_id=phone_id,
                 event_type=event_type,
                 old_value=(
-                    {"value": old_value}
-                    if not isinstance(old_value, (list, dict))
-                    else old_value
+                    {"value": old_value} if not isinstance(old_value, (list, dict)) else old_value
                 )
                 if old_value is not None
                 else None,
                 new_value=(
-                    {"value": new_value}
-                    if not isinstance(new_value, (list, dict))
-                    else new_value
+                    {"value": new_value} if not isinstance(new_value, (list, dict)) else new_value
                 )
                 if new_value is not None
                 else None,
@@ -237,10 +225,10 @@ async def _write_events(
 
 def _recovery_keys(
     *,
-    quality_rating: Optional[str],
-    name_status: Optional[str],
+    quality_rating: str | None,
+    name_status: str | None,
     restrictions: list[dict[str, Any]],
-    tier: Optional[str],
+    tier: str | None,
 ) -> list[str]:
     """Operator-actionable hint keys for the UI. The frontend renders
     a fixed copy block per key; we only decide which to show."""
@@ -272,14 +260,11 @@ async def refresh_from_meta(
     bundle = await get_active_config(session)
     if bundle is None:
         raise WhatsAppNotConnected(
-            "WhatsApp is not connected for this org. "
-            "Connect it in Settings → Integrations."
+            "WhatsApp is not connected for this org. Connect it in Settings → Integrations."
         )
     integration, config = bundle
     if integration.access_token_enc is None:
-        raise WhatsAppNotConnected(
-            "Stored credentials are missing; reconnect required."
-        )
+        raise WhatsAppNotConnected("Stored credentials are missing; reconnect required.")
     token = decrypt(integration.access_token_enc)
 
     payload = await _fetch_phone_health(
@@ -289,13 +274,11 @@ async def refresh_from_meta(
         http_client_factory=http_client_factory,
     )
 
-    new_quality = (
-        str(payload.get("quality_rating") or "").upper() or None
-    )
+    new_quality = str(payload.get("quality_rating") or "").upper() or None
     new_tier = payload.get("messaging_limit_tier") or None
     new_name_status = payload.get("name_status") or None
     raw_throughput = payload.get("throughput")
-    new_throughput: Optional[int] = None
+    new_throughput: int | None = None
     if isinstance(raw_throughput, dict):
         level = raw_throughput.get("level")
         if isinstance(level, int):
@@ -316,7 +299,7 @@ async def refresh_from_meta(
         new_restrictions=new_restrictions,
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if new_quality:
         config.quality_rating = new_quality
     if new_tier:
@@ -348,9 +331,9 @@ async def apply_webhook_quality_event(
     *,
     org_id: uuid.UUID,
     phone_id: str,
-    new_quality: Optional[str],
-    new_tier: Optional[str],
-    occurred_at: Optional[datetime] = None,
+    new_quality: str | None,
+    new_tier: str | None,
+    occurred_at: datetime | None = None,
 ) -> bool:
     """Handle a ``phone_number_quality_update`` webhook event.
 
@@ -385,7 +368,7 @@ async def apply_webhook_quality_event(
     if not diff:
         return False
 
-    timestamp = occurred_at or datetime.now(timezone.utc)
+    timestamp = occurred_at or datetime.now(UTC)
     if new_quality:
         config.quality_rating = new_quality.upper()
     if new_tier:
@@ -416,8 +399,7 @@ async def get_phone_health(
     bundle = await get_active_config(session)
     if bundle is None:
         raise WhatsAppNotConnected(
-            "WhatsApp is not connected for this org. "
-            "Connect it in Settings → Integrations."
+            "WhatsApp is not connected for this org. Connect it in Settings → Integrations."
         )
     integration, config = bundle
 
@@ -436,7 +418,7 @@ async def get_phone_health(
         remaining = 0
         usage_percent = 0
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=timeline_days)
+    cutoff = datetime.now(UTC) - timedelta(days=timeline_days)
     events_rows = (
         (
             await session.execute(
@@ -446,7 +428,9 @@ async def get_phone_health(
                 .order_by(WhatsAppPhoneHealthEvent.occurred_at.asc())
                 .limit(500)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
     return {

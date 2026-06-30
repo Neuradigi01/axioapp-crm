@@ -15,9 +15,10 @@ literally cannot reach the caller.
 
 `http_client` is injectable for tests; production callers pass
 `None` and get a fresh httpx client per call (cheap)."""
+
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from fastapi import HTTPException, status
@@ -25,7 +26,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.email import service as email_service
 from src.app.core.email.models import EmailAccount, EmailAccountSyncState
-
 
 _API_BASE = "https://gmail.googleapis.com/gmail/v1"
 _HTTP_TIMEOUT = 30.0
@@ -54,15 +54,12 @@ class GmailClient:
         *,
         account: EmailAccount,
         session: AsyncSession,
-        http_client: Optional[httpx.AsyncClient] = None,
+        http_client: httpx.AsyncClient | None = None,
     ) -> None:
         if account.sync_state == EmailAccountSyncState.disconnected:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"email_account {account.id} is disconnected — "
-                    "reconnect required."
-                ),
+                detail=(f"email_account {account.id} is disconnected — reconnect required."),
             )
         self._account = account
         self._session = session
@@ -73,8 +70,8 @@ class GmailClient:
     async def list_messages(
         self,
         *,
-        q: Optional[str] = None,
-        page_token: Optional[str] = None,
+        q: str | None = None,
+        page_token: str | None = None,
         max_results: int = 100,
     ) -> dict:
         """`users.messages.list` — used by backfill. `q` is the Gmail
@@ -87,9 +84,7 @@ class GmailClient:
             params["pageToken"] = page_token
         return await self._get("/users/me/messages", params=params)
 
-    async def get_message(
-        self, message_id: str, *, format: str = "metadata"
-    ) -> dict:
+    async def get_message(self, message_id: str, *, format: str = "metadata") -> dict:
         """`users.messages.get` — `format` is one of `minimal`,
         `metadata` (headers only), `full` (parsed payload), or `raw`
         (base64url-encoded MIME). Backfill uses `metadata` first to
@@ -109,16 +104,14 @@ class GmailClient:
                 "In-Reply-To",
                 "References",
             ]
-        return await self._get(
-            f"/users/me/messages/{message_id}", params=params
-        )
+        return await self._get(f"/users/me/messages/{message_id}", params=params)
 
     async def list_history(
         self,
         *,
         start_history_id: str,
-        page_token: Optional[str] = None,
-        history_types: Optional[list[str]] = None,
+        page_token: str | None = None,
+        history_types: list[str] | None = None,
     ) -> dict:
         """`users.history.list` — incremental sync. Each event in
         `.history` is `{messagesAdded, messagesDeleted, ...}`.
@@ -134,7 +127,7 @@ class GmailClient:
         self,
         *,
         raw_b64url: str,
-        thread_id: Optional[str] = None,
+        thread_id: str | None = None,
     ) -> dict:
         """`users.messages.send` — `raw_b64url` is the message MIME
         encoded as URL-safe base64 (no padding). Returns
@@ -163,9 +156,7 @@ class GmailClient:
 
     # --- private -------------------------------------------------------
 
-    async def _get(
-        self, path: str, *, params: Optional[dict] = None
-    ) -> dict:
+    async def _get(self, path: str, *, params: dict | None = None) -> dict:
         return await self._request("GET", path, params=params)
 
     async def _post(
@@ -175,17 +166,15 @@ class GmailClient:
         json: dict,
         expect_json: bool = True,
     ) -> dict:
-        return await self._request(
-            "POST", path, json=json, expect_json=expect_json
-        )
+        return await self._request("POST", path, json=json, expect_json=expect_json)
 
     async def _request(
         self,
         method: str,
         path: str,
         *,
-        params: Optional[dict] = None,
-        json: Optional[dict] = None,
+        params: dict | None = None,
+        json: dict | None = None,
         expect_json: bool = True,
     ) -> dict:
         access_token = await self._access_token()
@@ -200,9 +189,7 @@ class GmailClient:
                     method, url, headers=headers, params=params, json=json
                 )
             else:
-                async with httpx.AsyncClient(
-                    timeout=_HTTP_TIMEOUT
-                ) as client:
+                async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
                     response = await client.request(
                         method,
                         url,
@@ -228,9 +215,7 @@ class GmailClient:
 
     async def _access_token(self) -> str:
         """Refresh-if-expired, then decrypt + return plaintext."""
-        tokens = await email_service.refresh_if_expired(
-            self._session, account=self._account
-        )
+        tokens = await email_service.refresh_if_expired(self._session, account=self._account)
         return tokens.access_token
 
 

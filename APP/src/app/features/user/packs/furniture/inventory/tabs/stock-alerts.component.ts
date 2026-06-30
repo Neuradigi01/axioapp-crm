@@ -12,11 +12,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { forkJoin } from 'rxjs';
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  InventoryApiService,
-  InventoryItem,
-  StockAlert,
-} from '../inventory-api.service';
+import { InventoryApiService, InventoryItem, StockAlert } from '../inventory-api.service';
 
 /**
  * Stock Alerts tab.
@@ -154,15 +150,11 @@ export class StockAlertsTabComponent {
           this.busyAlertId.set(null);
           this.modalTarget.set(null);
           // Drop the now-ordered alert from the open list.
-          this.rows.update((rows) =>
-            rows.filter((r) => r.alert.id !== updated.id),
-          );
+          this.rows.update((rows) => rows.filter((r) => r.alert.id !== updated.id));
         },
         error: (err: HttpErrorResponse) => {
           this.busyAlertId.set(null);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not mark alert as ordered.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not mark alert as ordered.');
         },
       });
   }
@@ -179,15 +171,11 @@ export class StockAlertsTabComponent {
       .subscribe({
         next: () => {
           this.busyAlertId.set(null);
-          this.rows.update((rows) =>
-            rows.filter((r) => r.alert.id !== row.alert.id),
-          );
+          this.rows.update((rows) => rows.filter((r) => r.alert.id !== row.alert.id));
         },
         error: (err: HttpErrorResponse) => {
           this.busyAlertId.set(null);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not close alert.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not close alert.');
         },
       });
   }
@@ -232,5 +220,4 @@ export class StockAlertsTabComponent {
         },
       });
   }
-
 }

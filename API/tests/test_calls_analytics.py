@@ -4,10 +4,11 @@ Seeds a handful of calls across two outcomes and two days, then asserts
 that all three chart-ready arrays (outcomes / daily / direction) are
 correctly populated and date-windowed.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -28,9 +29,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -66,9 +65,7 @@ async def _seed_calls(org_id: uuid.UUID) -> dict[str, uuid.UUID]:
 
         # Anchor "today" at 12:00 UTC so neither end of the window
         # straddles a date boundary.
-        today = datetime.now(timezone.utc).replace(
-            hour=12, minute=0, second=0, microsecond=0
-        )
+        today = datetime.now(UTC).replace(hour=12, minute=0, second=0, microsecond=0)
         day_minus_1 = today - timedelta(days=1)
         day_minus_2 = today - timedelta(days=2)
 
@@ -129,7 +126,7 @@ async def test_analytics_returns_three_arrays(layered_client, seeded_admin):
 
     outcomes = await _seed_calls(org.id)
 
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     frm = (today - timedelta(days=3)).isoformat()
     to = today.isoformat()
 
@@ -168,9 +165,7 @@ async def test_analytics_returns_three_arrays(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_analytics_window_filters_out_of_range(
-    layered_client, seeded_admin
-):
+async def test_analytics_window_filters_out_of_range(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "calls.read")
@@ -182,7 +177,7 @@ async def test_analytics_window_filters_out_of_range(
     )
     await _seed_calls(org.id)
 
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     # Far in the past — nothing should match.
     frm = (today - timedelta(days=100)).isoformat()
     to = (today - timedelta(days=50)).isoformat()
@@ -198,9 +193,7 @@ async def test_analytics_window_filters_out_of_range(
 
 
 @pytest.mark.asyncio
-async def test_analytics_inverted_window_returns_400(
-    layered_client, seeded_admin
-):
+async def test_analytics_inverted_window_returns_400(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "calls.read")

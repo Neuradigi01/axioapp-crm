@@ -13,10 +13,10 @@ FastAPI's path-router treats "me" / "all" as literal segments, not as
 UUIDs. Reads need `tasks.read`; the org-wide `/all` additionally needs
 `users.read`. Writes need `tasks.write`. Tenant scoping is automatic.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,16 +53,15 @@ from src.app.core.tasks.service import (
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 
 @router.get("/me", response_model=TaskListResponse)
 async def my_tasks(
-    status_filter: Optional[TaskStatus] = Query(default=None, alias="status"),
-    priority: Optional[TaskPriority] = Query(default=None),
-    q: Optional[str] = Query(default=None, min_length=1, max_length=255),
-    due_filter: Optional[DueFilter] = Query(default=None),
+    status_filter: TaskStatus | None = Query(default=None, alias="status"),
+    priority: TaskPriority | None = Query(default=None),
+    q: str | None = Query(default=None, min_length=1, max_length=255),
+    due_filter: DueFilter | None = Query(default=None),
     sort_by: SortBy = Query(default="due_at"),
     sort_dir: SortDir = Query(default="asc"),
     page: int = Query(1, ge=1),
@@ -92,11 +91,11 @@ async def my_tasks(
 
 @router.get("/all", response_model=TaskListResponse)
 async def all_tasks(
-    status_filter: Optional[TaskStatus] = Query(default=None, alias="status"),
-    priority: Optional[TaskPriority] = Query(default=None),
-    assigned_to_id: Optional[uuid.UUID] = Query(default=None),
-    q: Optional[str] = Query(default=None, min_length=1, max_length=255),
-    due_filter: Optional[DueFilter] = Query(default=None),
+    status_filter: TaskStatus | None = Query(default=None, alias="status"),
+    priority: TaskPriority | None = Query(default=None),
+    assigned_to_id: uuid.UUID | None = Query(default=None),
+    q: str | None = Query(default=None, min_length=1, max_length=255),
+    due_filter: DueFilter | None = Query(default=None),
     sort_by: SortBy = Query(default="due_at"),
     sort_dir: SortDir = Query(default="asc"),
     page: int = Query(1, ge=1),
@@ -129,7 +128,7 @@ async def all_tasks(
 async def list_tasks_endpoint(
     related_entity_type: str = Query(..., min_length=1, max_length=64),
     related_entity_id: uuid.UUID = Query(...),
-    status_filter: Optional[TaskStatus] = Query(default=None, alias="status"),
+    status_filter: TaskStatus | None = Query(default=None, alias="status"),
     page: int = Query(1, ge=1),
     size: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -193,9 +192,7 @@ async def bulk_mark_done_tasks_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("tasks.write")),
 ) -> TaskBulkMarkDoneResult:
-    done, skipped = await bulk_mark_done_tasks(
-        db, ids=payload.ids, org_id=user.org_id
-    )
+    done, skipped = await bulk_mark_done_tasks(db, ids=payload.ids, org_id=user.org_id)
     return TaskBulkMarkDoneResult(done=done, skipped=skipped)
 
 
@@ -205,9 +202,7 @@ async def bulk_delete_tasks_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("tasks.write")),
 ) -> TaskBulkDeleteResult:
-    n = await bulk_delete_tasks(
-        db, ids=payload.ids, org_id=user.org_id
-    )
+    n = await bulk_delete_tasks(db, ids=payload.ids, org_id=user.org_id)
     return TaskBulkDeleteResult(deleted=n)
 
 
@@ -219,9 +214,7 @@ async def get_task_endpoint(
 ) -> TaskOut:
     task = await get_task(db, task_id)
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="task not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="task not found")
     return TaskOut.model_validate(task)
 
 

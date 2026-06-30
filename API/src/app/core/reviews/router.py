@@ -12,10 +12,10 @@
 Reads need `reviews.read`; mutations need `reviews.write`. Tenant
 scoping is automatic via the ORM filter on `TenantScoped`.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,7 +44,6 @@ from src.app.core.reviews.service import (
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
 
@@ -60,9 +59,9 @@ async def stats_endpoint(
 
 @router.get("", response_model=ReviewListResponse)
 async def list_endpoint(
-    source: Optional[str] = Query(default=None, max_length=32),
-    rating: Optional[int] = Query(default=None, ge=1, le=5),
-    status_: Optional[ReviewStatus] = Query(default=None, alias="status"),
+    source: str | None = Query(default=None, max_length=32),
+    rating: int | None = Query(default=None, ge=1, le=5),
+    status_: ReviewStatus | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -84,17 +83,13 @@ async def list_endpoint(
     )
 
 
-@router.post(
-    "", response_model=ReviewOut, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=ReviewOut, status_code=status.HTTP_201_CREATED)
 async def create_endpoint(
     payload: ReviewCreate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("reviews.write")),
 ) -> ReviewOut:
-    review = await create_review(
-        db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload
-    )
+    review = await create_review(db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload)
     return ReviewOut.model_validate(review)
 
 

@@ -19,10 +19,7 @@ import {
   AppointmentsApiService,
 } from '../../../core/appointments/appointments-api.service';
 import { ContactsApiService } from '../../../core/contacts/contacts-api.service';
-import {
-  FieldOpsApiService,
-  FieldVisit,
-} from './field-ops-api.service';
+import { FieldOpsApiService, FieldVisit } from './field-ops-api.service';
 import { ScheduleVisitModalComponent } from './schedule-visit-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { purposeBadgeClass } from '@core/services/badge.util';
@@ -84,8 +81,7 @@ export class FieldOpsPageComponent {
       const apptKey = this.dayKey(new Date(appt.scheduled_at));
       if (filt === 'today') return apptKey === todayKey;
       // upcoming: future days only (today's open ones live in `today`)
-      return new Date(appt.scheduled_at).getTime() > Date.now()
-        && apptKey !== todayKey;
+      return new Date(appt.scheduled_at).getTime() > Date.now() && apptKey !== todayKey;
     });
 
     return filtered.sort((a, b) => {
@@ -113,8 +109,7 @@ export class FieldOpsPageComponent {
       }
       const apptKey = this.dayKey(new Date(appt.scheduled_at));
       if (apptKey === todayKey) today += 1;
-      else if (new Date(appt.scheduled_at).getTime() > Date.now())
-        upcoming += 1;
+      else if (new Date(appt.scheduled_at).getTime() > Date.now()) upcoming += 1;
     }
     return { today, upcoming, completed };
   });
@@ -133,9 +128,7 @@ export class FieldOpsPageComponent {
 
     effect(() => {
       const apptIdx = this.appointmentsById();
-      const contactIds = new Set(
-        Object.values(apptIdx).map((a) => a.contact_id),
-      );
+      const contactIds = new Set(Object.values(apptIdx).map((a) => a.contact_id));
       const cache = this.contactsById();
       const missing = [...contactIds].filter((id) => !cache[id]);
       if (missing.length > 0) this.fetchContacts(missing);
@@ -174,9 +167,7 @@ export class FieldOpsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.visits.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load field visits.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load field visits.');
         },
       });
   }
@@ -197,7 +188,6 @@ export class FieldOpsPageComponent {
     });
   }
 
-
   protected contactName(id: string): string {
     return this.contactsById()[id]?.full_name ?? 'Unknown';
   }
@@ -211,11 +201,7 @@ export class FieldOpsPageComponent {
   }
 
   private fetchAppointments(ids: string[]): void {
-    forkJoin(
-      ids.map((id) =>
-        this.appointmentsApi.get(id).pipe(catchError(() => of(null))),
-      ),
-    )
+    forkJoin(ids.map((id) => this.appointmentsApi.get(id).pipe(catchError(() => of(null)))))
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((rows) => {
         this.appointmentsById.update((cache) => {
@@ -227,11 +213,7 @@ export class FieldOpsPageComponent {
   }
 
   private fetchContacts(ids: string[]): void {
-    forkJoin(
-      ids.map((id) =>
-        this.contactsApi.get(id).pipe(catchError(() => of(null))),
-      ),
-    )
+    forkJoin(ids.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((rows) => {
         this.contactsById.update((cache) => {
@@ -249,5 +231,4 @@ export class FieldOpsPageComponent {
         });
       });
   }
-
 }

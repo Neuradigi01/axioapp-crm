@@ -12,6 +12,7 @@ Covers:
     dependency (the registry resolves to the stub without a config
     table).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -36,7 +37,6 @@ from src.app.core.templates.sms_extension import (
 )
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -47,10 +47,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {"id": str(org_id), "name": "Demo", "slug": f"demo-{org_id.hex[:6]}"},
     )
     await test_db.commit()
@@ -100,13 +97,9 @@ def test_sms_dlt_template_status_values_are_stable():
 # --- DAL + service round-trip ------------------------------------------
 
 
-async def test_get_dlt_metadata_returns_none_for_fresh_template(
-    test_db, org_id
-):
+async def test_get_dlt_metadata_returns_none_for_fresh_template(test_db, org_id):
     template = await _make_sms_template(test_db, org_id=org_id)
-    out = await sms_extension.get_dlt_metadata(
-        test_db, org_id=org_id, template_id=template.id
-    )
+    out = await sms_extension.get_dlt_metadata(test_db, org_id=org_id, template_id=template.id)
     assert out is None
 
 

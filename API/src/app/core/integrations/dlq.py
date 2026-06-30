@@ -10,10 +10,11 @@ Always commits — callers are Celery workers with no other
 transactional work to bundle. Emits `integration.webhook.dlq` so an
 operator can grep `audit_logs` for delivery-failure spikes.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,7 +30,7 @@ async def record_dlq(
     *,
     provider: IntegrationProvider,
     org_id: uuid.UUID,
-    integration_id: Optional[uuid.UUID],
+    integration_id: uuid.UUID | None,
     payload: dict[str, Any],
     error_message: str,
     retries_attempted: int = 0,
@@ -55,9 +56,7 @@ async def record_dlq(
         entity_id=row.id,
         after={
             "provider": provider.value,
-            "integration_id": (
-                str(integration_id) if integration_id else None
-            ),
+            "integration_id": (str(integration_id) if integration_id else None),
             "error_message": error_message[:500],
             "retries_attempted": retries_attempted,
         },

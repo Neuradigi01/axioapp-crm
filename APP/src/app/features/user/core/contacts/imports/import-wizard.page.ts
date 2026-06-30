@@ -57,9 +57,7 @@ const FIELD_TARGETS: FieldTargetOption[] = [
   { value: 'tag', label: 'Tag' },
 ];
 
-const VALID_TARGET_SET = new Set<ContactFieldTarget>(
-  FIELD_TARGETS.map((t) => t.value),
-);
+const VALID_TARGET_SET = new Set<ContactFieldTarget>(FIELD_TARGETS.map((t) => t.value));
 
 const ACCEPT_EXTENSIONS = ['.xlsx', '.csv'] as const;
 
@@ -160,12 +158,7 @@ export class ContactImportWizardPageComponent {
 
   protected readonly canCommit = computed(() => {
     const dr = this.dryRunResult();
-    return (
-      dr !== null &&
-      dr.will_insert > 0 &&
-      !this.committing() &&
-      !this.groupNameRequired()
-    );
+    return dr !== null && dr.will_insert > 0 && !this.committing() && !this.groupNameRequired();
   });
 
   protected readonly visibleErrors = computed(() => {
@@ -231,8 +224,7 @@ export class ContactImportWizardPageComponent {
         error: (err: HttpErrorResponse) => {
           this.uploading.set(false);
           this.uploadError.set(
-            extractApiError(err) ??
-              'Upload failed — please try again or check the file format.',
+            extractApiError(err) ?? 'Upload failed — please try again or check the file format.',
           );
         },
       });
@@ -257,8 +249,7 @@ export class ContactImportWizardPageComponent {
   // --- Step 2 handlers ------------------------------------------------
 
   protected onMappingChange(column: string, event: Event): void {
-    const value = (event.target as HTMLSelectElement)
-      .value as ContactFieldTarget;
+    const value = (event.target as HTMLSelectElement).value as ContactFieldTarget;
     this.mapping.update((m) => ({ ...m, [column]: value }));
   }
 
@@ -296,9 +287,7 @@ export class ContactImportWizardPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.dryRunRunning.set(false);
-          this.dryRunError.set(
-            extractApiError(err) ?? 'Could not preview the import.',
-          );
+          this.dryRunError.set(extractApiError(err) ?? 'Could not preview the import.');
         },
       });
   }
@@ -329,9 +318,7 @@ export class ContactImportWizardPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.committing.set(false);
-          this.commitError.set(
-            extractApiError(err) ?? 'Could not commit the import.',
-          );
+          this.commitError.set(extractApiError(err) ?? 'Could not commit the import.');
         },
       });
   }

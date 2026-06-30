@@ -63,7 +63,6 @@ const STATUS_OPTIONS: Array<{
   { value: 'archived', label: 'Archived' },
 ];
 
-
 @Component({
   selector: 'app-templates-page',
   standalone: true,
@@ -102,17 +101,11 @@ export class TemplatesPageComponent {
   // Debounced version of `searchQuery` — what actually drives the API.
   protected readonly debouncedSearch = signal<string>('');
 
-  protected readonly canWrite = computed(() =>
-    this.auth.hasPermission('templates.write'),
-  );
+  protected readonly canWrite = computed(() => this.auth.hasPermission('templates.write'));
 
-  protected readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.total() / PAGE_SIZE)),
-  );
+  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / PAGE_SIZE)));
   protected readonly hasPrev = computed(() => this.pageIndex() > 0);
-  protected readonly hasNext = computed(
-    () => this.pageIndex() < this.totalPages() - 1,
-  );
+  protected readonly hasNext = computed(() => this.pageIndex() < this.totalPages() - 1);
 
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -198,9 +191,7 @@ export class TemplatesPageComponent {
           this.items.set([]);
           this.total.set(0);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load templates.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load templates.');
         },
       });
   }

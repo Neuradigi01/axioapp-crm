@@ -25,18 +25,8 @@ export type WorkflowRunStatus =
   | 'paused'
   | 'canceled'
   | 'errored';
-export type WorkflowRunOutcome =
-  | 'goal_reached'
-  | 'completed'
-  | 'canceled'
-  | 'errored'
-  | null;
-export type WorkflowStepRunStatus =
-  | 'pending'
-  | 'running'
-  | 'completed'
-  | 'skipped'
-  | 'errored';
+export type WorkflowRunOutcome = 'goal_reached' | 'completed' | 'canceled' | 'errored' | null;
+export type WorkflowStepRunStatus = 'pending' | 'running' | 'completed' | 'skipped' | 'errored';
 
 /** Loose graph type at Step 13 — Step 14 + 15 tighten to typed node shapes
  *  when the canvas + node editor ship. */
@@ -284,6 +274,7 @@ export interface WorkflowImportRequest {
   name?: string | null;
 }
 
+<<<<<<< HEAD
 // --- Step 18: A/B testing ---------------------------------------------
 
 export type ABWinnerMetric =
@@ -318,6 +309,8 @@ export interface ABStatsResponse {
 }
 
 
+=======
+>>>>>>> ca72f6424858470152dfc533fa19615166225bb0
 @Injectable({ providedIn: 'root' })
 export class WorkflowsApiService {
   private readonly http = inject(HttpClient);
@@ -365,32 +358,21 @@ export class WorkflowsApiService {
     return this.http.post<WorkflowRead>(`${this.base}/${id}/clone`, { name });
   }
 
-  testFire(
-    id: string,
-    payload: WorkflowTestFireRequest,
-  ): Observable<WorkflowTestFireResponse> {
-    return this.http.post<WorkflowTestFireResponse>(
-      `${this.base}/${id}/test-fire`,
-      payload,
-    );
+  testFire(id: string, payload: WorkflowTestFireRequest): Observable<WorkflowTestFireResponse> {
+    return this.http.post<WorkflowTestFireResponse>(`${this.base}/${id}/test-fire`, payload);
   }
 
   // --- Step 16: gallery + clone-from-gallery -----------------------
 
   listGallery(): Observable<WorkflowGalleryListResponse> {
-    return this.http.get<WorkflowGalleryListResponse>(
-      `${this.base}/gallery`,
-    );
+    return this.http.get<WorkflowGalleryListResponse>(`${this.base}/gallery`);
   }
 
   cloneFromGallery(
     templateId: string,
     payload: WorkflowGalleryCloneRequest,
   ): Observable<WorkflowRead> {
-    return this.http.post<WorkflowRead>(
-      `${this.base}/gallery/${templateId}/clone`,
-      payload,
-    );
+    return this.http.post<WorkflowRead>(`${this.base}/gallery/${templateId}/clone`, payload);
   }
 
   // --- Step 17: version history + rollback + import / export ---------
@@ -403,40 +385,24 @@ export class WorkflowsApiService {
       limit: query.limit,
       offset: query.offset,
     });
-    return this.http.get<WorkflowVersionListResponse>(
-      `${this.base}/${workflowId}/versions`,
-      { params },
-    );
+    return this.http.get<WorkflowVersionListResponse>(`${this.base}/${workflowId}/versions`, {
+      params,
+    });
   }
 
-  getVersion(
-    workflowId: string,
-    version: number,
-  ): Observable<WorkflowVersionDetail> {
-    return this.http.get<WorkflowVersionDetail>(
-      `${this.base}/${workflowId}/versions/${version}`,
-    );
+  getVersion(workflowId: string, version: number): Observable<WorkflowVersionDetail> {
+    return this.http.get<WorkflowVersionDetail>(`${this.base}/${workflowId}/versions/${version}`);
   }
 
-  rollback(
-    workflowId: string,
-    payload: WorkflowRollbackRequest,
-  ): Observable<WorkflowRead> {
-    return this.http.post<WorkflowRead>(
-      `${this.base}/${workflowId}/rollback`,
-      payload,
-    );
+  rollback(workflowId: string, payload: WorkflowRollbackRequest): Observable<WorkflowRead> {
+    return this.http.post<WorkflowRead>(`${this.base}/${workflowId}/rollback`, payload);
   }
 
   exportWorkflow(workflowId: string): Observable<WorkflowExportBody> {
-    return this.http.get<WorkflowExportBody>(
-      `${this.base}/${workflowId}/export`,
-    );
+    return this.http.get<WorkflowExportBody>(`${this.base}/${workflowId}/export`);
   }
 
-  importWorkflow(
-    payload: WorkflowImportRequest,
-  ): Observable<WorkflowRead> {
+  importWorkflow(payload: WorkflowImportRequest): Observable<WorkflowRead> {
     return this.http.post<WorkflowRead>(`${this.base}/import`, payload);
   }
 
@@ -471,20 +437,12 @@ export class WorkflowsApiService {
     return this.http.get<WorkflowFolder[]>(`${this.base}/folders`);
   }
 
-  createFolder(
-    payload: WorkflowFolderCreatePayload,
-  ): Observable<WorkflowFolder> {
+  createFolder(payload: WorkflowFolderCreatePayload): Observable<WorkflowFolder> {
     return this.http.post<WorkflowFolder>(`${this.base}/folders`, payload);
   }
 
-  patchFolder(
-    id: string,
-    payload: WorkflowFolderUpdatePayload,
-  ): Observable<WorkflowFolder> {
-    return this.http.patch<WorkflowFolder>(
-      `${this.base}/folders/${id}`,
-      payload,
-    );
+  patchFolder(id: string, payload: WorkflowFolderUpdatePayload): Observable<WorkflowFolder> {
+    return this.http.patch<WorkflowFolder>(`${this.base}/folders/${id}`, payload);
   }
 
   deleteFolder(id: string): Observable<void> {
@@ -503,10 +461,7 @@ export class WorkflowsApiService {
       limit: query.limit,
       offset: query.offset,
     });
-    return this.http.get<WorkflowRunListResponse>(
-      `${this.base}/${workflowId}/runs`,
-      { params },
-    );
+    return this.http.get<WorkflowRunListResponse>(`${this.base}/${workflowId}/runs`, { params });
   }
 
   getRun(runId: string): Observable<WorkflowRunRead> {
@@ -514,8 +469,6 @@ export class WorkflowsApiService {
   }
 
   listRunSteps(runId: string): Observable<WorkflowStepRunRead[]> {
-    return this.http.get<WorkflowStepRunRead[]>(
-      `${this.base}/runs/${runId}/steps`,
-    );
+    return this.http.get<WorkflowStepRunRead[]>(`${this.base}/runs/${runId}/steps`);
   }
 }

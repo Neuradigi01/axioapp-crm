@@ -27,7 +27,9 @@
     <section class="mt-4 rounded-lg bg-white p-6 shadow-sm ring-1 ring-zinc-200">
       <div class="flex items-start justify-between gap-4">
         <div class="flex items-start gap-4">
-          <span class="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-base font-semibold text-white">
+          <span
+            class="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-base font-semibold text-white"
+          >
             {{ initials(headerTitle()) }}
           </span>
           <div>
@@ -48,18 +50,29 @@
                 <dt class="font-medium text-zinc-500">Status</dt>
                 <dd>
                   @if (l.status === 'won') {
-                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">Won</span>
+                    <span
+                      class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+                      >Won</span
+                    >
                   } @else if (l.status === 'lost') {
-                    <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200">Lost</span>
+                    <span
+                      class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
+                      >Lost</span
+                    >
                   } @else {
-                    <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-200">Active</span>
+                    <span
+                      class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-200"
+                      >Active</span
+                    >
                   }
                 </dd>
               </div>
               <div class="flex items-center gap-1">
                 <dt class="font-medium text-zinc-500">Source</dt>
                 <dd>
-                  <span class="inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200">
+                  <span
+                    class="inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                  >
                     {{ l.source }}
                   </span>
                 </dd>
@@ -134,18 +147,13 @@
       @switch (activeTab()) {
         @case ('tasks') {
           <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-            <app-tasks-panel
-              [entityType]="'lead'"
-              [entityId]="l.id"
-            />
+            <app-tasks-panel [entityType]="'lead'" [entityId]="l.id" />
           </div>
         }
         @case ('activities') {
           <div class="space-y-6">
             <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-              <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                Add note
-              </h2>
+              <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Add note</h2>
               <div class="mt-3">
                 <app-add-note
                   [entityType]="'lead'"
@@ -155,14 +163,9 @@
               </div>
             </div>
             <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-              <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                Timeline
-              </h2>
+              <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Timeline</h2>
               <div class="mt-3">
-                <app-activity-timeline
-                  [entityType]="'lead'"
-                  [entityId]="l.id"
-                />
+                <app-activity-timeline [entityType]="'lead'" [entityId]="l.id" />
               </div>
             </div>
           </div>
@@ -233,9 +236,7 @@
               </div>
 
               <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-                <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  Custom
-                </h2>
+                <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Custom</h2>
                 @if (customFields().length === 0) {
                   <p class="mt-3 text-xs text-zinc-500">No custom fields defined.</p>
                 } @else {
@@ -254,13 +255,13 @@
             <!-- Right column: Linked contact card + Source attribution. -->
             <aside class="space-y-4">
               <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-                <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  Contact
-                </h2>
+                <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contact</h2>
                 @if (contact(); as c) {
                   <div class="mt-3">
                     <div class="flex items-center gap-3">
-                      <span class="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                      <span
+                        class="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white"
+                      >
                         {{ initials(c.full_name) }}
                       </span>
                       <div class="min-w-0 flex-1">
@@ -347,7 +348,9 @@
           </div>
         }
         @default {
-          <div class="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-6 py-10 text-center text-sm text-zinc-500">
+          <div
+            class="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-6 py-10 text-center text-sm text-zinc-500"
+          >
             @if (placeholderForActiveTab() === 'later') {
               Coming in a future step.
             } @else {

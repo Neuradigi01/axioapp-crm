@@ -1,11 +1,4 @@
-import {
-  DestroyRef,
-  Injectable,
-  computed,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
+import { DestroyRef, Injectable, computed, effect, inject, signal } from '@angular/core';
 
 import { BillingApiService } from './billing-api.service';
 import { SubscriptionCurrent } from '../types/subscription.types';
@@ -102,10 +95,7 @@ export class SubscriptionStateService {
 
   private startTrialPoll(): void {
     if (this.pollHandle !== null) return;
-    this.pollHandle = setInterval(
-      () => this.refresh(),
-      TRIAL_POLL_INTERVAL_MS,
-    );
+    this.pollHandle = setInterval(() => this.refresh(), TRIAL_POLL_INTERVAL_MS);
   }
 
   private stopTrialPoll(): void {

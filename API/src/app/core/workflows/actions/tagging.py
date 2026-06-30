@@ -19,6 +19,7 @@ carry a tags column in the current schema, so the ``target='lead'``
 config option short-circuits to ``ActionNotImplemented`` — operators
 add lead-shaped tags via custom_data instead.
 """
+
 from __future__ import annotations
 
 import logging
@@ -30,7 +31,6 @@ from pydantic import ValidationError
 
 from src.app.core.workflows.actions import register_action
 from src.app.core.workflows.exceptions import ActionNotImplemented
-
 
 logger = logging.getLogger(__name__)
 
@@ -90,9 +90,7 @@ def _resolve_lead_id(*, node: dict[str, Any], context: dict[str, Any]):
         except (ValueError, TypeError):
             return None
     payload = context.get("trigger_payload") or {}
-    raw = payload.get("lead_id") or (
-        payload.get("lead", {}) or {}
-    ).get("id")
+    raw = payload.get("lead_id") or (payload.get("lead", {}) or {}).get("id")
     if raw is None:
         return None
     try:
@@ -105,11 +103,11 @@ def _resolve_lead_id(*, node: dict[str, Any], context: dict[str, Any]):
 
 
 async def _add_tag(session, *, run, step_run, node, context):
-    from src.app.core.contacts import service as contacts_service
-    from src.app.core.contacts.schemas import ContactUpdate
     from sqlalchemy import select
 
+    from src.app.core.contacts import service as contacts_service
     from src.app.core.contacts.models import Contact
+    from src.app.core.contacts.schemas import ContactUpdate
 
     cfg = node.get("config") or {}
     target = cfg.get("target", "contact")
@@ -137,9 +135,7 @@ async def _add_tag(session, *, run, step_run, node, context):
     existing = list(contact.tags or [])
     if tag.strip() in existing:
         # Idempotent — no-op.
-        return _result_sent(
-            {"contact_id": str(contact_id), "tag": tag.strip(), "added": False}
-        )
+        return _result_sent({"contact_id": str(contact_id), "tag": tag.strip(), "added": False})
     new_tags = existing + [tag.strip()]
     try:
         await contacts_service.update_contact(
@@ -151,9 +147,7 @@ async def _add_tag(session, *, run, step_run, node, context):
         reason, msg = _classify(exc)
         return _result_skipped(reason, error=msg)
 
-    return _result_sent(
-        {"contact_id": str(contact_id), "tag": tag.strip(), "added": True}
-    )
+    return _result_sent({"contact_id": str(contact_id), "tag": tag.strip(), "added": True})
 
 
 async def _remove_tag(session, *, run, step_run, node, context):
@@ -232,17 +226,13 @@ async def _set_lead_score(session, *, run, step_run, node, context):
     if not isinstance(value, (int, float)):
         return _result_skipped("validation_failed", reason="numeric_value_required")
     if operation not in ("set", "increment", "decrement"):
-        return _result_skipped(
-            "validation_failed", reason=f"unknown_operation:{operation}"
-        )
+        return _result_skipped("validation_failed", reason=f"unknown_operation:{operation}")
 
     lead_id = _resolve_lead_id(node=node, context=context)
     if lead_id is None:
         return _result_skipped("target_not_found", reason="no_lead_id")
 
-    lead = (
-        await session.execute(select(Lead).where(Lead.id == lead_id))
-    ).scalar_one_or_none()
+    lead = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
     if lead is None:
         return _result_skipped("target_not_found", reason="lead_missing")
 

@@ -4,7 +4,12 @@ import { catchError, throwError, switchMap, from } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '@core/services/auth.service';
 import { ActionVerifyService } from '@core/services/action-verify.service';
-import { SNACKBAR_DURATION, SNACKBAR_ACTION, ACTION_TOKEN_HEADER, ACTION_2FA_ERROR_CODE } from '@core/constants/app.constants';
+import {
+  SNACKBAR_DURATION,
+  SNACKBAR_ACTION,
+  ACTION_TOKEN_HEADER,
+  ACTION_2FA_ERROR_CODE,
+} from '@core/constants/app.constants';
 import { MSG_ACTION_VERIFY_CANCELLED, MSG_ACCESS_DENIED } from '@core/constants/messages.constants';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
@@ -61,6 +66,6 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         });
       }
       return throwError(() => error);
-    })
+    }),
   );
 };

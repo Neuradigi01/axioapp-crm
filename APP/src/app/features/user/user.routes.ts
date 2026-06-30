@@ -21,9 +21,7 @@ const devRoutes: Routes = environment.production
       {
         path: 'dev/pipeline-demo',
         loadComponent: () =>
-          import('./core/pipelines/dev-pipeline.page').then(
-            (m) => m.DevPipelinePageComponent,
-          ),
+          import('./core/pipelines/dev-pipeline.page').then((m) => m.DevPipelinePageComponent),
       },
     ];
 
@@ -37,8 +35,7 @@ export const userRoutes: Routes = [
     // and the per-route `permissionGuard` (RBAC) — order is:
     // furnitureAuthGuard → noOrgGuard → permissionGuard.
     canActivateChild: [noOrgGuard],
-    loadComponent: () =>
-      import('./core/layout/shell.component').then((m) => m.ShellComponent),
+    loadComponent: () => import('./core/layout/shell.component').then((m) => m.ShellComponent),
     children: [
       {
         path: '',
@@ -48,21 +45,16 @@ export const userRoutes: Routes = [
       {
         path: 'dashboard',
         loadComponent: () =>
-          import('./core/dashboard/dashboard.page').then(
-            (m) => m.DashboardPageComponent,
-          ),
+          import('./core/dashboard/dashboard.page').then((m) => m.DashboardPageComponent),
       },
       {
         path: 'welcome',
-        loadComponent: () =>
-          import('./layout/welcome.component').then((m) => m.WelcomeComponent),
+        loadComponent: () => import('./layout/welcome.component').then((m) => m.WelcomeComponent),
       },
       {
         path: 'settings',
         loadComponent: () =>
-          import('./core/settings/settings-page.component').then(
-            (m) => m.SettingsPageComponent,
-          ),
+          import('./core/settings/settings-page.component').then((m) => m.SettingsPageComponent),
       },
       {
         // Integrations — promoted to a top-level sidebar module.
@@ -72,9 +64,9 @@ export const userRoutes: Routes = [
         path: 'integrations',
         canActivate: [permissionGuard('settings.integrations.manage')],
         loadComponent: () =>
-          import(
-            './core/settings/integrations/integrations-page.component'
-          ).then((m) => m.IntegrationsPageComponent),
+          import('./core/settings/integrations/integrations-page.component').then(
+            (m) => m.IntegrationsPageComponent,
+          ),
       },
       {
         // Legacy redirect — Integrations used to live as a tab in
@@ -92,9 +84,7 @@ export const userRoutes: Routes = [
         path: 'settings/email-accounts',
         data: { tab: 'email-accounts' },
         loadComponent: () =>
-          import('./core/settings/settings-page.component').then(
-            (m) => m.SettingsPageComponent,
-          ),
+          import('./core/settings/settings-page.component').then((m) => m.SettingsPageComponent),
       },
       {
         // tasks/template-library Step 10 — the Settings → Email
@@ -113,30 +103,28 @@ export const userRoutes: Routes = [
         path: 'settings/email-sequences',
         data: { tab: 'email-sequences' },
         loadComponent: () =>
-          import('./core/settings/settings-page.component').then(
-            (m) => m.SettingsPageComponent,
-          ),
+          import('./core/settings/settings-page.component').then((m) => m.SettingsPageComponent),
       },
       {
         path: 'settings/email-sequences/new',
         loadComponent: () =>
-          import(
-            './core/settings/email-sequences/sequence-builder.page'
-          ).then((m) => m.SequenceBuilderPageComponent),
+          import('./core/settings/email-sequences/sequence-builder.page').then(
+            (m) => m.SequenceBuilderPageComponent,
+          ),
       },
       {
         path: 'settings/email-sequences/:id/edit',
         loadComponent: () =>
-          import(
-            './core/settings/email-sequences/sequence-builder.page'
-          ).then((m) => m.SequenceBuilderPageComponent),
+          import('./core/settings/email-sequences/sequence-builder.page').then(
+            (m) => m.SequenceBuilderPageComponent,
+          ),
       },
       {
         path: 'settings/email-sequences/:id',
         loadComponent: () =>
-          import(
-            './core/settings/email-sequences/sequence-detail.component'
-          ).then((m) => m.SequenceDetailComponent),
+          import('./core/settings/email-sequences/sequence-detail.component').then(
+            (m) => m.SequenceDetailComponent,
+          ),
       },
       {
         // SaaS subscription billing — promoted to a top-level sidebar
@@ -145,10 +133,7 @@ export const userRoutes: Routes = [
         // `success_url` / `cancel_url` land on the children below.
         path: 'subscription',
         canActivate: [permissionGuard('billing.manage')],
-        loadComponent: () =>
-          import('./core/billing/pages/billing.page').then(
-            (m) => m.BillingPage,
-          ),
+        loadComponent: () => import('./core/billing/pages/billing.page').then((m) => m.BillingPage),
       },
       {
         // Stripe Checkout `success_url`. Polls `/subscriptions/current`
@@ -157,9 +142,7 @@ export const userRoutes: Routes = [
         path: 'subscription/upgrade-success',
         canActivate: [permissionGuard('billing.manage')],
         loadComponent: () =>
-          import('./core/billing/pages/upgrade-success.page').then(
-            (m) => m.UpgradeSuccessPage,
-          ),
+          import('./core/billing/pages/upgrade-success.page').then((m) => m.UpgradeSuccessPage),
       },
       {
         // Stripe Checkout `cancel_url`. Brief page with
@@ -167,9 +150,7 @@ export const userRoutes: Routes = [
         path: 'subscription/upgrade-cancel',
         canActivate: [permissionGuard('billing.manage')],
         loadComponent: () =>
-          import('./core/billing/pages/upgrade-cancel.page').then(
-            (m) => m.UpgradeCancelPage,
-          ),
+          import('./core/billing/pages/upgrade-cancel.page').then((m) => m.UpgradeCancelPage),
       },
       {
         // Legacy redirects — Billing used to live as a tab in
@@ -194,9 +175,7 @@ export const userRoutes: Routes = [
         path: 'settings/lead-scoring',
         canActivate: [permissionGuard('leads.scoring.manage')],
         loadComponent: () =>
-          import('./core/settings/lead-scoring-rules.page').then(
-            (m) => m.LeadScoringRulesPage,
-          ),
+          import('./core/settings/lead-scoring-rules.page').then((m) => m.LeadScoringRulesPage),
       },
       {
         // Fold-in redirect: the standalone /user/profile page was
@@ -209,9 +188,7 @@ export const userRoutes: Routes = [
       {
         path: 'contacts',
         loadComponent: () =>
-          import('./core/contacts/contacts-list.page').then(
-            (m) => m.ContactsListPageComponent,
-          ),
+          import('./core/contacts/contacts-list.page').then((m) => m.ContactsListPageComponent),
       },
       {
         // MUST precede `contacts/:id` — same reason as the `groups`
@@ -251,46 +228,35 @@ export const userRoutes: Routes = [
       {
         path: 'contacts/:id',
         loadComponent: () =>
-          import('./core/contacts/contact-detail.page').then(
-            (m) => m.ContactDetailPageComponent,
-          ),
+          import('./core/contacts/contact-detail.page').then((m) => m.ContactDetailPageComponent),
       },
       {
         path: 'leads',
-        loadComponent: () =>
-          import('./core/leads/leads.page').then((m) => m.LeadsPageComponent),
+        loadComponent: () => import('./core/leads/leads.page').then((m) => m.LeadsPageComponent),
       },
       {
         path: 'leads/import',
         canActivate: [permissionGuard('leads.import')],
         loadComponent: () =>
-          import('./core/leads/import/upload-page.component').then(
-            (m) => m.UploadPageComponent,
-          ),
+          import('./core/leads/import/upload-page.component').then((m) => m.UploadPageComponent),
       },
       {
         path: 'leads/import-history',
         canActivate: [permissionGuard('leads.import')],
         loadComponent: () =>
-          import('./core/leads/import/history-page.component').then(
-            (m) => m.HistoryPageComponent,
-          ),
+          import('./core/leads/import/history-page.component').then((m) => m.HistoryPageComponent),
       },
       {
         path: 'leads/import/:id/mapping',
         canActivate: [permissionGuard('leads.import')],
         loadComponent: () =>
-          import('./core/leads/import/mapping-page.component').then(
-            (m) => m.MappingPageComponent,
-          ),
+          import('./core/leads/import/mapping-page.component').then((m) => m.MappingPageComponent),
       },
       {
         path: 'leads/import/:id/result',
         canActivate: [permissionGuard('leads.import')],
         loadComponent: () =>
-          import('./core/leads/import/result-page.component').then(
-            (m) => m.ResultPageComponent,
-          ),
+          import('./core/leads/import/result-page.component').then((m) => m.ResultPageComponent),
       },
       {
         // MUST come after every literal `leads/...` path above —
@@ -298,43 +264,31 @@ export const userRoutes: Routes = [
         // etc. and the import flow never resolves.
         path: 'leads/:id',
         loadComponent: () =>
-          import('./core/leads/lead-detail.page').then(
-            (m) => m.LeadDetailPageComponent,
-          ),
+          import('./core/leads/lead-detail.page').then((m) => m.LeadDetailPageComponent),
       },
       {
         path: 'appointments',
         loadComponent: () =>
-          import('./core/appointments/appointments.page').then(
-            (m) => m.AppointmentsPageComponent,
-          ),
+          import('./core/appointments/appointments.page').then((m) => m.AppointmentsPageComponent),
       },
       {
         path: 'tasks',
-        loadComponent: () =>
-          import('./core/tasks/tasks.page').then((m) => m.TasksPageComponent),
+        loadComponent: () => import('./core/tasks/tasks.page').then((m) => m.TasksPageComponent),
       },
       {
         path: 'walk-ins',
         loadComponent: () =>
-          import('./core/walk-ins/walk-ins.page').then(
-            (m) => m.WalkInsPageComponent,
-          ),
+          import('./core/walk-ins/walk-ins.page').then((m) => m.WalkInsPageComponent),
       },
       {
         path: 'catalog',
         loadComponent: () =>
-          import('./core/catalog/catalog.page').then(
-            (m) => m.CatalogPageComponent,
-          ),
+          import('./core/catalog/catalog.page').then((m) => m.CatalogPageComponent),
       },
       {
         path: 'staff',
         canActivate: [permissionGuard('staff.read')],
-        loadComponent: () =>
-          import('./core/staff/staff.page').then(
-            (m) => m.StaffPageComponent,
-          ),
+        loadComponent: () => import('./core/staff/staff.page').then((m) => m.StaffPageComponent),
       },
       {
         path: 'conversations',
@@ -351,9 +305,9 @@ export const userRoutes: Routes = [
         path: 'whatsapp/templates',
         canActivate: [permissionGuard('whatsapp.templates.read')],
         loadComponent: () =>
-          import(
-            './core/whatsapp/templates/whatsapp-templates.page'
-          ).then((m) => m.WhatsAppTemplatesPageComponent),
+          import('./core/whatsapp/templates/whatsapp-templates.page').then(
+            (m) => m.WhatsAppTemplatesPageComponent,
+          ),
       },
       {
         // tasks/template-library Step 6 — central multi-channel template
@@ -363,9 +317,7 @@ export const userRoutes: Routes = [
         path: 'templates',
         canActivate: [permissionGuard('templates.read')],
         loadComponent: () =>
-          import('./core/templates/templates.page').then(
-            (m) => m.TemplatesPageComponent,
-          ),
+          import('./core/templates/templates.page').then((m) => m.TemplatesPageComponent),
       },
       {
         // tasks/workflows Step 13 — workflow list + folders + run
@@ -377,9 +329,7 @@ export const userRoutes: Routes = [
         path: 'workflows',
         canActivate: [permissionGuard('workflows.read')],
         loadComponent: () =>
-          import('./core/workflows/workflows.page').then(
-            (m) => m.WorkflowsPageComponent,
-          ),
+          import('./core/workflows/workflows.page').then((m) => m.WorkflowsPageComponent),
       },
       {
         // tasks/workflows Step 16 — gallery of 15 default workflow
@@ -389,9 +339,9 @@ export const userRoutes: Routes = [
         path: 'workflows/gallery',
         canActivate: [permissionGuard('workflows.read')],
         loadComponent: () =>
-          import(
-            './core/workflows/gallery/workflows-gallery.page'
-          ).then((m) => m.WorkflowsGalleryPageComponent),
+          import('./core/workflows/gallery/workflows-gallery.page').then(
+            (m) => m.WorkflowsGalleryPageComponent,
+          ),
       },
       {
         // tasks/workflows Step 14 — SVG canvas editor. /new boots a
@@ -402,9 +352,9 @@ export const userRoutes: Routes = [
         path: 'workflows/new',
         canActivate: [permissionGuard('workflows.write')],
         loadComponent: () =>
-          import(
-            './core/workflows/canvas/workflow-canvas.page'
-          ).then((m) => m.WorkflowCanvasPageComponent),
+          import('./core/workflows/canvas/workflow-canvas.page').then(
+            (m) => m.WorkflowCanvasPageComponent,
+          ),
       },
       {
         // tasks/workflows Step 18 — full-page side-by-side A/B
@@ -421,9 +371,9 @@ export const userRoutes: Routes = [
         path: 'workflows/:id',
         canActivate: [permissionGuard('workflows.read')],
         loadComponent: () =>
-          import(
-            './core/workflows/canvas/workflow-canvas.page'
-          ).then((m) => m.WorkflowCanvasPageComponent),
+          import('./core/workflows/canvas/workflow-canvas.page').then(
+            (m) => m.WorkflowCanvasPageComponent,
+          ),
       },
       {
         // tasks/automation-engine Step 7 — single-event trigger
@@ -433,9 +383,7 @@ export const userRoutes: Routes = [
         path: 'automations',
         canActivate: [permissionGuard('automations.read')],
         loadComponent: () =>
-          import('./core/automations/automations.page').then(
-            (m) => m.AutomationsPageComponent,
-          ),
+          import('./core/automations/automations.page').then((m) => m.AutomationsPageComponent),
       },
       {
         // tasks/automation-engine Step 8 — trigger editor for
@@ -465,9 +413,7 @@ export const userRoutes: Routes = [
         path: 'automations/:id/runs',
         canActivate: [permissionGuard('automations.runs.read')],
         loadComponent: () =>
-          import('./core/automations/runs/run-history.page').then(
-            (m) => m.RunHistoryPageComponent,
-          ),
+          import('./core/automations/runs/run-history.page').then((m) => m.RunHistoryPageComponent),
       },
       {
         // tasks/template-library Step 7 — channel-aware editor.
@@ -496,9 +442,9 @@ export const userRoutes: Routes = [
         path: 'whatsapp/business-profile',
         canActivate: [permissionGuard('whatsapp.business_profile.manage')],
         loadComponent: () =>
-          import(
-            './core/whatsapp/business-profile/business-profile.page'
-          ).then((m) => m.WhatsAppBusinessProfilePageComponent),
+          import('./core/whatsapp/business-profile/business-profile.page').then(
+            (m) => m.WhatsAppBusinessProfilePageComponent,
+          ),
       },
       {
         // whatsapp-platform-upgrade Step 17 — keyword automation rules.
@@ -507,9 +453,9 @@ export const userRoutes: Routes = [
         path: 'whatsapp/automation',
         canActivate: [permissionGuard('whatsapp.automation.manage')],
         loadComponent: () =>
-          import(
-            './core/whatsapp/automation/automation.page'
-          ).then((m) => m.WhatsAppAutomationPageComponent),
+          import('./core/whatsapp/automation/automation.page').then(
+            (m) => m.WhatsAppAutomationPageComponent,
+          ),
       },
       {
         // whatsapp-platform-upgrade Step 23 — block list (DND).
@@ -518,9 +464,9 @@ export const userRoutes: Routes = [
         path: 'whatsapp/block-list',
         canActivate: [permissionGuard('whatsapp.opt_in.manage')],
         loadComponent: () =>
-          import(
-            './core/whatsapp/block-list/block-list-page.component'
-          ).then((m) => m.BlockListPageComponent),
+          import('./core/whatsapp/block-list/block-list-page.component').then(
+            (m) => m.BlockListPageComponent,
+          ),
       },
       {
         // whatsapp-platform-upgrade Step 25 — WhatsApp Flows library.
@@ -528,9 +474,9 @@ export const userRoutes: Routes = [
         path: 'whatsapp/flows',
         canActivate: [permissionGuard('whatsapp.flows.manage')],
         loadComponent: () =>
-          import(
-            './core/whatsapp/flows/flows-page.component'
-          ).then((m) => m.WhatsAppFlowsPageComponent),
+          import('./core/whatsapp/flows/flows-page.component').then(
+            (m) => m.WhatsAppFlowsPageComponent,
+          ),
       },
       {
         // whatsapp-platform-upgrade Step 26 — QR + wa.me tracking links.
@@ -538,16 +484,14 @@ export const userRoutes: Routes = [
         path: 'whatsapp/quick-links',
         canActivate: [permissionGuard('whatsapp.automation.manage')],
         loadComponent: () =>
-          import(
-            './core/whatsapp/quick-links/quick-links-page.component'
-          ).then((m) => m.WhatsAppQuickLinksPageComponent),
+          import('./core/whatsapp/quick-links/quick-links-page.component').then(
+            (m) => m.WhatsAppQuickLinksPageComponent,
+          ),
       },
       {
         path: 'calls',
         loadComponent: () =>
-          import('./core/calls/call-center.page').then(
-            (m) => m.CallCenterPageComponent,
-          ),
+          import('./core/calls/call-center.page').then((m) => m.CallCenterPageComponent),
       },
       {
         // whatsapp-platform-upgrade Step 20 — conversation analytics
@@ -556,25 +500,21 @@ export const userRoutes: Routes = [
         path: 'reports/whatsapp',
         canActivate: [permissionGuard('whatsapp.analytics.read')],
         loadComponent: () =>
-          import(
-            './core/reporting/whatsapp/whatsapp-reports-page.component'
-          ).then((m) => m.WhatsAppReportsPageComponent),
+          import('./core/reporting/whatsapp/whatsapp-reports-page.component').then(
+            (m) => m.WhatsAppReportsPageComponent,
+          ),
       },
       {
         path: 'reviews',
         canActivate: [permissionGuard('reviews.read')],
         loadComponent: () =>
-          import('./core/reviews/reviews.page').then(
-            (m) => m.ReviewsPageComponent,
-          ),
+          import('./core/reviews/reviews.page').then((m) => m.ReviewsPageComponent),
       },
       {
         path: 'campaigns',
         canActivate: [permissionGuard('campaigns.read')],
         loadComponent: () =>
-          import('./core/campaigns/campaigns.page').then(
-            (m) => m.CampaignsPageComponent,
-          ),
+          import('./core/campaigns/campaigns.page').then((m) => m.CampaignsPageComponent),
       },
       {
         path: 'campaigns/:id',
@@ -604,41 +544,37 @@ export const userRoutes: Routes = [
         path: 'custom-orders/:id',
         canActivate: [permissionGuard('custom_orders.read')],
         loadComponent: () =>
-          import(
-            './packs/furniture/custom-orders/custom-order-detail.page'
-          ).then((m) => m.CustomOrderDetailPageComponent),
+          import('./packs/furniture/custom-orders/custom-order-detail.page').then(
+            (m) => m.CustomOrderDetailPageComponent,
+          ),
       },
       {
         path: 'field-ops',
         canActivate: [permissionGuard('field_visits.read')],
         loadComponent: () =>
-          import('./packs/furniture/field-ops/field-ops.page').then(
-            (m) => m.FieldOpsPageComponent,
-          ),
+          import('./packs/furniture/field-ops/field-ops.page').then((m) => m.FieldOpsPageComponent),
       },
       {
         path: 'field-ops/:id',
         canActivate: [permissionGuard('field_visits.read')],
         loadComponent: () =>
-          import(
-            './packs/furniture/field-ops/field-visit-detail.page'
-          ).then((m) => m.FieldVisitDetailPageComponent),
+          import('./packs/furniture/field-ops/field-visit-detail.page').then(
+            (m) => m.FieldVisitDetailPageComponent,
+          ),
       },
       {
         path: 'billing',
         canActivate: [permissionGuard('billing.read')],
         loadComponent: () =>
-          import('./packs/furniture/billing/billing.page').then(
-            (m) => m.BillingPageComponent,
-          ),
+          import('./packs/furniture/billing/billing.page').then((m) => m.BillingPageComponent),
       },
       {
         path: 'billing/invoices/:id',
         canActivate: [permissionGuard('billing.read')],
         loadComponent: () =>
-          import(
-            './packs/furniture/billing/invoice-detail.page'
-          ).then((m) => m.InvoiceDetailPageComponent),
+          import('./packs/furniture/billing/invoice-detail.page').then(
+            (m) => m.InvoiceDetailPageComponent,
+          ),
       },
       {
         path: 'access-denied',

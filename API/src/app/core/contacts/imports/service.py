@@ -1,9 +1,9 @@
 """Service layer for contact bulk imports — upload, dry-run, commit."""
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +28,6 @@ from src.app.core.contacts.imports.schemas import (
 from src.app.core.contacts.models import Contact
 from src.app.shared.storage import get_storage
 
-
 # Hard caps — `(a) 5 MB / 10K rows` per Step 3.5.10's recommendation.
 # Predictable memory profile for inline processing; future Celery
 # pathway lifts these.
@@ -46,9 +45,7 @@ def _normalise_phone(raw: str) -> str:
     return digits.lstrip("0") if digits else ""
 
 
-async def _get_import(
-    session: AsyncSession, import_id: uuid.UUID
-) -> ContactImport:
+async def _get_import(session: AsyncSession, import_id: uuid.UUID) -> ContactImport:
     row = await data_access.get_import_by_id(session, import_id)
     if row is None:
         raise HTTPException(
@@ -81,14 +78,12 @@ async def upload_file(
         )
 
     try:
-        headers, sample, total = parse_headers_and_sample(
-            file_bytes, filename
-        )
+        headers, sample, total = parse_headers_and_sample(file_bytes, filename)
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
-        )
+        ) from exc
 
     if total > MAX_ROW_COUNT:
         raise HTTPException(
@@ -180,9 +175,7 @@ async def dry_run_import(
         mapped = _apply_mapping(raw, mapping)
 
         if not mapped.get("full_name"):
-            errors.append(
-                RowError(row=row_no, reason="missing required field 'full_name'")
-            )
+            errors.append(RowError(row=row_no, reason="missing required field 'full_name'"))
             will_skip += 1
             continue
 
@@ -225,7 +218,7 @@ async def commit_import(
     import_id: uuid.UUID,
     mapping: dict[str, str],
     create_group: bool = False,
-    group_name: Optional[str] = None,
+    group_name: str | None = None,
 ) -> ContactImport:
     """Insert rows. Same parse + dedupe logic as dry-run; same errors
     surface in the persisted `error_log`. Optionally bundles the
@@ -243,26 +236,16 @@ async def commit_import(
         mapped = _apply_mapping(raw, mapping)
         full_name = mapped.get("full_name")
         if not full_name:
-            errors.append(
-                {"row": row_no, "reason": "missing required field 'full_name'"}
-            )
+            errors.append({"row": row_no, "reason": "missing required field 'full_name'"})
             continue
 
         phone_norm = _normalise_phone(mapped.get("phone") or "")
-        if phone_norm and (
-            phone_norm in existing_phones or phone_norm in seen_phones_in_file
-        ):
-            errors.append(
-                {"row": row_no, "reason": f"duplicate phone {phone_norm}"}
-            )
+        if phone_norm and (phone_norm in existing_phones or phone_norm in seen_phones_in_file):
+            errors.append({"row": row_no, "reason": f"duplicate phone {phone_norm}"})
             continue
 
         contact_id = uuid.uuid4()
-        tags = (
-            [mapped["tag"].strip()]
-            if mapped.get("tag") and mapped["tag"].strip()
-            else []
-        )
+        tags = [mapped["tag"].strip()] if mapped.get("tag") and mapped["tag"].strip() else []
         data_access.add_contact(
             session,
             Contact(
@@ -283,7 +266,7 @@ async def commit_import(
     # so the FK in `contact_group_members` resolves.
     await session.flush()
 
-    created_group_id: Optional[uuid.UUID] = None
+    created_group_id: uuid.UUID | None = None
     if create_group and inserted_ids:
         if not group_name:
             raise HTTPException(
@@ -345,9 +328,7 @@ def _read_file_bytes(storage, storage_path: str) -> bytes:
     return full.read_bytes()
 
 
-def _apply_mapping(
-    raw: dict[str, str], mapping: dict[str, str]
-) -> dict[str, str]:
+def _apply_mapping(raw: dict[str, str], mapping: dict[str, str]) -> dict[str, str]:
     """Translate `{column: cell}` into `{contact_field: cell}` using
     the operator's mapping. Columns mapped to `'skip'` (or absent
     from the mapping) are dropped."""

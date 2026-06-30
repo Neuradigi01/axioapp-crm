@@ -33,6 +33,7 @@ actually subscribe to today (Step 5/6 ship `user.signed_up` +
 `lead.created`; later steps add appointments / quotes / invoices /
 birthdays / stale-lead).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

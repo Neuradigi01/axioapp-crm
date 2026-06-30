@@ -23,6 +23,7 @@ Why a stub at all?
   same surface (one Page-Access Token, one webhook envelope), which
   is why the editor reuses the FB sub-form for both channels.
 """
+
 from __future__ import annotations
 
 import uuid

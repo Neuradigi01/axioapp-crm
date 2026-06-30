@@ -25,12 +25,14 @@ Why a stub?
 Replace ``_invoke_llm`` with a real call and the rest of the
 pipeline picks it up unchanged.
 """
+
 from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +74,7 @@ _DEFAULT_SYSTEM_PROMPT = (
 
 async def generate_response(
     *,
-    system_prompt: Optional[str],
+    system_prompt: str | None,
     history: list[ConversationTurn],
     latest_inbound_text: str,
 ) -> AIResponse:
@@ -96,10 +98,7 @@ async def generate_response(
     except Exception:
         logger.exception("AI invocation failed; returning low-confidence stub")
         return AIResponse(
-            text=(
-                "Hi! I'm having trouble responding right now — let me "
-                "get a teammate to help."
-            ),
+            text=("Hi! I'm having trouble responding right now — let me get a teammate to help."),
             confidence=0.0,
             handover_requested=True,
             metadata={"error": "invocation_failed"},
@@ -207,10 +206,7 @@ async def _invoke_llm(
         confidence = 0.35
 
     return AIResponse(
-        text=(
-            "Thanks for your message — I'm processing it and a "
-            "teammate will follow up shortly."
-        ),
+        text=("Thanks for your message — I'm processing it and a teammate will follow up shortly."),
         confidence=confidence,
         handover_requested=confidence < 0.4,
     )
@@ -238,11 +234,7 @@ def history_from_messages(
     for m in rows:
         if getattr(m, "is_internal", False):
             continue
-        role = (
-            "user"
-            if getattr(m, "direction", "out") == "in"
-            else "assistant"
-        )
+        role = "user" if getattr(m, "direction", "out") == "in" else "assistant"
         text = getattr(m, "text", None)
         if text:
             out.append(ConversationTurn(role=role, text=text))

@@ -5,6 +5,7 @@ Covers the parser (``extract_variable_paths``), the strict renderer
 empty on missing), the Jinja-statement rejector, and the per-channel
 variable picker registry. No DB / network — pure functions.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -22,7 +23,6 @@ from src.app.core.templates.variables import (
     resolve,
     variables_for_channel,
 )
-
 
 # --- extract_variables / extract_variable_paths ------------------------
 

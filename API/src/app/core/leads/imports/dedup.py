@@ -22,27 +22,26 @@ when a real customer hits the limit.
 The dedup key set is hardcoded here for v1 (phone OR email). Making
 it per-org configurable is a known follow-up.
 """
+
 from __future__ import annotations
 
 import re
 import uuid
-from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 _NON_DIGIT = re.compile(r"\D")
 
 
-def normalize_phone(value: Optional[str]) -> str:
+def normalize_phone(value: str | None) -> str:
     """Strip every non-digit. Empty string if input is None/blank."""
     if not value:
         return ""
     return _NON_DIGIT.sub("", value)
 
 
-def lowercase_email(value: Optional[str]) -> str:
+def lowercase_email(value: str | None) -> str:
     """Trim + lowercase. Empty string if input is None/blank."""
     if not value:
         return ""
@@ -53,9 +52,9 @@ async def find_existing_contact(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    phone: Optional[str],
-    email: Optional[str],
-) -> Optional[uuid.UUID]:
+    phone: str | None,
+    email: str | None,
+) -> uuid.UUID | None:
     """Return the id of an existing contact in `org_id` matching by
     phone OR email; None if no match (or if both inputs are blank).
 

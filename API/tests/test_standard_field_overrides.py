@@ -27,6 +27,7 @@ be added (one per spec bullet):
     - cross-tenant isolation on /render
     - 404 on unknown entity render
 """
+
 from __future__ import annotations
 
 import pytest
@@ -49,7 +50,6 @@ from src.app.core.standard_fields.service import (
     _merge,
     _validate_payload_against_registry,
 )
-
 
 # ---------------------------------------------------------------------------
 # Registry-contract validator — happy paths
@@ -200,9 +200,7 @@ def test_payload_prop_map_covers_every_valid_registry_prop() -> None:
 
     mapped_tokens = set(_PAYLOAD_PROP_MAP.values())
     missing = _VALID_PROPS - mapped_tokens
-    assert not missing, (
-        f"_PAYLOAD_PROP_MAP missing entries for registry props: {sorted(missing)}"
-    )
+    assert not missing, f"_PAYLOAD_PROP_MAP missing entries for registry props: {sorted(missing)}"
 
 
 def test_payload_prop_map_keys_match_pydantic_field_names() -> None:
@@ -261,9 +259,7 @@ def test_migration_file_revision_and_down_revision() -> None:
     import importlib.util
     import pathlib
 
-    path = pathlib.Path(
-        "alembic/versions/0039_standard_field_overrides.py"
-    ).resolve()
+    path = pathlib.Path("alembic/versions/0039_standard_field_overrides.py").resolve()
     spec = importlib.util.spec_from_file_location("mig0039", str(path))
     module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
     spec.loader.exec_module(module)  # type: ignore[union-attr]
@@ -300,18 +296,12 @@ def test_management_routes_gated_on_manage_permission_render_is_not() -> None:
 
     for route in router.routes:
         deps = [d.call for d in route.dependant.dependencies]
-        has_check = any(
-            "_check" in getattr(d, "__qualname__", "") for d in deps
-        )
+        has_check = any("_check" in getattr(d, "__qualname__", "") for d in deps)
         is_render = route.path.endswith("/render")
         if is_render:
-            assert not has_check, (
-                "render endpoint should not require the manage permission"
-            )
+            assert not has_check, "render endpoint should not require the manage permission"
         else:
-            assert has_check, (
-                f"{route.path!r} missing the manage-permission dependency"
-            )
+            assert has_check, f"{route.path!r} missing the manage-permission dependency"
 
 
 def test_out_schema_includes_audit_columns() -> None:
@@ -513,9 +503,7 @@ def test_render_sort_respects_override_display_order_then_registry_order(
             "expected_close_date": _bare_override(
                 entity="lead", field_key="expected_close_date", display_order=0
             ),
-            "budget": _bare_override(
-                entity="lead", field_key="budget", display_order=0
-            ),
+            "budget": _bare_override(entity="lead", field_key="budget", display_order=0),
         }
 
     monkeypatch.setattr(sfo_service, "_fetch_overrides_map", fake_fetch)

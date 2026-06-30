@@ -11,12 +11,13 @@ The webhook endpoint is intentionally unauthenticated (channel
 providers don't carry JWTs) — adapter `parse_webhook` is the
 signature-verification choke point.
 """
+
 from __future__ import annotations
 
-import uuid
-from typing import Any, Optional
-
 import json
+import uuid
+from datetime import UTC
+from typing import Any
 
 from fastapi import (
     APIRouter,
@@ -49,11 +50,11 @@ from src.app.core.conversations.models import (
     ConversationChannel,
     ConversationStatus,
 )
+from src.app.core.conversations.notes_service import post_note
 from src.app.core.conversations.registry import (
     ChannelNotRegistered,
     resolve,
 )
-from src.app.core.conversations.notes_service import post_note
 from src.app.core.conversations.schemas import (
     AssignTagRequest,
     AttachmentType,
@@ -70,6 +71,15 @@ from src.app.core.conversations.schemas import (
     TagOut,
     TagUpdate,
 )
+from src.app.core.conversations.service import (
+    get_conversation,
+    list_conversations,
+    list_messages,
+    patch_conversation,
+    react_to_message,
+    receive_webhook,
+    send_outbound,
+)
 from src.app.core.conversations.tags_service import (
     assign_tag,
     bulk_tags_for_conversations,
@@ -83,35 +93,25 @@ from src.app.core.conversations.tags_service import (
 from src.app.core.conversations.whatsapp_session import (
     compute_session_state,
 )
-from src.app.core.conversations.service import (
-    get_conversation,
-    list_conversations,
-    list_messages,
-    patch_conversation,
-    react_to_message,
-    receive_webhook,
-    send_outbound,
-)
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
 
 
 @router.get("", response_model=ConversationListResponse)
 async def list_endpoint(
-    channel: Optional[ConversationChannel] = Query(default=None),
-    status_: Optional[ConversationStatus] = Query(default=None, alias="status"),
+    channel: ConversationChannel | None = Query(default=None),
+    status_: ConversationStatus | None = Query(default=None, alias="status"),
     # Widened to `str` so the sentinel value `'unassigned'` can pass
     # through (matches the leads / contacts convention). The service
     # parses the value: a UUID maps to equality; `'unassigned'` maps
     # to `IS NULL`; anything else is rejected with a 422-style error.
-    assigned_to: Optional[str] = Query(default=None, max_length=64),
-    q: Optional[str] = Query(default=None, max_length=255),
+    assigned_to: str | None = Query(default=None, max_length=64),
+    q: str | None = Query(default=None, max_length=255),
     # Step 14 — OR-semantic tag filter. Repeat the query param to
     # match multiple tags: ?tag_ids=uuid1&tag_ids=uuid2.
-    tag_ids: Optional[list[uuid.UUID]] = Query(default=None),
+    tag_ids: list[uuid.UUID] | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -129,17 +129,13 @@ async def list_endpoint(
     )
     # Bulk-fetch tags for the rows we're about to return so the chip
     # row in the list view doesn't N+1.
-    tags_by_conv = await bulk_tags_for_conversations(
-        db, [r.id for r in rows]
-    )
+    tags_by_conv = await bulk_tags_for_conversations(db, [r.id for r in rows])
     items = []
     for r in rows:
         out = ConversationOut.model_validate(r)
         out.tags = tags_by_conv.get(r.id, [])
         items.append(out)
-    return ConversationListResponse(
-        items=items, total=total, page=page, size=size
-    )
+    return ConversationListResponse(items=items, total=total, page=page, size=size)
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetail)
@@ -170,7 +166,7 @@ async def get_detail_endpoint(
 
 @router.get("/tags", response_model=list[TagOut])
 async def list_tags_endpoint(
-    search: Optional[str] = Query(default=None, max_length=64),
+    search: str | None = Query(default=None, max_length=64),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("conversations.read")),
 ) -> list[TagOut]:
@@ -181,15 +177,11 @@ async def list_tags_endpoint(
     return [TagOut.model_validate(r) for r in rows]
 
 
-@router.post(
-    "/tags", response_model=TagOut, status_code=status.HTTP_201_CREATED
-)
+@router.post("/tags", response_model=TagOut, status_code=status.HTTP_201_CREATED)
 async def create_tag_endpoint(
     payload: TagCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.conversations.manage")
-    ),
+    user: User = Depends(require_permissions("settings.conversations.manage")),
 ) -> TagOut:
     tag = await create_tag(
         db,
@@ -206,9 +198,7 @@ async def update_tag_endpoint(
     tag_id: uuid.UUID,
     payload: TagUpdate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.conversations.manage")
-    ),
+    user: User = Depends(require_permissions("settings.conversations.manage")),
 ) -> TagOut:
     tag = await update_tag(
         db,
@@ -220,19 +210,13 @@ async def update_tag_endpoint(
     return TagOut.model_validate(tag)
 
 
-@router.delete(
-    "/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_tag_endpoint(
     tag_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.conversations.manage")
-    ),
+    user: User = Depends(require_permissions("settings.conversations.manage")),
 ) -> Response:
-    await delete_tag(
-        db, actor_id=user.legacy_uuid, tag_id=tag_id
-    )
+    await delete_tag(db, actor_id=user.legacy_uuid, tag_id=tag_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -291,22 +275,13 @@ async def send_message_endpoint(
     # `text` to optional to allow interactive-only sends, so re-check at
     # the boundary instead of with a Pydantic root validator (keeps the
     # error message friendlier).
-    if (
-        not payload.text
-        and not payload.attachments
-        and payload.interactive is None
-    ):
+    if not payload.text and not payload.attachments and payload.interactive is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Message must include text, an attachment, or an "
-                "interactive payload."
-            ),
+            detail=("Message must include text, an attachment, or an interactive payload."),
         )
     interactive_dict = (
-        payload.interactive.model_dump(mode="json")
-        if payload.interactive is not None
-        else None
+        payload.interactive.model_dump(mode="json") if payload.interactive is not None else None
     )
     try:
         msg = await send_outbound(
@@ -320,9 +295,7 @@ async def send_message_endpoint(
             send_from_phone_id=payload.send_from_phone_id,
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return MessageOut.model_validate(msg)
 
 
@@ -380,9 +353,7 @@ async def react_endpoint(
             emoji=payload.emoji,
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return MessageOut.model_validate(msg)
 
 
@@ -395,7 +366,7 @@ async def send_media_message_endpoint(
     conversation_id: uuid.UUID,
     file: UploadFile = File(...),
     type: AttachmentType = Form(...),
-    caption: Optional[str] = Form(default=None, max_length=MAX_CAPTION_LENGTH),
+    caption: str | None = Form(default=None, max_length=MAX_CAPTION_LENGTH),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
 ) -> MessageOut:
@@ -431,16 +402,12 @@ async def send_media_message_endpoint(
             size_bytes=len(file_bytes),
         )
     except MediaUploadError as exc:
-        raise HTTPException(
-            status_code=exc.http_status, detail=exc.user_message
-        )
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
 
     try:
         bundle = await resolve_whatsapp_adapter(db)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     # Resolve the per-org Cloud API credentials. The adapter holds them
     # in private attrs; we read directly because the upload uses the
@@ -464,9 +431,7 @@ async def send_media_message_endpoint(
             filename=file.filename or "file",
         )
     except MediaUploadError as exc:
-        raise HTTPException(
-            status_code=exc.http_status, detail=exc.user_message
-        )
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
 
     effective_caption = caption if captions_supported(type) else None
 
@@ -503,9 +468,7 @@ async def patch_endpoint(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("conversations.write")),
 ) -> ConversationOut:
-    conv = await patch_conversation(
-        db, conversation_id=conversation_id, payload=payload
-    )
+    conv = await patch_conversation(db, conversation_id=conversation_id, payload=payload)
     return ConversationOut.model_validate(conv)
 
 
@@ -530,9 +493,7 @@ async def get_conversation_attribution_endpoint(
     conv = await get_conversation(db, conversation_id)
     payload = conv.acquisition_referral_payload or {}
     resolved = (
-        payload.get("_resolved")
-        if isinstance(payload.get("_resolved"), dict)
-        else None
+        payload.get("_resolved") if isinstance(payload.get("_resolved"), dict) else None
     ) or {}
     deeplink = deeplink_for_ad(resolved) if resolved else None
     return ConversationAttributionOut(
@@ -590,14 +551,12 @@ async def export_conversation_pdf_endpoint(
     from src.app.core.conversations.export import export_conversation_pdf
 
     try:
-        blob, filename = await export_conversation_pdf(
-            db, conversation_id=conversation_id
-        )
+        blob, filename = await export_conversation_pdf(db, conversation_id=conversation_id)
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
-        )
+        ) from exc
     return Response(
         content=blob,
         media_type="application/pdf",
@@ -607,9 +566,7 @@ async def export_conversation_pdf_endpoint(
     )
 
 
-@router.patch(
-    "/{conversation_id}/ai-handling", response_model=ConversationOut
-)
+@router.patch("/{conversation_id}/ai-handling", response_model=ConversationOut)
 async def patch_ai_handling_endpoint(
     conversation_id: uuid.UUID,
     payload: dict[str, Any],
@@ -681,18 +638,14 @@ async def webhook_verify_endpoint(
     try:
         adapter = resolve(channel)
     except ChannelNotRegistered as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if not hasattr(adapter, "verify_subscription"):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"channel '{channel.value}' has no subscription handshake",
         )
     if not adapter.verify_subscription(mode, token):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="verify failed"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="verify failed")
     return PlainTextResponse(content=qp.get("hub.challenge", ""))
 
 
@@ -712,7 +665,7 @@ async def webhook_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"webhook body is not valid JSON: {exc}",
-        )
+        ) from exc
 
     # WhatsApp follows the per-org routing flow (Step 3.5.12) — extract
     # phone_id from the payload, look up the org's config, verify the
@@ -725,9 +678,7 @@ async def webhook_endpoint(
     try:
         adapter = resolve(channel)
     except ChannelNotRegistered as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if hasattr(adapter, "verify_signature"):
         signature = request.headers.get("x-hub-signature-256")
         if not adapter.verify_signature(raw, signature):
@@ -738,9 +689,7 @@ async def webhook_endpoint(
     try:
         msg = await receive_webhook(db, channel=channel, payload=payload)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     # Reaction events return None — the row update is enough; the SPA
     # picks up the change on the next thread poll / WS push.
     if msg is None:
@@ -787,16 +736,11 @@ async def _handle_whatsapp_webhook(
     # phone metadata isn't carried on these payloads.
     quality_event = _extract_phone_quality_event(payload)
     if quality_event is not None:
-        bundle = await find_org_by_waba_id(
-            db, waba_id=quality_event["waba_id"]
-        )
+        bundle = await find_org_by_waba_id(db, waba_id=quality_event["waba_id"])
         if bundle is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=(
-                    f"no WhatsApp integration found for "
-                    f"waba_id={quality_event['waba_id']}"
-                ),
+                detail=(f"no WhatsApp integration found for waba_id={quality_event['waba_id']}"),
             )
         integration, config = bundle
         _verify_whatsapp_signature(
@@ -805,9 +749,7 @@ async def _handle_whatsapp_webhook(
             config=config,
             platform_secret=WHATSAPP_APP_SECRET,
         )
-        set_context(
-            RequestContext(org_id=integration.org_id, user_id=None)
-        )
+        set_context(RequestContext(org_id=integration.org_id, user_id=None))
         from src.app.core.integrations.whatsapp.health_service import (
             apply_webhook_quality_event,
         )
@@ -832,16 +774,11 @@ async def _handle_whatsapp_webhook(
     # before the phone-id branch.
     template_event = _extract_template_status_event(payload)
     if template_event is not None:
-        bundle = await find_org_by_waba_id(
-            db, waba_id=template_event["waba_id"]
-        )
+        bundle = await find_org_by_waba_id(db, waba_id=template_event["waba_id"])
         if bundle is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=(
-                    f"no WhatsApp integration found for "
-                    f"waba_id={template_event['waba_id']}"
-                ),
+                detail=(f"no WhatsApp integration found for waba_id={template_event['waba_id']}"),
             )
         integration, config = bundle
         _verify_whatsapp_signature(
@@ -850,9 +787,7 @@ async def _handle_whatsapp_webhook(
             config=config,
             platform_secret=WHATSAPP_APP_SECRET,
         )
-        set_context(
-            RequestContext(org_id=integration.org_id, user_id=None)
-        )
+        set_context(RequestContext(org_id=integration.org_id, user_id=None))
         from src.app.core.integrations.whatsapp.templates_service import (
             apply_template_status_update,
         )
@@ -947,9 +882,7 @@ async def _handle_whatsapp_webhook(
 
     blocked_phone = parse_inbound_phone(payload)
     if blocked_phone:
-        hit = await is_blocked(
-            db, org_id=integration.org_id, phone=blocked_phone
-        )
+        hit = await is_blocked(db, org_id=integration.org_id, phone=blocked_phone)
         if hit is not None:
             from src.app.core import audit
 
@@ -977,9 +910,7 @@ async def _handle_whatsapp_webhook(
             received_via_phone_id=config.phone_id,
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if msg is None:
         return {"reaction_applied": True}
     return {"message_id": str(msg.id)}
@@ -1011,7 +942,7 @@ def _extract_phone_quality_event(
 
     Returns a dict ``{waba_id, phone_id, event, current_limit,
     occurred_at}`` or None when the payload isn't a quality event."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     try:
         entry = payload["entry"][0]
@@ -1029,16 +960,14 @@ def _extract_phone_quality_event(
     if not isinstance(event, str) or not event:
         return None
     raw_phone = value.get("display_phone_number") or value.get("phone_number")
-    phone_id = (
-        str(raw_phone) if isinstance(raw_phone, (str, int)) else ""
-    )
+    phone_id = str(raw_phone) if isinstance(raw_phone, (str, int)) else ""
     if not phone_id:
         return None
     occurred_at: datetime | None = None
     raw_ts = value.get("timestamp") or entry.get("time")
     if isinstance(raw_ts, (int, float)):
         try:
-            occurred_at = datetime.fromtimestamp(int(raw_ts), tz=timezone.utc)
+            occurred_at = datetime.fromtimestamp(int(raw_ts), tz=UTC)
         except (TypeError, ValueError):
             occurred_at = None
     return {
@@ -1046,9 +975,7 @@ def _extract_phone_quality_event(
         "phone_id": phone_id,
         "event": event,
         "current_limit": (
-            value.get("current_limit")
-            if isinstance(value.get("current_limit"), str)
-            else None
+            value.get("current_limit") if isinstance(value.get("current_limit"), str) else None
         ),
         "occurred_at": occurred_at,
     }
@@ -1103,11 +1030,7 @@ def _extract_template_status_event(
             if isinstance(value.get("message_template_language"), str)
             else None
         ),
-        "reason": (
-            value.get("reason")
-            if isinstance(value.get("reason"), str)
-            else None
-        ),
+        "reason": (value.get("reason") if isinstance(value.get("reason"), str) else None),
     }
 
 

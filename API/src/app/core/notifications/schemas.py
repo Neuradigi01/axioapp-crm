@@ -5,11 +5,12 @@ schema migration. The REST shape mirrors the wire-format pushed over
 the WebSocket — same object, same field names, so the frontend has
 one parser.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -18,20 +19,18 @@ from src.app.shared.schemas import ORMModel
 
 
 class NotificationOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     user_id: uuid.UUID
     type: str
     title: str
-    body: Optional[str]
+    body: str | None
     payload: dict[str, Any]
-    read_at: Optional[datetime]
+    read_at: datetime | None
     created_at: datetime
 
 
 class NotificationPreferenceOut(ORMModel):
-
     type: str
     channel: NotificationChannel
     enabled: bool
@@ -42,9 +41,9 @@ class PreferenceUpdate(BaseModel):
     left untouched. Provided channels are upserted to the boolean
     value supplied."""
 
-    in_app: Optional[bool] = None
-    email: Optional[bool] = None
-    push: Optional[bool] = None
+    in_app: bool | None = None
+    email: bool | None = None
+    push: bool | None = None
 
     model_config = ConfigDict(extra="forbid")
 

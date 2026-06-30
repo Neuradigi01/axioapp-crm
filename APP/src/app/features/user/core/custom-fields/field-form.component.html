@@ -5,15 +5,17 @@
         {{ isEdit() ? 'Edit field' : 'Add field' }}
       </h2>
       <p class="mt-1 text-xs text-zinc-500">
-        {{ isEdit() ? 'Field key and type are locked. Label, required, hidden, and choices can change.' : 'New fields are user-scoped and fully editable later.' }}
+        {{
+          isEdit()
+            ? 'Field key and type are locked. Label, required, hidden, and choices can change.'
+            : 'New fields are user-scoped and fully editable later.'
+        }}
       </p>
     </header>
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4 px-6 py-5">
       <div>
-        <label class="block text-xs font-medium text-zinc-700" for="field_key">
-          Field key
-        </label>
+        <label class="block text-xs font-medium text-zinc-700" for="field_key"> Field key </label>
         <input
           id="field_key"
           type="text"
@@ -24,7 +26,8 @@
         />
         @if (form.controls.field_key.touched && form.controls.field_key.invalid) {
           <p class="mt-1 text-xs text-red-600">
-            Must be lowercase, start with a letter, and use only letters, digits, or underscores (2–50 chars).
+            Must be lowercase, start with a letter, and use only letters, digits, or underscores
+            (2–50 chars).
           </p>
         }
       </div>
@@ -78,11 +81,19 @@
 
       <div class="flex items-center gap-6">
         <label class="flex items-center gap-2 text-sm text-zinc-700">
-          <input type="checkbox" formControlName="is_required" class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500" />
+          <input
+            type="checkbox"
+            formControlName="is_required"
+            class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+          />
           Required
         </label>
         <label class="flex items-center gap-2 text-sm text-zinc-700">
-          <input type="checkbox" formControlName="is_hidden" class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500" />
+          <input
+            type="checkbox"
+            formControlName="is_hidden"
+            class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+          />
           Hidden
         </label>
       </div>
@@ -93,7 +104,9 @@
         </div>
       }
 
-      <footer class="-mx-6 -mb-5 flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg">
+      <footer
+        class="-mx-6 -mb-5 flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg"
+      >
         <button
           type="button"
           class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"

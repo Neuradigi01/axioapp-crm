@@ -2,12 +2,10 @@
   <header class="border-b border-zinc-200 bg-white px-6 py-4">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-xl font-semibold text-zinc-900">
-          WhatsApp Business profile
-        </h1>
+        <h1 class="text-xl font-semibold text-zinc-900">WhatsApp Business profile</h1>
         <p class="text-xs text-zinc-500">
-          Edit how your business appears on WhatsApp. Set business
-          hours and auto-reply messages used by automation.
+          Edit how your business appears on WhatsApp. Set business hours and auto-reply messages
+          used by automation.
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -32,7 +30,9 @@
     </div>
 
     @if (toast(); as msg) {
-      <div class="mt-3 flex items-start justify-between gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+      <div
+        class="mt-3 flex items-start justify-between gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700"
+      >
         <span class="flex-1">{{ msg }}</span>
         <button
           type="button"
@@ -45,7 +45,9 @@
       </div>
     }
     @if (loadError(); as err) {
-      <div class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      <div
+        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+      >
         {{ err }}
       </div>
     }
@@ -57,9 +59,7 @@
   </header>
 
   @if (loading()) {
-    <div class="px-6 py-12 text-center text-sm text-zinc-500">
-      Loading profile…
-    </div>
+    <div class="px-6 py-12 text-center text-sm text-zinc-500">Loading profile…</div>
   } @else if (profile(); as p) {
     <section class="grid grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-3">
       <!-- Photo + verified name (left) -->
@@ -69,7 +69,9 @@
             Profile picture
           </p>
           <div class="flex flex-col items-center gap-3">
-            <div class="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
+            <div
+              class="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border border-zinc-200 bg-zinc-100"
+            >
               @if (p.profile_picture_url) {
                 <img
                   [src]="p.profile_picture_url"
@@ -103,21 +105,20 @@
         </div>
 
         <div class="rounded-md border border-zinc-200 bg-white p-4">
-          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Number
-          </p>
+          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Number</p>
           <p class="text-sm font-medium text-zinc-900">
             {{ p.display_phone_number }}
           </p>
           @if (p.verified_name) {
-            <p class="mt-1 inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
+            <p
+              class="mt-1 inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700"
+            >
               <lucide-icon name="check-circle-2" size="10" />
               {{ p.verified_name }}
             </p>
           }
           <p class="mt-2 text-[11px] text-zinc-500">
-            Display name changes require a separate Meta review and
-            aren't done from this page.
+            Display name changes require a separate Meta review and aren't done from this page.
           </p>
         </div>
       </div>
@@ -140,9 +141,7 @@
             placeholder="Family-run furniture store since 1992."
             class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
           />
-          <p class="mt-1 text-right text-[10px] text-zinc-400">
-            {{ about().length }}/139
-          </p>
+          <p class="mt-1 text-right text-[10px] text-zinc-400">{{ about().length }}/139</p>
 
           <label class="mb-1 mt-3 block text-xs font-medium text-zinc-700">
             Description (512 chars max)
@@ -155,9 +154,7 @@
             placeholder="Tell customers about your business."
             class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
           ></textarea>
-          <p class="mt-1 text-right text-[10px] text-zinc-400">
-            {{ description().length }}/512
-          </p>
+          <p class="mt-1 text-right text-[10px] text-zinc-400">{{ description().length }}/512</p>
 
           <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
@@ -184,9 +181,7 @@
             </div>
           </div>
 
-          <label class="mb-1 mt-3 block text-xs font-medium text-zinc-700">
-            Vertical
-          </label>
+          <label class="mb-1 mt-3 block text-xs font-medium text-zinc-700"> Vertical </label>
           <select
             [ngModel]="vertical()"
             (ngModelChange)="vertical.set($event)"
@@ -247,8 +242,8 @@
             </button>
           </div>
           <p class="mb-3 text-[11px] text-zinc-500">
-            Step 16's out-of-hours auto-reply reads this schedule. Times
-            are in your store's local timezone.
+            Step 16's out-of-hours auto-reply reads this schedule. Times are in your store's local
+            timezone.
           </p>
 
           <div class="space-y-2">
@@ -256,11 +251,7 @@
               <div class="rounded-md border border-zinc-200 p-2">
                 <div class="flex items-center justify-between">
                   <label class="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      [checked]="isDayOpen(day)"
-                      (change)="toggleDay(day)"
-                    />
+                    <input type="checkbox" [checked]="isDayOpen(day)" (change)="toggleDay(day)" />
                     <span class="font-medium text-zinc-800">
                       {{ dayLabel(day) }}
                     </span>

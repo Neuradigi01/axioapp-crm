@@ -46,12 +46,14 @@ Scope (per spec)
   ``http_exception_handler`` in ``main.py`` passes the structured
   ``detail`` dict through verbatim.
 """
+
 from __future__ import annotations
 
 import functools
 import inspect
 import uuid
-from typing import Any, Awaitable, Callable, Union
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from fastapi import Depends
 
@@ -63,14 +65,13 @@ from src.app.core.subscriptions.entitlements import (
 )
 from src.app.core.subscriptions.exceptions import EntitlementError
 
-
 # Callable signature for ``enforces_cap``'s count source. The provider
 # receives the caller's ``org_id`` and returns either an ``int`` or an
 # awaitable that resolves to one. Sync providers are accepted so tests
 # (and trivial constant providers) can stay terse; production usage in
 # Step 5 will hand in an awaitable backed by the ``usage_counters``
 # denormalised counter.
-CapCountProvider = Callable[[uuid.UUID], Union[int, Awaitable[int]]]
+CapCountProvider = Callable[[uuid.UUID], int | Awaitable[int]]
 
 
 # Unique sentinel kwarg names. Picked so they cannot collide with any
@@ -98,8 +99,7 @@ def requires_feature(key: str) -> Callable[[Callable[..., Any]], Callable[..., A
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         if not inspect.iscoroutinefunction(func):
             raise TypeError(
-                "requires_feature can only wrap async def handlers; "
-                f"{func.__qualname__} is sync."
+                f"requires_feature can only wrap async def handlers; {func.__qualname__} is sync."
             )
 
         @functools.wraps(func)
@@ -150,8 +150,7 @@ def enforces_cap(
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         if not inspect.iscoroutinefunction(func):
             raise TypeError(
-                "enforces_cap can only wrap async def handlers; "
-                f"{func.__qualname__} is sync."
+                f"enforces_cap can only wrap async def handlers; {func.__qualname__} is sync."
             )
 
         @functools.wraps(func)
@@ -164,17 +163,13 @@ def enforces_cap(
             if cap != -1:
                 current = await _resolve_count(current_provider, entitlements.org_id)
                 if not entitlements.is_within_cap(resource, current):
-                    required = _lowest_plan_with_higher_cap(
-                        resource, current_cap=cap
-                    )
+                    required = _lowest_plan_with_higher_cap(resource, current_cap=cap)
                     raise EntitlementError(
                         "cap_reached",
                         required_plan=required,
                         resource=resource,
                         cap=cap,
-                        message=(
-                            f"You have reached the {resource} limit on your current plan."
-                        ),
+                        message=(f"You have reached the {resource} limit on your current plan."),
                     )
 
             return await func(*args, **kwargs)
@@ -189,9 +184,8 @@ def enforces_cap(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-async def _resolve_count(
-    provider: CapCountProvider, org_id: uuid.UUID
-) -> int:
+
+async def _resolve_count(provider: CapCountProvider, org_id: uuid.UUID) -> int:
     """Invoke ``provider(org_id)``; await the result if it is awaitable."""
     result = provider(org_id)
     if inspect.isawaitable(result):
@@ -199,9 +193,7 @@ async def _resolve_count(
     return int(result)
 
 
-def _inject_entitlements_param(
-    func: Callable[..., Any], param_name: str
-) -> inspect.Signature:
+def _inject_entitlements_param(func: Callable[..., Any], param_name: str) -> inspect.Signature:
     """Return ``func``'s signature with an ``Entitlements`` dependency parameter inserted.
 
     FastAPI inspects the wrapper's signature to discover dependencies.

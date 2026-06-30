@@ -5,7 +5,7 @@ class RouteSaveRequest(BaseModel):
     id: int | None = None
     parent_id: int = 0
     control_id: str = ""
-    user_type: str = Field(..., pattern=r'^(Admin|User|Any)$')
+    user_type: str = Field(..., pattern=r"^(Admin|User|Any)$")
     name: str = Field(..., min_length=1)
     path: str = Field(..., min_length=1)
     url: str = ""

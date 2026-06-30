@@ -1,19 +1,9 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
-import {
-  CanvasNode,
-  CanvasStateService,
-} from './canvas-state.service';
+import { CanvasNode, CanvasStateService } from './canvas-state.service';
 import { getNodeType } from './node-type-registry';
 
 import { AbSplitEditorComponent } from './editors/ab-split-editor.component';
@@ -43,7 +33,6 @@ import { WaitEditorComponent } from './editors/wait-editor.component';
 import { WaitForEventEditorComponent } from './editors/wait-for-event-editor.component';
 import { WebhookEditorComponent } from './editors/webhook-editor.component';
 
-
 /**
  * Right-drawer body — switches on `node.type` and renders the
  * matching typed sub-editor. Header collects the node label, the
@@ -56,7 +45,6 @@ import { WebhookEditorComponent } from './editors/webhook-editor.component';
  * `state.updateNodeConfig`; validity stamps `__valid` on the node's
  * config so the SVG node card can render the red validation dot.
  */
-
 
 @Component({
   selector: 'app-node-editor',

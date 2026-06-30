@@ -1,19 +1,18 @@
+import asyncpg
 import pytest
 import pytest_asyncio
-import asyncpg
-from unittest.mock import patch
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
-from httpx import AsyncClient, ASGITransport
 
+from config import DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
+from src.core.db import DATABASE_URL
+from src.core.security.jwt import create_access_token
+from src.core.security.password import hash_password
 from src.models import Base
 from src.models.admin import Admin
-from src.models.user import UserLogin, UserInfo
 from src.models.routes import Route
-from src.core.security.password import hash_password
-from src.core.security.jwt import create_access_token
-from src.core.db import DATABASE_URL
-from config import DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
+from src.models.user import UserInfo, UserLogin
 
 # Use a separate test database
 TEST_DB_NAME = f"{DB_NAME}_test"
@@ -26,7 +25,10 @@ TestSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_com
 async def _ensure_test_db_exists():
     """Create the test database if it doesn't exist."""
     sys_conn = await asyncpg.connect(
-        host=DB_HOST, port=int(DB_PORT), user=DB_USER, password=DB_PASSWORD,
+        host=DB_HOST,
+        port=int(DB_PORT),
+        user=DB_USER,
+        password=DB_PASSWORD,
         database="postgres",
     )
     try:
@@ -139,31 +141,35 @@ async def seed_test_data(test_db):
 @pytest_asyncio.fixture
 async def admin_token(seed_test_data):
     data = seed_test_data
-    return create_access_token({
-        "user_id": data["admin"].admin_user_id,
-        "role": "Admin",
-        "admin_id": data["admin"].id,
-        "access_rights": "1,2",
-    })
+    return create_access_token(
+        {
+            "user_id": data["admin"].admin_user_id,
+            "role": "Admin",
+            "admin_id": data["admin"].id,
+            "access_rights": "1,2",
+        }
+    )
 
 
 @pytest_asyncio.fixture
 async def user_token(seed_test_data):
     data = seed_test_data
-    return create_access_token({
-        "user_id": data["user_login"].user_id,
-        "role": "User",
-        "member_id": data["user_login"].id,
-        "access_rights": "2",
-    })
+    return create_access_token(
+        {
+            "user_id": data["user_login"].user_id,
+            "role": "User",
+            "member_id": data["user_login"].id,
+            "access_rights": "2",
+        }
+    )
 
 
 def _patch_all_async_sessions():
     """Patch async_session in all modules that import it directly from src.core.db."""
     import src.core.db as db_module
-    import src.providers.route_provider as route_provider_module
-    import src.providers.error_log_provider as error_log_module
     import src.core.security.jwt as jwt_module
+    import src.providers.error_log_provider as error_log_module
+    import src.providers.route_provider as route_provider_module
 
     modules = [db_module, route_provider_module, error_log_module, jwt_module]
     originals = {mod: mod.async_session for mod in modules}
@@ -206,6 +212,7 @@ def _reset_login_limiter():
     a later test into 429s. The rate-limit test resets explicitly too.
     """
     from src.app.shared.rate_limit import login_limiter
+
     login_limiter.reset()
     yield
     login_limiter.reset()
@@ -256,13 +263,15 @@ async def seeded_admin():
     """
     import uuid as _uuid
 
-    from sqlalchemy import select, text as sql_text
+    from sqlalchemy import select
+    from sqlalchemy import text as sql_text
 
     from src.app.core.permissions.models import Role
     from src.app.core.tenants.models import Organization
     from src.app.core.users.models import OrganizationMember, User
     from src.app.shared.security.password import hash_password as _hp
-    from src.models.user import UserInfo as LegacyUserInfo, UserLogin
+    from src.models.user import UserInfo as LegacyUserInfo
+    from src.models.user import UserLogin
 
     org_uuid = _uuid.uuid4()
     role_uuid = _uuid.uuid4()

@@ -14,11 +14,11 @@ Encryption reuses `core.integrations.crypto` (the same Fernet key).
 No second key to manage; Rule 10 "no parallel infra" wins over the
 spec's suggestion of a separate `EMAIL_TOKEN_KEY`.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,7 +37,6 @@ from src.app.core.integrations.crypto import (
     encrypt_optional,
 )
 
-
 # A token within this window is treated as expired so the provider
 # client preemptively refreshes before hitting the wire — defends
 # against clock skew + the long-tail of refresh latency.
@@ -50,7 +49,7 @@ _REFRESH_LEEWAY = timedelta(minutes=5)
 async def list_accounts(
     session: AsyncSession,
     *,
-    user_id: Optional[uuid.UUID] = None,
+    user_id: uuid.UUID | None = None,
 ) -> list[EmailAccount]:
     """Every account row visible to the active tenant. Pass
     `user_id` to filter to that user's accounts (the rep's "my
@@ -63,9 +62,7 @@ async def list_accounts(
     return await _da.list_accounts_query(session, user_id=user_id)
 
 
-async def get_account(
-    session: AsyncSession, *, account_id: uuid.UUID
-) -> Optional[EmailAccount]:
+async def get_account(session: AsyncSession, *, account_id: uuid.UUID) -> EmailAccount | None:
     """Single row by id (RLS-scoped). None if missing OR if the
     caller's org cannot see it (RLS hides cross-tenant rows)."""
     return await _da.get_account_by_id(session, account_id=account_id)
@@ -73,7 +70,7 @@ async def get_account(
 
 async def get_account_unscoped(
     session: AsyncSession, *, account_id: uuid.UUID
-) -> Optional[EmailAccount]:
+) -> EmailAccount | None:
     """Load an account by id BYPASSING the tenant filter — used by
     Step 4's Celery tasks which have no JWT and need to learn the
     org from the row itself before setting context.
@@ -83,9 +80,7 @@ async def get_account_unscoped(
     find_account_by_email` — both load cross-tenant for webhook /
     daemon entry points that have no JWT to derive context from.
     """
-    return await _da.get_account_by_id_unscoped(
-        session, account_id=account_id
-    )
+    return await _da.get_account_by_id_unscoped(session, account_id=account_id)
 
 
 # --- Writes --------------------------------------------------------------
@@ -97,7 +92,7 @@ async def upsert(
     org_id: uuid.UUID,
     user_id: uuid.UUID,
     payload: EmailAccountUpsert,
-    actor_id: Optional[uuid.UUID] = None,
+    actor_id: uuid.UUID | None = None,
 ) -> EmailAccount:
     """Insert-or-update the (user, provider, external_account_id)
     row. Encrypts the plaintext tokens before write — the caller
@@ -124,7 +119,7 @@ async def upsert(
 
     access_enc = encrypt(payload.access_token)
     refresh_enc = encrypt_optional(payload.refresh_token)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if existing is None:
         row = EmailAccount(
@@ -212,7 +207,9 @@ async def disconnect_as_caller(
          disconnect always succeeds.
       4. Delegate the actual state change to :func:`disconnect`.
     """
-    from fastapi import HTTPException, status as _http_status
+    from fastapi import HTTPException
+    from fastapi import status as _http_status
+
     from src.app.core.permissions.service import list_permissions_for_role
 
     row = await get_account(session, account_id=account_id)
@@ -237,21 +234,17 @@ async def disconnect_as_caller(
     elif row.provider.value == "microsoft":
         from src.app.core.email.microsoft import webhook as ms_webhook
 
-        await ms_webhook.unsubscribe_quiet(
-            row, session, subscription_id=row.sync_cursor
-        )
+        await ms_webhook.unsubscribe_quiet(row, session, subscription_id=row.sync_cursor)
 
-    return await disconnect(
-        session, account_id=account_id, actor_id=caller.legacy_uuid
-    )
+    return await disconnect(session, account_id=account_id, actor_id=caller.legacy_uuid)
 
 
 async def disconnect(
     session: AsyncSession,
     *,
     account_id: uuid.UUID,
-    actor_id: Optional[uuid.UUID] = None,
-) -> Optional[EmailAccount]:
+    actor_id: uuid.UUID | None = None,
+) -> EmailAccount | None:
     """Clear the row's tokens + flip `sync_state` to `disconnected`.
     Returns the updated row, or None if the row doesn't exist (or
     is hidden by RLS).
@@ -272,7 +265,7 @@ async def disconnect(
     row.token_expires_at = None
     row.sync_cursor = None
     row.sync_state = EmailAccountSyncState.disconnected
-    row.disconnected_at = datetime.now(timezone.utc)
+    row.disconnected_at = datetime.now(UTC)
     row.disconnected_by = actor_id
 
     await session.commit()
@@ -296,9 +289,9 @@ async def update_sync_state(
     *,
     account_id: uuid.UUID,
     sync_state: EmailAccountSyncState,
-    cursor: Optional[str] = None,
-    error: Optional[str] = None,
-) -> Optional[EmailAccount]:
+    cursor: str | None = None,
+    error: str | None = None,
+) -> EmailAccount | None:
     """Helper for the sync daemon (Step 4) and the provider sync
     routines (Steps 2 + 3). Flips `sync_state`, optionally advances
     `sync_cursor` and stamps `last_sync_error`.
@@ -314,7 +307,7 @@ async def update_sync_state(
     if cursor is not None:
         row.sync_cursor = cursor
     if sync_state == EmailAccountSyncState.live:
-        row.last_sync_at = datetime.now(timezone.utc)
+        row.last_sync_at = datetime.now(UTC)
         row.last_sync_error = None
     elif sync_state == EmailAccountSyncState.error:
         row.last_sync_error = error
@@ -326,7 +319,7 @@ async def update_sync_state(
 # --- Token decrypt + refresh --------------------------------------------
 
 
-def decrypt_tokens(account: EmailAccount) -> tuple[str, Optional[str]]:
+def decrypt_tokens(account: EmailAccount) -> tuple[str, str | None]:
     """Return `(access_token, refresh_token)` in plaintext. The
     access token is always present for a row that isn't
     `disconnected`; the refresh token may be None on providers
@@ -378,11 +371,10 @@ async def refresh_if_expired(
         `update_sync_state(...)`.
     """
     access_plain, refresh_plain = decrypt_tokens(account)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     needs_refresh = (
-        account.token_expires_at is None
-        or account.token_expires_at - now <= _REFRESH_LEEWAY
+        account.token_expires_at is None or account.token_expires_at - now <= _REFRESH_LEEWAY
     )
     if not needs_refresh:
         return TokenSet(
@@ -415,9 +407,7 @@ async def refresh_if_expired(
         # None and want us to keep the prior refresh token.
         account.refresh_token_enc = encrypt(fresh.refresh_token)
     if fresh.expires_in_seconds is not None:
-        account.token_expires_at = now + timedelta(
-            seconds=fresh.expires_in_seconds
-        )
+        account.token_expires_at = now + timedelta(seconds=fresh.expires_in_seconds)
     if fresh.scopes_granted:
         account.scopes_granted = list(fresh.scopes_granted)
     await session.commit()

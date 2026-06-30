@@ -18,23 +18,21 @@ picks `"<platform> v<N>"` where N is `1 + the highest existing
 "<platform> vK" name in this org for this platform`. Lets clients
 hit "Save preset" multiple times without naming each one.
 """
+
 from __future__ import annotations
 
 import re
 import uuid
-from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core import audit
-from src.app.shared.audit import log_entity_change
 from src.app.core.leads.imports.models import ImportPreset
 from src.app.core.leads.imports.schemas import SourcePlatform
 from src.app.core.leads.imports.targets import list_target_keys
-
+from src.app.shared.audit import log_entity_change
 
 _VERSION_NAME_RE = re.compile(r"^(?P<platform>[a-z_]+) v(?P<num>\d+)$")
 
@@ -73,9 +71,9 @@ async def create_preset(
     *,
     org_id: uuid.UUID,
     actor_id: uuid.UUID,
-    name: Optional[str],
+    name: str | None,
     source_platform: SourcePlatform,
-    mapping: dict[str, Optional[str]],
+    mapping: dict[str, str | None],
 ) -> ImportPreset:
     """Validate the mapping + persist an org-owned preset.
 
@@ -150,14 +148,10 @@ async def delete_preset(
     found in some drivers.
     """
     row = (
-        await session.execute(
-            select(ImportPreset).where(ImportPreset.id == preset_id)
-        )
+        await session.execute(select(ImportPreset).where(ImportPreset.id == preset_id))
     ).scalar_one_or_none()
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="preset not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="preset not found")
     if row.is_system:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -166,9 +160,7 @@ async def delete_preset(
     if row.org_id != org_id:
         # Defence-in-depth — RLS already shouldn't show this row to
         # other orgs, but in case it slipped through.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="preset not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="preset not found")
 
     preset_id_snapshot = row.id
     preset_name_snapshot = row.name

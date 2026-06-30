@@ -9,7 +9,6 @@ import {
   inject,
   input,
   output,
-  signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -46,7 +45,8 @@ import { WhatsAppNumbersService } from './whatsapp-numbers.service';
         >
           @for (n of numbers(); track n.phone_id) {
             <option [value]="n.phone_id">
-              +{{ n.display_phone_number }}{{ n.verified_name ? ' — ' + n.verified_name : '' }}{{ n.is_default ? ' (default)' : '' }}
+              +{{ n.display_phone_number }}{{ n.verified_name ? ' — ' + n.verified_name : ''
+              }}{{ n.is_default ? ' (default)' : '' }}
             </option>
           }
         </select>

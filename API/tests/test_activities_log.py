@@ -8,6 +8,7 @@ Exercises both ingress paths:
   2. The HTTP `POST /activities` endpoint for manual notes — verifies
      the schema enforces `type=note` + non-empty `payload.text`.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -33,9 +34,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -87,9 +86,7 @@ async def test_post_note_then_list_returns_it(layered_client, seeded_admin):
     assert listed.status_code == 200
     payload = listed.json()
     assert payload["total"] == 1
-    assert payload["items"][0]["payload"]["text"] == (
-        "Customer called to ask about Teak sofas."
-    )
+    assert payload["items"][0]["payload"]["text"] == ("Customer called to ask about Teak sofas.")
 
 
 @pytest.mark.asyncio
@@ -147,9 +144,7 @@ async def test_post_rejects_empty_or_missing_text(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_internal_log_helper_persists_visible_to_http(
-    layered_client, seeded_admin
-):
+async def test_internal_log_helper_persists_visible_to_http(layered_client, seeded_admin):
     """The reusable `activities.log(...)` helper is the canonical ingress
     for non-HTTP events (status changes, call ends, …). It must produce
     rows visible to the HTTP reader for the same `(org, entity)`."""

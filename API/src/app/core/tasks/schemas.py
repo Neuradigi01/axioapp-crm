@@ -5,11 +5,11 @@ assigns the task to the caller. `related_entity_type` and
 `related_entity_id` are paired — both or neither must be present —
 because a "task on contact X" needs both halves to be a meaningful row.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -19,7 +19,6 @@ from src.app.shared.schemas import (
     BulkDeleteResult,
     BulkReassign,
     BulkReassignResult,
-    ORMModel,
     PaginatedResponse,
     TimestampedOrgScopedOut,
 )
@@ -27,21 +26,20 @@ from src.app.shared.schemas import (
 
 class TaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
-    description: Optional[str] = None
-    due_at: Optional[datetime] = None
-    assigned_to_id: Optional[uuid.UUID] = None
-    related_entity_type: Optional[str] = Field(default=None, max_length=64)
-    related_entity_id: Optional[uuid.UUID] = None
+    description: str | None = None
+    due_at: datetime | None = None
+    assigned_to_id: uuid.UUID | None = None
+    related_entity_type: str | None = Field(default=None, max_length=64)
+    related_entity_id: uuid.UUID | None = None
     priority: TaskPriority = TaskPriority.med
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     @model_validator(mode="after")
-    def _check_relation_pair(self) -> "TaskCreate":
+    def _check_relation_pair(self) -> TaskCreate:
         if (self.related_entity_type is None) != (self.related_entity_id is None):
             raise ValueError(
-                "related_entity_type and related_entity_id must be set together "
-                "(or both left null)"
+                "related_entity_type and related_entity_id must be set together (or both left null)"
             )
         return self
 
@@ -49,28 +47,27 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     """Every field optional — partial PATCH."""
 
-    title: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    due_at: Optional[datetime] = None
-    assigned_to_id: Optional[uuid.UUID] = None
-    status: Optional[TaskStatus] = None
-    priority: Optional[TaskPriority] = None
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    due_at: datetime | None = None
+    assigned_to_id: uuid.UUID | None = None
+    status: TaskStatus | None = None
+    priority: TaskPriority | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class TaskOut(TimestampedOrgScopedOut):
-
     id: uuid.UUID
     title: str
-    description: Optional[str]
-    due_at: Optional[datetime]
+    description: str | None
+    due_at: datetime | None
     assigned_to_id: uuid.UUID
-    related_entity_type: Optional[str]
-    related_entity_id: Optional[uuid.UUID]
+    related_entity_type: str | None
+    related_entity_id: uuid.UUID | None
     status: TaskStatus
     priority: TaskPriority
-    last_activity_at: Optional[datetime]
+    last_activity_at: datetime | None
 
 
 TaskListResponse = PaginatedResponse[TaskOut]

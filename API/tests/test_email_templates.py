@@ -17,24 +17,21 @@ Six groups:
 Convention: no DB. AsyncMock for sessions; stub
 `custom_field_definitions` rows; stub `audit.log`.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from types import SimpleNamespace
-from typing import Any
-from unittest.mock import AsyncMock
+from datetime import UTC, datetime
 
 import pytest
-
-from src.app.core.email import variables as vars_engine
-from src.app.core.email_templates import service as templates_service
 from src.app.core.email_templates.models import EmailTemplate
 from src.app.core.email_templates.schemas import (
     EmailTemplateCreate,
     EmailTemplateUpdate,
 )
 
+from src.app.core.email import variables as vars_engine
+from src.app.core.email_templates import service as templates_service
 
 _ORG_ID = uuid.uuid4()
 _ACTOR_ID = uuid.uuid4()
@@ -45,41 +42,34 @@ _ACTOR_ID = uuid.uuid4()
 
 class TestExtractPaths:
     def test_single(self):
-        assert vars_engine.extract_variable_paths(
-            "Hi {{ contact.first_name }}"
-        ) == ["contact.first_name"]
+        assert vars_engine.extract_variable_paths("Hi {{ contact.first_name }}") == [
+            "contact.first_name"
+        ]
 
     def test_dedupe_and_sort(self):
         paths = vars_engine.extract_variable_paths(
-            "{{contact.email}} {{contact.first_name}} "
-            "{{contact.email}}"
+            "{{contact.email}} {{contact.first_name}} {{contact.email}}"
         )
         assert paths == ["contact.email", "contact.first_name"]
 
     def test_deep_path(self):
-        assert vars_engine.extract_variable_paths(
-            "{{ contact.custom_data.preferred_brand }}"
-        ) == ["contact.custom_data.preferred_brand"]
+        assert vars_engine.extract_variable_paths("{{ contact.custom_data.preferred_brand }}") == [
+            "contact.custom_data.preferred_brand"
+        ]
 
     def test_empty(self):
         assert vars_engine.extract_variable_paths("") == []
-        assert vars_engine.extract_variable_paths(
-            "no variables here"
-        ) == []
+        assert vars_engine.extract_variable_paths("no variables here") == []
 
 
 class TestRejectJinja:
     def test_for_loop(self):
         with pytest.raises(vars_engine.TemplateSyntaxError):
-            vars_engine.reject_jinja_statements(
-                "{% for x in items %}{{x}}{% endfor %}"
-            )
+            vars_engine.reject_jinja_statements("{% for x in items %}{{x}}{% endfor %}")
 
     def test_if_statement(self):
         with pytest.raises(vars_engine.TemplateSyntaxError):
-            vars_engine.reject_jinja_statements(
-                "{% if user %}hi{% endif %}"
-            )
+            vars_engine.reject_jinja_statements("{% if user %}hi{% endif %}")
 
     def test_comment(self):
         with pytest.raises(vars_engine.TemplateSyntaxError):
@@ -87,9 +77,7 @@ class TestRejectJinja:
 
     def test_clean_template(self):
         # Should not raise.
-        vars_engine.reject_jinja_statements(
-            "Hi {{ contact.first_name }}, how are you?"
-        )
+        vars_engine.reject_jinja_statements("Hi {{ contact.first_name }}, how are you?")
 
 
 class TestRender:
@@ -136,9 +124,7 @@ class TestRender:
 
     def test_jinja_statement_rejected_at_render(self):
         with pytest.raises(vars_engine.TemplateSyntaxError):
-            vars_engine.render(
-                "{% if user %}x{% endif %}", {}
-            )
+            vars_engine.render("{% if user %}x{% endif %}", {})
 
 
 # --- 2. html_to_text ----------------------------------------------------
@@ -146,12 +132,7 @@ class TestRender:
 
 class TestHtmlToText:
     def test_strips_tags(self):
-        assert (
-            templates_service.html_to_text(
-                "<p>Hello <b>world</b></p>"
-            )
-            == "Hello world"
-        )
+        assert templates_service.html_to_text("<p>Hello <b>world</b></p>") == "Hello world"
 
     def test_br_becomes_newline(self):
         text = templates_service.html_to_text("Line 1<br>Line 2")
@@ -159,9 +140,7 @@ class TestHtmlToText:
         assert "\n" in text
 
     def test_inlines_link_urls(self):
-        text = templates_service.html_to_text(
-            '<a href="https://x.com">Click here</a>'
-        )
+        text = templates_service.html_to_text('<a href="https://x.com">Click here</a>')
         assert "Click here" in text
         assert "https://x.com" in text
 
@@ -207,9 +186,7 @@ class TestValidateTemplateText:
 
     @pytest.mark.asyncio
     async def test_custom_field_allowed_when_defined(self):
-        session = _FakeSession(
-            custom_fields=[("contact", "preferred_brand")]
-        )
+        session = _FakeSession(custom_fields=[("contact", "preferred_brand")])
         used = await templates_service.validate_template_text(
             session,
             org_id=_ORG_ID,
@@ -294,8 +271,8 @@ def _make_template(
         variables_used=variables_used or ["contact.first_name"],
         is_active=True,
         created_by=_ACTOR_ID,
-        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-        updated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        updated_at=datetime(2026, 1, 1, tzinfo=UTC),
     )
 
 
@@ -312,22 +289,14 @@ class TestRenderTemplate:
         t = _make_template()
         rendered = templates_service.render_template(
             t,
-            {
-                "contact": {
-                    "first_name": "<script>alert(1)</script>"
-                }
-            },
+            {"contact": {"first_name": "<script>alert(1)</script>"}},
         )
         assert "&lt;script&gt;" in rendered["body_html"]
         assert "<script>" not in rendered["body_html"]
 
     def test_plain_text_does_not_escape(self):
-        t = _make_template(
-            body_text="Hello {{ contact.first_name }}"
-        )
-        rendered = templates_service.render_template(
-            t, {"contact": {"first_name": "A&B"}}
-        )
+        t = _make_template(body_text="Hello {{ contact.first_name }}")
+        rendered = templates_service.render_template(t, {"contact": {"first_name": "A&B"}})
         # Plain text path skips escape so &amp; doesn't slip in.
         assert rendered["body_text"] == "Hello A&B"
 
@@ -341,9 +310,7 @@ class TestRenderTemplate:
             variables_used=["lead.title"],
         )
         with pytest.raises(HTTPException) as exc:
-            templates_service.render_template(
-                t, {"contact": {"first_name": "Asha"}}
-            )
+            templates_service.render_template(t, {"contact": {"first_name": "Asha"}})
         assert exc.value.status_code == 400
         assert "lead.title" in str(exc.value.detail)
 
@@ -375,7 +342,7 @@ class _CapturingSession:
             row.id = uuid.uuid4()
         # Stamp updated_at/created_at since the migration's
         # server_default won't fire under a Python-only flow.
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not getattr(row, "created_at", None):
             row.created_at = now
         if not getattr(row, "updated_at", None):
@@ -422,12 +389,11 @@ class _ScalarOne:
 @pytest.fixture(autouse=True)
 def _silence_audit(monkeypatch):
     """audit.log opens its own session — stub to a no-op."""
+
     async def _noop(*_a, **_k):
         return None
 
-    monkeypatch.setattr(
-        templates_service.audit, "log", _noop
-    )
+    monkeypatch.setattr(templates_service.audit, "log", _noop)
 
 
 class TestCreate:
@@ -459,8 +425,7 @@ class TestCreate:
 
         async def boom_commit():
             raise RuntimeError(
-                "duplicate key value violates unique constraint "
-                "uq_email_templates_org_name"
+                "duplicate key value violates unique constraint uq_email_templates_org_name"
             )
 
         monkeypatch.setattr(session, "commit", boom_commit)
@@ -536,12 +501,10 @@ class TestGetTemplate:
     async def test_get_soft_deleted_404(self):
         session = _CapturingSession()
         deleted = _make_template()
-        deleted.deleted_at = datetime.now(timezone.utc)
+        deleted.deleted_at = datetime.now(UTC)
         session.stage(_ScalarOne(deleted))
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc:
-            await templates_service.get_template(
-                session, template_id=deleted.id
-            )
+            await templates_service.get_template(session, template_id=deleted.id)
         assert exc.value.status_code == 404

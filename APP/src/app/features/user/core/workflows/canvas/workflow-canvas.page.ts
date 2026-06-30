@@ -8,7 +8,6 @@ import {
   HostListener,
   ViewChild,
   computed,
-  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -19,26 +18,18 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  CanvasNode,
-  CanvasStateService,
-} from './canvas-state.service';
+import { CanvasNode, CanvasStateService } from './canvas-state.service';
 import { WorkflowEdgeComponent } from './edge.component';
 import { ImportModalComponent } from './import-modal.component';
 import { NodeEditorComponent } from './node-editor.component';
 import { NodePaletteComponent } from './node-palette.component';
-import {
-  NODE_HEIGHT,
-  NODE_WIDTH,
-  WorkflowNodeComponent,
-} from './node.component';
+import { NODE_HEIGHT, NODE_WIDTH, WorkflowNodeComponent } from './node.component';
 import { getNodeType } from './node-type-registry';
 import { SaveChangeNoteModalComponent } from './save-change-note.modal.component';
 import { VersionHistoryDrawerComponent } from './version-history-drawer.component';
 import {
   WorkflowExportBody,
   WorkflowGraph,
-  WorkflowRead,
   WorkflowStatus,
   WorkflowTestFireResponse,
   WorkflowVersionDetail,
@@ -47,7 +38,6 @@ import {
 import { WorkflowStatusBadgeComponent } from '../workflow-status-badge.component';
 import { ABPairModalComponent } from '../ab/ab-pair-modal.component';
 import { ABStatsBannerComponent } from '../ab/ab-stats-banner.component';
-
 
 /**
  * The marquee surface — Angular canvas at `/user/workflows/:id` where
@@ -71,7 +61,6 @@ import { ABStatsBannerComponent } from '../ab/ab-stats-banner.component';
  * history all use the existing `workflows-api.service` surfaces.
  */
 
-
 type CursorPoint = { x: number; y: number };
 type PendingEdge = {
   sourceNodeId: string;
@@ -80,9 +69,7 @@ type PendingEdge = {
   cursor: CursorPoint;
 };
 
-
 const AUTOSAVE_INTERVAL_MS = 30_000;
-
 
 @Component({
   selector: 'app-workflow-canvas',
@@ -146,14 +133,12 @@ export class WorkflowCanvasPageComponent {
   // Camera + edge-drag local state.
   readonly pendingEdge = signal<PendingEdge | null>(null);
   private panDrag: { start: CursorPoint; pan0: CursorPoint } | null = null;
-  private nodeDrag:
-    | {
-        nodeId: string;
-        start: CursorPoint;
-        initialPos: CursorPoint;
-        moved: boolean;
-      }
-    | null = null;
+  private nodeDrag: {
+    nodeId: string;
+    start: CursorPoint;
+    initialPos: CursorPoint;
+    moved: boolean;
+  } | null = null;
 
   readonly transform = computed(() => {
     const z = this.state.zoom();
@@ -180,7 +165,6 @@ export class WorkflowCanvasPageComponent {
     } ${p.cursor.y - dy}, ${p.cursor.x} ${p.cursor.y}`;
   });
 
-
   constructor() {
     // Boot — load existing workflow OR initialise a blank one.
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
@@ -196,11 +180,7 @@ export class WorkflowCanvasPageComponent {
     // Auto-save loop — fires every AUTOSAVE_INTERVAL_MS. Only flushes
     // when the workflow is dirty AND in draft status.
     const tick = window.setInterval(() => {
-      if (
-        this.state.dirty() &&
-        this.state.status() === 'draft' &&
-        this.state.workflowId()
-      ) {
+      if (this.state.dirty() && this.state.status() === 'draft' && this.state.workflowId()) {
         this.save({ silent: true });
       }
     }, AUTOSAVE_INTERVAL_MS);
@@ -214,11 +194,8 @@ export class WorkflowCanvasPageComponent {
       }
     };
     window.addEventListener('beforeunload', beforeUnload);
-    this.destroyRef.onDestroy(() =>
-      window.removeEventListener('beforeunload', beforeUnload),
-    );
+    this.destroyRef.onDestroy(() => window.removeEventListener('beforeunload', beforeUnload));
   }
-
 
   // --- Load / Save / lifecycle ----------------------------------------
 
@@ -246,21 +223,14 @@ export class WorkflowCanvasPageComponent {
     // change-note modal so the version row gets a meaningful label.
     // Auto-save (`silent: true`) and brand-new workflows skip it.
     const id = this.state.workflowId();
-    if (
-      id &&
-      !opts.silent &&
-      opts.changeNote === undefined &&
-      this.state.dirty()
-    ) {
+    if (id && !opts.silent && opts.changeNote === undefined && this.state.dirty()) {
       this.showChangeNoteModal.set(true);
       return;
     }
     this.flushSave(opts);
   }
 
-  private flushSave(
-    opts: { silent?: boolean; changeNote?: string } = {},
-  ): void {
+  private flushSave(opts: { silent?: boolean; changeNote?: string } = {}): void {
     const id = this.state.workflowId();
     const graph = this.state.serializeGraph();
     const name = this.state.name().trim() || 'Untitled workflow';
@@ -274,9 +244,7 @@ export class WorkflowCanvasPageComponent {
     } = { name, graph };
     if (opts.changeNote) patchBody.change_note = opts.changeNote;
 
-    const obs = id
-      ? this.api.patch(id, patchBody)
-      : this.api.create({ name, graph });
+    const obs = id ? this.api.patch(id, patchBody) : this.api.create({ name, graph });
 
     obs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (workflow) => {
@@ -288,10 +256,7 @@ export class WorkflowCanvasPageComponent {
         if (!id && !opts.silent) {
           // Created — swap the URL so subsequent refreshes load the
           // workflow rather than re-creating blanks.
-          this.router.navigate(
-            ['/user/workflows', workflow.id],
-            { replaceUrl: true },
-          );
+          this.router.navigate(['/user/workflows', workflow.id], { replaceUrl: true });
         }
       },
       error: (err: HttpErrorResponse) => {
@@ -376,8 +341,7 @@ export class WorkflowCanvasPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (body) => this.downloadJson(body),
-        error: (err: HttpErrorResponse) =>
-          this.error.set(extractApiError(err) ?? 'Export failed.'),
+        error: (err: HttpErrorResponse) => this.error.set(extractApiError(err) ?? 'Export failed.'),
       });
   }
 
@@ -409,10 +373,7 @@ export class WorkflowCanvasPageComponent {
     this.showImportModal.set(false);
   }
 
-  confirmImport(payload: {
-    body: WorkflowExportBody;
-    name: string | null;
-  }): void {
+  confirmImport(payload: { body: WorkflowExportBody; name: string | null }): void {
     this.importBusy.set(true);
     this.api
       .importWorkflow({ json: payload.body, name: payload.name })
@@ -442,8 +403,7 @@ export class WorkflowCanvasPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (workflow) => this.state.setStatus(workflow.status),
-        error: (err) =>
-          this.error.set(extractApiError(err) ?? 'Activate failed.'),
+        error: (err) => this.error.set(extractApiError(err) ?? 'Activate failed.'),
       });
   }
 
@@ -455,18 +415,13 @@ export class WorkflowCanvasPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (workflow) => this.state.setStatus(workflow.status),
-        error: (err) =>
-          this.error.set(extractApiError(err) ?? 'Pause failed.'),
+        error: (err) => this.error.set(extractApiError(err) ?? 'Pause failed.'),
       });
   }
 
   discard(): void {
     if (!this.state.dirty()) return;
-    if (
-      !confirm(
-        'Discard unsaved changes? The canvas will revert to the last saved state.',
-      )
-    ) {
+    if (!confirm('Discard unsaved changes? The canvas will revert to the last saved state.')) {
       return;
     }
     const id = this.state.workflowId();
@@ -481,11 +436,7 @@ export class WorkflowCanvasPageComponent {
     const id = this.state.workflowId();
     if (!id) return;
     if (this.state.dirty()) {
-      if (
-        !confirm(
-          'Save before test-firing? The dry-run uses the persisted graph.',
-        )
-      ) {
+      if (!confirm('Save before test-firing? The dry-run uses the persisted graph.')) {
         return;
       }
       this.save();
@@ -506,7 +457,6 @@ export class WorkflowCanvasPageComponent {
         },
       });
   }
-
 
   // --- Camera (pan + zoom) --------------------------------------------
 
@@ -559,15 +509,13 @@ export class WorkflowCanvasPageComponent {
   }
 
   @HostListener('window:mouseup', ['$event'])
-  onWindowMouseUp(event: MouseEvent): void {
+  onWindowMouseUp(_event: MouseEvent): void {
     if (this.panDrag) {
       this.panDrag = null;
     }
     if (this.nodeDrag) {
       if (this.nodeDrag.moved) {
-        const final = this.state
-          .nodes()
-          .find((n) => n.id === this.nodeDrag!.nodeId);
+        const final = this.state.nodes().find((n) => n.id === this.nodeDrag!.nodeId);
         if (final) {
           // Commit the move through the undo-tracked path.
           this.state.moveNode(this.nodeDrag.nodeId, final.position ?? { x: 0, y: 0 });
@@ -598,7 +546,6 @@ export class WorkflowCanvasPageComponent {
     this.state.setPan({ x: dx, y: dy });
   }
 
-
   // --- Node drag (move) -----------------------------------------------
 
   onNodeMouseDown(payload: { nodeId: string; event: MouseEvent }): void {
@@ -617,14 +564,9 @@ export class WorkflowCanvasPageComponent {
     this.state.selectNode(nodeId);
   }
 
-
   // --- Edge drag (connect) --------------------------------------------
 
-  onOutputPortDown(payload: {
-    nodeId: string;
-    portLabel: string | null;
-    event: MouseEvent;
-  }): void {
+  onOutputPortDown(payload: { nodeId: string; portLabel: string | null; event: MouseEvent }): void {
     const node = this.nodeById().get(payload.nodeId);
     if (!node) return;
     const outputs = getNodeType(node.type)?.outputs ?? [];
@@ -632,9 +574,7 @@ export class WorkflowCanvasPageComponent {
       0,
       outputs.findIndex((o) => (o.label ?? null) === payload.portLabel),
     );
-    const sx =
-      (node.position?.x ?? 0) +
-      this.computeOutputPortX(idx, outputs.length);
+    const sx = (node.position?.x ?? 0) + this.computeOutputPortX(idx, outputs.length);
     const sy = (node.position?.y ?? 0) + NODE_HEIGHT;
     const cursor = this.toCanvasCoords(payload.event);
     this.pendingEdge.set({
@@ -652,11 +592,7 @@ export class WorkflowCanvasPageComponent {
       this.pendingEdge.set(null);
       return;
     }
-    this.state.addEdge(
-      pending.sourceNodeId,
-      payload.nodeId,
-      pending.sourcePortLabel,
-    );
+    this.state.addEdge(pending.sourceNodeId, payload.nodeId, pending.sourcePortLabel);
     this.pendingEdge.set(null);
   }
 
@@ -666,7 +602,6 @@ export class WorkflowCanvasPageComponent {
     const step = usable / (total - 1);
     return 20 + step * index;
   }
-
 
   // --- Drop from palette ----------------------------------------------
 
@@ -688,7 +623,6 @@ export class WorkflowCanvasPageComponent {
       y: pos.y - NODE_HEIGHT / 2,
     });
   }
-
 
   // --- Camera helpers + keyboard --------------------------------------
 
@@ -754,15 +688,11 @@ export class WorkflowCanvasPageComponent {
     } else if (cmd && event.key === 's') {
       event.preventDefault();
       if (this.state.dirty()) this.save();
-    } else if (
-      event.key === 'Delete' &&
-      this.state.selectedNodeId() !== null
-    ) {
+    } else if (event.key === 'Delete' && this.state.selectedNodeId() !== null) {
       const id = this.state.selectedNodeId();
       if (id) this.state.deleteNode(id);
     }
   }
-
 
   // --- Coord transforms -----------------------------------------------
 

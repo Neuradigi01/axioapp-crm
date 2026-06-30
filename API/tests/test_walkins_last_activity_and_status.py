@@ -11,10 +11,11 @@ Six cases:
   6. `list?sort=last_activity_at&order=desc` returns expected order
      (newest activity first, NULLs last).
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -38,9 +39,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -125,9 +124,7 @@ async def test_happy_path_browsing_to_interested(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_rejects_skipping_intermediate_states(
-    layered_client, seeded_admin
-):
+async def test_rejects_skipping_intermediate_states(layered_client, seeded_admin):
     """`browsing → converted` is not allowed — must go through interested."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -152,16 +149,12 @@ async def test_rejects_skipping_intermediate_states(
 
 
 @pytest.mark.asyncio
-async def test_terminal_converted_cannot_be_changed(
-    layered_client, seeded_admin
-):
+async def test_terminal_converted_cannot_be_changed(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "walkins.read", "walkins.write")
     contact_id = await _seed_contact(org.id)
-    w = await _seed_walkin(
-        org.id, contact_id=contact_id, status=WalkInStatus.converted
-    )
+    w = await _seed_walkin(org.id, contact_id=contact_id, status=WalkInStatus.converted)
 
     token = await _login(
         layered_client,
@@ -205,9 +198,7 @@ async def test_left_can_be_reengaged_to_browsing(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_activity_insert_bumps_walkin_last_activity_at(
-    layered_client, seeded_admin
-):
+async def test_activity_insert_bumps_walkin_last_activity_at(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -245,24 +236,20 @@ async def test_activity_insert_bumps_walkin_last_activity_at(
     ctx = set_context(RequestContext(org_id=org.id))
     try:
         async with TestSession() as session:
-            row = (
-                await session.execute(select(WalkIn).where(WalkIn.id == w))
-            ).scalar_one()
+            row = (await session.execute(select(WalkIn).where(WalkIn.id == w))).scalar_one()
             assert row.last_activity_at is not None
     finally:
         reset_context(ctx)
 
 
 @pytest.mark.asyncio
-async def test_list_sort_by_last_activity_desc_nulls_last(
-    layered_client, seeded_admin
-):
+async def test_list_sort_by_last_activity_desc_nulls_last(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "walkins.read", "walkins.write")
     contact_id = await _seed_contact(org.id)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     older = await _seed_walkin(
         org.id,
         contact_id=contact_id,

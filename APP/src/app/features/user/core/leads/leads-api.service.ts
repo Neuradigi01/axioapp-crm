@@ -15,12 +15,7 @@ export type LeadStatus = 'active' | 'won' | 'lost';
 
 /** Provenance of a lead row. Matches the backend `lead_source` PG enum
  * exactly — keep in sync. */
-export type LeadSource =
-  | 'manual'
-  | 'bulk_import'
-  | 'widget'
-  | 'google_ads'
-  | 'meta_ads';
+export type LeadSource = 'manual' | 'bulk_import' | 'widget' | 'google_ads' | 'meta_ads';
 
 export interface Lead {
   id: string;
@@ -52,11 +47,7 @@ export interface Lead {
   [key: string]: unknown;
 }
 
-export type LeadSortKey =
-  | 'created_at'
-  | 'last_activity_at'
-  | 'lead_score'
-  | 'contact_name';
+export type LeadSortKey = 'created_at' | 'last_activity_at' | 'lead_score' | 'contact_name';
 export type SortOrder = 'asc' | 'desc';
 
 /**
@@ -160,11 +151,7 @@ export interface LeadListQuery {
 }
 
 @Injectable({ providedIn: 'root' })
-export class LeadsApiService extends BaseCrudApiService<
-  Lead,
-  LeadCreate,
-  LeadUpdate
-> {
+export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUpdate> {
   protected readonly base = `${environment.apiBaseUrl}/leads`;
   private readonly renderUrl = `${environment.apiBaseUrl}/custom-fields/lead/render`;
 
@@ -219,10 +206,7 @@ export class LeadsApiService extends BaseCrudApiService<
   }
 
   /** Single-row reassign. `userId === null` clears the owner. */
-  reassign(
-    id: string,
-    body: { userId: string | null; note?: string | null },
-  ): Observable<Lead> {
+  reassign(id: string, body: { userId: string | null; note?: string | null }): Observable<Lead> {
     return this.http.post<Lead>(`${this.base}/${id}/reassign`, {
       assigned_to_id: body.userId,
       note: body.note ?? null,
@@ -261,14 +245,8 @@ export class LeadsApiService extends BaseCrudApiService<
     return this.http.post<LeadScoringRule>(`${this.base}/scoring-rules`, payload);
   }
 
-  updateScoringRule(
-    id: string,
-    payload: LeadScoringRuleUpdate,
-  ): Observable<LeadScoringRule> {
-    return this.http.patch<LeadScoringRule>(
-      `${this.base}/scoring-rules/${id}`,
-      payload,
-    );
+  updateScoringRule(id: string, payload: LeadScoringRuleUpdate): Observable<LeadScoringRule> {
+    return this.http.patch<LeadScoringRule>(`${this.base}/scoring-rules/${id}`, payload);
   }
 
   deleteScoringRule(id: string): Observable<void> {
@@ -276,10 +254,7 @@ export class LeadsApiService extends BaseCrudApiService<
   }
 
   recomputeScores(): Observable<{ touched: number }> {
-    return this.http.post<{ touched: number }>(
-      `${this.base}/scoring-rules/recompute`,
-      {},
-    );
+    return this.http.post<{ touched: number }>(`${this.base}/scoring-rules/recompute`, {});
   }
 
   private buildParams(query: LeadListQuery) {
@@ -299,9 +274,7 @@ export class LeadsApiService extends BaseCrudApiService<
       limit: query.limit,
       with_total: query.with_total,
       filter:
-        query.filter && !isEmptyFilter(query.filter)
-          ? JSON.stringify(query.filter)
-          : undefined,
+        query.filter && !isEmptyFilter(query.filter) ? JSON.stringify(query.filter) : undefined,
       ...prefixCustomFilters(query.customFilters),
     });
   }

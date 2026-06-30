@@ -25,6 +25,7 @@ Lifecycle invariants enforced here:
 Compliance pre-flight (Step 12) hooks in via the ``ActivationBlocked``
 exception path. Until Step 12 lands the hook is a no-op.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -37,7 +38,6 @@ from src.app.core.workflows import data_access as _da
 from src.app.core.workflows.exceptions import (
     DuplicateWorkflowName,
     FolderHasWorkflows,
-    InvalidGraph,
     WorkflowLocked,
     WorkflowNotFound,
 )
@@ -56,19 +56,12 @@ from src.app.core.workflows.schemas import (
     WorkflowUpdate,
 )
 
-
 # Status transitions the service allows. Any transition not in
 # this set raises a :class:`ValueError` — the router maps to 409.
 _ALLOWED_TRANSITIONS: dict[WorkflowStatus, frozenset[WorkflowStatus]] = {
-    WorkflowStatus.draft: frozenset(
-        {WorkflowStatus.active, WorkflowStatus.archived}
-    ),
-    WorkflowStatus.active: frozenset(
-        {WorkflowStatus.paused, WorkflowStatus.archived}
-    ),
-    WorkflowStatus.paused: frozenset(
-        {WorkflowStatus.active, WorkflowStatus.archived}
-    ),
+    WorkflowStatus.draft: frozenset({WorkflowStatus.active, WorkflowStatus.archived}),
+    WorkflowStatus.active: frozenset({WorkflowStatus.paused, WorkflowStatus.archived}),
+    WorkflowStatus.paused: frozenset({WorkflowStatus.active, WorkflowStatus.archived}),
     WorkflowStatus.archived: frozenset(),
 }
 
@@ -90,9 +83,7 @@ def _is_marketing_locked(workflow: Workflow) -> bool:
     """Active marketing workflows lock against edits. Operator
     pauses + edits + reactivates so an in-flight enrolment doesn't
     switch graph mid-stream."""
-    return bool(
-        workflow.status == WorkflowStatus.active and workflow.is_marketing
-    )
+    return bool(workflow.status == WorkflowStatus.active and workflow.is_marketing)
 
 
 # --- workflow CRUD ------------------------------------------------------
@@ -110,13 +101,9 @@ async def create_workflow(
     ``tbl_workflow_versions`` so Step 17 has a starting baseline.
     Raises :class:`DuplicateWorkflowName` when ``(org_id, lower(name))``
     is taken."""
-    existing = await _da.get_workflow_by_name(
-        session, org_id=org_id, name=payload.name
-    )
+    existing = await _da.get_workflow_by_name(session, org_id=org_id, name=payload.name)
     if existing is not None:
-        raise DuplicateWorkflowName(
-            f"workflow named '{payload.name}' already exists"
-        )
+        raise DuplicateWorkflowName(f"workflow named '{payload.name}' already exists")
 
     # DB-bound validation: template-id references resolve, action
     # types resolve, no cycles, single trigger, etc.
@@ -168,9 +155,7 @@ async def get_workflow(
     workflow_id: uuid.UUID,
 ) -> Workflow:
     """Single-row hydrate. Raises :class:`WorkflowNotFound` on miss."""
-    row = await _da.get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
+    row = await _da.get_workflow(session, org_id=org_id, workflow_id=workflow_id)
     if row is None:
         raise WorkflowNotFound(str(workflow_id))
     return row
@@ -214,26 +199,18 @@ async def update_workflow(
     (:class:`WorkflowLocked`); operator pauses + edits +
     reactivates. Any graph change bumps ``current_version`` and
     writes a new row in ``tbl_workflow_versions``."""
-    workflow = await get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
+    workflow = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
     if _is_marketing_locked(workflow):
-        raise WorkflowLocked(
-            "cannot edit an active marketing workflow; pause it first"
-        )
+        raise WorkflowLocked("cannot edit an active marketing workflow; pause it first")
 
     changes = payload.model_dump(exclude_unset=True)
 
     # Name uniqueness re-check when renaming.
     new_name = changes.get("name")
     if new_name is not None and new_name.strip().lower() != workflow.name.lower():
-        clash = await _da.get_workflow_by_name(
-            session, org_id=org_id, name=new_name
-        )
+        clash = await _da.get_workflow_by_name(session, org_id=org_id, name=new_name)
         if clash is not None and clash.id != workflow.id:
-            raise DuplicateWorkflowName(
-                f"workflow named '{new_name}' already exists"
-            )
+            raise DuplicateWorkflowName(f"workflow named '{new_name}' already exists")
 
     # Graph re-validation when supplied.
     new_graph_obj: WorkflowGraph | None = None
@@ -264,9 +241,7 @@ async def update_workflow(
             setattr(workflow, key, changes[key])
 
     if "re_enrollment_rule" in changes and changes["re_enrollment_rule"] is not None:
-        workflow.re_enrollment_rule = WorkflowReEnrollmentRule(
-            changes["re_enrollment_rule"]
-        )
+        workflow.re_enrollment_rule = WorkflowReEnrollmentRule(changes["re_enrollment_rule"])
 
     # Status changes go through ``change_status`` so the state
     # machine is enforced consistently.
@@ -321,14 +296,8 @@ async def change_status(
       * :class:`ValueError` — invalid transition (router maps to
         409).
     """
-    workflow = await get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
-    target = (
-        new_status
-        if isinstance(new_status, WorkflowStatus)
-        else WorkflowStatus(new_status)
-    )
+    workflow = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
+    target = new_status if isinstance(new_status, WorkflowStatus) else WorkflowStatus(new_status)
     await _transition_status_in_session(
         session, workflow=workflow, org_id=org_id, new_status=target
     )
@@ -354,8 +323,7 @@ async def _transition_status_in_session(
     allowed = _ALLOWED_TRANSITIONS.get(workflow.status, frozenset())
     if new_status not in allowed:
         raise ValueError(
-            f"invalid status transition {workflow.status.value!r} → "
-            f"{new_status.value!r}"
+            f"invalid status transition {workflow.status.value!r} → {new_status.value!r}"
         )
 
     if new_status == WorkflowStatus.active:
@@ -411,9 +379,7 @@ async def create_folder(
     return folder
 
 
-async def list_folders(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> list[WorkflowFolder]:
+async def list_folders(session: AsyncSession, *, org_id: uuid.UUID) -> list[WorkflowFolder]:
     return await _da.list_folders(session, org_id=org_id)
 
 
@@ -426,9 +392,7 @@ async def patch_folder(
     parent_folder_id: uuid.UUID | None = None,
     display_order: int | None = None,
 ) -> WorkflowFolder:
-    folder = await _da.get_folder(
-        session, org_id=org_id, folder_id=folder_id
-    )
+    folder = await _da.get_folder(session, org_id=org_id, folder_id=folder_id)
     if folder is None:
         raise WorkflowNotFound(str(folder_id))
     if name is not None:
@@ -450,9 +414,7 @@ async def delete_folder(
 ) -> None:
     """Hard delete. Refuses with :class:`FolderHasWorkflows` when
     the folder still has non-archived workflows assigned."""
-    folder = await _da.get_folder(
-        session, org_id=org_id, folder_id=folder_id
-    )
+    folder = await _da.get_folder(session, org_id=org_id, folder_id=folder_id)
     if folder is None:
         raise WorkflowNotFound(str(folder_id))
     blocking_count = await _da.count_workflows_in_folder(
@@ -481,9 +443,7 @@ async def update_enabled_event_types_from_graph(
 
     Returns the new list for caller introspection.
     """
-    workflow = await get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
+    workflow = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
     graph_obj = WorkflowGraph.model_validate(workflow.graph)
     workflow.enabled_event_types = _extract_event_types(graph_obj)
     await session.commit()
@@ -514,9 +474,7 @@ async def list_workflow_versions(
         limit=limit,
         offset=offset,
     )
-    total = await _da.count_versions(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
+    total = await _da.count_versions(session, org_id=org_id, workflow_id=workflow_id)
     return rows, total
 
 
@@ -539,9 +497,7 @@ async def get_workflow_version(
         version=version,
     )
     if row is None:
-        raise WorkflowNotFound(
-            f"workflow {workflow_id} has no version {version}"
-        )
+        raise WorkflowNotFound(f"workflow {workflow_id} has no version {version}")
     return row
 
 
@@ -566,13 +522,9 @@ async def rollback_workflow(
     template / sub-workflow references that were valid at the time
     of the version snapshot may have been archived since.
     """
-    workflow = await get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
+    workflow = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
     if _is_marketing_locked(workflow):
-        raise WorkflowLocked(
-            "cannot roll back an active marketing workflow; pause it first"
-        )
+        raise WorkflowLocked("cannot roll back an active marketing workflow; pause it first")
 
     target = await _da.get_version(
         session,
@@ -581,9 +533,7 @@ async def rollback_workflow(
         version=target_version,
     )
     if target is None:
-        raise WorkflowNotFound(
-            f"workflow {workflow_id} has no version {target_version}"
-        )
+        raise WorkflowNotFound(f"workflow {workflow_id} has no version {target_version}")
 
     graph_dict = dict(target.graph or {})
     graph_obj = WorkflowGraph.model_validate(graph_dict)
@@ -625,9 +575,7 @@ async def export_workflow(
     matches :class:`schemas.WorkflowExport`. Internal UUIDs
     (template_id references, etc.) are kept verbatim; the importer
     remaps unknown references to ``null``."""
-    workflow = await get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
+    workflow = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
     return {
         "name": workflow.name,
         "description": workflow.description,
@@ -672,9 +620,7 @@ async def import_workflow(
     """
     # Auto-uniqify the name.
     desired = (override_name or payload.name).strip()
-    existing_names = {
-        name for name in await _da.list_workflow_names(session, org_id=org_id)
-    }
+    existing_names = {name for name in await _da.list_workflow_names(session, org_id=org_id)}
     final_name = _next_unique_name(desired, existing_names)
 
     # Remap unknown template_ids → null. Pulls the existing template
@@ -695,9 +641,7 @@ async def import_workflow(
 
     valid_ids: set[uuid.UUID] = set()
     for tid in referenced_ids:
-        row = await templates_da.get_template(
-            session, org_id=org_id, template_id=tid
-        )
+        row = await templates_da.get_template(session, org_id=org_id, template_id=tid)
         if row is not None:
             valid_ids.add(tid)
 
@@ -734,9 +678,7 @@ async def import_workflow(
         goal_node_id=payload.goal_node_id,
         cost_per_run_cents=payload.cost_per_run_cents,
     )
-    return await create_workflow(
-        session, org_id=org_id, user_id=user_id, payload=create_payload
-    )
+    return await create_workflow(session, org_id=org_id, user_id=user_id, payload=create_payload)
 
 
 # --- Step 18: A/B pairing + unpair + stats ---------------------------

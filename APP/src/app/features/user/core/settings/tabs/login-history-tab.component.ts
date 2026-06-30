@@ -1,18 +1,9 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 
-import {
-  LoginHistoryApiService,
-  SessionRow,
-} from '../services/login-history-api.service';
+import { LoginHistoryApiService, SessionRow } from '../services/login-history-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
@@ -56,9 +47,7 @@ export class LoginHistoryTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not load login history.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load login history.');
         },
       });
   }
@@ -76,9 +65,7 @@ export class LoginHistoryTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.revokingId.set(null);
-          this.error.set(
-            extractApiError(err) ?? 'Could not sign out that session.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not sign out that session.');
         },
       });
   }

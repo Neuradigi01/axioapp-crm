@@ -53,9 +53,7 @@ import { FunnelChartComponent } from './funnel-chart.component';
       <div class="rounded-md border border-zinc-200 bg-white p-4">
         <div class="mb-3 flex items-center justify-between">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Funnel
-            </p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Funnel</p>
             <p class="text-[11px] text-zinc-500">
               Conversion attribution uses a 7-day window from message receipt.
             </p>
@@ -79,9 +77,7 @@ import { FunnelChartComponent } from './funnel-chart.component';
             <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
               Failure breakdown
             </p>
-            <p class="text-[11px] text-zinc-500">
-              Classified from Meta's error titles.
-            </p>
+            <p class="text-[11px] text-zinc-500">Classified from Meta's error titles.</p>
           </div>
           @if (failuresLoading()) {
             <span class="text-[11px] text-zinc-500">Loading…</span>
@@ -132,9 +128,7 @@ export class CampaignAnalyticsTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.funnelLoading.set(false);
-          this.funnelError.set(
-            extractApiError(err) ?? 'Could not load funnel.',
-          );
+          this.funnelError.set(extractApiError(err) ?? 'Could not load funnel.');
         },
       });
 
@@ -150,9 +144,7 @@ export class CampaignAnalyticsTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.failuresLoading.set(false);
-          this.failuresError.set(
-            extractApiError(err) ?? 'Could not load failures.',
-          );
+          this.failuresError.set(extractApiError(err) ?? 'Could not load failures.');
         },
       });
   }

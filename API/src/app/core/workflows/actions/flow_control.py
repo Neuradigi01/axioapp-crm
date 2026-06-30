@@ -26,6 +26,7 @@ The remaining flow nodes (``flow.wait``, ``flow.wait_for_event``,
 Step 6 only registers the two branch handlers because they're the
 minimum needed to validate the condition AST end-to-end.
 """
+
 from __future__ import annotations
 
 import logging
@@ -33,7 +34,6 @@ from typing import Any
 
 from src.app.core.events.conditions import evaluate_safe
 from src.app.core.workflows.actions import register_action
-
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ async def _switch_handler(
     """Read one value off the context + match by equality against
     every ``branches[].value``. Missing path / no match falls
     through to ``"default"``."""
-    from src.app.core.events.conditions import _resolve_path, _MISSING
+    from src.app.core.events.conditions import _MISSING, _resolve_path
     from src.app.core.workflows.engine import ActionResult
 
     cfg = node.get("config") or {}
@@ -109,10 +109,8 @@ async def _switch_handler(
 
 import hashlib  # noqa: E402
 import logging  # noqa: E402
-import random  # noqa: E402
 import uuid as _uuid_mod  # noqa: E402
-from datetime import datetime, timedelta, timezone  # noqa: E402
-
+from datetime import UTC, datetime, timedelta  # noqa: E402
 
 _logger = logging.getLogger(__name__)
 
@@ -216,11 +214,9 @@ async def _wait_for_event_handler(session, *, run, step_run, node, context):
     max_wait = min(int(max_wait), _MAX_WAIT_SECONDS)
 
     contact_match = bool(cfg.get("contact_match", True))
-    wait_contact_id = (
-        getattr(run, "contact_id", None) if contact_match else None
-    )
+    wait_contact_id = getattr(run, "contact_id", None) if contact_match else None
 
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=max_wait)
+    expires_at = datetime.now(UTC) + timedelta(seconds=max_wait)
 
     wait = WorkflowEventWait(
         org_id=run.org_id,
@@ -314,15 +310,11 @@ async def _call_webhook_handler(session, *, run, step_run, node, context):
 
     request_headers = dict(headers)
     request_headers.setdefault("Content-Type", "application/json")
-    request_headers.setdefault(
-        "X-Idempotency-Key", str(getattr(step_run, "id", "")) or ""
-    )
+    request_headers.setdefault("X-Idempotency-Key", str(getattr(step_run, "id", "")) or "")
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(
-                url, content=rendered_body, headers=request_headers
-            )
+            response = await client.post(url, content=rendered_body, headers=request_headers)
     except Exception as exc:
         if on_failure == "error":
             raise
@@ -333,9 +325,7 @@ async def _call_webhook_handler(session, *, run, step_run, node, context):
 
     if response.status_code not in expected:
         if on_failure == "error":
-            raise RuntimeError(
-                f"webhook returned {response.status_code}: {response.text[:200]}"
-            )
+            raise RuntimeError(f"webhook returned {response.status_code}: {response.text[:200]}")
         return ActionResult(
             skip_reason="webhook_failed",
             output={
@@ -383,9 +373,7 @@ async def _notify_user_handler(session, *, run, step_run, node, context):
     elif recipient_kind == "lead_owner":
         payload = context.get("trigger_payload") or {}
         lead = payload.get("lead") or {}
-        raw = (
-            lead.get("assigned_to_id") if isinstance(lead, dict) else None
-        )
+        raw = lead.get("assigned_to_id") if isinstance(lead, dict) else None
         try:
             target_user_id = _uuid_mod.UUID(str(raw)) if raw else None
         except (ValueError, TypeError):
@@ -430,9 +418,7 @@ async def _notify_user_handler(session, *, run, step_run, node, context):
             output={"skip_reason": "notify_failed", "error": str(exc)},
         )
 
-    return ActionResult(
-        output={"notified_user_id": str(target_user_id), "title": title}
-    )
+    return ActionResult(output={"notified_user_id": str(target_user_id), "title": title})
 
 
 async def _log_internal_note_handler(session, *, run, step_run, node, context):
@@ -477,9 +463,7 @@ async def _log_internal_note_handler(session, *, run, step_run, node, context):
             output={"skip_reason": "activity_log_failed", "error": str(exc)},
         )
 
-    return ActionResult(
-        output={"contact_id": str(contact_id), "is_internal": True}
-    )
+    return ActionResult(output={"contact_id": str(contact_id), "is_internal": True})
 
 
 def register() -> None:
@@ -494,18 +478,10 @@ def register() -> None:
     register_action("flow_control.wait", lambda: _wait_handler)
     register_action("flow_control.ab_split", lambda: _ab_split_handler)
     register_action("flow_control.goal", lambda: _goal_handler)
-    register_action(
-        "flow_control.wait_for_event", lambda: _wait_for_event_handler
-    )
-    register_action(
-        "flow_control.call_webhook", lambda: _call_webhook_handler
-    )
-    register_action(
-        "flow_control.notify_user", lambda: _notify_user_handler
-    )
-    register_action(
-        "flow_control.log_internal_note", lambda: _log_internal_note_handler
-    )
+    register_action("flow_control.wait_for_event", lambda: _wait_for_event_handler)
+    register_action("flow_control.call_webhook", lambda: _call_webhook_handler)
+    register_action("flow_control.notify_user", lambda: _notify_user_handler)
+    register_action("flow_control.log_internal_note", lambda: _log_internal_note_handler)
 
 
 # Side-effect registration on import so the engine resolves

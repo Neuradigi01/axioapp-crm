@@ -20,11 +20,12 @@ the data invariants:
 
 All reads/writes RLS-scope to the active org via ``TenantScoped``.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -46,7 +47,7 @@ logger = logging.getLogger(__name__)
 async def list_tags(
     session: AsyncSession,
     *,
-    search: Optional[str] = None,
+    search: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return all tags for the active org, sorted by name. The result
     carries `usage_count` (number of conversations the tag is on) so
@@ -65,9 +66,7 @@ async def list_tags(
     ]
 
 
-async def get_tag_or_404(
-    session: AsyncSession, tag_id: uuid.UUID
-) -> ConversationTag:
+async def get_tag_or_404(session: AsyncSession, tag_id: uuid.UUID) -> ConversationTag:
     row = await _da.get_tag_by_id(session, tag_id)
     if row is None:
         raise HTTPException(
@@ -83,12 +82,8 @@ async def list_tags_for_conversation(
 ) -> list[dict[str, Any]]:
     """Embedded `tags[]` for the conversation detail view. Returns
     `[{id, name, color}, ...]` ordered by name."""
-    rows = await _da.list_tag_chips_for_conversation(
-        session, conversation_id
-    )
-    return [
-        {"id": r.id, "name": r.name, "color": r.color} for r in rows
-    ]
+    rows = await _da.list_tag_chips_for_conversation(session, conversation_id)
+    return [{"id": r.id, "name": r.name, "color": r.color} for r in rows]
 
 
 async def bulk_tags_for_conversations(
@@ -97,14 +92,10 @@ async def bulk_tags_for_conversations(
 ) -> dict[uuid.UUID, list[dict[str, Any]]]:
     """One-shot fetch of tags for many conversations — used by the
     list endpoint so we don't N+1-query the chip data."""
-    rows = await _da.bulk_list_tag_chips_for_conversations(
-        session, conversation_ids
-    )
+    rows = await _da.bulk_list_tag_chips_for_conversations(session, conversation_ids)
     out: dict[uuid.UUID, list[dict[str, Any]]] = {}
     for r in rows:
-        out.setdefault(r.conversation_id, []).append(
-            {"id": r.id, "name": r.name, "color": r.color}
-        )
+        out.setdefault(r.conversation_id, []).append({"id": r.id, "name": r.name, "color": r.color})
     return out
 
 
@@ -153,8 +144,8 @@ async def update_tag(
     *,
     actor_id: uuid.UUID,
     tag_id: uuid.UUID,
-    name: Optional[str],
-    color: Optional[str],
+    name: str | None,
+    color: str | None,
 ) -> ConversationTag:
     """Rename and / or recolor a tag. Empty patches are a no-op (no
     audit row, no commit)."""
@@ -229,9 +220,7 @@ async def assign_tag(
         )
     await get_tag_or_404(session, tag_id)
 
-    existing = await _da.get_tag_assignment(
-        session, conversation_id=conversation_id, tag_id=tag_id
-    )
+    existing = await _da.get_tag_assignment(session, conversation_id=conversation_id, tag_id=tag_id)
     if existing is None:
         _da.insert_tag_assignment(
             session,

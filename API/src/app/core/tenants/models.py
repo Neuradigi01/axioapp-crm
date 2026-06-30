@@ -7,6 +7,7 @@ enforces tenant isolation at the database layer.
 This model uses SQLAlchemy 2.x typed-Mapped style and registers on the
 shared `Base` so Alembic autogenerate picks it up alongside legacy models.
 """
+
 import uuid
 from datetime import datetime, time
 from decimal import Decimal
@@ -32,7 +33,9 @@ class Organization(Base):
     # "real_estate", ...). The literal "pending" is a sentinel meaning
     # "register completed, onboarding not yet finalized" — see the
     # onboarding-setup track.
-    template_id: Mapped[str] = mapped_column(String(32), nullable=False, server_default=text("'pending'"))
+    template_id: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default=text("'pending'")
+    )
     template_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default=text("'INR'"))
     tax_rate: Mapped[Decimal] = mapped_column(
@@ -40,7 +43,9 @@ class Organization(Base):
         nullable=False,
         server_default=text("18.00"),
     )
-    timezone: Mapped[str] = mapped_column(String(64), nullable=False, server_default=text("'Asia/Kolkata'"))
+    timezone: Mapped[str] = mapped_column(
+        String(64), nullable=False, server_default=text("'Asia/Kolkata'")
+    )
     created_via: Mapped[str] = mapped_column(
         String(32),
         nullable=False,

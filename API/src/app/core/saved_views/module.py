@@ -10,8 +10,8 @@ toolbar (and, in future, the contacts / walk-ins toolbars) — there is
 no top-level "Saved Views" navigation. ``menu_position=None`` keeps
 the registry quiet about it.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="saved_views",

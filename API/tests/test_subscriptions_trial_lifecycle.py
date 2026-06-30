@@ -20,10 +20,11 @@ Step-6 spec verifications covered:
     sub even on a repeated scan.
   - Audit events land for every transition.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -42,10 +43,10 @@ from src.app.core.subscriptions.signup_hook import (
 )
 from src.app.core.tenants.models import Organization
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_org(name: str = "Lifecycle Co") -> Organization:
     return Organization(id=uuid.uuid4(), name=name, slug=f"{name}-{uuid.uuid4().hex[:6]}")
@@ -62,7 +63,7 @@ async def _insert_sub(
     archived_at: datetime | None = None,
     plan_code: str = "trial",
 ) -> Subscription:
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = Subscription(
         org_id=org_id,
         plan_code=plan_code,
@@ -94,6 +95,7 @@ async def fresh_org(test_db):
 # Signup hook
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_create_trial_subscription_inserts_14_day_trial(test_db, fresh_org):
     sub = await create_trial_subscription(test_db, org_id=fresh_org.id)
@@ -108,7 +110,7 @@ async def test_create_trial_subscription_inserts_14_day_trial(test_db, fresh_org
     assert sub.seats_purchased == TRIAL_SEATS
     assert sub.trial_started_at is not None
     assert sub.trial_ends_at is not None
-    window = (sub.trial_ends_at - sub.trial_started_at)
+    window = sub.trial_ends_at - sub.trial_started_at
     assert timedelta(days=13, hours=23) < window < timedelta(days=14, hours=1)
 
 
@@ -123,10 +125,10 @@ async def test_signup_hook_rolls_back_with_parent_transaction(test_db):
     await test_db.rollback()
 
     rows = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.org_id == o.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(Subscription).where(Subscription.org_id == o.id)))
+        .scalars()
+        .all()
+    )
     assert rows == []
 
 
@@ -134,9 +136,10 @@ async def test_signup_hook_rolls_back_with_parent_transaction(test_db):
 # Trial → read_only
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_trial_to_read_only_at_deadline(test_db, fresh_org):
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = await _insert_sub(
         test_db,
         fresh_org.id,
@@ -150,9 +153,7 @@ async def test_trial_to_read_only_at_deadline(test_db, fresh_org):
     assert new_status == "read_only"
 
     refreshed = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     assert refreshed.status == "read_only"
     assert refreshed.read_only_at is not None
@@ -171,7 +172,7 @@ async def test_trial_to_read_only_at_deadline(test_db, fresh_org):
 
 @pytest.mark.asyncio
 async def test_trial_not_yet_due_returns_none(test_db, fresh_org):
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = await _insert_sub(
         test_db,
         fresh_org.id,
@@ -188,9 +189,10 @@ async def test_trial_not_yet_due_returns_none(test_db, fresh_org):
 # Read_only → archived
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_read_only_to_archived_at_deadline(test_db, fresh_org):
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = await _insert_sub(
         test_db,
         fresh_org.id,
@@ -203,9 +205,7 @@ async def test_read_only_to_archived_at_deadline(test_db, fresh_org):
     assert new_status == "archived"
 
     refreshed = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     assert refreshed.status == "archived"
     assert refreshed.archived_at is not None
@@ -215,9 +215,10 @@ async def test_read_only_to_archived_at_deadline(test_db, fresh_org):
 # Archived → deleted (row removed)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_archived_to_deleted_at_deadline(test_db, fresh_org):
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = await _insert_sub(
         test_db,
         fresh_org.id,
@@ -231,9 +232,7 @@ async def test_archived_to_deleted_at_deadline(test_db, fresh_org):
     assert new_status == "deleted"
 
     remaining = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub_id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub_id))
     ).scalar_one_or_none()
     assert remaining is None
 
@@ -252,9 +251,10 @@ async def test_archived_to_deleted_at_deadline(test_db, fresh_org):
 # Idempotency / race
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_transition_idempotent(test_db, fresh_org):
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = await _insert_sub(
         test_db,
         fresh_org.id,
@@ -267,9 +267,7 @@ async def test_transition_idempotent(test_db, fresh_org):
     assert first == "read_only"
 
     refreshed = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     # `subscription` is the original snapshot; pass the refreshed row.
     second = await transition_if_due(test_db, refreshed)
@@ -280,7 +278,7 @@ async def test_transition_idempotent(test_db, fresh_org):
 async def test_transition_aborts_on_concurrent_status_change(test_db, fresh_org):
     """If status flipped underfoot (e.g. paid upgrade) the UPDATE is
     a no-op and we emit no audit/email."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = await _insert_sub(
         test_db,
         fresh_org.id,
@@ -290,9 +288,7 @@ async def test_transition_aborts_on_concurrent_status_change(test_db, fresh_org)
     )
     # Simulate a concurrent payment success.
     await test_db.execute(
-        text(
-            "UPDATE tbl_subscriptions SET status='active', plan_code='basic' WHERE id=:id"
-        ),
+        text("UPDATE tbl_subscriptions SET status='active', plan_code='basic' WHERE id=:id"),
         {"id": sub.id},
     )
     await test_db.commit()
@@ -317,9 +313,10 @@ async def test_transition_aborts_on_concurrent_status_change(test_db, fresh_org)
 # Sweep
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_scan_summary_counts_mixed_states(test_db):
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
 
     # 2 trials past deadline
     for _ in range(2):
@@ -327,7 +324,8 @@ async def test_scan_summary_counts_mixed_states(test_db):
         test_db.add(o)
         await test_db.flush()
         await _insert_sub(
-            test_db, o.id,
+            test_db,
+            o.id,
             status="trialing",
             trial_started_at=now - timedelta(days=15),
             trial_ends_at=now - timedelta(hours=1),
@@ -350,7 +348,8 @@ async def test_scan_summary_counts_mixed_states(test_db):
     test_db.add(o)
     await test_db.flush()
     await _insert_sub(
-        test_db, o.id,
+        test_db,
+        o.id,
         status="trialing",
         trial_started_at=now,
         trial_ends_at=now + timedelta(days=14),
@@ -367,9 +366,10 @@ async def test_scan_summary_counts_mixed_states(test_db):
 # 3-day reminder dedup
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_trial_ending_soon_fires_once(test_db, fresh_org):
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = await _insert_sub(
         test_db,
         fresh_org.id,
@@ -387,9 +387,7 @@ async def test_trial_ending_soon_fires_once(test_db, fresh_org):
     assert second == 0
 
     refreshed = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     assert refreshed.reminders_sent.get("trial_ending_soon") is True
 
@@ -398,7 +396,7 @@ async def test_trial_ending_soon_fires_once(test_db, fresh_org):
 async def test_trial_ending_soon_skips_already_expired(test_db, fresh_org):
     """If the trial is already past deadline, the reminder window has
     closed — no email."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_sub(
         test_db,
         fresh_org.id,

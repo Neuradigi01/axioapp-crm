@@ -14,10 +14,11 @@ Four operations cover the module's needs:
     commits, caller catches IntegrityError on the ``(org_id, sku)``
     uniqueness violation.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,22 +27,18 @@ from src.app.core.catalog.models import CatalogItem
 from src.app.shared.db.pagination import paginate
 
 
-async def get_catalog_item_by_id(
-    session: AsyncSession, item_id: uuid.UUID
-) -> Optional[CatalogItem]:
+async def get_catalog_item_by_id(session: AsyncSession, item_id: uuid.UUID) -> CatalogItem | None:
     """Single-row read by PK. ``None`` on miss (or cross-tenant — the
     ORM filter applies)."""
-    result = await session.execute(
-        select(CatalogItem).where(CatalogItem.id == item_id)
-    )
+    result = await session.execute(select(CatalogItem).where(CatalogItem.id == item_id))
     return result.scalar_one_or_none()
 
 
 async def list_catalog_items_query(
     session: AsyncSession,
     *,
-    q: Optional[str] = None,
-    category: Optional[str] = None,
+    q: str | None = None,
+    category: str | None = None,
     active_only: bool = False,
     page: int = 1,
     size: int = 50,
@@ -51,9 +48,7 @@ async def list_catalog_items_query(
     filters: list[Any] = []
     if q:
         like = f"%{q}%"
-        filters.append(
-            or_(CatalogItem.name.ilike(like), CatalogItem.sku.ilike(like))
-        )
+        filters.append(or_(CatalogItem.name.ilike(like), CatalogItem.sku.ilike(like)))
     if category:
         filters.append(CatalogItem.category == category)
     if active_only:
@@ -66,16 +61,12 @@ async def list_catalog_items_query(
     return await paginate(session, base, page=page, size=size)
 
 
-def insert_catalog_item(
-    session: AsyncSession, item: CatalogItem
-) -> None:
+def insert_catalog_item(session: AsyncSession, item: CatalogItem) -> None:
     """Register an already-constructed CatalogItem for INSERT."""
     session.add(item)
 
 
-async def delete_catalog_item_row(
-    session: AsyncSession, item: CatalogItem
-) -> None:
+async def delete_catalog_item_row(session: AsyncSession, item: CatalogItem) -> None:
     """Mark a CatalogItem row for DELETE."""
     await session.delete(item)
 

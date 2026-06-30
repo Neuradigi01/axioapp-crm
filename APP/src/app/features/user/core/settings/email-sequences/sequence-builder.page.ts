@@ -9,7 +9,6 @@ import { ActivatedRoute } from '@angular/router';
 
 import { SequenceBuilderComponent } from './sequence-builder.component';
 
-
 @Component({
   selector: 'app-sequence-builder-page',
   standalone: true,

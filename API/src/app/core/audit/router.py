@@ -6,6 +6,7 @@ Gated by the `audit.read` permission. The auto-tenant ORM filter
 restricts every query to the caller's org, so a viewer can never see
 audit rows belonging to another tenant.
 """
+
 from __future__ import annotations
 
 from datetime import datetime

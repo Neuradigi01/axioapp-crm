@@ -9,13 +9,15 @@ Three notification types fire from appointments/service.py:
 Self-spam suppression: when the recipient == actor, no row is written.
 Reschedule is the only event that fires unconditionally (paper trail).
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.app.core.appointments.models import Appointment, AppointmentStatus
@@ -32,7 +34,6 @@ from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.security.password import hash_password as _hp
 from src.models.user import UserLogin
 
-
 # --- helpers ---------------------------------------------------------------
 
 
@@ -47,9 +48,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -102,15 +101,11 @@ async def _seed_second_user(
         await session.flush()
 
         await session.execute(
-            sql_text(
-                "UPDATE tbl_user_login SET legacy_uuid = :u WHERE id = :i"
-            ),
+            sql_text("UPDATE tbl_user_login SET legacy_uuid = :u WHERE id = :i"),
             {"u": str(user_uuid), "i": login.id},
         )
         await session.execute(
-            sql_text(
-                "INSERT INTO users (id) VALUES (:u) ON CONFLICT DO NOTHING"
-            ),
+            sql_text("INSERT INTO users (id) VALUES (:u) ON CONFLICT DO NOTHING"),
             {"u": str(user_uuid)},
         )
         session.add(
@@ -153,8 +148,7 @@ async def _seed_appointment(
                 org_id=org_id,
                 contact_id=contact_id,
                 title="Showroom visit",
-                scheduled_at=scheduled_at
-                or datetime.now(timezone.utc) + timedelta(days=1, hours=2),
+                scheduled_at=scheduled_at or datetime.now(UTC) + timedelta(days=1, hours=2),
                 duration_min=60,
                 assigned_to_id=assigned_to_id,
                 status=status,
@@ -167,9 +161,7 @@ async def _seed_appointment(
         reset_context(token)
 
 
-async def _notifications_for(
-    user_id: uuid.UUID, *, type_: str | None = None
-) -> list[Notification]:
+async def _notifications_for(user_id: uuid.UUID, *, type_: str | None = None) -> list[Notification]:
     from tests.conftest import TestSession
 
     async with TestSession() as session:
@@ -181,11 +173,8 @@ async def _notifications_for(
 
 
 def _ts(hour: int, days_offset: int = 1) -> str:
-    base = (
-        datetime.now(timezone.utc).replace(
-            hour=hour, minute=0, second=0, microsecond=0
-        )
-        + timedelta(days=days_offset)
+    base = datetime.now(UTC).replace(hour=hour, minute=0, second=0, microsecond=0) + timedelta(
+        days=days_offset
     )
     return base.isoformat()
 
@@ -194,15 +183,11 @@ def _ts(hour: int, days_offset: int = 1) -> str:
 
 
 @pytest.mark.asyncio
-async def test_create_assigned_to_other_user_notifies(
-    layered_client, seeded_admin
-):
+async def test_create_assigned_to_other_user_notifies(layered_client, seeded_admin):
     """Owner books an appointment for Priya -> one notification row."""
     org = seeded_admin["org"]
     actor = seeded_admin["user"]  # current_user_id = actor.legacy_uuid
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id, name="Asha Reddy")
     priya_uuid = await _seed_second_user(
         org.id, role_id=seeded_admin["role"].id, first_name="Priya"
@@ -230,9 +215,7 @@ async def test_create_assigned_to_other_user_notifies(
     assert resp.status_code == 201, resp.text
     appt_id = resp.json()["id"]
 
-    notifs = await _notifications_for(
-        priya_uuid, type_="appointment.assigned"
-    )
+    notifs = await _notifications_for(priya_uuid, type_="appointment.assigned")
     assert len(notifs) == 1
     n = notifs[0]
     assert n.title == "New appointment: Sofa selection"
@@ -243,15 +226,11 @@ async def test_create_assigned_to_other_user_notifies(
 
 
 @pytest.mark.asyncio
-async def test_create_assigned_to_self_does_not_notify(
-    layered_client, seeded_admin
-):
+async def test_create_assigned_to_self_does_not_notify(layered_client, seeded_admin):
     """Owner books for themselves -> no notification."""
     org = seeded_admin["org"]
     actor = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id)
 
     token = await _login(
@@ -296,9 +275,7 @@ async def test_reassign_notifies_new_owner(layered_client, seeded_admin):
     rahul_uuid = await _seed_second_user(
         org.id, role_id=seeded_admin["role"].id, first_name="Rahul"
     )
-    appt_id = await _seed_appointment(
-        org.id, contact_id=contact_id, assigned_to_id=priya_uuid
-    )
+    appt_id = await _seed_appointment(org.id, contact_id=contact_id, assigned_to_id=priya_uuid)
 
     token = await _login(
         layered_client,
@@ -314,9 +291,7 @@ async def test_reassign_notifies_new_owner(layered_client, seeded_admin):
     )
     assert resp.status_code == 200, resp.text
 
-    rahul_notifs = await _notifications_for(
-        rahul_uuid, type_="appointment.assigned"
-    )
+    rahul_notifs = await _notifications_for(rahul_uuid, type_="appointment.assigned")
     priya_notifs = await _notifications_for(priya_uuid)
     assert len(rahul_notifs) == 1
     assert rahul_notifs[0].payload["appointment_id"] == str(appt_id)
@@ -325,9 +300,7 @@ async def test_reassign_notifies_new_owner(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_bulk_reassign_emits_one_per_moved_row(
-    layered_client, seeded_admin
-):
+async def test_bulk_reassign_emits_one_per_moved_row(layered_client, seeded_admin):
     """Bulk reassign 3 rows -> 3 notifications for the new owner."""
     org = seeded_admin["org"]
     actor = seeded_admin["user"]
@@ -351,8 +324,7 @@ async def test_bulk_reassign_emits_one_per_moved_row(
             org.id,
             contact_id=contact_id,
             assigned_to_id=priya_uuid,
-            scheduled_at=datetime.now(timezone.utc)
-            + timedelta(days=2, hours=i * 3),
+            scheduled_at=datetime.now(UTC) + timedelta(days=2, hours=i * 3),
         )
         ids.append(str(aid))
 
@@ -370,9 +342,7 @@ async def test_bulk_reassign_emits_one_per_moved_row(
     )
     assert resp.status_code == 200, resp.text
 
-    rahul_notifs = await _notifications_for(
-        rahul_uuid, type_="appointment.assigned"
-    )
+    rahul_notifs = await _notifications_for(rahul_uuid, type_="appointment.assigned")
     assert len(rahul_notifs) == 3
     moved_ids = {n.payload["appointment_id"] for n in rahul_notifs}
     assert moved_ids == set(ids)
@@ -383,16 +353,12 @@ async def test_reschedule_notifies_owner(layered_client, seeded_admin):
     """Owner reschedules Priya's appointment -> Priya gets the notification."""
     org = seeded_admin["org"]
     actor = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id)
     priya_uuid = await _seed_second_user(
         org.id, role_id=seeded_admin["role"].id, first_name="PriyaR"
     )
-    appt_id = await _seed_appointment(
-        org.id, contact_id=contact_id, assigned_to_id=priya_uuid
-    )
+    appt_id = await _seed_appointment(org.id, contact_id=contact_id, assigned_to_id=priya_uuid)
 
     token = await _login(
         layered_client,
@@ -401,9 +367,7 @@ async def test_reschedule_notifies_owner(layered_client, seeded_admin):
         password=seeded_admin["password"],
     )
 
-    new_at = (
-        datetime.now(timezone.utc) + timedelta(days=2, hours=4)
-    ).isoformat()
+    new_at = (datetime.now(UTC) + timedelta(days=2, hours=4)).isoformat()
     resp = await layered_client.post(
         f"/api/v1/appointments/{appt_id}/reschedule",
         json={"scheduled_at": new_at, "reason": "vendor pushed back"},
@@ -411,9 +375,7 @@ async def test_reschedule_notifies_owner(layered_client, seeded_admin):
     )
     assert resp.status_code == 200, resp.text
 
-    notifs = await _notifications_for(
-        priya_uuid, type_="appointment.rescheduled"
-    )
+    notifs = await _notifications_for(priya_uuid, type_="appointment.rescheduled")
     assert len(notifs) == 1
     assert notifs[0].payload["appointment_id"] == str(appt_id)
 
@@ -424,16 +386,12 @@ async def test_cancel_for_other_user_notifies(layered_client, seeded_admin):
     notification. Status-change is a PATCH on the appointment."""
     org = seeded_admin["org"]
     actor = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id, name="Mr Cancel")
     priya_uuid = await _seed_second_user(
         org.id, role_id=seeded_admin["role"].id, first_name="PriyaC"
     )
-    appt_id = await _seed_appointment(
-        org.id, contact_id=contact_id, assigned_to_id=priya_uuid
-    )
+    appt_id = await _seed_appointment(org.id, contact_id=contact_id, assigned_to_id=priya_uuid)
 
     token = await _login(
         layered_client,
@@ -449,9 +407,7 @@ async def test_cancel_for_other_user_notifies(layered_client, seeded_admin):
     )
     assert resp.status_code == 200, resp.text
 
-    notifs = await _notifications_for(
-        priya_uuid, type_="appointment.cancelled"
-    )
+    notifs = await _notifications_for(priya_uuid, type_="appointment.cancelled")
     assert len(notifs) == 1
     assert notifs[0].payload["appointment_id"] == str(appt_id)
     assert "Mr Cancel" in (notifs[0].body or "")
@@ -462,9 +418,7 @@ async def test_cancel_by_self_does_not_notify(layered_client, seeded_admin):
     """Owner cancels their own appointment -> no notification."""
     org = seeded_admin["org"]
     actor = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id)
     appt_id = await _seed_appointment(
         org.id, contact_id=contact_id, assigned_to_id=actor.legacy_uuid
@@ -489,18 +443,14 @@ async def test_cancel_by_self_does_not_notify(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_preference_off_suppresses_notification(
-    layered_client, seeded_admin
-):
+async def test_preference_off_suppresses_notification(layered_client, seeded_admin):
     """Priya disables in_app for `appointment.assigned` -> next booking
     does NOT write a notification row."""
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
     actor = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id, name="Quiet Customer")
     priya_uuid = await _seed_second_user(
         org.id, role_id=seeded_admin["role"].id, first_name="PriyaQ"

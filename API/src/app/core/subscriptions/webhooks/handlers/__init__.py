@@ -8,9 +8,10 @@ Shared helpers — `find_subscription_by_stripe_id` and
 `parse_unix_ts` — live here so the per-handler modules stay focused
 on event-specific logic.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,8 @@ from src.app.core.subscriptions.models import Subscription
 
 
 async def find_subscription_by_stripe_id(
-    db: AsyncSession, stripe_subscription_id: str,
+    db: AsyncSession,
+    stripe_subscription_id: str,
 ) -> Subscription | None:
     """Lookup a local subscription by its Stripe-side ID.
 
@@ -30,9 +32,7 @@ async def find_subscription_by_stripe_id(
     if not stripe_subscription_id:
         return None
     result = await db.execute(
-        select(Subscription).where(
-            Subscription.stripe_subscription_id == stripe_subscription_id
-        )
+        select(Subscription).where(Subscription.stripe_subscription_id == stripe_subscription_id)
     )
     return result.scalar_one_or_none()
 
@@ -46,4 +46,4 @@ def parse_unix_ts(value: int | float | None) -> datetime | None:
     """
     if value is None:
         return None
-    return datetime.fromtimestamp(int(value), tz=timezone.utc)
+    return datetime.fromtimestamp(int(value), tz=UTC)

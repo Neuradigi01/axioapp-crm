@@ -18,10 +18,7 @@ import { environment } from '../../../../../environments/environment';
 
 import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  ContactListItem,
-  ContactsApiService,
-} from '../contacts/contacts-api.service';
+import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import { FieldDef } from '../shared/dynamic-form/types';
 import type { StandardFieldRendered } from '../standard-fields/types';
@@ -78,9 +75,7 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
   /** `title` + `scheduled_at` + `duration_min` are backend-required (locked).
    *  `purpose` / `location` accept the `required` override.
    *  `duration_min` additionally accepts `min`/`max` (default 1–1440). */
-  protected applyStandardValidators(
-    map: Record<string, StandardFieldRendered>,
-  ): void {
+  protected applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
     this.form.controls.title.setValidators([
       commonValidators.required,
       commonValidators.maxLength(255),
@@ -97,10 +92,7 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     ]);
     this.form.controls.duration_min.updateValueAndValidity({ emitEvent: false });
 
-    const setReq = (
-      ctrl: 'purpose' | 'location',
-      row: StandardFieldRendered | undefined,
-    ): void => {
+    const setReq = (ctrl: 'purpose' | 'location', row: StandardFieldRendered | undefined): void => {
       this.form.controls[ctrl].setValidators(withRequiredIf([], row));
       this.form.controls[ctrl].updateValueAndValidity({ emitEvent: false });
     };
@@ -163,9 +155,7 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     assigned_to_id: this.assigneeControl,
   });
 
-  readonly canSubmit = computed(
-    () => this.me() !== null && !this.submitting$(),
-  );
+  readonly canSubmit = computed(() => this.me() !== null && !this.submitting$());
 
   override ngOnInit(): void {
     super.ngOnInit();
@@ -203,9 +193,7 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
       .pipe(
         debounceTime(200),
         distinctUntilChanged(),
-        switchMap((q) =>
-          this.contactsApi.list({ q: q || undefined, size: 8 }),
-        ),
+        switchMap((q) => this.contactsApi.list({ q: q || undefined, size: 8 })),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
@@ -282,14 +270,9 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
           if (err.status === 409) {
             const body = err.error as Partial<ConflictBody>;
             this.conflicts.set(body?.conflicts ?? []);
-            this._submitError.set(
-              body?.message
-                ?? 'Time conflict: this slot is already booked.',
-            );
+            this._submitError.set(body?.message ?? 'Time conflict: this slot is already booked.');
           } else {
-            this._submitError.set(
-              extractApiError(err) ?? 'Could not create appointment.',
-            );
+            this._submitError.set(extractApiError(err) ?? 'Could not create appointment.');
           }
         },
       });
@@ -307,20 +290,11 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
 
   /** Convert a Date â†’ "YYYY-MM-DDTHH:mm" for <input type="datetime-local">. */
   private toDatetimeLocalString(d: Date, hour: number): string {
-    const local = new Date(
-      d.getFullYear(),
-      d.getMonth(),
-      d.getDate(),
-      hour,
-      0,
-      0,
-      0,
-    );
+    const local = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour, 0, 0, 0);
     const pad = (n: number) => String(n).padStart(2, '0');
     return (
-      `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}`
-      + `T${pad(local.getHours())}:${pad(local.getMinutes())}`
+      `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}` +
+      `T${pad(local.getHours())}:${pad(local.getMinutes())}`
     );
   }
-
 }

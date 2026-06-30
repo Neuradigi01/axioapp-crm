@@ -85,7 +85,7 @@ export interface MappingTarget {
 
 export interface ImportPreset {
   id: string;
-  org_id: string | null;        // null = system preset
+  org_id: string | null; // null = system preset
   source_platform: string;
   name: string;
   mapping: Record<string, string | null>;
@@ -106,18 +106,13 @@ export interface PreviewResponse {
   rows: Array<Array<string | null>>;
 }
 
-
 @Injectable({ providedIn: 'root' })
 export class ImportsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/leads/import`;
 
   /** Multipart upload. Backend caps file at 10 MB and 50,000 rows. */
-  upload(
-    file: File,
-    sourcePlatform: SourcePlatform,
-    name?: string | null,
-  ): Observable<LeadImport> {
+  upload(file: File, sourcePlatform: SourcePlatform, name?: string | null): Observable<LeadImport> {
     const fd = new FormData();
     fd.append('file', file, file.name);
     fd.append('source_platform', sourcePlatform);
@@ -148,16 +143,10 @@ export class ImportsApiService {
 
   preview(importId: string, limit = 5): Observable<PreviewResponse> {
     const params = buildHttpParams({ limit });
-    return this.http.get<PreviewResponse>(
-      `${this.base}/${importId}/preview`,
-      { params },
-    );
+    return this.http.get<PreviewResponse>(`${this.base}/${importId}/preview`, { params });
   }
 
-  commit(
-    importId: string,
-    mapping: Record<string, string | null>,
-  ): Observable<LeadImport> {
+  commit(importId: string, mapping: Record<string, string | null>): Observable<LeadImport> {
     return this.http.post<LeadImport>(`${this.base}/${importId}/commit`, {
       mapping,
     });

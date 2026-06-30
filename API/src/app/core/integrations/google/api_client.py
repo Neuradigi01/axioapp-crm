@@ -21,11 +21,11 @@ literally cannot reach the caller.
 of truth. After a refresh, we re-encrypt the new access token + the
 new expiry and persist; the caller's session commits it.
 """
+
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import httpx
 from fastapi import HTTPException, status
@@ -42,7 +42,6 @@ from src.app.core.integrations.models import (
     Integration,
     IntegrationStatus,
 )
-
 
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _API_BASE = "https://googleads.googleapis.com"
@@ -68,15 +67,12 @@ class GoogleAdsRestClient:
         *,
         integration: Integration,
         session: AsyncSession,
-        http_client: Optional[httpx.AsyncClient] = None,
+        http_client: httpx.AsyncClient | None = None,
     ) -> None:
         if integration.status != IntegrationStatus.connected:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"Google integration is {integration.status.value} — "
-                    "reconnect required."
-                ),
+                detail=(f"Google integration is {integration.status.value} — reconnect required."),
             )
         if not GOOGLE_ADS_DEVELOPER_TOKEN:
             raise HTTPException(
@@ -93,21 +89,17 @@ class GoogleAdsRestClient:
 
     # --- public surface -------------------------------------------------
 
-    async def get(
-        self, path: str, *, login_customer_id: Optional[str] = None
-    ) -> dict:
+    async def get(self, path: str, *, login_customer_id: str | None = None) -> dict:
         """GET an API path, returning the decoded JSON. Raises
         HTTPException with the upstream status code on non-2xx."""
-        return await self._request(
-            "GET", path, login_customer_id=login_customer_id
-        )
+        return await self._request("GET", path, login_customer_id=login_customer_id)
 
     async def post(
         self,
         path: str,
         *,
         json: dict,
-        login_customer_id: Optional[str] = None,
+        login_customer_id: str | None = None,
     ) -> dict:
         """POST JSON, return decoded JSON. Same error semantics as `get`."""
         return await self._request(
@@ -124,8 +116,8 @@ class GoogleAdsRestClient:
         method: str,
         path: str,
         *,
-        json: Optional[dict] = None,
-        login_customer_id: Optional[str] = None,
+        json: dict | None = None,
+        login_customer_id: str | None = None,
     ) -> dict:
         access_token = await self._get_access_token()
         url = f"{_API_BASE}/{GOOGLE_ADS_API_VERSION}/{path.lstrip('/')}"
@@ -142,9 +134,7 @@ class GoogleAdsRestClient:
             headers["login-customer-id"] = login_customer_id.replace("-", "")
 
         try:
-            response = await self._http_call(
-                method, url, headers=headers, json=json
-            )
+            response = await self._http_call(method, url, headers=headers, json=json)
         except (httpx.HTTPError, httpx.TimeoutException) as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -155,10 +145,7 @@ class GoogleAdsRestClient:
             detail = _safe_json(response) or {"raw": response.text[:300]}
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=(
-                    f"Google Ads API error (status={response.status_code}): "
-                    f"{detail}"
-                ),
+                detail=(f"Google Ads API error (status={response.status_code}): {detail}"),
             )
         # Some endpoints (e.g. searchStream) can return an empty array;
         # JSON decode still works.
@@ -171,16 +158,12 @@ class GoogleAdsRestClient:
         url: str,
         *,
         headers: dict,
-        json: Optional[dict],
+        json: dict | None,
     ) -> httpx.Response:
         if self._http is not None:
-            return await self._http.request(
-                method, url, headers=headers, json=json
-            )
+            return await self._http.request(method, url, headers=headers, json=json)
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
-            return await client.request(
-                method, url, headers=headers, json=json
-            )
+            return await client.request(method, url, headers=headers, json=json)
 
     async def _get_access_token(self) -> str:
         """Return a usable access token, refreshing transparently if
@@ -226,9 +209,7 @@ class GoogleAdsRestClient:
             # surface the reconnect CTA. We don't raise the original
             # body — Google sometimes returns generic 401s here.
             self._integration.status = IntegrationStatus.expired
-            self._integration.last_error = (
-                f"refresh failed status={response.status_code}"
-            )
+            self._integration.last_error = f"refresh failed status={response.status_code}"
             await self._session.commit()
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -247,9 +228,7 @@ class GoogleAdsRestClient:
         # Persist the rotated credentials. Google sometimes rotates the
         # refresh token; honour it if present.
         self._integration.access_token_enc = encrypt(new_access)
-        self._integration.token_expires_at = datetime.fromtimestamp(
-            new_expiry, tz=timezone.utc
-        )
+        self._integration.token_expires_at = datetime.fromtimestamp(new_expiry, tz=UTC)
         rotated_refresh = body.get("refresh_token")
         if rotated_refresh:
             self._integration.refresh_token_enc = encrypt(rotated_refresh)
@@ -276,16 +255,16 @@ class GoogleAdsRestClient:
 
 def _expires_in_more_than(expires_at: datetime, seconds: int) -> bool:
     """True iff the token is still good for at least `seconds` more."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # `expires_at` from the DB is tz-aware; defensive normalisation
     # in case a naive datetime ever slips through (Pydantic v2 strips
     # tz on some round-trips).
     if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
+        expires_at = expires_at.replace(tzinfo=UTC)
     return (expires_at - now).total_seconds() > seconds
 
 
-def _safe_json(response: httpx.Response) -> Optional[dict]:
+def _safe_json(response: httpx.Response) -> dict | None:
     try:
         return response.json()
     except ValueError:

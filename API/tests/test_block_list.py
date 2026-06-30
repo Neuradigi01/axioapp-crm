@@ -21,6 +21,7 @@ Cases:
  13.   ``parse_inbound_phone`` returns None on malformed envelope.
  14.   ``BlockedNumberOutbound`` carries phone + reason for audit.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -30,8 +31,8 @@ from src.app.core.conversations.adapters.whatsapp import (
 )
 from src.app.core.integrations.whatsapp.block_list import (
     BLOCK_REASONS,
-    BlockListError,
     BlockedNumberOutbound,
+    BlockListError,
     _validate_reason,
     normalise_phone,
 )
@@ -61,9 +62,7 @@ class TestNormalisePhone:
 
 
 class TestReasonValidation:
-    @pytest.mark.parametrize(
-        "reason", list(BLOCK_REASONS)
-    )
+    @pytest.mark.parametrize("reason", list(BLOCK_REASONS))
     def test_known_values_accepted(self, reason):
         assert _validate_reason(reason) == reason
 
@@ -89,17 +88,7 @@ class TestInboundPhoneParser:
     def test_extracts_from_field(self):
         payload = {
             "entry": [
-                {
-                    "changes": [
-                        {
-                            "value": {
-                                "messages": [
-                                    {"from": "919999988888", "id": "wamid.X"}
-                                ]
-                            }
-                        }
-                    ]
-                }
+                {"changes": [{"value": {"messages": [{"from": "919999988888", "id": "wamid.X"}]}}]}
             ]
         }
         assert parse_inbound_phone(payload) == "919999988888"
@@ -109,17 +98,7 @@ class TestInboundPhoneParser:
         # parser must return None so the block check doesn't fire.
         payload = {
             "entry": [
-                {
-                    "changes": [
-                        {
-                            "value": {
-                                "statuses": [
-                                    {"id": "wamid.X", "status": "delivered"}
-                                ]
-                            }
-                        }
-                    ]
-                }
+                {"changes": [{"value": {"statuses": [{"id": "wamid.X", "status": "delivered"}]}}]}
             ]
         }
         assert parse_inbound_phone(payload) is None
@@ -129,27 +108,12 @@ class TestInboundPhoneParser:
         # different point — none should raise.
         assert parse_inbound_phone({}) is None
         assert parse_inbound_phone({"entry": []}) is None
-        assert (
-            parse_inbound_phone({"entry": [{"changes": []}]}) is None
-        )
-        assert (
-            parse_inbound_phone(
-                {"entry": [{"changes": [{"value": "not-a-dict"}]}]}
-            )
-            is None
-        )
+        assert parse_inbound_phone({"entry": [{"changes": []}]}) is None
+        assert parse_inbound_phone({"entry": [{"changes": [{"value": "not-a-dict"}]}]}) is None
         # `from` missing → None.
         assert (
             parse_inbound_phone(
-                {
-                    "entry": [
-                        {
-                            "changes": [
-                                {"value": {"messages": [{"id": "wamid.X"}]}}
-                            ]
-                        }
-                    ]
-                }
+                {"entry": [{"changes": [{"value": {"messages": [{"id": "wamid.X"}]}}]}]}
             )
             is None
         )

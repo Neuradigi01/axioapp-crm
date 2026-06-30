@@ -71,8 +71,6 @@ export class WhatsAppNumbersService {
   /** Force a refetch — invoked after connect / disconnect on the
    *  Settings card so the dropdowns light up the new state. */
   refresh(): Observable<WhatsAppNumber[]> {
-    return this.http.get<WhatsAppNumber[]>(this.base).pipe(
-      tap((list) => this.numbers.set(list)),
-    );
+    return this.http.get<WhatsAppNumber[]>(this.base).pipe(tap((list) => this.numbers.set(list)));
   }
 }

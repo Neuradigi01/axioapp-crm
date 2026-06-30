@@ -4,8 +4,8 @@ Sidebar entry at `menu_position=500` (after Staff at 450, before
 Reporting). Permission keys `conversations.read` / `conversations.write`
 register on startup via the standard module-registry pickup.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="conversations",

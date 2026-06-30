@@ -5,6 +5,7 @@ Two angles:
   - tenant isolation — a viewer in one org cannot see another org's
     audit trail even with the right permission.
 """
+
 from __future__ import annotations
 
 import uuid

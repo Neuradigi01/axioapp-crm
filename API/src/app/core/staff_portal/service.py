@@ -18,25 +18,25 @@ Four concerns:
 4. Audit — every login attempt fires `staff_portal.login_*` so HR has
    a complete record (success and failure both).
 """
+
 from __future__ import annotations
 
 import uuid
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.tenants import service as tenants_service
 from src.app.core.auth.tokens import STAFF_TOKEN_TTL, encode_token
 from src.app.core.staff.models import EmploymentStatus
 from src.app.core.staff_portal import data_access as _da
 from src.app.core.staff_portal.models import StaffSession
 from src.app.core.staff_portal.schemas import StaffPickerUser
+from src.app.core.tenants import service as tenants_service
 from src.app.core.tenants.models import Organization
-
 
 # --- rate limiting ---------------------------------------------------------
 
@@ -84,18 +84,14 @@ async def _resolve_org(session: AsyncSession, org_slug: str) -> Organization:
     return org
 
 
-async def list_pickable_users(
-    session: AsyncSession, *, org_slug: str
-) -> list[StaffPickerUser]:
+async def list_pickable_users(session: AsyncSession, *, org_slug: str) -> list[StaffPickerUser]:
     """Active staff for the login picker. No PII beyond name."""
     org = await _resolve_org(session, org_slug)
     rows = await _da.list_active_staff_for_picker(session, org_id=org.id)
     return [
         StaffPickerUser(
             id=row.legacy_uuid,
-            full_name=" ".join(
-                p for p in (row.first_name, row.last_name) if p
-            ).strip(),
+            full_name=" ".join(p for p in (row.first_name, row.last_name) if p).strip(),
             avatar=None,
         )
         for row in rows
@@ -124,9 +120,7 @@ async def login(
     """Validate PIN → mint staff JWT → persist `staff_sessions` row."""
     org = await _resolve_org(session, org_slug)
 
-    user = await _da.get_active_member_user_for_org(
-        session, user_id=user_id, org_id=org.id
-    )
+    user = await _da.get_active_member_user_for_org(session, user_id=user_id, org_id=org.id)
     if user is None or not user.is_active:
         await audit.log(
             "staff_portal.login_failed",
@@ -159,7 +153,7 @@ async def login(
             detail="invalid credentials",
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     rate_key = (org.id, user.legacy_uuid)
     if _is_rate_limited(rate_key, now):
         await audit.log(

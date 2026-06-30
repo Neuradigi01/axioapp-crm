@@ -28,11 +28,10 @@ Cases:
  14.  ``_rate_limit_ok`` rejects past the cap within the window.
  15.  ``_rate_limit_ok`` re-allows after the window expires (clock patch).
 """
+
 from __future__ import annotations
 
 import time
-
-import pytest
 
 from src.app.core.integrations.whatsapp.qr_generator import (
     render_png,
@@ -99,16 +98,12 @@ class TestHashPrefilled:
 
 class TestBuildWaMeUrl:
     def test_basic_message(self):
-        url = build_wa_me_url(
-            _StubLink(prefilled_message="I saw your billboard")
-        )
+        url = build_wa_me_url(_StubLink(prefilled_message="I saw your billboard"))
         assert url.startswith("https://wa.me/919999988888?text=")
         assert "I%20saw%20your%20billboard" in url
 
     def test_non_ascii_hindi(self):
-        url = build_wa_me_url(
-            _StubLink(prefilled_message="नमस्ते Sharma Furniture")
-        )
+        url = build_wa_me_url(_StubLink(prefilled_message="नमस्ते Sharma Furniture"))
         # The Devanagari characters get percent-encoded; the encoded
         # bytes start with `%E0%A4` for the नमस्ते prefix.
         assert "%E0%A4" in url

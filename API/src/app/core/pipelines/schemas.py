@@ -12,11 +12,11 @@ Pydantic refuses unknown keys by default.
 acceptable — creating terminal stages from the API is a pack-level
 concern, so they're hardcoded to `false` in the service.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,19 +24,17 @@ from src.app.shared.schemas import ORMModel
 
 
 class PipelineStageOut(ORMModel):
-
     id: uuid.UUID
     pipeline_id: uuid.UUID
     key: str
     name: str
-    color: Optional[str]
+    color: str | None
     display_order: int
     is_won: bool
     is_lost: bool
 
 
 class PipelineOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     key: str
@@ -48,9 +46,9 @@ class PipelineOut(ORMModel):
 class StageUpdate(BaseModel):
     """Editable fields only — label, color, display_order."""
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=128)
-    color: Optional[str] = Field(default=None, max_length=16)
-    display_order: Optional[int] = Field(default=None, ge=0)
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    color: str | None = Field(default=None, max_length=16)
+    display_order: int | None = Field(default=None, ge=0)
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
@@ -66,7 +64,7 @@ class StageCreate(BaseModel):
     """
 
     name: str = Field(min_length=1, max_length=128)
-    color: Optional[str] = Field(default=None, max_length=16)
-    after_stage_key: Optional[str] = Field(default=None, max_length=64)
+    color: str | None = Field(default=None, max_length=16)
+    after_stage_key: str | None = Field(default=None, max_length=64)
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")

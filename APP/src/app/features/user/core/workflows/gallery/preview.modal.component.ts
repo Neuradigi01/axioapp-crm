@@ -12,16 +12,8 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { CanvasNode, CanvasStateService } from '../canvas/canvas-state.service';
 import { WorkflowEdgeComponent } from '../canvas/edge.component';
-import {
-  NODE_HEIGHT,
-  NODE_WIDTH,
-  WorkflowNodeComponent,
-} from '../canvas/node.component';
-import {
-  WorkflowGalleryEntry,
-  WorkflowRead,
-} from '../workflows-api.service';
-
+import { NODE_HEIGHT, NODE_WIDTH, WorkflowNodeComponent } from '../canvas/node.component';
+import { WorkflowGalleryEntry, WorkflowRead } from '../workflows-api.service';
 
 /**
  * Read-only preview modal — renders the gallery entry's
@@ -35,16 +27,10 @@ import {
  * parent page, which then opens the clone-name modal.
  */
 
-
 @Component({
   selector: 'app-gallery-preview-modal',
   standalone: true,
-  imports: [
-    CommonModule,
-    LucideAngularModule,
-    WorkflowNodeComponent,
-    WorkflowEdgeComponent,
-  ],
+  imports: [CommonModule, LucideAngularModule, WorkflowNodeComponent, WorkflowEdgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [CanvasStateService],
   templateUrl: './preview.modal.component.html',
@@ -67,7 +53,10 @@ export class GalleryPreviewModalComponent {
   readonly bounds = computed(() => {
     const nodes = this.state.nodes();
     if (nodes.length === 0) return { x: 0, y: 0, w: 1200, h: 800 };
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     for (const n of nodes) {
       const x = n.position?.x ?? 0;
       const y = n.position?.y ?? 0;

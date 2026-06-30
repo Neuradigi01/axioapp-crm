@@ -4,10 +4,11 @@ Outcomes are config (not hardcoded) — the tests create them as needed
 through the public endpoints so we exercise the same path the operator
 uses, not a back-door insert.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -27,9 +28,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -71,7 +70,7 @@ async def test_create_get_list_patch_delete(layered_client, seeded_admin):
     outcome_id = out.json()["id"]
 
     # Call creation.
-    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    now = datetime.now(UTC).replace(microsecond=0).isoformat()
     create = await layered_client.post(
         "/api/v1/calls",
         json={
@@ -106,9 +105,7 @@ async def test_create_get_list_patch_delete(layered_client, seeded_admin):
     assert patch.json()["notes"] == "Updated note"
 
     # Delete.
-    delete = await layered_client.delete(
-        f"/api/v1/calls/{call_id}", headers=headers
-    )
+    delete = await layered_client.delete(f"/api/v1/calls/{call_id}", headers=headers)
     assert delete.status_code == 204
 
 
@@ -152,7 +149,7 @@ async def test_transcript_upsert_replaces(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    now = datetime.now(UTC).replace(microsecond=0).isoformat()
     create = await layered_client.post(
         "/api/v1/calls",
         json={"direction": "in", "started_at": now, "duration_sec": 60},
@@ -180,9 +177,7 @@ async def test_transcript_upsert_replaces(layered_client, seeded_admin):
     assert second.json()["language"] == "hi"
 
     # GET reflects latest.
-    got = await layered_client.get(
-        f"/api/v1/calls/{call_id}/transcript", headers=headers
-    )
+    got = await layered_client.get(f"/api/v1/calls/{call_id}/transcript", headers=headers)
     assert got.status_code == 200
     assert got.json()["text"] == "second version"
 

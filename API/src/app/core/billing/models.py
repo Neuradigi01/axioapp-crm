@@ -20,6 +20,7 @@ scoped to a tenant cheaply).
 `core/` knows nothing about furniture — the pack provides the PDF
 template and the POS endpoint on top.
 """
+
 from __future__ import annotations
 
 import enum
@@ -122,18 +123,10 @@ class Invoice(Base, TenantScoped):
     )
     # Snapshot of org settings at issue time — historical record.
     gst_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    tax_rate_snapshot: Mapped[Decimal | None] = mapped_column(
-        Numeric(5, 2), nullable=True
-    )
-    issued_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    paid_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    payment_method: Mapped[PaymentMethod | None] = mapped_column(
-        payment_method_enum, nullable=True
-    )
+    tax_rate_snapshot: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    payment_method: Mapped[PaymentMethod | None] = mapped_column(payment_method_enum, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     custom_data: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=sql_text("'{}'::jsonb")
@@ -153,9 +146,7 @@ class Invoice(Base, TenantScoped):
 
 class InvoiceLine(Base, TenantScoped):
     __tablename__ = "tbl_invoice_lines"
-    __table_args__ = (
-        Index("ix_invoice_lines_invoice", "invoice_id"),
-    )
+    __table_args__ = (Index("ix_invoice_lines_invoice", "invoice_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -175,15 +166,11 @@ class InvoiceLine(Base, TenantScoped):
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     qty: Mapped[int] = mapped_column(Integer, nullable=False)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
-    line_subtotal: Mapped[Decimal] = mapped_column(
-        Numeric(14, 2), nullable=False
-    )
+    line_subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     tax_pct: Mapped[Decimal] = mapped_column(
         Numeric(5, 2), nullable=False, server_default=sql_text("0")
     )
-    line_total: Mapped[Decimal] = mapped_column(
-        Numeric(14, 2), nullable=False
-    )
+    line_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -193,9 +180,7 @@ class InvoiceLine(Base, TenantScoped):
 
 class Payment(Base, TenantScoped):
     __tablename__ = "tbl_payments"
-    __table_args__ = (
-        Index("ix_payments_invoice", "invoice_id"),
-    )
+    __table_args__ = (Index("ix_payments_invoice", "invoice_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -208,9 +193,7 @@ class Payment(Base, TenantScoped):
         nullable=False,
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
-    method: Mapped[PaymentMethod] = mapped_column(
-        payment_method_enum, nullable=False
-    )
+    method: Mapped[PaymentMethod] = mapped_column(payment_method_enum, nullable=False)
     reference: Mapped[str | None] = mapped_column(String(128), nullable=True)
     received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

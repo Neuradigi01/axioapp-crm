@@ -9,25 +9,22 @@ callback handlers (Step 2 + 4) to pass plaintext tokens into
 `service.upsert()`. It's NEVER deserialised from an HTTP body; the
 router has no PUT/POST endpoint that accepts it.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from config import API_BASE_URL
-
 from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
-
 
 # Mirrors the SQLAlchemy `IntegrationProvider` / `IntegrationStatus`
 # enums as Literals so schema consumers don't have to import the ORM.
 IntegrationProviderLiteral = Literal["google_ads", "meta_ads", "whatsapp"]
-IntegrationStatusLiteral = Literal[
-    "connected", "disconnected", "expired", "error"
-]
+IntegrationStatusLiteral = Literal["connected", "disconnected", "expired", "error"]
 
 
 class IntegrationRead(ORMModel):
@@ -44,25 +41,25 @@ class IntegrationRead(ORMModel):
     id: uuid.UUID
     org_id: uuid.UUID
     provider: IntegrationProviderLiteral
-    account_id: Optional[str]
-    account_label: Optional[str]
-    token_expires_at: Optional[datetime]
-    scopes: Optional[list[str]]
+    account_id: str | None
+    account_label: str | None
+    token_expires_at: datetime | None
+    scopes: list[str] | None
     status: IntegrationStatusLiteral
-    last_error: Optional[str]
-    connected_at: Optional[datetime]
-    connected_by: Optional[uuid.UUID]
-    disconnected_at: Optional[datetime]
-    disconnected_by: Optional[uuid.UUID]
+    last_error: str | None
+    connected_at: datetime | None
+    connected_by: uuid.UUID | None
+    disconnected_at: datetime | None
+    disconnected_by: uuid.UUID | None
     updated_at: datetime
     # Per-tenant webhook URL discriminator (Google) — admin pastes it
     # into the Google Ads UI. Meta uses a single env-level URL with no
     # per-tenant component; `webhook_secret` stays None for Meta rows.
-    webhook_secret: Optional[str] = None
+    webhook_secret: str | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property
-    def webhook_url(self) -> Optional[str]:
+    def webhook_url(self) -> str | None:
         """Provider-aware webhook URL the Settings UI surfaces.
 
         - `google_ads` (connected, has secret) →
@@ -75,10 +72,7 @@ class IntegrationRead(ORMModel):
         - otherwise → None.
         """
         if self.provider == "google_ads" and self.webhook_secret:
-            return (
-                f"{API_BASE_URL}/api/v1/integrations/google/webhook/v1/"
-                f"{self.webhook_secret}"
-            )
+            return f"{API_BASE_URL}/api/v1/integrations/google/webhook/v1/{self.webhook_secret}"
         if self.provider == "meta_ads" and self.status == "connected":
             return f"{API_BASE_URL}/api/v1/integrations/meta/webhook"
         return None
@@ -89,11 +83,11 @@ class IntegrationUpsert(BaseModel):
     into `service.upsert()`. NOT exposed as an HTTP request body."""
 
     provider: IntegrationProviderLiteral
-    account_id: Optional[str] = Field(default=None, max_length=128)
-    account_label: Optional[str] = Field(default=None, max_length=255)
+    account_id: str | None = Field(default=None, max_length=128)
+    account_label: str | None = Field(default=None, max_length=255)
     access_token: str = Field(min_length=1)
-    refresh_token: Optional[str] = None
-    token_expires_at: Optional[datetime] = None
+    refresh_token: str | None = None
+    token_expires_at: datetime | None = None
     scopes: list[str] = Field(default_factory=list)
 
 
@@ -105,7 +99,7 @@ class IntegrationSubscriptionRead(TimestampedOrgScopedOut):
     id: uuid.UUID
     integration_id: uuid.UUID
     external_form_id: str
-    external_form_label: Optional[str]
+    external_form_label: str | None
     field_mapping: dict
     enabled: bool
 
@@ -120,7 +114,7 @@ class IntegrationSubscriptionCreate(BaseModel):
 
     integration_id: uuid.UUID
     external_form_id: str = Field(min_length=1, max_length=128)
-    external_form_label: Optional[str] = Field(default=None, max_length=255)
+    external_form_label: str | None = Field(default=None, max_length=255)
     field_mapping: dict = Field(default_factory=dict)
     enabled: bool = True
 
@@ -130,9 +124,9 @@ class IntegrationSubscriptionUpdate(BaseModel):
     toggle in the Settings UI. `external_form_id` is immutable — to
     point at a different form, delete + recreate."""
 
-    external_form_label: Optional[str] = Field(default=None, max_length=255)
-    field_mapping: Optional[dict] = None
-    enabled: Optional[bool] = None
+    external_form_label: str | None = Field(default=None, max_length=255)
+    field_mapping: dict | None = None
+    enabled: bool | None = None
 
 
 class IntegrationDLQRead(ORMModel):
@@ -143,14 +137,14 @@ class IntegrationDLQRead(ORMModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
-    integration_id: Optional[uuid.UUID]
+    integration_id: uuid.UUID | None
     provider: IntegrationProviderLiteral
     payload: dict
     error_message: str
     retries_attempted: int
     created_at: datetime
-    replayed_at: Optional[datetime]
-    replayed_by: Optional[uuid.UUID]
+    replayed_at: datetime | None
+    replayed_by: uuid.UUID | None
 
 
 IntegrationDLQListResponse = PaginatedResponse[IntegrationDLQRead]
@@ -179,7 +173,7 @@ class ProviderDeliveryStatus(BaseModel):
 
     provider: IntegrationProviderLiteral
     status: IntegrationStatusLiteral
-    last_delivery_at: Optional[datetime]
+    last_delivery_at: datetime | None
     deliveries_24h_accepted: int
     deliveries_24h_failed: int
 

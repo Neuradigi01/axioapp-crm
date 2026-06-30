@@ -13,6 +13,7 @@ surface (Steps 7-9 wire the UI; the API is already live from
 Step 3). Idempotent on ``(org_id, lower(name))`` — re-runs never
 duplicate.
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,7 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.automation import data_access
 from src.app.core.automation.models import AutomationTrigger
 from src.app.core.conversations.models import ConversationChannel
-
 
 logger = logging.getLogger(__name__)
 
@@ -150,9 +150,7 @@ async def _seed_appointment_trigger(
     difference between them is the trigger ``name`` + the
     ``event_type`` it subscribes to. Idempotent on
     ``(org_id, lower(name))``."""
-    existing = await data_access.get_trigger_by_name(
-        session, org_id=org_id, name=name
-    )
+    existing = await data_access.get_trigger_by_name(session, org_id=org_id, name=name)
     if existing is not None:
         return existing
 
@@ -173,8 +171,7 @@ async def _seed_appointment_trigger(
     session.add(trigger)
     await session.flush()
     logger.info(
-        "automation.seed appointment_trigger org=%s name=%s "
-        "trigger=%s template=%s",
+        "automation.seed appointment_trigger org=%s name=%s trigger=%s template=%s",
         org_id,
         name,
         trigger.id,
@@ -249,9 +246,7 @@ async def _seed_invoice_trigger(
     delay, recipient resolved off ``contact.email``. The only
     difference is the trigger ``name`` + the ``event_type`` it
     subscribes to. Idempotent on ``(org_id, lower(name))``."""
-    existing = await data_access.get_trigger_by_name(
-        session, org_id=org_id, name=name
-    )
+    existing = await data_access.get_trigger_by_name(session, org_id=org_id, name=name)
     if existing is not None:
         return existing
 
@@ -272,8 +267,7 @@ async def _seed_invoice_trigger(
     session.add(trigger)
     await session.flush()
     logger.info(
-        "automation.seed invoice_trigger org=%s name=%s "
-        "trigger=%s template=%s",
+        "automation.seed invoice_trigger org=%s name=%s trigger=%s template=%s",
         org_id,
         name,
         trigger.id,
@@ -416,9 +410,7 @@ async def seed_lead_stale_30d_trigger(
     return trigger
 
 
-async def install_default_org_seeds(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> dict:
+async def install_default_org_seeds(session: AsyncSession, *, org_id: uuid.UUID) -> dict:
     """Single entry-point called by ``core.tenants.service.create_organization``
     + every backfill migration. Wires the v1 seeded triggers:
 
@@ -450,84 +442,64 @@ async def install_default_org_seeds(
         seed_user_welcome_template,
     )
 
-    welcome_template = await seed_user_welcome_template(
-        session, org_id=org_id
-    )
+    welcome_template = await seed_user_welcome_template(session, org_id=org_id)
     welcome_trigger = await seed_user_welcome_trigger(
         session, org_id=org_id, template_id=welcome_template.id
     )
 
-    lead_template = await seed_lead_confirmation_template(
-        session, org_id=org_id
-    )
+    lead_template = await seed_lead_confirmation_template(session, org_id=org_id)
     lead_trigger = await seed_lead_confirmation_trigger(
         session, org_id=org_id, template_id=lead_template.id
     )
 
-    booked_template = await seed_appointment_booked_template(
-        session, org_id=org_id
-    )
+    booked_template = await seed_appointment_booked_template(session, org_id=org_id)
     booked_trigger = await seed_appointment_booked_trigger(
         session, org_id=org_id, template_id=booked_template.id
     )
 
-    reminder_24h_template = await seed_appointment_reminder_24h_template(
-        session, org_id=org_id
-    )
+    reminder_24h_template = await seed_appointment_reminder_24h_template(session, org_id=org_id)
     reminder_24h_trigger = await seed_appointment_reminder_24h_trigger(
         session,
         org_id=org_id,
         template_id=reminder_24h_template.id,
     )
 
-    reminder_1h_template = await seed_appointment_reminder_1h_template(
-        session, org_id=org_id
-    )
+    reminder_1h_template = await seed_appointment_reminder_1h_template(session, org_id=org_id)
     reminder_1h_trigger = await seed_appointment_reminder_1h_trigger(
         session,
         org_id=org_id,
         template_id=reminder_1h_template.id,
     )
 
-    invoice_sent_template = await seed_invoice_sent_template(
-        session, org_id=org_id
-    )
+    invoice_sent_template = await seed_invoice_sent_template(session, org_id=org_id)
     invoice_sent_trigger = await seed_invoice_sent_trigger(
         session,
         org_id=org_id,
         template_id=invoice_sent_template.id,
     )
 
-    invoice_paid_template = await seed_invoice_paid_template(
-        session, org_id=org_id
-    )
+    invoice_paid_template = await seed_invoice_paid_template(session, org_id=org_id)
     invoice_paid_trigger = await seed_invoice_paid_trigger(
         session,
         org_id=org_id,
         template_id=invoice_paid_template.id,
     )
 
-    invoice_overdue_template = await seed_invoice_overdue_template(
-        session, org_id=org_id
-    )
+    invoice_overdue_template = await seed_invoice_overdue_template(session, org_id=org_id)
     invoice_overdue_trigger = await seed_invoice_overdue_trigger(
         session,
         org_id=org_id,
         template_id=invoice_overdue_template.id,
     )
 
-    birthday_template = await seed_contact_birthday_template(
-        session, org_id=org_id
-    )
+    birthday_template = await seed_contact_birthday_template(session, org_id=org_id)
     birthday_trigger = await seed_contact_birthday_trigger(
         session,
         org_id=org_id,
         template_id=birthday_template.id,
     )
 
-    stale_30d_template = await seed_lead_stale_30d_template(
-        session, org_id=org_id
-    )
+    stale_30d_template = await seed_lead_stale_30d_template(session, org_id=org_id)
     stale_30d_trigger = await seed_lead_stale_30d_trigger(
         session,
         org_id=org_id,

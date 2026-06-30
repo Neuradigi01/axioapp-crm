@@ -74,11 +74,7 @@ export class StaffPortalApiService {
     return this.http.get<StaffPickerUser[]>(`${this.base}/users`, { params });
   }
 
-  login(
-    orgSlug: string,
-    userId: string,
-    pin: string,
-  ): Observable<StaffLoginResponse> {
+  login(orgSlug: string, userId: string, pin: string): Observable<StaffLoginResponse> {
     return this.http.post<StaffLoginResponse>(`${this.base}/auth/login`, {
       org_slug: orgSlug,
       user_id: userId,

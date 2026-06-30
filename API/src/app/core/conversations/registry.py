@@ -11,9 +11,10 @@ The registry is a module-level dict — per-process, mirroring how
 that needs cross-process consistency would replace this with a
 config-driven map; the call sites would not change.
 """
+
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from src.app.core.conversations.adapters import ChannelAdapter
 from src.app.core.conversations.models import ConversationChannel
@@ -41,9 +42,7 @@ def unregister_channel(channel: ConversationChannel) -> None:
 def resolve(channel: ConversationChannel) -> ChannelAdapter:
     factory = _factories.get(channel)
     if factory is None:
-        raise ChannelNotRegistered(
-            f"no adapter registered for channel '{channel.value}'"
-        )
+        raise ChannelNotRegistered(f"no adapter registered for channel '{channel.value}'")
     return factory()
 
 

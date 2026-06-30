@@ -11,13 +11,13 @@ writes happen here so the audit log + updated_at flow cleanly. DLT
 portal submission is NOT in scope (TRAI portals are externally
 mandated; standard CRM pattern is manual ID capture).
 """
+
 from __future__ import annotations
 
 import enum
 import logging
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy import text as sql_text
@@ -28,7 +28,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.app.core.templates.exceptions import TemplateNotFound
 from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
-
 
 logger = logging.getLogger(__name__)
 
@@ -95,30 +94,24 @@ class SMSDLTTemplate(Base, TenantScoped):
         ForeignKey("tbl_message_templates.id", ondelete="CASCADE"),
         nullable=False,
     )
-    dlt_entity_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    dlt_template_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    dlt_entity_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dlt_template_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     dlt_content_category: Mapped[SMSDLTContentCategory] = mapped_column(
         sms_dlt_content_category_enum,
         nullable=False,
         server_default=sql_text("'transactional'"),
     )
-    dlt_header: Mapped[Optional[str]] = mapped_column(
-        String(6), nullable=True
-    )
-    dlt_principal_entity_id: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
+    dlt_header: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    dlt_principal_entity_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     dlt_template_status: Mapped[SMSDLTTemplateStatus] = mapped_column(
         sms_dlt_template_status_enum,
         nullable=False,
         server_default=sql_text("'pending'"),
     )
-    dlt_registered_at: Mapped[Optional[datetime]] = mapped_column(
+    dlt_registered_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    dlt_rejection_reason: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
+    dlt_rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -145,9 +138,7 @@ async def get_dlt_metadata(
     need to import the DAL directly."""
     from src.app.core.templates.data_access import sms_dlt as sms_dlt_da
 
-    return await sms_dlt_da.get_dlt_metadata(
-        session, org_id=org_id, template_id=template_id
-    )
+    return await sms_dlt_da.get_dlt_metadata(session, org_id=org_id, template_id=template_id)
 
 
 async def set_dlt_metadata(
@@ -167,19 +158,13 @@ async def set_dlt_metadata(
     """
     from src.app.core.templates import service as templates_service
 
-    template = await templates_service.get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await templates_service.get_template(session, org_id=org_id, template_id=template_id)
     if template is None:
         raise TemplateNotFound(str(template_id))
 
-    row = await get_dlt_metadata(
-        session, org_id=org_id, template_id=template_id
-    )
+    row = await get_dlt_metadata(session, org_id=org_id, template_id=template_id)
     if row is None:
-        row = SMSDLTTemplate(
-            org_id=org_id, message_template_id=template_id
-        )
+        row = SMSDLTTemplate(org_id=org_id, message_template_id=template_id)
         session.add(row)
         await session.flush()
 

@@ -60,10 +60,7 @@ export class ContactDataExportButtonComponent {
     this.busy.set(true);
     this.error.set(null);
     this.http
-      .get(
-        `${environment.apiBaseUrl}/contacts/${id}/data-export`,
-        { responseType: 'blob' },
-      )
+      .get(`${environment.apiBaseUrl}/contacts/${id}/data-export`, { responseType: 'blob' })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (blob: Blob) => {
@@ -79,9 +76,7 @@ export class ContactDataExportButtonComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.busy.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not prepare data export.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not prepare data export.');
         },
       });
   }

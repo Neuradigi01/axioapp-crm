@@ -1,0 +1,79 @@
+#!/usr/bin/env sh
+# Core CRM pre-commit hook — fast, staged-only quality gate.
+#
+# Activated by `git config core.hooksPath .githooks` (wired automatically by
+# API/run.{cmd,sh} `up`, or manually via `run hooks-on`). POSIX sh so it also
+# runs under Git-for-Windows bash.
+#
+# BLOCKS on:  ruff format --check, ruff check (errors), prettier --check,
+#             eslint (errors only — warnings such as a11y never block).
+# SKIPS silently (never blocks) when the API container is down or
+#             APP/node_modules is missing, so offline / partial commits work.
+# Slow tools (pyright, bandit, jscpd) are intentionally CI-only.
+set -u
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+API_DIR="$REPO_ROOT/API"
+APP_DIR="$REPO_ROOT/APP"
+FAIL=0
+
+# Staged files (added/copied/modified/renamed) matching the given pathspecs.
+staged() { git diff --cached --name-only --diff-filter=ACMR -- "$@"; }
+
+# ---------------------------------------------------------------------------
+# Python — delegated INTO the running dev `api` container (ruff lives there via
+# requirements.dev.txt). Paths have the "API/" prefix stripped to match /app.
+# ---------------------------------------------------------------------------
+PY_FILES=$(staged 'API/**/*.py' 'API/*.py')
+if [ -n "$PY_FILES" ]; then
+  CID=""
+  if command -v docker >/dev/null 2>&1; then
+    CID=$(cd "$API_DIR" 2>/dev/null && docker compose -f docker-compose.yml -f docker-compose.dev.yml ps -q api 2>/dev/null | head -n1)
+  fi
+  if [ -z "$CID" ]; then
+    echo "pre-commit: API container not running — skipping Python checks (CI will enforce)."
+  elif ! docker exec "$CID" sh -c 'command -v ruff >/dev/null 2>&1'; then
+    echo "pre-commit: ruff not in container (rebuild with 'run up') — skipping Python checks."
+  else
+    REL=$(printf '%s\n' "$PY_FILES" | sed 's#^API/##')
+    echo "pre-commit: ruff format --check (staged Python)"
+    if ! docker exec "$CID" ruff format --check --force-exclude $REL; then
+      echo "  ✗ formatting — run 'run lint-fix' to autoformat."; FAIL=1
+    fi
+    echo "pre-commit: ruff check (staged Python)"
+    if ! docker exec "$CID" ruff check --force-exclude $REL; then
+      echo "  ✗ lint — fix above ('run lint-fix' handles the autofixable ones)."; FAIL=1
+    fi
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Frontend — local node_modules binaries (npx --no-install). Skipped silently
+# if dependencies are not installed.
+# ---------------------------------------------------------------------------
+FE_FILES=$(staged 'APP/**/*.ts' 'APP/**/*.html' 'APP/**/*.scss' 'APP/**/*.css' 'APP/**/*.json')
+if [ -n "$FE_FILES" ]; then
+  if [ ! -d "$APP_DIR/node_modules" ]; then
+    echo "pre-commit: APP/node_modules missing ('npm ci') — skipping frontend checks (CI will enforce)."
+  else
+    REL=$(printf '%s\n' "$FE_FILES" | sed 's#^APP/##')
+    echo "pre-commit: prettier --check (staged frontend)"
+    if ! ( cd "$APP_DIR" && npx --no-install prettier --check $REL ); then
+      echo "  ✗ formatting — run 'run lint-fix' (or 'npx prettier --write')."; FAIL=1
+    fi
+    FE_LINT=$(printf '%s\n' "$REL" | grep -E '\.(ts|html)$' || true)
+    if [ -n "$FE_LINT" ]; then
+      echo "pre-commit: eslint (staged frontend, errors only)"
+      if ! ( cd "$APP_DIR" && npx --no-install eslint --quiet $FE_LINT ); then
+        echo "  ✗ lint errors — fix above."; FAIL=1
+      fi
+    fi
+  fi
+fi
+
+if [ "$FAIL" -ne 0 ]; then
+  echo ""
+  echo "✗ pre-commit checks failed. Fix the issues, or bypass once with: git commit --no-verify"
+  exit 1
+fi
+exit 0

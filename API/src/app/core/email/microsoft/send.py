@@ -14,19 +14,18 @@ id the recipient's reply will reference in its `In-Reply-To`.
 adapter. Step 5 will read the Message-ID header from the raw MIME
 bytes when it persists the outbound `messages` row.
 """
+
 from __future__ import annotations
 
 import base64
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.email.microsoft.client import GraphClient, GraphHTTPError
 from src.app.core.email.models import EmailAccount
-
 
 # Same defaults as the Gmail adapter. Step 5 may surface per-org
 # overrides; the env-var fallback below covers global tuning.
@@ -41,10 +40,7 @@ class DailyCapExceeded(HTTPException):
     def __init__(self, *, sent: int, cap: int) -> None:
         super().__init__(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=(
-                f"Daily send cap reached for this account "
-                f"({sent}/{cap}). Try again tomorrow."
-            ),
+            detail=(f"Daily send cap reached for this account ({sent}/{cap}). Try again tomorrow."),
         )
 
 
@@ -54,7 +50,7 @@ class SendResult:
     is None — Graph's sendMail doesn't return one (see module
     docstring)."""
 
-    provider_message_id: Optional[str]
+    provider_message_id: str | None
     daily_sent_after: int
     near_soft_cap: bool
 
@@ -64,7 +60,7 @@ async def send(
     session: AsyncSession,
     *,
     raw_mime: bytes,
-    client: Optional[GraphClient] = None,
+    client: GraphClient | None = None,
     soft_cap: int = DEFAULT_SOFT_CAP,
     hard_cap: int = DEFAULT_HARD_CAP,
 ) -> SendResult:
@@ -96,9 +92,7 @@ async def send(
 
 def _ensure_under_hard_cap(account: EmailAccount, hard_cap: int) -> None:
     if (account.daily_sent_count or 0) >= hard_cap:
-        raise DailyCapExceeded(
-            sent=account.daily_sent_count, cap=hard_cap
-        )
+        raise DailyCapExceeded(sent=account.daily_sent_count, cap=hard_cap)
 
 
 __all__ = [

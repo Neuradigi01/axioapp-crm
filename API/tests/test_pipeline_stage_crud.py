@@ -12,6 +12,7 @@ provided. DELETE refuses terminal stages, demands a relocation target
 when cards exist in the stage being deleted, and UPDATE+DELETEs in one
 transaction.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -27,7 +28,6 @@ from src.app.core.permissions.models import RolePermission
 from src.app.core.permissions.service import register_permission
 from src.app.core.pipelines.models import Pipeline, PipelineStage
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 # Six-stage pipeline matching the task spec's POST happy-path scenario:
 # inserting after "contacted" must shift qualified/proposal/won/lost up.
@@ -52,9 +52,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -122,9 +120,7 @@ async def _seed_contact(org_id: uuid.UUID, *, suffix: str) -> uuid.UUID:
         reset_context(token)
 
 
-async def _seed_lead(
-    org_id: uuid.UUID, *, contact_id: uuid.UUID, stage_key: str
-) -> uuid.UUID:
+async def _seed_lead(org_id: uuid.UUID, *, contact_id: uuid.UUID, stage_key: str) -> uuid.UUID:
     from tests.conftest import TestSession
 
     token = set_context(RequestContext(org_id=org_id))
@@ -149,9 +145,7 @@ async def _stages_by_key(org_id: uuid.UUID) -> dict[str, PipelineStage]:
     token = set_context(RequestContext(org_id=org_id))
     try:
         async with TestSession() as session:
-            rows = (
-                await session.execute(select(PipelineStage))
-            ).scalars().all()
+            rows = (await session.execute(select(PipelineStage))).scalars().all()
             return {s.key: s for s in rows}
     finally:
         reset_context(token)
@@ -161,9 +155,7 @@ async def _stages_by_key(org_id: uuid.UUID) -> dict[str, PipelineStage]:
 
 
 @pytest.mark.asyncio
-async def test_post_inserts_after_anchor_and_shifts_later_stages(
-    layered_client, seeded_admin
-):
+async def test_post_inserts_after_anchor_and_shifts_later_stages(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "pipelines.read", "pipelines.manage")
@@ -189,9 +181,7 @@ async def test_post_inserts_after_anchor_and_shifts_later_stages(
     assert body["is_won"] is False
     assert body["is_lost"] is False
 
-    listing = await layered_client.get(
-        "/api/v1/pipelines/leads", headers=headers
-    )
+    listing = await layered_client.get("/api/v1/pipelines/leads", headers=headers)
     by_key = {s["key"]: s["display_order"] for s in listing.json()["stages"]}
     assert by_key == {
         "new": 0,
@@ -205,9 +195,7 @@ async def test_post_inserts_after_anchor_and_shifts_later_stages(
 
 
 @pytest.mark.asyncio
-async def test_post_appends_when_after_stage_key_omitted(
-    layered_client, seeded_admin
-):
+async def test_post_appends_when_after_stage_key_omitted(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "pipelines.read", "pipelines.manage")
@@ -278,9 +266,7 @@ async def test_post_rejects_is_won_in_body(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_post_without_manage_permission_is_403(
-    layered_client, seeded_admin
-):
+async def test_post_without_manage_permission_is_403(layered_client, seeded_admin):
     """Employee-like caller with only `pipelines.read` cannot create stages."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -330,9 +316,7 @@ async def test_delete_empty_stage_succeeds(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_delete_stage_with_cards_without_target_is_409(
-    layered_client, seeded_admin
-):
+async def test_delete_stage_with_cards_without_target_is_409(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "pipelines.manage")
@@ -357,9 +341,7 @@ async def test_delete_stage_with_cards_without_target_is_409(
 
 
 @pytest.mark.asyncio
-async def test_delete_stage_with_cards_relocates_then_deletes(
-    layered_client, seeded_admin
-):
+async def test_delete_stage_with_cards_relocates_then_deletes(layered_client, seeded_admin):
     """Cards in the deleted stage end up in the target; the stage row goes."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -378,8 +360,7 @@ async def test_delete_stage_with_cards_relocates_then_deletes(
     headers = {"Authorization": f"Bearer {token}"}
 
     resp = await layered_client.delete(
-        f"/api/v1/pipelines/leads/stages/{stage_ids['qualified']}"
-        f"?move_leads_to=proposal",
+        f"/api/v1/pipelines/leads/stages/{stage_ids['qualified']}?move_leads_to=proposal",
         headers=headers,
     )
     assert resp.status_code == 204, resp.text
@@ -391,17 +372,13 @@ async def test_delete_stage_with_cards_relocates_then_deletes(
     try:
         async with TestSession() as session:
             leads = (
-                await session.execute(
-                    select(Lead).where(Lead.id.in_([l1, l2]))
-                )
-            ).scalars().all()
-            assert {l.pipeline_stage for l in leads} == {"proposal"}
+                (await session.execute(select(Lead).where(Lead.id.in_([l1, l2])))).scalars().all()
+            )
+            assert {lead.pipeline_stage for lead in leads} == {"proposal"}
 
             still_there = (
                 await session.execute(
-                    select(PipelineStage).where(
-                        PipelineStage.id == stage_ids["qualified"]
-                    )
+                    select(PipelineStage).where(PipelineStage.id == stage_ids["qualified"])
                 )
             ).scalar_one_or_none()
             assert still_there is None
@@ -425,8 +402,7 @@ async def test_delete_won_stage_is_409(layered_client, seeded_admin):
 
     # Even with a relocation target supplied, won is undeletable.
     resp = await layered_client.delete(
-        f"/api/v1/pipelines/leads/stages/{stage_ids['won']}"
-        f"?move_leads_to=new",
+        f"/api/v1/pipelines/leads/stages/{stage_ids['won']}?move_leads_to=new",
         headers=headers,
     )
     assert resp.status_code == 409, resp.text
@@ -454,9 +430,7 @@ async def test_delete_lost_stage_is_409(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_delete_without_manage_permission_is_403(
-    layered_client, seeded_admin
-):
+async def test_delete_without_manage_permission_is_403(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "pipelines.read")
@@ -480,9 +454,7 @@ async def test_delete_without_manage_permission_is_403(
 
 
 @pytest.mark.asyncio
-async def test_audit_rows_emitted_for_create_and_delete(
-    layered_client, seeded_admin
-):
+async def test_audit_rows_emitted_for_create_and_delete(layered_client, seeded_admin):
     """POST emits `pipelines.stage_created`; DELETE emits `pipelines.stage_deleted`
     carrying `cards_moved_count`."""
     org = seeded_admin["org"]
@@ -508,8 +480,7 @@ async def test_audit_rows_emitted_for_create_and_delete(
     created_stage_id = uuid.UUID(create_resp.json()["id"])
 
     del_resp = await layered_client.delete(
-        f"/api/v1/pipelines/leads/stages/{stage_ids['qualified']}"
-        f"?move_leads_to=proposal",
+        f"/api/v1/pipelines/leads/stages/{stage_ids['qualified']}?move_leads_to=proposal",
         headers=headers,
     )
     assert del_resp.status_code == 204, del_resp.text
@@ -520,22 +491,30 @@ async def test_audit_rows_emitted_for_create_and_delete(
     try:
         async with TestSession() as session:
             created_rows = (
-                await session.execute(
-                    select(AuditLog)
-                    .where(AuditLog.action == "pipelines.stage_created")
-                    .where(AuditLog.entity_id == created_stage_id)
+                (
+                    await session.execute(
+                        select(AuditLog)
+                        .where(AuditLog.action == "pipelines.stage_created")
+                        .where(AuditLog.entity_id == created_stage_id)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(created_rows) == 1
             assert created_rows[0].after["key"] == "demo_scheduled"
 
             deleted_rows = (
-                await session.execute(
-                    select(AuditLog)
-                    .where(AuditLog.action == "pipelines.stage_deleted")
-                    .where(AuditLog.entity_id == stage_ids["qualified"])
+                (
+                    await session.execute(
+                        select(AuditLog)
+                        .where(AuditLog.action == "pipelines.stage_deleted")
+                        .where(AuditLog.entity_id == stage_ids["qualified"])
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(deleted_rows) == 1
             after = deleted_rows[0].after
             assert after["cards_moved_count"] == 1

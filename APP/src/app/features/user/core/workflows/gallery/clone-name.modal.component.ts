@@ -13,7 +13,6 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { WorkflowGalleryEntry } from '../workflows-api.service';
 
-
 /**
  * Naming modal — opens after the operator clicks "Use this template"
  * (either from a card or from inside the preview modal). Shows a
@@ -24,7 +23,6 @@ import { WorkflowGalleryEntry } from '../workflows-api.service';
  * input falls back to "Copy of <template name>" — the backend
  * defaults to the same value when no name is supplied.
  */
-
 
 @Component({
   selector: 'app-clone-name-modal',

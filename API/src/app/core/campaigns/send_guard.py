@@ -39,11 +39,11 @@ covers ALL outbound. We honour that strictly — opted-out blocks
 every category. Operators who need to send a transactional message
 must manually re-opt-in the contact first.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, Optional
-
+from typing import Any, Literal
 
 SendVerdict = Literal["allow", "warn", "block"]
 
@@ -52,7 +52,7 @@ SendVerdict = Literal["allow", "warn", "block"]
 class SendDecision:
     verdict: SendVerdict
     status: str
-    reason: Optional[str]
+    reason: str | None
 
     @property
     def should_block(self) -> bool:
@@ -62,7 +62,7 @@ class SendDecision:
 def evaluate_contact(
     contact: Any,
     *,
-    template_category: Optional[str] = None,
+    template_category: str | None = None,
     allow_implicit: bool = False,
 ) -> SendDecision:
     """Decide whether ``contact`` may receive a campaign message.
@@ -77,9 +77,7 @@ def evaluate_contact(
         campaign create modal. When ``True`` and the contact is
         ``implicit`` consent, we promote ``warn`` → ``allow``.
     """
-    status_value = getattr(contact, "whatsapp_opt_in_status", None) or (
-        "never_contacted"
-    )
+    status_value = getattr(contact, "whatsapp_opt_in_status", None) or ("never_contacted")
 
     if status_value == "opted_out":
         return SendDecision(
@@ -123,10 +121,7 @@ def block_reason(decision: SendDecision) -> str:
     """Friendly error string for the failed-message row. Matches
     Step 21's failure classifier so the dashboard bucket is
     correct without a special-case mapping."""
-    return (
-        decision.reason
-        or f"send blocked: contact status={decision.status}"
-    )
+    return decision.reason or f"send blocked: contact status={decision.status}"
 
 
 __all__ = ["SendDecision", "SendVerdict", "block_reason", "evaluate_contact"]

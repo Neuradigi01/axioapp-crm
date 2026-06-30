@@ -20,11 +20,12 @@ Both wrap their async work in `asyncio.run(...)` per the project's
 Celery convention (see `src/celery/worker.py` for the engine reset
 hooks that keep this safe across tasks).
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from celery import shared_task
@@ -58,7 +59,7 @@ async def _rollover_period_counters_async() -> dict[str, Any]:
     from src.app.core.subscriptions.usage_service import reset_monthly_counters
     from src.app.shared.db import async_session
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     advanced = 0
     counters_inserted = 0
 
@@ -67,20 +68,25 @@ async def _rollover_period_counters_async() -> dict[str, Any]:
         # no-op when `RequestContext.org_id is None`, so this plain SELECT
         # sees every org's row.
         rows = (
-            await session.execute(
-                select(Subscription).where(
-                    Subscription.current_period_end <= now,
-                    Subscription.status.in_(("trialing", "active")),
+            (
+                await session.execute(
+                    select(Subscription).where(
+                        Subscription.current_period_end <= now,
+                        Subscription.status.in_(("trialing", "active")),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         for sub in rows:
             cycle = _CYCLE_LENGTHS.get(sub.billing_cycle)
             if cycle is None:
                 log.warning(
                     "skipping subscription %s with unknown billing_cycle %r",
-                    sub.id, sub.billing_cycle,
+                    sub.id,
+                    sub.billing_cycle,
                 )
                 continue
 
@@ -104,7 +110,8 @@ async def _rollover_period_counters_async() -> dict[str, Any]:
 
     log.info(
         "rollover_period_counters advanced=%d counters_inserted=%d",
-        advanced, counters_inserted,
+        advanced,
+        counters_inserted,
     )
     return {"advanced": advanced, "counters_inserted": counters_inserted}
 
@@ -135,24 +142,25 @@ async def _reset_daily_counters_async() -> dict[str, Any]:
 
     async with async_session() as session:
         rows = (
-            await session.execute(
-                select(Subscription.org_id).where(
-                    Subscription.status.in_(ACTIVE_STATUSES)
+            (
+                await session.execute(
+                    select(Subscription.org_id).where(Subscription.status.in_(ACTIVE_STATUSES))
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         for org_id in rows:
-            counters_inserted += await reset_daily_counter_rows(
-                session, org_id, start, end
-            )
+            counters_inserted += await reset_daily_counter_rows(session, org_id, start, end)
             orgs_processed += 1
 
         await session.commit()
 
     log.info(
         "reset_daily_counters orgs_processed=%d counters_inserted=%d",
-        orgs_processed, counters_inserted,
+        orgs_processed,
+        counters_inserted,
     )
     return {"orgs_processed": orgs_processed, "counters_inserted": counters_inserted}
 

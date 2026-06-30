@@ -13,20 +13,19 @@ Covers:
     a broken graph re-raises ``InvalidGraph``.
   * Folder delete on a non-empty folder → ``FolderHasWorkflows``.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from decimal import Decimal
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.templates import service as templates_service
 from src.app.core.templates.models import (
-    MessageTemplate,
     TemplateCategory,
 )
 from src.app.core.templates.schemas import TemplateCreate
@@ -41,7 +40,6 @@ from src.app.core.workflows.exceptions import (
     WorkflowLocked,
 )
 from src.app.core.workflows.models import (
-    Workflow,
     WorkflowFolder,
     WorkflowStatus,
     WorkflowVersion,
@@ -56,7 +54,6 @@ from src.app.core.workflows.schemas import (
 )
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -64,10 +61,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -155,12 +149,14 @@ async def test_create_workflow_persists_and_writes_v1_version(test_db, org_id):
     assert workflow.enabled_event_types == ["lead.created"]
 
     versions = (
-        await test_db.execute(
-            select(WorkflowVersion).where(
-                WorkflowVersion.workflow_id == workflow.id
+        (
+            await test_db.execute(
+                select(WorkflowVersion).where(WorkflowVersion.workflow_id == workflow.id)
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(versions) == 1
     assert versions[0].version == 1
 
@@ -195,10 +191,7 @@ async def test_duplicate_name_in_same_org_rejected(test_db, org_id):
 async def test_same_name_in_different_orgs_allowed(test_db, org_id):
     other_org = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(other_org),
             "name": "Other",
@@ -280,12 +273,16 @@ async def test_update_graph_bumps_version_and_writes_new_row(test_db, org_id):
     assert updated.description == "now with feeling"
 
     versions = (
-        await test_db.execute(
-            select(WorkflowVersion)
-            .where(WorkflowVersion.workflow_id == workflow.id)
-            .order_by(WorkflowVersion.version.asc())
+        (
+            await test_db.execute(
+                select(WorkflowVersion)
+                .where(WorkflowVersion.workflow_id == workflow.id)
+                .order_by(WorkflowVersion.version.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(versions) == 2
     assert [v.version for v in versions] == [1, 2]
 
@@ -391,12 +388,10 @@ async def test_delete_empty_folder_succeeds(test_db, org_id):
             folder_id=folder.id,
         )
         rows = (
-            await test_db.execute(
-                select(WorkflowFolder).where(
-                    WorkflowFolder.id == folder.id
-                )
-            )
-        ).scalars().all()
+            (await test_db.execute(select(WorkflowFolder).where(WorkflowFolder.id == folder.id)))
+            .scalars()
+            .all()
+        )
         assert rows == []
     finally:
         reset_context(token)

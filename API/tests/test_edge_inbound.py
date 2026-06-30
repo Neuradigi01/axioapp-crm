@@ -23,9 +23,8 @@ Cases:
  13.  `_build_location_envelope` shape (lat/lng floats + name + address).
  14.  `_build_location_envelope` skips empty name / address.
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from src.app.core.conversations.adapters.whatsapp import (
     WhatsAppAdapter,
@@ -45,9 +44,7 @@ def _adapter() -> WhatsAppAdapter:
 
 
 def _wrap_message(message: dict) -> dict:
-    return {
-        "entry": [{"changes": [{"value": {"messages": [message]}}]}]
-    }
+    return {"entry": [{"changes": [{"value": {"messages": [message]}}]}]}
 
 
 class TestInboundLocation:
@@ -114,9 +111,7 @@ class TestInboundLocation:
             "location": {"longitude": 72.8},
         }
         parsed = _adapter().parse_webhook(_wrap_message(msg))
-        assert not any(
-            a.get("type") == "location" for a in parsed.attachments
-        )
+        assert not any(a.get("type") == "location" for a in parsed.attachments)
 
 
 class TestInboundContacts:
@@ -229,9 +224,7 @@ class TestInboundSticker:
             "sticker": {"mime_type": "image/webp"},
         }
         parsed = _adapter().parse_webhook(_wrap_message(msg))
-        assert not any(
-            a.get("type") == "sticker" for a in parsed.attachments
-        )
+        assert not any(a.get("type") == "sticker" for a in parsed.attachments)
 
 
 class TestOutboundLocationHelpers:

@@ -16,6 +16,7 @@ Cases:
   7. TeamBased schema requires team_id.
   8. _coerce_uuid_list filters out non-UUIDs.
 """
+
 from __future__ import annotations
 
 import uuid

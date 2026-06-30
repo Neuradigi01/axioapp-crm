@@ -25,11 +25,12 @@ The WHERE-clause composition + sort-column whitelisting stays in
 validation are business-layer concerns. DAL accepts already-built
 SQLAlchemy clause / column expressions and just executes them.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import delete, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,13 +40,10 @@ from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead, LeadScoringRule, LeadStatus
 from src.app.core.users.models import OrganizationMember, User
 
-
 # --- Leads --------------------------------------------------------------
 
 
-async def get_lead_by_id(
-    session: AsyncSession, lead_id: uuid.UUID
-) -> Optional[Lead]:
+async def get_lead_by_id(session: AsyncSession, lead_id: uuid.UUID) -> Lead | None:
     """Single-row read by PK. ``None`` on miss (or cross-tenant — the
     ORM filter applies)."""
     result = await session.execute(select(Lead).where(Lead.id == lead_id))
@@ -55,7 +53,7 @@ async def get_lead_by_id(
 async def count_leads_with_where(
     session: AsyncSession,
     *,
-    where: Optional[ClauseElement] = None,
+    where: ClauseElement | None = None,
     needs_contact_join: bool = False,
 ) -> int:
     """COUNT against the leads table with an optional pre-built WHERE
@@ -72,11 +70,11 @@ async def count_leads_with_where(
 async def list_leads_with_where(
     session: AsyncSession,
     *,
-    where: Optional[ClauseElement] = None,
+    where: ClauseElement | None = None,
     needs_contact_join: bool = False,
     primary_order: Any,
     secondary_order: Any,
-    keyset_clause: Optional[ClauseElement] = None,
+    keyset_clause: ClauseElement | None = None,
     offset: int = 0,
     limit: int,
 ) -> list[Lead]:
@@ -112,9 +110,7 @@ async def bulk_delete_leads_by_ids(
     """DELETE ``WHERE id IN (...) AND org_id = ...``. The ``org_id``
     predicate is belt-and-braces alongside the per-tenant RLS policy.
     Returns the row count deleted. Caller commits."""
-    result = await session.execute(
-        delete(Lead).where(Lead.id.in_(ids), Lead.org_id == org_id)
-    )
+    result = await session.execute(delete(Lead).where(Lead.id.in_(ids), Lead.org_id == org_id))
     return int(result.rowcount or 0)
 
 
@@ -133,11 +129,9 @@ async def delete_lead_row(session: AsyncSession, lead: Lead) -> None:
 
 async def get_scoring_rule_by_id(
     session: AsyncSession, rule_id: uuid.UUID
-) -> Optional[LeadScoringRule]:
+) -> LeadScoringRule | None:
     """Single-row read by PK."""
-    result = await session.execute(
-        select(LeadScoringRule).where(LeadScoringRule.id == rule_id)
-    )
+    result = await session.execute(select(LeadScoringRule).where(LeadScoringRule.id == rule_id))
     return result.scalar_one_or_none()
 
 
@@ -155,16 +149,12 @@ async def list_scoring_rules_for_org(
     return list(result.scalars())
 
 
-def insert_scoring_rule(
-    session: AsyncSession, rule: LeadScoringRule
-) -> None:
+def insert_scoring_rule(session: AsyncSession, rule: LeadScoringRule) -> None:
     """Register an already-constructed LeadScoringRule for INSERT."""
     session.add(rule)
 
 
-async def delete_scoring_rule_row(
-    session: AsyncSession, rule: LeadScoringRule
-) -> None:
+async def delete_scoring_rule_row(session: AsyncSession, rule: LeadScoringRule) -> None:
     """Mark a LeadScoringRule row for DELETE. Caller commits."""
     await session.delete(rule)
 
@@ -172,16 +162,12 @@ async def delete_scoring_rule_row(
 # --- Cross-module verifiers ---------------------------------------------
 
 
-async def contact_exists_in_org(
-    session: AsyncSession, contact_id: uuid.UUID
-) -> bool:
+async def contact_exists_in_org(session: AsyncSession, contact_id: uuid.UUID) -> bool:
     """Narrow-column existence check used by the lead-create validator
     to reject out-of-org contact ids. The tenant ORM filter ensures
     only in-org contacts are visible; missing → caller raises 422."""
     contact = (
-        await session.execute(
-            select(Contact.id).where(Contact.id == contact_id)
-        )
+        await session.execute(select(Contact.id).where(Contact.id == contact_id))
     ).scalar_one_or_none()
     return contact is not None
 
@@ -240,8 +226,7 @@ async def find_stale_leads(
                 Lead.last_activity_at <= inactive_since,
                 # Never-touched leads: count the create timestamp
                 # as the "last activity" for staleness purposes.
-                (Lead.last_activity_at.is_(None))
-                & (Lead.created_at <= inactive_since),
+                (Lead.last_activity_at.is_(None)) & (Lead.created_at <= inactive_since),
             )
         )
     )

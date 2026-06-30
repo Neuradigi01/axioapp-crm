@@ -1,27 +1,15 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CanvasNode } from '../canvas-state.service';
 import { ConditionsBuilderComponent } from '../conditions-builder.component';
-import {
-  ALWAYS_AVAILABLE,
-  ConditionNode,
-} from './editor-contract';
-
+import { ALWAYS_AVAILABLE, ConditionNode } from './editor-contract';
 
 export interface Branch {
   label: string;
   conditions: ConditionNode | null;
 }
-
 
 /**
  * `branch.if` config editor — yes / no fork. Operator configures the
@@ -29,7 +17,6 @@ export interface Branch {
  * when no other branch matches). Backend already enforces the dual
  * output edges via the node-type registry.
  */
-
 
 @Component({
   selector: 'app-branch-editor',

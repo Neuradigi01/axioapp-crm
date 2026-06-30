@@ -10,17 +10,15 @@
     (click)="$event.stopPropagation()"
   >
     <header class="border-b border-zinc-200 px-4 py-3">
-      <h3 class="text-sm font-semibold text-zinc-900">
-        Delete &ldquo;{{ stage().name }}&rdquo;?
-      </h3>
+      <h3 class="text-sm font-semibold text-zinc-900">Delete &ldquo;{{ stage().name }}&rdquo;?</h3>
     </header>
 
     <div class="space-y-3 px-4 py-4">
       <div class="flex items-start gap-2 rounded bg-amber-50 px-3 py-2 ring-1 ring-amber-200">
         <span class="text-base leading-none text-amber-700">⚠</span>
         <p class="text-xs text-amber-800">
-          {{ cardsInStage() }} {{ cardsInStage() === 1 ? 'lead is' : 'leads are' }}
-          currently in this stage. Move {{ cardsInStage() === 1 ? 'it' : 'them' }} to:
+          {{ cardsInStage() }} {{ cardsInStage() === 1 ? 'lead is' : 'leads are' }} currently in
+          this stage. Move {{ cardsInStage() === 1 ? 'it' : 'them' }} to:
         </p>
       </div>
 
@@ -39,7 +37,9 @@
       <p class="text-[11px] text-zinc-500">This cannot be undone.</p>
     </div>
 
-    <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-4 py-2">
+    <footer
+      class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-4 py-2"
+    >
       <button
         type="button"
         (click)="onCancel()"

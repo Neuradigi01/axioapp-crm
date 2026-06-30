@@ -119,6 +119,34 @@ WHATSAPP_GRAPH_API_VERSION = os.getenv("WHATSAPP_GRAPH_API_VERSION", "v19.0")
 # per-org row only when this is empty.
 WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
 
+# WhatsApp Web (unofficial / Baileys) — Step 4 of the
+# `tasks/whatsapp-unofficial/` track. The Node sidecar at
+# `sidecars/whatsapp-web/` owns the WhatsApp Web protocol; FastAPI
+# speaks to it over HMAC-signed HTTP.
+#
+# SIDECAR_URL is the base URL FastAPI POSTs to (e.g. /sessions,
+# /sessions/{id}/send-text, /sessions/{id}/download-media). Default
+# is the docker-compose service name on the project network; local
+# dev override via `http://localhost:4000`.
+WHATSAPP_WEB_SIDECAR_URL = os.getenv(
+    "WHATSAPP_WEB_SIDECAR_URL", "http://whatsapp-web-sidecar:4000"
+)
+# Outbound HMAC secret — used by the FastAPI client to sign every
+# request to the sidecar. MUST match the sidecar's
+# `SIDECAR_HMAC_SECRET`. Generate with:
+#   python -c "import secrets; print(secrets.token_hex(32))"
+# Stored in secrets.enc.env, NOT here.
+WHATSAPP_WEB_SIDECAR_HMAC_SECRET = os.getenv(
+    "WHATSAPP_WEB_SIDECAR_HMAC_SECRET", ""
+)
+# Inbound HMAC secret — used by the FastAPI events receiver
+# (Step 6) to verify the sidecar's signature on every event POST.
+# MUST match the sidecar's `FASTAPI_HMAC_SECRET`. Stored in
+# secrets.enc.env, NOT here.
+WHATSAPP_WEB_INBOUND_HMAC_SECRET = os.getenv(
+    "WHATSAPP_WEB_INBOUND_HMAC_SECRET", ""
+)
+
 # Ad integrations (Google Ads + Meta Ads) — OAuth-token encryption.
 # Fernet key — 32 url-safe-base64-encoded bytes. Generate with:
 #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

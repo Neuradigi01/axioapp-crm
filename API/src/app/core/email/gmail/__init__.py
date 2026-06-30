@@ -10,8 +10,8 @@ The registration runs once per process. `oauth.register_provider` is
 idempotent — re-registering the same name overwrites silently (used
 in tests to swap in mocks).
 """
+
 from src.app.core.email.gmail.oauth import GmailProvider
 from src.app.core.email.oauth import register_provider
-
 
 register_provider(GmailProvider())

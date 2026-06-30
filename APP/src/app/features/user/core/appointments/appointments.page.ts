@@ -11,14 +11,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
-import {
-  endOfMonth,
-  endOfWeek,
-  format,
-  isSameDay,
-  startOfMonth,
-  startOfWeek,
-} from 'date-fns';
+import { endOfMonth, endOfWeek, format, isSameDay, startOfMonth, startOfWeek } from 'date-fns';
 import { forkJoin, of } from 'rxjs';
 import { catchError, distinctUntilChanged } from 'rxjs/operators';
 
@@ -26,10 +19,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { FurnitureAuthService } from '../auth/auth.service';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
-import {
-  CalendarComponent,
-  CalendarEvent,
-} from '../shared/calendar/calendar.component';
+import { CalendarComponent, CalendarEvent } from '../shared/calendar/calendar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { ContactsApiService } from '../contacts/contacts-api.service';
 import { MailLinkDirective } from '../shared/directives/mail-link.directive';
@@ -55,10 +45,7 @@ import {
 } from './appointments-api.service';
 import { AppointmentPopoverComponent } from './appointment-popover.component';
 import { BookAppointmentModalComponent } from './book-appointment-modal.component';
-import {
-  RescheduleConfirm,
-  RescheduleModalComponent,
-} from './reschedule-modal.component';
+import { RescheduleConfirm, RescheduleModalComponent } from './reschedule-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
 
@@ -140,9 +127,7 @@ export class AppointmentsPageComponent {
   readonly statusFilter = signal<StatusFilter>('all');
   readonly chips = FILTER_CHIPS;
 
-  readonly scope = signal<'mine' | 'team' | 'all'>(
-    this.defaultScopeForRole(),
-  );
+  readonly scope = signal<'mine' | 'team' | 'all'>(this.defaultScopeForRole());
 
   readonly assigneeControl = new FormControl<string>('', { nonNullable: true });
 
@@ -179,16 +164,15 @@ export class AppointmentsPageComponent {
 
   readonly daysAppointments = computed<Appointment[]>(() => {
     const day = this.selectedDay();
-    return this.state.items()
+    return this.state
+      .items()
       .filter((a) => isSameDay(new Date(a.scheduled_at), day))
       .sort((a, b) =>
         a.scheduled_at < b.scheduled_at ? -1 : a.scheduled_at > b.scheduled_at ? 1 : 0,
       );
   });
 
-  readonly selectedDayLabel = computed(() =>
-    format(this.selectedDay(), 'EEEE, d MMMM yyyy'),
-  );
+  readonly selectedDayLabel = computed(() => format(this.selectedDay(), 'EEEE, d MMMM yyyy'));
 
   // --- Selection + bulk --------------------------------------------------
 
@@ -254,11 +238,7 @@ export class AppointmentsPageComponent {
     sort: {
       read: () => this.sortKey(),
       write: (v) => {
-        if (
-          v === 'scheduled_at' ||
-          v === 'created_at' ||
-          v === 'last_activity_at'
-        ) {
+        if (v === 'scheduled_at' || v === 'created_at' || v === 'last_activity_at') {
           this.sortKey.set(v);
         }
       },
@@ -309,19 +289,17 @@ export class AppointmentsPageComponent {
     // Honour `/user/appointments?new=1` (dashboard quick-action) so
     // landing on the page from elsewhere opens the book-appointment
     // modal directly. Strip the param after consuming it.
-    this.route.queryParamMap
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((params) => {
-        if (params.get('new') !== null && !this.modalOpen()) {
-          this.openBook();
-          this.router.navigate([], {
-            relativeTo: this.route,
-            queryParams: { new: null },
-            queryParamsHandling: 'merge',
-            replaceUrl: true,
-          });
-        }
-      });
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      if (params.get('new') !== null && !this.modalOpen()) {
+        this.openBook();
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { new: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      }
+    });
   }
 
   // --- View / filter setters ---------------------------------------------
@@ -341,11 +319,7 @@ export class AppointmentsPageComponent {
 
   protected setSort(value: string): void {
     const [key, order] = value.split(':');
-    if (
-      key !== 'scheduled_at' &&
-      key !== 'created_at' &&
-      key !== 'last_activity_at'
-    ) {
+    if (key !== 'scheduled_at' && key !== 'created_at' && key !== 'last_activity_at') {
       return;
     }
     if (order !== 'asc' && order !== 'desc') return;
@@ -439,9 +413,7 @@ export class AppointmentsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.state.bulkSubmitting.set(false);
-          this.state.bulkError.set(
-            extractApiError(err) ?? 'Could not reassign appointments.',
-          );
+          this.state.bulkError.set(extractApiError(err) ?? 'Could not reassign appointments.');
         },
       });
   }
@@ -468,9 +440,7 @@ export class AppointmentsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.state.bulkSubmitting.set(false);
-          this.state.bulkError.set(
-            extractApiError(err) ?? 'Could not cancel appointments.',
-          );
+          this.state.bulkError.set(extractApiError(err) ?? 'Could not cancel appointments.');
         },
       });
   }
@@ -528,9 +498,7 @@ export class AppointmentsPageComponent {
     const appt = this.singleReassignAppt();
     if (!appt) return;
     if (!payload.userId) {
-      this.singleReassignError.set(
-        'Appointments require an owner — pick a user.',
-      );
+      this.singleReassignError.set('Appointments require an owner — pick a user.');
       return;
     }
     this.singleReassignSubmitting.set(true);
@@ -541,16 +509,12 @@ export class AppointmentsPageComponent {
       .subscribe({
         next: (updated) => {
           this.singleReassignSubmitting.set(false);
-          this.state.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.closeSingleReassign();
         },
         error: (err: HttpErrorResponse) => {
           this.singleReassignSubmitting.set(false);
-          this.singleReassignError.set(
-            extractApiError(err) ?? 'Could not reassign appointment.',
-          );
+          this.singleReassignError.set(extractApiError(err) ?? 'Could not reassign appointment.');
         },
       });
   }
@@ -577,16 +541,12 @@ export class AppointmentsPageComponent {
       .subscribe({
         next: (updated) => {
           this.rescheduleSubmitting.set(false);
-          this.state.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.closeReschedule();
         },
         error: (err: HttpErrorResponse) => {
           this.rescheduleSubmitting.set(false);
-          this.rescheduleError.set(
-            extractApiError(err) ?? 'Could not reschedule appointment.',
-          );
+          this.rescheduleError.set(extractApiError(err) ?? 'Could not reschedule appointment.');
         },
       });
   }
@@ -608,17 +568,13 @@ export class AppointmentsPageComponent {
       .subscribe({
         next: (updated) => {
           this.cancelSubmitting.set(false);
-          this.state.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.closeCancelConfirm();
         },
         error: (err: HttpErrorResponse) => {
           this.cancelSubmitting.set(false);
           this.closeCancelConfirm();
-          this.state.loadError.set(
-            extractApiError(err) ?? 'Could not cancel appointment.',
-          );
+          this.state.loadError.set(extractApiError(err) ?? 'Could not cancel appointment.');
         },
       });
   }
@@ -634,15 +590,11 @@ export class AppointmentsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.state.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
         },
         error: (err: HttpErrorResponse) => {
           this.state.items.set(before);
-          this.state.loadError.set(
-            extractApiError(err) ?? 'Could not update appointment status.',
-          );
+          this.state.loadError.set(extractApiError(err) ?? 'Could not update appointment status.');
         },
       });
   }
@@ -737,10 +689,7 @@ export class AppointmentsPageComponent {
       const month = this.viewMonth();
       const fromDt = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
       const toDt = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
-      const lower =
-        extraFrom && new Date(extraFrom) > fromDt
-          ? extraFrom
-          : fromDt.toISOString();
+      const lower = extraFrom && new Date(extraFrom) > fromDt ? extraFrom : fromDt.toISOString();
       return { scheduledFrom: lower, scheduledTo: toDt.toISOString() };
     }
     return extraFrom ? { scheduledFrom: extraFrom } : {};
@@ -771,9 +720,7 @@ export class AppointmentsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.state.items.set([]);
           this.state.loading.set(false);
-          this.state.loadError.set(
-            extractApiError(err) ?? 'Could not load appointments.',
-          );
+          this.state.loadError.set(extractApiError(err) ?? 'Could not load appointments.');
         },
       });
   }
@@ -783,11 +730,7 @@ export class AppointmentsPageComponent {
     const cache = this.contactsById();
     const missing = [...ids].filter((id) => !cache[id]);
     if (missing.length === 0) return;
-    forkJoin(
-      missing.map((id) =>
-        this.contactsApi.get(id).pipe(catchError(() => of(null))),
-      ),
-    )
+    forkJoin(missing.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((results) => {
         this.contactsById.update((current) => {

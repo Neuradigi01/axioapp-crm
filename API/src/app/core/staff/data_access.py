@@ -18,11 +18,12 @@ Operations grouped by entity:
       count_leads_for_user_by_status — drives the performance card
       list_activities_for_user — drives the staff activity feed
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import date as Date
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.engine import Row
@@ -32,7 +33,6 @@ from src.app.core.activities.models import Activity
 from src.app.core.leads.models import Lead, LeadStatus
 from src.app.core.staff.models import Attendance, StaffProfile
 from src.app.core.users.models import User, UserInfo
-
 
 # --- Staff users + profiles ---------------------------------------------
 
@@ -47,9 +47,7 @@ async def list_users_with_profiles(
     stmt = (
         select(User, StaffProfile)
         .join(UserInfo, UserInfo.member_id == User.id)
-        .outerjoin(
-            StaffProfile, StaffProfile.user_id == User.legacy_uuid
-        )
+        .outerjoin(StaffProfile, StaffProfile.user_id == User.legacy_uuid)
         .order_by(UserInfo.first_name.asc())
     )
     return list((await session.execute(stmt)).all())
@@ -57,19 +55,15 @@ async def list_users_with_profiles(
 
 async def get_staff_profile_by_user_id(
     session: AsyncSession, user_id: uuid.UUID
-) -> Optional[StaffProfile]:
+) -> StaffProfile | None:
     """Single-row read of the staff profile keyed by ``user_id`` (the
     UUID identity that joins to ``User.legacy_uuid``)."""
     return (
-        await session.execute(
-            select(StaffProfile).where(StaffProfile.user_id == user_id)
-        )
+        await session.execute(select(StaffProfile).where(StaffProfile.user_id == user_id))
     ).scalar_one_or_none()
 
 
-def insert_staff_profile(
-    session: AsyncSession, profile: StaffProfile
-) -> None:
+def insert_staff_profile(session: AsyncSession, profile: StaffProfile) -> None:
     """Register an already-constructed StaffProfile for INSERT."""
     session.add(profile)
 
@@ -79,7 +73,7 @@ def insert_staff_profile(
 
 async def find_open_attendance_session(
     session: AsyncSession, user_id: uuid.UUID
-) -> Optional[Attendance]:
+) -> Attendance | None:
     """The user's currently-open attendance row (``clock_out_at IS
     NULL``), if any. Used by the "at most one open session" guard on
     clock-in."""
@@ -96,8 +90,8 @@ async def list_attendance_for_user(
     session: AsyncSession,
     *,
     user_id: uuid.UUID,
-    from_dt: Optional[Date] = None,
-    to_dt: Optional[Date] = None,
+    from_dt: Date | None = None,
+    to_dt: Date | None = None,
 ) -> list[Attendance]:
     """Windowed read of one user's attendance rows, newest first.
     ``from_dt`` / ``to_dt`` bound the ``date`` column inclusively."""
@@ -106,17 +100,11 @@ async def list_attendance_for_user(
         filters.append(Attendance.date >= from_dt)
     if to_dt is not None:
         filters.append(Attendance.date <= to_dt)
-    stmt = (
-        select(Attendance)
-        .where(and_(*filters))
-        .order_by(Attendance.clock_in_at.desc())
-    )
+    stmt = select(Attendance).where(and_(*filters)).order_by(Attendance.clock_in_at.desc())
     return list((await session.execute(stmt)).scalars().all())
 
 
-def insert_attendance(
-    session: AsyncSession, attendance: Attendance
-) -> None:
+def insert_attendance(session: AsyncSession, attendance: Attendance) -> None:
     """Register an already-constructed Attendance for INSERT."""
     session.add(attendance)
 

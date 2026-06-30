@@ -18,6 +18,7 @@ is better than no seed. The caller (CLI / tests) gets back an
 Idempotency is preserved everywhere by `ON CONFLICT DO NOTHING` or
 explicit existence checks before INSERT.
 """
+
 from __future__ import annotations
 
 import logging
@@ -31,7 +32,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.tenants import data_access
 from src.app.core.calls.models import CallOutcome
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
@@ -40,12 +40,11 @@ from src.app.core.custom_fields.models import (
 )
 from src.app.core.packs.manifest import PackManifest
 from src.app.core.packs.models import LeadSource
-from src.app.core.permissions.models import Permission, Role, RolePermission
+from src.app.core.permissions.models import Role, RolePermission
 from src.app.core.permissions.service import register_permission
 from src.app.core.pipelines.models import Pipeline, PipelineStage
-from src.app.core.settings.models import OrgSettings
 from src.app.core.settings.service import get_or_create as get_or_create_settings
-from src.app.core.tenants.models import Organization
+from src.app.core.tenants import data_access
 
 logger = logging.getLogger(__name__)
 
@@ -155,9 +154,7 @@ async def install(
     return report
 
 
-async def _section(
-    name: str, coro, report: InstallReport
-) -> None:
+async def _section(name: str, coro, report: InstallReport) -> None:
     """Wrap a section coroutine so failures don't abort the install."""
     try:
         await coro
@@ -184,9 +181,7 @@ async def _install_pipelines(
     for p in manifest.pipelines:
         existing = (
             await session.execute(
-                select(Pipeline)
-                .where(Pipeline.org_id == org_id)
-                .where(Pipeline.key == p.key)
+                select(Pipeline).where(Pipeline.org_id == org_id).where(Pipeline.key == p.key)
             )
         ).scalar_one_or_none()
         if existing is not None:
@@ -285,9 +280,7 @@ async def _install_roles(
     for r in manifest.roles:
         existing = (
             await session.execute(
-                select(Role)
-                .where(Role.org_id == org_id)
-                .where(Role.name == r.name)
+                select(Role).where(Role.org_id == org_id).where(Role.name == r.name)
             )
         ).scalar_one_or_none()
         if existing is None:
@@ -318,9 +311,7 @@ async def _install_roles(
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role.id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
             report.role_permissions_added += 1
     await session.commit()

@@ -6,6 +6,7 @@ system events (call ended, status changed, …). `ActivityCreate`
 enforces `type='note'` and `payload={"text": <non-empty string>}` so
 operators can't sneak in a fake call/email row from a browser.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -16,7 +17,6 @@ from pydantic import BaseModel, Field, field_validator
 
 from src.app.core.activities.models import ActivityType
 from src.app.shared.schemas import ORMModel, PaginatedResponse
-
 
 _ENTITY_TYPE_MIN = 1
 _ENTITY_TYPE_MAX = 64
@@ -53,7 +53,6 @@ class ActivityCreate(BaseModel):
 
 
 class ActivityOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     entity_type: str

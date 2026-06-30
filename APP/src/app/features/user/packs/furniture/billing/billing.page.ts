@@ -1,8 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 
 import { InvoicesTabComponent } from './tabs/invoices.component';
 import { PosTabComponent } from './tabs/pos.component';

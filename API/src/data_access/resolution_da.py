@@ -1,7 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.user import UserLogin
+
 from src.models.admin import Admin
+from src.models.user import UserLogin
 
 
 async def resolve_member_id(db: AsyncSession, text_user_id: str, user_type: str) -> int | None:
@@ -23,7 +24,8 @@ async def resolve_text_user_id(db: AsyncSession, member_id: int, user_type: str)
 
 
 async def batch_resolve_text_user_ids(
-    db: AsyncSession, pairs: list[tuple[int, str]],
+    db: AsyncSession,
+    pairs: list[tuple[int, str]],
 ) -> dict[tuple[int, str], str]:
     """Batch resolve (member_id, user_type) pairs to text user_ids.
     Returns dict mapping (member_id, user_type) -> text_user_id.

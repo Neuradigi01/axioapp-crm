@@ -23,7 +23,6 @@ from src.app.shared.custom_fields.coercion import (
     coerce_value,
 )
 
-
 # --- dispatch-table coverage --------------------------------------------
 
 

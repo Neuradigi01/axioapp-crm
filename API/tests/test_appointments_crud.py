@@ -4,10 +4,11 @@ Covers: create / get / list-by-range / patch / delete happy path,
 422 on unknown contact or unknown assignee, calendar filters
 (`from`, `to`, `assigned_to`, `status`), perm-gated write.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -29,9 +30,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -66,9 +65,9 @@ async def _seed_contact(org_id: uuid.UUID) -> uuid.UUID:
 
 def _ts(hour: int, minute: int = 0) -> str:
     """Pick a future-ish timestamp deterministically within today's range."""
-    base = datetime.now(timezone.utc).replace(
-        hour=hour, minute=minute, second=0, microsecond=0
-    ) + timedelta(days=1)
+    base = datetime.now(UTC).replace(hour=hour, minute=minute, second=0, microsecond=0) + timedelta(
+        days=1
+    )
     return base.isoformat()
 
 
@@ -107,9 +106,7 @@ async def test_create_get_patch_delete(layered_client, seeded_admin):
     assert body["duration_min"] == 60
     appt_id = body["id"]
 
-    got = await layered_client.get(
-        f"/api/v1/appointments/{appt_id}", headers=headers
-    )
+    got = await layered_client.get(f"/api/v1/appointments/{appt_id}", headers=headers)
     assert got.status_code == 200
 
     patch = await layered_client.patch(
@@ -121,14 +118,10 @@ async def test_create_get_patch_delete(layered_client, seeded_admin):
     assert patch.json()["status"] == "completed"
     assert patch.json()["location"] == "Banjara Hills · Floor 2"
 
-    delete = await layered_client.delete(
-        f"/api/v1/appointments/{appt_id}", headers=headers
-    )
+    delete = await layered_client.delete(f"/api/v1/appointments/{appt_id}", headers=headers)
     assert delete.status_code == 204
 
-    after = await layered_client.get(
-        f"/api/v1/appointments/{appt_id}", headers=headers
-    )
+    after = await layered_client.get(f"/api/v1/appointments/{appt_id}", headers=headers)
     assert after.status_code == 404
 
 
@@ -201,9 +194,7 @@ async def test_calendar_list_filters(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    base = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    ) + timedelta(days=2)
+    base = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=2)
 
     # Three non-overlapping appointments at +0h, +2h, +4h on `base`.
     for offset_hours in (0, 2, 4):
@@ -234,9 +225,7 @@ async def test_calendar_list_filters(layered_client, seeded_admin):
 
     # Filtered by assignee that owns no appointments → empty.
     foreign = uuid.uuid4()
-    resp = await layered_client.get(
-        f"/api/v1/appointments?assigned_to={foreign}", headers=headers
-    )
+    resp = await layered_client.get(f"/api/v1/appointments?assigned_to={foreign}", headers=headers)
     assert resp.status_code == 200
     assert resp.json() == []
 
@@ -270,11 +259,10 @@ async def test_write_requires_permission(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_create_writes_activity_on_contact_timeline(
-    layered_client, seeded_admin
-):
+async def test_create_writes_activity_on_contact_timeline(layered_client, seeded_admin):
     """Creating an appointment surfaces a note on the contact's timeline."""
     from sqlalchemy import select
+
     from src.app.core.activities.models import Activity
     from tests.conftest import TestSession
 
@@ -311,12 +299,16 @@ async def test_create_writes_activity_on_contact_timeline(
     try:
         async with TestSession() as session:
             acts = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_type == "contact")
-                    .where(Activity.entity_id == contact_id)
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_type == "contact")
+                        .where(Activity.entity_id == contact_id)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(acts) == 1
             assert "Appointment scheduled" in acts[0].payload["text"]
     finally:

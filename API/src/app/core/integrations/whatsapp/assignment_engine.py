@@ -36,13 +36,14 @@ Business-hours skip: when `rule.skip_outside_hours=True` and the
 current time falls outside the org's Step-11 schedule, the rule
 returns NULL and the next rule (or no-op) takes over.
 """
+
 from __future__ import annotations
 
 import logging
 import random
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,13 +83,17 @@ async def _active_user_ids(
     if not candidate_ids:
         return []
     rows = (
-        await session.execute(
-            select(User.legacy_uuid).where(
-                User.legacy_uuid.in_(candidate_ids),
-                User.is_active.is_(True),
+        (
+            await session.execute(
+                select(User.legacy_uuid).where(
+                    User.legacy_uuid.in_(candidate_ids),
+                    User.is_active.is_(True),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     active_set = set(rows)
     return [uid for uid in candidate_ids if uid in active_set]
 
@@ -124,12 +129,16 @@ async def _conversation_tag_ids(
     conversation_id: uuid.UUID,
 ) -> set[uuid.UUID]:
     rows = (
-        await session.execute(
-            select(ConversationTagAssignment.tag_id).where(
-                ConversationTagAssignment.conversation_id == conversation_id
+        (
+            await session.execute(
+                select(ConversationTagAssignment.tag_id).where(
+                    ConversationTagAssignment.conversation_id == conversation_id
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return set(rows)
 
 
@@ -152,7 +161,7 @@ async def _pick_round_robin(
     session: AsyncSession,
     *,
     rule: WhatsAppAssignmentRule,
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     """Locks the rule row, advances the cursor, returns the next
     active eligible user.
 
@@ -166,9 +175,7 @@ async def _pick_round_robin(
             .with_for_update()
         )
     ).scalar_one()
-    eligible = _coerce_uuid_list(
-        (locked.config or {}).get("eligible_user_ids")
-    )
+    eligible = _coerce_uuid_list((locked.config or {}).get("eligible_user_ids"))
     active = await _active_user_ids(session, candidate_ids=eligible)
     if not active:
         return None
@@ -186,26 +193,18 @@ async def _pick_load_balanced(
     session: AsyncSession,
     *,
     rule: WhatsAppAssignmentRule,
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     """Pick the eligible user with the fewest open conversations.
     Tiebreak: alphabetic by user id. Respects `cap_per_user` when set."""
-    eligible = _coerce_uuid_list(
-        (rule.config or {}).get("eligible_user_ids")
-    )
+    eligible = _coerce_uuid_list((rule.config or {}).get("eligible_user_ids"))
     active = await _active_user_ids(session, candidate_ids=eligible)
     if not active:
         return None
     counts = await _load_counts(session, user_ids=active)
     cap_raw = (rule.config or {}).get("cap_per_user")
-    cap = (
-        int(cap_raw)
-        if isinstance(cap_raw, int) and cap_raw > 0
-        else None
-    )
+    cap = int(cap_raw) if isinstance(cap_raw, int) and cap_raw > 0 else None
     # Sort: count asc, then user_id string asc (stable tiebreak).
-    candidates = [
-        (counts.get(uid, 0), str(uid), uid) for uid in active
-    ]
+    candidates = [(counts.get(uid, 0), str(uid), uid) for uid in active]
     candidates.sort(key=lambda c: (c[0], c[1]))
     for count, _str_id, uid in candidates:
         if cap is not None and count >= cap:
@@ -219,7 +218,7 @@ async def _pick_tag_based(
     *,
     rule: WhatsAppAssignmentRule,
     conversation_id: uuid.UUID,
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     """Map the conversation's current tags through ``mapping`` and
     return the first eligible user. Skips silently when no tag
     matches or the mapped user is inactive."""
@@ -237,9 +236,7 @@ async def _pick_tag_based(
     if not parsed:
         return None
 
-    conv_tags = await _conversation_tag_ids(
-        session, conversation_id=conversation_id
-    )
+    conv_tags = await _conversation_tag_ids(session, conversation_id=conversation_id)
     if not conv_tags:
         return None
     # First-match order is "any matching tag" → no stable ordering
@@ -247,9 +244,7 @@ async def _pick_tag_based(
     # for determinism.
     for tag_id in sorted(parsed.keys() & conv_tags, key=str):
         candidate = parsed[tag_id]
-        active = await _active_user_ids(
-            session, candidate_ids=[candidate]
-        )
+        active = await _active_user_ids(session, candidate_ids=[candidate])
         if active:
             return active[0]
     return None
@@ -259,7 +254,7 @@ async def _pick_team_based(
     session: AsyncSession,
     *,
     rule: WhatsAppAssignmentRule,
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     """Pick a random active member of the team's `tbl_organization_members`
     set. The teams concept isn't fully wired yet — this implementation
     treats `team_id` as a placeholder org-membership filter, picking
@@ -269,18 +264,22 @@ async def _pick_team_based(
     if not raw:
         return None
     rows = (
-        await session.execute(
-            select(User.legacy_uuid)
-            .join(
-                OrganizationMember,
-                OrganizationMember.user_member_id == User.id,
-            )
-            .where(
-                OrganizationMember.is_active.is_(True),
-                User.is_active.is_(True),
+        (
+            await session.execute(
+                select(User.legacy_uuid)
+                .join(
+                    OrganizationMember,
+                    OrganizationMember.user_member_id == User.id,
+                )
+                .where(
+                    OrganizationMember.is_active.is_(True),
+                    User.is_active.is_(True),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if not rows:
         return None
     return random.choice(list(rows))
@@ -293,7 +292,7 @@ async def dispatch_assignment(
     session: AsyncSession,
     *,
     conversation: Conversation,
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     """Run the assignment pipeline for a (still-unassigned) WhatsApp
     conversation. Returns the assigned user_id (also written to
     `conversation.assigned_to_id`) or None.
@@ -307,22 +306,26 @@ async def dispatch_assignment(
         return None
 
     rules = (
-        await session.execute(
-            select(WhatsAppAssignmentRule)
-            .where(WhatsAppAssignmentRule.enabled.is_(True))
-            .order_by(
-                WhatsAppAssignmentRule.priority.asc(),
-                WhatsAppAssignmentRule.created_at.asc(),
+        (
+            await session.execute(
+                select(WhatsAppAssignmentRule)
+                .where(WhatsAppAssignmentRule.enabled.is_(True))
+                .order_by(
+                    WhatsAppAssignmentRule.priority.asc(),
+                    WhatsAppAssignmentRule.created_at.asc(),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if not rules:
         return None
 
     # Optionally load business hours for skip-outside-hours rules.
-    config: Optional[WhatsAppAccountConfig] = None
-    business_hours: Optional[list[dict[str, Any]]] = None
-    now = datetime.now(timezone.utc)
+    config: WhatsAppAccountConfig | None = None
+    business_hours: list[dict[str, Any]] | None = None
+    now = datetime.now(UTC)
 
     for rule in rules:
         if rule.skip_outside_hours:
@@ -332,24 +335,15 @@ async def dispatch_assignment(
                     if bundle is not None:
                         _, config = bundle
                         business_hours = (
-                            list(config.business_hours or [])
-                            if config.business_hours
-                            else []
+                            list(config.business_hours or []) if config.business_hours else []
                         )
                 except Exception:
-                    logger.exception(
-                        "assignment_engine: business-hours lookup failed"
-                    )
+                    logger.exception("assignment_engine: business-hours lookup failed")
                     business_hours = None
-            if (
-                business_hours is not None
-                and not is_within_business_hours(
-                    business_hours, now=now
-                )
-            ):
+            if business_hours is not None and not is_within_business_hours(business_hours, now=now):
                 continue
 
-        chosen: Optional[uuid.UUID] = None
+        chosen: uuid.UUID | None = None
         try:
             if rule.strategy == AssignmentStrategy.round_robin:
                 chosen = await _pick_round_robin(session, rule=rule)

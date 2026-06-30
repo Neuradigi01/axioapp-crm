@@ -3,8 +3,8 @@
     <div>
       <h2 class="text-base font-semibold text-zinc-900">Custom fields</h2>
       <p class="mt-1 text-xs text-zinc-500">
-        Add fields to an entity, rename labels, mark required, hide, or reorder by dragging.
-        System and Pack fields can be relabelled / hidden / reordered but not deleted.
+        Add fields to an entity, rename labels, mark required, hide, or reorder by dragging. System
+        and Pack fields can be relabelled / hidden / reordered but not deleted.
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -36,16 +36,22 @@
   }
 
   @if (loading()) {
-    <div class="rounded-md border border-dashed border-zinc-300 px-3 py-12 text-center text-sm text-zinc-500">
+    <div
+      class="rounded-md border border-dashed border-zinc-300 px-3 py-12 text-center text-sm text-zinc-500"
+    >
       Loading fields…
     </div>
   } @else if (fields().length === 0) {
-    <div class="rounded-md border border-dashed border-zinc-300 px-3 py-12 text-center text-sm text-zinc-500">
+    <div
+      class="rounded-md border border-dashed border-zinc-300 px-3 py-12 text-center text-sm text-zinc-500"
+    >
       No fields defined for this entity yet.
     </div>
   } @else {
     <div class="overflow-hidden rounded-md ring-1 ring-zinc-200">
-      <div class="grid grid-cols-12 gap-2 border-b border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-500">
+      <div
+        class="grid grid-cols-12 gap-2 border-b border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-500"
+      >
         <div class="col-span-1"></div>
         <div class="col-span-3">Key</div>
         <div class="col-span-4">Label</div>
@@ -54,11 +60,7 @@
         <div class="col-span-1 text-right">Required</div>
         <div class="col-span-1 text-right">Actions</div>
       </div>
-      <ul
-        cdkDropList
-        class="divide-y divide-zinc-100"
-        (cdkDropListDropped)="onDrop($event)"
-      >
+      <ul cdkDropList class="divide-y divide-zinc-100" (cdkDropListDropped)="onDrop($event)">
         @for (field of fields(); track field.id) {
           <li
             cdkDrag
@@ -72,7 +74,9 @@
             >
               ☰
             </span>
-            <span class="col-span-3 truncate font-mono text-xs text-zinc-600">{{ field.field_key }}</span>
+            <span class="col-span-3 truncate font-mono text-xs text-zinc-600">{{
+              field.field_key
+            }}</span>
             <span class="col-span-4 truncate" [class.text-zinc-400]="field.is_hidden">
               {{ field.field_label }}
               @if (field.is_hidden) {

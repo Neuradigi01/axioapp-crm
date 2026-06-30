@@ -1,12 +1,8 @@
 <div class="space-y-2">
   @if (tree(); as root) {
-    <ng-container
-      *ngTemplateOutlet="nodeTpl; context: { node: root, path: [] }"
-    ></ng-container>
+    <ng-container *ngTemplateOutlet="nodeTpl; context: { node: root, path: [] }"></ng-container>
   } @else {
-    <p class="text-[11px] text-zinc-500 italic">
-      No conditions — this branch always matches.
-    </p>
+    <p class="text-[11px] text-zinc-500 italic">No conditions — this branch always matches.</p>
   }
 
   <div class="flex items-center gap-2">
@@ -32,9 +28,10 @@
 
 <ng-template #nodeTpl let-node="node" let-path="path">
   @if (isGroup(node)) {
-    <div class="border-l-2 pl-3 py-2"
-         [class.border-sky-300]="node.kind === 'and'"
-         [class.border-amber-300]="node.kind === 'or'"
+    <div
+      class="border-l-2 pl-3 py-2"
+      [class.border-sky-300]="node.kind === 'and'"
+      [class.border-amber-300]="node.kind === 'or'"
     >
       <div class="flex items-center gap-2 mb-1">
         <button
@@ -70,10 +67,7 @@
       </div>
       @for (child of node.children; track $index) {
         <ng-container
-          *ngTemplateOutlet="
-            nodeTpl;
-            context: { node: child, path: childPath(path, $index) }
-          "
+          *ngTemplateOutlet="nodeTpl; context: { node: child, path: childPath(path, $index) }"
         ></ng-container>
       }
       <div class="flex items-center gap-1 mt-1">
@@ -96,9 +90,7 @@
   } @else if (isNot(node)) {
     <div class="border-l-2 border-rose-300 pl-3 py-2">
       <div class="flex items-center gap-2 mb-1">
-        <span
-          class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700"
-        >NOT</span>
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700">NOT</span>
         <button
           type="button"
           class="text-[10px] text-zinc-500 hover:text-zinc-700"
@@ -116,10 +108,7 @@
         </button>
       </div>
       <ng-container
-        *ngTemplateOutlet="
-          nodeTpl;
-          context: { node: node.child, path: childPath(path, 0) }
-        "
+        *ngTemplateOutlet="nodeTpl; context: { node: node.child, path: childPath(path, 0) }"
       ></ng-container>
     </div>
   } @else if (isLeaf(node)) {

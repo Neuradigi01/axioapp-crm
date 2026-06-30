@@ -17,20 +17,22 @@ Seven cases:
      `transfer-records` was run first.
   7. Caller without `users.write` → 403 on the transfer endpoint.
 """
+
 from __future__ import annotations
 
 import uuid
 
 import pytest
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.app.core.activities.models import Activity, ActivityType
 from src.app.core.contacts.models import Contact
-from src.app.core.permissions.models import Role, RolePermission
+from src.app.core.permissions.models import RolePermission
 from src.app.core.permissions.service import register_permission
 from src.app.core.tasks.models import Task, TaskStatus
-from src.app.core.users.models import OrganizationMember, User, UserInfo
+from src.app.core.users.models import OrganizationMember, UserInfo
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.security.password import hash_password as _hp
 from src.models.user import UserLogin
@@ -47,9 +49,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -87,15 +87,11 @@ async def _seed_second_user(
         await session.flush()
 
         await session.execute(
-            sql_text(
-                "UPDATE tbl_user_login SET legacy_uuid = :u WHERE id = :i"
-            ),
+            sql_text("UPDATE tbl_user_login SET legacy_uuid = :u WHERE id = :i"),
             {"u": str(user_uuid), "i": login.id},
         )
         await session.execute(
-            sql_text(
-                "INSERT INTO users (id) VALUES (:u) ON CONFLICT DO NOTHING"
-            ),
+            sql_text("INSERT INTO users (id) VALUES (:u) ON CONFLICT DO NOTHING"),
             {"u": str(user_uuid)},
         )
         session.add(
@@ -169,9 +165,7 @@ async def _seed_task_assigned_to(
 
 
 @pytest.mark.asyncio
-async def test_counts_endpoint_returns_per_entity_counts(
-    layered_client, seeded_admin
-):
+async def test_counts_endpoint_returns_per_entity_counts(layered_client, seeded_admin):
     """Seed 2 contacts + 1 task assigned to the admin; counts should
     reflect both. The other three entities have nothing to count,
     so they're zero."""
@@ -205,9 +199,7 @@ async def test_counts_endpoint_returns_per_entity_counts(
 
 
 @pytest.mark.asyncio
-async def test_transfer_reassigns_and_writes_audit(
-    layered_client, seeded_admin
-):
+async def test_transfer_reassigns_and_writes_audit(layered_client, seeded_admin):
     """Transfer one contact + one task to a second user. Both rows
     should end up assigned to the new owner with one `reassign`
     audit activity per record."""
@@ -249,33 +241,31 @@ async def test_transfer_reassigns_and_writes_audit(
     try:
         async with TestSession() as session:
             c = (
-                await session.execute(
-                    select(Contact).where(Contact.id == contact_id)
-                )
+                await session.execute(select(Contact).where(Contact.id == contact_id))
             ).scalar_one()
             assert c.assigned_to_id == target_uuid
 
-            t = (
-                await session.execute(select(Task).where(Task.id == task_id))
-            ).scalar_one()
+            t = (await session.execute(select(Task).where(Task.id == task_id))).scalar_one()
             assert t.assigned_to_id == target_uuid
 
             activities = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_id.in_([contact_id, task_id]))
-                    .where(Activity.type == ActivityType.reassign)
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_id.in_([contact_id, task_id]))
+                        .where(Activity.type == ActivityType.reassign)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(activities) == 2
     finally:
         reset_context(ctx)
 
 
 @pytest.mark.asyncio
-async def test_transfer_to_cross_tenant_user_rejected(
-    layered_client, seeded_admin
-):
+async def test_transfer_to_cross_tenant_user_rejected(layered_client, seeded_admin):
     """`to_user_id` not a member of this org → 422."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -303,16 +293,12 @@ async def test_transfer_to_cross_tenant_user_rejected(
 
 
 @pytest.mark.asyncio
-async def test_transfer_to_deactivated_user_rejected(
-    layered_client, seeded_admin
-):
+async def test_transfer_to_deactivated_user_rejected(layered_client, seeded_admin):
     """`to_user_id` exists in org but is_active=false → 422."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "users.read", "users.write")
-    target_uuid = await _seed_second_user(
-        org.id, role_id=seeded_admin["role"].id, is_active=False
-    )
+    target_uuid = await _seed_second_user(org.id, role_id=seeded_admin["role"].id, is_active=False)
     await _seed_contact_assigned_to(org.id, user.legacy_uuid)
 
     token = await _login(
@@ -380,9 +366,7 @@ async def test_owner_deactivation_refused(layered_client, seeded_admin):
     # to match the offboarding service's Owner detection.
     async with TestSession() as session:
         await session.execute(
-            sql_text(
-                "UPDATE tbl_roles SET name='Owner', is_system=true WHERE id=:i"
-            ),
+            sql_text("UPDATE tbl_roles SET name='Owner', is_system=true WHERE id=:i"),
             {"i": seeded_admin["role"].id},
         )
         await session.commit()
@@ -404,9 +388,7 @@ async def test_owner_deactivation_refused(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_transfer_without_users_write_returns_403(
-    layered_client, seeded_admin
-):
+async def test_transfer_without_users_write_returns_403(layered_client, seeded_admin):
     """Caller without `users.write` → 403."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]

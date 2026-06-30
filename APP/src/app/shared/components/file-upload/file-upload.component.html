@@ -15,13 +15,7 @@
     </span>
   </div>
 
-  <input
-    #fileInput
-    type="file"
-    multiple
-    hidden
-    (change)="onFileSelected($event)"
-  />
+  <input #fileInput type="file" multiple hidden (change)="onFileSelected($event)" />
 
   <!-- Validation errors -->
   @if (errors().length > 0) {

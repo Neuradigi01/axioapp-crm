@@ -40,13 +40,13 @@ Returned shape::
       "ad_account_id": "act_123...",
     }
 """
+
 from __future__ import annotations
 
 import logging
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -65,7 +65,7 @@ logger = logging.getLogger(__name__)
 
 
 _HIT_TTL = 60 * 60 * 24  # 24 hours
-_MISS_TTL = 60 * 60       # 1 hour — let Meta heal
+_MISS_TTL = 60 * 60  # 1 hour — let Meta heal
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,7 +75,7 @@ class _CacheEntry:
     ``expires_at`` is a unix timestamp; the cache reads it on each
     access without needing a background sweeper."""
 
-    value: Optional[dict]
+    value: dict | None
     expires_at: float
 
 
@@ -95,16 +95,12 @@ def _cache_get(key: tuple[str, str]) -> _CacheEntry | None:
     return entry
 
 
-def _cache_put(
-    key: tuple[str, str], value: Optional[dict], ttl: int
-) -> None:
+def _cache_put(key: tuple[str, str], value: dict | None, ttl: int) -> None:
     if len(_cache) >= _MAX_ENTRIES:
         # Cheap eviction — drop one arbitrary entry. The LRU policy
         # isn't worth the bookkeeping for a 2K-entry cache.
         _cache.pop(next(iter(_cache)), None)
-    _cache[key] = _CacheEntry(
-        value=value, expires_at=time.time() + ttl
-    )
+    _cache[key] = _CacheEntry(value=value, expires_at=time.time() + ttl)
 
 
 def reset_cache() -> None:
@@ -133,7 +129,7 @@ async def resolve_ad(
     *,
     org_id: uuid.UUID,
     ad_id: str,
-) -> Optional[dict]:
+) -> dict | None:
     """Resolve a Meta ad id to its campaign + ad metadata.
 
     Returns the metadata dict on success, ``None`` when the org has
@@ -153,9 +149,7 @@ async def resolve_ad(
     if cached is not None:
         return cached.value
 
-    integration = await _resolve_meta_ads_integration(
-        session, org_id=org_id
-    )
+    integration = await _resolve_meta_ads_integration(session, org_id=org_id)
     if integration is None:
         # No integration — no friendly name. Cache the negative so
         # subsequent ad referrals don't keep retrying the lookup.
@@ -163,9 +157,7 @@ async def resolve_ad(
         return None
 
     try:
-        client = MetaGraphClient(
-            integration=integration, session=session
-        )
+        client = MetaGraphClient(integration=integration, session=session)
         # Graph API: `/<ad_id>?fields=name,campaign{name,id},
         # account_id` is the smallest payload that gets us the
         # operator-facing labels + the deeplink path.
@@ -182,9 +174,7 @@ async def resolve_ad(
         _cache_put(key, None, _MISS_TTL)
         return None
     except Exception:  # noqa: BLE001
-        logger.exception(
-            "meta ads lookup failed for ad=%s org=%s", ad_id, org_id
-        )
+        logger.exception("meta ads lookup failed for ad=%s org=%s", ad_id, org_id)
         _cache_put(key, None, _MISS_TTL)
         return None
 
@@ -192,21 +182,15 @@ async def resolve_ad(
         _cache_put(key, None, _MISS_TTL)
         return None
 
-    campaign = result.get("campaign") if isinstance(
-        result.get("campaign"), dict
-    ) else {}
+    campaign = result.get("campaign") if isinstance(result.get("campaign"), dict) else {}
     metadata = {
         "ad_id": str(ad_id),
         "ad_name": str(result.get("name") or "") or None,
         "campaign_id": (
-            str(campaign.get("id") or "") or None
-            if isinstance(campaign, dict)
-            else None
+            str(campaign.get("id") or "") or None if isinstance(campaign, dict) else None
         ),
         "campaign_name": (
-            str(campaign.get("name") or "") or None
-            if isinstance(campaign, dict)
-            else None
+            str(campaign.get("name") or "") or None if isinstance(campaign, dict) else None
         ),
         "ad_account_id": str(result.get("account_id") or "") or None,
     }
@@ -214,7 +198,7 @@ async def resolve_ad(
     return metadata
 
 
-def deeplink_for_ad(metadata: dict) -> Optional[str]:
+def deeplink_for_ad(metadata: dict) -> str | None:
     """Build the Meta Ads Manager deeplink for the resolved ad.
 
     Format mirrors Meta's documented deeplink so an operator
@@ -228,10 +212,7 @@ def deeplink_for_ad(metadata: dict) -> Optional[str]:
     if not account or not ad_id:
         return None
     # Meta Ads Manager URL — `?act=<account>&selected_ad_ids=<id>`.
-    return (
-        f"https://www.facebook.com/adsmanager/manage/ads"
-        f"?act={account}&selected_ad_ids={ad_id}"
-    )
+    return f"https://www.facebook.com/adsmanager/manage/ads?act={account}&selected_ad_ids={ad_id}"
 
 
 __all__ = [

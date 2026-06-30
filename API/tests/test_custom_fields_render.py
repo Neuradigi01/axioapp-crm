@@ -6,6 +6,7 @@ Verifies:
   - render payload is the slim shape (no internal columns like
     `source` / `pack_id` / `id` / timestamps).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -142,9 +143,7 @@ async def test_list_can_include_hidden(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    default = await layered_client.get(
-        "/api/v1/custom-fields?entity_type=contact", headers=headers
-    )
+    default = await layered_client.get("/api/v1/custom-fields?entity_type=contact", headers=headers)
     visible_only = {row["field_key"] for row in default.json()}
     assert visible_only == {"visible"}
 

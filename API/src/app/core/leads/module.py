@@ -10,8 +10,8 @@ candidate for round-robin assignment. Sales-rep roles get
 permission registration writes the key to the `permissions` table
 so RBAC can grant/deny it per role.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="leads",

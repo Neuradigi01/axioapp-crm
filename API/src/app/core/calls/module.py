@@ -4,8 +4,8 @@ Sidebar entry at `menu_position=520` (after Conversations at 500).
 Permission keys `calls.read`, `calls.write`, `calls.outcomes.manage`
 register on startup via the standard module-registry pickup.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="calls",

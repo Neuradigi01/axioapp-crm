@@ -1,5 +1,7 @@
 @if (rows().length === 0) {
-  <div class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500">
+  <div
+    class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+  >
     No staff to inspect yet.
   </div>
 } @else {
@@ -11,10 +13,7 @@
         class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       >
         @for (row of rows(); track row.staff.id) {
-          <option
-            [value]="row.staff.id"
-            [selected]="row.staff.id === selectedUserId()"
-          >
+          <option [value]="row.staff.id" [selected]="row.staff.id === selectedUserId()">
             {{ row.staff.full_name }}
           </option>
         }
@@ -56,8 +55,7 @@
                     <div class="min-w-0 flex-1">
                       <p class="text-sm text-zinc-900">{{ snippet(a) }}</p>
                       <p class="mt-0.5 text-xs text-zinc-500">
-                        {{ meta.label }} ·
-                        {{ entityLabel(a) }} ·
+                        {{ meta.label }} · {{ entityLabel(a) }} ·
                         {{ a.created_at | relativeTime }}
                       </p>
                     </div>

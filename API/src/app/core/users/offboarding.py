@@ -23,6 +23,7 @@ The per-entity "open" predicates and the membership / owner / count
 guards used by this flow live in `src.app.core.data_access` — this
 file holds only the orchestration shell.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -30,14 +31,13 @@ import uuid
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.users import data_access
-from src.app.core.users import service as users_service
 from src.app.core.appointments.service import bulk_reassign_appointments
 from src.app.core.contacts.service import bulk_reassign_contacts
 from src.app.core.leads.service import bulk_reassign_leads
 from src.app.core.tasks.service import bulk_reassign_tasks
+from src.app.core.users import data_access
+from src.app.core.users import service as users_service
 from src.app.core.walk_ins.service import bulk_reassign_walk_ins
-
 
 _BULK_REASSIGN_FNS = {
     "contacts": bulk_reassign_contacts,
@@ -90,9 +90,7 @@ async def transfer_records(
         active_only=True,
         on_missing=status.HTTP_422_UNPROCESSABLE_ENTITY,
         not_found_detail=f"target user {to_user_uuid} not found",
-        not_member_detail=(
-            "target user is not an active member of this organisation"
-        ),
+        not_member_detail=("target user is not an active member of this organisation"),
     )
     if to_user_uuid == from_user_uuid:
         raise HTTPException(

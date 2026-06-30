@@ -11,11 +11,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
-import {
-  Review,
-  ReviewStats,
-  ReviewsApiService,
-} from './reviews-api.service';
+import { Review, ReviewStats, ReviewsApiService } from './reviews-api.service';
 import { ReviewReplyModalComponent } from './reply-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -63,14 +59,14 @@ export class ReviewsPageComponent {
 
   /** Recent â‰¤3â˜… rows for the alerts panel â€” derived from `items`. */
   protected readonly alertRows = computed(() =>
-    this.items().filter((r) => r.rating <= 3).slice(0, 5),
+    this.items()
+      .filter((r) => r.rating <= 3)
+      .slice(0, 5),
   );
 
   /** Lookup the count for a given rating in the distribution. */
   protected countFor(rating: number): number {
-    return (
-      this.stats()?.distribution.find((d) => d.rating === rating)?.count ?? 0
-    );
+    return this.stats()?.distribution.find((d) => d.rating === rating)?.count ?? 0;
   }
 
   /** Bar width % for the distribution bars â€” relative to the rating with most counts. */
@@ -145,10 +141,7 @@ export class ReviewsPageComponent {
     // Persist the toggle whenever it flips.
     effect(() => {
       try {
-        localStorage.setItem(
-          AUTO_REQUEST_KEY,
-          this.autoRequest() ? '1' : '0',
-        );
+        localStorage.setItem(AUTO_REQUEST_KEY, this.autoRequest() ? '1' : '0');
       } catch {
         /* localStorage might be unavailable â€” silently ignore */
       }
@@ -174,32 +167,24 @@ export class ReviewsPageComponent {
   }
 
   protected onReplied(updated: Review): void {
-    this.items.update((rows) =>
-      rows.map((r) => (r.id === updated.id ? updated : r)),
-    );
+    this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
     this.replyTarget.set(null);
     this.reloadStats();
   }
 
   protected escalate(review: Review): void {
-    const ok = window.confirm(
-      `Escalate this ${review.rating}â˜… review for owner attention?`,
-    );
+    const ok = window.confirm(`Escalate this ${review.rating}â˜… review for owner attention?`);
     if (!ok) return;
     this.api
       .escalate(review.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.reloadStats();
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not escalate review.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not escalate review.');
         },
       });
   }
@@ -226,9 +211,7 @@ export class ReviewsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load reviews.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load reviews.');
         },
       });
   }
@@ -250,5 +233,4 @@ export class ReviewsPageComponent {
       return false;
     }
   }
-
 }

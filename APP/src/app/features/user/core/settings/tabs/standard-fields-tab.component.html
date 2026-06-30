@@ -1,19 +1,17 @@
 <section>
   @if (!canManage()) {
     <div class="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
-      You don't have permission to manage standard-field overrides
-      (<code class="font-mono">settings.standard_fields.manage</code>).
-      Ask an Owner or Admin to grant access.
+      You don't have permission to manage standard-field overrides (<code class="font-mono"
+        >settings.standard_fields.manage</code
+      >). Ask an Owner or Admin to grant access.
     </div>
   } @else {
     <header class="mb-4">
       <h2 class="text-base font-semibold text-zinc-900">Standard fields</h2>
       <p class="mt-1 text-sm text-zinc-500">
-        Customise the label, required state, visibility, and numeric bounds
-        of the canonical fields on each form. Changes apply to every form
-        modal in your org. The
-        <code class="font-mono">field_key</code> and underlying data type
-        stay fixed.
+        Customise the label, required state, visibility, and numeric bounds of the canonical fields
+        on each form. Changes apply to every form modal in your org. The
+        <code class="font-mono">field_key</code> and underlying data type stay fixed.
       </p>
     </header>
 
@@ -34,8 +32,8 @@
         </select>
       </div>
       <p class="pb-2 text-xs text-zinc-500">
-        <span class="font-medium text-zinc-700">●</span> overridden
-        &middot; <span class="text-zinc-700">🔒</span> locked by registry
+        <span class="font-medium text-zinc-700">●</span> overridden &middot;
+        <span class="text-zinc-700">🔒</span> locked by registry
       </p>
     </div>
 
@@ -48,7 +46,9 @@
     @if (loading()) {
       <p class="text-sm text-zinc-500">Loading…</p>
     } @else if (fields().length === 0) {
-      <p class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm text-zinc-500">
+      <p
+        class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm text-zinc-500"
+      >
         No standard fields registered for this entity.
       </p>
     } @else {
@@ -72,7 +72,9 @@
                 <td class="px-3 py-2">
                   <div class="font-medium text-zinc-900">
                     {{ f.label }}
-                    @if (f.is_overridden) { <span class="ml-1 text-zinc-700">●</span> }
+                    @if (f.is_overridden) {
+                      <span class="ml-1 text-zinc-700">●</span>
+                    }
                   </div>
                   <div class="text-xs text-zinc-500 font-mono">{{ f.field_key }}</div>
                 </td>
@@ -103,11 +105,15 @@
                 <td class="px-3 py-2 text-zinc-700">{{ f.display_order }}</td>
                 <td class="px-3 py-2">
                   @if (f.is_overridden) {
-                    <span class="inline-flex items-center rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-medium text-white">
+                    <span
+                      class="inline-flex items-center rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-medium text-white"
+                    >
                       Overridden
                     </span>
                   } @else {
-                    <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                    <span
+                      class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600"
+                    >
                       Default
                     </span>
                   }

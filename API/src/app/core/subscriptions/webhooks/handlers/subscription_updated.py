@@ -11,6 +11,7 @@ We *do not* update the status from this event — Stripe's
 signal, and `invoice.payment_failed` is the past_due signal. Mixing
 status changes here would race the dedicated handlers.
 """
+
 from __future__ import annotations
 
 import logging
@@ -29,7 +30,8 @@ log = logging.getLogger(__name__)
 
 
 async def on_subscription_updated(
-    db: AsyncSession, event: dict[str, Any],
+    db: AsyncSession,
+    event: dict[str, Any],
 ) -> None:
     stripe_sub = event.get("data", {}).get("object", {}) or {}
     stripe_sub_id = stripe_sub.get("id")
@@ -57,11 +59,7 @@ async def on_subscription_updated(
     new_billing_cycle = price_metadata.get("billing_cycle")
 
     changes: dict[str, Any] = {}
-    if (
-        isinstance(new_quantity, int)
-        and new_quantity > 0
-        and new_quantity != sub.seats_purchased
-    ):
+    if isinstance(new_quantity, int) and new_quantity > 0 and new_quantity != sub.seats_purchased:
         changes["seats_purchased"] = new_quantity
     if new_plan_code and new_plan_code != sub.plan_code:
         changes["plan_code"] = new_plan_code
@@ -73,9 +71,7 @@ async def on_subscription_updated(
 
     before = {k: getattr(sub, k) for k in changes}
 
-    await db.execute(
-        update(Subscription).where(Subscription.id == sub.id).values(**changes)
-    )
+    await db.execute(update(Subscription).where(Subscription.id == sub.id).values(**changes))
     await db.commit()
 
     await audit.log(
@@ -89,5 +85,6 @@ async def on_subscription_updated(
     )
     log.info(
         "customer.subscription.updated → org %s applied %s",
-        sub.org_id, changes,
+        sub.org_id,
+        changes,
     )

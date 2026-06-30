@@ -8,8 +8,8 @@ Permissions still register on startup via the module-registry sweep,
 so `custom_fields.read` / `.write` show up in the global permission
 registry without any per-module hand-wiring.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="custom_fields",

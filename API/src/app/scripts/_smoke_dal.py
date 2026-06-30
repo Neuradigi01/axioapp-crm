@@ -3,6 +3,7 @@
 NOT a pytest target. Run with:
     docker exec crm-api-1 python -m src.app.scripts._smoke_dal
 """
+
 import asyncio
 import inspect
 import urllib.error as _ue
@@ -13,6 +14,7 @@ import src.app.core.auth.data_access as auth_da
 import src.app.core.contacts.data_access as contacts_da
 import src.app.core.tenants.data_access as tenants_da
 import src.app.core.users.data_access as users_da
+import src.app.core.users.service as users_service
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 
@@ -38,11 +40,20 @@ def main() -> int:
         "users.data_access": (
             users_da,
             {
-                "get_user_by_uuid", "get_user_by_email", "get_user_info", "email_exists",
-                "get_membership", "require_membership", "count_active_members",
-                "get_role_in_org", "get_role_by_id_in_org",
-                "get_owner_role", "get_admin_role",
-                "list_open_record_ids", "compute_open_records_counts", "assert_not_owner_role",
+                "get_user_by_uuid",
+                "get_user_by_email",
+                "get_user_info",
+                "email_exists",
+                "get_membership",
+                "require_membership",
+                "count_active_members",
+                "get_role_in_org",
+                "get_role_by_id_in_org",
+                "get_owner_role",
+                "get_admin_role",
+                "list_open_record_ids",
+                "compute_open_records_counts",
+                "assert_not_owner_role",
             },
         ),
         "tenants.data_access": (tenants_da, {"get_organization_by_id", "get_organization_by_slug"}),
@@ -135,9 +146,7 @@ def main() -> int:
             ):
                 local_failures += 1
 
-            mem = await users_da.get_membership(
-                s, user_member_id=user.id, org_id=SMOKE_ORG_ID
-            )
+            mem = await users_da.get_membership(s, user_member_id=user.id, org_id=SMOKE_ORG_ID)
             if not step(
                 mem is not None and mem.is_active,
                 f"users.get_membership -> active={mem.is_active if mem else None}, role_id={mem.role_id if mem else None}",
@@ -186,12 +195,16 @@ def main() -> int:
                     s, user_uuid=user_uuid, org_id=SMOKE_ORG_ID
                 )
                 if not step(
-                    all(k in counts for k in ("contacts", "leads", "walk_ins", "appointments", "tasks", "total")),
+                    all(
+                        k in counts
+                        for k in ("contacts", "leads", "walk_ins", "appointments", "tasks", "total")
+                    ),
                     f"users.compute_open_records_counts -> {counts}",
                 ):
                     local_failures += 1
 
                 from fastapi import HTTPException
+
                 raised_403 = False
                 try:
                     await users_service.assert_not_owner_role(
@@ -207,12 +220,15 @@ def main() -> int:
 
                 # contacts.data_access — pick the first contact in the org if any
                 from sqlalchemy import select
+
                 from src.app.core.contacts.models import Contact
-                row = (
-                    await s.execute(select(Contact.id, Contact.phone).limit(1))
-                ).first()
+
+                row = (await s.execute(select(Contact.id, Contact.phone).limit(1))).first()
                 if row is None:
-                    step(True, "contacts: org has zero contacts — by-id/by-phone exercised against None")
+                    step(
+                        True,
+                        "contacts: org has zero contacts — by-id/by-phone exercised against None",
+                    )
                     none_c = await contacts_da.get_contact(s, uuid.uuid4())
                     if not step(none_c is None, f"contacts.get_contact(random) -> {none_c}"):
                         local_failures += 1

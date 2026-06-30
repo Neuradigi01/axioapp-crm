@@ -1,11 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -31,12 +24,7 @@ type EditingState = LeadScoringRule | undefined | null;
   selector: 'app-lead-scoring-rules-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    FormsModule,
-    LucideAngularModule,
-    AdvancedFilterModalComponent,
-    ConfirmDialogComponent,
-  ],
+  imports: [FormsModule, LucideAngularModule, AdvancedFilterModalComponent, ConfirmDialogComponent],
   template: `
     <div class="mx-auto max-w-5xl p-6 space-y-5">
       <header class="flex flex-wrap items-start justify-between gap-3">
@@ -73,7 +61,9 @@ type EditingState = LeadScoringRule | undefined | null;
       </header>
 
       @if (recomputeMessage(); as msg) {
-        <p class="rounded-md bg-emerald-50 px-4 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200">
+        <p
+          class="rounded-md bg-emerald-50 px-4 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200"
+        >
           {{ msg }}
         </p>
       }
@@ -99,9 +89,7 @@ type EditingState = LeadScoringRule | undefined | null;
           <tbody class="divide-y divide-zinc-100 text-sm">
             @if (loading()) {
               <tr>
-                <td colspan="5" class="px-4 py-6 text-center text-xs text-zinc-500">
-                  Loading…
-                </td>
+                <td colspan="5" class="px-4 py-6 text-center text-xs text-zinc-500">Loading…</td>
               </tr>
             } @else {
               @for (rule of rules(); track rule.id) {
@@ -201,7 +189,9 @@ type EditingState = LeadScoringRule | undefined | null;
             <div>
               <span class="text-xs font-medium text-zinc-700">Condition</span>
               <div class="mt-1 flex items-center gap-2">
-                <span class="flex-1 truncate rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+                <span
+                  class="flex-1 truncate rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700"
+                >
                   {{ humanizeCondition(formCondition()) }}
                 </span>
                 <button
@@ -335,9 +325,7 @@ export class LeadScoringRulesPage {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load scoring rules.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load scoring rules.');
         },
       });
   }
@@ -419,17 +407,13 @@ export class LeadScoringRulesPage {
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (updated) => {
-            this.rules.update((rows) =>
-              rows.map((r) => (r.id === updated.id ? updated : r)),
-            );
+            this.rules.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
             this.closeEditor();
             this.kickRecompute();
           },
           error: (err: HttpErrorResponse) => {
             this.submitting.set(false);
-            this.formError.set(
-              extractApiError(err) ?? 'Could not save rule.',
-            );
+            this.formError.set(extractApiError(err) ?? 'Could not save rule.');
           },
         });
     } else {
@@ -450,9 +434,7 @@ export class LeadScoringRulesPage {
           },
           error: (err: HttpErrorResponse) => {
             this.submitting.set(false);
-            this.formError.set(
-              extractApiError(err) ?? 'Could not save rule.',
-            );
+            this.formError.set(extractApiError(err) ?? 'Could not save rule.');
           },
         });
     }
@@ -482,9 +464,7 @@ export class LeadScoringRulesPage {
         },
         error: (err: HttpErrorResponse) => {
           this.deleting.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not delete rule.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not delete rule.');
         },
       });
   }
@@ -504,9 +484,7 @@ export class LeadScoringRulesPage {
         },
         error: (err: HttpErrorResponse) => {
           this.recomputing.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not recompute scores.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not recompute scores.');
         },
       });
   }

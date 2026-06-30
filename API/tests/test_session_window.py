@@ -15,17 +15,17 @@ Cases:
   7. `hours_remaining` clamps to 0.0 when out of session.
   8. The helper accepts a custom `now` for deterministic testing.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from src.app.core.conversations.whatsapp_session import (
     SESSION_WINDOW,
     compute_session_state,
 )
 
-
-_FIXED_NOW = datetime(2026, 6, 23, 12, 0, 0, tzinfo=timezone.utc)
+_FIXED_NOW = datetime(2026, 6, 23, 12, 0, 0, tzinfo=UTC)
 
 
 class TestComputeSessionState:
@@ -54,9 +54,7 @@ class TestComputeSessionState:
         # Spec rounds down at the boundary — "less than 24h" is the
         # in-session predicate, so exactly 24h must flip to out.
         exactly_24h_ago = _FIXED_NOW - SESSION_WINDOW
-        state = compute_session_state(
-            exactly_24h_ago, now=_FIXED_NOW
-        )
+        state = compute_session_state(exactly_24h_ago, now=_FIXED_NOW)
         assert state["in_session"] is False
         assert state["hours_remaining"] == 0.0
 
@@ -68,11 +66,9 @@ class TestComputeSessionState:
         assert state["hours_remaining"] == 0.0
 
     def test_expires_at_is_offset_by_window(self):
-        msg_time = datetime(2026, 6, 23, 10, 0, 0, tzinfo=timezone.utc)
+        msg_time = datetime(2026, 6, 23, 10, 0, 0, tzinfo=UTC)
         state = compute_session_state(msg_time, now=_FIXED_NOW)
-        assert state["expires_at"] == datetime(
-            2026, 6, 24, 10, 0, 0, tzinfo=timezone.utc
-        )
+        assert state["expires_at"] == datetime(2026, 6, 24, 10, 0, 0, tzinfo=UTC)
 
     def test_hours_remaining_clamps_to_zero(self):
         # Way past — make sure we never emit a negative number.

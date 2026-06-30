@@ -15,6 +15,7 @@ Both tables are tenant-scoped. The `(user_id, read_at)` partial index
 on `Notification` is the hot path for "my unread notifications" reads;
 the order-by + page is small so a plain B-tree is enough.
 """
+
 from __future__ import annotations
 
 import enum
@@ -78,9 +79,7 @@ class Notification(Base, TenantScoped):
         nullable=False,
         server_default=text("'{}'::jsonb"),
     )
-    read_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -110,12 +109,8 @@ class NotificationPreference(Base, TenantScoped):
         nullable=False,
     )
     type: Mapped[str] = mapped_column(String(64), nullable=False)
-    channel: Mapped[NotificationChannel] = mapped_column(
-        notification_channel_enum, nullable=False
-    )
-    enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
+    channel: Mapped[NotificationChannel] = mapped_column(notification_channel_enum, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

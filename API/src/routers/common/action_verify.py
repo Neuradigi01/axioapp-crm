@@ -1,16 +1,17 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.constants.route_ids import RouteIds
 from src.core.db import get_db
 from src.core.security.access_guard import AccessGuard
-from src.schemas.action_verify import VerifyActionRequest, SendActionVerifyOtpRequest
-from src.services.security import action_verify_service
+from src.schemas.action_verify import SendActionVerifyOtpRequest, VerifyActionRequest
 from src.services import common_service
-from src.constants.route_ids import RouteIds
+from src.services.security import action_verify_service
 
 router = APIRouter(prefix="/action-verify")
 
 
-@router.post('/send-otp')
+@router.post("/send-otp")
 async def send_action_verify_otp(
     req: SendActionVerifyOtpRequest,
     token_payload: dict = Depends(AccessGuard([RouteIds.USER_PROFILE, RouteIds.ADMIN_PROFILE])),
@@ -26,7 +27,7 @@ async def send_action_verify_otp(
     )
 
 
-@router.post('')
+@router.post("")
 async def verify_action(
     req: VerifyActionRequest,
     token_payload: dict = Depends(AccessGuard([RouteIds.USER_PROFILE, RouteIds.ADMIN_PROFILE])),

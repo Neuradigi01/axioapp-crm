@@ -71,7 +71,6 @@ export interface WhatsAppBusinessProfilePatch {
   away_message?: string | null;
 }
 
-
 /**
  * Step 16 — auto-reply pipeline settings.
  *
@@ -101,7 +100,6 @@ export interface AutoReplySettingsPatch {
   away_template_id?: string | null;
 }
 
-
 @Injectable({ providedIn: 'root' })
 export class WhatsAppBusinessProfileApiService {
   private readonly http = inject(HttpClient);
@@ -112,19 +110,14 @@ export class WhatsAppBusinessProfileApiService {
     return this.http.get<WhatsAppBusinessProfile>(this.base);
   }
 
-  patch(
-    payload: WhatsAppBusinessProfilePatch,
-  ): Observable<WhatsAppBusinessProfile> {
+  patch(payload: WhatsAppBusinessProfilePatch): Observable<WhatsAppBusinessProfile> {
     return this.http.patch<WhatsAppBusinessProfile>(this.base, payload);
   }
 
   /** Pull current Meta-side values + persist to the local mirror.
    *  Stamps `last_synced_at`. */
   refresh(): Observable<WhatsAppBusinessProfile> {
-    return this.http.post<WhatsAppBusinessProfile>(
-      `${this.base}/refresh`,
-      {},
-    );
+    return this.http.post<WhatsAppBusinessProfile>(`${this.base}/refresh`, {});
   }
 
   /** Upload a square JPEG/PNG profile picture (≤ 5 MB). The new
@@ -133,10 +126,7 @@ export class WhatsAppBusinessProfileApiService {
   uploadPicture(file: File): Observable<WhatsAppBusinessProfile> {
     const form = new FormData();
     form.append('file', file, file.name);
-    return this.http.post<WhatsAppBusinessProfile>(
-      `${this.base}/picture`,
-      form,
-    );
+    return this.http.post<WhatsAppBusinessProfile>(`${this.base}/picture`, form);
   }
 
   // --- Auto-reply (whatsapp-platform-upgrade Step 16) -----------------
@@ -148,12 +138,7 @@ export class WhatsAppBusinessProfileApiService {
 
   /** Update the auto-reply toggles + linked templates. Server
    *  refuses to save an enabled toggle without a body OR template. */
-  patchAutoReplySettings(
-    payload: AutoReplySettingsPatch,
-  ): Observable<AutoReplySettings> {
-    return this.http.patch<AutoReplySettings>(
-      `${this.autoReplyBase}/settings`,
-      payload,
-    );
+  patchAutoReplySettings(payload: AutoReplySettingsPatch): Observable<AutoReplySettings> {
+    return this.http.patch<AutoReplySettings>(`${this.autoReplyBase}/settings`, payload);
   }
 }

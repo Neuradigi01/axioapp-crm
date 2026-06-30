@@ -62,9 +62,7 @@ export class LeadCardComponent {
   @Output() readonly reassignClick = new EventEmitter<MouseEvent>();
 
   /** Card-level permission gate — junior reps see no pencil. */
-  protected readonly canReassign = computed(() =>
-    this.auth.hasPermission('leads.reassign'),
-  );
+  protected readonly canReassign = computed(() => this.auth.hasPermission('leads.reassign'));
 
   protected onReassignClick(event: MouseEvent): void {
     // Stop the parent <button (click)="openEdit(item)"> from firing.

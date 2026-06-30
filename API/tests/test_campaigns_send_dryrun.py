@@ -3,6 +3,7 @@
 `CHUNK_SIZE` is 50; we seed 120 contacts so the dispatch path
 processes 3 chunks. A fake whatsapp adapter records every send call.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -10,7 +11,6 @@ import uuid
 import pytest
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from src.app.core.campaigns.models import CampaignMessageStatus
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations.adapters import (
     ChannelMessageRef,
@@ -64,9 +64,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -98,9 +96,7 @@ async def _seed_contacts(org_id: uuid.UUID, n: int) -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_start_chunks_processed(
-    layered_client, seeded_admin, _register_fake_whatsapp
-):
+async def test_create_start_chunks_processed(layered_client, seeded_admin, _register_fake_whatsapp):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(
@@ -132,9 +128,7 @@ async def test_create_start_chunks_processed(
     assert create.status_code == 201, create.text
     cid = create.json()["id"]
 
-    start = await layered_client.post(
-        f"/api/v1/campaigns/{cid}/start", headers=headers
-    )
+    start = await layered_client.post(f"/api/v1/campaigns/{cid}/start", headers=headers)
     assert start.status_code == 200, start.text
     body = start.json()
     assert body["audience_size"] == 120
@@ -149,9 +143,7 @@ async def test_create_start_chunks_processed(
     assert "20% off" in first_sent_text
 
     # Stats reflect 120 sent rows.
-    stats = await layered_client.get(
-        f"/api/v1/campaigns/{cid}/stats", headers=headers
-    )
+    stats = await layered_client.get(f"/api/v1/campaigns/{cid}/stats", headers=headers)
     assert stats.status_code == 200
     s = stats.json()
     assert s["audience_size"] == 120
@@ -160,16 +152,12 @@ async def test_create_start_chunks_processed(
     assert s["failed"] == 0
 
     # Campaign flipped to `done`.
-    detail = await layered_client.get(
-        f"/api/v1/campaigns/{cid}", headers=headers
-    )
+    detail = await layered_client.get(f"/api/v1/campaigns/{cid}", headers=headers)
     assert detail.json()["status"] == "done"
 
 
 @pytest.mark.asyncio
-async def test_start_with_empty_audience_marks_done_with_zero(
-    layered_client, seeded_admin
-):
+async def test_start_with_empty_audience_marks_done_with_zero(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(
@@ -198,9 +186,7 @@ async def test_start_with_empty_audience_marks_done_with_zero(
     )
     cid = create.json()["id"]
 
-    start = await layered_client.post(
-        f"/api/v1/campaigns/{cid}/start", headers=headers
-    )
+    start = await layered_client.post(f"/api/v1/campaigns/{cid}/start", headers=headers)
     assert start.status_code == 200
     body = start.json()
     assert body["audience_size"] == 0
@@ -209,9 +195,7 @@ async def test_start_with_empty_audience_marks_done_with_zero(
 
 
 @pytest.mark.asyncio
-async def test_cannot_start_unregistered_channel(
-    layered_client, seeded_admin
-):
+async def test_cannot_start_unregistered_channel(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(
@@ -239,8 +223,6 @@ async def test_cannot_start_unregistered_channel(
         headers=headers,
     )
     cid = create.json()["id"]
-    start = await layered_client.post(
-        f"/api/v1/campaigns/{cid}/start", headers=headers
-    )
+    start = await layered_client.post(f"/api/v1/campaigns/{cid}/start", headers=headers)
     assert start.status_code == 400, start.text
     assert "sms" in start.json().get("message", start.json().get("detail", ""))

@@ -8,6 +8,7 @@ it up without explicit threading through call signatures.
 Today the org_id is read from a dev placeholder header (`X-Org-Id`).
 Step 1.6 replaces this with JWT-claim extraction.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -30,7 +31,10 @@ class RequestContext:
 
 _request_context: ContextVar[RequestContext] = ContextVar(
     "request_context",
-    default=RequestContext(),
+    # RequestContext is a frozen (immutable) dataclass, so sharing one default
+    # instance across contexts is safe — B039's mutable-default concern does
+    # not apply.
+    default=RequestContext(),  # noqa: B039
 )
 
 

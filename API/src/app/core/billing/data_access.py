@@ -15,12 +15,12 @@ Operations cover the three tables this module owns:
 The state-machine validation, tax-rate snapshotting, total recomputation,
 and audit emits all live in ``service.py``.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -35,26 +35,21 @@ from src.app.core.billing.models import (
 )
 from src.app.shared.db.pagination import paginate
 
-
 # --- invoice reads ------------------------------------------------------
 
 
-async def get_invoice_by_id(
-    session: AsyncSession, invoice_id: uuid.UUID
-) -> Optional[Invoice]:
+async def get_invoice_by_id(session: AsyncSession, invoice_id: uuid.UUID) -> Invoice | None:
     """Single-row read by PK. ``None`` on miss (or cross-tenant — the
     ORM filter applies)."""
-    result = await session.execute(
-        select(Invoice).where(Invoice.id == invoice_id)
-    )
+    result = await session.execute(select(Invoice).where(Invoice.id == invoice_id))
     return result.scalar_one_or_none()
 
 
 async def list_invoices_query(
     session: AsyncSession,
     *,
-    status_filter: Optional[InvoiceStatus] = None,
-    contact_id: Optional[uuid.UUID] = None,
+    status_filter: InvoiceStatus | None = None,
+    contact_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Invoice], int]:
@@ -71,18 +66,20 @@ async def list_invoices_query(
 # --- invoice line reads -------------------------------------------------
 
 
-async def list_invoice_lines(
-    session: AsyncSession, invoice_id: uuid.UUID
-) -> list[InvoiceLine]:
+async def list_invoice_lines(session: AsyncSession, invoice_id: uuid.UUID) -> list[InvoiceLine]:
     """All lines on one invoice, oldest first (preserves authoring
     order in the invoice viewer)."""
     rows = (
-        await session.execute(
-            select(InvoiceLine)
-            .where(InvoiceLine.invoice_id == invoice_id)
-            .order_by(InvoiceLine.created_at.asc())
+        (
+            await session.execute(
+                select(InvoiceLine)
+                .where(InvoiceLine.invoice_id == invoice_id)
+                .order_by(InvoiceLine.created_at.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -91,7 +88,7 @@ async def get_invoice_line(
     *,
     invoice_id: uuid.UUID,
     line_id: uuid.UUID,
-) -> Optional[InvoiceLine]:
+) -> InvoiceLine | None:
     """Single-line read scoped to its parent invoice — refuses a
     cross-invoice line id even when the row exists."""
     return (
@@ -107,17 +104,19 @@ async def get_invoice_line(
 # --- payment reads ------------------------------------------------------
 
 
-async def list_payments_query(
-    session: AsyncSession, *, invoice_id: uuid.UUID
-) -> list[Payment]:
+async def list_payments_query(session: AsyncSession, *, invoice_id: uuid.UUID) -> list[Payment]:
     """All payments against one invoice, oldest first."""
     rows = (
-        await session.execute(
-            select(Payment)
-            .where(Payment.invoice_id == invoice_id)
-            .order_by(Payment.received_at.asc())
+        (
+            await session.execute(
+                select(Payment)
+                .where(Payment.invoice_id == invoice_id)
+                .order_by(Payment.received_at.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -142,7 +141,7 @@ async def find_overdue(
     ``issued_at + days_overdue`` as the overdue threshold (industry
     default Net-7 / Net-30 alignment).
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days_overdue)
+    cutoff = datetime.now(UTC) - timedelta(days=days_overdue)
     stmt = (
         select(Invoice)
         .where(Invoice.status == InvoiceStatus.issued)
@@ -152,17 +151,13 @@ async def find_overdue(
     return list((await session.execute(stmt)).scalars().all())
 
 
-async def sum_payments(
-    session: AsyncSession, invoice_id: uuid.UUID
-) -> Decimal:
+async def sum_payments(session: AsyncSession, invoice_id: uuid.UUID) -> Decimal:
     """Sum of all payment amounts against one invoice. Returns
     ``Decimal('0')`` when the invoice has no payments yet — caller
     uses this to decide whether the invoice has fully settled and
     should flip to ``paid``."""
     result = await session.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(
-            Payment.invoice_id == invoice_id
-        )
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.invoice_id == invoice_id)
     )
     return Decimal(result.scalar_one())
 
@@ -170,9 +165,7 @@ async def sum_payments(
 # --- sequence allocator -------------------------------------------------
 
 
-async def next_invoice_number(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> int:
+async def next_invoice_number(session: AsyncSession, *, org_id: uuid.UUID) -> int:
     """Atomically allocate the next per-org invoice number.
 
     Uses ``INSERT ... ON CONFLICT DO UPDATE`` so the row is created on
@@ -212,16 +205,12 @@ def insert_payment(session: AsyncSession, payment: Payment) -> None:
     session.add(payment)
 
 
-async def delete_invoice_row(
-    session: AsyncSession, invoice: Invoice
-) -> None:
+async def delete_invoice_row(session: AsyncSession, invoice: Invoice) -> None:
     """Mark an Invoice row for DELETE. Caller commits."""
     await session.delete(invoice)
 
 
-async def delete_invoice_line(
-    session: AsyncSession, line: InvoiceLine
-) -> None:
+async def delete_invoice_line(session: AsyncSession, line: InvoiceLine) -> None:
     """Mark an InvoiceLine row for DELETE. Caller commits."""
     await session.delete(line)
 

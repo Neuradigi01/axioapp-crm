@@ -1,13 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-  model,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, model, signal } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 /**
@@ -68,7 +60,6 @@ const OP_OPTIONS: Array<{ value: Op; label: string; needsValue: boolean }> = [
   { value: 'not_exists', label: "doesn't exist", needsValue: false },
   { value: 'regex', label: 'matches regex', needsValue: true },
 ];
-
 
 @Component({
   selector: 'app-condition-builder',
@@ -140,23 +131,17 @@ export class ConditionBuilderComponent {
   }
 
   protected onFieldChange(index: number, value: string): void {
-    this.rules.update((rs) =>
-      rs.map((r, i) => (i === index ? { ...r, field: value } : r)),
-    );
+    this.rules.update((rs) => rs.map((r, i) => (i === index ? { ...r, field: value } : r)));
     this.emitConditions();
   }
 
   protected onOpChange(index: number, value: Op): void {
-    this.rules.update((rs) =>
-      rs.map((r, i) => (i === index ? { ...r, op: value } : r)),
-    );
+    this.rules.update((rs) => rs.map((r, i) => (i === index ? { ...r, op: value } : r)));
     this.emitConditions();
   }
 
   protected onValueChange(index: number, value: string): void {
-    this.rules.update((rs) =>
-      rs.map((r, i) => (i === index ? { ...r, value } : r)),
-    );
+    this.rules.update((rs) => rs.map((r, i) => (i === index ? { ...r, value } : r)));
     this.emitConditions();
   }
 
@@ -242,15 +227,13 @@ export class ConditionBuilderComponent {
     if (!this.opNeedsValue(rule.op)) return out;
     const v = rule.value;
     if (rule.op === 'in' || rule.op === 'not_in') {
-      out['value'] = v.split(',').map((s) => s.trim()).filter(Boolean);
+      out['value'] = v
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       return out;
     }
-    if (
-      rule.op === 'gt' ||
-      rule.op === 'gte' ||
-      rule.op === 'lt' ||
-      rule.op === 'lte'
-    ) {
+    if (rule.op === 'gt' || rule.op === 'gte' || rule.op === 'lt' || rule.op === 'lte') {
       const num = Number(v);
       out['value'] = Number.isFinite(num) ? num : v;
       return out;

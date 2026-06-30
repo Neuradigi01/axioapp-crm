@@ -19,10 +19,10 @@ Operations grouped by entity:
   * Cross-module verifier
       count_active_members_for_role — used by the delete-role guard
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -32,17 +32,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.permissions.models import Permission, Role, RolePermission
 from src.app.core.users.models import OrganizationMember
 
-
 # --- Permission registry ------------------------------------------------
 
 
-async def get_permission_by_key(
-    session: AsyncSession, key: str
-) -> Optional[Permission]:
+async def get_permission_by_key(session: AsyncSession, key: str) -> Permission | None:
     """Single-row read by the unique ``key``."""
-    result = await session.execute(
-        select(Permission).where(Permission.key == key)
-    )
+    result = await session.execute(select(Permission).where(Permission.key == key))
     return result.scalar_one_or_none()
 
 
@@ -52,29 +47,21 @@ async def list_all_permissions(
     """Global registry list — ordered by module then key for stable UI
     grouping."""
     result = await session.execute(
-        select(Permission).order_by(
-            Permission.module.asc(), Permission.key.asc()
-        )
+        select(Permission).order_by(Permission.module.asc(), Permission.key.asc())
     )
     return list(result.scalars().all())
 
 
-async def list_permissions_by_keys(
-    session: AsyncSession, keys: list[str]
-) -> list[Permission]:
+async def list_permissions_by_keys(session: AsyncSession, keys: list[str]) -> list[Permission]:
     """Lookup multiple permissions by key. Used by the bulk-register
     flow's post-upsert re-read."""
     if not keys:
         return []
-    result = await session.execute(
-        select(Permission).where(Permission.key.in_(keys))
-    )
+    result = await session.execute(select(Permission).where(Permission.key.in_(keys)))
     return list(result.scalars().all())
 
 
-async def list_permission_keys_with_ids(
-    session: AsyncSession, keys: list[str]
-) -> list[Row]:
+async def list_permission_keys_with_ids(session: AsyncSession, keys: list[str]) -> list[Row]:
     """Return ``[(id, key), ...]`` for the subset of ``keys`` that
     exist. Caller (``_resolve_permission_ids`` in service) compares
     against the input to surface 422 with the missing keys list."""
@@ -83,9 +70,7 @@ async def list_permission_keys_with_ids(
     return list(
         (
             await session.execute(
-                select(Permission.id, Permission.key).where(
-                    Permission.key.in_(keys)
-                )
+                select(Permission.id, Permission.key).where(Permission.key.in_(keys))
             )
         ).all()
     )
@@ -96,7 +81,7 @@ async def upsert_permission_key(
     *,
     key: str,
     module: str,
-    description: Optional[str] = None,
+    description: str | None = None,
 ) -> None:
     """``INSERT ... ON CONFLICT DO NOTHING`` on the unique ``key``
     column. Caller commits + re-reads via ``get_permission_by_key``."""
@@ -107,30 +92,22 @@ async def upsert_permission_key(
     )
 
 
-async def bulk_upsert_permission_keys(
-    session: AsyncSession, rows: list[dict]
-) -> None:
+async def bulk_upsert_permission_keys(session: AsyncSession, rows: list[dict]) -> None:
     """Bulk ``INSERT ... ON CONFLICT DO NOTHING`` for a list of
     ``{key, module, description}`` dicts. Caller commits."""
     if not rows:
         return
     await session.execute(
-        pg_insert(Permission)
-        .values(rows)
-        .on_conflict_do_nothing(index_elements=["key"])
+        pg_insert(Permission).values(rows).on_conflict_do_nothing(index_elements=["key"])
     )
 
 
 # --- Role + role_permissions --------------------------------------------
 
 
-async def get_role_by_id(
-    session: AsyncSession, role_id: uuid.UUID
-) -> Optional[Role]:
+async def get_role_by_id(session: AsyncSession, role_id: uuid.UUID) -> Role | None:
     """Single-row read by PK (tenant-scoped via ORM filter)."""
-    result = await session.execute(
-        select(Role).where(Role.id == role_id)
-    )
+    result = await session.execute(select(Role).where(Role.id == role_id))
     return result.scalar_one_or_none()
 
 
@@ -141,9 +118,7 @@ async def list_role_permissions_query(
     ``tbl_role_permissions``, ordered by ``key``."""
     stmt = (
         select(Permission)
-        .join(
-            RolePermission, RolePermission.permission_id == Permission.id
-        )
+        .join(RolePermission, RolePermission.permission_id == Permission.id)
         .where(RolePermission.role_id == role_id)
         .order_by(Permission.key)
     )
@@ -151,9 +126,7 @@ async def list_role_permissions_query(
     return list(result.scalars().all())
 
 
-async def role_has_permission_query(
-    session: AsyncSession, *, role_id: uuid.UUID, key: str
-) -> bool:
+async def role_has_permission_query(session: AsyncSession, *, role_id: uuid.UUID, key: str) -> bool:
     """Single-key existence check. Used by the row-level scope rules
     (e.g. the ``users.read`` gate that decides team-view vs
     personal-view on leads / walk-ins / dashboard)."""
@@ -171,21 +144,17 @@ async def find_role_by_name_in_org(
     *,
     org_id: uuid.UUID,
     name: str,
-    exclude_id: Optional[uuid.UUID] = None,
-) -> Optional[uuid.UUID]:
+    exclude_id: uuid.UUID | None = None,
+) -> uuid.UUID | None:
     """Return the role id (if any) whose name matches in this org.
     ``exclude_id`` lets update-role skip self-collisions."""
     stmt = select(Role.id).where(Role.org_id == org_id, Role.name == name)
     if exclude_id is not None:
         stmt = stmt.where(Role.id != exclude_id)
-    return (
-        await session.execute(stmt)
-    ).scalar_one_or_none()
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
-async def list_roles_with_counts_in_org(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> list[Row]:
+async def list_roles_with_counts_in_org(session: AsyncSession, *, org_id: uuid.UUID) -> list[Row]:
     """List the org's roles with permission + member counts and the
     full grant-set as ``permission_keys``.
 
@@ -259,35 +228,22 @@ async def bulk_insert_role_permissions(
         return
     await session.execute(
         pg_insert(RolePermission)
-        .values(
-            [
-                {"role_id": role_id, "permission_id": pid}
-                for pid in permission_ids
-            ]
-        )
-        .on_conflict_do_nothing(
-            index_elements=["role_id", "permission_id"]
-        )
+        .values([{"role_id": role_id, "permission_id": pid} for pid in permission_ids])
+        .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
     )
 
 
-async def delete_role_permissions_for_role(
-    session: AsyncSession, role_id: uuid.UUID
-) -> None:
+async def delete_role_permissions_for_role(session: AsyncSession, role_id: uuid.UUID) -> None:
     """DELETE every ``tbl_role_permissions`` row for ``role_id``.
     Used by the update-role replace-all flow + the delete-role
     cascade."""
-    await session.execute(
-        delete(RolePermission).where(RolePermission.role_id == role_id)
-    )
+    await session.execute(delete(RolePermission).where(RolePermission.role_id == role_id))
 
 
 # --- Cross-module verifier ----------------------------------------------
 
 
-async def count_active_members_for_role(
-    session: AsyncSession, role_id: uuid.UUID
-) -> int:
+async def count_active_members_for_role(session: AsyncSession, role_id: uuid.UUID) -> int:
     """Number of active OrganizationMember rows referencing ``role_id``.
     Used by the delete-role guard to refuse 409 when anyone still
     holds the role."""

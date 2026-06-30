@@ -11,11 +11,11 @@ listener (``Workflow`` / ``WorkflowFolder`` inherit
 ``TenantScoped``); consumers still pass ``org_id`` explicitly so
 Celery tasks + scripts without a context get correct results.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +30,6 @@ from src.app.core.workflows.models import (
     WorkflowStepRun,
     WorkflowVersion,
 )
-
 
 # --- workflow reads ------------------------------------------------------
 
@@ -70,14 +69,10 @@ async def get_workflow_by_name(
     return result.scalar_one_or_none()
 
 
-async def list_workflow_names(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> list[str]:
+async def list_workflow_names(session: AsyncSession, *, org_id: uuid.UUID) -> list[str]:
     """Every workflow name in the org. Powers the gallery-clone path's
     name-uniqification — avoids an N+1 retry loop on collision."""
-    result = await session.execute(
-        select(Workflow.name).where(Workflow.org_id == org_id)
-    )
+    result = await session.execute(select(Workflow.name).where(Workflow.org_id == org_id))
     return [row for (row,) in result.all()]
 
 
@@ -113,18 +108,12 @@ async def list_workflows(
             )
         )
 
-    total = (
-        await session.execute(
-            select(func.count()).select_from(base.subquery())
-        )
-    ).scalar_one()
+    total = (await session.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
 
     rows = (
         (
             await session.execute(
-                base.order_by(Workflow.updated_at.desc())
-                .offset(offset)
-                .limit(limit)
+                base.order_by(Workflow.updated_at.desc()).offset(offset).limit(limit)
             )
         )
         .scalars()
@@ -267,25 +256,19 @@ def add_workflow(session: AsyncSession, workflow: Workflow) -> Workflow:
     return workflow
 
 
-def add_version(
-    session: AsyncSession, version: WorkflowVersion
-) -> WorkflowVersion:
+def add_version(session: AsyncSession, version: WorkflowVersion) -> WorkflowVersion:
     """Register a new WorkflowVersion for INSERT. Caller commits."""
     session.add(version)
     return version
 
 
-def add_folder(
-    session: AsyncSession, folder: WorkflowFolder
-) -> WorkflowFolder:
+def add_folder(session: AsyncSession, folder: WorkflowFolder) -> WorkflowFolder:
     """Register a new WorkflowFolder for INSERT. Caller commits."""
     session.add(folder)
     return folder
 
 
-async def delete_folder(
-    session: AsyncSession, folder: WorkflowFolder
-) -> None:
+async def delete_folder(session: AsyncSession, folder: WorkflowFolder) -> None:
     """Hard delete on a folder row. Caller commits. Service checks
     ``count_workflows_in_folder`` first + raises 409 when non-empty."""
     await session.delete(folder)
@@ -300,30 +283,22 @@ def insert_run(session: AsyncSession, run: WorkflowRun) -> WorkflowRun:
     return run
 
 
-def insert_step_run(
-    session: AsyncSession, step_run: WorkflowStepRun
-) -> WorkflowStepRun:
+def insert_step_run(session: AsyncSession, step_run: WorkflowStepRun) -> WorkflowStepRun:
     """Stage a new WorkflowStepRun for INSERT. Caller commits."""
     session.add(step_run)
     return step_run
 
 
-async def get_run_unscoped(
-    session: AsyncSession, *, run_id: uuid.UUID
-) -> WorkflowRun | None:
+async def get_run_unscoped(session: AsyncSession, *, run_id: uuid.UUID) -> WorkflowRun | None:
     """Cross-tenant single-row read by PK. The Celery worker calls
     this BEFORE setting ``RequestContext.org_id`` — once it has
     the run, it reads ``run.org_id`` and sets the context for the
     rest of the dispatch."""
-    result = await session.execute(
-        select(WorkflowRun).where(WorkflowRun.id == run_id)
-    )
+    result = await session.execute(select(WorkflowRun).where(WorkflowRun.id == run_id))
     return result.scalar_one_or_none()
 
 
-async def get_run_for_processing(
-    session: AsyncSession, *, run_id: uuid.UUID
-) -> WorkflowRun | None:
+async def get_run_for_processing(session: AsyncSession, *, run_id: uuid.UUID) -> WorkflowRun | None:
     """Locked single-row read used by the Celery step processor.
     Acquires a row-level lock via ``SELECT ... FOR UPDATE SKIP
     LOCKED`` so two concurrent workers can't process the same run
@@ -331,11 +306,7 @@ async def get_run_for_processing(
 
     Caller's transaction holds the lock until commit / rollback.
     """
-    stmt = (
-        select(WorkflowRun)
-        .where(WorkflowRun.id == run_id)
-        .with_for_update(skip_locked=True)
-    )
+    stmt = select(WorkflowRun).where(WorkflowRun.id == run_id).with_for_update(skip_locked=True)
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
@@ -385,18 +356,12 @@ async def list_runs(
     if status is not None:
         base = base.where(WorkflowRun.status == status)
 
-    total = (
-        await session.execute(
-            select(func.count()).select_from(base.subquery())
-        )
-    ).scalar_one()
+    total = (await session.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
 
     rows = (
         (
             await session.execute(
-                base.order_by(WorkflowRun.started_at.desc())
-                .offset(offset)
-                .limit(limit)
+                base.order_by(WorkflowRun.started_at.desc()).offset(offset).limit(limit)
             )
         )
         .scalars()
@@ -505,9 +470,7 @@ async def find_existing_run(
         else:
             stmt = stmt.where(WorkflowRun.contact_id == contact_id)
         # Canceled runs do not block re-enrollment.
-        stmt = stmt.where(
-            WorkflowRun.status != WorkflowRunStatus.canceled
-        )
+        stmt = stmt.where(WorkflowRun.status != WorkflowRunStatus.canceled)
         if since_started_at is not None:
             stmt = stmt.where(WorkflowRun.started_at >= since_started_at)
 
@@ -516,9 +479,7 @@ async def find_existing_run(
     return result.scalar_one_or_none()
 
 
-def insert_event_wait(
-    session: AsyncSession, wait: WorkflowEventWait
-) -> WorkflowEventWait:
+def insert_event_wait(session: AsyncSession, wait: WorkflowEventWait) -> WorkflowEventWait:
     """Stage a new event-wait row for INSERT. Caller commits."""
     session.add(wait)
     return wait
@@ -590,9 +551,7 @@ async def list_expired_waits(
     return list((await session.execute(stmt)).scalars().all())
 
 
-async def delete_event_wait(
-    session: AsyncSession, wait: WorkflowEventWait
-) -> None:
+async def delete_event_wait(session: AsyncSession, wait: WorkflowEventWait) -> None:
     """Hard-delete a wait row. Caller commits. Used after a
     successful resume so the same wait can't fire twice."""
     await session.delete(wait)
@@ -654,13 +613,9 @@ async def count_recent_marketing_sends(
             .join(WorkflowRun, WorkflowRun.id == WorkflowStepRun.run_id)
             .where(WorkflowStepRun.org_id == org_id)
             .where(WorkflowRun.contact_id == contact_id)
-            .where(
-                WorkflowStepRun.status == WorkflowStepRunStatus.completed
-            )
+            .where(WorkflowStepRun.status == WorkflowStepRunStatus.completed)
             .where(WorkflowStepRun.started_at >= since)
-            .where(
-                WorkflowStepRun.payload["category"].astext == "marketing"
-            )
+            .where(WorkflowStepRun.payload["category"].astext == "marketing")
         )
     ).scalar_one()
 
@@ -703,8 +658,9 @@ async def next_step_index(
     ordering; collisions surface as IntegrityError + the engine's
     catch-all marks the run errored."""
     result = await session.execute(
-        select(func.coalesce(func.max(WorkflowStepRun.step_index), -1))
-        .where(WorkflowStepRun.run_id == run_id)
+        select(func.coalesce(func.max(WorkflowStepRun.step_index), -1)).where(
+            WorkflowStepRun.run_id == run_id
+        )
     )
     return int(result.scalar_one()) + 1
 

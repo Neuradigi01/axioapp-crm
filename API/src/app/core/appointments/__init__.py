@@ -5,6 +5,7 @@ modules — most notably the Phase 4 field-visit module — can import
 `from src.app.core.appointments import find_conflicts, create_appointment`
 and reuse this engine without dragging in HTTP-layer deps.
 """
+
 from src.app.core.appointments.models import AppointmentStatus
 from src.app.core.appointments.service import (
     create_appointment,

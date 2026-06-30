@@ -35,14 +35,12 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 
-
 export type EnrollmentState =
   | 'active'
   | 'completed'
   | 'paused_on_reply'
   | 'paused_manual'
   | 'cancelled';
-
 
 export interface EmailSequenceStep {
   id: string;
@@ -51,7 +49,6 @@ export interface EmailSequenceStep {
   delay_days: number;
   template_id: string;
 }
-
 
 export interface EmailSequence {
   id: string;
@@ -64,7 +61,6 @@ export interface EmailSequence {
   steps: EmailSequenceStep[];
 }
 
-
 export interface EmailSequenceListResponse {
   items: EmailSequence[];
   total: number;
@@ -72,19 +68,16 @@ export interface EmailSequenceListResponse {
   size: number;
 }
 
-
 export interface SequenceStepCreate {
   delay_days: number;
   template_id: string;
 }
-
 
 export interface SequenceCreatePayload {
   name: string;
   is_active?: boolean;
   steps: SequenceStepCreate[];
 }
-
 
 export interface SequenceUpdatePayload {
   name?: string;
@@ -94,13 +87,11 @@ export interface SequenceUpdatePayload {
   steps?: SequenceStepCreate[];
 }
 
-
 export interface EnrollmentRequest {
   contact_ids: string[];
   /** Optional; same length as `contact_ids` when provided. */
   lead_ids?: string[];
 }
-
 
 export interface EnrollmentResultRow {
   contact_id: string;
@@ -109,13 +100,11 @@ export interface EnrollmentResultRow {
   skip_reason: string | null;
 }
 
-
 export interface EnrollmentResponse {
   results: EnrollmentResultRow[];
   enrolled_count: number;
   skipped_count: number;
 }
-
 
 export interface Enrollment {
   id: string;
@@ -130,14 +119,12 @@ export interface Enrollment {
   current_step_order: number;
 }
 
-
 export interface EnrollmentListResponse {
   items: Enrollment[];
   total: number;
   page: number;
   size: number;
 }
-
 
 @Injectable({ providedIn: 'root' })
 export class EmailSequencesApiService {
@@ -170,10 +157,7 @@ export class EmailSequencesApiService {
     return this.http.post<EmailSequence>(this.base, payload);
   }
 
-  updateSequence(
-    id: string,
-    payload: SequenceUpdatePayload,
-  ): Observable<EmailSequence> {
+  updateSequence(id: string, payload: SequenceUpdatePayload): Observable<EmailSequence> {
     return this.http.patch<EmailSequence>(`${this.base}/${id}`, payload);
   }
 
@@ -183,14 +167,8 @@ export class EmailSequencesApiService {
 
   // --- Enrollment -------------------------------------------------------
 
-  enroll(
-    sequenceId: string,
-    payload: EnrollmentRequest,
-  ): Observable<EnrollmentResponse> {
-    return this.http.post<EnrollmentResponse>(
-      `${this.base}/${sequenceId}/enroll`,
-      payload,
-    );
+  enroll(sequenceId: string, payload: EnrollmentRequest): Observable<EnrollmentResponse> {
+    return this.http.post<EnrollmentResponse>(`${this.base}/${sequenceId}/enroll`, payload);
   }
 
   listEnrollments(filters?: {
@@ -210,30 +188,18 @@ export class EmailSequencesApiService {
     if (filters?.state) params = params.set('state', filters.state);
     if (filters?.page) params = params.set('page', String(filters.page));
     if (filters?.size) params = params.set('size', String(filters.size));
-    return this.http.get<EnrollmentListResponse>(
-      `${this.base}/enrollments`,
-      { params },
-    );
+    return this.http.get<EnrollmentListResponse>(`${this.base}/enrollments`, { params });
   }
 
   pauseEnrollment(id: string): Observable<Enrollment> {
-    return this.http.post<Enrollment>(
-      `${this.base}/enrollments/${id}/pause`,
-      {},
-    );
+    return this.http.post<Enrollment>(`${this.base}/enrollments/${id}/pause`, {});
   }
 
   resumeEnrollment(id: string): Observable<Enrollment> {
-    return this.http.post<Enrollment>(
-      `${this.base}/enrollments/${id}/resume`,
-      {},
-    );
+    return this.http.post<Enrollment>(`${this.base}/enrollments/${id}/resume`, {});
   }
 
   cancelEnrollment(id: string): Observable<Enrollment> {
-    return this.http.post<Enrollment>(
-      `${this.base}/enrollments/${id}/cancel`,
-      {},
-    );
+    return this.http.post<Enrollment>(`${this.base}/enrollments/${id}/cancel`, {});
   }
 }

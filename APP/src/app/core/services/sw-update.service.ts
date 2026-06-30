@@ -13,9 +13,7 @@ export class SwUpdateService {
   init(): void {
     if (!this.swUpdate.isEnabled) return;
 
-    this.appRef.isStable
-      .pipe(first((stable) => stable))
-      .subscribe(() => this.checkForUpdates());
+    this.appRef.isStable.pipe(first((stable) => stable)).subscribe(() => this.checkForUpdates());
 
     this.swUpdate.versionUpdates
       .pipe(filter((evt) => evt.type === 'VERSION_READY'))
@@ -27,11 +25,7 @@ export class SwUpdateService {
   }
 
   private promptUpdate(): void {
-    const ref = this.snackBar.open(
-      MSG_APP_UPDATE_AVAILABLE,
-      'Update',
-      { duration: 0 }
-    );
+    const ref = this.snackBar.open(MSG_APP_UPDATE_AVAILABLE, 'Update', { duration: 0 });
     ref.onAction().subscribe(() => {
       this.swUpdate.activateUpdate().then(() => document.location.reload());
     });

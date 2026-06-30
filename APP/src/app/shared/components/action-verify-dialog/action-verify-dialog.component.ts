@@ -1,4 +1,13 @@
-import { Component, ChangeDetectionStrategy, inject, signal, OnInit, OnDestroy, viewChildren, ElementRef } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  signal,
+  OnInit,
+  OnDestroy,
+  viewChildren,
+  ElementRef,
+} from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -6,8 +15,19 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActionVerifyApiService } from '@app/services/action-verify-api.service';
 import { IActionVerifyDialogData, TwoFactorMethod } from '@app/schemas/common';
-import { TFA_METHOD_LABELS, TFA_METHOD_ICONS, RESEND_COOLDOWN_SECONDS, SNACKBAR_DURATION, SNACKBAR_ACTION } from '@core/constants/app.constants';
-import { MSG_ERROR_GENERIC, MSG_ACTION_VERIFY_FAILED, MSG_ACTION_VERIFY_OTP_SENT, MSG_ACTION_VERIFY_OTP_SEND_FAILED } from '@core/constants/messages.constants';
+import {
+  TFA_METHOD_LABELS,
+  TFA_METHOD_ICONS,
+  RESEND_COOLDOWN_SECONDS,
+  SNACKBAR_DURATION,
+  SNACKBAR_ACTION,
+} from '@core/constants/app.constants';
+import {
+  MSG_ERROR_GENERIC,
+  MSG_ACTION_VERIFY_FAILED,
+  MSG_ACTION_VERIFY_OTP_SENT,
+  MSG_ACTION_VERIFY_OTP_SEND_FAILED,
+} from '@core/constants/messages.constants';
 import { createCountdownTimer } from '@core/services/countdown.service';
 
 @Component({
@@ -15,12 +35,7 @@ import { createCountdownTimer } from '@core/services/countdown.service';
   templateUrl: './action-verify-dialog.component.html',
   styleUrl: './action-verify-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-    MatProgressSpinnerModule,
-  ],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule],
 })
 export class ActionVerifyDialogComponent implements OnInit, OnDestroy {
   private readonly dialogRef = inject(MatDialogRef<ActionVerifyDialogComponent>);
@@ -164,10 +179,14 @@ export class ActionVerifyDialogComponent implements OnInit, OnDestroy {
     try {
       const response = await this.actionVerifyApi.sendOtp(this.method());
       if (response.success) {
-        this.snackBar.open(MSG_ACTION_VERIFY_OTP_SENT, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(MSG_ACTION_VERIFY_OTP_SENT, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
         this.resendCountdown.start(RESEND_COOLDOWN_SECONDS);
       } else {
-        this.snackBar.open(response.message || MSG_ACTION_VERIFY_OTP_SEND_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(response.message || MSG_ACTION_VERIFY_OTP_SEND_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });

@@ -5,6 +5,7 @@ Asserts:
   - existing phone → reuses contact (no dup), creates walk-in
   - response carries both walk-in + contact + was_created flag
 """
+
 from __future__ import annotations
 
 import uuid
@@ -30,9 +31,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -47,9 +46,7 @@ async def _login(client, *, org_slug: str, email: str, password: str) -> str:
 
 
 @pytest.mark.asyncio
-async def test_new_phone_creates_contact_and_walk_in(
-    layered_client, seeded_admin
-):
+async def test_new_phone_creates_contact_and_walk_in(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "walkins.read", "walkins.write")
@@ -140,10 +137,10 @@ async def test_existing_phone_reuses_contact(layered_client, seeded_admin):
     try:
         async with TestSession() as session:
             rows = (
-                await session.execute(
-                    select(Contact).where(Contact.phone == phone)
-                )
-            ).scalars().all()
+                (await session.execute(select(Contact).where(Contact.phone == phone)))
+                .scalars()
+                .all()
+            )
             assert len(rows) == 1
     finally:
         reset_context(ctx)

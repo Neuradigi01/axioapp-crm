@@ -8,6 +8,7 @@ TYPE on first metadata-create at test setup.
 
 See :mod:`core.workflows.__init__` for the conceptual map.
 """
+
 from __future__ import annotations
 
 import enum
@@ -32,7 +33,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
-
 
 # --- ENUMs ----------------------------------------------------------------
 
@@ -253,7 +253,7 @@ class Workflow(Base, TenantScoped):
     graph: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
-        server_default=sql_text("'{\"nodes\": [], \"edges\": []}'::jsonb"),
+        server_default=sql_text('\'{"nodes": [], "edges": []}\'::jsonb'),
     )
     ab_sibling_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
@@ -306,12 +306,8 @@ class Workflow(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("ARRAY[]::text[]"),
     )
-    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
-    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -360,9 +356,7 @@ class WorkflowVersion(Base, TenantScoped):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     graph: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     change_note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -437,12 +431,8 @@ class WorkflowRun(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("now()"),
     )
-    next_step_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    next_step_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class WorkflowStepRun(Base, TenantScoped):
@@ -484,9 +474,7 @@ class WorkflowStepRun(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("now()"),
     )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     output_edge_label: Mapped[str | None] = mapped_column(Text, nullable=True)
     skip_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     payload: Mapped[dict[str, Any]] = mapped_column(
@@ -528,9 +516,7 @@ class WorkflowEventWait(Base, TenantScoped):
         ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
         nullable=True,
     )
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

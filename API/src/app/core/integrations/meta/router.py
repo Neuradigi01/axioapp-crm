@@ -19,6 +19,7 @@ Core CRM account by definition).
 Same shape as `google/router.py` — symmetric on purpose so the Step-7
 Settings UI can drive both providers through a common shape.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -44,7 +45,6 @@ from src.app.shared.context import (
 )
 from src.app.shared.db import async_session, get_db
 
-
 router = APIRouter(prefix="/meta", tags=["Ad Integrations — Meta"])
 
 
@@ -56,18 +56,14 @@ _SETTINGS_RETURN_PATH = "/user/settings/integrations"
 
 @router.get("/authorize")
 async def authorize_endpoint(
-    user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> dict:
     """Return the Facebook consent URL as JSON. Same reasoning as
     `google/router.authorize_endpoint`: a top-level browser GET to a
     JWT-gated endpoint can't carry the Bearer header, so the SPA
     fetches the URL via XHR (interceptor-injected token) and then
     navigates the browser to it."""
-    url = oauth.start_authorize(
-        org_id=user.org_id, actor_id=user.legacy_uuid
-    )
+    url = oauth.start_authorize(org_id=user.org_id, actor_id=user.legacy_uuid)
     return {"url": url}
 
 
@@ -98,27 +94,19 @@ async def callback_endpoint(
         reason = error_reason or error
         return _settings_redirect(status_param="meta_denied", reason=reason)
     if not code or not state:
-        return _settings_redirect(
-            status_param="meta_error", reason="missing_params"
-        )
+        return _settings_redirect(status_param="meta_error", reason="missing_params")
 
     try:
         payload = oauth.verify_state(state)
         org_id = uuid.UUID(payload["org_id"])
     except HTTPException:
-        return _settings_redirect(
-            status_param="meta_error", reason="invalid_state"
-        )
+        return _settings_redirect(status_param="meta_error", reason="invalid_state")
 
-    ctx_token = set_context(
-        RequestContext(org_id=org_id, user_id=None)
-    )
+    ctx_token = set_context(RequestContext(org_id=org_id, user_id=None))
     try:
         async with async_session() as session:
             try:
-                await oauth.handle_callback(
-                    session, code=code, state=state
-                )
+                await oauth.handle_callback(session, code=code, state=state)
             except HTTPException:
                 return _settings_redirect(
                     status_param="meta_error",
@@ -140,16 +128,12 @@ async def callback_endpoint(
 @router.get("/pages")
 async def list_pages_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> list[dict]:
     """List every Facebook Page the OAuth user manages. Settings UI
     drives the per-Page subscribe picker off this. Returns `[]` (not
     404) when Meta isn't connected yet — keeps the picker UI simple."""
-    integration = await get_integration(
-        db, provider=IntegrationProvider.meta_ads
-    )
+    integration = await get_integration(db, provider=IntegrationProvider.meta_ads)
     if integration is None:
         return []
     client = MetaGraphClient(integration=integration, session=db)
@@ -161,7 +145,7 @@ async def list_pages_endpoint(
         raise HTTPException(
             status_code=401,
             detail="Meta token expired — reconnect required.",
-        )
+        ) from None
     return [
         {
             "page_id": p.page_id,
@@ -179,9 +163,7 @@ async def list_pages_endpoint(
 async def list_lead_forms_endpoint(
     page_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> list[dict]:
     """List Lead Forms on a Page. Internally re-fetches Pages to
     locate the per-Page access_token (we deliberately don't persist
@@ -189,9 +171,7 @@ async def list_lead_forms_endpoint(
     integration = await _require_meta(db)
     client = MetaGraphClient(integration=integration, session=db)
     try:
-        page_token = await subscriptions.find_page_token(
-            client, page_id=page_id
-        )
+        page_token = await subscriptions.find_page_token(client, page_id=page_id)
         if not page_token:
             raise HTTPException(
                 status_code=404,
@@ -204,20 +184,15 @@ async def list_lead_forms_endpoint(
         raise HTTPException(
             status_code=401,
             detail="Meta token expired — reconnect required.",
-        )
-    return [
-        {"form_id": f.form_id, "name": f.name, "status": f.status}
-        for f in forms
-    ]
+        ) from None
+    return [{"form_id": f.form_id, "name": f.name, "status": f.status} for f in forms]
 
 
 @router.post("/pages/{page_id}/subscribe")
 async def subscribe_page_endpoint(
     page_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> dict:
     """Subscribe to the `leadgen` field on this Page. After 200, Meta
     starts delivering lead events to our webhook URL (configured ONCE
@@ -228,9 +203,7 @@ async def subscribe_page_endpoint(
         # Pull the full Page record so we can cache its name alongside
         # the token — picker UI shows it without an extra round trip.
         all_pages = await subscriptions.list_pages(client)
-        page = next(
-            (p for p in all_pages if p.page_id == page_id), None
-        )
+        page = next((p for p in all_pages if p.page_id == page_id), None)
         if page is None:
             raise HTTPException(
                 status_code=404,
@@ -243,7 +216,7 @@ async def subscribe_page_endpoint(
         raise HTTPException(
             status_code=401,
             detail="Meta token expired — reconnect required.",
-        )
+        ) from None
     if not ok:
         raise HTTPException(
             status_code=502,
@@ -267,9 +240,7 @@ async def subscribe_page_endpoint(
 async def unsubscribe_page_endpoint(
     page_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> dict:
     """Stop `leadgen` deliveries for this Page. Doesn't touch other
     Pages on the same integration. Also drops the cached Page token
@@ -278,22 +249,18 @@ async def unsubscribe_page_endpoint(
     integration = await _require_meta(db)
     client = MetaGraphClient(integration=integration, session=db)
     try:
-        page_token = await subscriptions.find_page_token(
-            client, page_id=page_id
-        )
+        page_token = await subscriptions.find_page_token(client, page_id=page_id)
         if not page_token:
             raise HTTPException(
                 status_code=404,
                 detail=f"Page {page_id} not managed by the connected Meta user.",
             )
-        ok = await subscriptions.unsubscribe_page(
-            client, page_id=page_id, page_token=page_token
-        )
+        ok = await subscriptions.unsubscribe_page(client, page_id=page_id, page_token=page_token)
     except MetaTokenExpiredError:
         raise HTTPException(
             status_code=401,
             detail="Meta token expired — reconnect required.",
-        )
+        ) from None
     if not ok:
         raise HTTPException(
             status_code=502,
@@ -301,9 +268,7 @@ async def unsubscribe_page_endpoint(
         )
     # Always-OK to drop the cache (idempotent). Done AFTER Meta
     # confirms so a half-success doesn't leave us with stale state.
-    await subscriptions.delete_page_token(
-        db, integration_id=integration.id, page_id=page_id
-    )
+    await subscriptions.delete_page_token(db, integration_id=integration.id, page_id=page_id)
     return {"status": "unsubscribed", "page_id": page_id}
 
 
@@ -335,9 +300,7 @@ async def data_deletion_callback_endpoint(request: Request) -> dict:
             detail="Meta App Secret is not configured on this server.",
         )
     try:
-        payload = data_deletion.parse_signed_request(
-            signed_request, app_secret=META_APP_SECRET
-        )
+        payload = data_deletion.parse_signed_request(signed_request, app_secret=META_APP_SECRET)
     except data_deletion.SignedRequestError as exc:
         # Don't leak the specific reason — single generic 400 message.
         # Specifics live in server logs for diagnosis.
@@ -347,9 +310,7 @@ async def data_deletion_callback_endpoint(request: Request) -> dict:
             "meta_data_deletion: rejected signed_request reason=%s",
             type(exc).__name__,
         )
-        raise HTTPException(
-            status_code=400, detail="invalid signed_request"
-        )
+        raise HTTPException(status_code=400, detail="invalid signed_request") from exc
 
     user_id = payload["user_id"]
     issued_at = payload["issued_at"]
@@ -363,10 +324,8 @@ async def data_deletion_callback_endpoint(request: Request) -> dict:
             # already showed the user on the first delivery.
             confirmation_code = existing.confirmation_code
         else:
-            integrations = (
-                await data_deletion.find_integrations_by_meta_user(
-                    session, meta_user_id=user_id
-                )
+            integrations = await data_deletion.find_integrations_by_meta_user(
+                session, meta_user_id=user_id
             )
             request_row = await data_deletion.record_deletion_request(
                 session,
@@ -400,15 +359,10 @@ async def data_deletion_callback_endpoint(request: Request) -> dict:
             # progress until the worker flips the row to `completed`.
             from src.app.core.integrations.meta import tasks as _tasks
 
-            _tasks.delete_meta_user_data_async_task.delay(
-                str(request_row.id)
-            )
+            _tasks.delete_meta_user_data_async_task.delay(str(request_row.id))
 
     return {
-        "url": (
-            f"{FRONTEND_URL}/data-deletion-status"
-            f"?confirmation_code={confirmation_code}"
-        ),
+        "url": (f"{FRONTEND_URL}/data-deletion-status?confirmation_code={confirmation_code}"),
         "confirmation_code": confirmation_code,
     }
 
@@ -437,9 +391,7 @@ async def data_deletion_status_endpoint(
 async def _require_meta(db: AsyncSession):
     """Return the connected Meta integration row for the active tenant
     or 404. Used by every endpoint that needs to make a Graph API call."""
-    integration = await get_integration(
-        db, provider=IntegrationProvider.meta_ads
-    )
+    integration = await get_integration(db, provider=IntegrationProvider.meta_ads)
     if integration is None:
         raise HTTPException(
             status_code=404,
@@ -448,9 +400,7 @@ async def _require_meta(db: AsyncSession):
     return integration
 
 
-def _settings_redirect(
-    *, status_param: str, reason: str | None = None
-) -> RedirectResponse:
+def _settings_redirect(*, status_param: str, reason: str | None = None) -> RedirectResponse:
     """Bounce back to Settings with `?status=…&reason=…`. Same query
     vocab as the Google callback so the frontend toast logic is shared."""
     from urllib.parse import urlencode

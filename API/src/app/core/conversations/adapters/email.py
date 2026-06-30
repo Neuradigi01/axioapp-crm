@@ -29,26 +29,26 @@ Both paths run inside the active tenant's context — Step 4's task
 sets `RequestContext.org_id` from the account row BEFORE dispatching
 to the handler, so the ORM tenant filter + RLS work transparently.
 """
+
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from email.utils import make_msgid, parseaddr
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.contacts import data_access as contacts_da
-from src.app.core.tenants import data_access as tenants_da
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
-from src.app.core.contacts.models import Contact
+from src.app.core.contacts import data_access as contacts_da
 from src.app.core.conversations.adapters import (
     ChannelMessageRef,
     InboundMessage,
@@ -66,21 +66,26 @@ from src.app.core.conversations.models import (
     MessageDirection,
 )
 from src.app.core.email import service as email_service
-from src.app.core.email.tracking import (
-    footer as tracking_footer,
-    link_rewriter as tracking_links,
-    pixel as tracking_pixel,
-    tokens as tracking_tokens,
-)
 from src.app.core.email.models import (
     EmailAccount,
     EmailAccountProvider,
     EmailAccountSyncState,
 )
+from src.app.core.email.tracking import (
+    footer as tracking_footer,
+)
+from src.app.core.email.tracking import (
+    link_rewriter as tracking_links,
+)
+from src.app.core.email.tracking import (
+    pixel as tracking_pixel,
+)
+from src.app.core.email.tracking import (
+    tokens as tracking_tokens,
+)
 from src.app.core.notifications.service import notify
 from src.app.core.settings.models import OrgSettings
-from src.app.core.tenants.models import Organization
-
+from src.app.core.tenants import data_access as tenants_da
 
 logger = logging.getLogger(__name__)
 
@@ -94,23 +99,17 @@ _SUBJECT_THREADING_WINDOW = timedelta(days=30)
 # environments so a customer's reply (which echoes the value into
 # `In-Reply-To`) always threads back. Override per-deploy if the
 # product domain changes via `EMAIL_MESSAGE_ID_DOMAIN` env var.
-import os
-
 _MESSAGE_ID_DOMAIN = os.getenv("EMAIL_MESSAGE_ID_DOMAIN", "furnicrm.app")
 
 # Step 8 — public tracking base URL. Defaults to local in dev; in
 # prod set via env. No trailing slash — pixel/link helpers append the
 # full `/api/v1/track/...` path themselves.
-_TRACKING_BASE_URL = os.getenv(
-    "TRACKING_BASE_URL", "http://localhost:8000"
-).rstrip("/")
+_TRACKING_BASE_URL = os.getenv("TRACKING_BASE_URL", "http://localhost:8000").rstrip("/")
 
 # `mailto:` target for the `List-Unsubscribe` header. The MIME
 # headers carry both the URL and a mailto so RFC 8058 one-click
 # unsubscribe works in Gmail / Outlook / Apple Mail.
-_LIST_UNSUB_MAILTO = os.getenv(
-    "LIST_UNSUBSCRIBE_MAILTO", "unsubscribe@furnicrm.app"
-)
+_LIST_UNSUB_MAILTO = os.getenv("LIST_UNSUBSCRIBE_MAILTO", "unsubscribe@furnicrm.app")
 
 
 class EmailUseSendEmailEndpoint(HTTPException):
@@ -139,8 +138,7 @@ class HardCapExceeded(HTTPException):
         super().__init__(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=(
-                f"Daily email send cap reached for this account "
-                f"({sent}/{cap}). Try again tomorrow."
+                f"Daily email send cap reached for this account ({sent}/{cap}). Try again tomorrow."
             ),
         )
 
@@ -226,7 +224,7 @@ class SendEmailResult:
 
     message: Message
     conversation: Conversation
-    provider_message_id: Optional[str]
+    provider_message_id: str | None
     daily_sent_after: int
     near_soft_cap: bool
 
@@ -240,9 +238,9 @@ async def send_email(
     contact_id: uuid.UUID,
     subject: str,
     body_text: str,
-    body_html: Optional[str] = None,
-    in_reply_to_message_id: Optional[uuid.UUID] = None,
-    conversation_id: Optional[uuid.UUID] = None,
+    body_html: str | None = None,
+    in_reply_to_message_id: uuid.UUID | None = None,
+    conversation_id: uuid.UUID | None = None,
 ) -> SendEmailResult:
     """Send an email from the rep's connected mailbox.
 
@@ -262,9 +260,7 @@ async def send_email(
     from a contact-detail page). When None, we find-or-create one
     keyed on `(contact_id, channel=email)`.
     """
-    account = await email_service.get_account(
-        session, account_id=account_id
-    )
+    account = await email_service.get_account(session, account_id=account_id)
     if account is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -273,27 +269,19 @@ async def send_email(
     if account.user_id != sender_user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "You can only send through your own connected "
-                "email account."
-            ),
+            detail=("You can only send through your own connected email account."),
         )
     if account.sync_state == EmailAccountSyncState.disconnected:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Email account is disconnected — reconnect in "
-                "Settings → Email Accounts."
-            ),
+            detail=("Email account is disconnected — reconnect in Settings → Email Accounts."),
         )
 
     contact = await contacts_da.get_contact(session, contact_id)
     if contact is None or not contact.email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Recipient contact missing or has no email address."
-            ),
+            detail=("Recipient contact missing or has no email address."),
         )
     # Step 8 — opt-out compliance gate. Any prior unsubscribe blocks
     # every future send to this contact. Sequence scheduler maps the
@@ -305,9 +293,7 @@ async def send_email(
     # row so we can both (a) refuse the send when no address is set
     # and (b) compose the footer from the structured fields below.
     org_settings = (
-        await session.execute(
-            select(OrgSettings).where(OrgSettings.org_id == org_id)
-        )
+        await session.execute(select(OrgSettings).where(OrgSettings.org_id == org_id))
     ).scalar_one_or_none()
     if not tracking_footer.has_required_address(org_settings):
         raise MissingCompanyAddress()
@@ -328,14 +314,10 @@ async def send_email(
 
     # Read the prior outbound message's channel_message_id when
     # replying so we can stamp In-Reply-To + References.
-    parent_msg_id: Optional[str] = None
+    parent_msg_id: str | None = None
     if in_reply_to_message_id is not None:
         parent = (
-            await session.execute(
-                select(Message).where(
-                    Message.id == in_reply_to_message_id
-                )
-            )
+            await session.execute(select(Message).where(Message.id == in_reply_to_message_id))
         ).scalar_one_or_none()
         if parent is not None and parent.channel_message_id:
             parent_msg_id = parent.channel_message_id
@@ -355,24 +337,16 @@ async def send_email(
     # Build the tracking tokens. Each kind carries the same message_id
     # but a different kind char so the public router can route /o vs
     # /c vs /unsubscribe with one decoder.
-    open_token = tracking_tokens.encode(
-        message_id=pre_message_id, kind="o"
-    )
-    click_token = tracking_tokens.encode(
-        message_id=pre_message_id, kind="c"
-    )
-    unsub_token = tracking_tokens.encode(
-        message_id=pre_message_id, kind="u"
-    )
-    unsub_url = (
-        f"{_TRACKING_BASE_URL}/api/v1/track/unsubscribe/{unsub_token}"
-    )
+    open_token = tracking_tokens.encode(message_id=pre_message_id, kind="o")
+    click_token = tracking_tokens.encode(message_id=pre_message_id, kind="c")
+    unsub_token = tracking_tokens.encode(message_id=pre_message_id, kind="u")
+    unsub_url = f"{_TRACKING_BASE_URL}/api/v1/track/unsubscribe/{unsub_token}"
 
     # Apply pixel + link rewriting + footer to the HTML body. The
     # plain-text alternative is left untouched — tracking only makes
     # sense in the HTML branch where the recipient's client can
     # fetch an `<img>` and follow a wrapped `<a href>`.
-    tracked_body_html: Optional[str] = body_html
+    tracked_body_html: str | None = body_html
     if body_html is not None:
         tracked_body_html = tracking_pixel.inject(
             body_html, token=open_token, base_url=_TRACKING_BASE_URL
@@ -387,9 +361,7 @@ async def send_email(
             org_settings=org_settings,
             unsubscribe_url=unsub_url,
         )
-        tracked_body_html = tracking_footer.append(
-            tracked_body_html, footer_html=footer_html
-        )
+        tracked_body_html = tracking_footer.append(tracked_body_html, footer_html=footer_html)
 
     mime = _build_outbound_mime(
         from_email=account.email_address,
@@ -410,7 +382,7 @@ async def send_email(
     # check + counter increment (with rollback on failure). We catch
     # the typed `DailyCapExceeded` and re-raise as our public type
     # so callers don't have to know which provider raised.
-    provider_message_id: Optional[str] = None
+    provider_message_id: str | None = None
     daily_sent_after = account.daily_sent_count or 0
     near_soft_cap = False
 
@@ -418,9 +390,7 @@ async def send_email(
         from src.app.core.email.gmail import send as gmail_send
 
         try:
-            result = await gmail_send.send(
-                account, session, raw_mime=raw_bytes
-            )
+            result = await gmail_send.send(account, session, raw_mime=raw_bytes)
         except gmail_send.DailyCapExceeded as exc:
             raise HardCapExceeded(
                 sent=account.daily_sent_count or 0,
@@ -434,9 +404,7 @@ async def send_email(
         from src.app.core.email.microsoft import send as ms_send
 
         try:
-            result = await ms_send.send(
-                account, session, raw_mime=raw_bytes
-            )
+            result = await ms_send.send(account, session, raw_mime=raw_bytes)
         except ms_send.DailyCapExceeded as exc:
             raise HardCapExceeded(
                 sent=account.daily_sent_count or 0,
@@ -448,10 +416,7 @@ async def send_email(
     else:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=(
-                f"Email provider {account.provider.value} is not "
-                "supported in this deploy."
-            ),
+            detail=(f"Email provider {account.provider.value} is not supported in this deploy."),
         )
 
     # Persist outbound row. `channel_message_id` is OUR Message-ID
@@ -460,7 +425,7 @@ async def send_email(
     # payload for forensics; threading does NOT depend on them.
     # `id` is pre-allocated above so the tracking tokens we already
     # baked into the HTML reference this exact row.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     msg = Message(
         id=pre_message_id,
         org_id=org_id,
@@ -529,9 +494,7 @@ async def send_email(
 # --- Inbound: receive_email() ------------------------------------------
 
 
-async def receive_email(
-    account: EmailAccount, matched: dict[str, Any]
-) -> Optional[Message]:
+async def receive_email(account: EmailAccount, matched: dict[str, Any]) -> Message | None:
     """Step 4's inbound-handler signature. Called from
     `email_tasks._dispatch_inbound` for every `MatchedMessage` the
     sync routines pulled.
@@ -549,8 +512,7 @@ async def receive_email(
     contact_id = matched.get("contact_id")
     if contact_id is None:
         logger.debug(
-            "receive_email: no contact_id in matched; skipping "
-            "account=%s provider_message_id=%s",
+            "receive_email: no contact_id in matched; skipping account=%s provider_message_id=%s",
             account.id,
             matched.get("message_id"),
         )
@@ -565,9 +527,7 @@ async def receive_email(
         headers: dict[str, str] = matched.get("headers") or {}
         rfc_message_id = extract_message_id(headers)
         provider_message_id = matched.get("message_id")
-        if rfc_message_id and await _exists_by_rfc_id(
-            session, rfc_message_id
-        ):
+        if rfc_message_id and await _exists_by_rfc_id(session, rfc_message_id):
             logger.debug(
                 "receive_email: dedupe hit account=%s rfc_id=%s",
                 account.id,
@@ -606,7 +566,7 @@ async def receive_email(
         # Persist the inbound message. `channel_message_id` is the
         # RFC Message-ID so future replies thread back through us.
         body_text = (matched.get("body_text") or "").strip()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         msg = Message(
             org_id=account.org_id,
             conversation_id=conversation.id,
@@ -670,16 +630,16 @@ async def receive_email(
 def _build_outbound_mime(
     *,
     from_email: str,
-    from_name: Optional[str],
+    from_name: str | None,
     to_email: str,
-    to_name: Optional[str],
+    to_name: str | None,
     subject: str,
     body_text: str,
-    body_html: Optional[str],
+    body_html: str | None,
     message_id: str,
-    in_reply_to: Optional[str],
-    list_unsubscribe_url: Optional[str] = None,
-    list_unsubscribe_mailto: Optional[str] = None,
+    in_reply_to: str | None,
+    list_unsubscribe_url: str | None = None,
+    list_unsubscribe_mailto: str | None = None,
 ) -> EmailMessage:
     """Assemble a multipart/alternative MIME message via stdlib
     `email.message.EmailMessage`. Sets threading headers when
@@ -692,12 +652,8 @@ def _build_outbound_mime(
     UI). Both header forms are concatenated — Gmail prefers the URL,
     Outlook the mailto, so providing both maximises the surface."""
     msg = EmailMessage()
-    msg["From"] = (
-        f'"{from_name}" <{from_email}>' if from_name else from_email
-    )
-    msg["To"] = (
-        f'"{to_name}" <{to_email}>' if to_name else to_email
-    )
+    msg["From"] = f'"{from_name}" <{from_email}>' if from_name else from_email
+    msg["To"] = f'"{to_name}" <{to_email}>' if to_name else to_email
     msg["Subject"] = subject
     msg["Message-ID"] = message_id
     # Step 8 — RFC 8058 one-click unsubscribe. Mailto first so an
@@ -713,11 +669,7 @@ def _build_outbound_mime(
         # Both headers carry the prior message id in angle brackets.
         # Servers expect `<id@host>` form even though our column
         # stores the bare value.
-        bracketed = (
-            in_reply_to
-            if in_reply_to.startswith("<")
-            else f"<{in_reply_to}>"
-        )
+        bracketed = in_reply_to if in_reply_to.startswith("<") else f"<{in_reply_to}>"
         msg["In-Reply-To"] = bracketed
         # `References` should be a space-separated chain; for v1 we
         # don't walk further back than the immediate parent. Step 8
@@ -738,18 +690,14 @@ async def _find_or_create_conversation(
     org_id: uuid.UUID,
     contact_id: uuid.UUID,
     contact_email: str,
-    conversation_id: Optional[uuid.UUID],
+    conversation_id: uuid.UUID | None,
 ) -> Conversation:
     """Outbound find-or-create. Explicit `conversation_id` wins; else
     we reuse the existing email conversation for this contact when
     one exists, else create a fresh one."""
     if conversation_id is not None:
         existing = (
-            await session.execute(
-                select(Conversation).where(
-                    Conversation.id == conversation_id
-                )
-            )
+            await session.execute(select(Conversation).where(Conversation.id == conversation_id))
         ).scalar_one_or_none()
         if existing is not None:
             return existing
@@ -798,7 +746,7 @@ async def _find_conversation_by_thread_keys(
     org_id: uuid.UUID,
     thread_keys: set[str],
     contact_id: uuid.UUID,
-) -> Optional[Conversation]:
+) -> Conversation | None:
     """Return the conversation that owns any prior message whose
     `channel_message_id` matches one of `thread_keys`. The
     `contact_id` filter is belt-and-braces: a forged thread key
@@ -808,23 +756,26 @@ async def _find_conversation_by_thread_keys(
         return None
     rows = (
         await session.execute(
-            select(Message.conversation_id)
-            .where(Message.channel_message_id.in_(list(thread_keys)))
+            select(Message.conversation_id).where(Message.channel_message_id.in_(list(thread_keys)))
         )
     ).all()
     if not rows:
         return None
     candidate_ids = {r[0] for r in rows}
     convs = (
-        await session.execute(
-            select(Conversation)
-            .where(Conversation.id.in_(list(candidate_ids)))
-            .where(Conversation.contact_id == contact_id)
-            .where(Conversation.channel == ConversationChannel.email)
-            .order_by(Conversation.last_message_at.desc().nullslast())
-            .limit(1)
+        (
+            await session.execute(
+                select(Conversation)
+                .where(Conversation.id.in_(list(candidate_ids)))
+                .where(Conversation.contact_id == contact_id)
+                .where(Conversation.channel == ConversationChannel.email)
+                .order_by(Conversation.last_message_at.desc().nullslast())
+                .limit(1)
+            )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     return convs
 
 
@@ -834,30 +785,34 @@ async def _find_conversation_by_subject(
     org_id: uuid.UUID,
     contact_id: uuid.UUID,
     subject: str,
-) -> Optional[Conversation]:
+) -> Conversation | None:
     """Subject-based fallback. Looks for an OPEN email conversation
     for the same contact within the last 30 days whose most recent
     message's `payload.subject` normalises to the same key."""
     key = subject_thread_key(subject)
     if not key:
         return None
-    cutoff = datetime.now(timezone.utc) - _SUBJECT_THREADING_WINDOW
+    cutoff = datetime.now(UTC) - _SUBJECT_THREADING_WINDOW
     candidates = (
-        await session.execute(
-            select(Conversation)
-            .where(Conversation.channel == ConversationChannel.email)
-            .where(Conversation.contact_id == contact_id)
-            .where(Conversation.status == ConversationStatus.open)
-            .where(
-                and_(
-                    Conversation.last_message_at.isnot(None),
-                    Conversation.last_message_at >= cutoff,
+        (
+            await session.execute(
+                select(Conversation)
+                .where(Conversation.channel == ConversationChannel.email)
+                .where(Conversation.contact_id == contact_id)
+                .where(Conversation.status == ConversationStatus.open)
+                .where(
+                    and_(
+                        Conversation.last_message_at.isnot(None),
+                        Conversation.last_message_at >= cutoff,
+                    )
                 )
+                .order_by(Conversation.last_message_at.desc())
+                .limit(10)
             )
-            .order_by(Conversation.last_message_at.desc())
-            .limit(10)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     for conv in candidates:
         # Fetch the most recent message in this conversation; check
@@ -879,16 +834,12 @@ async def _find_conversation_by_subject(
     return None
 
 
-async def _exists_by_rfc_id(
-    session: AsyncSession, rfc_id: str
-) -> bool:
+async def _exists_by_rfc_id(session: AsyncSession, rfc_id: str) -> bool:
     """Dedupe lookup — would this RFC Message-ID create a duplicate
     row inside this org? RLS scopes the search."""
     rows = (
         await session.execute(
-            select(Message.id)
-            .where(Message.channel_message_id == rfc_id)
-            .limit(1)
+            select(Message.id).where(Message.channel_message_id == rfc_id).limit(1)
         )
     ).first()
     return rows is not None
@@ -908,10 +859,9 @@ async def _exists_by_provider_id(
     # is acceptable. The RFC-id check above catches the common case.
     rows = (
         await session.execute(
-            select(Message.id).where(
-                Message.payload["provider_message_id"].astext
-                == provider_message_id
-            ).limit(1)
+            select(Message.id)
+            .where(Message.payload["provider_message_id"].astext == provider_message_id)
+            .limit(1)
         )
     ).first()
     return rows is not None
@@ -951,8 +901,8 @@ __all__ = [
 #
 # Idempotent: re-importing this module just overwrites the
 # registrations with the same callables.
-from src.app.core.conversations.registry import register_channel
-from src.app.core.email.sync_daemon import register_inbound_handler
+from src.app.core.conversations.registry import register_channel  # noqa: E402
+from src.app.core.email.sync_daemon import register_inbound_handler  # noqa: E402
 
 
 def _step5_register() -> None:

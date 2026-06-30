@@ -60,30 +60,21 @@ export class AppointmentPopoverComponent {
   @Output() readonly cancelAppt = new EventEmitter<void>();
   @Output() readonly dismiss = new EventEmitter<void>();
 
-  protected readonly canReassign = computed(() =>
-    this.auth.hasPermission('appointments.reassign'),
-  );
+  protected readonly canReassign = computed(() => this.auth.hasPermission('appointments.reassign'));
 
-  protected readonly canWrite = computed(() =>
-    this.auth.hasPermission('appointments.write'),
-  );
+  protected readonly canWrite = computed(() => this.auth.hasPermission('appointments.write'));
 
   /** Status-machine gate for "Mark completed" — only valid from `scheduled`. */
   protected readonly canMarkCompleted = computed(() => {
     const a = this._appointment();
     if (!a) return false;
-    return (
-      this.canWrite() &&
-      ALLOWED_FROM_STATUS[a.status].includes('completed')
-    );
+    return this.canWrite() && ALLOWED_FROM_STATUS[a.status].includes('completed');
   });
 
   /** Status-machine gate for "Cancel" — only valid from `scheduled`. */
   protected readonly canCancel = computed(() => {
     const a = this._appointment();
     if (!a) return false;
-    return (
-      this.canWrite() && ALLOWED_FROM_STATUS[a.status].includes('cancelled')
-    );
+    return this.canWrite() && ALLOWED_FROM_STATUS[a.status].includes('cancelled');
   });
 }

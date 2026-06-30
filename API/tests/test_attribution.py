@@ -26,11 +26,10 @@ Cases:
  10. Negative-cache entry prevents repeated misses.
  11. Cache eviction kicks in past ``_MAX_ENTRIES``.
 """
+
 from __future__ import annotations
 
 import time
-
-import pytest
 
 from src.app.core.conversations.adapters.whatsapp import WhatsAppAdapter
 from src.app.core.integrations.meta import ads_lookup
@@ -47,15 +46,7 @@ def _make_adapter() -> WhatsAppAdapter:
 
 
 def _wrap_message(message: dict) -> dict:
-    return {
-        "entry": [
-            {
-                "changes": [
-                    {"value": {"messages": [message]}}
-                ]
-            }
-        ]
-    }
+    return {"entry": [{"changes": [{"value": {"messages": [message]}}]}]}
 
 
 class TestReferralParser:
@@ -148,9 +139,7 @@ class TestDeeplink:
         assert url.startswith("https://www.facebook.com/adsmanager")
 
     def test_returns_none_without_account(self):
-        assert (
-            ads_lookup.deeplink_for_ad({"ad_id": "23845001"}) is None
-        )
+        assert ads_lookup.deeplink_for_ad({"ad_id": "23845001"}) is None
 
     def test_returns_none_on_non_dict(self):
         assert ads_lookup.deeplink_for_ad(None) is None  # type: ignore[arg-type]
@@ -184,18 +173,14 @@ class TestCache:
         ads_lookup._cache_put(key, {"ad_id": "ad-1"}, ttl=60)
         # Move clock past TTL.
         original_time = time.time
-        monkeypatch.setattr(
-            ads_lookup.time, "time", lambda: original_time() + 120
-        )
+        monkeypatch.setattr(ads_lookup.time, "time", lambda: original_time() + 120)
         assert ads_lookup._cache_get(key) is None
 
     def test_eviction_past_max_entries(self, monkeypatch):
         monkeypatch.setattr(ads_lookup, "_MAX_ENTRIES", 3)
         ads_lookup.reset_cache()
         for i in range(5):
-            ads_lookup._cache_put(
-                ("org-1", f"ad-{i}"), {"ad_id": f"ad-{i}"}, ttl=60
-            )
+            ads_lookup._cache_put(("org-1", f"ad-{i}"), {"ad_id": f"ad-{i}"}, ttl=60)
         # We can only assert the cache stayed bounded; the exact
         # eviction policy is a "drop one arbitrary entry" — not
         # LRU — so we don't pin which keys remain.

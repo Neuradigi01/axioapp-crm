@@ -12,14 +12,14 @@ a mocked `WhatsAppTemplate` extension row, covering the channel-not-
 supported path + the missing-extension path + the happy path that
 ends with `external_status='pending'`.
 """
+
 from __future__ import annotations
 
 import uuid
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
-from unittest.mock import AsyncMock, patch
+from sqlalchemy import text as sql_text
 
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.templates import external_submission as templates_external
@@ -30,14 +30,10 @@ from src.app.core.templates.external_submission import (
     MissingExtensionRow,
 )
 from src.app.core.templates.models import (
-    MessageTemplate,
     TemplateCategory,
-    TemplateExternalStatus,
-    TemplateInternalStatus,
 )
 from src.app.core.templates.schemas import TemplateCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -50,9 +46,6 @@ def test_wa_internal_status_mapping_is_stable():
     values map into central `internal_status`. Confirm with the
     manager before adjusting — production tenants will re-key on the
     next backfill round."""
-    from src.app.alembic.versions import (  # type: ignore[import-not-found]
-        _migration_module_lookup,
-    ) if False else None
     # The migration filename starts with a digit so we can't `from
     # alembic.versions.0120_...` directly. Read the constants via
     # importlib to keep this pin honest.
@@ -60,9 +53,7 @@ def test_wa_internal_status_mapping_is_stable():
     import os
 
     here = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    path = os.path.join(
-        here, "alembic", "versions", "0120_wa_template_backfill.py"
-    )
+    path = os.path.join(here, "alembic", "versions", "0120_wa_template_backfill.py")
     spec = importlib.util.spec_from_file_location("backfill_0120", path)
     assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
@@ -93,10 +84,7 @@ def test_wa_internal_status_mapping_is_stable():
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {"id": str(org_id), "name": "Demo", "slug": f"demo-{org_id.hex[:6]}"},
     )
     await test_db.commit()

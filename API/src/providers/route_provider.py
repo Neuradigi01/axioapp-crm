@@ -1,10 +1,12 @@
 import os
+
 import orjson
 from sqlalchemy import select
+
+from config import ROUTES_API
 from src.core.db import async_session
 from src.core.logger import logger
 from src.models.routes import Route
-from config import ROUTES_API
 
 
 async def generate_routes_json():

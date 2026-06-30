@@ -68,11 +68,8 @@ export class AddNoteComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.submitError.set(
-            extractApiError(err) ?? 'Could not save the note.',
-          );
+          this.submitError.set(extractApiError(err) ?? 'Could not save the note.');
         },
       });
   }
-
 }

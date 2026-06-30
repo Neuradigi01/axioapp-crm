@@ -11,10 +11,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Observable, of } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
@@ -23,13 +20,7 @@ import { FieldDef } from '../shared/dynamic-form/types';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators, withRequiredIf } from '../shared/validators';
 
-import {
-  Task,
-  TaskCreate,
-  TaskPriority,
-  TaskUpdate,
-  TasksApiService,
-} from './tasks-api.service';
+import { Task, TaskCreate, TaskPriority, TaskUpdate, TasksApiService } from './tasks-api.service';
 
 export interface TaskAssignee {
   id: string;
@@ -64,9 +55,7 @@ export class TaskFormModalComponent extends BaseFormModalComponent {
 
   /** `title` + `priority` stay always-required (registry locks both).
    *  `description` / `due_at` / `assigned_to_id` accept the `required` override. */
-  protected applyStandardValidators(
-    map: Record<string, StandardFieldRendered>,
-  ): void {
+  protected applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
     this.form.controls.title.setValidators([
       commonValidators.required,
       commonValidators.maxLength(255),
@@ -111,9 +100,7 @@ export class TaskFormModalComponent extends BaseFormModalComponent {
     assigned_to_id: [''],
   });
 
-  protected readonly hasAssigneeDropdown = computed(
-    () => this.assignees.length > 0,
-  );
+  protected readonly hasAssigneeDropdown = computed(() => this.assignees.length > 0);
 
   protected readonly isEdit = computed(() => this.task !== null);
 
@@ -145,9 +132,7 @@ export class TaskFormModalComponent extends BaseFormModalComponent {
   protected onSubmit(): void {
     if (this.form.invalid || this.saving()) return;
     const raw = this.form.getRawValue();
-    const due_at = raw.due_at
-      ? new Date(raw.due_at).toISOString()
-      : null;
+    const due_at = raw.due_at ? new Date(raw.due_at).toISOString() : null;
     const assignee = raw.assigned_to_id || this.callerUuid;
     if (!assignee) {
       this.error.set('Could not determine an assignee for this task.');

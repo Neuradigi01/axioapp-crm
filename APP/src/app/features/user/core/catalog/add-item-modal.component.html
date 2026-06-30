@@ -5,7 +5,11 @@
         {{ isEdit() ? 'Edit product' : 'Add product' }}
       </h2>
       <p class="mt-1 text-xs text-zinc-500">
-        {{ isEdit() ? 'SKU is locked. Change name, category, price, or active state.' : 'Pick a unique SKU, give it a name, set the price.' }}
+        {{
+          isEdit()
+            ? 'SKU is locked. Change name, category, price, or active state.'
+            : 'Pick a unique SKU, give it a name, set the price.'
+        }}
       </p>
     </header>
 
@@ -20,7 +24,9 @@
               class="h-20 w-20 shrink-0 rounded-md object-cover ring-1 ring-zinc-200"
             />
           } @else {
-            <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-xs text-zinc-400 ring-1 ring-dashed ring-zinc-300">
+            <div
+              class="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-xs text-zinc-400 ring-1 ring-dashed ring-zinc-300"
+            >
               No image
             </div>
           }
@@ -79,7 +85,9 @@
           <div>
             <label class="block text-xs font-medium text-zinc-700" for="ci_category">
               {{ stdField('category')?.label ?? 'Category' }}
-              @if (stdField('category')?.is_required) { <span class="text-red-600">*</span> }
+              @if (stdField('category')?.is_required) {
+                <span class="text-red-600">*</span>
+              }
             </label>
             <input
               id="ci_category"
@@ -169,7 +177,9 @@
       }
     </form>
 
-    <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg">
+    <footer
+      class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg"
+    >
       <button
         type="button"
         (click)="cancel.emit()"

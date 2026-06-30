@@ -7,15 +7,17 @@ Usage:
     python -m src.seeds.run routes     # Seed default routes only
     python -m src.seeds.run layered    # Seed FurnitureCRM demo org + admin role + user
 """
-import sys
+
 import asyncio
-from src.seeds.seed_admin import seed_super_admin
-from src.seeds.seed_routes import seed_routes
-from src.seeds.seed_countries import seed_countries, seed_states
-from src.app.scripts.seed_demo_org import seed_demo_org
+import sys
+
 from src.app.scripts.seed_admin_user import seed_admin_user
-from src.app.scripts.seed_contact_system_fields import seed_contact_system_fields
 from src.app.scripts.seed_call_outcomes import seed_call_outcomes
+from src.app.scripts.seed_contact_system_fields import seed_contact_system_fields
+from src.app.scripts.seed_demo_org import seed_demo_org
+from src.seeds.seed_admin import seed_super_admin
+from src.seeds.seed_countries import seed_countries, seed_states
+from src.seeds.seed_routes import seed_routes
 
 
 async def run_layered():

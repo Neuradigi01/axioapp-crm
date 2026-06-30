@@ -3,7 +3,12 @@
     <div class="form-card__header">
       <div class="form-card__header-content">
         @if (showBackButton()) {
-          <button mat-icon-button class="form-card__back-btn" (click)="onBackClick()" aria-label="Go back">
+          <button
+            mat-icon-button
+            class="form-card__back-btn"
+            (click)="onBackClick()"
+            aria-label="Go back"
+          >
             <mat-icon>arrow_back</mat-icon>
           </button>
         }

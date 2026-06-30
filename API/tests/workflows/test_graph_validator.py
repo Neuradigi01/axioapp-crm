@@ -15,6 +15,7 @@ Covers the 10 checks documented in :mod:`core.workflows.graph`:
   * Wait-for-event with max_wait_seconds > 30 days → InvalidGraph.
   * Goal node missing from graph → InvalidGraph.
 """
+
 from __future__ import annotations
 
 import pytest

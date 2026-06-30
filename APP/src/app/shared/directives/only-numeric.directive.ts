@@ -95,7 +95,9 @@ export class OnlyNumericDirective {
 
   private sanitizeSigned(value: string, allowDecimal: boolean): string {
     const hasNegative = value.startsWith('-');
-    let cleaned = allowDecimal ? this.sanitizeDecimal(value.replace(/-/g, ''), false) : value.replace(/-/g, '').replace(/[^0-9]/g, '');
+    let cleaned = allowDecimal
+      ? this.sanitizeDecimal(value.replace(/-/g, ''), false)
+      : value.replace(/-/g, '').replace(/[^0-9]/g, '');
     if (hasNegative) {
       cleaned = '-' + cleaned;
     }
@@ -106,7 +108,8 @@ export class OnlyNumericDirective {
     let result = value.replace(/[^0-9.]/g, '');
     const dotIndex = result.indexOf('.');
     if (dotIndex !== -1) {
-      result = result.substring(0, dotIndex + 1) + result.substring(dotIndex + 1).replace(/\./g, '');
+      result =
+        result.substring(0, dotIndex + 1) + result.substring(dotIndex + 1).replace(/\./g, '');
     }
     return result;
   }

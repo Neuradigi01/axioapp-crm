@@ -26,15 +26,16 @@ HMAC validation per provider is the router's job — see
 :func:`core.email.router.bounce_webhook_endpoint`. This module
 assumes the payload has already been authenticated.
 """
+
 from __future__ import annotations
 
 import hashlib
 import hmac
 import logging
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable, Literal
-
+from typing import Any, Literal
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +46,7 @@ ProviderKey = Literal["mailgun", "sendgrid", "ses", "postmark"]
 
 # Bounce types that warrant a suppression row. Soft bounces don't
 # (transient) and unknown types fall through to "log only".
-_SUPPRESSING_TYPES: frozenset[str] = frozenset(
-    {"hard", "complaint", "unsubscribe"}
-)
+_SUPPRESSING_TYPES: frozenset[str] = frozenset({"hard", "complaint", "unsubscribe"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,9 +117,7 @@ def parse_mailgun(payload: dict[str, Any]) -> list[BounceEvent]:
     ]
 
 
-def verify_mailgun_signature(
-    payload: dict[str, Any], *, signing_key: str
-) -> bool:
+def verify_mailgun_signature(payload: dict[str, Any], *, signing_key: str) -> bool:
     """Mailgun signs with ``HMAC-SHA256(signing_key, timestamp + token)``;
     the signature ships in the body's ``signature`` dict."""
     sig = payload.get("signature") or {}
@@ -131,7 +128,7 @@ def verify_mailgun_signature(
         return False
     computed = hmac.new(
         signing_key.encode("utf-8"),
-        f"{timestamp}{token}".encode("utf-8"),
+        f"{timestamp}{token}".encode(),
         hashlib.sha256,
     ).hexdigest()
     return hmac.compare_digest(computed, expected)
@@ -289,9 +286,7 @@ def parse_postmark(payload: dict[str, Any]) -> list[BounceEvent]:
     record_type = payload.get("RecordType")
     email = (payload.get("Email") or "").lower().strip()
     provider_event_id = (
-        str(payload.get("ID"))
-        if payload.get("ID") is not None
-        else str(uuid.uuid4())
+        str(payload.get("ID")) if payload.get("ID") is not None else str(uuid.uuid4())
     )
     if not email or not record_type:
         return []
@@ -302,9 +297,7 @@ def parse_postmark(payload: dict[str, Any]) -> list[BounceEvent]:
         bounce_type = "hard" if sub == "hardbounce" else "soft"
     elif record_type == "SpamComplaint":
         bounce_type = "complaint"
-    elif record_type == "SubscriptionChange" and payload.get(
-        "SuppressSending"
-    ):
+    elif record_type == "SubscriptionChange" and payload.get("SuppressSending"):
         bounce_type = "unsubscribe"
     else:
         return []
@@ -331,17 +324,13 @@ _PARSERS: dict[str, Any] = {
 }
 
 
-def parse_provider_payload(
-    provider: str, payload: Any
-) -> list[BounceEvent]:
+def parse_provider_payload(provider: str, payload: Any) -> list[BounceEvent]:
     """Pick the parser for ``provider`` + return the list of
     normalised events. Raises :class:`UnsupportedWebhookError` for
     unknown providers so the router maps to 400."""
     parser = _PARSERS.get(provider.lower())
     if parser is None:
-        raise UnsupportedWebhookError(
-            f"unsupported bounce webhook provider: {provider}"
-        )
+        raise UnsupportedWebhookError(f"unsupported bounce webhook provider: {provider}")
     return parser(payload)
 
 
@@ -411,8 +400,7 @@ async def persist_bounce_events(
                 await session.execute(
                     _select(AutomationSuppression.id).where(
                         AutomationSuppression.org_id == org_id,
-                        AutomationSuppression.channel
-                        == ConversationChannel.email,
+                        AutomationSuppression.channel == ConversationChannel.email,
                         AutomationSuppression.address == ev.email_address,
                     )
                 )

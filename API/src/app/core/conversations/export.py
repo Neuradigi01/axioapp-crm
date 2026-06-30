@@ -19,13 +19,14 @@ layout API) so the output stays readable for long transcripts —
 inbound / outbound get distinct fonts + indent levels, page
 numbers footer, header with conversation metadata.
 """
+
 from __future__ import annotations
 
 import csv
 import io
 import uuid
-from datetime import datetime, timezone
-from typing import Iterable, Optional
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,7 +35,6 @@ from src.app.core.conversations.service import (
     get_conversation,
     list_messages,
 )
-
 
 # ---------------------------------------------------------------------------
 # Selection
@@ -62,11 +62,11 @@ def _author_label(m: Message) -> str:
     return f"Staff ({m.sender_user_id})"
 
 
-def _format_ts(ts: Optional[datetime]) -> str:
+def _format_ts(ts: datetime | None) -> str:
     if ts is None:
         return ""
     if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=timezone.utc)
+        ts = ts.replace(tzinfo=UTC)
     return ts.isoformat()
 
 
@@ -107,9 +107,7 @@ def build_csv_bytes(
     )
     for m in _filter_for_export(messages):
         payload = getattr(m, "payload", None) or {}
-        is_ai = (
-            isinstance(payload, dict) and payload.get("author") == "ai"
-        )
+        is_ai = isinstance(payload, dict) and payload.get("author") == "ai"
         writer.writerow(
             [
                 str(m.id),
@@ -158,9 +156,7 @@ def build_pdf_bytes(
             Spacer,
         )
     except ImportError as exc:  # pragma: no cover — handled by callers
-        raise RuntimeError(
-            "reportlab is required for PDF export but is not installed"
-        ) from exc
+        raise RuntimeError("reportlab is required for PDF export but is not installed") from exc
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -224,9 +220,7 @@ def build_pdf_bytes(
     ]
 
     for m in _filter_for_export(messages):
-        style = (
-            inbound_style if m.direction.value == "in" else outbound_style
-        )
+        style = inbound_style if m.direction.value == "in" else outbound_style
         ts = _format_ts(m.sent_at or m.created_at)
         author = _author_label(m)
         text = (m.text or "").replace("\n", "<br/>")
@@ -275,7 +269,7 @@ async def export_conversation_pdf(
 
 def _filename_ts() -> str:
     """Compact UTC timestamp for export filenames."""
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
 __all__ = [

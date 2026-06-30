@@ -17,14 +17,16 @@ Covers:
   * ``update_enabled_event_types_from_graph`` re-derives the
     denormalised column from the persisted graph.
 """
+
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.events import bus as events_bus
 from src.app.core.events.event_catalog import (
@@ -34,6 +36,8 @@ from src.app.core.events.event_catalog import (
 )
 from src.app.core.workflows import (
     service as workflows_service,
+)
+from src.app.core.workflows import (
     trigger_handlers,
 )
 from src.app.core.workflows.models import (
@@ -44,7 +48,6 @@ from src.app.core.workflows.models import (
 )
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -52,10 +55,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -135,10 +135,7 @@ async def test_on_event_starts_run_for_active_workflow(test_db, org_id):
     wf = await _seed_workflow(test_db, org_id=org_id)
     contact_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_contacts (id, org_id, full_name) "
-            "VALUES (:id, :org_id, :name)"
-        ),
+        sql_text("INSERT INTO tbl_contacts (id, org_id, full_name) VALUES (:id, :org_id, :name)"),
         {"id": str(contact_id), "org_id": str(org_id), "name": "Asha"},
     )
     await test_db.commit()
@@ -160,10 +157,10 @@ async def test_on_event_starts_run_for_active_workflow(test_db, org_id):
         await trigger_handlers._on_event(envelope)
 
     rows = (
-        await test_db.execute(
-            select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
     assert rows[0].contact_id == contact_id
     assert rows[0].trigger_event_id == "lead_created:abc"
@@ -171,12 +168,8 @@ async def test_on_event_starts_run_for_active_workflow(test_db, org_id):
 
 async def test_on_event_skips_draft_and_paused_workflows(test_db, org_id):
     """Only ``status='active'`` workflows trigger runs."""
-    await _seed_workflow(
-        test_db, org_id=org_id, status=WorkflowStatus.draft
-    )
-    await _seed_workflow(
-        test_db, org_id=org_id, status=WorkflowStatus.paused
-    )
+    await _seed_workflow(test_db, org_id=org_id, status=WorkflowStatus.draft)
+    await _seed_workflow(test_db, org_id=org_id, status=WorkflowStatus.paused)
 
     envelope = {
         "event_type": LEAD_CREATED,
@@ -197,10 +190,7 @@ async def test_on_event_isolates_orgs(test_db, org_id):
     """An event for org A doesn't fire workflows in org B."""
     other_org = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(other_org),
             "name": "Other",
@@ -224,27 +214,23 @@ async def test_on_event_isolates_orgs(test_db, org_id):
         await trigger_handlers._on_event(envelope)
 
     rows_a = (
-        await test_db.execute(
-            select(WorkflowRun).where(WorkflowRun.workflow_id == wf_a.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowRun).where(WorkflowRun.workflow_id == wf_a.id)))
+        .scalars()
+        .all()
+    )
     rows_b = (
-        await test_db.execute(
-            select(WorkflowRun).where(WorkflowRun.workflow_id == wf_b.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowRun).where(WorkflowRun.workflow_id == wf_b.id)))
+        .scalars()
+        .all()
+    )
     assert len(rows_a) == 1
     assert rows_b == []
 
 
-async def test_on_event_without_contact_starts_null_contact_run(
-    test_db, org_id
-):
+async def test_on_event_without_contact_starts_null_contact_run(test_db, org_id):
     """``time.daily_tick`` + similar events publish without a
     contact — the run is created with ``contact_id=NULL``."""
-    wf = await _seed_workflow(
-        test_db, org_id=org_id, event_type="time.daily_tick"
-    )
+    wf = await _seed_workflow(test_db, org_id=org_id, event_type="time.daily_tick")
     envelope = {
         "event_type": "time.daily_tick",
         "org_id": org_id,
@@ -258,10 +244,10 @@ async def test_on_event_without_contact_starts_null_contact_run(
         await trigger_handlers._on_event(envelope)
 
     rows = (
-        await test_db.execute(
-            select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
     assert rows[0].contact_id is None
 
@@ -272,10 +258,7 @@ async def test_on_event_idempotent_on_trigger_event_id(test_db, org_id):
     wf = await _seed_workflow(test_db, org_id=org_id)
     contact_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_contacts (id, org_id, full_name) "
-            "VALUES (:id, :org_id, :name)"
-        ),
+        sql_text("INSERT INTO tbl_contacts (id, org_id, full_name) VALUES (:id, :org_id, :name)"),
         {"id": str(contact_id), "org_id": str(org_id), "name": "Asha"},
     )
     await test_db.commit()
@@ -294,10 +277,10 @@ async def test_on_event_idempotent_on_trigger_event_id(test_db, org_id):
         await trigger_handlers._on_event(envelope)
 
     rows = (
-        await test_db.execute(
-            select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
 
 
@@ -335,10 +318,8 @@ async def test_update_enabled_event_types_rewrites_column(test_db, org_id):
 
     token = set_context(RequestContext(org_id=org_id))
     try:
-        new_types = (
-            await workflows_service.update_enabled_event_types_from_graph(
-                test_db, org_id=org_id, workflow_id=wf.id
-            )
+        new_types = await workflows_service.update_enabled_event_types_from_graph(
+            test_db, org_id=org_id, workflow_id=wf.id
         )
     finally:
         reset_context(token)

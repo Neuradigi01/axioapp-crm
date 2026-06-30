@@ -9,18 +9,17 @@ Auth uses the ``seeded_admin`` fixture which builds an Owner role
 with every core key — including the five new ``templates.*`` keys
 once the role-template registry's lifespan sweep registers them.
 """
+
 from __future__ import annotations
 
 import uuid
 
 import pytest
-import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from src.app.core.permissions.models import Permission, Role, RolePermission
+from src.app.core.permissions.models import RolePermission
 from src.app.core.permissions.service import register_permission
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -47,9 +46,7 @@ async def _grant_keys(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -108,9 +105,7 @@ async def test_create_then_read(layered_client, seeded_admin):
     assert create_resp.status_code == 201, create_resp.text
     tid = create_resp.json()["id"]
 
-    get_resp = await layered_client.get(
-        f"/api/v1/templates/{tid}", headers=headers
-    )
+    get_resp = await layered_client.get(f"/api/v1/templates/{tid}", headers=headers)
     assert get_resp.status_code == 200
     body = get_resp.json()
     assert body["current_version"] == 1
@@ -142,9 +137,7 @@ async def test_create_requires_write_perm(layered_client, seeded_admin):
 
 
 async def test_create_duplicate_name_returns_409(layered_client, seeded_admin):
-    await _grant_keys(
-        seeded_admin["role"].id, "templates.read", "templates.write"
-    )
+    await _grant_keys(seeded_admin["role"].id, "templates.read", "templates.write")
     token = await _login(
         layered_client,
         org_slug=seeded_admin["org"].slug,
@@ -185,12 +178,8 @@ async def test_create_email_without_subject_is_422(layered_client, seeded_admin)
 # --- update + versions -------------------------------------------------
 
 
-async def test_update_bumps_version_and_lists_history(
-    layered_client, seeded_admin
-):
-    await _grant_keys(
-        seeded_admin["role"].id, "templates.read", "templates.write"
-    )
+async def test_update_bumps_version_and_lists_history(layered_client, seeded_admin):
+    await _grant_keys(seeded_admin["role"].id, "templates.read", "templates.write")
     token = await _login(
         layered_client,
         org_slug=seeded_admin["org"].slug,
@@ -218,9 +207,7 @@ async def test_update_bumps_version_and_lists_history(
     assert patch_resp.status_code == 200
     assert patch_resp.json()["current_version"] == 2
 
-    versions_resp = await layered_client.get(
-        f"/api/v1/templates/{tid}/versions", headers=headers
-    )
+    versions_resp = await layered_client.get(f"/api/v1/templates/{tid}/versions", headers=headers)
     assert versions_resp.status_code == 200
     versions = versions_resp.json()
     assert len(versions) == 2
@@ -229,18 +216,14 @@ async def test_update_bumps_version_and_lists_history(
     assert versions[1]["version"] == 1
 
 
-async def test_update_locked_template_returns_409(
-    layered_client, seeded_admin
-):
-    from tests.conftest import TestSession
+async def test_update_locked_template_returns_409(layered_client, seeded_admin):
     from src.app.core.templates.models import (
         MessageTemplate,
         TemplateInternalStatus,
     )
+    from tests.conftest import TestSession
 
-    await _grant_keys(
-        seeded_admin["role"].id, "templates.read", "templates.write"
-    )
+    await _grant_keys(seeded_admin["role"].id, "templates.read", "templates.write")
     token = await _login(
         layered_client,
         org_slug=seeded_admin["org"].slug,
@@ -283,9 +266,7 @@ async def test_update_locked_template_returns_409(
 
 
 async def test_archive_returns_204_and_flips_status(layered_client, seeded_admin):
-    await _grant_keys(
-        seeded_admin["role"].id, "templates.read", "templates.write"
-    )
+    await _grant_keys(seeded_admin["role"].id, "templates.read", "templates.write")
     token = await _login(
         layered_client,
         org_slug=seeded_admin["org"].slug,
@@ -304,13 +285,9 @@ async def test_archive_returns_204_and_flips_status(layered_client, seeded_admin
         headers=headers,
     )
     tid = create_resp.json()["id"]
-    del_resp = await layered_client.delete(
-        f"/api/v1/templates/{tid}", headers=headers
-    )
+    del_resp = await layered_client.delete(f"/api/v1/templates/{tid}", headers=headers)
     assert del_resp.status_code == 204
-    get_resp = await layered_client.get(
-        f"/api/v1/templates/{tid}", headers=headers
-    )
+    get_resp = await layered_client.get(f"/api/v1/templates/{tid}", headers=headers)
     assert get_resp.json()["internal_status"] == "archived"
 
 
@@ -318,9 +295,7 @@ async def test_archive_returns_204_and_flips_status(layered_client, seeded_admin
 
 
 async def test_preview_renders_variables(layered_client, seeded_admin):
-    await _grant_keys(
-        seeded_admin["role"].id, "templates.read", "templates.write"
-    )
+    await _grant_keys(seeded_admin["role"].id, "templates.read", "templates.write")
     token = await _login(
         layered_client,
         org_slug=seeded_admin["org"].slug,
@@ -356,9 +331,7 @@ async def test_preview_renders_variables(layered_client, seeded_admin):
 
 
 async def test_preview_unknown_variable_yields_empty(layered_client, seeded_admin):
-    await _grant_keys(
-        seeded_admin["role"].id, "templates.read", "templates.write"
-    )
+    await _grant_keys(seeded_admin["role"].id, "templates.read", "templates.write")
     token = await _login(
         layered_client,
         org_slug=seeded_admin["org"].slug,
@@ -387,9 +360,7 @@ async def test_preview_unknown_variable_yields_empty(layered_client, seeded_admi
     assert resp.json()["body"] == "Hi Asha"
 
 
-async def test_variables_endpoint_returns_channel_registry(
-    layered_client, seeded_admin
-):
+async def test_variables_endpoint_returns_channel_registry(layered_client, seeded_admin):
     await _grant_keys(seeded_admin["role"].id, "templates.read")
     token = await _login(
         layered_client,

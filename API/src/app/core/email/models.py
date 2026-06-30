@@ -14,12 +14,12 @@ to it are forbidden in new work. The UUID is the user's
 Tenant-scoped: standard `TenantScoped` mixin + RLS policy from
 migration 0082. The ORM tenant filter auto-applies to every query.
 """
+
 from __future__ import annotations
 
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import DateTime, Enum, Integer, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
@@ -76,9 +76,7 @@ class EmailAccount(Base, TenantScoped):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     provider: Mapped[EmailAccountProvider] = mapped_column(
         Enum(
             EmailAccountProvider,
@@ -90,16 +88,12 @@ class EmailAccount(Base, TenantScoped):
     )
     external_account_id: Mapped[str] = mapped_column(Text, nullable=False)
     email_address: Mapped[str] = mapped_column(Text, nullable=False)
-    display_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    display_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Fernet ciphertexts. NULL when sync_state='disconnected' — the
     # row stays so connect/disconnect history survives reconnects.
-    access_token_enc: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
-    refresh_token_enc: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
-    token_expires_at: Mapped[Optional[datetime]] = mapped_column(
+    access_token_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    refresh_token_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     scopes_granted: Mapped[list[str]] = mapped_column(
@@ -107,7 +101,7 @@ class EmailAccount(Base, TenantScoped):
         nullable=False,
         server_default=text("'{}'::text[]"),
     )
-    sync_cursor: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sync_cursor: Mapped[str | None] = mapped_column(Text, nullable=True)
     sync_state: Mapped[EmailAccountSyncState] = mapped_column(
         Enum(
             EmailAccountSyncState,
@@ -118,15 +112,9 @@ class EmailAccount(Base, TenantScoped):
         nullable=False,
         server_default=text("'pending'"),
     )
-    last_sync_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    last_sync_error: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
-    daily_sent_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("0")
-    )
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_sync_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    daily_sent_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     daily_sent_reset_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -137,18 +125,15 @@ class EmailAccount(Base, TenantScoped):
         nullable=False,
         server_default=text("now()"),
     )
-    disconnected_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    disconnected_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    disconnected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    disconnected_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     @property
     def is_connected(self) -> bool:
-        return self.sync_state not in (
-            EmailAccountSyncState.disconnected,
-        ) and self.access_token_enc is not None
+        return (
+            self.sync_state not in (EmailAccountSyncState.disconnected,)
+            and self.access_token_enc is not None
+        )
 
 
 __all__ = [

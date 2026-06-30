@@ -17,11 +17,12 @@ entity-keyed dispatch from `test_whatsapp_templates.py` wouldn't fit.
 We special-case the count by inspecting the stringified statement
 instead.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import httpx
 import pytest
@@ -35,7 +36,6 @@ from src.app.core.integrations.models import (
 )
 from src.app.core.integrations.whatsapp import status as wa_status
 from src.app.core.integrations.whatsapp.models import WhatsAppAccountConfig
-
 
 _ORG_ID = uuid.uuid4()
 
@@ -85,9 +85,7 @@ class _CapturingSession:
         # this service issues. Match by stringified SQL.
         sql_text = str(stmt).lower()
         if "count(distinct" in sql_text:
-            return _FakeResult(
-                [], scalar=self.unique_recipients_today, has_scalar=True
-            )
+            return _FakeResult([], scalar=self.unique_recipients_today, has_scalar=True)
         # Entity-keyed selects.
         try:
             descs = stmt.column_descriptions
@@ -109,7 +107,7 @@ def _meta_factory_with(
     payload: dict,
     *,
     status_code: int = 200,
-    call_log: Optional[list] = None,
+    call_log: list | None = None,
 ):
     """httpx client factory whose `get(url, headers)` returns the given
     JSON. Optionally appends to `call_log` so a test can assert the
@@ -132,8 +130,8 @@ def _meta_factory_with(
 
 def _connected_pair(
     *,
-    tier: Optional[str] = None,
-    synced_at: Optional[datetime] = None,
+    tier: str | None = None,
+    synced_at: datetime | None = None,
 ) -> tuple[Integration, WhatsAppAccountConfig]:
     integration = Integration(
         id=uuid.uuid4(),
@@ -147,7 +145,7 @@ def _connected_pair(
         scopes=None,
         status=IntegrationStatus.connected,
         last_error=None,
-        connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        connected_at=datetime(2026, 1, 1, tzinfo=UTC),
     )
     config = WhatsAppAccountConfig(
         id=uuid.uuid4(),
@@ -225,9 +223,7 @@ class TestGetCapacity:
 
         result = await wa_status.get_send_capacity(
             session,
-            http_client_factory=_meta_factory_with(
-                {"messaging_limit_tier": "TIER_1K"}
-            ),
+            http_client_factory=_meta_factory_with({"messaging_limit_tier": "TIER_1K"}),
         )
 
         assert result["remaining"] == 0
@@ -246,9 +242,7 @@ class TestGetCapacity:
 
         result = await wa_status.get_send_capacity(
             session,
-            http_client_factory=_meta_factory_with(
-                {"messaging_limit_tier": "TIER_1K"}
-            ),
+            http_client_factory=_meta_factory_with({"messaging_limit_tier": "TIER_1K"}),
         )
 
         assert result["remaining"] == 0
@@ -264,9 +258,7 @@ class TestGetCapacity:
 
         result = await wa_status.get_send_capacity(
             session,
-            http_client_factory=_meta_factory_with(
-                {"messaging_limit_tier": "TIER_UNLIMITED"}
-            ),
+            http_client_factory=_meta_factory_with({"messaging_limit_tier": "TIER_UNLIMITED"}),
         )
 
         assert result["is_unlimited"] is True
@@ -293,9 +285,7 @@ class TestGetCapacity:
         session.rows[Integration] = [integration]
         session.rows[WhatsAppAccountConfig] = [config]
 
-        with pytest.raises(
-            WhatsAppNotConnected, match="credentials are missing"
-        ):
+        with pytest.raises(WhatsAppNotConnected, match="credentials are missing"):
             await wa_status.get_send_capacity(
                 session,
                 http_client_factory=_meta_factory_with({}),
@@ -308,17 +298,11 @@ class TestGetCapacity:
         session.rows[Integration] = [integration]
         session.rows[WhatsAppAccountConfig] = [config]
 
-        meta_error = {
-            "error": {"message": "Invalid OAuth access token"}
-        }
-        with pytest.raises(
-            WhatsAppNotConnected, match="Invalid OAuth access token"
-        ):
+        meta_error = {"error": {"message": "Invalid OAuth access token"}}
+        with pytest.raises(WhatsAppNotConnected, match="Invalid OAuth access token"):
             await wa_status.get_send_capacity(
                 session,
-                http_client_factory=_meta_factory_with(
-                    meta_error, status_code=401
-                ),
+                http_client_factory=_meta_factory_with(meta_error, status_code=401),
             )
 
     @pytest.mark.asyncio
@@ -334,9 +318,7 @@ class TestGetCapacity:
 
         result = await wa_status.get_send_capacity(
             session,
-            http_client_factory=_meta_factory_with(
-                {"messaging_limit_tier": "TIER_500K"}
-            ),
+            http_client_factory=_meta_factory_with({"messaging_limit_tier": "TIER_500K"}),
         )
 
         assert result["tier"] == "TIER_500K"
@@ -367,10 +349,8 @@ class TestTierCache:
     async def test_cache_hit_skips_meta_call(self):
         """Fresh cache (synced 30 minutes ago) → no httpx call."""
         session = _CapturingSession()
-        synced = datetime.now(timezone.utc) - timedelta(minutes=30)
-        integration, config = _connected_pair(
-            tier="TIER_10K", synced_at=synced
-        )
+        synced = datetime.now(UTC) - timedelta(minutes=30)
+        integration, config = _connected_pair(tier="TIER_10K", synced_at=synced)
         session.rows[Integration] = [integration]
         session.rows[WhatsAppAccountConfig] = [config]
         session.unique_recipients_today = 500
@@ -390,10 +370,8 @@ class TestTierCache:
         """Stale cache (synced 2 hours ago) → Meta call, then column
         updated and committed."""
         session = _CapturingSession()
-        synced = datetime.now(timezone.utc) - timedelta(hours=2)
-        integration, config = _connected_pair(
-            tier="TIER_1K", synced_at=synced
-        )
+        synced = datetime.now(UTC) - timedelta(hours=2)
+        integration, config = _connected_pair(tier="TIER_1K", synced_at=synced)
         session.rows[Integration] = [integration]
         session.rows[WhatsAppAccountConfig] = [config]
 
@@ -408,9 +386,7 @@ class TestTierCache:
         assert len(call_log) == 1
         assert config.messaging_limit_tier == "TIER_10K"
         assert config.tier_synced_at is not None
-        assert (
-            datetime.now(timezone.utc) - config.tier_synced_at
-        ) < timedelta(seconds=5)
+        assert (datetime.now(UTC) - config.tier_synced_at) < timedelta(seconds=5)
         assert session.commits == 1
         assert result["tier"] == "TIER_10K"
 

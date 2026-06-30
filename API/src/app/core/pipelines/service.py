@@ -22,12 +22,13 @@ Four public entry points:
 here, because doing so would re-introduce the cross-layer knowledge
 the registry is designed to avoid.
 """
+
 from __future__ import annotations
 
 import logging
 import re
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -68,9 +69,7 @@ def register_pipeline_table(name: str) -> None:
     name doesn't match the SQL-safe identifier pattern.
     """
     if not _TABLE_NAME_RE.match(name):
-        raise ValueError(
-            f"pipeline-tracked table name {name!r} must match [a-z][a-z0-9_]*"
-        )
+        raise ValueError(f"pipeline-tracked table name {name!r} must match [a-z][a-z0-9_]*")
     _PIPELINE_TRACKED_TABLES.add(name)
 
 
@@ -78,21 +77,15 @@ async def list_pipelines(session: AsyncSession) -> list[Pipeline]:
     return await _da.list_pipelines_with_stages(session)
 
 
-async def get_pipeline_by_key(
-    session: AsyncSession, *, key: str
-) -> Optional[Pipeline]:
+async def get_pipeline_by_key(session: AsyncSession, *, key: str) -> Pipeline | None:
     return await _da.get_pipeline_by_key_with_stages(session, key)
 
 
-async def get_pipeline_by_id(
-    session: AsyncSession, *, pipeline_id: uuid.UUID
-) -> Optional[Pipeline]:
+async def get_pipeline_by_id(session: AsyncSession, *, pipeline_id: uuid.UUID) -> Pipeline | None:
     return await _da.get_pipeline_by_id_with_stages(session, pipeline_id)
 
 
-async def get_stage(
-    session: AsyncSession, stage_id: uuid.UUID
-) -> Optional[PipelineStage]:
+async def get_stage(session: AsyncSession, stage_id: uuid.UUID) -> PipelineStage | None:
     return await _da.get_stage_by_id(session, stage_id)
 
 
@@ -119,9 +112,7 @@ async def update_stage(
     """Update label / color / display_order on one stage."""
     pipeline = await get_pipeline_by_key(session, key=pipeline_key)
     if pipeline is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found")
 
     stage = await get_stage(session, stage_id)
     if stage is None or stage.pipeline_id != pipeline.id:
@@ -170,9 +161,7 @@ async def create_stage(
     """Insert a new stage into `pipeline_key`."""
     pipeline = await get_pipeline_by_key(session, key=pipeline_key)
     if pipeline is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found")
 
     new_key = _slugify_stage_key(payload.name)
     if not new_key:
@@ -240,14 +229,12 @@ async def delete_stage(
     *,
     pipeline_key: str,
     stage_id: uuid.UUID,
-    move_leads_to: Optional[str] = None,
+    move_leads_to: str | None = None,
 ) -> None:
     """Delete a stage, relocating any cards that reference its key."""
     pipeline = await get_pipeline_by_key(session, key=pipeline_key)
     if pipeline is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found")
 
     stage = await get_stage(session, stage_id)
     if stage is None or stage.pipeline_id != pipeline.id:
@@ -268,15 +255,12 @@ async def delete_stage(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="move_leads_to cannot be the stage being deleted",
             )
-        target_exists = any(
-            s.key == move_leads_to for s in pipeline.stages
-        )
+        target_exists = any(s.key == move_leads_to for s in pipeline.stages)
         if not target_exists:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(
-                    f"move_leads_to {move_leads_to!r} is not a stage in "
-                    f"pipeline {pipeline_key!r}"
+                    f"move_leads_to {move_leads_to!r} is not a stage in pipeline {pipeline_key!r}"
                 ),
             )
 
@@ -329,16 +313,13 @@ async def move_card(
     card_table: str,
     card_id: uuid.UUID,
     to_stage_key: str,
-    user_id: Optional[uuid.UUID] = None,
+    user_id: uuid.UUID | None = None,
 ) -> None:
     """Generic helper: move a row in `card_table` to `to_stage_key`."""
     if card_table not in _PIPELINE_TRACKED_TABLES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"card_table {card_table!r} is not a registered "
-                "pipeline-tracked table"
-            ),
+            detail=(f"card_table {card_table!r} is not a registered pipeline-tracked table"),
         )
 
     pipeline = await get_pipeline_by_key(session, key=pipeline_key)
@@ -352,16 +333,11 @@ async def move_card(
     if to_stage_key not in valid_stage_keys:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"stage {to_stage_key!r} is not part of pipeline "
-                f"{pipeline_key!r}"
-            ),
+            detail=(f"stage {to_stage_key!r} is not part of pipeline {pipeline_key!r}"),
         )
 
     # Read current stage first so we can stamp before/after on audit.
-    from_stage_key = await _da.read_card_pipeline_stage(
-        session, table=card_table, card_id=card_id
-    )
+    from_stage_key = await _da.read_card_pipeline_stage(session, table=card_table, card_id=card_id)
     if from_stage_key is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

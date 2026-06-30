@@ -13,7 +13,7 @@ export class PreventContextMenuDirective {
   private readonly breakpointObserver = inject(BreakpointObserver);
   private readonly isHandset = toSignal(
     this.breakpointObserver.observe([Breakpoints.Handset]).pipe(map((result) => result.matches)),
-    { initialValue: false }
+    { initialValue: false },
   );
 
   @HostListener('contextmenu', ['$event'])

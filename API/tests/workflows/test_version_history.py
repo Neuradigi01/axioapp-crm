@@ -21,16 +21,17 @@ Covers:
 Graph validation is bypassed where possible by constructing minimal
 trigger → send → goal shapes that satisfy the Step-2 validator.
 """
+
 from __future__ import annotations
 
 import uuid
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import text as sql_text
 
-from src.app.core.workflows import service as workflows_service
 from src.app.core.workflows import data_access as _da
+from src.app.core.workflows import service as workflows_service
 from src.app.core.workflows.exceptions import (
     WorkflowLocked,
     WorkflowNotFound,
@@ -38,7 +39,6 @@ from src.app.core.workflows.exceptions import (
 from src.app.core.workflows.models import (
     Workflow,
     WorkflowStatus,
-    WorkflowVersion,
 )
 from src.app.core.workflows.schemas import (
     WorkflowCreate,
@@ -47,7 +47,6 @@ from src.app.core.workflows.schemas import (
 )
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -55,10 +54,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -154,9 +150,7 @@ async def test_list_workflow_versions_returns_newest_first(test_db, org_id):
 # ---------------------------------------------------------------------------
 
 
-async def test_rollback_writes_new_version_with_rolled_back_graph(
-    test_db, org_id
-):
+async def test_rollback_writes_new_version_with_rolled_back_graph(test_db, org_id):
     """Rolling back from v2 to v1 lands v3 with v1's graph + bumps
     `current_version` to 3."""
     token = set_context(RequestContext(org_id=org_id))
@@ -187,9 +181,7 @@ async def test_rollback_writes_new_version_with_rolled_back_graph(
     assert rolled.graph == v1_graph
 
     # v3 row exists with the note we passed.
-    v3 = await _da.get_version(
-        test_db, org_id=org_id, workflow_id=wf.id, version=3
-    )
+    v3 = await _da.get_version(test_db, org_id=org_id, workflow_id=wf.id, version=3)
     assert v3 is not None
     assert v3.change_note == "Bring back v1"
     assert v3.graph == v1_graph
@@ -256,9 +248,7 @@ async def test_rollback_bumps_current_version_monotonically(test_db, org_id):
             ),
         )
         pre = (
-            await workflows_service.get_workflow(
-                test_db, org_id=org_id, workflow_id=wf.id
-            )
+            await workflows_service.get_workflow(test_db, org_id=org_id, workflow_id=wf.id)
         ).current_version
         rolled = await workflows_service.rollback_workflow(
             test_db,
@@ -282,9 +272,7 @@ async def test_export_workflow_returns_documented_schema(test_db, org_id):
     token = set_context(RequestContext(org_id=org_id))
     try:
         wf = await _make_workflow(test_db, org_id=org_id, name="To Export")
-        body = await workflows_service.export_workflow(
-            test_db, org_id=org_id, workflow_id=wf.id
-        )
+        body = await workflows_service.export_workflow(test_db, org_id=org_id, workflow_id=wf.id)
     finally:
         reset_context(token)
 
@@ -310,9 +298,7 @@ async def test_export_then_import_round_trips_graph(test_db, org_id):
     nodes whose template_id wasn't a real one in this org)."""
     token = set_context(RequestContext(org_id=org_id))
     try:
-        source = await _make_workflow(
-            test_db, org_id=org_id, name="Round Trip Source"
-        )
+        source = await _make_workflow(test_db, org_id=org_id, name="Round Trip Source")
         body = await workflows_service.export_workflow(
             test_db, org_id=org_id, workflow_id=source.id
         )
@@ -347,9 +333,7 @@ async def test_export_then_import_round_trips_graph(test_db, org_id):
     assert len(source.graph["edges"]) == len(imported.graph["edges"])
 
 
-async def test_import_remaps_unknown_template_id_to_null_and_invalid(
-    test_db, org_id
-):
+async def test_import_remaps_unknown_template_id_to_null_and_invalid(test_db, org_id):
     """A send node whose `template_id` doesn't exist in the org
     must land as `template_id` absent + `__valid=false` so the
     Step-15 editor surfaces it for fix-up."""
@@ -393,13 +377,9 @@ async def test_import_remaps_unknown_template_id_to_null_and_invalid(
     finally:
         reset_context(token)
 
-    send_node = next(
-        n for n in imported.graph["nodes"] if n.get("type") == "send.email"
-    )
+    send_node = next(n for n in imported.graph["nodes"] if n.get("type") == "send.email")
     cfg = send_node.get("config") or {}
-    assert "template_id" not in cfg, (
-        "import path must strip unknown template_ids"
-    )
+    assert "template_id" not in cfg, "import path must strip unknown template_ids"
     assert cfg.get("__valid") is False
 
 

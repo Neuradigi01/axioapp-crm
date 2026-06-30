@@ -14,12 +14,14 @@ Every method maps non-2xx Meta responses to a typed `MetaGraphError`
 that carries the HTTP status + the friendly user-facing message the
 router will surface. The orchestration never sees raw httpx errors.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any
 
 import httpx
 
@@ -41,9 +43,9 @@ class WabaInfo:
     """Subset of `GET /{waba_id}?fields=...` we use during ES persist."""
 
     id: str
-    name: Optional[str]
-    verified_name: Optional[str]
-    timezone_offset_min: Optional[int]
+    name: str | None
+    verified_name: str | None
+    timezone_offset_min: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,10 +54,10 @@ class PhoneInfo:
 
     id: str
     display_phone_number: str
-    verified_name: Optional[str]
-    quality_rating: Optional[str]
-    code_verification_status: Optional[str]
-    messaging_limit_tier: Optional[str]
+    verified_name: str | None
+    quality_rating: str | None
+    code_verification_status: str | None
+    messaging_limit_tier: str | None
 
 
 # --- typed error -----------------------------------------------------------
@@ -78,9 +80,9 @@ class MetaGraphError(Exception):
         *,
         http_status: int,
         user_message: str,
-        meta_code: Optional[int] = None,
-        meta_subcode: Optional[int] = None,
-        raw: Optional[dict[str, Any]] = None,
+        meta_code: int | None = None,
+        meta_subcode: int | None = None,
+        raw: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(user_message)
         self.http_status = http_status
@@ -95,31 +97,25 @@ class MetaGraphError(Exception):
 
 def _extract_meta_error(
     response: httpx.Response,
-) -> tuple[Optional[int], Optional[int], str, Optional[dict[str, Any]]]:
+) -> tuple[int | None, int | None, str, dict[str, Any] | None]:
     """Pull `(code, subcode, message, raw_error)` out of Meta's error
     envelope, falling back to the raw text + status when the body
     isn't JSON."""
     try:
         payload = response.json()
     except ValueError:
-        return None, None, (
-            f"HTTP {response.status_code}: {response.text[:200]}"
-        ), None
+        return None, None, (f"HTTP {response.status_code}: {response.text[:200]}"), None
     if not isinstance(payload, dict):
         return None, None, f"HTTP {response.status_code}: {payload!r}", None
     err = payload.get("error")
     if not isinstance(err, dict):
-        return None, None, (
-            f"HTTP {response.status_code}: {response.text[:200]}"
-        ), None
+        return None, None, (f"HTTP {response.status_code}: {response.text[:200]}"), None
     code = err.get("code") if isinstance(err.get("code"), int) else None
-    subcode = (
-        err.get("error_subcode")
-        if isinstance(err.get("error_subcode"), int)
-        else None
-    )
-    message = err.get("message") if isinstance(err.get("message"), str) else (
-        f"HTTP {response.status_code}"
+    subcode = err.get("error_subcode") if isinstance(err.get("error_subcode"), int) else None
+    message = (
+        err.get("message")
+        if isinstance(err.get("message"), str)
+        else (f"HTTP {response.status_code}")
     )
     return code, subcode, message, err
 
@@ -153,8 +149,7 @@ def _classify(
         return MetaGraphError(
             http_status=503,
             user_message=(
-                "Webhook setup incomplete — see Step 1 (callback URL "
-                "not yet verified at Meta)."
+                "Webhook setup incomplete — see Step 1 (callback URL not yet verified at Meta)."
             ),
             meta_code=code,
             meta_subcode=subcode,
@@ -164,9 +159,7 @@ def _classify(
     if stage == "code_exchange" and status in (400, 401, 403):
         return MetaGraphError(
             http_status=400,
-            user_message=(
-                "Embedded Signup session expired — please retry."
-            ),
+            user_message=("Embedded Signup session expired — please retry."),
             meta_code=code,
             meta_subcode=subcode,
             raw=raw,
@@ -175,9 +168,7 @@ def _classify(
     if stage in ("subscribe_apps", "register_phone") and status == 403:
         return MetaGraphError(
             http_status=403,
-            user_message=(
-                "Account not approved for management — contact support."
-            ),
+            user_message=("Account not approved for management — contact support."),
             meta_code=code,
             meta_subcode=subcode,
             raw=raw,
@@ -234,13 +225,13 @@ class MetaGraphClient:
         method: str,
         url: str,
         stage: str,
-        params: Optional[dict[str, str]] = None,
-        data: Optional[dict[str, str]] = None,
-        headers: Optional[dict[str, str]] = None,
+        params: dict[str, str] | None = None,
+        data: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """One-shot retry on 5xx, then bubble. Maps non-2xx to typed
         MetaGraphError via the stage-specific classifier."""
-        last_response: Optional[httpx.Response] = None
+        last_response: httpx.Response | None = None
         for attempt in (1, 2):
             async with self._factory() as client:
                 response = await client.request(
@@ -265,16 +256,12 @@ class MetaGraphClient:
         except ValueError:
             raise MetaGraphError(
                 http_status=502,
-                user_message=(
-                    f"Meta API returned a non-JSON body during {stage}."
-                ),
-            )
+                user_message=(f"Meta API returned a non-JSON body during {stage}."),
+            ) from None
         if not isinstance(body, dict):
             raise MetaGraphError(
                 http_status=502,
-                user_message=(
-                    f"Meta API returned an unexpected shape during {stage}."
-                ),
+                user_message=(f"Meta API returned an unexpected shape during {stage}."),
             )
         return body
 
@@ -300,16 +287,14 @@ class MetaGraphClient:
         if not isinstance(token, str) or not token:
             raise MetaGraphError(
                 http_status=502,
-                user_message=(
-                    "Meta did not return an access token — please retry."
-                ),
+                user_message=("Meta did not return an access token — please retry."),
                 raw=body,
             )
         return token
 
     # ----- 1a. extract Meta user_id from the exchanged token --------------
 
-    async def debug_token(self, token: str) -> Optional[str]:
+    async def debug_token(self, token: str) -> str | None:
         """Resolve the Meta-side user identity behind ``token``.
 
         Used by the ES orchestration to capture ``Integration.meta_user_id``
@@ -356,13 +341,9 @@ class MetaGraphClient:
         )
         return WabaInfo(
             id=str(body.get("id") or waba_id),
-            name=(
-                str(body["name"]) if isinstance(body.get("name"), str) else None
-            ),
+            name=(str(body["name"]) if isinstance(body.get("name"), str) else None),
             verified_name=(
-                str(body["verified_name"])
-                if isinstance(body.get("verified_name"), str)
-                else None
+                str(body["verified_name"]) if isinstance(body.get("verified_name"), str) else None
             ),
             timezone_offset_min=(
                 int(body["timezone_offset_min"])
@@ -373,9 +354,7 @@ class MetaGraphClient:
 
     # ----- 3. fetch phone-number details -----------------------------------
 
-    async def get_phone_number(
-        self, *, phone_id: str, token: str
-    ) -> PhoneInfo:
+    async def get_phone_number(self, *, phone_id: str, token: str) -> PhoneInfo:
         body = await self._request(
             method="GET",
             url=self._url(f"/{phone_id}"),
@@ -392,9 +371,7 @@ class MetaGraphClient:
 
     # ----- 4. list phone numbers on a WABA ---------------------------------
 
-    async def list_phone_numbers(
-        self, *, waba_id: str, token: str
-    ) -> list[PhoneInfo]:
+    async def list_phone_numbers(self, *, waba_id: str, token: str) -> list[PhoneInfo]:
         body = await self._request(
             method="GET",
             url=self._url(f"/{waba_id}/phone_numbers"),
@@ -418,9 +395,7 @@ class MetaGraphClient:
 
     # ----- 5. subscribe the app to the WABA --------------------------------
 
-    async def subscribe_app_to_waba(
-        self, *, waba_id: str, token: str
-    ) -> None:
+    async def subscribe_app_to_waba(self, *, waba_id: str, token: str) -> None:
         await self._request(
             method="POST",
             url=self._url(f"/{waba_id}/subscribed_apps"),
@@ -430,9 +405,7 @@ class MetaGraphClient:
 
     # ----- 6. register the phone number for Cloud API ----------------------
 
-    async def register_phone_number(
-        self, *, phone_id: str, token: str, pin: str
-    ) -> None:
+    async def register_phone_number(self, *, phone_id: str, token: str, pin: str) -> None:
         await self._request(
             method="POST",
             url=self._url(f"/{phone_id}/register"),
@@ -519,7 +492,7 @@ class MetaGraphClient:
         waba_id: str,
         token: str,
         name: str,
-        meta_template_id: Optional[str] = None,
+        meta_template_id: str | None = None,
     ) -> None:
         """``DELETE /{waba_id}/message_templates?name=...``.
 
@@ -540,19 +513,13 @@ class MetaGraphClient:
         )
 
 
-def _phone_from_payload(
-    payload: dict[str, Any], *, fallback_id: str
-) -> PhoneInfo:
+def _phone_from_payload(payload: dict[str, Any], *, fallback_id: str) -> PhoneInfo:
     """Map one phone-number Graph entry → typed `PhoneInfo`."""
     return PhoneInfo(
         id=str(payload.get("id") or fallback_id),
-        display_phone_number=str(
-            payload.get("display_phone_number") or ""
-        ),
+        display_phone_number=str(payload.get("display_phone_number") or ""),
         verified_name=(
-            str(payload["verified_name"])
-            if isinstance(payload.get("verified_name"), str)
-            else None
+            str(payload["verified_name"]) if isinstance(payload.get("verified_name"), str) else None
         ),
         quality_rating=(
             str(payload["quality_rating"])

@@ -1,4 +1,11 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  signal,
+  computed,
+  OnInit,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
@@ -17,7 +24,12 @@ import { SharedService } from '@core/services/shared.service';
 import { getRoute } from '@core/services/routes-helper.service';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { IConfirmDialogData } from '@app/schemas/shared';
-import { BADGE_MAP, ROLE_ADMIN, SNACKBAR_ACTION, SNACKBAR_DURATION } from '@core/constants/app.constants';
+import {
+  BADGE_MAP,
+  ROLE_ADMIN,
+  SNACKBAR_ACTION,
+  SNACKBAR_DURATION,
+} from '@core/constants/app.constants';
 import {
   MSG_ERROR_GENERIC,
   MSG_ERROR_LOAD_FAILED,
@@ -30,9 +42,9 @@ import {
 import { ITicketDetail, IThreadMessage } from '@app/schemas/ticket';
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
-  'Open': ['In Progress', 'Resolved', 'Closed'],
+  Open: ['In Progress', 'Resolved', 'Closed'],
   'In Progress': ['Resolved', 'Closed'],
-  'Resolved': ['In Progress', 'Closed'],
+  Resolved: ['In Progress', 'Closed'],
 };
 
 @Component({
@@ -93,7 +105,9 @@ export class ViewMessageComponent implements OnInit {
         this.ticket.set(res.data);
         this.thread.set(res.data.thread);
       } else {
-        this.snackBar.open(res.message || MSG_ERROR_LOAD_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(res.message || MSG_ERROR_LOAD_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
@@ -111,12 +125,19 @@ export class ViewMessageComponent implements OnInit {
 
     this.isSending.set(true);
     try {
-      let attachments: { stored_name: string; file_name: string; file_size: number; mime_type: string }[] = [];
+      let attachments: {
+        stored_name: string;
+        file_name: string;
+        file_size: number;
+        mime_type: string;
+      }[] = [];
 
       if (this.replyFiles.length > 0) {
         const uploadRes = await this.ticketApi.uploadAttachments(this.replyFiles);
         if (!uploadRes.success) {
-          this.snackBar.open(uploadRes.message || MSG_TICKET_UPLOAD_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+          this.snackBar.open(uploadRes.message || MSG_TICKET_UPLOAD_FAILED, SNACKBAR_ACTION, {
+            duration: SNACKBAR_DURATION,
+          });
           this.isSending.set(false);
           return;
         }
@@ -134,7 +155,9 @@ export class ViewMessageComponent implements OnInit {
         this.replyFiles = [];
         this.loadTicket();
       } else {
-        this.snackBar.open(res.message || MSG_TICKET_REPLY_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(res.message || MSG_TICKET_REPLY_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
@@ -148,7 +171,8 @@ export class ViewMessageComponent implements OnInit {
       const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
         data: {
           title: 'Close Ticket',
-          message: 'Are you sure you want to close this ticket? Users will no longer be able to reply.',
+          message:
+            'Are you sure you want to close this ticket? Users will no longer be able to reply.',
           confirmText: 'Close Ticket',
           cancelText: 'Cancel',
           color: 'warn',
@@ -163,10 +187,14 @@ export class ViewMessageComponent implements OnInit {
     try {
       const res = await this.ticketApi.updateStatus(this.ticketId, { status: newStatus });
       if (res.success) {
-        this.snackBar.open(MSG_TICKET_STATUS_UPDATED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(MSG_TICKET_STATUS_UPDATED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
         this.loadTicket();
       } else {
-        this.snackBar.open(res.message || MSG_TICKET_STATUS_UPDATE_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(res.message || MSG_TICKET_STATUS_UPDATE_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
@@ -191,13 +219,15 @@ export class ViewMessageComponent implements OnInit {
   }
 
   toggleAttachments(): void {
-    this.showAttachments.update(v => !v);
+    this.showAttachments.update((v) => !v);
   }
 
   getStatusBadge(status: string): { color: string; bgVar: string; label: string } {
     const key = status.toLowerCase();
     const badge = this.badgeMap[key];
-    return badge ? { ...badge, label: status } : { color: 'var(--page-text)', bgVar: 'var(--surface-2)', label: status };
+    return badge
+      ? { ...badge, label: status }
+      : { color: 'var(--page-text)', bgVar: 'var(--surface-2)', label: status };
   }
 
   isClosed(): boolean {

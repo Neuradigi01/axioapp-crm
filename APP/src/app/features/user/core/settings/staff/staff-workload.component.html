@@ -5,7 +5,7 @@
       <p class="mt-0.5 text-xs text-zinc-500">
         Open records per teammate.
         @if (asOf(); as ts) {
-          <span class="text-zinc-400">· as of {{ ts | date:'short' }}</span>
+          <span class="text-zinc-400">· as of {{ ts | date: 'short' }}</span>
         }
       </p>
     </div>
@@ -31,7 +31,9 @@
       Loading…
     </div>
   } @else if (rows().length === 0) {
-    <div class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500">
+    <div
+      class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+    >
       No active teammates yet.
     </div>
   } @else {
@@ -106,24 +108,35 @@
         </thead>
         <tbody class="divide-y divide-zinc-100">
           @for (u of sorted(); track u.user_id) {
-            <tr
-              class="transition-colors"
-              [class.bg-zinc-50]="u.user_id === heaviestId()"
-            >
+            <tr class="transition-colors" [class.bg-zinc-50]="u.user_id === heaviestId()">
               <td class="px-3 py-2 text-sm font-medium text-zinc-900">
                 {{ fullName(u) }}
                 @if (!u.is_active) {
-                  <span class="ml-1 inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 ring-1 ring-rose-200">
+                  <span
+                    class="ml-1 inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 ring-1 ring-rose-200"
+                  >
                     inactive
                   </span>
                 }
               </td>
-              <td class="px-3 py-2 text-right text-sm tabular-nums text-zinc-700">{{ u.counts.contacts }}</td>
-              <td class="px-3 py-2 text-right text-sm tabular-nums text-zinc-700">{{ u.counts.leads }}</td>
-              <td class="px-3 py-2 text-right text-sm tabular-nums text-zinc-700">{{ u.counts.walk_ins }}</td>
-              <td class="px-3 py-2 text-right text-sm tabular-nums text-zinc-700">{{ u.counts.appointments }}</td>
-              <td class="px-3 py-2 text-right text-sm tabular-nums text-zinc-700">{{ u.counts.tasks }}</td>
-              <td class="px-3 py-2 text-right text-sm font-semibold tabular-nums text-zinc-900">{{ u.counts.total }}</td>
+              <td class="px-3 py-2 text-right text-sm tabular-nums text-zinc-700">
+                {{ u.counts.contacts }}
+              </td>
+              <td class="px-3 py-2 text-right text-sm tabular-nums text-zinc-700">
+                {{ u.counts.leads }}
+              </td>
+              <td class="px-3 py-2 text-right text-sm tabular-nums text-zinc-700">
+                {{ u.counts.walk_ins }}
+              </td>
+              <td class="px-3 py-2 text-right text-sm tabular-nums text-zinc-700">
+                {{ u.counts.appointments }}
+              </td>
+              <td class="px-3 py-2 text-right text-sm tabular-nums text-zinc-700">
+                {{ u.counts.tasks }}
+              </td>
+              <td class="px-3 py-2 text-right text-sm font-semibold tabular-nums text-zinc-900">
+                {{ u.counts.total }}
+              </td>
             </tr>
           }
         </tbody>

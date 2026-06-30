@@ -1,6 +1,10 @@
 <div class="space-y-5">
   <!-- Inline add-task form -->
-  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
+  <form
+    [formGroup]="form"
+    (ngSubmit)="onSubmit()"
+    class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200"
+  >
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
       <div>
         <label class="block text-xs font-medium text-zinc-700" for="tp_title">Title</label>
@@ -45,18 +49,16 @@
       <p class="mt-2 text-xs text-red-600">A title is required.</p>
     }
     @if (addError(); as err) {
-      <p class="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">{{ err }}</p>
+      <p class="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+        {{ err }}
+      </p>
     }
   </form>
 
   <!-- List header / summary -->
   <div class="flex items-center justify-between">
-    <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-      Tasks
-    </h3>
-    <p class="text-xs text-zinc-500">
-      {{ openCount() }} open · {{ doneCount() }} done
-    </p>
+    <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tasks</h3>
+    <p class="text-xs text-zinc-500">{{ openCount() }} open · {{ doneCount() }} done</p>
   </div>
 
   <!-- Body -->
@@ -67,7 +69,9 @@
   } @else if (loading() && items().length === 0) {
     <ul class="space-y-2">
       @for (i of skeletonRows; track i) {
-        <li class="flex items-start gap-3 rounded-lg bg-white p-3 shadow-sm ring-1 ring-zinc-200 animate-pulse">
+        <li
+          class="flex items-start gap-3 rounded-lg bg-white p-3 shadow-sm ring-1 ring-zinc-200 animate-pulse"
+        >
           <div class="mt-0.5 h-4 w-4 rounded-sm bg-zinc-200"></div>
           <div class="flex-1">
             <div class="h-3 w-40 rounded bg-zinc-200"></div>
@@ -77,7 +81,9 @@
       }
     </ul>
   } @else if (items().length === 0) {
-    <p class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
+    <p
+      class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+    >
       No tasks yet.
       <span class="block text-xs text-zinc-400">Add one above to get started.</span>
     </p>
@@ -109,7 +115,9 @@
                 {{ task.priority }}
               </span>
               @if (isOverdue(task)) {
-                <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-red-200">
+                <span
+                  class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-red-200"
+                >
                   Overdue
                 </span>
               }

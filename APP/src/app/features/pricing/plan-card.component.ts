@@ -1,9 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -60,9 +55,7 @@ import { BillingCycle, Plan } from './pricing.types';
         @if (cycle() === 'annual') {
           <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">
             \${{ plan().pricing.annual_bundle_usd }} billed annually
-            <span class="text-emerald-600 dark:text-emerald-400 font-medium">
-              · save 20%
-            </span>
+            <span class="text-emerald-600 dark:text-emerald-400 font-medium"> · save 20% </span>
           </p>
         }
         <p class="mt-3 text-sm text-gray-600 dark:text-slate-300">
@@ -118,16 +111,12 @@ export class PlanCardComponent {
    */
   protected readonly displayPrice = computed(() => {
     const p = this.plan().pricing;
-    return this.cycle() === 'annual'
-      ? Math.floor(p.annual_bundle_usd / 12)
-      : p.monthly_bundle_usd;
+    return this.cycle() === 'annual' ? Math.floor(p.annual_bundle_usd / 12) : p.monthly_bundle_usd;
   });
 
   protected readonly extraSeatPrice = computed(() => {
     const p = this.plan().pricing;
-    return this.cycle() === 'annual'
-      ? p.extra_seat_annual_usd
-      : p.extra_seat_monthly_usd;
+    return this.cycle() === 'annual' ? p.extra_seat_annual_usd : p.extra_seat_monthly_usd;
   });
 
   protected readonly ctaQueryParams = computed(() => ({

@@ -1,4 +1,5 @@
 """Pydantic v2 shapes for the invitations API."""
+
 from __future__ import annotations
 
 import uuid

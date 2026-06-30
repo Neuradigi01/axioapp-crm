@@ -18,6 +18,7 @@ icon vocabulary, so adding a new type is a deliberate schema change.
 `user_id` is nullable so system-emitted events (cron jobs, integrations
 firing without a logged-in user) can still log.
 """
+
 from __future__ import annotations
 
 import enum

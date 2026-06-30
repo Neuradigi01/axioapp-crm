@@ -11,10 +11,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { RelativeTimePipe } from '../../features/user/core/activities/relative-time.pipe';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  StaffActivity,
-  StaffPortalApiService,
-} from '../staff-portal-api.service';
+import { StaffActivity, StaffPortalApiService } from '../staff-portal-api.service';
 
 interface DayGroup {
   dayKey: string;
@@ -62,9 +59,7 @@ export class StaffPortalActivityLogPageComponent {
       }
       g.items.push(item);
     }
-    return [...byKey.values()].sort((a, b) =>
-      b.dayKey.localeCompare(a.dayKey),
-    );
+    return [...byKey.values()].sort((a, b) => b.dayKey.localeCompare(a.dayKey));
   });
 
   constructor() {
@@ -95,9 +90,7 @@ export class StaffPortalActivityLogPageComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load activity.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load activity.');
         },
       });
   }
@@ -116,5 +109,4 @@ export class StaffPortalActivityLogPageComponent {
       year: 'numeric',
     });
   }
-
 }

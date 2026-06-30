@@ -32,12 +32,13 @@ rep keeps ownership; only an extra timeline entry is added.
 `integration.lead.merged_via_dedup` audit event fires so an operator
 can grep for high-merge-rate sources (a sign of repeat customers).
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,7 +50,6 @@ from src.app.core.leads.models import LeadSource
 from src.app.core.leads.routing import pick_assignee
 from src.app.core.leads.schemas import LeadCreate
 from src.app.core.leads.service import create_lead
-
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class IngestResult:
     action: Literal["created", "merged"]
     lead_id: uuid.UUID
     contact_id: uuid.UUID
-    assignee_id: Optional[uuid.UUID]
+    assignee_id: uuid.UUID | None
 
 
 async def ingest(
@@ -73,7 +73,7 @@ async def ingest(
     source: LeadSource,
     contact_id: uuid.UUID,
     lead_payload: LeadCreate,
-    actor_user_id: Optional[uuid.UUID] = None,
+    actor_user_id: uuid.UUID | None = None,
 ) -> IngestResult:
     """Resolve dedup + routing for one inbound lead.
 
@@ -129,9 +129,7 @@ async def ingest(
         )
 
     # 2. Fresh lead — pick an assignee, then create.
-    assignee_id = await pick_assignee(
-        session, org_id=org_id, source=source.value
-    )
+    assignee_id = await pick_assignee(session, org_id=org_id, source=source.value)
     # Rebuild the payload so source / contact_id / assignee come from
     # ingest's arguments, not whatever the caller put on the payload.
     # `model_copy(update=...)` is the Pydantic v2 idiom.

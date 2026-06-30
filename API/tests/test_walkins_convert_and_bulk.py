@@ -15,10 +15,11 @@ Five cases:
      visits returns the partial-success split
      `{"checked_out": N, "already_checked_out": M}`.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import select
@@ -44,9 +45,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -85,9 +84,7 @@ async def _seed_leads_pipeline(org_id: uuid.UUID) -> None:
         reset_context(token)
 
 
-async def _seed_contact(
-    org_id: uuid.UUID, *, phone: str = "+91 9000000001"
-) -> uuid.UUID:
+async def _seed_contact(org_id: uuid.UUID, *, phone: str = "+91 9000000001") -> uuid.UUID:
     from tests.conftest import TestSession
 
     token = set_context(RequestContext(org_id=org_id))
@@ -135,9 +132,7 @@ async def _seed_walkin(
 
 
 @pytest.mark.asyncio
-async def test_convert_auto_creates_lead_and_links_walkin(
-    layered_client, seeded_admin
-):
+async def test_convert_auto_creates_lead_and_links_walkin(layered_client, seeded_admin):
     """Happy path. `auto` reuses the walk-in's existing contact; the
     new lead lands at the first stage of the `leads` pipeline; the
     walk-in's `linked_lead_id` is stamped; a `convert` activity is
@@ -180,20 +175,22 @@ async def test_convert_auto_creates_lead_and_links_walkin(
     try:
         async with TestSession() as session:
             row = (
-                await session.execute(
-                    select(WalkIn).where(WalkIn.id == walk_in_id)
-                )
+                await session.execute(select(WalkIn).where(WalkIn.id == walk_in_id))
             ).scalar_one()
             assert row.linked_lead_id == lead_id
 
             activities = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_type == "walk_in")
-                    .where(Activity.entity_id == walk_in_id)
-                    .where(Activity.type == ActivityType.convert)
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_type == "walk_in")
+                        .where(Activity.entity_id == walk_in_id)
+                        .where(Activity.type == ActivityType.convert)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(activities) == 1
             payload = activities[0].payload
             assert payload["lead_id"] == str(lead_id)
@@ -204,9 +201,7 @@ async def test_convert_auto_creates_lead_and_links_walkin(
 
 
 @pytest.mark.asyncio
-async def test_convert_already_linked_returns_409(
-    layered_client, seeded_admin
-):
+async def test_convert_already_linked_returns_409(layered_client, seeded_admin):
     """A walk-in already converted (linked_lead_id set) re-converts to
     409. The response embeds the existing lead id so the FE can
     redirect without re-issuing the call."""
@@ -222,9 +217,7 @@ async def test_convert_already_linked_returns_409(
     await _seed_leads_pipeline(org.id)
     contact_id = await _seed_contact(org.id)
     existing_lead = uuid.uuid4()
-    walk_in_id = await _seed_walkin(
-        org.id, contact_id=contact_id, linked_lead_id=existing_lead
-    )
+    walk_in_id = await _seed_walkin(org.id, contact_id=contact_id, linked_lead_id=existing_lead)
 
     token = await _login(
         layered_client,
@@ -245,9 +238,7 @@ async def test_convert_already_linked_returns_409(
 
 
 @pytest.mark.asyncio
-async def test_convert_link_mode_cross_tenant_contact_rejected(
-    layered_client, seeded_admin
-):
+async def test_convert_link_mode_cross_tenant_contact_rejected(layered_client, seeded_admin):
     """`mode=link` with a `linked_contact_id` not in this org's scope
     → 422. The ORM-level tenant filter makes the unknown contact
     invisible to the in-scope lookup, so the service raises the
@@ -285,9 +276,7 @@ async def test_convert_link_mode_cross_tenant_contact_rejected(
 
 
 @pytest.mark.asyncio
-async def test_bulk_reassign_writes_activity_per_row(
-    layered_client, seeded_admin
-):
+async def test_bulk_reassign_writes_activity_per_row(layered_client, seeded_admin):
     """Bulk reassign over three walk-ins updates every row's owner
     and emits one `reassign` activity per row."""
     from tests.conftest import TestSession
@@ -301,9 +290,7 @@ async def test_bulk_reassign_writes_activity_per_row(
         "walkins.reassign",
     )
     contact_id = await _seed_contact(org.id)
-    ids = [
-        await _seed_walkin(org.id, contact_id=contact_id) for _ in range(3)
-    ]
+    ids = [await _seed_walkin(org.id, contact_id=contact_id) for _ in range(3)]
 
     token = await _login(
         layered_client,
@@ -329,30 +316,28 @@ async def test_bulk_reassign_writes_activity_per_row(
     try:
         async with TestSession() as session:
             for wid in ids:
-                row = (
-                    await session.execute(
-                        select(WalkIn).where(WalkIn.id == wid)
-                    )
-                ).scalar_one()
+                row = (await session.execute(select(WalkIn).where(WalkIn.id == wid))).scalar_one()
                 assert row.assigned_to_id == user.legacy_uuid
 
             activities = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_type == "walk_in")
-                    .where(Activity.entity_id.in_(ids))
-                    .where(Activity.type == ActivityType.reassign)
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_type == "walk_in")
+                        .where(Activity.entity_id.in_(ids))
+                        .where(Activity.type == ActivityType.reassign)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(activities) == 3
     finally:
         reset_context(ctx)
 
 
 @pytest.mark.asyncio
-async def test_bulk_checkout_partial_success_with_already_checked_out(
-    layered_client, seeded_admin
-):
+async def test_bulk_checkout_partial_success_with_already_checked_out(layered_client, seeded_admin):
     """Mixing open + already-checked-out walk-ins should NOT error.
     The response splits the count: `checked_out` for rows newly
     stamped, `already_checked_out` for rows skipped. Same semantic
@@ -367,7 +352,7 @@ async def test_bulk_checkout_partial_success_with_already_checked_out(
     closed = await _seed_walkin(
         org.id,
         contact_id=contact_id,
-        time_out=datetime.now(timezone.utc),
+        time_out=datetime.now(UTC),
     )
 
     token = await _login(

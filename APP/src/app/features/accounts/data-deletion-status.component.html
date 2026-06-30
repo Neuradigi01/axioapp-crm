@@ -4,41 +4,30 @@
 >
   <div class="mx-auto max-w-xl">
     <header class="mb-8">
-      <h1 class="text-2xl font-semibold tracking-tight">
-        Data deletion status
-      </h1>
+      <h1 class="text-2xl font-semibold tracking-tight">Data deletion status</h1>
       <p class="mt-2 text-sm text-zinc-600">
-        We received your request to delete your data from Core CRM.
-        This page shows the current status — it stays valid forever,
-        so you can revisit it any time.
+        We received your request to delete your data from Core CRM. This page shows the current
+        status — it stays valid forever, so you can revisit it any time.
       </p>
     </header>
 
     @if (loading()) {
-      <div
-        class="rounded-lg border border-zinc-200 bg-white p-6 text-sm text-zinc-600 shadow-sm"
-      >
+      <div class="rounded-lg border border-zinc-200 bg-white p-6 text-sm text-zinc-600 shadow-sm">
         Checking status…
       </div>
     } @else if (error(); as err) {
-      <div
-        class="rounded-lg border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800 shadow-sm"
-      >
+      <div class="rounded-lg border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800 shadow-sm">
         <p class="font-medium">We couldn't load this page.</p>
         <p class="mt-2">{{ err }}</p>
         <p class="mt-4 text-xs text-rose-700">
           If the problem keeps happening, contact us at
-          <a
-            href="mailto:privacy@core-crm.com"
-            class="underline hover:no-underline"
+          <a href="mailto:privacy@core-crm.com" class="underline hover:no-underline"
             >privacy&#64;core-crm.com</a
           >.
         </p>
       </div>
     } @else if (response(); as r) {
-      <section
-        class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm"
-      >
+      <section class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
         <div class="flex items-start gap-3">
           @switch (displayStatus()) {
             @case ('pending') {
@@ -49,8 +38,8 @@
               <div>
                 <h2 class="text-base font-semibold">Pending</h2>
                 <p class="mt-1 text-sm text-zinc-600">
-                  We received your request and are about to start.
-                  This page refreshes automatically.
+                  We received your request and are about to start. This page refreshes
+                  automatically.
                 </p>
               </div>
             }
@@ -62,8 +51,7 @@
               <div>
                 <h2 class="text-base font-semibold">In progress</h2>
                 <p class="mt-1 text-sm text-zinc-600">
-                  Your data is being removed. This usually completes
-                  within a minute.
+                  Your data is being removed. This usually completes within a minute.
                 </p>
               </div>
             }
@@ -94,15 +82,12 @@
               <div>
                 <h2 class="text-base font-semibold">Failed</h2>
                 <p class="mt-1 text-sm text-zinc-600">
-                  Something went wrong while processing your
-                  deletion. Our team has been notified — you don't
-                  need to do anything.
+                  Something went wrong while processing your deletion. Our team has been notified —
+                  you don't need to do anything.
                 </p>
                 <p class="mt-2 text-xs text-zinc-500">
                   For urgent issues, contact
-                  <a
-                    href="mailto:privacy@core-crm.com"
-                    class="underline hover:no-underline"
+                  <a href="mailto:privacy@core-crm.com" class="underline hover:no-underline"
                     >privacy&#64;core-crm.com</a
                   >.
                 </p>
@@ -115,9 +100,7 @@
               ></span>
               <div>
                 <h2 class="text-base font-semibold">Unknown</h2>
-                <p class="mt-1 text-sm text-zinc-600">
-                  Status unavailable.
-                </p>
+                <p class="mt-1 text-sm text-zinc-600">Status unavailable.</p>
               </div>
             }
           }
@@ -127,20 +110,14 @@
           class="mt-6 grid grid-cols-1 gap-3 border-t border-zinc-200 pt-6 text-sm sm:grid-cols-2"
         >
           <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
-              Requested
-            </dt>
+            <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Requested</dt>
             <dd class="mt-0.5">
               {{ r.requested_at | date: 'medium' }}
             </dd>
           </div>
           @if (r.completed_at; as ca) {
             <div>
-              <dt
-                class="text-xs font-medium uppercase tracking-wide text-zinc-500"
-              >
-                Completed
-              </dt>
+              <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Completed</dt>
               <dd class="mt-0.5">{{ ca | date: 'medium' }}</dd>
             </div>
           }
@@ -164,15 +141,10 @@
 
     <footer class="mt-8 text-xs text-zinc-500">
       <p>
-        Core CRM removes all WhatsApp messages associated with the
-        Meta account that initiated this deletion. Contact records
-        sourced from other channels (email, web forms, manual entry)
-        are kept per our
-        <a
-          href="/privacy"
-          class="underline hover:no-underline"
-          >privacy policy</a
-        >.
+        Core CRM removes all WhatsApp messages associated with the Meta account that initiated this
+        deletion. Contact records sourced from other channels (email, web forms, manual entry) are
+        kept per our
+        <a href="/privacy" class="underline hover:no-underline">privacy policy</a>.
       </p>
     </footer>
   </div>

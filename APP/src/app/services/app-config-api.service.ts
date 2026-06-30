@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpHelperService } from '@core/services/http-helper.service';
-import { IApiResponse, IAppConfig } from '@app/schemas/common';
+import { IAppConfig } from '@app/schemas/common';
 
 @Injectable({ providedIn: 'root' })
 export class AppConfigApiService {

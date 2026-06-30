@@ -20,20 +20,19 @@ GCP Pub/Sub properly. Documented in
 `tasks/app-updates/email/manual-google-gmail-setup.md` (to be
 authored alongside the OAuth verification kick-off).
 """
+
 from __future__ import annotations
 
 import base64
 import json
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from fastapi import HTTPException, status
 from jose import jwt
 from jose.exceptions import JWTError
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import (
@@ -42,7 +41,6 @@ from config import (
 )
 from src.app.core.email.gmail.client import GmailClient, GmailHTTPError
 from src.app.core.email.models import EmailAccount
-
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +65,8 @@ async def watch_if_configured(
     account: EmailAccount,
     session: AsyncSession,
     *,
-    client: Optional[GmailClient] = None,
-) -> Optional[str]:
+    client: GmailClient | None = None,
+) -> str | None:
     """Register a Pub/Sub push subscription if a topic is configured.
     Returns the initial historyId from `users.watch`, which the
     caller should persist as `account.sync_cursor` so the first
@@ -86,8 +84,7 @@ async def watch_if_configured(
         body = await gc.watch(topic_name=GOOGLE_GMAIL_PUBSUB_TOPIC)
     except GmailHTTPError as exc:
         logger.warning(
-            "users.watch failed for account=%s status=%s body=%s — "
-            "falling back to poll-only sync",
+            "users.watch failed for account=%s status=%s body=%s — falling back to poll-only sync",
             account.id,
             exc.status_code,
             exc.body,
@@ -100,7 +97,7 @@ async def stop_watch_quiet(
     account: EmailAccount,
     session: AsyncSession,
     *,
-    client: Optional[GmailClient] = None,
+    client: GmailClient | None = None,
 ) -> None:
     """Tear down the Pub/Sub subscription. Idempotent: Gmail returns
     204 even for a mailbox that isn't being watched, and any error
@@ -123,9 +120,7 @@ async def stop_watch_quiet(
 # --- Push webhook validation -------------------------------------------
 
 
-async def find_account_by_email(
-    session: AsyncSession, email_address: str
-) -> Optional[EmailAccount]:
+async def find_account_by_email(session: AsyncSession, email_address: str) -> EmailAccount | None:
     """Resolve an inbound push notification's `emailAddress` payload
     to an `email_accounts` row. RLS would normally hide cross-tenant
     rows, but the push handler has no tenant context yet — it LEARNS
@@ -156,9 +151,7 @@ async def find_account_by_email(
         LIMIT 1
         """
     )
-    row = (
-        await session.execute(sql, {"email": email_address})
-    ).mappings().first()
+    row = (await session.execute(sql, {"email": email_address})).mappings().first()
     if row is None:
         return None
     # Instantiate the ORM model from the raw row so callers can
@@ -246,7 +239,7 @@ async def verify_oidc_jwt(
     *,
     authorization_header: str,
     expected_audience: str,
-    http_client: Optional[httpx.AsyncClient] = None,
+    http_client: httpx.AsyncClient | None = None,
 ) -> dict:
     """Validate the OIDC token Pub/Sub sends in the `Authorization:
     Bearer …` header. Returns the decoded JWT claims on success.
@@ -281,7 +274,7 @@ async def verify_oidc_jwt(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Push token header not parseable.",
-        )
+        ) from None
     kid = unverified_header.get("kid")
     if not kid:
         raise HTTPException(
@@ -313,7 +306,7 @@ async def verify_oidc_jwt(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Push token rejected: {exc}",
-        )
+        ) from exc
 
     if GOOGLE_GMAIL_PUBSUB_SA_EMAIL:
         if claims.get("email") != GOOGLE_GMAIL_PUBSUB_SA_EMAIL:
@@ -324,9 +317,7 @@ async def verify_oidc_jwt(
     return claims
 
 
-async def _get_jwks(
-    *, http_client: Optional[httpx.AsyncClient], force_refresh: bool
-) -> dict:
+async def _get_jwks(*, http_client: httpx.AsyncClient | None, force_refresh: bool) -> dict:
     """Cached fetch of Google's JWKS. Refreshes on TTL expiry or on
     a `force_refresh=True` call (signature mismatch fallback)."""
     now = time.time()
@@ -348,8 +339,8 @@ async def _get_jwks(
     return keys
 
 
-def _find_key(jwks: dict, kid: str) -> Optional[dict]:
-    for k in (jwks.get("keys") or []):
+def _find_key(jwks: dict, kid: str) -> dict | None:
+    for k in jwks.get("keys") or []:
         if k.get("kid") == kid:
             return k
     return None

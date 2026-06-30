@@ -5,6 +5,7 @@ publisher's emit site. Step 5+ will add a consistency pin-test that
 walks every ``bus.publish`` call and fails CI if its event_type is
 not in the catalog; this file pins the catalog's own shape.
 """
+
 from __future__ import annotations
 
 from src.app.core.automation import event_catalog

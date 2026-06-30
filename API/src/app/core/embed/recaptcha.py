@@ -24,13 +24,13 @@ honeypot + min-time gates already filter most volume; reCAPTCHA is
 the last spam wall, and it's better to lose a small fraction of real
 submissions during a Google outage than to flood the CRM with bots.
 """
+
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import httpx
-
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +45,8 @@ async def verify_token(
     secret: str,
     expected_action: str = "submit",
     score_threshold: float = DEFAULT_SCORE_THRESHOLD,
-    remote_ip: Optional[str] = None,
-    http_client: Optional[httpx.AsyncClient] = None,
+    remote_ip: str | None = None,
+    http_client: httpx.AsyncClient | None = None,
 ) -> bool:
     """Verify a reCAPTCHA v3 token against Google's siteverify API.
 
@@ -69,16 +69,12 @@ async def verify_token(
         if http_client is not None:
             response = await http_client.post(VERIFY_URL, data=data)
         else:
-            async with httpx.AsyncClient(
-                timeout=DEFAULT_TIMEOUT_SECONDS
-            ) as client:
+            async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT_SECONDS) as client:
                 response = await client.post(VERIFY_URL, data=data)
     except (httpx.HTTPError, httpx.TimeoutException) as exc:
         # Network / DNS / timeout / TLS failure — Google unreachable.
         # Fail closed: we can't prove the user is human.
-        logger.warning(
-            "recaptcha.verify network error: %s", exc
-        )
+        logger.warning("recaptcha.verify network error: %s", exc)
         return False
 
     if response.status_code != 200:

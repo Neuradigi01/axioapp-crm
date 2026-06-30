@@ -24,22 +24,26 @@ transaction stays in charge. Activity / notification fan-outs use
 their respective `log` / `notify` helpers, both of which are
 non-raising.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.contacts import service as contacts_service
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
+from src.app.core.contacts import service as contacts_service
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations import data_access as _da
 from src.app.core.conversations.adapters import InboundMessage
+from src.app.core.conversations.adapters.whatsapp import (
+    resolve_whatsapp_adapter,
+)
 from src.app.core.conversations.models import (
     Conversation,
     ConversationChannel,
@@ -47,14 +51,10 @@ from src.app.core.conversations.models import (
     Message,
     MessageDirection,
 )
-from src.app.core.conversations.adapters.whatsapp import (
-    resolve_whatsapp_adapter,
-)
 from src.app.core.conversations.registry import resolve
 from src.app.core.conversations.schemas import ConversationPatch
 from src.app.core.notifications.service import notify
 from src.app.shared.db.queries import ensure_found
-
 
 # Channels whose `external_id` is a phone number; the webhook intake
 # tries to resolve / auto-create a contact for these so the inbox can
@@ -68,18 +68,18 @@ _PHONE_CHANNELS = {ConversationChannel.whatsapp, ConversationChannel.sms}
 async def list_conversations(
     session: AsyncSession,
     *,
-    channel: Optional[ConversationChannel] = None,
-    status_filter: Optional[ConversationStatus] = None,
-    assigned_to: Optional[str] = None,
-    q: Optional[str] = None,
-    tag_ids: Optional[list[uuid.UUID]] = None,
+    channel: ConversationChannel | None = None,
+    status_filter: ConversationStatus | None = None,
+    assigned_to: str | None = None,
+    q: str | None = None,
+    tag_ids: list[uuid.UUID] | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Conversation], int]:
     # `assigned_to` may be a UUID string (filter to that owner),
     # the sentinel `'unassigned'` (rows with `assigned_to_id IS NULL`),
     # or absent (no filter). Anything else raises 422.
-    assigned_to_id: Optional[uuid.UUID] = None
+    assigned_to_id: uuid.UUID | None = None
     assigned_to_unassigned = False
     if assigned_to is not None:
         if assigned_to == "unassigned":
@@ -106,18 +106,14 @@ async def list_conversations(
     )
 
 
-async def get_conversation(
-    session: AsyncSession, conversation_id: uuid.UUID
-) -> Conversation:
+async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) -> Conversation:
     return ensure_found(
         await _da.get_conversation_by_id(session, conversation_id),
         entity="conversation",
     )
 
 
-async def list_messages(
-    session: AsyncSession, conversation_id: uuid.UUID
-) -> list[Message]:
+async def list_messages(session: AsyncSession, conversation_id: uuid.UUID) -> list[Message]:
     return await _da.list_messages_for_conversation(session, conversation_id)
 
 
@@ -144,9 +140,7 @@ async def send_outbound(
             is_blocked,
         )
 
-        block_hit = await is_blocked(
-            session, org_id=conv.org_id, phone=conv.external_id
-        )
+        block_hit = await is_blocked(session, org_id=conv.org_id, phone=conv.external_id)
         if block_hit is not None:
             raise ValueError(
                 f"This number is on the block list "
@@ -161,23 +155,15 @@ async def send_outbound(
     # never pass ``send_from_phone_id`` and have one config to
     # resolve anyway).
     if conv.channel == ConversationChannel.whatsapp:
-        resolved_phone_id = (
-            send_from_phone_id
-            or getattr(conv, "received_via_phone_id", None)
-        )
-        adapter = await resolve_whatsapp_adapter(
-            session, phone_id=resolved_phone_id
-        )
+        resolved_phone_id = send_from_phone_id or getattr(conv, "received_via_phone_id", None)
+        adapter = await resolve_whatsapp_adapter(session, phone_id=resolved_phone_id)
     else:
         adapter = resolve(conv.channel)
 
     if interactive is not None and conv.channel != ConversationChannel.whatsapp:
         # Interactive messages are a WhatsApp-only surface today.
         # Surface as a 400 via the router (ValueError → HTTPException).
-        raise ValueError(
-            "Interactive messages are only supported on WhatsApp "
-            "conversations."
-        )
+        raise ValueError("Interactive messages are only supported on WhatsApp conversations.")
 
     # Step 7: resolve the reply target to a channel-side wamid the
     # adapter can put inside `context.message_id`. Mismatches (wrong
@@ -187,20 +173,13 @@ async def send_outbound(
     if reply_to_message_id is not None:
         target = await _da.get_message_by_id(session, reply_to_message_id)
         if target is None or target.conversation_id != conv.id:
-            raise ValueError(
-                "reply_to_message_id does not belong to this conversation."
-            )
+            raise ValueError("reply_to_message_id does not belong to this conversation.")
         if not target.channel_message_id:
-            raise ValueError(
-                "Cannot reply to a message that has not been delivered yet."
-            )
+            raise ValueError("Cannot reply to a message that has not been delivered yet.")
         reply_to_wamid = target.channel_message_id
 
     is_first_outbound = (
-        await _da.count_outbound_messages_for_conversation(
-            session, conversation_id
-        )
-        == 0
+        await _da.count_outbound_messages_for_conversation(session, conversation_id) == 0
     )
 
     # Pass `interactive` only when supplied so the registry-based
@@ -216,7 +195,7 @@ async def send_outbound(
     if reply_to_wamid is not None:
         send_kwargs["reply_to_channel_message_id"] = reply_to_wamid
     ref = await adapter.send(**send_kwargs)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     sent_at = ref.sent_at or now
 
     msg = Message(
@@ -288,7 +267,7 @@ async def receive_webhook(
         external_id=parsed.external_id,
         received_via_phone_id=received_via_phone_id,
     )
-    sent_at = parsed.sent_at or datetime.now(timezone.utc)
+    sent_at = parsed.sent_at or datetime.now(UTC)
 
     # whatsapp-platform-upgrade Step 24 — click-to-WhatsApp ad
     # attribution. Single-touch: capture only when the conversation
@@ -299,25 +278,15 @@ async def receive_webhook(
     # (token expired, ad deleted, network); we still persist the
     # raw referral payload so the operator gets *some* attribution
     # even on a degraded lookup.
-    if (
-        parsed.referral
-        and channel == ConversationChannel.whatsapp
-        and not conv.acquisition_source
-    ):
+    if parsed.referral and channel == ConversationChannel.whatsapp and not conv.acquisition_source:
         try:
             from src.app.core.integrations.meta.ads_lookup import (
                 resolve_ad,
             )
 
-            source_type = str(
-                parsed.referral.get("source_type") or ""
-            ).lower()
+            source_type = str(parsed.referral.get("source_type") or "").lower()
             ad_id_raw = parsed.referral.get("source_id")
-            source = (
-                "ad"
-                if source_type in ("ad", "ad_post", "post")
-                else "organic"
-            )
+            source = "ad" if source_type in ("ad", "ad_post", "post") else "organic"
             metadata: dict[str, Any] = {}
             if source == "ad" and ad_id_raw:
                 lookup = await resolve_ad(
@@ -329,15 +298,9 @@ async def receive_webhook(
                     metadata = lookup
 
             conv.acquisition_source = source
-            conv.acquisition_ad_id = (
-                str(ad_id_raw) if ad_id_raw else None
-            )
-            conv.acquisition_campaign_id = metadata.get(
-                "campaign_id"
-            )
-            conv.acquisition_landing_url = str(
-                parsed.referral.get("source_url") or ""
-            ) or None
+            conv.acquisition_ad_id = str(ad_id_raw) if ad_id_raw else None
+            conv.acquisition_campaign_id = metadata.get("campaign_id")
+            conv.acquisition_landing_url = str(parsed.referral.get("source_url") or "") or None
             # Persist the whole referral envelope so the chip / ad
             # ROI widget can pull the headline + prefilled body
             # without a follow-up Meta call. Merge in the resolved
@@ -351,9 +314,7 @@ async def receive_webhook(
         except Exception:  # noqa: BLE001
             import logging
 
-            logging.getLogger(__name__).exception(
-                "attribution capture failed for conv %s", conv.id
-            )
+            logging.getLogger(__name__).exception("attribution capture failed for conv %s", conv.id)
 
     # Step 7: reaction events short-circuit. Locate the target message
     # (by its wamid) and mutate its `reactions` JSONB. No new row, no
@@ -430,12 +391,7 @@ async def receive_webhook(
     # has no acquisition source yet, try to pair the inbound text with
     # a recent quick-link click whose `prefilled_hash` matches. Single-
     # touch — same convention as Step 24.
-    if (
-        conv.channel == ConversationChannel.whatsapp
-        and not customer_opted_out
-        and not conv.acquisition_source
-        and parsed.text
-    ):
+    if conv.channel == ConversationChannel.whatsapp and not conv.acquisition_source and parsed.text:
         try:
             from src.app.core.integrations.whatsapp.quick_links import (
                 attribute_inbound,
@@ -460,17 +416,9 @@ async def receive_webhook(
     # parsed form data off to the flows service. Best-effort: any
     # failure inside the dispatcher is logged + swallowed so the
     # message row + downstream pipeline keep flowing.
-    if (
-        conv.channel == ConversationChannel.whatsapp
-        and parsed.attachments
-    ):
+    if conv.channel == ConversationChannel.whatsapp and parsed.attachments:
         nfm = next(
-            (
-                a
-                for a in parsed.attachments
-                if isinstance(a, dict)
-                and a.get("type") == "nfm_reply"
-            ),
+            (a for a in parsed.attachments if isinstance(a, dict) and a.get("type") == "nfm_reply"),
             None,
         )
         if nfm is not None:
@@ -508,10 +456,7 @@ async def receive_webhook(
     # the conversation has no `contact_id` yet (e.g. unknown phone),
     # the helper returns None and the pipeline continues unchanged.
     customer_opted_out = False
-    if (
-        conv.channel == ConversationChannel.whatsapp
-        and conv.contact_id is not None
-    ):
+    if conv.channel == ConversationChannel.whatsapp and conv.contact_id is not None:
         from src.app.core.contacts.consent_service import (
             auto_flip_on_inbound,
         )
@@ -526,9 +471,7 @@ async def receive_webhook(
                 # rather than conv-history so a customer who reuses
                 # the channel after a wipe still counts as
                 # implicit-consent on the next inbound.
-                is_first = (
-                    contact.whatsapp_opt_in_status == "never_contacted"
-                )
+                is_first = contact.whatsapp_opt_in_status == "never_contacted"
                 result = await auto_flip_on_inbound(
                     session,
                     contact=contact,
@@ -548,15 +491,11 @@ async def receive_webhook(
                             send_opt_out_confirmation,
                         )
 
-                        await send_opt_out_confirmation(
-                            session, conversation=conv
-                        )
+                        await send_opt_out_confirmation(session, conversation=conv)
         except Exception:  # noqa: BLE001
             import logging
 
-            logging.getLogger(__name__).exception(
-                "opt-in auto-flip failed for conv %s", conv.id
-            )
+            logging.getLogger(__name__).exception("opt-in auto-flip failed for conv %s", conv.id)
 
     # whatsapp-platform-upgrade Step 16 — fire auto-reply pipeline.
     # Greeting + out-of-hours away dispatch after the inbound row is
@@ -643,19 +582,13 @@ async def react_to_message(
     `channel_message_id` yet, or the channel isn't WhatsApp."""
     conv = await get_conversation(session, conversation_id)
     if conv.channel != ConversationChannel.whatsapp:
-        raise ValueError(
-            "Reactions are only supported on WhatsApp conversations."
-        )
+        raise ValueError("Reactions are only supported on WhatsApp conversations.")
 
     target = await _da.get_message_by_id(session, message_id)
     if target is None or target.conversation_id != conv.id:
-        raise ValueError(
-            "message_id does not belong to this conversation."
-        )
+        raise ValueError("message_id does not belong to this conversation.")
     if not target.channel_message_id:
-        raise ValueError(
-            "Cannot react to a message that has not been delivered yet."
-        )
+        raise ValueError("Cannot react to a message that has not been delivered yet.")
 
     adapter = await resolve_whatsapp_adapter(session)
     await adapter.send_reaction(
@@ -664,7 +597,7 @@ async def react_to_message(
         emoji=emoji,
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     target.reactions = _merge_reaction(
         list(target.reactions or []),
         actor=str(user_id),
@@ -691,9 +624,7 @@ def _merge_reaction(
     rest = [r for r in existing if r.get("actor") != actor]
     if not emoji:
         return rest
-    rest.append(
-        {"actor": actor, "emoji": emoji, "ts": ts.isoformat()}
-    )
+    rest.append({"actor": actor, "emoji": emoji, "ts": ts.isoformat()})
     return rest
 
 
@@ -806,9 +737,7 @@ async def _find_or_create_conversation(
             bundle = await get_active_config(session)
             if bundle is not None:
                 _, wa_config = bundle
-                ai_handling_default = bool(
-                    getattr(wa_config, "ai_handling_default_enabled", False)
-                )
+                ai_handling_default = bool(getattr(wa_config, "ai_handling_default_enabled", False))
         except Exception:
             pass
 

@@ -91,7 +91,7 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
       const res = await this.notificationApi.markAsRead(notification.id);
       if (res.success) {
         this.notifications.update((list) =>
-          list.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n))
+          list.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n)),
         );
         this.unreadCount.update((c) => Math.max(0, c - 1));
       }

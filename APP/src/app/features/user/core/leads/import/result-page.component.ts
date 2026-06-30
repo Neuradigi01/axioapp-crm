@@ -12,12 +12,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { Subscription, interval } from 'rxjs';
 import { startWith } from 'rxjs/operators';
 
-import {
-  ImportsApiService,
-  LeadImport,
-  LeadImportStatus,
-} from './imports-api.service';
-
+import { ImportsApiService, LeadImport, LeadImportStatus } from './imports-api.service';
 
 /**
  * `/user/leads/import/:id/result` — post-commit dashboard.
@@ -38,12 +33,7 @@ import {
 
 const POLL_INTERVAL_MS = 2000;
 
-const TERMINAL_STATUSES = new Set<LeadImportStatus>([
-  'completed',
-  'failed',
-  'cancelled',
-]);
-
+const TERMINAL_STATUSES = new Set<LeadImportStatus>(['completed', 'failed', 'cancelled']);
 
 @Component({
   selector: 'app-import-result-page',

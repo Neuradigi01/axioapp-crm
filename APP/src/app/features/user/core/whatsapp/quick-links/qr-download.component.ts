@@ -9,7 +9,6 @@ import {
   input,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { QuickLink, QuickLinksService } from './quick-links.service';
@@ -37,9 +36,7 @@ import { QuickLink, QuickLinksService } from './quick-links.service';
   template: `
     @if (link(); as l) {
       <div class="rounded-md border border-zinc-200 bg-white p-3">
-        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          QR code
-        </p>
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">QR code</p>
         <div class="flex flex-col items-center gap-2">
           <img
             [src]="pngUrl()"
@@ -47,8 +44,7 @@ import { QuickLink, QuickLinksService } from './quick-links.service';
             class="h-48 w-48 rounded-md border border-zinc-200 bg-white"
           />
           <p class="text-center text-[11px] text-zinc-500">
-            Scan with any phone camera — opens WhatsApp with the
-            prefilled message ready to send.
+            Scan with any phone camera — opens WhatsApp with the prefilled message ready to send.
           </p>
         </div>
 

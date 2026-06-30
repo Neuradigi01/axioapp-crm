@@ -1,16 +1,9 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { WorkflowExportBody } from '../workflows-api.service';
-
 
 /**
  * Import-from-JSON modal — file picker + client-side validation.
@@ -23,7 +16,6 @@ import { WorkflowExportBody } from '../workflows-api.service';
  * POSTs `/workflows/import` and routes to the new draft on success.
  */
 
-
 const REQUIRED_TOP_KEYS = [
   'name',
   'category',
@@ -32,7 +24,6 @@ const REQUIRED_TOP_KEYS = [
   'is_marketing',
   'schema_version',
 ];
-
 
 @Component({
   selector: 'app-import-modal',
@@ -51,9 +42,7 @@ export class ImportModalComponent {
   readonly parsed = signal<WorkflowExportBody | null>(null);
   readonly overrideName = signal<string>('');
 
-  readonly canSubmit = computed(
-    () => this.parsed() !== null && !this.busy(),
-  );
+  readonly canSubmit = computed(() => this.parsed() !== null && !this.busy());
 
   onFileChange(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -78,9 +67,7 @@ export class ImportModalComponent {
           this.overrideName.set(body.name);
         } catch (err) {
           this.error.set(
-            err instanceof Error
-              ? err.message
-              : 'JSON parse failed — is this a workflow export?',
+            err instanceof Error ? err.message : 'JSON parse failed — is this a workflow export?',
           );
         }
       })
@@ -94,9 +81,7 @@ export class ImportModalComponent {
     const obj = data as Record<string, unknown>;
     const missing = REQUIRED_TOP_KEYS.filter((k) => !(k in obj));
     if (missing.length > 0) {
-      throw new Error(
-        `Missing required key(s): ${missing.join(', ')}.`,
-      );
+      throw new Error(`Missing required key(s): ${missing.join(', ')}.`);
     }
     const graph = obj['graph'];
     if (

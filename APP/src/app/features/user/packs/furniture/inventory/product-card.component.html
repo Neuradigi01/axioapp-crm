@@ -1,18 +1,11 @@
-<div class="flex h-full flex-col rounded-lg border border-zinc-200 bg-white shadow-sm overflow-hidden">
+<div
+  class="flex h-full flex-col rounded-lg border border-zinc-200 bg-white shadow-sm overflow-hidden"
+>
   <!-- Thumbnail: uploaded cover if present, else material-derived glyph -->
   @if (item().cover_url; as url) {
-    <img
-      [src]="url"
-      [alt]="item().sku"
-      class="h-28 w-full object-cover"
-      loading="lazy"
-    />
+    <img [src]="url" [alt]="item().sku" class="h-28 w-full object-cover" loading="lazy" />
   } @else {
-    <div
-      [class]="
-        'flex h-28 items-center justify-center text-4xl ' + thumbnailBg()
-      "
-    >
+    <div [class]="'flex h-28 items-center justify-center text-4xl ' + thumbnailBg()">
       {{ thumbnailGlyph() }}
     </div>
   }
@@ -24,7 +17,9 @@
         @if (item().material || item().color) {
           <p class="truncate text-xs text-zinc-500">
             {{ item().material }}
-            @if (item().material && item().color) { · }
+            @if (item().material && item().color) {
+              ·
+            }
             {{ item().color }}
           </p>
         }
@@ -56,7 +51,9 @@
     <div class="mt-auto flex items-center justify-between pt-3">
       <span class="truncate text-[10px] text-zinc-500">{{ warehouseLabel() ?? '' }}</span>
       @if (showBestSeller()) {
-        <span class="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700 ring-1 ring-violet-200">
+        <span
+          class="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700 ring-1 ring-violet-200"
+        >
           ★ Best Seller
         </span>
       }

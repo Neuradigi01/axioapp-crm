@@ -4,6 +4,7 @@ Wraps the dev DAL and shapes the raw rows into the `DemoLogin` response
 schema. No business logic — dev tooling is internal-only, mounted only
 when `IS_DEVELOPMENT=true`.
 """
+
 from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession

@@ -21,6 +21,7 @@ dev shells without Celery installed don't break import — the shim's
 ``process_step.apply_async(args=(run_id,))`` call still compiles
 + tests can monkey-patch the dispatch.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -28,13 +29,11 @@ import logging
 import uuid
 from typing import Any
 
-
 try:
     from celery import shared_task as _shared_task
 
     HAS_CELERY = True
 except ImportError:  # pragma: no cover — celery absent in dev shells
-
     HAS_CELERY = False
 
     def _shared_task(*decorator_args: Any, **decorator_kwargs: Any):
@@ -112,6 +111,8 @@ def expire_waits() -> dict[str, Any]:
 async def _expire_waits_async() -> dict[str, Any]:
     from src.app.core.workflows import (
         data_access as _wf_da,
+    )
+    from src.app.core.workflows import (
         engine as _engine,
     )
     from src.app.shared.db import async_session
@@ -130,16 +131,12 @@ async def _expire_waits_async() -> dict[str, Any]:
                 await session.commit()
                 deleted += 1
             except Exception:
-                logger.exception(
-                    "workflows.expire_waits delete_failed wait=%s", wait.id
-                )
+                logger.exception("workflows.expire_waits delete_failed wait=%s", wait.id)
                 failed += 1
                 continue
 
             try:
-                await _engine.resume_run(
-                    wait.run_id, output_edge_label="timeout"
-                )
+                await _engine.resume_run(wait.run_id, output_edge_label="timeout")
                 resumed += 1
             except Exception:
                 logger.exception(

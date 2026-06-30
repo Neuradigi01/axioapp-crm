@@ -26,11 +26,7 @@ import { Observable } from 'rxjs';
  *     bulkReassign(ids, body): Observable<{reassigned: number}> { ... }
  *   }
  */
-export abstract class BaseCrudApiService<
-  T,
-  TCreate = Partial<T>,
-  TUpdate = Partial<T>,
-> {
+export abstract class BaseCrudApiService<T, TCreate = Partial<T>, TUpdate = Partial<T>> {
   protected readonly http = inject(HttpClient);
 
   /** Fully-qualified base URL for the entity, e.g.

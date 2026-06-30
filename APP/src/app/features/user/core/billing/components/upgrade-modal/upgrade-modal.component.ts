@@ -10,10 +10,7 @@ import {
 import { BillingApiService } from '../../services/billing-api.service';
 import { SubscriptionStateService } from '../../services/subscription-state.service';
 import { UpgradeModalService } from '../../services/upgrade-modal.service';
-import {
-  BillingCycle,
-  PlanCatalogEntry,
-} from '../../types/subscription.types';
+import { BillingCycle, PlanCatalogEntry } from '../../types/subscription.types';
 
 /** Plan code shown with the "Most popular" ribbon (matches the public
  *  `/pricing` page so messaging is consistent). */
@@ -46,9 +43,7 @@ export class UpgradeModalComponent {
   private readonly api = inject(BillingApiService);
 
   /** True when the shell should mount the modal DOM. */
-  protected readonly isOpen = computed(
-    () => this.modalState.state().open,
-  );
+  protected readonly isOpen = computed(() => this.modalState.state().open);
 
   // ---- Catalogue ---------------------------------------------------------
 
@@ -93,24 +88,15 @@ export class UpgradeModalComponent {
     if (plan === null) return 0;
     const cycle = this.selectedCycle();
     const bundle =
-      cycle === 'annual'
-        ? plan.pricing.annual_bundle_usd
-        : plan.pricing.monthly_bundle_usd;
+      cycle === 'annual' ? plan.pricing.annual_bundle_usd : plan.pricing.monthly_bundle_usd;
     const extraSeatCost =
-      cycle === 'annual'
-        ? plan.pricing.extra_seat_annual_usd
-        : plan.pricing.extra_seat_monthly_usd;
-    const extras = Math.max(
-      0,
-      this.selectedSeats() - plan.pricing.included_seats,
-    );
+      cycle === 'annual' ? plan.pricing.extra_seat_annual_usd : plan.pricing.extra_seat_monthly_usd;
+    const extras = Math.max(0, this.selectedSeats() - plan.pricing.included_seats);
     return bundle + extras * extraSeatCost;
   });
 
   /** Per-cycle recurring cost shown under the estimate. */
-  protected readonly renewalAmount = computed<number>(
-    () => this.estimateToday(),
-  );
+  protected readonly renewalAmount = computed<number>(() => this.estimateToday());
 
   protected readonly cycleLabel = computed<string>(() =>
     this.selectedCycle() === 'annual' ? 'year' : 'month',
@@ -209,11 +195,8 @@ export class UpgradeModalComponent {
         to_plan: plan,
         billing_cycle: this.selectedCycle(),
         seats: this.selectedSeats(),
-        success_url:
-          origin +
-          '/user/subscription/upgrade-success?session_id={CHECKOUT_SESSION_ID}',
-        cancel_url:
-          origin + '/user/subscription/upgrade-cancel',
+        success_url: origin + '/user/subscription/upgrade-success?session_id={CHECKOUT_SESSION_ID}',
+        cancel_url: origin + '/user/subscription/upgrade-cancel',
       })
       .subscribe({
         next: (response) => {
@@ -245,7 +228,6 @@ export class UpgradeModalComponent {
     });
   }
 }
-
 
 /** Pulls the structured backend error code into a user-readable
  *  inline message. Falls back to generic copy on unknown shapes so

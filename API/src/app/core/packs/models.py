@@ -9,6 +9,7 @@ in Step 4.2; core stays source-agnostic.
 
 Tenant-scoped, RLS-on, UNIQUE(org_id, key).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -30,9 +31,7 @@ from src.app.shared.orm import TenantScoped
 
 class LeadSource(Base, TenantScoped):
     __tablename__ = "tbl_lead_sources"
-    __table_args__ = (
-        UniqueConstraint("org_id", "key", name="uq_lead_sources_org_key"),
-    )
+    __table_args__ = (UniqueConstraint("org_id", "key", name="uq_lead_sources_org_key"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

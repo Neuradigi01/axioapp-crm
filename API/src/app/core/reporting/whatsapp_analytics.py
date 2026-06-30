@@ -43,13 +43,14 @@ via the SQLAlchemy ``after_begin`` hook; we additionally pass
 RLS policy can't accidentally leak. Numbers reported are tenant-
 isolated either way.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Literal, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,30 +74,23 @@ def _resolve_range(range_key: str) -> tuple[datetime, datetime]:
     locale at display time."""
     days = _RANGE_DAYS.get(range_key)
     if days is None:
-        raise ValueError(
-            f"range must be one of {sorted(_RANGE_DAYS)}, got {range_key!r}"
-        )
-    end = datetime.now(timezone.utc)
+        raise ValueError(f"range must be one of {sorted(_RANGE_DAYS)}, got {range_key!r}")
+    end = datetime.now(UTC)
     start = end - timedelta(days=days)
     return start, end
 
 
-def _resolve_granularity(
-    granularity: str, range_key: str
-) -> str:
+def _resolve_granularity(granularity: str, range_key: str) -> str:
     """Validate the granularity choice against the range.
 
     Hour-buckets only make sense for short ranges — 90d * 24h = 2160
     buckets, well past the 100-cap, so we reject ``hour`` for the
     90d range. Day works for everything."""
     if granularity not in ("day", "hour"):
-        raise ValueError(
-            f"granularity must be 'day' or 'hour', got {granularity!r}"
-        )
+        raise ValueError(f"granularity must be 'day' or 'hour', got {granularity!r}")
     if granularity == "hour" and range_key == "90d":
         raise ValueError(
-            "hour granularity not supported for 90d range "
-            "(use day or shorten the range)"
+            "hour granularity not supported for 90d range (use day or shorten the range)"
         )
     return granularity
 
@@ -142,8 +136,8 @@ class ResponseTimeGroup:
 
     key: str  # user id / team id / channel
     label: str
-    median_seconds: Optional[float]
-    p95_seconds: Optional[float]
+    median_seconds: float | None
+    p95_seconds: float | None
     sample_size: int
 
 
@@ -151,8 +145,8 @@ class ResponseTimeGroup:
 class ResponseTimeReport:
     range: str
     groupby: str
-    overall_median_seconds: Optional[float]
-    overall_p95_seconds: Optional[float]
+    overall_median_seconds: float | None
+    overall_p95_seconds: float | None
     sample_size: int
     distribution: list[ResponseTimeBucket]
     groups: list[ResponseTimeGroup]
@@ -179,8 +173,8 @@ class LeaderboardRow:
     name: str
     replies: int
     conversations_handled: int
-    median_response_seconds: Optional[float]
-    p95_response_seconds: Optional[float]
+    median_response_seconds: float | None
+    p95_response_seconds: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,7 +205,7 @@ async def compute_volume(
     granularity = _resolve_granularity(granularity, range_key)
 
     stmt = text(
-        f"""
+        """
         SELECT
             date_trunc(:granularity, m.created_at AT TIME ZONE 'UTC')
                 AS bucket_start,
@@ -258,7 +252,7 @@ async def compute_volume(
         ai_sent = int(r.ai_sent or 0)
         bucket_start = r.bucket_start
         if bucket_start.tzinfo is None:
-            bucket_start = bucket_start.replace(tzinfo=timezone.utc)
+            bucket_start = bucket_start.replace(tzinfo=UTC)
         buckets.append(
             VolumeBucket(
                 bucket_start=bucket_start,
@@ -325,9 +319,7 @@ async def compute_response_time(
     contribute zero samples here, which keeps the median honest."""
     start, end = _resolve_range(range_key)
     if groupby not in ("agent", "team", "channel"):
-        raise ValueError(
-            f"groupby must be 'agent', 'team', or 'channel', got {groupby!r}"
-        )
+        raise ValueError(f"groupby must be 'agent', 'team', or 'channel', got {groupby!r}")
 
     # Per-conversation: first inbound time + first human staff reply
     # time + the user who replied. We compute the delta in seconds in
@@ -416,7 +408,7 @@ async def compute_response_time(
                 )
             )
         groups.sort(
-            key=lambda g: (g.median_seconds if g.median_seconds is not None else float("inf"))
+            key=lambda g: g.median_seconds if g.median_seconds is not None else float("inf")
         )
     # `team` + `channel` groupings are present in the schema for
     # future expansion (Phase 3.6 multi-channel + the teams module);
@@ -433,7 +425,7 @@ async def compute_response_time(
     )
 
 
-def _percentile(samples: list[float], q: float) -> Optional[float]:
+def _percentile(samples: list[float], q: float) -> float | None:
     """Lightweight percentile — no numpy dep for one analytics call.
 
     `q` is in 0..1. Uses linear interpolation between adjacent ranks
@@ -472,9 +464,7 @@ async def _resolve_user_names(
         WHERE u.legacy_uuid = ANY(:ids)
         """
     )
-    rows = (
-        await session.execute(stmt, {"ids": list(user_ids)})
-    ).all()
+    rows = (await session.execute(stmt, {"ids": list(user_ids)})).all()
     out: dict[uuid.UUID, str] = {}
     for r in rows:
         name = f"{r.first_name} {r.last_name}".strip()
@@ -527,11 +517,7 @@ async def compute_outcomes(
     total = 0
     for r in status_rows:
         n = int(r.n or 0)
-        by_status.append(
-            OutcomeSlice(
-                key=str(r.status), label=str(r.status).title(), count=n
-            )
-        )
+        by_status.append(OutcomeSlice(key=str(r.status), label=str(r.status).title(), count=n))
         total += n
 
     tag_stmt = text(
@@ -556,15 +542,11 @@ async def compute_outcomes(
         )
     ).all()
     by_tag = [
-        OutcomeSlice(
-            key=str(r.tag_id), label=str(r.tag_name), count=int(r.n or 0)
-        )
+        OutcomeSlice(key=str(r.tag_id), label=str(r.tag_name), count=int(r.n or 0))
         for r in tag_rows
     ]
 
-    return OutcomesReport(
-        range=range_key, by_status=by_status, by_tag=by_tag, total=total
-    )
+    return OutcomesReport(range=range_key, by_status=by_status, by_tag=by_tag, total=total)
 
 
 # ---------------------------------------------------------------------------
@@ -667,17 +649,13 @@ async def compute_agent_leaderboard(
     for r in rt_rows:
         if r.user_id is None:
             continue
-        per_agent_samples.setdefault(r.user_id, []).append(
-            float(r.seconds or 0)
-        )
+        per_agent_samples.setdefault(r.user_id, []).append(float(r.seconds or 0))
 
     # Combine the two passes. The "counts" pass is the source of
     # truth for who shows up (anyone with ≥ 1 reply); samples is a
     # left-join (None when the agent only sent follow-ups, never the
     # first reply).
-    user_ids: list[uuid.UUID] = [
-        r.user_id for r in counts_rows if r.user_id is not None
-    ]
+    user_ids: list[uuid.UUID] = [r.user_id for r in counts_rows if r.user_id is not None]
     names = await _resolve_user_names(session, user_ids)
 
     rows: list[LeaderboardRow] = []
@@ -697,9 +675,7 @@ async def compute_agent_leaderboard(
         )
     rows.sort(
         key=lambda x: (
-            x.median_response_seconds
-            if x.median_response_seconds is not None
-            else float("inf"),
+            x.median_response_seconds if x.median_response_seconds is not None else float("inf"),
             -x.replies,
         )
     )

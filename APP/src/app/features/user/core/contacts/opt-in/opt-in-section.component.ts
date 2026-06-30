@@ -14,11 +14,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
-import {
-  ConsentEvent,
-  ContactsApiService,
-  OptInHistory,
-} from '../contacts-api.service';
+import { ContactsApiService, OptInHistory } from '../contacts-api.service';
 import { ContactDataExportButtonComponent } from './data-export-button.component';
 import { OptInChipComponent } from './opt-in-chip.component';
 
@@ -34,22 +30,13 @@ import { OptInChipComponent } from './opt-in-chip.component';
   selector: 'app-opt-in-section',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    CommonModule,
-    FormsModule,
-    OptInChipComponent,
-    ContactDataExportButtonComponent,
-  ],
+  imports: [CommonModule, FormsModule, OptInChipComponent, ContactDataExportButtonComponent],
   template: `
     <section class="rounded-md border border-zinc-200 bg-white p-4">
       <header class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            WhatsApp opt-in
-          </p>
-          <p class="text-[11px] text-zinc-500">
-            DPDP-grade consent record.
-          </p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">WhatsApp opt-in</p>
+          <p class="text-[11px] text-zinc-500">DPDP-grade consent record.</p>
         </div>
         <div class="flex items-center gap-2">
           <app-contact-data-export-button [contactId]="contactId()" />
@@ -78,7 +65,9 @@ import { OptInChipComponent } from './opt-in-chip.component';
             <dd class="text-zinc-800">{{ formatDate(h.recorded_at) }}</dd>
           </div>
           @if (h.opt_out_recorded_at) {
-            <div class="col-span-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-rose-700">
+            <div
+              class="col-span-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-rose-700"
+            >
               <dt class="text-[10px] uppercase text-rose-700">Opted out</dt>
               <dd>
                 {{ formatDate(h.opt_out_recorded_at) }}
@@ -125,7 +114,9 @@ import { OptInChipComponent } from './opt-in-chip.component';
         }
 
         <details>
-          <summary class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700">
+          <summary
+            class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700"
+          >
             Consent log ({{ h.events.length }})
           </summary>
           @if (h.events.length === 0) {
@@ -167,8 +158,7 @@ export class OptInSectionComponent {
   protected readonly history = signal<OptInHistory | null>(null);
   protected readonly reason = signal<string>('');
 
-  protected readonly canManage = (): boolean =>
-    this.auth.hasPermission('whatsapp.opt_in.manage');
+  protected readonly canManage = (): boolean => this.auth.hasPermission('whatsapp.opt_in.manage');
 
   constructor() {
     effect(() => {

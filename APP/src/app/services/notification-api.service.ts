@@ -7,8 +7,13 @@ import { INotification } from '@app/schemas/notification';
 export class NotificationApiService {
   private readonly http = inject(HttpHelperService);
 
-  getNotifications(payload: { page_index: number; page_size: number }): Promise<IPaginatedApiResponse<INotification>> {
-    return this.http.Post('/notifications/list', payload) as Promise<IPaginatedApiResponse<INotification>>;
+  getNotifications(payload: {
+    page_index: number;
+    page_size: number;
+  }): Promise<IPaginatedApiResponse<INotification>> {
+    return this.http.Post('/notifications/list', payload) as Promise<
+      IPaginatedApiResponse<INotification>
+    >;
   }
 
   getUnreadCount(): Promise<IApiResponse<{ count: number }>> {

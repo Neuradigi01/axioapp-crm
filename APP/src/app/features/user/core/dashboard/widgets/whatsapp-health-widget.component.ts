@@ -1,12 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
@@ -40,7 +34,6 @@ const QUALITY_LABEL: Record<WhatsAppQualityRating, string> = {
   UNKNOWN: 'Unknown',
 };
 
-
 @Component({
   selector: 'app-whatsapp-health-widget',
   standalone: true,
@@ -53,20 +46,12 @@ const QUALITY_LABEL: Record<WhatsAppQualityRating, string> = {
         class="block rounded-md border border-zinc-200 bg-white p-3 transition hover:border-zinc-300 hover:shadow-sm"
       >
         <div class="flex items-center justify-between">
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            WhatsApp health
-          </p>
-          <lucide-icon
-            name="arrow-right"
-            class="h-3 w-3 text-zinc-400"
-          />
+          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">WhatsApp health</p>
+          <lucide-icon name="arrow-right" class="h-3 w-3 text-zinc-400" />
         </div>
         <div class="mt-2 flex items-center gap-2">
           <span
-            [class]="
-              'inline-block h-2.5 w-2.5 rounded-full ' +
-              QUALITY_DOT[h.quality_rating]
-            "
+            [class]="'inline-block h-2.5 w-2.5 rounded-full ' + QUALITY_DOT[h.quality_rating]"
           ></span>
           <span class="text-sm font-medium text-zinc-900">
             {{ QUALITY_LABEL[h.quality_rating] }}
@@ -82,7 +67,9 @@ const QUALITY_LABEL: Record<WhatsAppQualityRating, string> = {
           </p>
         }
         @if (h.restrictions.length > 0) {
-          <p class="mt-1 inline-flex items-center gap-1 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
+          <p
+            class="mt-1 inline-flex items-center gap-1 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700"
+          >
             <lucide-icon name="alert-triangle" size="10" />
             Restricted
           </p>

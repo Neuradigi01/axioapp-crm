@@ -15,7 +15,11 @@ export class NewsletterApiService {
     return this.http.Post<void>('/misc/newsletter/unsubscribe', { email });
   }
 
-  getSubscriberList(payload: INewsletterListRequest): Promise<IPaginatedApiResponse<INewsletterSubscriber>> {
-    return this.http.Post('/admin/newsletter/list', payload) as Promise<IPaginatedApiResponse<INewsletterSubscriber>>;
+  getSubscriberList(
+    payload: INewsletterListRequest,
+  ): Promise<IPaginatedApiResponse<INewsletterSubscriber>> {
+    return this.http.Post('/admin/newsletter/list', payload) as Promise<
+      IPaginatedApiResponse<INewsletterSubscriber>
+    >;
   }
 }

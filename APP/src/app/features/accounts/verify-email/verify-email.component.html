@@ -5,22 +5,30 @@
 
   <div class="flex flex-col items-center text-center">
     @if (isLoading()) {
-      <span class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-zinc-500">
+      <span
+        class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-zinc-500"
+      >
         <lucide-icon name="mail" class="h-6 w-6" />
       </span>
       <p class="text-sm text-zinc-700">Verifying your email address…</p>
     } @else if (result() === 'success') {
-      <span class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+      <span
+        class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"
+      >
         <lucide-icon name="check-circle-2" class="h-6 w-6" />
       </span>
       <p class="text-sm font-medium text-zinc-800">Your email has been verified successfully!</p>
       <p class="mt-1 text-sm text-zinc-500">You can now login to your account.</p>
     } @else {
-      <span class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+      <span
+        class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600"
+      >
         <lucide-icon name="x-circle" class="h-6 w-6" />
       </span>
       <p class="text-sm font-medium text-zinc-800">{{ errorMessage() }}</p>
-      <p class="mt-1 text-sm text-zinc-500">Please try logging in to receive a new verification email.</p>
+      <p class="mt-1 text-sm text-zinc-500">
+        Please try logging in to receive a new verification email.
+      </p>
     }
   </div>
 

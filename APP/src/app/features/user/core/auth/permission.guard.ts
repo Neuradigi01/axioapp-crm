@@ -46,9 +46,7 @@ export const permissionGuard = (...required: string[]): CanActivateFn => {
 
     return auth.me().pipe(
       map((me) => {
-        const missing = required.filter(
-          (k) => !me.permission_keys.includes(k),
-        );
+        const missing = required.filter((k) => !me.permission_keys.includes(k));
         return missing.length === 0 ? true : denied(missing);
       }),
       catchError(() =>

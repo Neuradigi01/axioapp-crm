@@ -10,10 +10,10 @@
 Reads need `catalog.read`; writes need `catalog.write`. Tenant scoping
 is automatic via the ORM filter on `TenantScoped`.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import (
     APIRouter,
@@ -45,14 +45,13 @@ from src.app.core.catalog.service import (
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
 
 @router.get("", response_model=CatalogListResponse)
 async def list_items_endpoint(
-    q: Optional[str] = Query(default=None, max_length=255),
-    category: Optional[str] = Query(default=None, max_length=64),
+    q: str | None = Query(default=None, max_length=255),
+    category: str | None = Query(default=None, max_length=64),
     active_only: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
@@ -75,9 +74,7 @@ async def list_items_endpoint(
     )
 
 
-@router.post(
-    "", response_model=CatalogItemOut, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=CatalogItemOut, status_code=status.HTTP_201_CREATED)
 async def create_item_endpoint(
     payload: CatalogItemCreate,
     db: AsyncSession = Depends(get_db),
@@ -137,7 +134,5 @@ async def upload_item_image_endpoint(
     same storage path; the returned `image_url` may differ from a
     prior URL only if the detected extension changed."""
     file_bytes = await file.read()
-    item = await set_item_image(
-        db, org_id=user.org_id, item_id=item_id, file_bytes=file_bytes
-    )
+    item = await set_item_image(db, org_id=user.org_id, item_id=item_id, file_bytes=file_bytes)
     return CatalogItemOut.model_validate(item)

@@ -35,14 +35,15 @@ the operator can rerun the action manually from the SPA submissions
 table (future Step 26+ surface). The webhook handler must never
 fail because a downstream service balked.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -115,9 +116,7 @@ def load_template(category: str) -> dict[str, Any]:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise FlowsServiceError(
-            f"could not load template {category!r}: {exc}"
-        ) from exc
+        raise FlowsServiceError(f"could not load template {category!r}: {exc}") from exc
 
 
 def available_templates() -> list[dict[str, str]]:
@@ -129,16 +128,14 @@ def available_templates() -> list[dict[str, str]]:
             "key": "appointment_booking",
             "label": "Appointment booking",
             "description": (
-                "Date + time + service picker. Auto-creates an "
-                "appointment in your CRM on submit."
+                "Date + time + service picker. Auto-creates an appointment in your CRM on submit."
             ),
         },
         {
             "key": "lead_capture",
             "label": "Lead capture",
             "description": (
-                "Name + interest + budget intake. Auto-creates a "
-                "lead and routes to a sales rep."
+                "Name + interest + budget intake. Auto-creates a lead and routes to a sales rep."
             ),
         },
         {
@@ -153,8 +150,7 @@ def available_templates() -> list[dict[str, str]]:
             "key": "custom",
             "label": "Blank custom",
             "description": (
-                "Empty single-screen flow. Edit the JSON to your "
-                "needs — no auto-action wired."
+                "Empty single-screen flow. Edit the JSON to your needs — no auto-action wired."
             ),
         },
     ]
@@ -181,14 +177,10 @@ async def _resolve_meta_client(
 
     bundle = await get_active_config(session)
     if bundle is None:
-        raise FlowsServiceError(
-            "WhatsApp is not connected — connect it from Integrations first."
-        )
+        raise FlowsServiceError("WhatsApp is not connected — connect it from Integrations first.")
     _, wa_config = bundle
     if not wa_config.waba_id:
-        raise FlowsServiceError(
-            "WhatsApp integration is missing a WABA id."
-        )
+        raise FlowsServiceError("WhatsApp integration is missing a WABA id.")
 
     # Flow operations use the same OAuth-issued user token the rest
     # of the Graph calls do — pulled from the `whatsapp` integration
@@ -203,17 +195,13 @@ async def _resolve_meta_client(
         )
     ).scalar_one_or_none()
     if integration is None:
-        raise FlowsServiceError(
-            "no connected WhatsApp integration row for this org."
-        )
+        raise FlowsServiceError("no connected WhatsApp integration row for this org.")
 
     client = MetaGraphClient(integration=integration, session=session)
     return client, wa_config.waba_id, wa_config
 
 
-async def publish_flow(
-    session: AsyncSession, *, flow: WhatsAppFlow
-) -> WhatsAppFlow:
+async def publish_flow(session: AsyncSession, *, flow: WhatsAppFlow) -> WhatsAppFlow:
     """Create the Flow at Meta (if not already), upload the JSON
     asset, then publish. Idempotent — re-publishing an already-
     published flow updates the JSON assets in place and bumps
@@ -237,9 +225,7 @@ async def publish_flow(
             )
             meta_id = str(created.get("id") or "")
             if not meta_id:
-                raise FlowsServiceError(
-                    "Meta did not return a flow id on create."
-                )
+                raise FlowsServiceError("Meta did not return a flow id on create.")
             flow.meta_flow_id = meta_id
             await session.commit()
             await session.refresh(flow)
@@ -265,12 +251,10 @@ async def publish_flow(
             flow.id,
             flow.meta_flow_id,
         )
-        raise FlowsServiceError(
-            f"Meta rejected the publish call: {exc}"
-        ) from exc
+        raise FlowsServiceError(f"Meta rejected the publish call: {exc}") from exc
 
     flow.status = "published"
-    flow.updated_at = datetime.now(timezone.utc)
+    flow.updated_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(flow)
     await audit.log(
@@ -282,9 +266,7 @@ async def publish_flow(
     return flow
 
 
-async def delete_flow(
-    session: AsyncSession, *, flow: WhatsAppFlow
-) -> None:
+async def delete_flow(session: AsyncSession, *, flow: WhatsAppFlow) -> None:
     """Soft-deprecate a flow: archive locally + DELETE on Meta when
     a meta_flow_id is known. We don't drop the local row so the
     submissions history stays intact (the FK is ``ON DELETE SET
@@ -301,7 +283,7 @@ async def delete_flow(
                 flow.meta_flow_id,
             )
     flow.status = "archived"
-    flow.updated_at = datetime.now(timezone.utc)
+    flow.updated_at = datetime.now(UTC)
     await session.commit()
     await audit.log(
         "whatsapp.flows.archived",
@@ -324,20 +306,11 @@ async def test_send_flow(
     different envelope shape and the adapter is intentionally
     scoped to text / media / interactive(buttons/cta/list)."""
     if flow.status != "published":
-        raise FlowsServiceError(
-            "Only published flows can be test-sent. "
-            "Publish the flow first."
-        )
+        raise FlowsServiceError("Only published flows can be test-sent. Publish the flow first.")
     if not flow.meta_flow_id:
-        raise FlowsServiceError(
-            "Flow is missing the Meta-side id — re-publish and retry."
-        )
+        raise FlowsServiceError("Flow is missing the Meta-side id — re-publish and retry.")
     client, _, wa_config = await _resolve_meta_client(session)
-    token = (
-        decrypt(wa_config.access_token_enc)
-        if wa_config.access_token_enc
-        else None
-    )
+    token = decrypt(wa_config.access_token_enc) if wa_config.access_token_enc else None
     envelope = {
         "messaging_product": "whatsapp",
         "to": "".join(c for c in to_phone if c.isdigit()),
@@ -364,12 +337,8 @@ async def test_send_flow(
             access_token=token,
         )
     except Exception as exc:  # noqa: BLE001
-        logger.exception(
-            "test_send_flow: Meta send failed for flow %s", flow.id
-        )
-        raise FlowsServiceError(
-            f"Meta rejected the test send: {exc}"
-        ) from exc
+        logger.exception("test_send_flow: Meta send failed for flow %s", flow.id)
+        raise FlowsServiceError(f"Meta rejected the test send: {exc}") from exc
     await audit.log(
         "whatsapp.flows.test_sent",
         entity_type="whatsapp_flow",
@@ -388,9 +357,9 @@ async def record_submission(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    flow_token: Optional[str],
-    contact_id: Optional[uuid.UUID],
-    conversation_id: Optional[uuid.UUID],
+    flow_token: str | None,
+    contact_id: uuid.UUID | None,
+    conversation_id: uuid.UUID | None,
     response_data: dict[str, Any],
 ) -> WhatsAppFlowSubmission:
     """Persist a flow submission + dispatch the category-specific
@@ -409,11 +378,7 @@ async def record_submission(
             token_uuid = None
         if token_uuid is not None:
             flow = (
-                await session.execute(
-                    select(WhatsAppFlow).where(
-                        WhatsAppFlow.id == token_uuid
-                    )
-                )
+                await session.execute(select(WhatsAppFlow).where(WhatsAppFlow.id == token_uuid))
             ).scalar_one_or_none()
 
     submission = WhatsAppFlowSubmission(
@@ -473,7 +438,7 @@ async def _dispatch_auto_action(
     org_id: uuid.UUID,
     contact_id: uuid.UUID,
     response_data: dict[str, Any],
-) -> tuple[str, Optional[uuid.UUID]]:
+) -> tuple[str, uuid.UUID | None]:
     """Run the category-specific auto-action. Returns ``(action,
     entity_id)`` so the submission row can record what produced
     what. Unknown categories no-op with ``('none', None)``."""
@@ -519,19 +484,13 @@ async def _dispatch_auto_action(
         from src.app.core.appointments.service import create_appointment
         from src.app.core.leads.routing import pick_assignee
 
-        assignee = await pick_assignee(
-            session, org_id=org_id, source="whatsapp_flow"
-        )
+        assignee = await pick_assignee(session, org_id=org_id, source="whatsapp_flow")
         if assignee is None:
-            logger.info(
-                "appointment auto-action skipped — no assignee available"
-            )
+            logger.info("appointment auto-action skipped — no assignee available")
             return "skipped_no_assignee", None
         scheduled_at = _parse_scheduled_at(response_data)
         if scheduled_at is None:
-            logger.info(
-                "appointment auto-action skipped — could not parse date/time"
-            )
+            logger.info("appointment auto-action skipped — could not parse date/time")
             return "skipped_bad_datetime", None
         appt = await create_appointment(
             session,
@@ -568,9 +527,7 @@ async def _dispatch_auto_action(
             rating=max(1, min(5, rating)) if rating else 3,
             text=str(response_data.get("comment") or "").strip() or None,
             status=ReviewStatus.pending_reply,
-            tags=[
-                str(response_data.get("topic") or "general")
-            ],
+            tags=[str(response_data.get("topic") or "general")],
         )
         session.add(review)
         await session.commit()
@@ -583,7 +540,7 @@ async def _dispatch_auto_action(
 
 def _parse_scheduled_at(
     response_data: dict[str, Any],
-) -> Optional[datetime]:
+) -> datetime | None:
     """Build a tz-aware UTC datetime from the appointment template's
     ``preferred_date`` (``YYYY-MM-DD``) + ``preferred_time``
     (``HH:MM``). Returns None when either piece is missing or
@@ -596,15 +553,11 @@ def _parse_scheduled_at(
     if not raw_time:
         raw_time = "10:00"
     try:
-        return datetime.strptime(
-            f"{raw_date} {raw_time}", "%Y-%m-%d %H:%M"
-        ).replace(tzinfo=timezone.utc)
+        return datetime.strptime(f"{raw_date} {raw_time}", "%Y-%m-%d %H:%M").replace(tzinfo=UTC)
     except ValueError:
         # Try ISO-shaped date with no explicit time.
         try:
-            return datetime.fromisoformat(raw_date).replace(
-                tzinfo=timezone.utc
-            )
+            return datetime.fromisoformat(raw_date).replace(tzinfo=UTC)
         except ValueError:
             return None
 

@@ -18,6 +18,7 @@ The two permissions compose: the route declares the lower bar
 (`email.accounts.manage`) so any rep can hit it; admin-only behavior
 is decided inside the handler by sniffing the granted set.
 """
+
 from __future__ import annotations
 
 import logging
@@ -49,7 +50,6 @@ from src.app.core.email.service import (
 from src.app.core.users.models import User
 from src.app.shared.context import get_context
 from src.app.shared.db import get_db
-
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +152,7 @@ async def bounce_webhook_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="invalid_json",
-        )
+        ) from None
 
     # Provider-specific HMAC. Mailgun is in-band; the rest are
     # gateway-validated so we accept them by shape.
@@ -183,7 +183,7 @@ async def bounce_webhook_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
-        )
+        ) from exc
 
     if not events:
         return BounceWebhookResponse()

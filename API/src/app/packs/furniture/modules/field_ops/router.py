@@ -20,10 +20,10 @@ Permissions:
   - `field_visits.read`  → admin GETs
   - `field_visits.write` → admin create/update/delete/complete/photos
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import (
     APIRouter,
@@ -64,7 +64,6 @@ from src.app.packs.furniture.modules.field_ops.service import (
 )
 from src.app.shared.db import get_db
 
-
 # --- admin router -------------------------------------------------------
 
 
@@ -73,10 +72,10 @@ router = APIRouter(prefix="/field-visits", tags=["Field Visits"])
 
 @router.get("", response_model=FieldVisitListResponse)
 async def list_visits_endpoint(
-    assigned_to_id: Optional[uuid.UUID] = Query(default=None),
-    purpose: Optional[FieldVisitPurpose] = Query(default=None),
-    completed: Optional[bool] = Query(default=None),
-    custom_order_id: Optional[uuid.UUID] = Query(default=None),
+    assigned_to_id: uuid.UUID | None = Query(default=None),
+    purpose: FieldVisitPurpose | None = Query(default=None),
+    completed: bool | None = Query(default=None),
+    custom_order_id: uuid.UUID | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -109,9 +108,7 @@ async def create_visit_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("field_visits.write")),
 ) -> FieldVisitOut:
-    visit = await create_visit(
-        db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload
-    )
+    visit = await create_visit(db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload)
     return FieldVisitOut.model_validate(visit)
 
 
@@ -153,15 +150,11 @@ async def complete_visit_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("field_visits.write")),
 ) -> FieldVisitOut:
-    visit = await complete_visit(
-        db, visit_id=visit_id, user_id=user.legacy_uuid, payload=payload
-    )
+    visit = await complete_visit(db, visit_id=visit_id, user_id=user.legacy_uuid, payload=payload)
     return FieldVisitOut.model_validate(visit)
 
 
-@router.get(
-    "/{visit_id}/photos", response_model=list[FieldVisitPhotoOut]
-)
+@router.get("/{visit_id}/photos", response_model=list[FieldVisitPhotoOut])
 async def list_photos_endpoint(
     visit_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -180,7 +173,7 @@ async def list_photos_endpoint(
 async def upload_photo_endpoint(
     visit_id: uuid.UUID,
     file: UploadFile = File(...),
-    caption: Optional[str] = Form(default=None),
+    caption: str | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("field_visits.write")),
 ) -> FieldVisitPhotoOut:
@@ -207,14 +200,12 @@ async def upload_photo_endpoint(
 # --- staff portal router -----------------------------------------------
 
 
-staff_portal_router = APIRouter(
-    prefix="/staff-portal/me/field-visits", tags=["StaffPortal"]
-)
+staff_portal_router = APIRouter(prefix="/staff-portal/me/field-visits", tags=["StaffPortal"])
 
 
 @staff_portal_router.get("", response_model=list[FieldVisitOut])
 async def me_list_visits_endpoint(
-    completed: Optional[bool] = Query(default=None),
+    completed: bool | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_staff),
 ) -> list[FieldVisitOut]:
@@ -228,9 +219,7 @@ async def me_list_visits_endpoint(
     return [FieldVisitOut.model_validate(r) for r in rows]
 
 
-@staff_portal_router.get(
-    "/{visit_id}", response_model=FieldVisitOut
-)
+@staff_portal_router.get("/{visit_id}", response_model=FieldVisitOut)
 async def me_get_visit_endpoint(
     visit_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -240,24 +229,18 @@ async def me_get_visit_endpoint(
     return FieldVisitOut.model_validate(visit)
 
 
-@staff_portal_router.post(
-    "/{visit_id}/complete", response_model=FieldVisitOut
-)
+@staff_portal_router.post("/{visit_id}/complete", response_model=FieldVisitOut)
 async def me_complete_visit_endpoint(
     visit_id: uuid.UUID,
     payload: FieldVisitCompletePayload,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_staff),
 ) -> FieldVisitOut:
-    visit = await complete_visit(
-        db, visit_id=visit_id, user_id=user.legacy_uuid, payload=payload
-    )
+    visit = await complete_visit(db, visit_id=visit_id, user_id=user.legacy_uuid, payload=payload)
     return FieldVisitOut.model_validate(visit)
 
 
-@staff_portal_router.get(
-    "/{visit_id}/photos", response_model=list[FieldVisitPhotoOut]
-)
+@staff_portal_router.get("/{visit_id}/photos", response_model=list[FieldVisitPhotoOut])
 async def me_list_photos_endpoint(
     visit_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -276,7 +259,7 @@ async def me_list_photos_endpoint(
 async def me_upload_photo_endpoint(
     visit_id: uuid.UUID,
     file: UploadFile = File(...),
-    caption: Optional[str] = Form(default=None),
+    caption: str | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_staff),
 ) -> FieldVisitPhotoOut:

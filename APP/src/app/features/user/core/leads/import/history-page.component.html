@@ -8,8 +8,8 @@
       </nav>
       <h1 class="text-lg font-semibold text-zinc-900">Import history</h1>
       <p class="text-xs text-zinc-500">
-        Every bulk import this org has run. Download the original source file
-        or the per-row error report from any past run.
+        Every bulk import this org has run. Download the original source file or the per-row error
+        report from any past run.
       </p>
     </div>
     <a
@@ -56,7 +56,9 @@
   </div>
 
   @if (loadError(); as err) {
-    <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ err }}</p>
+    <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ err }}
+    </p>
   }
 
   @if (loading()) {
@@ -77,7 +79,6 @@
       </a>
     </div>
   } @else {
-
     <!-- Desktop table -->
     <div class="hidden md:block overflow-visible rounded-md border border-zinc-200 bg-white">
       <table class="min-w-full text-sm">
@@ -95,12 +96,15 @@
           @for (row of rows(); track row.id) {
             <tr>
               <td class="px-4 py-3 text-zinc-700">
-                <span [title]="absoluteTime(row.created_at)">{{ relativeTime(row.created_at) }}</span>
+                <span [title]="absoluteTime(row.created_at)">{{
+                  relativeTime(row.created_at)
+                }}</span>
               </td>
               <td class="px-4 py-3">
                 <p class="truncate font-medium text-zinc-900">{{ row.name }}</p>
                 <p class="truncate text-xs text-zinc-500">
-                  {{ row.original_filename }} · {{ formatBytes(row.byte_size) }} · {{ row.row_count_estimate }} rows
+                  {{ row.original_filename }} · {{ formatBytes(row.byte_size) }} ·
+                  {{ row.row_count_estimate }} rows
                 </p>
               </td>
               <td class="px-4 py-3 text-zinc-700">
@@ -183,7 +187,9 @@
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
               <p class="truncate text-sm font-medium text-zinc-900">{{ row.name }}</p>
-              <p class="text-xs text-zinc-500">{{ relativeTime(row.created_at) }} · {{ platformLabel(row.source_platform) }}</p>
+              <p class="text-xs text-zinc-500">
+                {{ relativeTime(row.created_at) }} · {{ platformLabel(row.source_platform) }}
+              </p>
             </div>
             <span
               class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 shrink-0"
@@ -195,17 +201,32 @@
           @if (row.counts; as c) {
             <p class="text-xs text-zinc-600">
               <span class="text-emerald-700">{{ c.imported ?? 0 }} ✓</span>
-              · <span class="text-indigo-700">{{ c.duplicates_skipped ?? 0 }} dup</span>
-              · <span class="text-red-700">{{ c.errors ?? 0 }} err</span>
+              · <span class="text-indigo-700">{{ c.duplicates_skipped ?? 0 }} dup</span> ·
+              <span class="text-red-700">{{ c.errors ?? 0 }} err</span>
             </p>
           }
           <div class="flex flex-wrap gap-2 text-xs">
-            <button (click)="downloadSource(row)" class="rounded border border-zinc-300 px-2 py-1 text-zinc-700">Source</button>
+            <button
+              (click)="downloadSource(row)"
+              class="rounded border border-zinc-300 px-2 py-1 text-zinc-700"
+            >
+              Source
+            </button>
             @if (hasErrors(row)) {
-              <button (click)="downloadErrors(row)" class="rounded border border-zinc-300 px-2 py-1 text-zinc-700">Errors</button>
+              <button
+                (click)="downloadErrors(row)"
+                class="rounded border border-zinc-300 px-2 py-1 text-zinc-700"
+              >
+                Errors
+              </button>
             }
             @if (canCancel(row)) {
-              <button (click)="cancelImport(row)" class="rounded border border-red-300 px-2 py-1 text-red-700">Cancel</button>
+              <button
+                (click)="cancelImport(row)"
+                class="rounded border border-red-300 px-2 py-1 text-red-700"
+              >
+                Cancel
+              </button>
             }
           </div>
         </div>
@@ -214,9 +235,7 @@
 
     <!-- Pagination -->
     <div class="flex items-center justify-between text-sm text-zinc-600">
-      <p>
-        Page {{ page() }} of {{ totalPages() }} · {{ total() }} imports total
-      </p>
+      <p>Page {{ page() }} of {{ totalPages() }} · {{ total() }} imports total</p>
       <div class="flex items-center gap-2">
         <button
           type="button"

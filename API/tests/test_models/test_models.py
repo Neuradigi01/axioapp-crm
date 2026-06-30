@@ -1,11 +1,10 @@
 import pytest
-import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from src.models.user import UserLogin, UserInfo
-from src.models.admin import Admin
 from src.core.security.password import hash_password
+from src.models.admin import Admin
+from src.models.user import UserInfo, UserLogin
 
 
 @pytest.mark.asyncio
@@ -72,6 +71,7 @@ async def test_user_info_relationship(test_db):
     await db.flush()
 
     from sqlalchemy.orm import selectinload
+
     stmt = (
         select(UserLogin)
         .options(selectinload(UserLogin.user_info))

@@ -11,6 +11,7 @@ of mysterious 500s.
 Inbound (`parse_webhook`) is :class:`NotImplementedError` for the
 same reason — no provider, no inbound.
 """
+
 from __future__ import annotations
 
 import uuid

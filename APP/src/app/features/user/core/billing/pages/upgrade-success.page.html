@@ -4,7 +4,9 @@
   >
     @switch (status()) {
       @case ('polling') {
-        <div class="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
+        <div
+          class="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"
+        ></div>
         <h1 class="mt-4 text-lg font-semibold text-zinc-900 dark:text-slate-100">
           Confirming your payment…
         </h1>
@@ -37,9 +39,8 @@
           Payment received — confirmation is taking longer than expected
         </h1>
         <p class="mt-2 text-sm text-zinc-500 dark:text-slate-400">
-          Your payment was accepted by Stripe but our records haven't caught
-          up yet. Refresh this page in a minute, or open Billing to check the
-          current status.
+          Your payment was accepted by Stripe but our records haven't caught up yet. Refresh this
+          page in a minute, or open Billing to check the current status.
         </p>
         <div class="mt-5 flex items-center justify-center gap-2">
           <a

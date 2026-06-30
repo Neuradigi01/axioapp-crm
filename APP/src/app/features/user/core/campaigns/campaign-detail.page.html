@@ -68,143 +68,195 @@
     @if (activeTab() === 'analytics') {
       <app-campaign-analytics-tab [campaignId]="id" />
     } @else {
-    @if (stats(); as s) {
-      <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <div class="rounded-lg border border-zinc-200 bg-white p-3 text-center">
-          <div class="text-[10px] uppercase tracking-wide text-zinc-500">Audience</div>
-          <div class="mt-1 text-xl font-semibold text-zinc-900">{{ s.audience_size }}</div>
-        </div>
-        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
-          <div class="text-[10px] uppercase tracking-wide text-amber-700">Queued</div>
-          <div class="mt-1 text-xl font-semibold text-amber-900">{{ s.queued }}</div>
-        </div>
-        <div class="rounded-lg border border-sky-200 bg-sky-50 p-3 text-center">
-          <div class="text-[10px] uppercase tracking-wide text-sky-700">Sent</div>
-          <div class="mt-1 text-xl font-semibold text-sky-900">{{ s.sent }}</div>
-        </div>
-        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center">
-          <div class="text-[10px] uppercase tracking-wide text-emerald-700">Delivered</div>
-          <div class="mt-1 text-xl font-semibold text-emerald-900">{{ s.delivered }}</div>
-          @if (deliveryRate() !== null) {
-            <div class="text-[10px] text-emerald-700">{{ deliveryRate() }}% of sent</div>
-          }
-        </div>
-        <div class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
-          <div class="text-[10px] uppercase tracking-wide text-violet-700">Read</div>
-          <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.read }}</div>
-          @if (readRate() !== null) {
-            <div class="text-[10px] text-violet-700">{{ readRate() }}% of delivered</div>
-          }
-        </div>
-        <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-center">
-          <div class="text-[10px] uppercase tracking-wide text-rose-700">Failed</div>
-          <div class="mt-1 text-xl font-semibold text-rose-900">{{ s.failed }}</div>
-          @if (failureRate() !== null) {
-            <div class="text-[10px] text-rose-700">{{ failureRate() }}% of attempts</div>
-          }
-        </div>
-      </div>
-    }
-
-    <div class="mb-3 flex items-baseline justify-between">
-      <h2 class="text-sm font-semibold text-zinc-900">Messages</h2>
-      <button
-        type="button"
-        (click)="refreshStatsAndMessages()"
-        class="text-xs text-zinc-500 hover:text-zinc-700"
-      >
-        Refresh now
-      </button>
-    </div>
-
-    @if (loading()) {
-      <div class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
-        Loading…
-      </div>
-    } @else if (messages().length === 0) {
-      <div class="rounded-lg border border-dashed border-zinc-300 bg-white p-8 text-center text-sm text-zinc-500">
-        No messages yet. Start the campaign to dispatch.
-      </div>
-    } @else {
-      <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
-        <table class="min-w-full divide-y divide-zinc-200 text-sm">
-          <thead class="bg-zinc-50">
-            <tr>
-              <th class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500">Contact</th>
-              <th class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500">Status</th>
-              <th class="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-500">Tick</th>
-              <th class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500">Channel msg</th>
-              <th class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500">Error</th>
-              <th class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500">Sent</th>
-              <th class="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-zinc-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-zinc-100">
-            @for (m of messages(); track m.id) {
-              <tr>
-                <td class="whitespace-nowrap px-3 py-2 font-mono text-xs text-zinc-700">
-                  {{ shortId(m.contact_id) }}
-                </td>
-                <td class="px-3 py-2">
-                  <span
-                    [class]="
-                      'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ' +
-                      messageStatusCls(m.status)
-                    "
-                  >
-                    {{ m.status }}
-                  </span>
-                </td>
-                <td class="px-3 py-2 text-center">
-                  @switch (tickState(m)) {
-                    @case ('read') {
-                      <lucide-icon name="check-check" class="inline h-4 w-4 text-sky-500" aria-label="Read" />
-                    }
-                    @case ('delivered') {
-                      <lucide-icon name="check-check" class="inline h-4 w-4 text-zinc-500" aria-label="Delivered" />
-                    }
-                    @case ('sent') {
-                      <lucide-icon name="check" class="inline h-4 w-4 text-zinc-500" aria-label="Sent" />
-                    }
-                    @case ('pending') {
-                      <lucide-icon name="clock" class="inline h-4 w-4 text-amber-500" aria-label="Pending" />
-                    }
-                    @case ('failed') {
-                      <lucide-icon name="x" class="inline h-4 w-4 text-rose-500" aria-label="Failed" />
-                    }
-                  }
-                </td>
-                <td class="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-zinc-500">
-                  {{ m.channel_message_id || '—' }}
-                </td>
-                <td class="max-w-xs px-3 py-2 text-xs text-rose-700">
-                  @if (m.error) {
-                    <span class="line-clamp-1">{{ m.error }}</span>
-                  } @else {
-                    <span class="text-zinc-400">—</span>
-                  }
-                </td>
-                <td class="whitespace-nowrap px-3 py-2 text-xs text-zinc-500">
-                  {{ formatDate(m.sent_at) }}
-                </td>
-                <td class="whitespace-nowrap px-3 py-2 text-right">
-                  @if (m.status === 'failed') {
-                    <button
-                      type="button"
-                      (click)="retry(m)"
-                      [disabled]="retryingId() === m.id"
-                      class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
-                    >
-                      {{ retryingId() === m.id ? 'Retrying…' : 'Retry' }}
-                    </button>
-                  }
-                </td>
-              </tr>
+      @if (stats(); as s) {
+        <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div class="rounded-lg border border-zinc-200 bg-white p-3 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-zinc-500">Audience</div>
+            <div class="mt-1 text-xl font-semibold text-zinc-900">{{ s.audience_size }}</div>
+          </div>
+          <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-amber-700">Queued</div>
+            <div class="mt-1 text-xl font-semibold text-amber-900">{{ s.queued }}</div>
+          </div>
+          <div class="rounded-lg border border-sky-200 bg-sky-50 p-3 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-sky-700">Sent</div>
+            <div class="mt-1 text-xl font-semibold text-sky-900">{{ s.sent }}</div>
+          </div>
+          <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-emerald-700">Delivered</div>
+            <div class="mt-1 text-xl font-semibold text-emerald-900">{{ s.delivered }}</div>
+            @if (deliveryRate() !== null) {
+              <div class="text-[10px] text-emerald-700">{{ deliveryRate() }}% of sent</div>
             }
-          </tbody>
-        </table>
+          </div>
+          <div class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-violet-700">Read</div>
+            <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.read }}</div>
+            @if (readRate() !== null) {
+              <div class="text-[10px] text-violet-700">{{ readRate() }}% of delivered</div>
+            }
+          </div>
+          <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-rose-700">Failed</div>
+            <div class="mt-1 text-xl font-semibold text-rose-900">{{ s.failed }}</div>
+            @if (failureRate() !== null) {
+              <div class="text-[10px] text-rose-700">{{ failureRate() }}% of attempts</div>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="mb-3 flex items-baseline justify-between">
+        <h2 class="text-sm font-semibold text-zinc-900">Messages</h2>
+        <button
+          type="button"
+          (click)="refreshStatsAndMessages()"
+          class="text-xs text-zinc-500 hover:text-zinc-700"
+        >
+          Refresh now
+        </button>
       </div>
-    }
+
+      @if (loading()) {
+        <div
+          class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500"
+        >
+          Loading…
+        </div>
+      } @else if (messages().length === 0) {
+        <div
+          class="rounded-lg border border-dashed border-zinc-300 bg-white p-8 text-center text-sm text-zinc-500"
+        >
+          No messages yet. Start the campaign to dispatch.
+        </div>
+      } @else {
+        <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+          <table class="min-w-full divide-y divide-zinc-200 text-sm">
+            <thead class="bg-zinc-50">
+              <tr>
+                <th
+                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                >
+                  Contact
+                </th>
+                <th
+                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                >
+                  Status
+                </th>
+                <th
+                  class="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                >
+                  Tick
+                </th>
+                <th
+                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                >
+                  Channel msg
+                </th>
+                <th
+                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                >
+                  Error
+                </th>
+                <th
+                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                >
+                  Sent
+                </th>
+                <th
+                  class="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                >
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-100">
+              @for (m of messages(); track m.id) {
+                <tr>
+                  <td class="whitespace-nowrap px-3 py-2 font-mono text-xs text-zinc-700">
+                    {{ shortId(m.contact_id) }}
+                  </td>
+                  <td class="px-3 py-2">
+                    <span
+                      [class]="
+                        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ' +
+                        messageStatusCls(m.status)
+                      "
+                    >
+                      {{ m.status }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-2 text-center">
+                    @switch (tickState(m)) {
+                      @case ('read') {
+                        <lucide-icon
+                          name="check-check"
+                          class="inline h-4 w-4 text-sky-500"
+                          aria-label="Read"
+                        />
+                      }
+                      @case ('delivered') {
+                        <lucide-icon
+                          name="check-check"
+                          class="inline h-4 w-4 text-zinc-500"
+                          aria-label="Delivered"
+                        />
+                      }
+                      @case ('sent') {
+                        <lucide-icon
+                          name="check"
+                          class="inline h-4 w-4 text-zinc-500"
+                          aria-label="Sent"
+                        />
+                      }
+                      @case ('pending') {
+                        <lucide-icon
+                          name="clock"
+                          class="inline h-4 w-4 text-amber-500"
+                          aria-label="Pending"
+                        />
+                      }
+                      @case ('failed') {
+                        <lucide-icon
+                          name="x"
+                          class="inline h-4 w-4 text-rose-500"
+                          aria-label="Failed"
+                        />
+                      }
+                    }
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-zinc-500">
+                    {{ m.channel_message_id || '—' }}
+                  </td>
+                  <td class="max-w-xs px-3 py-2 text-xs text-rose-700">
+                    @if (m.error) {
+                      <span class="line-clamp-1">{{ m.error }}</span>
+                    } @else {
+                      <span class="text-zinc-400">—</span>
+                    }
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2 text-xs text-zinc-500">
+                    {{ formatDate(m.sent_at) }}
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2 text-right">
+                    @if (m.status === 'failed') {
+                      <button
+                        type="button"
+                        (click)="retry(m)"
+                        [disabled]="retryingId() === m.id"
+                        class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                      >
+                        {{ retryingId() === m.id ? 'Retrying…' : 'Retry' }}
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
     }
   }
 </div>

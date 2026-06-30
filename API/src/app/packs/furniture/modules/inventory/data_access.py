@@ -19,10 +19,11 @@ Operations grouped by entity:
   * Cross-module (against ``catalog_items``)
       catalog_item_exists_in_org, insert_catalog_item
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,40 +38,29 @@ from src.app.packs.furniture.modules.inventory.models import (
     Warehouse,
 )
 
-
 # --- Warehouses ---------------------------------------------------------
 
 
-async def get_warehouse_by_id(
-    session: AsyncSession, warehouse_id: uuid.UUID
-) -> Optional[Warehouse]:
+async def get_warehouse_by_id(session: AsyncSession, warehouse_id: uuid.UUID) -> Warehouse | None:
     """Single-row read by PK. ``None`` on miss."""
     return (
-        await session.execute(
-            select(Warehouse).where(Warehouse.id == warehouse_id)
-        )
+        await session.execute(select(Warehouse).where(Warehouse.id == warehouse_id))
     ).scalar_one_or_none()
 
 
 async def list_warehouses_query(session: AsyncSession) -> list[Warehouse]:
     """All warehouses for the active tenant, default first, then
     alphabetical by name."""
-    stmt = select(Warehouse).order_by(
-        Warehouse.is_default.desc(), Warehouse.name.asc()
-    )
+    stmt = select(Warehouse).order_by(Warehouse.is_default.desc(), Warehouse.name.asc())
     return list((await session.execute(stmt)).scalars().all())
 
 
-def insert_warehouse(
-    session: AsyncSession, warehouse: Warehouse
-) -> None:
+def insert_warehouse(session: AsyncSession, warehouse: Warehouse) -> None:
     """Register an already-constructed Warehouse for INSERT."""
     session.add(warehouse)
 
 
-async def delete_warehouse_row(
-    session: AsyncSession, warehouse: Warehouse
-) -> None:
+async def delete_warehouse_row(session: AsyncSession, warehouse: Warehouse) -> None:
     """Mark a Warehouse row for DELETE. Caller commits."""
     await session.delete(warehouse)
 
@@ -78,23 +68,19 @@ async def delete_warehouse_row(
 # --- Inventory items ----------------------------------------------------
 
 
-async def get_item_by_id(
-    session: AsyncSession, item_id: uuid.UUID
-) -> Optional[InventoryItem]:
+async def get_item_by_id(session: AsyncSession, item_id: uuid.UUID) -> InventoryItem | None:
     """Single-row read by PK. ``None`` on miss."""
     return (
-        await session.execute(
-            select(InventoryItem).where(InventoryItem.id == item_id)
-        )
+        await session.execute(select(InventoryItem).where(InventoryItem.id == item_id))
     ).scalar_one_or_none()
 
 
 async def list_items_query(
     session: AsyncSession,
     *,
-    warehouse_id: Optional[uuid.UUID] = None,
-    category: Optional[str] = None,
-    q: Optional[str] = None,
+    warehouse_id: uuid.UUID | None = None,
+    category: str | None = None,
+    q: str | None = None,
     active_only: bool = False,
     page: int = 1,
     size: int = 50,
@@ -144,11 +130,7 @@ async def list_items_query(
 
     total = (await session.execute(total_base)).scalar_one()
     offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
-    )
+    rows = (await session.execute(base.offset(offset).limit(size))).scalars().all()
     return list(rows), int(total)
 
 
@@ -157,9 +139,7 @@ def insert_item(session: AsyncSession, item: InventoryItem) -> None:
     session.add(item)
 
 
-async def delete_item_row(
-    session: AsyncSession, item: InventoryItem
-) -> None:
+async def delete_item_row(session: AsyncSession, item: InventoryItem) -> None:
     """Mark an InventoryItem row for DELETE. Caller commits."""
     await session.delete(item)
 
@@ -183,9 +163,7 @@ async def list_movements_for_item(
     return list((await session.execute(stmt)).scalars().all())
 
 
-def insert_movement(
-    session: AsyncSession, movement: InventoryMovement
-) -> None:
+def insert_movement(session: AsyncSession, movement: InventoryMovement) -> None:
     """Register an already-constructed InventoryMovement for INSERT."""
     session.add(movement)
 
@@ -193,9 +171,7 @@ def insert_movement(
 # --- Stock alerts -------------------------------------------------------
 
 
-async def get_open_alert_for_item(
-    session: AsyncSession, item_id: uuid.UUID
-) -> Optional[StockAlert]:
+async def get_open_alert_for_item(session: AsyncSession, item_id: uuid.UUID) -> StockAlert | None:
     """The single open alert for an item (if any). Used by the
     ``recompute_alerts`` decision tree to avoid churning the row when
     the desired state matches the current state."""
@@ -209,22 +185,18 @@ async def get_open_alert_for_item(
     ).scalar_one_or_none()
 
 
-async def get_alert_by_id(
-    session: AsyncSession, alert_id: uuid.UUID
-) -> Optional[StockAlert]:
+async def get_alert_by_id(session: AsyncSession, alert_id: uuid.UUID) -> StockAlert | None:
     """Single-row alert read by PK."""
     return (
-        await session.execute(
-            select(StockAlert).where(StockAlert.id == alert_id)
-        )
+        await session.execute(select(StockAlert).where(StockAlert.id == alert_id))
     ).scalar_one_or_none()
 
 
 async def list_alerts_query(
     session: AsyncSession,
     *,
-    severity: Optional[AlertSeverity] = None,
-    status_filter: Optional[AlertStatus] = None,
+    severity: AlertSeverity | None = None,
+    status_filter: AlertStatus | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[StockAlert], int]:
@@ -241,9 +213,7 @@ async def list_alerts_query(
     base = select(StockAlert)
     if where is not None:
         base = base.where(where)
-    base = base.order_by(
-        StockAlert.priority.desc(), StockAlert.created_at.desc()
-    )
+    base = base.order_by(StockAlert.priority.desc(), StockAlert.created_at.desc())
 
     total_stmt = select(func.count()).select_from(StockAlert)
     if where is not None:
@@ -251,11 +221,7 @@ async def list_alerts_query(
     total = (await session.execute(total_stmt)).scalar_one()
 
     offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
-    )
+    rows = (await session.execute(base.offset(offset).limit(size))).scalars().all()
     return list(rows), int(total)
 
 
@@ -267,23 +233,17 @@ def insert_alert(session: AsyncSession, alert: StockAlert) -> None:
 # --- Cross-module (catalog_items) ---------------------------------------
 
 
-async def catalog_item_exists_in_org(
-    session: AsyncSession, catalog_item_id: uuid.UUID
-) -> bool:
+async def catalog_item_exists_in_org(session: AsyncSession, catalog_item_id: uuid.UUID) -> bool:
     """Narrow-column existence check against ``catalog_items``. Used
     by the inventory-item-create validator to reject out-of-org
     catalog_item_id references with a friendly 422."""
     row = (
-        await session.execute(
-            select(CatalogItem.id).where(CatalogItem.id == catalog_item_id)
-        )
+        await session.execute(select(CatalogItem.id).where(CatalogItem.id == catalog_item_id))
     ).scalar_one_or_none()
     return row is not None
 
 
-def insert_catalog_item(
-    session: AsyncSession, catalog_item: CatalogItem
-) -> None:
+def insert_catalog_item(session: AsyncSession, catalog_item: CatalogItem) -> None:
     """Register an already-constructed CatalogItem for INSERT. Used
     by ``create_item_full`` to land the catalog row + the inventory
     row in one transaction."""

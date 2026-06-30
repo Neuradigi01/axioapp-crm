@@ -29,6 +29,7 @@ Cases:
  15. `estimate` folds an unknown category key into `utility`.
  16. `estimate` reports the right currency for AE / US.
 """
+
 from __future__ import annotations
 
 import json
@@ -133,9 +134,7 @@ class TestRateOverride:
         assert "marketing" in rates
         assert rates["service"] == 0.0
 
-    def test_unknown_category_in_override_silently_dropped(
-        self, monkeypatch
-    ):
+    def test_unknown_category_in_override_silently_dropped(self, monkeypatch):
         monkeypatch.setenv(
             "WHATSAPP_COST_RATES_OVERRIDE",
             json.dumps({"IN": {"marketing": 1.0, "frobnicate": 9.99}}),
@@ -165,30 +164,20 @@ class TestEstimate:
             counts={"marketing": 10, "bogus": 5},
         )
         # Pull the utility line, which absorbed the bogus 5.
-        util_line = next(l for l in report.lines if l.category == "utility")
+        util_line = next(line for line in report.lines if line.category == "utility")
         assert util_line.count == 5
 
     def test_currency_per_region(self):
-        in_report = cost_estimator.estimate(
-            region="IN", counts={"marketing": 1}
-        )
-        ae_report = cost_estimator.estimate(
-            region="AE", counts={"marketing": 1}
-        )
-        us_report = cost_estimator.estimate(
-            region="US", counts={"marketing": 1}
-        )
+        in_report = cost_estimator.estimate(region="IN", counts={"marketing": 1})
+        ae_report = cost_estimator.estimate(region="AE", counts={"marketing": 1})
+        us_report = cost_estimator.estimate(region="US", counts={"marketing": 1})
         assert in_report.currency == "INR"
         assert ae_report.currency == "AED"
         assert us_report.currency == "USD"
 
     def test_service_line_is_zero_cost(self):
-        report = cost_estimator.estimate(
-            region="IN", counts={"service": 9999}
-        )
-        service_line = next(
-            l for l in report.lines if l.category == "service"
-        )
+        report = cost_estimator.estimate(region="IN", counts={"service": 9999})
+        service_line = next(line for line in report.lines if line.category == "service")
         assert service_line.total == 0.0
         assert report.total == 0.0
 
@@ -197,12 +186,8 @@ class TestEstimate:
         assert report.total == 0.0
         # All four category lines still present so the UI table stays
         # consistent across windows with no traffic.
-        assert {l.category for l in report.lines} == set(
-            cost_estimator.CATEGORIES
-        )
+        assert {line.category for line in report.lines} == set(cost_estimator.CATEGORIES)
 
     def test_is_estimate_flag(self):
-        report = cost_estimator.estimate(
-            region="IN", counts={"marketing": 1}
-        )
+        report = cost_estimator.estimate(region="IN", counts={"marketing": 1})
         assert report.is_estimate is True

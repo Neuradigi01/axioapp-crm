@@ -1,9 +1,7 @@
 <div class="space-y-3">
   @if (isTag()) {
     <div>
-      <label class="block text-[11px] font-medium text-zinc-600 mb-1">
-        Tag name
-      </label>
+      <label class="block text-[11px] font-medium text-zinc-600 mb-1"> Tag name </label>
       <input
         type="text"
         [ngModel]="tagName()"
@@ -17,9 +15,7 @@
     </div>
   } @else if (isList()) {
     <div>
-      <label class="block text-[11px] font-medium text-zinc-600 mb-1">
-        Contact-group UUID
-      </label>
+      <label class="block text-[11px] font-medium text-zinc-600 mb-1"> Contact-group UUID </label>
       <input
         type="text"
         [ngModel]="listId()"

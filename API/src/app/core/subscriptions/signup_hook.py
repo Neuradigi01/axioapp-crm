@@ -10,16 +10,16 @@ with the rest of the bootstrap — there is no codepath that produces an
 organization without a subscription. The lifecycle service (Step 6's
 `lifecycle.py`) only ever sees orgs in known states.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.subscriptions.models import Subscription
-
 
 # Length of the free trial granted to every new org. Mirrored in
 # `plans.yaml` (`trial.trial_duration_days = 14`) — keep in sync if one
@@ -48,7 +48,7 @@ async def create_trial_subscription(
     second active subscription for the same org. Callers should only
     invoke this on a fresh org.
     """
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     trial_end = now + TRIAL_DURATION
     sub = Subscription(
         org_id=org_id,

@@ -1,4 +1,5 @@
 """Tests for `POST /api/v1/auth/login`."""
+
 from __future__ import annotations
 
 import pytest
@@ -7,9 +8,7 @@ from src.app.core.auth.tokens import decode_token
 
 
 @pytest.mark.asyncio
-async def test_login_with_correct_credentials_returns_token(
-    layered_client, seeded_admin
-):
+async def test_login_with_correct_credentials_returns_token(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
 
@@ -65,9 +64,10 @@ async def test_login_with_unknown_org_slug_is_401(layered_client, seeded_admin):
 @pytest.mark.asyncio
 async def test_login_with_inactive_user_is_401(layered_client, seeded_admin):
     """Inactive users can't log in even with correct creds."""
-    from tests.conftest import TestSession
     from sqlalchemy import update
+
     from src.app.core.users.models import User
+    from tests.conftest import TestSession
 
     org = seeded_admin["org"]
     user = seeded_admin["user"]

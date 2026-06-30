@@ -28,7 +28,7 @@ export function getRoute(controlId: string): IRoute {
   const route = _routesMap[controlId];
   if (!route) {
     throw new Error(
-      `Route "${controlId}" not found. Ensure routes are loaded from API before use.`
+      `Route "${controlId}" not found. Ensure routes are loaded from API before use.`,
     );
   }
   return route;
@@ -45,8 +45,8 @@ export class RoutesHelperService {
     try {
       const response = await firstValueFrom(
         this.http.get<{ success: boolean; data: Record<string, IRoute> }>(
-          `${AppSettings.ApiBaseUrl}/routes/config`
-        )
+          `${AppSettings.ApiBaseUrl}/routes/config`,
+        ),
       );
       if (response?.success && response.data) {
         this.routesMap = response.data;
@@ -75,10 +75,7 @@ export class RoutesHelperService {
       let bestMatch: IRoute | undefined;
       let bestLength = 0;
       for (const r of Object.values(this.routesMap)) {
-        if (
-          cleanUrl.startsWith(r.url + '/') &&
-          r.url.length > bestLength
-        ) {
+        if (cleanUrl.startsWith(r.url + '/') && r.url.length > bestLength) {
           bestMatch = r;
           bestLength = r.url.length;
         }
@@ -94,15 +91,12 @@ export class RoutesHelperService {
     return accessRights.includes(route.id);
   }
 
-  getSideNavMenusFromAccessRights(
-    userType: string,
-    accessRights: number[]
-  ): INavMenuItem[] {
+  getSideNavMenusFromAccessRights(userType: string, accessRights: number[]): INavMenuItem[] {
     const accessibleRoutes = Object.values(this.routesMap).filter(
       (r) =>
         r.is_nav_menu_item &&
         accessRights.includes(r.id) &&
-        (r.user_type === userType || r.user_type === 'Any')
+        (r.user_type === userType || r.user_type === 'Any'),
     );
 
     const topLevel = accessibleRoutes

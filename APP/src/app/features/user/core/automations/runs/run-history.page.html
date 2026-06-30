@@ -20,7 +20,9 @@
     </div>
 
     @if (loadError(); as err) {
-      <div class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      <div
+        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+      >
         {{ err }}
       </div>
     }
@@ -51,7 +53,9 @@
 
   <section class="flex-1 px-6 py-4">
     @if (loading() && items().length === 0) {
-      <div class="rounded-md border border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500">
+      <div
+        class="rounded-md border border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500"
+      >
         Loading runs…
       </div>
     } @else if (items().length === 0) {
@@ -59,8 +63,7 @@
         <lucide-icon name="clock" size="28" class="mx-auto mb-2 text-zinc-400" />
         <p class="text-sm font-medium text-zinc-700">No runs match your filters.</p>
         <p class="mt-1 text-xs text-zinc-500">
-          When the trigger fires, every attempt lands here with the
-          rendered payload and status.
+          When the trigger fires, every attempt lands here with the rendered payload and status.
         </p>
       </div>
     } @else {
@@ -142,7 +145,10 @@
                     <div class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
                       Event payload
                     </div>
-                    <pre class="mt-1 overflow-x-auto rounded bg-white px-3 py-2 font-mono text-[11px] leading-snug text-zinc-700 ring-1 ring-zinc-200">{{ payloadJson(row) }}</pre>
+                    <pre
+                      class="mt-1 overflow-x-auto rounded bg-white px-3 py-2 font-mono text-[11px] leading-snug text-zinc-700 ring-1 ring-zinc-200"
+                      >{{ payloadJson(row) }}</pre
+                    >
                     <div class="mt-3 grid grid-cols-2 gap-3 text-xs text-zinc-600">
                       <div>
                         <span class="font-semibold text-zinc-700">Event id:</span>
@@ -176,8 +182,8 @@
       @if (totalPages() > 1) {
         <div class="mt-3 flex items-center justify-between text-xs text-zinc-600">
           <span>
-            Showing {{ items().length }} of {{ total() }}
-            • Page {{ pageIndex() + 1 }} / {{ totalPages() }}
+            Showing {{ items().length }} of {{ total() }} • Page {{ pageIndex() + 1 }} /
+            {{ totalPages() }}
           </span>
           <div class="flex items-center gap-1">
             <button
@@ -206,9 +212,5 @@
 </div>
 
 @if (retryTarget(); as r) {
-  <app-retry-modal
-    [run]="r"
-    (closed)="closeRetry()"
-    (retried)="onRetried($event)"
-  />
+  <app-retry-modal [run]="r" (closed)="closeRetry()" (retried)="onRetried($event)" />
 }

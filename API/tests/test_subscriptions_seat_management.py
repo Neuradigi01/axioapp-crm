@@ -19,10 +19,11 @@ Scenarios mirror the spec's acceptance list:
   - read-only can add seats (recovery path)
   - cancelled cannot change
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -33,7 +34,8 @@ from src.app.core.subscriptions.models import Subscription
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import OrganizationMember
 from src.app.shared.security.password import hash_password
-from src.models.user import UserInfo as LegacyUserInfo, UserLogin
+from src.models.user import UserInfo as LegacyUserInfo
+from src.models.user import UserLogin
 
 
 @pytest.fixture(autouse=True)
@@ -93,7 +95,7 @@ async def _insert_subscription(
 ) -> uuid.UUID:
     from tests.conftest import TestSession
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     cps = current_period_start or trial_started_at or now
     cpe = current_period_end or trial_ends_at or (now + timedelta(days=30))
 
@@ -176,7 +178,9 @@ async def _get_seats_preview(client, token, total_seats):
 async def test_no_change_when_total_matches_current(layered_client, seeded_admin):
     org = seeded_admin["org"]
     await _insert_subscription(
-        org.id, plan_code="basic", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        seats_purchased=5,
     )
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_seats(layered_client, token, 5)
@@ -192,7 +196,7 @@ async def test_no_change_when_total_matches_current(layered_client, seeded_admin
 @pytest.mark.asyncio
 async def test_trial_cannot_add_seats(layered_client, seeded_admin):
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="trial",
@@ -215,11 +219,13 @@ async def test_trial_cannot_add_seats(layered_client, seeded_admin):
 @pytest.mark.asyncio
 async def test_adding_seats_on_basic_needs_payment(layered_client, seeded_admin):
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     # Fresh period start ⇒ proration fraction ≈ 1.0 ⇒ near-full extra
     # seat cost. Use start=now to keep the math predictable.
     await _insert_subscription(
-        org.id, plan_code="basic", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        seats_purchased=5,
         billing_cycle="monthly",
         current_period_start=now,
         current_period_end=now + timedelta(days=30),
@@ -256,7 +262,9 @@ async def test_removing_above_floors_scheduled(layered_client, seeded_admin):
     role = seeded_admin["role"]
     # 1 seeded admin + 5 extras = 6 in_use ; purchased = 8 ; bundle min = 5.
     sub_id = await _insert_subscription(
-        org.id, plan_code="standard", seats_purchased=8,
+        org.id,
+        plan_code="standard",
+        seats_purchased=8,
         billing_cycle="monthly",
     )
     await _add_extra_members(org.id, role.id, count=5)
@@ -272,9 +280,7 @@ async def test_removing_above_floors_scheduled(layered_client, seeded_admin):
 
     async with TestSession() as session:
         sub = (
-            await session.execute(
-                select(Subscription).where(Subscription.id == sub_id)
-            )
+            await session.execute(select(Subscription).where(Subscription.id == sub_id))
         ).scalar_one()
         assert sub.next_seats == 6
         assert sub.next_plan_code is None  # seat-only schedule
@@ -292,7 +298,9 @@ async def test_removing_below_in_use_rejected(layered_client, seeded_admin):
     role = seeded_admin["role"]
     # 1 + 5 = 6 in_use, purchased 8 ⇒ asking for 5 is below in-use.
     await _insert_subscription(
-        org.id, plan_code="standard", seats_purchased=8,
+        org.id,
+        plan_code="standard",
+        seats_purchased=8,
     )
     await _add_extra_members(org.id, role.id, count=5)
 
@@ -310,7 +318,9 @@ async def test_removing_below_bundle_min_rejected(layered_client, seeded_admin):
     org = seeded_admin["org"]
     # 1 in_use, bundle min = 5; asking for 3 is below the bundle floor.
     await _insert_subscription(
-        org.id, plan_code="basic", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        seats_purchased=5,
     )
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_seats(layered_client, token, 3)
@@ -331,9 +341,11 @@ async def test_preview_matches_commit(layered_client, seeded_admin):
     embeds. We compare `amount_due_usd` with a small tolerance because
     `datetime.now()` ticks between the two calls."""
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
-        org.id, plan_code="basic", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        seats_purchased=5,
         billing_cycle="monthly",
         current_period_start=now,
         current_period_end=now + timedelta(days=30),
@@ -371,7 +383,7 @@ async def test_period_rollover_applies_next_seats(test_db):
     test_db.add(org)
     await test_db.flush()
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = Subscription(
         org_id=org.id,
         plan_code="standard",
@@ -390,9 +402,7 @@ async def test_period_rollover_applies_next_seats(test_db):
     assert summary["scheduled_change_applied"] == 1
 
     fresh = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     await test_db.refresh(fresh)
     assert fresh.plan_code == "standard"  # unchanged
@@ -412,7 +422,7 @@ async def test_read_only_sub_can_add_seats(layered_client, seeded_admin):
     """A read-only org must be able to top up seats — it's part of the
     recovery flow that ends with an upgrade or reactivation."""
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="basic",
@@ -439,7 +449,7 @@ async def test_cancelled_sub_cannot_change_seats(layered_client, seeded_admin):
     the endpoint reports `no_active_subscription`; either error code
     is acceptable as long as the request is refused with 400."""
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="basic",

@@ -30,13 +30,12 @@ Idempotency strategy:
     operator sees a single "lead went stale on YYYY-MM-DD" fire
     rather than 60 daily nags.
 """
+
 from __future__ import annotations
 
 import logging
-import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +60,7 @@ async def scan_birthdays(session, *, today: date) -> list[dict[str, Any]]:
     from src.app.core.contacts import data_access as contacts_da
     from src.app.core.contacts.models import Contact  # noqa: F401
 
-    rows = await contacts_da.find_birthdays_on(
-        session, month=today.month, day=today.day
-    )
+    rows = await contacts_da.find_birthdays_on(session, month=today.month, day=today.day)
     envelopes: list[dict[str, Any]] = []
     for contact in rows:
         age_turning = None
@@ -72,17 +69,13 @@ async def scan_birthdays(session, *, today: date) -> list[dict[str, Any]]:
         envelopes.append(
             {
                 "event_type": "contact.birthday",
-                "event_id": (
-                    f"contact_birthday:{contact.id}:{today.year}"
-                ),
+                "event_id": (f"contact_birthday:{contact.id}:{today.year}"),
                 "org_id": contact.org_id,
                 "payload": {
                     "contact_id": str(contact.id),
                     "age_turning": age_turning,
                     "date_of_birth": (
-                        contact.date_of_birth.isoformat()
-                        if contact.date_of_birth
-                        else None
+                        contact.date_of_birth.isoformat() if contact.date_of_birth else None
                     ),
                     "contact": {
                         "id": str(contact.id),
@@ -90,9 +83,7 @@ async def scan_birthdays(session, *, today: date) -> list[dict[str, Any]]:
                         "email": contact.email,
                         "phone": contact.phone,
                         "date_of_birth": (
-                            contact.date_of_birth.isoformat()
-                            if contact.date_of_birth
-                            else None
+                            contact.date_of_birth.isoformat() if contact.date_of_birth else None
                         ),
                     },
                 },
@@ -114,22 +105,19 @@ async def scan_stale_leads(
     ``last_activity_at + stale_days`` (truncated to date); for
     never-touched leads we use ``created_at + stale_days``.
     """
-    from src.app.core.contacts.models import Contact
-    from src.app.core.leads import data_access as leads_da
     from sqlalchemy import select as _select
 
+    from src.app.core.contacts.models import Contact
+    from src.app.core.leads import data_access as leads_da
+
     inactive_since = now - timedelta(days=stale_days)
-    rows = await leads_da.find_stale_leads(
-        session, inactive_since=inactive_since
-    )
+    rows = await leads_da.find_stale_leads(session, inactive_since=inactive_since)
 
     # Per-lead hydrate the contact for the renderer.
     envelopes: list[dict[str, Any]] = []
     for lead in rows:
         contact = (
-            await session.execute(
-                _select(Contact).where(Contact.id == lead.contact_id)
-            )
+            await session.execute(_select(Contact).where(Contact.id == lead.contact_id))
         ).scalar_one_or_none()
         anchor = lead.last_activity_at or lead.created_at
         if anchor is None:
@@ -140,32 +128,20 @@ async def scan_stale_leads(
         days_since = (now - anchor).days
         payload: dict[str, Any] = {
             "lead_id": str(lead.id),
-            "contact_id": (
-                str(lead.contact_id) if lead.contact_id else None
-            ),
+            "contact_id": (str(lead.contact_id) if lead.contact_id else None),
             "days_since_last_activity": days_since,
             "last_activity_at": (
-                lead.last_activity_at.isoformat()
-                if lead.last_activity_at
-                else None
+                lead.last_activity_at.isoformat() if lead.last_activity_at else None
             ),
             "lead": {
                 "id": str(lead.id),
                 "status": (
-                    lead.status.value
-                    if hasattr(lead.status, "value")
-                    else str(lead.status)
+                    lead.status.value if hasattr(lead.status, "value") else str(lead.status)
                 ),
                 "pipeline_stage": lead.pipeline_stage,
-                "assigned_to_id": (
-                    str(lead.assigned_to_id)
-                    if lead.assigned_to_id
-                    else None
-                ),
+                "assigned_to_id": (str(lead.assigned_to_id) if lead.assigned_to_id else None),
                 "last_activity_at": (
-                    lead.last_activity_at.isoformat()
-                    if lead.last_activity_at
-                    else None
+                    lead.last_activity_at.isoformat() if lead.last_activity_at else None
                 ),
             },
         }
@@ -179,9 +155,7 @@ async def scan_stale_leads(
         envelopes.append(
             {
                 "event_type": "lead.stale_30d",
-                "event_id": (
-                    f"lead_stale_30d:{lead.id}:{first_stale_date.isoformat()}"
-                ),
+                "event_id": (f"lead_stale_30d:{lead.id}:{first_stale_date.isoformat()}"),
                 "org_id": lead.org_id,
                 "payload": payload,
             }
@@ -189,9 +163,7 @@ async def scan_stale_leads(
     return envelopes
 
 
-async def run_daily_time_based_scan(
-    *, now: datetime | None = None
-) -> dict[str, int]:
+async def run_daily_time_based_scan(*, now: datetime | None = None) -> dict[str, int]:
     """End-to-end driver — opens its own session, runs both scans,
     publishes every envelope via the bus, and returns counts for the
     worker logs.
@@ -200,15 +172,15 @@ async def run_daily_time_based_scan(
     automation dispatcher's subscriber writes its run row in the
     right tenant scope.
     """
-    from src.app.core.events.bus import publish as events_publish
-    from src.app.shared.context import RequestContext, reset_context, set_context
-    from src.app.shared.db import async_session
     from sqlalchemy import select as _select
 
+    from src.app.core.events.bus import publish as events_publish
     from src.app.core.tenants.models import Organization
+    from src.app.shared.context import RequestContext, reset_context, set_context
+    from src.app.shared.db import async_session
 
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
     today = now.date()
 
     birthday_published = 0
@@ -218,9 +190,7 @@ async def run_daily_time_based_scan(
         # Pre-fetch org snapshots for the per-org enrichment of each
         # envelope. Cross-tenant cache keyed by org_id keeps the
         # publish loop from re-querying.
-        org_rows = (
-            await session.execute(_select(Organization))
-        ).scalars().all()
+        org_rows = (await session.execute(_select(Organization))).scalars().all()
         org_by_id = {o.id: o for o in org_rows}
 
         birthday_envelopes = await scan_birthdays(session, today=today)
@@ -248,8 +218,7 @@ async def run_daily_time_based_scan(
                 birthday_published += 1
             except Exception:
                 logger.exception(
-                    "automation.daily_time_based_scan birthday_publish_failed "
-                    "contact=%s",
+                    "automation.daily_time_based_scan birthday_publish_failed contact=%s",
                     env["payload"].get("contact_id"),
                 )
         finally:
@@ -275,8 +244,7 @@ async def run_daily_time_based_scan(
                 stale_published += 1
             except Exception:
                 logger.exception(
-                    "automation.daily_time_based_scan stale_publish_failed "
-                    "lead=%s",
+                    "automation.daily_time_based_scan stale_publish_failed lead=%s",
                     env["payload"].get("lead_id"),
                 )
         finally:

@@ -1,12 +1,14 @@
 from datetime import datetime
-from sqlalchemy import BigInteger, Text, DateTime
+
+from sqlalchemy import BigInteger, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
+
 from src.models import Base
 
 
 class ContactUs(Base):
-    __tablename__ = 'tbl_contact_us'
+    __tablename__ = "tbl_contact_us"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)

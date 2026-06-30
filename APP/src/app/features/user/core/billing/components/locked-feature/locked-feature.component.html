@@ -5,12 +5,7 @@
       class="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800"
     >
       @if (illustrationUrl(); as url) {
-        <img
-          [src]="url"
-          alt=""
-          class="mx-auto mb-6 h-32 w-32"
-          aria-hidden="true"
-        />
+        <img [src]="url" alt="" class="mx-auto mb-6 h-32 w-32" aria-hidden="true" />
       } @else {
         <div
           class="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-3xl text-blue-600 dark:bg-blue-950 dark:text-blue-300"

@@ -30,7 +30,6 @@ from src.app.shared.schemas import (
     BulkReassignResult,
 )
 
-
 # --- BulkReassign --------------------------------------------------------
 
 

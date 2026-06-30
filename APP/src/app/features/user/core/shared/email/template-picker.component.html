@@ -43,7 +43,12 @@
       <div class="max-h-72 overflow-y-auto">
         @if (loading() && templates().length === 0) {
           <p class="flex items-center gap-1 px-3 py-4 text-xs text-zinc-500">
-            <lucide-icon name="loader-2" size="12" class="animate-spin" aria-hidden="true"></lucide-icon>
+            <lucide-icon
+              name="loader-2"
+              size="12"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
             Loading…
           </p>
         } @else if (templates().length === 0) {

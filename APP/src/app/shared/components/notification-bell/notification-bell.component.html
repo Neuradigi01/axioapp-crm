@@ -3,12 +3,14 @@
   [matMenuTriggerFor]="notificationMenu"
   (menuOpened)="onMenuOpened()"
   aria-label="Notifications"
-  class="notification-bell__btn">
+  class="notification-bell__btn"
+>
   <mat-icon
     [matBadge]="unreadCount()"
     [matBadgeHidden]="unreadCount() === 0"
     matBadgeColor="warn"
-    matBadgeSize="small">
+    matBadgeSize="small"
+  >
     notifications
   </mat-icon>
 </button>
@@ -17,9 +19,7 @@
   <div class="notification-bell__header" (click)="$event.stopPropagation()">
     <span class="notification-bell__title">Notifications</span>
     @if (unreadCount() > 0) {
-      <button
-        class="notification-bell__mark-all"
-        (click)="markAllAsRead()">
+      <button class="notification-bell__mark-all" (click)="markAllAsRead()">
         Mark all as read
       </button>
     }
@@ -35,10 +35,13 @@
         <div
           class="notification-bell__item"
           [class.notification-bell__item--unread]="!notification.is_read"
-          (click)="markAsRead(notification, $event)">
+          (click)="markAsRead(notification, $event)"
+        >
           <div class="notification-bell__item-title">{{ notification.title }}</div>
           <div class="notification-bell__item-message">{{ notification.message }}</div>
-          <div class="notification-bell__item-time">{{ notification.created_at | date:'short' }}</div>
+          <div class="notification-bell__item-time">
+            {{ notification.created_at | date: 'short' }}
+          </div>
         </div>
       }
     }

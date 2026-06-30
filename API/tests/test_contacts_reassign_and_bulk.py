@@ -13,6 +13,7 @@ The fixture `seeded_admin` grants every permission key the test
 requests via `_grant(...)`; for the 403 case we deliberately omit
 `contacts.reassign`.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -39,9 +40,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -79,9 +78,7 @@ async def _make_contact(
 
 
 @pytest.mark.asyncio
-async def test_reassign_writes_owner_activity_and_bumps_last_activity(
-    layered_client, seeded_admin
-):
+async def test_reassign_writes_owner_activity_and_bumps_last_activity(layered_client, seeded_admin):
     """One endpoint hit covers test cases 1, 2, 3."""
     from tests.conftest import TestSession
 
@@ -116,21 +113,23 @@ async def test_reassign_writes_owner_activity_and_bumps_last_activity(
     try:
         async with TestSession() as session:
             row = (
-                await session.execute(
-                    select(Contact).where(Contact.id == contact_id)
-                )
+                await session.execute(select(Contact).where(Contact.id == contact_id))
             ).scalar_one()
             assert row.assigned_to_id == user.legacy_uuid
             assert row.last_activity_at is not None  # bumped by hook
 
             activities = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_type == "contact")
-                    .where(Activity.entity_id == contact_id)
-                    .where(Activity.type == ActivityType.reassign)
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_type == "contact")
+                        .where(Activity.entity_id == contact_id)
+                        .where(Activity.type == ActivityType.reassign)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(activities) == 1
             payload = activities[0].payload
             assert payload["from"] is None
@@ -141,9 +140,7 @@ async def test_reassign_writes_owner_activity_and_bumps_last_activity(
 
 
 @pytest.mark.asyncio
-async def test_bulk_reassign_updates_all_and_writes_activities(
-    layered_client, seeded_admin
-):
+async def test_bulk_reassign_updates_all_and_writes_activities(layered_client, seeded_admin):
     """`POST /contacts/bulk-reassign` rolls up to N reassigns + N activities."""
     from tests.conftest import TestSession
 
@@ -163,9 +160,7 @@ async def test_bulk_reassign_updates_all_and_writes_activities(
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    ids = [
-        await _make_contact(org.id, full_name=f"Bulk {i}") for i in range(3)
-    ]
+    ids = [await _make_contact(org.id, full_name=f"Bulk {i}") for i in range(3)]
 
     resp = await layered_client.post(
         "/api/v1/contacts/bulk-reassign",
@@ -183,30 +178,28 @@ async def test_bulk_reassign_updates_all_and_writes_activities(
     try:
         async with TestSession() as session:
             for cid in ids:
-                row = (
-                    await session.execute(
-                        select(Contact).where(Contact.id == cid)
-                    )
-                ).scalar_one()
+                row = (await session.execute(select(Contact).where(Contact.id == cid))).scalar_one()
                 assert row.assigned_to_id == user.legacy_uuid
 
             count = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_type == "contact")
-                    .where(Activity.entity_id.in_(ids))
-                    .where(Activity.type == ActivityType.reassign)
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_type == "contact")
+                        .where(Activity.entity_id.in_(ids))
+                        .where(Activity.type == ActivityType.reassign)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(count) == 3
     finally:
         reset_context(ctx)
 
 
 @pytest.mark.asyncio
-async def test_reassign_cross_tenant_target_rejected(
-    layered_client, seeded_admin
-):
+async def test_reassign_cross_tenant_target_rejected(layered_client, seeded_admin):
     """Target UUID belongs to no membership in the caller's org → 422."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -236,9 +229,7 @@ async def test_reassign_cross_tenant_target_rejected(
 
 
 @pytest.mark.asyncio
-async def test_reassign_without_permission_returns_403(
-    layered_client, seeded_admin
-):
+async def test_reassign_without_permission_returns_403(layered_client, seeded_admin):
     """Caller has contacts.read+write but NOT contacts.reassign → 403."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]

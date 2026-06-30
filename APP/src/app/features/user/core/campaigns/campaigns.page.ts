@@ -1,20 +1,10 @@
-﻿import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+﻿import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
-import {
-  Campaign,
-  CampaignStatus,
-  CampaignsApiService,
-} from './campaigns-api.service';
+import { Campaign, CampaignStatus, CampaignsApiService } from './campaigns-api.service';
 import { CreateCampaignModalComponent } from './create-campaign-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -109,9 +99,7 @@ export class CampaignsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load campaigns.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load campaigns.');
         },
       });
   }
@@ -141,9 +129,7 @@ export class CampaignsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.busyId.set(null);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not start campaign.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not start campaign.');
         },
       });
   }
@@ -162,9 +148,7 @@ export class CampaignsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.busyId.set(null);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not delete campaign.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not delete campaign.');
         },
       });
   }
@@ -180,8 +164,7 @@ export class CampaignsPageComponent {
   protected audiencePreview(c: Campaign): string {
     const parts: string[] = [];
     if (c.audience_filter?.q) parts.push(`q="${c.audience_filter.q}"`);
-    if (c.audience_filter?.source)
-      parts.push(`source=${c.audience_filter.source}`);
+    if (c.audience_filter?.source) parts.push(`source=${c.audience_filter.source}`);
     if (c.audience_filter?.tag) parts.push(`tag=${c.audience_filter.tag}`);
     return parts.length ? parts.join(' Â· ') : 'Everyone';
   }
@@ -190,5 +173,4 @@ export class CampaignsPageComponent {
     if (!iso) return 'â€”';
     return new Date(iso).toLocaleString();
   }
-
 }

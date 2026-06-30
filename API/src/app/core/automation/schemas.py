@@ -7,6 +7,7 @@ stay loose ``dict`` types — Step 2 introduces a typed grammar for
 each, but at the router boundary we accept any JSON-shaped object
 and validate semantics in the service layer.
 """
+
 from __future__ import annotations
 
 import uuid

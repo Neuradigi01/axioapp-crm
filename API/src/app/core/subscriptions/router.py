@@ -22,13 +22,15 @@ require auth + permission (Step 19):
     `/cancel`) → `billing.manage`. Owner-only by default; custom roles
     can be granted it via the roles UI.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
-from src.app.core.subscriptions import plans, service as subscription_service
+from src.app.core.subscriptions import plans
+from src.app.core.subscriptions import service as subscription_service
 from src.app.core.subscriptions.dependencies import get_payment_provider
 from src.app.core.subscriptions.payment_provider import PaymentProvider
 from src.app.core.subscriptions.schemas import (
@@ -47,7 +49,6 @@ from src.app.core.subscriptions.schemas import (
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 # Hosts the checkout URLs may redirect to. Anything outside this set
 # is rejected with 400 to prevent the endpoint from being used as an
@@ -89,10 +90,7 @@ def _default_redirect(request: Request, kind: str) -> str:
     Billing page; the query string distinguishes them so the Angular
     route can swap a toast.
     """
-    origin = (
-        request.headers.get("origin")
-        or f"{request.url.scheme}://{request.url.netloc}"
-    )
+    origin = request.headers.get("origin") or f"{request.url.scheme}://{request.url.netloc}"
     suffix = "?upgraded=true" if kind == "success" else ""
     return f"{origin}/user/subscription{suffix}"
 
@@ -134,9 +132,7 @@ async def get_current_subscription(
     legacy invoice surface also reuses this key). Mutating actions
     live behind `billing.manage` (Owner only).
     """
-    return await subscription_service.compose_current_subscription_response(
-        db, user.org_id
-    )
+    return await subscription_service.compose_current_subscription_response(db, user.org_id)
 
 
 @router.post(
@@ -205,9 +201,7 @@ async def preview_seat_change(
     request, so `outcome_if_committed` is informational, not a
     promise.
     """
-    return await subscription_service.preview_seat_change(
-        db, user.org_id, total_seats
-    )
+    return await subscription_service.preview_seat_change(db, user.org_id, total_seats)
 
 
 @router.post(
@@ -230,12 +224,11 @@ async def change_seats(
     immediately. Trial subs cannot add seats (use upgrade instead).
     """
     result = await subscription_service.change_seats(
-        db, user.org_id, total_seats=payload.total_seats,
+        db,
+        user.org_id,
+        total_seats=payload.total_seats,
     )
-    if (
-        isinstance(result, SeatChangeNeedsPaymentResponse)
-        and payment_provider is not None
-    ):
+    if isinstance(result, SeatChangeNeedsPaymentResponse) and payment_provider is not None:
         result = await subscription_service.attach_checkout_to_seats_needs_payment(
             db,
             user.org_id,
@@ -345,5 +338,6 @@ async def cancel_subscription_endpoint(
     so the idempotent contract holds end-to-end.
     """
     return await subscription_service.cancel_subscription(
-        db, user.org_id,
+        db,
+        user.org_id,
     )

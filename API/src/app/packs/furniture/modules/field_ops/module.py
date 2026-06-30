@@ -1,6 +1,6 @@
 """Furniture-pack: Field Operations module descriptor."""
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="field_ops",

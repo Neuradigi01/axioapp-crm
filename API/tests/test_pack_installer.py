@@ -6,6 +6,7 @@ the same org, then asserts:
   - row counts after the second run are unchanged
   - the org's `template_id` + `template_version` columns are stamped
 """
+
 from __future__ import annotations
 
 import pytest
@@ -21,8 +22,6 @@ from src.app.core.packs.loader import load_pack_dict
 from src.app.core.packs.models import LeadSource
 from src.app.core.permissions.models import Permission, Role, RolePermission
 from src.app.core.pipelines.models import Pipeline, PipelineStage
-from src.app.core.settings.models import OrgSettings
-from src.app.core.tenants.models import Organization
 
 
 def _tiny_manifest() -> dict:
@@ -65,8 +64,12 @@ def _tiny_manifest() -> dict:
             {"key": "website", "label": "Website", "display_order": 20},
         ],
         "call_outcomes": [
-            {"key": "store_visit_booked", "label": "Store visit booked",
-             "color": "#10b981", "display_order": 60},
+            {
+                "key": "store_visit_booked",
+                "label": "Store visit booked",
+                "color": "#10b981",
+                "display_order": 60,
+            },
         ],
         "defaults": {
             "currency": "INR",
@@ -118,7 +121,9 @@ async def test_install_creates_then_idempotent(test_db, seeded_admin):
     ).scalar_one()
     n_cf = (
         await test_db.execute(
-            select(func.count()).select_from(CustomFieldDefinition).where(CustomFieldDefinition.org_id == org.id)
+            select(func.count())
+            .select_from(CustomFieldDefinition)
+            .where(CustomFieldDefinition.org_id == org.id)
         )
     ).scalar_one()
     n_sources = (
@@ -172,19 +177,21 @@ async def test_install_creates_then_idempotent(test_db, seeded_admin):
         )
     ).scalar_one()
     granted = (
-        await test_db.execute(
-            select(Permission.key)
-            .join(RolePermission, RolePermission.permission_id == Permission.id)
-            .where(RolePermission.role_id == role.id)
+        (
+            await test_db.execute(
+                select(Permission.key)
+                .join(RolePermission, RolePermission.permission_id == Permission.id)
+                .where(RolePermission.role_id == role.id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert set(granted) == {"contacts.read", "leads.read", "leads.write"}
 
 
 @pytest.mark.asyncio
-async def test_install_unknown_org_returns_error_report(
-    test_db, seeded_admin
-):
+async def test_install_unknown_org_returns_error_report(test_db, seeded_admin):
     import uuid
 
     manifest = load_pack_dict(_tiny_manifest())

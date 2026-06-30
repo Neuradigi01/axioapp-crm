@@ -5,6 +5,7 @@ modules can `from src.app.core.walk_ins import quick_register, checkout`
 without dragging in HTTP-layer deps. Same pattern as audit / activities
 / notifications.
 """
+
 from src.app.core.walk_ins.models import WalkInStatus
 from src.app.core.walk_ins.service import (
     checkout,

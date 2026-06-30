@@ -12,8 +12,8 @@
         No automations have fired for this contact yet.
       </p>
       <p class="mt-1 text-xs text-zinc-500">
-        When a trigger like "Lead Confirmation" or "User Welcome" fires for
-        them, every send shows up here.
+        When a trigger like "Lead Confirmation" or "User Welcome" fires for them, every send shows
+        up here.
       </p>
     </div>
   } @else {
@@ -38,7 +38,10 @@
             <p class="mt-0.5 text-xs text-zinc-500">
               {{ row.scheduled_at | date: 'medium' }}
               @if (row.channel_message_id) {
-                · sent id <code class="rounded bg-zinc-100 px-1 font-mono text-[10px]">{{ row.channel_message_id }}</code>
+                · sent id
+                <code class="rounded bg-zinc-100 px-1 font-mono text-[10px]">{{
+                  row.channel_message_id
+                }}</code>
               }
             </p>
             @if (row.error) {

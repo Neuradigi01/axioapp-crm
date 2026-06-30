@@ -1,9 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { UsageRow } from '../../types/subscription.types';
@@ -61,12 +56,12 @@ interface UsageRowVM {
           <lucide-icon name="trending-up" size="18" aria-hidden="true"></lucide-icon>
         </div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+          <p
+            class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+          >
             Usage
           </p>
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-slate-100">
-            Current period
-          </h2>
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-slate-100">Current period</h2>
         </div>
       </div>
 
@@ -128,12 +123,10 @@ export class UsageBarsComponent {
   );
 }
 
-
 // ---------------------------------------------------------------------------
 // Pure helpers — module-private so the template's signal chain stays
 // noise-free.
 // ---------------------------------------------------------------------------
-
 
 function toViewModel(row: UsageRow): UsageRowVM {
   const label = RESOURCE_LABELS[row.resource] ?? titleCase(row.resource);
@@ -160,8 +153,7 @@ function toViewModel(row: UsageRow): UsageRowVM {
   }
 
   const percent = Math.min(100, Math.round((row.current / row.cap) * 100));
-  const tone: UsageRowVM['tone'] =
-    percent > 80 ? 'red' : percent >= 50 ? 'yellow' : 'green';
+  const tone: UsageRowVM['tone'] = percent > 80 ? 'red' : percent >= 50 ? 'yellow' : 'green';
 
   return {
     label,
@@ -172,14 +164,12 @@ function toViewModel(row: UsageRow): UsageRowVM {
   };
 }
 
-
 function formatNumber(value: number, isMb: boolean): string {
   if (isMb) {
     return `${value} MB`;
   }
   return value.toLocaleString('en-US');
 }
-
 
 function titleCase(raw: string): string {
   return raw

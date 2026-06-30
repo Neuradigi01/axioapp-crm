@@ -48,9 +48,22 @@ export const ACTION_2FA_ERROR_CODE = '2FA_REQUIRED';
 export const FILE_UPLOAD_MAX_FILES = 5;
 export const FILE_UPLOAD_MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const FILE_UPLOAD_ALLOWED_EXTENSIONS = [
-  'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp',
-  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv',
-  'txt', 'rtf', 'zip', 'rar',
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'bmp',
+  'webp',
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'csv',
+  'txt',
+  'rtf',
+  'zip',
+  'rar',
 ];
 
 export const FILE_TYPE_ICONS: Record<string, string> = {

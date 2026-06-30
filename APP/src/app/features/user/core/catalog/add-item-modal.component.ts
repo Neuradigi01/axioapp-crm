@@ -18,10 +18,7 @@ import { nullableTrim } from '@core/services/form.util';
 import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
 import { StandardFieldsSignalsService } from '../standard-fields/standard-fields-signals.service';
 import type { StandardFieldRendered } from '../standard-fields/types';
-import {
-  CatalogApiService,
-  CatalogItem,
-} from './catalog-api.service';
+import { CatalogApiService, CatalogItem } from './catalog-api.service';
 import { deriveApiOrigin } from '@core/services/url.util';
 
 /**
@@ -48,9 +45,7 @@ export class AddItemModalComponent {
   private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
-    {},
-  );
+  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>({});
 
   protected stdField(key: string): StandardFieldRendered | undefined {
     return this.stdFields()[key];
@@ -84,19 +79,11 @@ export class AddItemModalComponent {
 
   /** `sku` + `name` + `price` are backend-required (locked).
    *  `category` accepts `required`. `price` additionally accepts `min`/`max`. */
-  private applyStandardValidators(
-    map: Record<string, StandardFieldRendered>,
-  ): void {
-    this.form.controls.sku.setValidators([
-      Validators.required,
-      Validators.maxLength(64),
-    ]);
+  private applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
+    this.form.controls.sku.setValidators([Validators.required, Validators.maxLength(64)]);
     this.form.controls.sku.updateValueAndValidity({ emitEvent: false });
 
-    this.form.controls.name.setValidators([
-      Validators.required,
-      Validators.maxLength(255),
-    ]);
+    this.form.controls.name.setValidators([Validators.required, Validators.maxLength(255)]);
     this.form.controls.name.updateValueAndValidity({ emitEvent: false });
 
     const categoryV: ValidatorFn[] = [Validators.maxLength(64)];
@@ -131,11 +118,7 @@ export class AddItemModalComponent {
   // --- Image upload state ---
   // Server is the source of truth on size + MIME; these client-side
   // checks just block the obvious before we even hit the network.
-  private static readonly ALLOWED_IMAGE_MIME = new Set([
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-  ]);
+  private static readonly ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
   private static readonly MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
   protected readonly selectedFile = signal<File | null>(null);
@@ -268,9 +251,7 @@ export class AddItemModalComponent {
           error: (err: HttpErrorResponse) => {
             this.submitting.set(false);
             if (err.status === 409) {
-              this.submitError.set(
-                'SKU already exists in this org. Pick a different SKU.',
-              );
+              this.submitError.set('SKU already exists in this org. Pick a different SKU.');
             } else {
               this.submitError.set(this.errorFor(err) ?? 'Could not create item.');
             }
@@ -303,9 +284,7 @@ export class AddItemModalComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.submitError.set(
-            this.errorFor(err) ?? 'Saved, but the image upload failed.',
-          );
+          this.submitError.set(this.errorFor(err) ?? 'Saved, but the image upload failed.');
         },
       });
   }
@@ -321,14 +300,13 @@ export class AddItemModalComponent {
     this.form.controls.sku.disable();
   }
 
-
   private errorFor(err: HttpErrorResponse): string | null {
     const body = err?.error;
     if (typeof body === 'string') return body;
     if (body && typeof body === 'object') {
       const candidate =
-        (body as { message?: string; detail?: unknown }).message
-        ?? (body as { detail?: unknown }).detail;
+        (body as { message?: string; detail?: unknown }).message ??
+        (body as { detail?: unknown }).detail;
       if (typeof candidate === 'string') return candidate;
     }
     return null;

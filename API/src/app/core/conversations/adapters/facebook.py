@@ -23,6 +23,7 @@ Why a stub at all?
   external-status workflow, so :attr:`external_status` stays
   ``n_a`` for every FB template.
 """
+
 from __future__ import annotations
 
 import uuid

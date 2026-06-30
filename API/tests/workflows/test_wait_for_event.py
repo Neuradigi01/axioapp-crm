@@ -4,27 +4,29 @@ Covers: wait_for_event handler writes a tbl_workflow_event_waits
 row + parks the run; matching event resumes the run; expired waits
 are picked up by the sweep; cascade-delete on parent run cancel.
 """
+
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.workflows import (
     data_access as workflows_da,
-    tasks as workflows_tasks,
 )
 from src.app.core.workflows.actions import (
     _clear_registry_for_tests,
     _register_builtins,
-    resolve as resolve_action,
 )
 from src.app.core.workflows.actions import flow_control as flow_module
+from src.app.core.workflows.actions import (
+    resolve as resolve_action,
+)
 from src.app.core.workflows.models import (
     Workflow,
     WorkflowEventWait,
@@ -32,7 +34,6 @@ from src.app.core.workflows.models import (
     WorkflowRunStatus,
     WorkflowStatus,
 )
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -46,10 +47,7 @@ class _FakeStepRun:
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -79,7 +77,11 @@ async def _make_workflow(test_db, *, org_id) -> Workflow:
         current_version=1,
         graph={
             "nodes": [
-                {"id": "t1", "type": "trigger.lead_created", "config": {"event_type": "lead.created"}},
+                {
+                    "id": "t1",
+                    "type": "trigger.lead_created",
+                    "config": {"event_type": "lead.created"},
+                },
                 {"id": "wfe", "type": "flow_control.wait_for_event", "config": {}},
                 {"id": "end_ok", "type": "flow.end", "config": {}},
                 {"id": "end_to", "type": "flow.end", "config": {}},
@@ -122,17 +124,12 @@ async def _make_run(test_db, *, org_id, workflow_id, contact_id=None) -> Workflo
 async def test_wait_for_event_writes_wait_row_and_parks(test_db, org_id):
     contact_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_contacts (id, org_id, full_name) "
-            "VALUES (:id, :org_id, :name)"
-        ),
+        sql_text("INSERT INTO tbl_contacts (id, org_id, full_name) VALUES (:id, :org_id, :name)"),
         {"id": str(contact_id), "org_id": str(org_id), "name": "Asha"},
     )
     await test_db.commit()
     wf = await _make_workflow(test_db, org_id=org_id)
-    run = await _make_run(
-        test_db, org_id=org_id, workflow_id=wf.id, contact_id=contact_id
-    )
+    run = await _make_run(test_db, org_id=org_id, workflow_id=wf.id, contact_id=contact_id)
 
     handler = resolve_action("flow_control.wait_for_event")
     node = {
@@ -156,12 +153,10 @@ async def test_wait_for_event_writes_wait_row_and_parks(test_db, org_id):
     assert result.output["event_type"] == "quote.viewed"
 
     waits = (
-        await test_db.execute(
-            select(WorkflowEventWait).where(
-                WorkflowEventWait.run_id == run.id
-            )
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowEventWait).where(WorkflowEventWait.run_id == run.id)))
+        .scalars()
+        .all()
+    )
     assert len(waits) == 1
     assert waits[0].event_type == "quote.viewed"
     assert waits[0].contact_id == contact_id
@@ -203,21 +198,16 @@ async def test_find_waits_matches_contact_and_wildcard(test_db, org_id):
     for cid in (contact_a, contact_b):
         await test_db.execute(
             sql_text(
-                "INSERT INTO tbl_contacts (id, org_id, full_name) "
-                "VALUES (:id, :org_id, :name)"
+                "INSERT INTO tbl_contacts (id, org_id, full_name) VALUES (:id, :org_id, :name)"
             ),
             {"id": str(cid), "org_id": str(org_id), "name": "x"},
         )
     await test_db.commit()
 
-    run_a = await _make_run(
-        test_db, org_id=org_id, workflow_id=wf.id, contact_id=contact_a
-    )
-    run_wild = await _make_run(
-        test_db, org_id=org_id, workflow_id=wf.id, contact_id=None
-    )
+    run_a = await _make_run(test_db, org_id=org_id, workflow_id=wf.id, contact_id=contact_a)
+    run_wild = await _make_run(test_db, org_id=org_id, workflow_id=wf.id, contact_id=None)
 
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    expires_at = datetime.now(UTC) + timedelta(hours=1)
     test_db.add_all(
         [
             WorkflowEventWait(
@@ -275,7 +265,7 @@ async def test_find_waits_excludes_expired(test_db, org_id):
             node_id="wfe",
             event_type="quote.viewed",
             contact_id=None,
-            expires_at=datetime.now(timezone.utc) - timedelta(minutes=10),
+            expires_at=datetime.now(UTC) - timedelta(minutes=10),
         )
     )
     await test_db.commit()
@@ -304,7 +294,7 @@ async def test_list_expired_waits_returns_past_due(test_db, org_id):
         node_id="wfe",
         event_type="quote.viewed",
         contact_id=None,
-        expires_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+        expires_at=datetime.now(UTC) - timedelta(minutes=5),
     )
     not_expired = WorkflowEventWait(
         org_id=org_id,
@@ -312,7 +302,7 @@ async def test_list_expired_waits_returns_past_due(test_db, org_id):
         node_id="wfe2",
         event_type="quote.viewed",
         contact_id=None,
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
     )
     test_db.add_all([expired, not_expired])
     await test_db.commit()
@@ -340,7 +330,7 @@ async def test_cascade_delete_when_parent_run_deleted(test_db, org_id):
             node_id="wfe",
             event_type="quote.viewed",
             contact_id=None,
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
         )
     )
     await test_db.commit()
@@ -349,8 +339,8 @@ async def test_cascade_delete_when_parent_run_deleted(test_db, org_id):
     await test_db.commit()
 
     remaining = (
-        await test_db.execute(
-            select(WorkflowEventWait).where(WorkflowEventWait.run_id == run.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowEventWait).where(WorkflowEventWait.run_id == run.id)))
+        .scalars()
+        .all()
+    )
     assert remaining == []

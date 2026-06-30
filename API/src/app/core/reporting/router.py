@@ -12,11 +12,12 @@ behind a dedicated `whatsapp.analytics.read` permission
 default; Sales-Junior does not, so the dashboard tab hides via the
 module registry.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
@@ -47,7 +48,6 @@ from src.app.core.users.schemas import (
 )
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
 
@@ -59,9 +59,7 @@ async def workload_endpoint(
 ) -> WorkloadReport:
     """Per-user open-record counts across the org. Drives the
     Settings → Staff Workload tab plus optional list-page widgets."""
-    summary = await compute_workload(
-        session, org_id=user.org_id, active_only=active_only
-    )
+    summary = await compute_workload(session, org_id=user.org_id, active_only=active_only)
     entries = [
         WorkloadEntry(
             user_id=row["user_id"],
@@ -113,8 +111,8 @@ class _ResponseTimeGroupOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     key: str
     label: str
-    median_seconds: Optional[float]
-    p95_seconds: Optional[float]
+    median_seconds: float | None
+    p95_seconds: float | None
     sample_size: int
 
 
@@ -122,8 +120,8 @@ class _ResponseTimeReportOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     range: str
     groupby: str
-    overall_median_seconds: Optional[float]
-    overall_p95_seconds: Optional[float]
+    overall_median_seconds: float | None
+    overall_p95_seconds: float | None
     sample_size: int
     distribution: list[_ResponseTimeBucketOut]
     groups: list[_ResponseTimeGroupOut]
@@ -150,8 +148,8 @@ class _LeaderboardRowOut(BaseModel):
     name: str
     replies: int
     conversations_handled: int
-    median_response_seconds: Optional[float]
-    p95_response_seconds: Optional[float]
+    median_response_seconds: float | None
+    p95_response_seconds: float | None
 
 
 class _LeaderboardReportOut(BaseModel):
@@ -181,7 +179,7 @@ async def whatsapp_volume_endpoint(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        )
+        ) from exc
     return _VolumeReportOut.model_validate(report)
 
 
@@ -206,7 +204,7 @@ async def whatsapp_response_time_endpoint(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        )
+        ) from exc
     return _ResponseTimeReportOut.model_validate(report)
 
 
@@ -221,13 +219,11 @@ async def whatsapp_outcomes_endpoint(
     session: AsyncSession = Depends(get_db),
 ) -> _OutcomesReportOut:
     try:
-        report = await compute_outcomes(
-            session, org_id=user.org_id, range_key=range
-        )
+        report = await compute_outcomes(session, org_id=user.org_id, range_key=range)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        )
+        ) from exc
     return _OutcomesReportOut.model_validate(report)
 
 
@@ -242,13 +238,11 @@ async def whatsapp_agent_leaderboard_endpoint(
     session: AsyncSession = Depends(get_db),
 ) -> _LeaderboardReportOut:
     try:
-        report = await compute_agent_leaderboard(
-            session, org_id=user.org_id, range_key=range
-        )
+        report = await compute_agent_leaderboard(session, org_id=user.org_id, range_key=range)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        )
+        ) from exc
     return _LeaderboardReportOut.model_validate(report)
 
 
@@ -267,10 +261,10 @@ class _CampaignFunnelOut(BaseModel):
     campaign_id: uuid.UUID
     name: str
     status: str
-    started_at: Optional[datetime]
+    started_at: datetime | None
     stages: list[_FunnelStageOut]
-    delivery_median_seconds: Optional[float]
-    delivery_p95_seconds: Optional[float]
+    delivery_median_seconds: float | None
+    delivery_p95_seconds: float | None
 
 
 class _FailureBucketOut(BaseModel):
@@ -311,8 +305,8 @@ class _QualityEventOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     occurred_at: datetime
     event_type: str
-    old_value: Optional[str]
-    new_value: Optional[str]
+    old_value: str | None
+    new_value: str | None
 
 
 class _QualityVolumePointOut(BaseModel):
@@ -355,9 +349,7 @@ async def campaign_funnel_endpoint(
     user: User = Depends(require_permissions("whatsapp.analytics.read")),
     session: AsyncSession = Depends(get_db),
 ) -> _CampaignFunnelOut:
-    report = await compute_campaign_funnel(
-        session, org_id=user.org_id, campaign_id=campaign_id
-    )
+    report = await compute_campaign_funnel(session, org_id=user.org_id, campaign_id=campaign_id)
     if report is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -376,9 +368,7 @@ async def campaign_failures_endpoint(
     user: User = Depends(require_permissions("whatsapp.analytics.read")),
     session: AsyncSession = Depends(get_db),
 ) -> _CampaignFailuresOut:
-    report = await compute_campaign_failures(
-        session, org_id=user.org_id, campaign_id=campaign_id
-    )
+    report = await compute_campaign_failures(session, org_id=user.org_id, campaign_id=campaign_id)
     return _CampaignFailuresOut.model_validate(report)
 
 
@@ -403,7 +393,7 @@ async def whatsapp_cost_endpoint(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        )
+        ) from exc
     return _CostReportOut.model_validate(report)
 
 
@@ -418,13 +408,11 @@ async def whatsapp_quality_timeline_endpoint(
     session: AsyncSession = Depends(get_db),
 ) -> _QualityTimelineOut:
     try:
-        report = await compute_quality_timeline(
-            session, org_id=user.org_id, range_key=range
-        )
+        report = await compute_quality_timeline(session, org_id=user.org_id, range_key=range)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        )
+        ) from exc
     return _QualityTimelineOut.model_validate(report)
 
 
@@ -439,13 +427,11 @@ async def whatsapp_ai_metrics_endpoint(
     session: AsyncSession = Depends(get_db),
 ) -> _AIMetricsOut:
     try:
-        report = await compute_ai_metrics(
-            session, org_id=user.org_id, range_key=range
-        )
+        report = await compute_ai_metrics(session, org_id=user.org_id, range_key=range)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        )
+        ) from exc
     return _AIMetricsOut.model_validate(report)
 
 
@@ -454,10 +440,10 @@ async def whatsapp_ai_metrics_endpoint(
 
 class _AdAttributionRowOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    campaign_id: Optional[str]
-    campaign_name: Optional[str]
-    ad_id: Optional[str]
-    ad_name: Optional[str]
+    campaign_id: str | None
+    campaign_name: str | None
+    ad_id: str | None
+    ad_name: str | None
     conversations: int
     leads: int
     revenue: float
@@ -483,13 +469,11 @@ async def whatsapp_ad_attribution_endpoint(
     session: AsyncSession = Depends(get_db),
 ) -> _AdAttributionReportOut:
     try:
-        report = await compute_ad_attribution(
-            session, org_id=user.org_id, range_key=range
-        )
+        report = await compute_ad_attribution(session, org_id=user.org_id, range_key=range)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        )
+        ) from exc
     return _AdAttributionReportOut.model_validate(report)
 
 
@@ -499,8 +483,8 @@ async def whatsapp_ad_attribution_endpoint(
 class _AbVariantOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     variant: str
-    template_id: Optional[str]
-    template_name: Optional[str]
+    template_id: str | None
+    template_name: str | None
     sent: int
     delivered: int
     read: int
@@ -514,11 +498,11 @@ class _AbComparisonOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     campaign_id: uuid.UUID
     is_ab_test: bool
-    winner_metric: Optional[str]
-    winning_variant: Optional[str]
-    winner_decided_at: Optional[datetime]
-    a: Optional[_AbVariantOut]
-    b: Optional[_AbVariantOut]
+    winner_metric: str | None
+    winning_variant: str | None
+    winner_decided_at: datetime | None
+    a: _AbVariantOut | None
+    b: _AbVariantOut | None
 
 
 @router.get(
@@ -531,9 +515,7 @@ async def campaign_ab_comparison_endpoint(
     user: User = Depends(require_permissions("whatsapp.analytics.read")),
     session: AsyncSession = Depends(get_db),
 ) -> _AbComparisonOut:
-    report = await compute_ab_comparison(
-        session, org_id=user.org_id, campaign_id=campaign_id
-    )
+    report = await compute_ab_comparison(session, org_id=user.org_id, campaign_id=campaign_id)
     if report is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

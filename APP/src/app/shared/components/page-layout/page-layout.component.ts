@@ -1,4 +1,12 @@
-import { Component, ChangeDetectionStrategy, input, output, contentChild, signal, TemplateRef } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  output,
+  contentChild,
+  signal,
+  TemplateRef,
+} from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { NgTemplateOutlet } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';

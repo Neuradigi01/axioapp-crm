@@ -1,6 +1,7 @@
 """Tests for 2FA enforcement at `POST /api/v1/auth/login` plus
 `POST /api/v1/auth/2fa/try-another-way`.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -44,12 +45,16 @@ async def _enable_2fa(test_db, member_id: int, method: str, secret: str | None =
 
 async def _latest_otp_code(test_db, member_id: int) -> str | None:
     rows = (
-        await test_db.execute(
-            select(OtpRequest)
-            .where(OtpRequest.member_id == member_id)
-            .order_by(OtpRequest.id.desc())
+        (
+            await test_db.execute(
+                select(OtpRequest)
+                .where(OtpRequest.member_id == member_id)
+                .order_by(OtpRequest.id.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return rows[0].otp_code if rows else None
 
 
@@ -88,9 +93,7 @@ async def test_login_with_2fa_enabled_no_code_returns_challenge(
 
 
 @pytest.mark.asyncio
-async def test_login_with_2fa_email_valid_code_succeeds(
-    layered_client, seeded_admin, test_db
-):
+async def test_login_with_2fa_email_valid_code_succeeds(layered_client, seeded_admin, test_db):
     user = seeded_admin["user"]
     org = seeded_admin["org"]
     await _enable_2fa(test_db, user.id, method="email")
@@ -118,9 +121,7 @@ async def test_login_with_2fa_email_valid_code_succeeds(
 
 
 @pytest.mark.asyncio
-async def test_login_with_2fa_invalid_code_is_401(
-    layered_client, seeded_admin, test_db
-):
+async def test_login_with_2fa_invalid_code_is_401(layered_client, seeded_admin, test_db):
     user = seeded_admin["user"]
     org = seeded_admin["org"]
     await _enable_2fa(test_db, user.id, method="email")
@@ -144,9 +145,7 @@ async def test_login_with_2fa_invalid_code_is_401(
 
 
 @pytest.mark.asyncio
-async def test_login_with_2fa_authenticator_totp_succeeds(
-    layered_client, seeded_admin, test_db
-):
+async def test_login_with_2fa_authenticator_totp_succeeds(layered_client, seeded_admin, test_db):
     user = seeded_admin["user"]
     org = seeded_admin["org"]
     secret = pyotp.random_base32()
@@ -190,9 +189,7 @@ async def test_login_with_2fa_authenticator_wrong_code_is_401(
 
 
 @pytest.mark.asyncio
-async def test_try_another_way_dispatches_via_new_method(
-    layered_client, seeded_admin, test_db
-):
+async def test_try_another_way_dispatches_via_new_method(layered_client, seeded_admin, test_db):
     user = seeded_admin["user"]
     org = seeded_admin["org"]
     secret = pyotp.random_base32()
@@ -218,9 +215,7 @@ async def test_try_another_way_dispatches_via_new_method(
 
 
 @pytest.mark.asyncio
-async def test_try_another_way_rejects_wrong_password(
-    layered_client, seeded_admin, test_db
-):
+async def test_try_another_way_rejects_wrong_password(layered_client, seeded_admin, test_db):
     user = seeded_admin["user"]
     org = seeded_admin["org"]
     await _enable_2fa(test_db, user.id, method="email")
@@ -238,9 +233,7 @@ async def test_try_another_way_rejects_wrong_password(
 
 
 @pytest.mark.asyncio
-async def test_try_another_way_rejects_when_2fa_disabled(
-    layered_client, seeded_admin
-):
+async def test_try_another_way_rejects_when_2fa_disabled(layered_client, seeded_admin):
     user = seeded_admin["user"]
     org = seeded_admin["org"]
     resp = await layered_client.post(

@@ -7,6 +7,7 @@ email entirely without raising.
 Plain text + inline HTML — minimum viable. When we cross ~5 templates,
 move to Jinja2 partials under `core/notifications/email_templates/`.
 """
+
 from __future__ import annotations
 
 from typing import Any

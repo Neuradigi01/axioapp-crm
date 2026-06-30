@@ -16,9 +16,8 @@ Google client in two important ways:
 The client is short-lived — instantiate per-request, make a call or
 two, discard.
 """
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 import httpx
 from fastapi import HTTPException, status
@@ -30,7 +29,6 @@ from src.app.core.integrations.models import (
     Integration,
     IntegrationStatus,
 )
-
 
 _API_BASE = "https://graph.facebook.com"
 _HTTP_TIMEOUT = 15.0
@@ -52,15 +50,12 @@ class MetaGraphClient:
         *,
         integration: Integration,
         session: AsyncSession,
-        http_client: Optional[httpx.AsyncClient] = None,
+        http_client: httpx.AsyncClient | None = None,
     ) -> None:
         if integration.status != IntegrationStatus.connected:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"Meta integration is {integration.status.value} — "
-                    "reconnect required."
-                ),
+                detail=(f"Meta integration is {integration.status.value} — reconnect required."),
             )
         self._integration = integration
         self._session = session
@@ -72,41 +67,35 @@ class MetaGraphClient:
         self,
         path: str,
         *,
-        params: Optional[dict] = None,
-        access_token: Optional[str] = None,
+        params: dict | None = None,
+        access_token: str | None = None,
     ) -> dict:
         """GET a Graph path. `access_token` defaults to the
         integration's user token; pass a Page token explicitly when
         acting on a specific Page (subscribe / unsubscribe / list
         leadgen_forms)."""
-        return await self._request(
-            "GET", path, params=params, access_token=access_token
-        )
+        return await self._request("GET", path, params=params, access_token=access_token)
 
     async def post(
         self,
         path: str,
         *,
-        params: Optional[dict] = None,
-        access_token: Optional[str] = None,
+        params: dict | None = None,
+        access_token: str | None = None,
     ) -> dict:
         """POST to a Graph path. Meta's POST endpoints take params as
         querystring or form body interchangeably; we use querystring
         for parity with their docs."""
-        return await self._request(
-            "POST", path, params=params, access_token=access_token
-        )
+        return await self._request("POST", path, params=params, access_token=access_token)
 
     async def delete(
         self,
         path: str,
         *,
-        params: Optional[dict] = None,
-        access_token: Optional[str] = None,
+        params: dict | None = None,
+        access_token: str | None = None,
     ) -> dict:
-        return await self._request(
-            "DELETE", path, params=params, access_token=access_token
-        )
+        return await self._request("DELETE", path, params=params, access_token=access_token)
 
     # --- internals ------------------------------------------------------
 
@@ -125,8 +114,8 @@ class MetaGraphClient:
         method: str,
         path: str,
         *,
-        params: Optional[dict],
-        access_token: Optional[str],
+        params: dict | None,
+        access_token: str | None,
     ) -> dict:
         url = f"{_API_BASE}/{META_GRAPH_API_VERSION}/{path.lstrip('/')}"
         token = access_token or self._user_token()
@@ -141,12 +130,8 @@ class MetaGraphClient:
             ) from exc
 
         if response.status_code == 401:
-            await self._mark_expired(
-                reason=f"401 from {method} {path}"
-            )
-            raise MetaTokenExpiredError(
-                "Meta rejected the token — reconnect required."
-            )
+            await self._mark_expired(reason=f"401 from {method} {path}")
+            raise MetaTokenExpiredError("Meta rejected the token — reconnect required.")
         if response.status_code >= 400:
             detail = _safe_json(response) or {"raw": response.text[:300]}
             # Meta returns errors with an `error` object. If it carries
@@ -154,22 +139,15 @@ class MetaGraphClient:
             # sometimes returns 400 for revoked tokens, not 401.
             if _is_oauth_exception(detail):
                 await self._mark_expired(reason=str(detail)[:200])
-                raise MetaTokenExpiredError(
-                    "Meta token rejected (OAuthException) — reconnect."
-                )
+                raise MetaTokenExpiredError("Meta token rejected (OAuthException) — reconnect.")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=(
-                    f"Meta Graph API error (status={response.status_code}): "
-                    f"{detail}"
-                ),
+                detail=(f"Meta Graph API error (status={response.status_code}): {detail}"),
             )
         body = _safe_json(response)
         return body if body is not None else {}
 
-    async def _http_call(
-        self, method: str, url: str, params: dict
-    ) -> httpx.Response:
+    async def _http_call(self, method: str, url: str, params: dict) -> httpx.Response:
         if self._http is not None:
             return await self._http.request(method, url, params=params)
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
@@ -184,7 +162,7 @@ class MetaGraphClient:
         await self._session.commit()
 
 
-def _safe_json(response: httpx.Response) -> Optional[dict]:
+def _safe_json(response: httpx.Response) -> dict | None:
     try:
         return response.json()
     except ValueError:

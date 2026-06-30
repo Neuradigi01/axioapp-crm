@@ -5,6 +5,7 @@ Service-layer errors that callers (Step 3 router, future automation
 exceptions — no FastAPI ``HTTPException`` here so non-HTTP callers
 (Celery workers, internal dispatchers) get clean Python semantics.
 """
+
 from __future__ import annotations
 
 
@@ -25,9 +26,7 @@ class DuplicateTemplateName(TemplateError):
     name instead of a generic IntegrityError."""
 
     def __init__(self, name: str, channel: str) -> None:
-        super().__init__(
-            f"a {channel} template named '{name}' already exists in this org"
-        )
+        super().__init__(f"a {channel} template named '{name}' already exists in this org")
         self.name = name
         self.channel = channel
 
@@ -42,9 +41,7 @@ class TemplateLocked(TemplateError):
     """
 
     def __init__(self, status: str) -> None:
-        super().__init__(
-            f"template is locked for editing (current status: {status})"
-        )
+        super().__init__(f"template is locked for editing (current status: {status})")
         self.status = status
 
 
@@ -61,9 +58,7 @@ class InvalidWorkflowTransition(TemplateError):
         action: str,
         hint: str | None = None,
     ) -> None:
-        msg = (
-            f"cannot {action} a template that is currently {current!r}"
-        )
+        msg = f"cannot {action} a template that is currently {current!r}"
         if hint:
             msg = f"{msg} ({hint})"
         super().__init__(msg)
@@ -121,9 +116,7 @@ class InvalidRecipient(TemplateError):
     doesn't match the channel's expected shape. Router maps to 400."""
 
     def __init__(self, *, channel: str, recipient: str, reason: str) -> None:
-        super().__init__(
-            f"invalid recipient {recipient!r} for channel {channel!r}: {reason}"
-        )
+        super().__init__(f"invalid recipient {recipient!r} for channel {channel!r}: {reason}")
         self.channel = channel
         self.recipient = recipient
         self.reason = reason

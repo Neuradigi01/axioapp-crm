@@ -1,18 +1,10 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { SubscriptionStateService } from '../../services/subscription-state.service';
 import { UpgradeModalService } from '../../services/upgrade-modal.service';
-import {
-  SubscriptionCurrent,
-  SubscriptionStatus,
-} from '../../types/subscription.types';
+import { SubscriptionCurrent, SubscriptionStatus } from '../../types/subscription.types';
 
 /** What the template renders for a given subscription state.
  *
@@ -111,17 +103,13 @@ export class TrialBannerComponent {
   });
 }
 
-
 // ---------------------------------------------------------------------------
 // View-model builders — kept as plain functions so the template only
 // reads from one `vm` signal and the per-status copy lives next to the
 // tone choice that goes with it.
 // ---------------------------------------------------------------------------
 
-
-function buildViewModel(
-  sub: SubscriptionCurrent,
-): BannerViewModel | null {
+function buildViewModel(sub: SubscriptionCurrent): BannerViewModel | null {
   switch (sub.status) {
     case 'active':
       return null;
@@ -140,7 +128,6 @@ function buildViewModel(
   }
 }
 
-
 function makeTrialVM(sub: SubscriptionCurrent): BannerViewModel {
   // `trial` is guaranteed non-null when status is `trialing`, but the
   // type-system lets it be null so we default defensively.
@@ -157,7 +144,6 @@ function makeTrialVM(sub: SubscriptionCurrent): BannerViewModel {
   };
 }
 
-
 function makeExpiredVM(): BannerViewModel {
   return {
     tone: 'urgent',
@@ -167,7 +153,6 @@ function makeExpiredVM(): BannerViewModel {
   };
 }
 
-
 function makePaymentFailedVM(): BannerViewModel {
   return {
     tone: 'urgent',
@@ -176,7 +161,6 @@ function makePaymentFailedVM(): BannerViewModel {
     ctaAction: 'billing',
   };
 }
-
 
 function makeFinalStateVM(
   state: Extract<SubscriptionStatus, 'archived' | 'cancelled'>,

@@ -1,22 +1,34 @@
-import secrets
-import orjson
 import os
 import re
-from datetime import datetime, timezone
+import secrets
+from datetime import UTC, datetime
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
 import aiosmtplib
 import httpx
+import orjson
 from fastapi import Request
-from src.core.logger import logger
+
 from config import (
-    APP_NAME, IS_DEVELOPMENT, IPINFO_TOKEN, STATIC_DIR, LOGO_URL,
-    EMAIL_ENABLED, EMAIL_SENDER,
-    EMAIL_USER, EMAIL_APP_PASSWORD, EMAIL_HOST, EMAIL_PORT,
-    SMS_ENABLED, SMS_API_URL, SMS_API_KEY,
+    APP_NAME,
+    EMAIL_APP_PASSWORD,
+    EMAIL_ENABLED,
+    EMAIL_HOST,
+    EMAIL_PORT,
+    EMAIL_SENDER,
+    EMAIL_USER,
+    IPINFO_TOKEN,
+    IS_DEVELOPMENT,
+    LOGO_URL,
+    SMS_API_KEY,
+    SMS_API_URL,
+    SMS_ENABLED,
+    STATIC_DIR,
 )
+from src.core.logger import logger
 
 
 def get_real_client_ip(request: Request) -> str:
@@ -29,11 +41,7 @@ def get_real_client_ip(request: Request) -> str:
 def get_client_and_sender_ip(request: Request) -> tuple[str, str]:
     """Extract client IP and sender/proxy IP from request headers.
     Returns (client_ip, sender_ip) where sender_ip is the proxy/forwarding IP."""
-    client_ip = (
-        request.headers.get("x-real-ip")
-        or request.headers.get("x-client-ip")
-        or ""
-    )
+    client_ip = request.headers.get("x-real-ip") or request.headers.get("x-client-ip") or ""
     sender_ip = ""
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
@@ -65,7 +73,7 @@ async def extract_login_context(request: Request, device_info_model=None) -> dic
 
 
 def generate_otp(length: int = 6) -> str:
-    return ''.join([str(secrets.randbelow(10)) for _ in range(length)])
+    return "".join([str(secrets.randbelow(10)) for _ in range(length)])
 
 
 _template_cache: dict[str, str] = {}
@@ -75,7 +83,7 @@ def load_email_template(template_name: str) -> str:
     if template_name in _template_cache:
         return _template_cache[template_name]
     path = os.path.join(STATIC_DIR, "emails", f"{template_name}.html")
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         content = f.read()
     _template_cache[template_name] = content
     return content
@@ -84,7 +92,7 @@ def load_email_template(template_name: str) -> str:
 def render_email_template(template_name: str, context: dict) -> str:
     html = load_email_template(template_name)
     context.setdefault("app_name", APP_NAME)
-    context.setdefault("year", str(datetime.now(timezone.utc).year))
+    context.setdefault("year", str(datetime.now(UTC).year))
     context.setdefault("logo_url", LOGO_URL)
     return re.sub(r"\{\{(\w+)\}\}", lambda m: str(context.get(m.group(1), m.group(0))), html)
 

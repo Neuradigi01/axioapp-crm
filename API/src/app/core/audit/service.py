@@ -11,6 +11,7 @@ Default values for ``org_id`` and ``user_id`` come from the active
 the JWT hasn't been issued yet at that point (so the request context
 is still empty).
 """
+
 from __future__ import annotations
 
 import logging

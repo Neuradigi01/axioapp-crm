@@ -18,10 +18,11 @@ Pure-Python boundary tests; no DB, no FastAPI. Covers:
   8. ``apply_template_status_update`` updates a matching row and
      populates ``rejection_reason`` on REJECTED events.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -41,7 +42,6 @@ from src.app.core.integrations.whatsapp.templates_service import (
     _payload_to_components,
     apply_template_status_update,
 )
-
 
 _ORG_ID = uuid.uuid4()
 
@@ -156,10 +156,7 @@ class TestComponentsBuilder:
         kinds = [b["type"] for b in buttons_component["buttons"]]
         assert kinds == ["URL", "PHONE_NUMBER"]
         assert buttons_component["buttons"][0]["url"].startswith("https://")
-        assert (
-            buttons_component["buttons"][1]["phone_number"]
-            == "+919876543210"
-        )
+        assert buttons_component["buttons"][1]["phone_number"] == "+919876543210"
 
 
 # --- event mapping --------------------------------------------------------
@@ -183,19 +180,13 @@ class TestEventMapping:
         assert meta_events == set(_META_EVENT_TO_STATUS.keys())
 
     def test_approved_maps_to_approved(self):
-        assert (
-            _META_EVENT_TO_STATUS["APPROVED"]
-            == WhatsAppTemplateSubmissionStatus.approved
-        )
+        assert _META_EVENT_TO_STATUS["APPROVED"] == WhatsAppTemplateSubmissionStatus.approved
 
     def test_flagged_maps_to_rejected(self):
         # Meta's "FLAGGED" means temporarily unavailable due to a
         # specific complaint — we surface as rejected so the operator
         # gets the same "fix and resubmit" UX.
-        assert (
-            _META_EVENT_TO_STATUS["FLAGGED"]
-            == WhatsAppTemplateSubmissionStatus.rejected
-        )
+        assert _META_EVENT_TO_STATUS["FLAGGED"] == WhatsAppTemplateSubmissionStatus.rejected
 
 
 # --- webhook envelope parsing --------------------------------------------
@@ -314,7 +305,7 @@ def _draft_row() -> WhatsAppTemplate:
         variable_count=1,
         meta_template_id="meta-123",
         submission_status=WhatsAppTemplateSubmissionStatus.pending_review,
-        last_synced_at=datetime(2026, 6, 22, tzinfo=timezone.utc),
+        last_synced_at=datetime(2026, 6, 22, tzinfo=UTC),
         rejection_reason=None,
     )
 
@@ -334,10 +325,7 @@ class TestApplyTemplateStatusUpdate:
             reason=None,
         )
         assert applied is True
-        assert (
-            row.submission_status
-            == WhatsAppTemplateSubmissionStatus.approved
-        )
+        assert row.submission_status == WhatsAppTemplateSubmissionStatus.approved
         assert row.status == "APPROVED"
         # Approval clears any stale rejection reason.
         assert row.rejection_reason is None
@@ -356,10 +344,7 @@ class TestApplyTemplateStatusUpdate:
             reason="TAG_CONTENT_MISMATCH",
         )
         assert applied is True
-        assert (
-            row.submission_status
-            == WhatsAppTemplateSubmissionStatus.rejected
-        )
+        assert row.submission_status == WhatsAppTemplateSubmissionStatus.rejected
         assert row.rejection_reason == "TAG_CONTENT_MISMATCH"
 
     @pytest.mark.asyncio

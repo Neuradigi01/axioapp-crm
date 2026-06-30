@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 import orjson
@@ -33,9 +33,7 @@ class OtpDispatchResult:
 
 
 def _build_otp_token(contact_type: ContactType, value: str, otp_code: str) -> str:
-    expires_at = int(
-        (datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)).timestamp()
-    )
+    expires_at = int((datetime.now(UTC) + timedelta(minutes=OTP_EXPIRY_MINUTES)).timestamp())
     payload = orjson.dumps(
         {"type": contact_type, "value": value, "otp": otp_code, "expires_at": expires_at}
     ).decode()
@@ -75,7 +73,7 @@ def validate_otp_token(
     try:
         payload = orjson.loads(fernet.decrypt(otp_token))
     except Exception:
-        raise VerificationError("Invalid verification token")
+        raise VerificationError("Invalid verification token") from None
 
     if payload.get("type") != expected_type:
         raise VerificationError("Invalid verification token")
@@ -83,15 +81,13 @@ def validate_otp_token(
         raise VerificationError("Verification target does not match")
     if payload.get("otp") != otp_code:
         raise VerificationError("Invalid OTP code")
-    if int(datetime.now(timezone.utc).timestamp()) > int(payload.get("expires_at", 0)):
+    if int(datetime.now(UTC).timestamp()) > int(payload.get("expires_at", 0)):
         raise VerificationError("Verification token has expired")
 
 
 def build_email_verification_token(*, email: str, user_id: str) -> str:
     """Build a 24-hour fernet token for the click-the-link email verify flow."""
-    expires_at = int(
-        (datetime.now(timezone.utc) + timedelta(hours=24)).timestamp()
-    )
+    expires_at = int((datetime.now(UTC) + timedelta(hours=24)).timestamp())
     payload = orjson.dumps(
         {
             "type": "email_verification",
@@ -115,11 +111,11 @@ async def verify_email_token(db: AsyncSession, token: str) -> None:
     try:
         payload = orjson.loads(fernet.decrypt(token))
     except Exception:
-        raise VerificationError("Invalid verification token")
+        raise VerificationError("Invalid verification token") from None
 
     if payload.get("type") != "email_verification":
         raise VerificationError("Invalid verification token")
-    if int(datetime.now(timezone.utc).timestamp()) > int(payload.get("expires_at", 0)):
+    if int(datetime.now(UTC).timestamp()) > int(payload.get("expires_at", 0)):
         raise VerificationError("Verification token has expired")
 
     user_id = payload.get("user_id")

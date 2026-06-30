@@ -27,6 +27,7 @@ Step 2 will layer in semantic rules (single trigger root, no cycles
 in non-loop nodes, etc.); Step 1 only enforces the structural
 contract.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -42,7 +43,6 @@ from pydantic import (
 )
 
 from src.app.shared.schemas import ORMModel
-
 
 # --- Graph shape ---------------------------------------------------------
 
@@ -104,7 +104,7 @@ class WorkflowGraph(BaseModel):
     edges: list[GraphEdge] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _structural_checks(self) -> "WorkflowGraph":
+    def _structural_checks(self) -> WorkflowGraph:
         node_ids = {n.id for n in self.nodes}
         if len(node_ids) != len(self.nodes):
             raise ValueError("workflow.graph contains duplicate node ids")
@@ -116,13 +116,11 @@ class WorkflowGraph(BaseModel):
         for e in self.edges:
             if e.source not in node_ids:
                 raise ValueError(
-                    f"workflow.graph edge '{e.id}' references missing "
-                    f"source node '{e.source}'"
+                    f"workflow.graph edge '{e.id}' references missing source node '{e.source}'"
                 )
             if e.target not in node_ids:
                 raise ValueError(
-                    f"workflow.graph edge '{e.id}' references missing "
-                    f"target node '{e.target}'"
+                    f"workflow.graph edge '{e.id}' references missing target node '{e.target}'"
                 )
         return self
 
@@ -251,13 +249,9 @@ class WorkflowRunRead(ORMModel):
     version: int
     contact_id: uuid.UUID | None
     trigger_event_id: str | None
-    status: Literal[
-        "pending", "running", "completed", "paused", "canceled", "errored"
-    ]
+    status: Literal["pending", "running", "completed", "paused", "canceled", "errored"]
     current_node_id: str | None
-    outcome: Literal[
-        "goal_reached", "completed", "canceled", "errored"
-    ] | None
+    outcome: Literal["goal_reached", "completed", "canceled", "errored"] | None
     error: str | None
     started_at: datetime
     next_step_at: datetime | None

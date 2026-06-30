@@ -28,11 +28,11 @@ services) for keeping the accept transaction atomic in one place.
 A future polish step can route these through users + auth services
 once those expose ``insert_in_session`` style helpers.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -43,7 +43,6 @@ from src.app.core.invitations.models import Invitation
 from src.app.core.permissions.models import Role
 from src.app.core.users.models import OrganizationMember, User, UserInfo
 
-
 # --- Invitation reads ---------------------------------------------------
 
 
@@ -52,7 +51,7 @@ async def get_invitation_in_org(
     *,
     invitation_id: uuid.UUID,
     org_id: uuid.UUID,
-) -> Optional[Invitation]:
+) -> Invitation | None:
     """Single invitation row scoped to one org — used by revoke so
     a caller can't act on a foreign-org invitation even if they
     guess the UUID."""
@@ -66,15 +65,11 @@ async def get_invitation_in_org(
     ).scalar_one_or_none()
 
 
-async def get_invitation_by_token_hash(
-    session: AsyncSession, token_hash: str
-) -> Optional[Invitation]:
+async def get_invitation_by_token_hash(session: AsyncSession, token_hash: str) -> Invitation | None:
     """Resolve an invitation by the SHA-256 hash of its raw token.
     ``None`` on miss — caller raises 404."""
     return (
-        await session.execute(
-            select(Invitation).where(Invitation.token_hash == token_hash)
-        )
+        await session.execute(select(Invitation).where(Invitation.token_hash == token_hash))
     ).scalar_one_or_none()
 
 
@@ -84,7 +79,7 @@ async def find_pending_invitation_for_email(
     org_id: uuid.UUID,
     email: str,
     now: datetime,
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     """Return the id of an active (un-accepted, un-expired) invitation
     for ``email`` in ``org_id``, if one exists. Used by create to
     refuse double-invitations."""
@@ -120,9 +115,7 @@ async def list_pending_invitations(
     return list(result.scalars().all())
 
 
-def insert_invitation(
-    session: AsyncSession, invitation: Invitation
-) -> None:
+def insert_invitation(session: AsyncSession, invitation: Invitation) -> None:
     """Register an already-constructed Invitation for INSERT."""
     session.add(invitation)
 
@@ -130,9 +123,7 @@ def insert_invitation(
 # --- Cross-module reads -------------------------------------------------
 
 
-async def find_user_member_id_by_email(
-    session: AsyncSession, email: str
-) -> Optional[int]:
+async def find_user_member_id_by_email(session: AsyncSession, email: str) -> int | None:
     """Resolve a user's bigint id by their UserInfo.email — used by
     both create (refuse duplicate-email invite) and accept (defensive
     second check between issue + accept).
@@ -142,35 +133,21 @@ async def find_user_member_id_by_email(
     canonical user lookups stay in ``core/users/data_access.py``.
     """
     return (
-        await session.execute(
-            select(UserInfo.member_id).where(UserInfo.email == email)
-        )
+        await session.execute(select(UserInfo.member_id).where(UserInfo.email == email))
     ).scalar_one_or_none()
 
 
-async def get_role_name_by_id(
-    session: AsyncSession, role_id: uuid.UUID
-) -> Optional[str]:
+async def get_role_name_by_id(session: AsyncSession, role_id: uuid.UUID) -> str | None:
     """Best-effort role-name lookup for the audit row. Returns
     ``None`` if the role row vanished between the lookup and the
     audit emit (vanishingly unlikely; invite FKs use RESTRICT)."""
-    return (
-        await session.execute(
-            select(Role.name).where(Role.id == role_id)
-        )
-    ).scalar_one_or_none()
+    return (await session.execute(select(Role.name).where(Role.id == role_id))).scalar_one_or_none()
 
 
-async def get_role_by_id(
-    session: AsyncSession, role_id: uuid.UUID
-) -> Optional[Role]:
+async def get_role_by_id(session: AsyncSession, role_id: uuid.UUID) -> Role | None:
     """Full Role row by id — used by the ``lookup_invitation`` flow
     to surface the role name on the accept page."""
-    return (
-        await session.execute(
-            select(Role).where(Role.id == role_id)
-        )
-    ).scalar_one_or_none()
+    return (await session.execute(select(Role).where(Role.id == role_id))).scalar_one_or_none()
 
 
 # --- Cross-module writes (accept flow) ----------------------------------
@@ -207,23 +184,17 @@ async def insert_user_login_returning_id(
     return int(result.scalar_one())
 
 
-def insert_user_info(
-    session: AsyncSession, profile: UserInfo
-) -> None:
+def insert_user_info(session: AsyncSession, profile: UserInfo) -> None:
     """Register an already-constructed UserInfo for INSERT."""
     session.add(profile)
 
 
-def insert_organization_member(
-    session: AsyncSession, member: OrganizationMember
-) -> None:
+def insert_organization_member(session: AsyncSession, member: OrganizationMember) -> None:
     """Register an already-constructed OrganizationMember for INSERT."""
     session.add(member)
 
 
-def insert_auth_session(
-    session: AsyncSession, auth_session_row: AuthSession
-) -> None:
+def insert_auth_session(session: AsyncSession, auth_session_row: AuthSession) -> None:
     """Register an already-constructed AuthSession for INSERT."""
     session.add(auth_session_row)
 

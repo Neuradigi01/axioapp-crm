@@ -10,7 +10,9 @@
         {{ org()?.name ?? 'CRM' }}
       </span>
       @if (org(); as o) {
-        <span class="mt-0.5 inline-block rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+        <span
+          class="mt-0.5 inline-block rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400"
+        >
           {{ o.template_id }} pack
         </span>
       }
@@ -27,10 +29,7 @@
       (click)="toggle.emit()"
       [attr.aria-label]="expanded() ? 'Collapse sidebar' : 'Expand sidebar'"
     >
-      <lucide-icon
-        [name]="expanded() ? 'chevron-left' : 'chevron-right'"
-        class="h-4 w-4"
-      />
+      <lucide-icon [name]="expanded() ? 'chevron-left' : 'chevron-right'" class="h-4 w-4" />
     </button>
 
     <!-- Mobile drawer close. -->

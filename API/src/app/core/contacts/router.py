@@ -14,13 +14,15 @@ The dynamic ``custom.<key>=<value>`` filter is parsed off
 ``Request.query_params`` because FastAPI's typed Query params don't
 support arbitrary prefixed names.
 """
+
 from __future__ import annotations
 
 import csv
 import io
 import uuid
-from datetime import datetime, timezone
-from typing import AsyncIterator, Literal
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
@@ -70,7 +72,6 @@ from src.app.core.tenants import service as tenants_service
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/contacts", tags=["Contacts"])
 
 _CUSTOM_PREFIX = "custom."
@@ -92,9 +93,7 @@ async def list_contacts_endpoint(
     source: str | None = Query(default=None, max_length=64),
     tag: str | None = Query(default=None, max_length=64),
     assigned_to_id: uuid.UUID | None = Query(default=None),
-    sort: Literal["full_name", "created_at", "last_activity_at"] = Query(
-        default="created_at"
-    ),
+    sort: Literal["full_name", "created_at", "last_activity_at"] = Query(default="created_at"),
     order: Literal["asc", "desc"] = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
@@ -189,7 +188,7 @@ async def export_csv_endpoint(
     org = await tenants_service.get_organization_by_id(db, user.org_id)
     assert org is not None  # authed user implies their org exists
 
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = datetime.now(UTC).date().isoformat()
     filename = f"contacts-{org.slug}-{today}.csv"
 
     async def _stream() -> AsyncIterator[bytes]:
@@ -247,9 +246,7 @@ async def get_contact_endpoint(
 ) -> ContactOut:
     contact = await get_contact(db, contact_id)
     if contact is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact not found")
     return ContactOut.model_validate(contact)
 
 
@@ -328,9 +325,7 @@ async def bulk_add_tag_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("contacts.write")),
 ) -> ContactBulkAddTagResult:
-    n = await bulk_add_tag_contacts(
-        db, ids=payload.ids, tag=payload.tag, org_id=user.org_id
-    )
+    n = await bulk_add_tag_contacts(db, ids=payload.ids, tag=payload.tag, org_id=user.org_id)
     return ContactBulkAddTagResult(updated=n)
 
 
@@ -375,9 +370,7 @@ async def export_contact_data_endpoint(
             requested_by_user_id=user.legacy_uuid,
         )
     except LookupError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     from src.app.core import audit
 
     await audit.log(
@@ -391,9 +384,7 @@ async def export_contact_data_endpoint(
         content=bundle.archive_bytes,
         media_type="application/zip",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="{bundle.filename}"'
-            ),
+            "Content-Disposition": (f'attachment; filename="{bundle.filename}"'),
         },
     )
 
@@ -414,9 +405,7 @@ async def get_opt_in_endpoint(
     overrides are gated separately on `whatsapp.opt_in.manage`."""
     contact = await get_contact(db, contact_id)
     if contact is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact not found")
     events = await list_consent_events(db, contact_id=contact_id)
     return OptInHistoryOut(
         contact_id=contact.id,
@@ -445,9 +434,7 @@ async def post_opt_in_endpoint(
 ) -> ConsentEventOut:
     contact = await get_contact(db, contact_id)
     if contact is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact not found")
     try:
         result = await record_transition(
             db,
@@ -462,7 +449,7 @@ async def post_opt_in_endpoint(
     except ConsentError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        )
+        ) from exc
     if not result.persisted:
         # Idempotent no-op — re-fetch the most recent event so the
         # caller still gets a meaningful row back instead of a 201
@@ -493,9 +480,7 @@ async def post_opt_out_endpoint(
 ) -> ConsentEventOut:
     contact = await get_contact(db, contact_id)
     if contact is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="contact not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact not found")
     try:
         result = await record_transition(
             db,
@@ -510,7 +495,7 @@ async def post_opt_out_endpoint(
     except ConsentError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        )
+        ) from exc
     if not result.persisted:
         recent = await list_consent_events(db, contact_id=contact_id, limit=1)
         if recent:

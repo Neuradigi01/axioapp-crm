@@ -19,11 +19,12 @@ XLSX: openpyxl. Soft-imports — if openpyxl isn't installed the
 module still loads + CSV continues to work; XLSX uploads raise a
 clear error message at parse time.
 """
+
 from __future__ import annotations
 
 import csv
 import io
-from typing import Any, Iterator
+from collections.abc import Iterator
 
 
 def _decode_csv(data: bytes) -> str:
@@ -43,9 +44,7 @@ def _file_kind(filename: str) -> str:
         return "csv"
     if lower.endswith(".xlsx"):
         return "xlsx"
-    raise ValueError(
-        f"Unsupported file type: {filename!r}. Only .csv and .xlsx are accepted."
-    )
+    raise ValueError(f"Unsupported file type: {filename!r}. Only .csv and .xlsx are accepted.")
 
 
 # --- CSV ----------------------------------------------------------------
@@ -54,8 +53,7 @@ def _file_kind(filename: str) -> str:
 def _csv_rows(data: bytes) -> Iterator[list[str]]:
     text = _decode_csv(data)
     reader = csv.reader(io.StringIO(text))
-    for row in reader:
-        yield row
+    yield from reader
 
 
 # --- XLSX ---------------------------------------------------------------
@@ -114,9 +112,7 @@ def parse_headers_and_sample(
     return headers, sample_rows, total
 
 
-def parse_all_rows(
-    file_bytes: bytes, filename: str
-) -> Iterator[tuple[int, dict[str, str]]]:
+def parse_all_rows(file_bytes: bytes, filename: str) -> Iterator[tuple[int, dict[str, str]]]:
     """Full data iterator. `row_number` is 1-based against data rows
     (header is row 0 internally but never yielded)."""
     headers: list[str] = []

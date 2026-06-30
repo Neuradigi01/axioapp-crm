@@ -30,16 +30,9 @@ import { environment } from '../../../../../environments/environment';
 // `environment.apiBaseUrl` already carries the `/api/v1` prefix —
 // append just the resource path below.
 
-
 export type EmailAccountProvider = 'gmail' | 'microsoft';
 
-export type EmailAccountSyncState =
-  | 'pending'
-  | 'backfilling'
-  | 'live'
-  | 'error'
-  | 'disconnected';
-
+export type EmailAccountSyncState = 'pending' | 'backfilling' | 'live' | 'error' | 'disconnected';
 
 export interface EmailAccount {
   id: string;
@@ -61,11 +54,9 @@ export interface EmailAccount {
   disconnected_by: string | null;
 }
 
-
 export interface AuthorizeResponse {
   url: string;
 }
-
 
 @Injectable({ providedIn: 'root' })
 export class EmailAccountsApiService {
@@ -85,9 +76,7 @@ export class EmailAccountsApiService {
    *  `/api/v1/...` doesn't carry the Bearer header, so a 302 from
    *  the API would fail. JSON wrap-and-navigate is the workaround. */
   authorizeGmail(): Observable<AuthorizeResponse> {
-    return this.http.get<AuthorizeResponse>(
-      `${this.base}/gmail/authorize`,
-    );
+    return this.http.get<AuthorizeResponse>(`${this.base}/gmail/authorize`);
   }
 
   /** Same shape as `authorizeGmail` for the Microsoft Graph consent
@@ -95,9 +84,7 @@ export class EmailAccountsApiService {
    *  configured (dev default); the UI handles that as a disabled
    *  state. */
   authorizeMicrosoft(): Observable<AuthorizeResponse> {
-    return this.http.get<AuthorizeResponse>(
-      `${this.base}/microsoft/authorize`,
-    );
+    return this.http.get<AuthorizeResponse>(`${this.base}/microsoft/authorize`);
   }
 
   /** Disconnect an account. Returns 204 No Content; the wrapper types

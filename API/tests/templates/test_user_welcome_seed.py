@@ -5,13 +5,15 @@ always lands with a published Welcome template ready for the
 automation engine to render. The companion trigger seeder lives
 under `core/automation/seeds.py` (covered in `test_user_signed_up.py`).
 """
+
 from __future__ import annotations
 
 import uuid
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.templates.models import (
@@ -23,7 +25,6 @@ from src.app.core.templates.models import (
 from src.app.core.templates.seeds import seed_user_welcome_template
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -31,10 +32,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -74,12 +72,16 @@ async def test_seeds_version_row(test_db, org_id):
         reset_context(token)
 
     rows = (
-        await test_db.execute(
-            select(MessageTemplateVersion).where(
-                MessageTemplateVersion.template_id == template.id
+        (
+            await test_db.execute(
+                select(MessageTemplateVersion).where(
+                    MessageTemplateVersion.template_id == template.id
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
     assert rows[0].version == 1
     assert rows[0].body_text == template.body_text
@@ -98,11 +100,15 @@ async def test_seed_is_idempotent(test_db, org_id):
     assert first.id == second.id
 
     count = (
-        await test_db.execute(
-            select(MessageTemplate).where(
-                MessageTemplate.org_id == org_id,
-                MessageTemplate.name == "User Welcome",
+        (
+            await test_db.execute(
+                select(MessageTemplate).where(
+                    MessageTemplate.org_id == org_id,
+                    MessageTemplate.name == "User Welcome",
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(count) == 1

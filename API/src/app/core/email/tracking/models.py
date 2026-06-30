@@ -11,11 +11,11 @@ Two narrow tables, both tenant-scoped:
 
 Migration `0086_add_email_tracking` ships the tables + RLS.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import DateTime, Text, text
 from sqlalchemy.dialects.postgresql import UUID
@@ -33,18 +33,14 @@ class EmailMessageOpen(Base, TenantScoped):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    message_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
+    message_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     opened_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=text("now()"),
     )
-    ip_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    user_agent_hash: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
+    ip_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user_agent_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class EmailMessageClick(Base, TenantScoped):
@@ -55,16 +51,14 @@ class EmailMessageClick(Base, TenantScoped):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    message_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
+    message_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     target_url: Mapped[str] = mapped_column(Text, nullable=False)
     clicked_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=text("now()"),
     )
-    ip_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 __all__ = ["EmailMessageClick", "EmailMessageOpen"]

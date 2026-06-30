@@ -30,15 +30,14 @@ Strategy dispatch:
     falls through to round_robin. The Settings UI exposes the choice
     in Step 8.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,7 @@ async def pick_assignee(
     *,
     org_id: uuid.UUID,
     source: str | None = None,
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     """Resolve the next round-robin assignee for `org_id`.
 
     Returns the user's `legacy_uuid` (matching what
@@ -73,9 +72,7 @@ async def pick_assignee(
 
     # Strategy dispatch. v1 always round-robin; future strategies
     # consult org_settings.lead_routing_config.strategy.
-    index = await _next_round_robin_index(
-        session, org_id=org_id, modulo=len(eligible)
-    )
+    index = await _next_round_robin_index(session, org_id=org_id, modulo=len(eligible))
     return eligible[index]
 
 
@@ -155,9 +152,7 @@ async def _next_round_robin_index(
         RETURNING next_assignee_index - 1 AS picked_index
         """
     )
-    picked = (
-        await session.execute(sql, {"org_id": str(org_id)})
-    ).scalar()
+    picked = (await session.execute(sql, {"org_id": str(org_id)})).scalar()
     if picked is None:
         # ON CONFLICT path always returns; INSERT path returns the
         # default - 1 = 0. Defence in depth.

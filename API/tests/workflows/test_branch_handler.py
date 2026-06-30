@@ -15,6 +15,7 @@ Covers:
   * Graph validator rejects a branch node with a malformed
     condition AST.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -28,7 +29,6 @@ from src.app.core.workflows.schemas import (
     GraphNode,
     WorkflowGraph,
 )
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -65,15 +65,11 @@ async def test_branch_picks_first_matching_label():
         },
     }
     context = {"lead": {"score": 90}}
-    result = await handler(
-        None, run=None, step_run=None, node=node, context=context
-    )
+    result = await handler(None, run=None, step_run=None, node=node, context=context)
     assert result.next_edge_label == "high"
 
     context_med = {"lead": {"score": 60}}
-    result_med = await handler(
-        None, run=None, step_run=None, node=node, context=context_med
-    )
+    result_med = await handler(None, run=None, step_run=None, node=node, context=context_med)
     assert result_med.next_edge_label == "medium"
 
 
@@ -96,18 +92,14 @@ async def test_branch_falls_through_to_else():
         },
     }
     context = {"lead": {"score": 30}}
-    result = await handler(
-        None, run=None, step_run=None, node=node, context=context
-    )
+    result = await handler(None, run=None, step_run=None, node=node, context=context)
     assert result.next_edge_label == "else"
 
 
 async def test_branch_empty_config_falls_through_to_else():
     handler = resolve_action("branch.if")
     node = {"id": "br", "type": "branch.if", "config": {}}
-    result = await handler(
-        None, run=None, step_run=None, node=node, context={}
-    )
+    result = await handler(None, run=None, step_run=None, node=node, context={})
     assert result.next_edge_label == "else"
 
 
@@ -178,9 +170,7 @@ async def test_switch_missing_path_returns_default():
             "branches": [{"label": "x", "value": "y"}],
         },
     }
-    result = await handler(
-        None, run=None, step_run=None, node=node, context={"lead": {}}
-    )
+    result = await handler(None, run=None, step_run=None, node=node, context={"lead": {}})
     assert result.next_edge_label == "default"
 
 

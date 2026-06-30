@@ -1,16 +1,8 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CanvasNode } from '../canvas-state.service';
-
 
 @Component({
   selector: 'app-create-appointment-editor',
@@ -24,9 +16,7 @@ export class CreateAppointmentEditorComponent {
   readonly configChange = output<Record<string, unknown>>();
   readonly validityChange = output<boolean>();
 
-  readonly title = computed<string>(
-    () => (this.node().config?.['title'] as string) ?? '',
-  );
+  readonly title = computed<string>(() => (this.node().config?.['title'] as string) ?? '');
   readonly assignee = computed<string>(
     () => (this.node().config?.['assignee'] as string) ?? 'lead.owner',
   );
@@ -41,8 +31,12 @@ export class CreateAppointmentEditorComponent {
     effect(() => this.validityChange.emit(this.title().trim().length > 0));
   }
 
-  onTitleChange(v: string): void { this.configChange.emit({ title: v }); }
-  onAssigneeChange(v: string): void { this.configChange.emit({ assignee: v }); }
+  onTitleChange(v: string): void {
+    this.configChange.emit({ title: v });
+  }
+  onAssigneeChange(v: string): void {
+    this.configChange.emit({ assignee: v });
+  }
   onScheduleChange(v: number): void {
     this.configChange.emit({ schedule_in_hours: Number.isFinite(v) ? v : 24 });
   }

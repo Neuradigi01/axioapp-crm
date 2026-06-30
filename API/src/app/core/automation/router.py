@@ -20,11 +20,11 @@ shapes: 404 / 409 / 422 cover :class:`TriggerNotFound`,
 :class:`DuplicateTriggerName`, :class:`InvalidCondition` +
 :class:`MissingTemplateForChannel`.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import Optional
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict
@@ -55,7 +55,6 @@ from src.app.core.automation.schemas import (
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/automations", tags=["Automations"])
 
@@ -118,10 +117,10 @@ def _automation_http_map(exc: AutomationError) -> HTTPException:
 
 @router.get("/triggers", response_model=TriggerListResponse)
 async def list_triggers_endpoint(
-    event_type: Optional[str] = Query(default=None, max_length=200),
-    enabled: Optional[bool] = Query(default=None),
-    channel: Optional[ConversationChannel] = Query(default=None),
-    q: Optional[str] = Query(default=None, max_length=255),
+    event_type: str | None = Query(default=None, max_length=200),
+    enabled: bool | None = Query(default=None),
+    channel: ConversationChannel | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=255),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -202,9 +201,7 @@ async def update_trigger_endpoint(
     return TriggerRead.model_validate(trigger)
 
 
-@router.post(
-    "/triggers/{trigger_id}/enable", response_model=TriggerRead
-)
+@router.post("/triggers/{trigger_id}/enable", response_model=TriggerRead)
 async def enable_trigger_endpoint(
     trigger_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -222,9 +219,7 @@ async def enable_trigger_endpoint(
     return TriggerRead.model_validate(trigger)
 
 
-@router.post(
-    "/triggers/{trigger_id}/disable", response_model=TriggerRead
-)
+@router.post("/triggers/{trigger_id}/disable", response_model=TriggerRead)
 async def disable_trigger_endpoint(
     trigger_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -253,9 +248,7 @@ async def delete_trigger_endpoint(
     user: User = Depends(require_permissions(PERM_WRITE)),
 ) -> Response:
     try:
-        await automation_service.delete_trigger(
-            db, org_id=user.org_id, trigger_id=trigger_id
-        )
+        await automation_service.delete_trigger(db, org_id=user.org_id, trigger_id=trigger_id)
     except AutomationError as exc:
         raise _automation_http_map(exc) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -264,15 +257,11 @@ async def delete_trigger_endpoint(
 # --- run history ----------------------------------------------------
 
 
-@router.get(
-    "/triggers/{trigger_id}/runs", response_model=RunListResponse
-)
+@router.get("/triggers/{trigger_id}/runs", response_model=RunListResponse)
 async def list_runs_endpoint(
     trigger_id: uuid.UUID,
-    run_status: Optional[AutomationRunStatus] = Query(
-        default=None, alias="status"
-    ),
-    since: Optional[datetime] = Query(default=None),
+    run_status: AutomationRunStatus | None = Query(default=None, alias="status"),
+    since: datetime | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -284,9 +273,7 @@ async def list_runs_endpoint(
     trigger ids with 404 — RLS-scoped lookup."""
     try:
         # Confirm the trigger exists in this org (RLS + 404 mapping).
-        await automation_service.get_trigger(
-            db, org_id=user.org_id, trigger_id=trigger_id
-        )
+        await automation_service.get_trigger(db, org_id=user.org_id, trigger_id=trigger_id)
     except AutomationError as exc:
         raise _automation_http_map(exc) from exc
 
@@ -332,12 +319,10 @@ async def list_event_types_endpoint(
 
 @router.get("/runs", response_model=RunListResponse)
 async def list_runs_by_filters_endpoint(
-    contact_id: Optional[uuid.UUID] = Query(default=None),
-    trigger_id: Optional[uuid.UUID] = Query(default=None),
-    run_status: Optional[AutomationRunStatus] = Query(
-        default=None, alias="status"
-    ),
-    since: Optional[datetime] = Query(default=None),
+    contact_id: uuid.UUID | None = Query(default=None),
+    trigger_id: uuid.UUID | None = Query(default=None),
+    run_status: AutomationRunStatus | None = Query(default=None, alias="status"),
+    since: datetime | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -381,14 +366,11 @@ async def retry_run_endpoint(
       fire — operator should fix the root cause + use Run-now).
     """
     from datetime import datetime as _dt
-    from datetime import timezone as _tz
 
     from src.app.core.automation import tasks as automation_tasks
     from src.app.core.automation.models import AutomationRunStatus
 
-    run = await data_access.get_run(
-        db, org_id=user.org_id, run_id=run_id
-    )
+    run = await data_access.get_run(db, org_id=user.org_id, run_id=run_id)
     if run is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -399,10 +381,7 @@ async def retry_run_endpoint(
             status_code=status.HTTP_409_CONFLICT,
             detail={
                 "code": "automation.run_not_retryable",
-                "message": (
-                    f"only failed runs can be retried (this one is "
-                    f"'{run.status.value}')"
-                ),
+                "message": (f"only failed runs can be retried (this one is '{run.status.value}')"),
             },
         )
 
@@ -413,13 +392,11 @@ async def retry_run_endpoint(
     run.dispatched_at = None
     run.completed_at = None
     run.channel_message_id = None
-    run.scheduled_at = _dt.now(_tz.utc)
+    run.scheduled_at = _dt.now(UTC)
     await db.commit()
     await db.refresh(run)
 
-    automation_tasks.deliver_run.apply_async(
-        args=(str(run.id),), countdown=0
-    )
+    automation_tasks.deliver_run.apply_async(args=(str(run.id),), countdown=0)
 
     return RunRead.model_validate(run)
 
@@ -503,15 +480,13 @@ class DryRunResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     would_match: bool
-    skip_reason: Optional[str] = None
-    would_send_to: Optional[str] = None
-    rendered_subject: Optional[str] = None
-    rendered_body: Optional[str] = None
+    skip_reason: str | None = None
+    would_send_to: str | None = None
+    rendered_subject: str | None = None
+    rendered_body: str | None = None
 
 
-@router.post(
-    "/triggers/{trigger_id}/dry-run", response_model=DryRunResult
-)
+@router.post("/triggers/{trigger_id}/dry-run", response_model=DryRunResult)
 async def dry_run_endpoint(
     trigger_id: uuid.UUID,
     payload: DryRunPayload,
@@ -579,9 +554,7 @@ async def dry_run_endpoint(
 
     rendered_body = render_variables(template.body_text, payload.payload)
     rendered_subject = (
-        render_variables(template.subject, payload.payload)
-        if template.subject
-        else None
+        render_variables(template.subject, payload.payload) if template.subject else None
     )
 
     return DryRunResult(

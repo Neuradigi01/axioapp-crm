@@ -21,17 +21,13 @@ import {
   ConversationTag,
   ConversationsApiService,
 } from '../../conversations/conversations-api.service';
-import {
-  StaffApiService,
-  StaffListItem,
-} from '../../staff/staff-api.service';
+import { StaffApiService, StaffListItem } from '../../staff/staff-api.service';
 import {
   WhatsAppTemplateRead,
   WhatsAppTemplatesApiService,
 } from '../templates/whatsapp-templates-api.service';
 
 import {
-  KeywordAction,
   KeywordActionPayload,
   KeywordActionType,
   KeywordMatchType,
@@ -40,12 +36,10 @@ import {
   WhatsAppAutomationApiService,
 } from './whatsapp-automation-api.service';
 
-
 type ActionDraft = {
   action_type: KeywordActionType;
   action_config: Record<string, unknown>;
 };
-
 
 /**
  * Keyword rule editor (whatsapp-platform-upgrade Step 17).
@@ -160,16 +154,10 @@ export class KeywordRuleEditorComponent {
     this.actions.update((arr) => arr.filter((_, i) => i !== idx));
   }
 
-  protected updateActionConfig(
-    idx: number,
-    key: string,
-    value: unknown,
-  ): void {
+  protected updateActionConfig(idx: number, key: string, value: unknown): void {
     this.actions.update((arr) =>
       arr.map((a, i) =>
-        i === idx
-          ? { ...a, action_config: { ...a.action_config, [key]: value } }
-          : a,
+        i === idx ? { ...a, action_config: { ...a.action_config, [key]: value } } : a,
       ),
     );
   }
@@ -208,23 +196,17 @@ export class KeywordRuleEditorComponent {
     this.saving.set(true);
     this.error.set(null);
     const id = this.editingId();
-    const request$ = id
-      ? this.api.update(id, payload)
-      : this.api.create(payload);
-    request$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (rule) => {
-          this.saving.set(false);
-          this.saved.emit(rule);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.saving.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not save the rule.',
-          );
-        },
-      });
+    const request$ = id ? this.api.update(id, payload) : this.api.create(payload);
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (rule) => {
+        this.saving.set(false);
+        this.saved.emit(rule);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.saving.set(false);
+        this.error.set(extractApiError(err) ?? 'Could not save the rule.');
+      },
+    });
   }
 
   protected onCancel(): void {

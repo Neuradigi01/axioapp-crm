@@ -72,10 +72,7 @@ export class NotificationsPopoverComponent {
   }
 
   protected onMarkAllRead(): void {
-    this.api
-      .markAllRead()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe();
+    this.api.markAllRead().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
   }
 
   private fetch(): void {

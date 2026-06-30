@@ -74,9 +74,7 @@ export class UpgradeSuccessPage implements OnInit {
       this.status.set('completed');
       this.stopPolling();
       setTimeout(() => {
-        this.router.navigateByUrl(
-          '/user/subscription?upgraded=true',
-        );
+        this.router.navigateByUrl('/user/subscription?upgraded=true');
       }, SUCCESS_NAVIGATE_DELAY_MS);
       return;
     }

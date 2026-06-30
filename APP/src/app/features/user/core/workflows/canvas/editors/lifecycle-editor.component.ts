@@ -1,16 +1,8 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CanvasNode } from '../canvas-state.service';
-
 
 /**
  * Covers 4 lifecycle node types: `lifecycle.mark_converted`,
@@ -18,7 +10,6 @@ import { CanvasNode } from '../canvas-state.service';
  * `lifecycle.archive`. Each takes an optional reason note;
  * `mark_converted` additionally takes a `conversion_reason` enum.
  */
-
 
 @Component({
   selector: 'app-lifecycle-editor',
@@ -34,9 +25,7 @@ export class LifecycleEditorComponent {
 
   readonly type = computed(() => this.node().type);
 
-  readonly reason = computed<string>(
-    () => (this.node().config?.['reason'] as string) ?? '',
-  );
+  readonly reason = computed<string>(() => (this.node().config?.['reason'] as string) ?? '');
   readonly conversionReason = computed<string>(
     () => (this.node().config?.['conversion_reason'] as string) ?? 'won',
   );
@@ -47,9 +36,13 @@ export class LifecycleEditorComponent {
     effect(() => this.validityChange.emit(true));
   }
 
-  isConvert(): boolean { return this.type() === 'lifecycle.mark_converted'; }
+  isConvert(): boolean {
+    return this.type() === 'lifecycle.mark_converted';
+  }
 
-  onReasonChange(v: string): void { this.configChange.emit({ reason: v }); }
+  onReasonChange(v: string): void {
+    this.configChange.emit({ reason: v });
+  }
   onConversionReasonChange(v: string): void {
     this.configChange.emit({ conversion_reason: v });
   }

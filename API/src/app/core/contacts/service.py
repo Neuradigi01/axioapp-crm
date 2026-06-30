@@ -15,10 +15,12 @@ Two responsibilities sit here that the router does not duplicate:
 Audit events (`contacts.created`, `.updated`, `.deleted`) fire from
 inside each write path.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Iterable, Literal
+from collections.abc import Iterable
+from typing import Any, Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,7 +35,6 @@ from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
-
 
 _CONTACT_ENTITY = "contact"
 
@@ -66,9 +67,7 @@ def _snapshot(contact: Contact) -> dict[str, Any]:
     return snapshot(contact, fields=_SNAPSHOT_FIELDS)
 
 
-async def get_contact(
-    session: AsyncSession, contact_id: uuid.UUID
-) -> Contact | None:
+async def get_contact(session: AsyncSession, contact_id: uuid.UUID) -> Contact | None:
     """Public lookup-by-id wrapper. Thin pass-through to the DAL so
     other modules' routers (e.g. notes / activities / files endpoints
     that hang off a contact) don't reach into `contacts.data_access`
@@ -76,9 +75,7 @@ async def get_contact(
     return await data_access.get_contact(session, contact_id)
 
 
-async def get_contact_by_phone(
-    session: AsyncSession, phone: str
-) -> Contact | None:
+async def get_contact_by_phone(session: AsyncSession, phone: str) -> Contact | None:
     """Public lookup-by-phone wrapper. Used by inbound
     conversation routing and walk-in reception to resolve an
     incoming number to a contact."""
@@ -184,9 +181,7 @@ async def update_contact(
     return contact
 
 
-async def delete_contact(
-    session: AsyncSession, *, contact_id: uuid.UUID
-) -> None:
+async def delete_contact(session: AsyncSession, *, contact_id: uuid.UUID) -> None:
     contact = ensure_found(await data_access.get_contact(session, contact_id), entity="contact")
     before = _snapshot(contact)
     contact_uuid = contact.id
@@ -296,9 +291,7 @@ async def reassign_contact(
     contact = ensure_found(await data_access.get_contact(session, contact_id), entity="contact")
 
     if assigned_to_id is not None:
-        await _assert_user_in_org(
-            session, org_id=org_id, user_uuid=assigned_to_id
-        )
+        await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
     before_id = contact.assigned_to_id
     if before_id == assigned_to_id:
@@ -314,9 +307,7 @@ async def reassign_contact(
         entity_type="contact",
         entity_id=contact.id,
         type=ActivityType.reassign,
-        payload=_reassign_payload(
-            from_id=before_id, to_id=assigned_to_id, note=note
-        ),
+        payload=_reassign_payload(from_id=before_id, to_id=assigned_to_id, note=note),
         user_id=actor_user_id,
     )
 
@@ -350,9 +341,7 @@ async def bulk_reassign_contacts(
     are silently skipped (no-op activity).
     """
     if assigned_to_id is not None:
-        await _assert_user_in_org(
-            session, org_id=org_id, user_uuid=assigned_to_id
-        )
+        await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
     reassigned = 0
     for cid in ids:
@@ -369,9 +358,7 @@ async def bulk_reassign_contacts(
             entity_type="contact",
             entity_id=contact.id,
             type=ActivityType.reassign,
-            payload=_reassign_payload(
-                from_id=before_id, to_id=assigned_to_id, note=note
-            ),
+            payload=_reassign_payload(from_id=before_id, to_id=assigned_to_id, note=note),
             user_id=actor_user_id,
         )
         reassigned += 1
@@ -391,9 +378,7 @@ async def bulk_delete_contacts(
     `org_id` is enforced in the WHERE clause as a belt to the tenant RLS
     policy — the auto ORM tenant filter only injects on SELECTs.
     """
-    deleted = await data_access.delete_contacts_in_org(
-        session, ids=ids, org_id=org_id
-    )
+    deleted = await data_access.delete_contacts_in_org(session, ids=ids, org_id=org_id)
     await session.commit()
     return deleted
 
@@ -416,9 +401,7 @@ async def bulk_add_tag_contacts(
         return 0
     # `tags = CASE WHEN clean = ANY(tags) THEN tags ELSE array_append(tags, clean) END`
     # via SQLAlchemy text expression — keeps the per-row decision in PG.
-    rowcount = await data_access.bulk_append_tag(
-        session, ids=ids, tag=clean, org_id=org_id
-    )
+    rowcount = await data_access.bulk_append_tag(session, ids=ids, tag=clean, org_id=org_id)
     await session.commit()
     return rowcount
 
@@ -466,9 +449,7 @@ async def check_duplicate(
     if not has_phone and not has_email:
         return []
 
-    phone_suffix = (
-        _normalise_phone_suffix(phone or "") if has_phone else None
-    )
+    phone_suffix = _normalise_phone_suffix(phone or "") if has_phone else None
     email_lower = (email or "").strip().lower() if has_email else None
     return await data_access.find_duplicate_candidates(
         session,

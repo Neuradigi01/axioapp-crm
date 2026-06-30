@@ -62,7 +62,6 @@ export interface RuleTestResponse {
   actions: KeywordAction[];
 }
 
-
 @Injectable({ providedIn: 'root' })
 export class WhatsAppAutomationApiService {
   private readonly http = inject(HttpClient);
@@ -111,20 +110,12 @@ export class WhatsAppAutomationApiService {
     return this.http.get<AssignmentRule[]>(this.assignmentBase);
   }
 
-  createAssignmentRule(
-    payload: AssignmentRuleUpsert,
-  ): Observable<AssignmentRule> {
+  createAssignmentRule(payload: AssignmentRuleUpsert): Observable<AssignmentRule> {
     return this.http.post<AssignmentRule>(this.assignmentBase, payload);
   }
 
-  updateAssignmentRule(
-    id: string,
-    payload: AssignmentRuleUpsert,
-  ): Observable<AssignmentRule> {
-    return this.http.patch<AssignmentRule>(
-      `${this.assignmentBase}/${id}`,
-      payload,
-    );
+  updateAssignmentRule(id: string, payload: AssignmentRuleUpsert): Observable<AssignmentRule> {
+    return this.http.patch<AssignmentRule>(`${this.assignmentBase}/${id}`, payload);
   }
 
   deleteAssignmentRule(id: string): Observable<void> {
@@ -132,10 +123,9 @@ export class WhatsAppAutomationApiService {
   }
 
   reorderAssignmentRules(ruleIds: string[]): Observable<AssignmentRule[]> {
-    return this.http.post<AssignmentRule[]>(
-      `${this.assignmentBase}/reorder`,
-      { rule_ids: ruleIds },
-    );
+    return this.http.post<AssignmentRule[]>(`${this.assignmentBase}/reorder`, {
+      rule_ids: ruleIds,
+    });
   }
 
   // --- AI settings (whatsapp-platform-upgrade Step 19) --------------
@@ -147,21 +137,13 @@ export class WhatsAppAutomationApiService {
   }
 
   patchAISettings(payload: AISettingsPatch): Observable<AISettings> {
-    return this.http.patch<AISettings>(
-      `${this.aiBase}/settings`,
-      payload,
-    );
+    return this.http.patch<AISettings>(`${this.aiBase}/settings`, payload);
   }
 }
 
-
 // --- Step 18 types -------------------------------------------------
 
-export type AssignmentStrategy =
-  | 'round_robin'
-  | 'load_balanced'
-  | 'tag_based'
-  | 'team_based';
+export type AssignmentStrategy = 'round_robin' | 'load_balanced' | 'tag_based' | 'team_based';
 
 export interface AssignmentRule {
   id: string;
@@ -185,7 +167,6 @@ export interface AssignmentRuleUpsert {
   priority: number;
   skip_outside_hours: boolean;
 }
-
 
 // --- Step 19 — AI settings ----------------------------------------
 

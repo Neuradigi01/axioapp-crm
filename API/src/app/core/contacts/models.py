@@ -23,6 +23,7 @@ compliance — the campaign send guard queries them directly without
 unpacking `custom_data`. This is the intentional Rule-3 override
 called out in the step spec.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -35,7 +36,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
-
 
 # Step 22 — DPDP-ready opt-in state machine. Defined here so both
 # Contact and ConsentEvent share one ENUM definition and the
@@ -146,8 +146,8 @@ class Contact(Base, TenantScoped):
         DateTime(timezone=True),
         nullable=True,
     )
-    whatsapp_opt_in_recorded_by_user_id: Mapped[uuid.UUID | None] = (
-        mapped_column(UUID(as_uuid=True), nullable=True)
+    whatsapp_opt_in_recorded_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
     )
     whatsapp_opt_out_recorded_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),

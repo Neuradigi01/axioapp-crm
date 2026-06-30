@@ -6,6 +6,7 @@ the core CRM seeds (contact, lead, walk_in, task, appointment,
 catalog_item) into the in-process dict. Pack installers may call
 `register(...)` to extend the registry for their own entities.
 """
+
 from src.app.core.standard_fields import registry  # noqa: F401  - triggers seed registrations
 from src.app.core.standard_fields.registry import (
     StandardFieldDef,

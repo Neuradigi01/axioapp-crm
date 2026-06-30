@@ -14,11 +14,7 @@ interface PopupDisplayData {
   templateUrl: './popup-display.component.html',
   styleUrl: './popup-display.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-  ],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule],
 })
 export class PopupDisplayComponent {
   private readonly dialogRef = inject(MatDialogRef<PopupDisplayComponent>);

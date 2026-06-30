@@ -7,6 +7,7 @@
 All endpoints gate on `contacts.write` — same key used by the
 contacts create/edit endpoints. No new permission key.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -37,10 +38,7 @@ from src.app.core.contacts.imports.service import (
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
-router = APIRouter(
-    prefix="/contacts/imports", tags=["Contact Imports"]
-)
+router = APIRouter(prefix="/contacts/imports", tags=["Contact Imports"])
 
 
 @router.post("/upload", response_model=ImportUploadOut)
@@ -68,9 +66,7 @@ async def upload_endpoint(
     )
 
 
-@router.post(
-    "/{import_id}/dry-run", response_model=ImportDryRunOut
-)
+@router.post("/{import_id}/dry-run", response_model=ImportDryRunOut)
 async def dry_run_endpoint(
     import_id: uuid.UUID,
     payload: ImportDryRunIn,
@@ -87,9 +83,7 @@ async def dry_run_endpoint(
     )
 
 
-@router.post(
-    "/{import_id}/commit", response_model=ImportCommitOut
-)
+@router.post("/{import_id}/commit", response_model=ImportCommitOut)
 async def commit_endpoint(
     import_id: uuid.UUID,
     payload: ImportCommitIn,

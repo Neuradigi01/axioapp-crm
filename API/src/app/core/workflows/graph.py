@@ -37,6 +37,7 @@ Step-12 compliance pre-flight runs on top of this from the service
 layer; it's NOT in this module because compliance is a deployment-
 config check, not a graph-shape check.
 """
+
 from __future__ import annotations
 
 from collections import defaultdict, deque
@@ -44,16 +45,19 @@ from typing import Any
 
 from src.app.core.events.conditions import (
     InvalidCondition,
+)
+from src.app.core.events.conditions import (
     validate as validate_conditions,
 )
 from src.app.core.workflows.actions import (
     ActionNotRegistered,
     is_registered,
+)
+from src.app.core.workflows.actions import (
     resolve as resolve_action,
 )
 from src.app.core.workflows.exceptions import InvalidGraph
 from src.app.core.workflows.schemas import WorkflowGraph
-
 
 # 30-day max wait per the spec — anything longer parks the run
 # indefinitely + is almost certainly a config bug.
@@ -92,18 +96,14 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
         raise InvalidGraph("workflow.graph must contain a trigger node")
     if len(triggers) > 1:
         raise InvalidGraph(
-            "workflow.graph must contain exactly one trigger node; "
-            f"found {len(triggers)}"
+            f"workflow.graph must contain exactly one trigger node; found {len(triggers)}"
         )
     trigger = triggers[0]
 
     # --- 2. Trigger carries an event_type ----------------------------
     event_type = (trigger.config or {}).get("event_type")
     if not isinstance(event_type, str) or not event_type.strip():
-        raise InvalidGraph(
-            f"trigger node '{trigger.id}' missing non-empty "
-            "config.event_type"
-        )
+        raise InvalidGraph(f"trigger node '{trigger.id}' missing non-empty config.event_type")
 
     # --- 3. Edges reference existing node ids ------------------------
     # (Pydantic already enforced this for source + target; we keep
@@ -112,13 +112,9 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
     node_ids: set[str] = {n.id for n in nodes}
     for e in edges:
         if e.source not in node_ids:
-            raise InvalidGraph(
-                f"edge '{e.id}' references unknown source node '{e.source}'"
-            )
+            raise InvalidGraph(f"edge '{e.id}' references unknown source node '{e.source}'")
         if e.target not in node_ids:
-            raise InvalidGraph(
-                f"edge '{e.id}' references unknown target node '{e.target}'"
-            )
+            raise InvalidGraph(f"edge '{e.id}' references unknown target node '{e.target}'")
 
     # --- 4. No cycles (Kahn's algo, skipping wait-back edges) --------
     adjacency: dict[str, list[str]] = defaultdict(list)
@@ -141,8 +137,7 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
                 queue.append(nxt)
     if visited_count != len(nodes):
         raise InvalidGraph(
-            "workflow.graph contains a cycle (only wait-for-event "
-            "timeout edges may back-flow)"
+            "workflow.graph contains a cycle (only wait-for-event timeout edges may back-flow)"
         )
 
     # --- 5. No orphan nodes ------------------------------------------
@@ -165,15 +160,11 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
     unreachable = node_ids - reachable
     if unreachable:
         sample = sorted(unreachable)[:3]
-        raise InvalidGraph(
-            "workflow.graph has unreachable nodes: " + ", ".join(sample)
-        )
+        raise InvalidGraph("workflow.graph has unreachable nodes: " + ", ".join(sample))
 
     # --- 6. goal_node_id (when set) exists ---------------------------
     if goal_node_id is not None and goal_node_id not in node_ids:
-        raise InvalidGraph(
-            f"goal_node_id '{goal_node_id}' not present in graph"
-        )
+        raise InvalidGraph(f"goal_node_id '{goal_node_id}' not present in graph")
 
     # --- 7. Branch / switch nodes have labelled outbound edges -------
     outbound_by_source: dict[str, list[Any]] = defaultdict(list)
@@ -195,9 +186,7 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
             # explicit fallback edge so unmatched cases don't
             # silently terminate the run. ``branch.if`` → `else`;
             # ``branch.switch`` → `default`.
-            fallback = (
-                "default" if n.type == "branch.switch" else "else"
-            )
+            fallback = "default" if n.type == "branch.switch" else "else"
             if fallback not in outbound_labels:
                 raise InvalidGraph(
                     f"branch node '{n.id}' (type='{n.type}') must have "
@@ -210,18 +199,12 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
         if n.type in _WAIT_TYPES:
             max_wait = (n.config or {}).get("max_wait_seconds")
             if max_wait is None or not isinstance(max_wait, (int, float)):
-                raise InvalidGraph(
-                    f"wait node '{n.id}' missing numeric "
-                    "config.max_wait_seconds"
-                )
+                raise InvalidGraph(f"wait node '{n.id}' missing numeric config.max_wait_seconds")
             if max_wait <= 0:
-                raise InvalidGraph(
-                    f"wait node '{n.id}' config.max_wait_seconds must be > 0"
-                )
+                raise InvalidGraph(f"wait node '{n.id}' config.max_wait_seconds must be > 0")
             if max_wait > _MAX_WAIT_SECONDS:
                 raise InvalidGraph(
-                    f"wait node '{n.id}' config.max_wait_seconds exceeds "
-                    "30-day maximum"
+                    f"wait node '{n.id}' config.max_wait_seconds exceeds 30-day maximum"
                 )
 
     # --- 9. Action types resolve through the registry ----------------
@@ -247,8 +230,7 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
             conditions = (n.config or {}).get("conditions")
             if not isinstance(conditions, dict):
                 raise InvalidGraph(
-                    f"condition node '{n.id}' missing config.conditions "
-                    "(expected JSONB object)"
+                    f"condition node '{n.id}' missing config.conditions (expected JSONB object)"
                 )
 
     # --- 11. Step 6 — condition AST shape validation -----------------
@@ -266,9 +248,8 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
                     validate_conditions(conds)
                 except InvalidCondition as exc:
                     raise InvalidGraph(
-                        f"trigger node '{n.id}' has invalid conditions: "
-                        f"{exc}"
-                    )
+                        f"trigger node '{n.id}' has invalid conditions: {exc}"
+                    ) from exc
         # Condition nodes — already required to carry conditions
         # above; validate the AST shape.
         if n.type in _CONDITION_TYPES:
@@ -277,21 +258,16 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
                 validate_conditions(conds)
             except InvalidCondition as exc:
                 raise InvalidGraph(
-                    f"condition node '{n.id}' has invalid conditions: "
-                    f"{exc}"
-                )
+                    f"condition node '{n.id}' has invalid conditions: {exc}"
+                ) from exc
         # Branch nodes — validate each branch's conditions.
         if n.type == "branch.if":
             branches = cfg.get("branches") or []
             if not isinstance(branches, list):
-                raise InvalidGraph(
-                    f"branch node '{n.id}' config.branches must be a list"
-                )
+                raise InvalidGraph(f"branch node '{n.id}' config.branches must be a list")
             for i, branch in enumerate(branches):
                 if not isinstance(branch, dict):
-                    raise InvalidGraph(
-                        f"branch node '{n.id}' branches[{i}] must be a dict"
-                    )
+                    raise InvalidGraph(f"branch node '{n.id}' branches[{i}] must be a dict")
                 branch_conds = branch.get("conditions")
                 if branch_conds is None:
                     # Empty conditions are fine — they always match
@@ -301,9 +277,8 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
                     validate_conditions(branch_conds)
                 except InvalidCondition as exc:
                     raise InvalidGraph(
-                        f"branch node '{n.id}' branches[{i}] has invalid "
-                        f"conditions: {exc}"
-                    )
+                        f"branch node '{n.id}' branches[{i}] has invalid conditions: {exc}"
+                    ) from exc
 
 
 async def validate_graph_with_db(
@@ -341,15 +316,11 @@ async def validate_graph_with_db(
             continue
         raw = (n.config or {}).get("template_id")
         if raw is None:
-            raise InvalidGraph(
-                f"send node '{n.id}' missing config.template_id"
-            )
+            raise InvalidGraph(f"send node '{n.id}' missing config.template_id")
         try:
             tid = _uuid.UUID(str(raw))
         except (ValueError, TypeError) as exc:
-            raise InvalidGraph(
-                f"send node '{n.id}' has malformed template_id"
-            ) from exc
+            raise InvalidGraph(f"send node '{n.id}' has malformed template_id") from exc
         referenced_ids.append(tid)
         referenced_by_node[n.id] = tid
 
@@ -360,20 +331,21 @@ async def validate_graph_with_db(
     # active org. Missing rows surface as the first node that
     # references them.
     rows = (
-        await session.execute(
-            _select(MessageTemplate.id).where(
-                MessageTemplate.id.in_(referenced_ids),
-                MessageTemplate.org_id == org_id,
+        (
+            await session.execute(
+                _select(MessageTemplate.id).where(
+                    MessageTemplate.id.in_(referenced_ids),
+                    MessageTemplate.org_id == org_id,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     found: set[_uuid.UUID] = set(rows)
     for node_id, tid in referenced_by_node.items():
         if tid not in found:
-            raise InvalidGraph(
-                f"send node '{node_id}' references missing template "
-                f"'{tid}'"
-            )
+            raise InvalidGraph(f"send node '{node_id}' references missing template '{tid}'")
 
 
 __all__ = ["validate_graph", "validate_graph_with_db"]

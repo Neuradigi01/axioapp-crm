@@ -11,6 +11,7 @@ Response shape matches the rest of the legacy API
 (`{success, message, data}`) so `IApiResponse<T>` on the Angular side
 deserialises without special handling.
 """
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +22,6 @@ from src.data_access.location_da import (
     get_states_by_country,
 )
 
-
 router = APIRouter(prefix="/location", tags=["Location"])
 
 
@@ -31,23 +31,15 @@ async def list_countries(db: AsyncSession = Depends(get_db)) -> dict:
     return {
         "success": True,
         "message": messages.OK,
-        "data": [
-            {"id": c.id, "name": c.name, "iso2": c.iso2}
-            for c in countries
-        ],
+        "data": [{"id": c.id, "name": c.name, "iso2": c.iso2} for c in countries],
     }
 
 
 @router.get("/countries/{country_id}/states")
-async def list_states(
-    country_id: int, db: AsyncSession = Depends(get_db)
-) -> dict:
+async def list_states(country_id: int, db: AsyncSession = Depends(get_db)) -> dict:
     states = await get_states_by_country(db, country_id)
     return {
         "success": True,
         "message": messages.OK,
-        "data": [
-            {"id": s.id, "name": s.name, "code": s.code}
-            for s in states
-        ],
+        "data": [{"id": s.id, "name": s.name, "code": s.code} for s in states],
     }

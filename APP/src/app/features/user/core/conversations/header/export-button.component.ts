@@ -63,7 +63,9 @@ type ExportFormat = 'csv' | 'pdf';
         </div>
       }
       @if (error(); as err) {
-        <p class="absolute right-0 z-50 mt-1 w-64 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] text-rose-700">
+        <p
+          class="absolute right-0 z-50 mt-1 w-64 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] text-rose-700"
+        >
           {{ err }}
         </p>
       }
@@ -91,25 +93,19 @@ export class ConversationExportButtonComponent {
     this.busy.set(true);
     this.error.set(null);
     this.http
-      .get(
-        `${environment.apiBaseUrl}/conversations/${id}/export.${format}`,
-        { responseType: 'blob' },
-      )
+      .get(`${environment.apiBaseUrl}/conversations/${id}/export.${format}`, {
+        responseType: 'blob',
+      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (blob: Blob) => {
           this.busy.set(false);
           this.open.set(false);
-          this.triggerDownload(
-            blob,
-            `conversation-${id}.${format}`,
-          );
+          this.triggerDownload(blob, `conversation-${id}.${format}`);
         },
         error: (err: HttpErrorResponse) => {
           this.busy.set(false);
-          this.error.set(
-            extractApiError(err) ?? `Could not export ${format.toUpperCase()}.`,
-          );
+          this.error.set(extractApiError(err) ?? `Could not export ${format.toUpperCase()}.`);
         },
       });
   }

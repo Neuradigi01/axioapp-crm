@@ -1,12 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
@@ -46,8 +40,8 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
         <div>
           <h1 class="text-xl font-semibold text-zinc-900">Block list</h1>
           <p class="text-xs text-zinc-500">
-            Numbers we won't send to or accept from. Inbound is silently
-            dropped; outbound is refused by the campaign send guard.
+            Numbers we won't send to or accept from. Inbound is silently dropped; outbound is
+            refused by the campaign send guard.
           </p>
         </div>
         <button
@@ -299,9 +293,7 @@ export class BlockListPageComponent {
           this.load(this.page().page);
         },
         error: (err: HttpErrorResponse) => {
-          this.error.set(
-            extractApiError(err) ?? 'Could not unblock number.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not unblock number.');
         },
       });
   }
@@ -323,9 +315,7 @@ export class BlockListPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not load block list.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load block list.');
         },
       });
   }

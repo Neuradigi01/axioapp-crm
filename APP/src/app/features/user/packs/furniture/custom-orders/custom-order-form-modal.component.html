@@ -1,6 +1,7 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
-  <div class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
-
+  <div
+    class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+  >
     <!-- Header -->
     <div class="flex items-center justify-between border-b border-zinc-200 px-5 py-3">
       <div>
@@ -51,7 +52,9 @@
           <div>
             <label class="block text-xs font-medium text-zinc-700">Contact (optional)</label>
             @if (selectedContact(); as c) {
-              <div class="mt-1 flex items-center justify-between rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm">
+              <div
+                class="mt-1 flex items-center justify-between rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm"
+              >
                 <div>
                   <p class="font-medium text-zinc-900">{{ c.full_name }}</p>
                   <p class="text-xs text-zinc-500">{{ c.phone || '—' }}</p>
@@ -74,7 +77,9 @@
                   class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                 />
                 @if (contactSearchOpen() && contactResults().length > 0) {
-                  <ul class="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border border-zinc-200 bg-white shadow-lg">
+                  <ul
+                    class="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border border-zinc-200 bg-white shadow-lg"
+                  >
                     @for (r of contactResults(); track r.id) {
                       <li>
                         <button
@@ -83,7 +88,9 @@
                           class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50"
                         >
                           <span class="font-medium text-zinc-900">{{ r.full_name }}</span>
-                          <span class="ml-2 text-xs text-zinc-500">{{ r.phone || r.email || '—' }}</span>
+                          <span class="ml-2 text-xs text-zinc-500">{{
+                            r.phone || r.email || '—'
+                          }}</span>
                         </button>
                       </li>
                     }
@@ -102,7 +109,9 @@
                 id="co_title"
                 type="text"
                 formControlName="title"
-                [attr.placeholder]="stdField('title')?.placeholder ?? 'e.g. Modular Kitchen, Walnut TV Unit'"
+                [attr.placeholder]="
+                  stdField('title')?.placeholder ?? 'e.g. Modular Kitchen, Walnut TV Unit'
+                "
                 class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
               @if (basics.controls.title.touched && basics.controls.title.invalid) {
@@ -118,13 +127,18 @@
             <div>
               <label for="co_req" class="block text-xs font-medium text-zinc-700">
                 {{ stdField('requirement')?.label ?? 'Special requirements' }}
-                @if (stdField('requirement')?.is_required) { <span class="text-red-500">*</span> }
+                @if (stdField('requirement')?.is_required) {
+                  <span class="text-red-500">*</span>
+                }
               </label>
               <textarea
                 id="co_req"
                 formControlName="requirement"
                 rows="2"
-                [attr.placeholder]="stdField('requirement')?.placeholder ?? 'Anything special — soft-close hinges, wall-mounting, etc.'"
+                [attr.placeholder]="
+                  stdField('requirement')?.placeholder ??
+                  'Anything special — soft-close hinges, wall-mounting, etc.'
+                "
                 class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               ></textarea>
               @if (stdField('requirement')?.help_text; as help) {
@@ -138,12 +152,16 @@
               <div>
                 <label class="block text-xs font-medium text-zinc-700">
                   {{ stdField('material_primary')?.label ?? 'Primary material' }}
-                  @if (stdField('material_primary')?.is_required) { <span class="text-red-500">*</span> }
+                  @if (stdField('material_primary')?.is_required) {
+                    <span class="text-red-500">*</span>
+                  }
                 </label>
                 <input
                   type="text"
                   formControlName="material_primary"
-                  [attr.placeholder]="stdField('material_primary')?.placeholder ?? 'Walnut, Teak, …'"
+                  [attr.placeholder]="
+                    stdField('material_primary')?.placeholder ?? 'Walnut, Teak, …'
+                  "
                   class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                 />
               </div>
@@ -152,12 +170,16 @@
               <div>
                 <label class="block text-xs font-medium text-zinc-700">
                   {{ stdField('material_secondary')?.label ?? 'Secondary material' }}
-                  @if (stdField('material_secondary')?.is_required) { <span class="text-red-500">*</span> }
+                  @if (stdField('material_secondary')?.is_required) {
+                    <span class="text-red-500">*</span>
+                  }
                 </label>
                 <input
                   type="text"
                   formControlName="material_secondary"
-                  [attr.placeholder]="stdField('material_secondary')?.placeholder ?? 'MDF, glass, …'"
+                  [attr.placeholder]="
+                    stdField('material_secondary')?.placeholder ?? 'MDF, glass, …'
+                  "
                   class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                 />
               </div>
@@ -166,7 +188,9 @@
               <div>
                 <label class="block text-xs font-medium text-zinc-700">
                   {{ stdField('color')?.label ?? 'Color' }}
-                  @if (stdField('color')?.is_required) { <span class="text-red-500">*</span> }
+                  @if (stdField('color')?.is_required) {
+                    <span class="text-red-500">*</span>
+                  }
                 </label>
                 <input
                   type="text"
@@ -180,7 +204,9 @@
               <div>
                 <label class="block text-xs font-medium text-zinc-700">
                   {{ stdField('finish')?.label ?? 'Finish' }}
-                  @if (stdField('finish')?.is_required) { <span class="text-red-500">*</span> }
+                  @if (stdField('finish')?.is_required) {
+                    <span class="text-red-500">*</span>
+                  }
                 </label>
                 <input
                   type="text"
@@ -197,7 +223,9 @@
               <div>
                 <label class="block text-xs font-medium text-zinc-700">
                   {{ stdField('total_amount')?.label ?? 'Total (₹)' }}
-                  @if (stdField('total_amount')?.is_required) { <span class="text-red-500">*</span> }
+                  @if (stdField('total_amount')?.is_required) {
+                    <span class="text-red-500">*</span>
+                  }
                 </label>
                 <input
                   type="text"
@@ -212,7 +240,9 @@
               <div>
                 <label class="block text-xs font-medium text-zinc-700">
                   {{ stdField('advance_paid')?.label ?? 'Advance (₹)' }}
-                  @if (stdField('advance_paid')?.is_required) { <span class="text-red-500">*</span> }
+                  @if (stdField('advance_paid')?.is_required) {
+                    <span class="text-red-500">*</span>
+                  }
                 </label>
                 <input
                   type="text"
@@ -227,7 +257,9 @@
               <div>
                 <label class="block text-xs font-medium text-zinc-700">
                   {{ stdField('expected_delivery_date')?.label ?? 'Expected delivery' }}
-                  @if (stdField('expected_delivery_date')?.is_required) { <span class="text-red-500">*</span> }
+                  @if (stdField('expected_delivery_date')?.is_required) {
+                    <span class="text-red-500">*</span>
+                  }
                 </label>
                 <input
                   type="date"
@@ -322,10 +354,13 @@
       @if (step() === 3) {
         <div class="space-y-3">
           <p class="text-xs text-zinc-500">
-            Attach site visit photos, sketches, or reference images. They upload after the order is created.
+            Attach site visit photos, sketches, or reference images. They upload after the order is
+            created.
           </p>
 
-          <label class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-zinc-300 bg-zinc-50 px-4 py-8 text-center text-zinc-600 hover:bg-zinc-100">
+          <label
+            class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-zinc-300 bg-zinc-50 px-4 py-8 text-center text-zinc-600 hover:bg-zinc-100"
+          >
             <lucide-icon name="image" class="h-6 w-6 text-zinc-400" />
             <span class="text-sm font-medium">Choose images to upload</span>
             <span class="text-[11px] text-zinc-500">JPG, PNG · up to ~5 MB each</span>
@@ -342,7 +377,11 @@
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
               @for (p of photos(); track p.previewUrl; let i = $index) {
                 <div class="overflow-hidden rounded-md border border-zinc-200">
-                  <img [src]="p.previewUrl" [alt]="'photo ' + (i + 1)" class="h-24 w-full object-cover" />
+                  <img
+                    [src]="p.previewUrl"
+                    [alt]="'photo ' + (i + 1)"
+                    class="h-24 w-full object-cover"
+                  />
                   <div class="p-2">
                     <input
                       type="text"
@@ -374,7 +413,9 @@
               <dt class="text-zinc-500">Title</dt>
               <dd class="text-right text-zinc-900">{{ basics.controls.title.value || '—' }}</dd>
               <dt class="text-zinc-500">Contact</dt>
-              <dd class="text-right text-zinc-900">{{ selectedContact()?.full_name ?? 'Unlinked' }}</dd>
+              <dd class="text-right text-zinc-900">
+                {{ selectedContact()?.full_name ?? 'Unlinked' }}
+              </dd>
               <dt class="text-zinc-500">Materials</dt>
               <dd class="text-right text-zinc-900">
                 {{ basics.controls.material_primary.value || '—' }}
@@ -388,8 +429,9 @@
               </dd>
               <dt class="text-zinc-500">Total / Advance</dt>
               <dd class="text-right text-zinc-900">
-                ₹{{ basics.controls.total_amount.value || '0' }} /
-                ₹{{ basics.controls.advance_paid.value || '0' }}
+                ₹{{ basics.controls.total_amount.value || '0' }} / ₹{{
+                  basics.controls.advance_paid.value || '0'
+                }}
               </dd>
               <dt class="text-zinc-500">Expected delivery</dt>
               <dd class="text-right text-zinc-900">
@@ -410,7 +452,8 @@
                     <span class="font-medium">{{ v.item_label }}</span>
                     @if (v.length_cm || v.width_cm || v.height_cm) {
                       <span class="ml-1 text-zinc-500">
-                        — {{ v.length_cm || '?' }} × {{ v.width_cm || '?' }} × {{ v.height_cm || '?' }} cm
+                        — {{ v.length_cm || '?' }} × {{ v.width_cm || '?' }} ×
+                        {{ v.height_cm || '?' }} cm
                       </span>
                     }
                   </li>
@@ -436,7 +479,8 @@
 
           <p class="text-xs text-zinc-500">
             On submit the order is created in stage
-            <span class="font-medium">Measurement Scheduled</span>; measurements and photos upload next.
+            <span class="font-medium">Measurement Scheduled</span>; measurements and photos upload
+            next.
           </p>
         </div>
       }
@@ -485,7 +529,9 @@
             class="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
           >
             @if (_submitting()) {
-              <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+              <span
+                class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"
+              ></span>
               Creating…
             } @else {
               <lucide-icon name="check" class="h-3.5 w-3.5" />

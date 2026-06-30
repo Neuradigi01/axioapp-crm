@@ -30,7 +30,6 @@ import {
   TemplatesApiService,
 } from '../templates/templates-api.service';
 
-
 export interface EmailTemplate {
   id: string;
   org_id: string;
@@ -45,14 +44,12 @@ export interface EmailTemplate {
   updated_at: string;
 }
 
-
 export interface EmailTemplateListResponse {
   items: EmailTemplate[];
   total: number;
   page: number;
   size: number;
 }
-
 
 export interface EmailTemplateCreatePayload {
   name: string;
@@ -62,7 +59,6 @@ export interface EmailTemplateCreatePayload {
   is_active?: boolean;
 }
 
-
 export interface EmailTemplateUpdatePayload {
   name?: string;
   subject?: string;
@@ -71,7 +67,6 @@ export interface EmailTemplateUpdatePayload {
   is_active?: boolean;
 }
 
-
 export interface EmailTemplateRenderResponse {
   subject: string;
   body_html: string;
@@ -79,14 +74,12 @@ export interface EmailTemplateRenderResponse {
   variables_used: string[];
 }
 
-
 export interface VariableRegistryEntry {
   path: string;
   label: string;
   category: string;
   source: 'system' | 'custom';
 }
-
 
 function _adapt(row: TemplateRead): EmailTemplate {
   return {
@@ -104,7 +97,6 @@ function _adapt(row: TemplateRead): EmailTemplate {
   };
 }
 
-
 @Injectable({ providedIn: 'root' })
 export class EmailTemplatesApiService {
   private readonly central = inject(TemplatesApiService);
@@ -118,8 +110,7 @@ export class EmailTemplatesApiService {
     const page = filters?.page ?? 1;
     const size = filters?.size ?? 50;
     const offset = (page - 1) * size;
-    const internal_status =
-      filters?.is_active === false ? ('archived' as const) : undefined;
+    const internal_status = filters?.is_active === false ? ('archived' as const) : undefined;
     return this.central
       .list({
         channel: 'email',
@@ -132,9 +123,7 @@ export class EmailTemplatesApiService {
         map((resp: TemplateListResponse) => ({
           items: resp.items
             .map(_adapt)
-            .filter((t) =>
-              filters?.is_active === true ? t.is_active : true,
-            ),
+            .filter((t) => (filters?.is_active === true ? t.is_active : true)),
           total: resp.total,
           page,
           size,
@@ -157,10 +146,7 @@ export class EmailTemplatesApiService {
       .pipe(map(_adapt));
   }
 
-  update(
-    templateId: string,
-    payload: EmailTemplateUpdatePayload,
-  ): Observable<EmailTemplate> {
+  update(templateId: string, payload: EmailTemplateUpdatePayload): Observable<EmailTemplate> {
     return this.central
       .update(templateId, {
         name: payload.name,
@@ -171,12 +157,10 @@ export class EmailTemplatesApiService {
   }
 
   delete(templateId: string): Observable<EmailTemplate> {
-    return this.central
-      .archive(templateId)
-      .pipe(
-        switchMap(() => this.central.get(templateId)),
-        map(_adapt),
-      );
+    return this.central.archive(templateId).pipe(
+      switchMap(() => this.central.get(templateId)),
+      map(_adapt),
+    );
   }
 
   render(

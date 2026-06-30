@@ -15,10 +15,7 @@ import { FurnitureAuthService } from '../../auth/auth.service';
 
 import { StandardFieldsApiService } from '../../standard-fields/standard-fields-api.service';
 import { StandardFieldsSignalsService } from '../../standard-fields/standard-fields-signals.service';
-import type {
-  StandardFieldEntity,
-  StandardFieldRendered,
-} from '../../standard-fields/types';
+import type { StandardFieldEntity, StandardFieldRendered } from '../../standard-fields/types';
 
 import { StandardFieldEditModalComponent } from './standard-field-edit-modal.component';
 
@@ -57,9 +54,7 @@ export class StandardFieldsTabComponent {
   /** Field currently being edited (drives the modal). null = closed. */
   protected readonly editing = signal<StandardFieldRendered | null>(null);
 
-  readonly canManage = computed(() =>
-    this.auth.hasPermission('settings.standard_fields.manage'),
-  );
+  readonly canManage = computed(() => this.auth.hasPermission('settings.standard_fields.manage'));
 
   constructor() {
     // Load the entity dropdown once on mount. Pick the first as default.

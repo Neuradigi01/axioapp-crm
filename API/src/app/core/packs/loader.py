@@ -8,6 +8,7 @@ errors include the offending field path.
 `load_pack_dict(data)` is a thin helper for tests that already have
 the dict in memory.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -35,21 +36,13 @@ def load_pack(path: str | Path) -> PackManifest:
     except yaml.YAMLError as exc:
         # PyYAML exceptions carry .problem_mark with line/column.
         mark = getattr(exc, "problem_mark", None)
-        loc = (
-            f" at line {mark.line + 1} col {mark.column + 1}"
-            if mark is not None
-            else ""
-        )
-        raise PackLoadError(
-            f"YAML parse error in {p}{loc}: {exc}"
-        ) from exc
+        loc = f" at line {mark.line + 1} col {mark.column + 1}" if mark is not None else ""
+        raise PackLoadError(f"YAML parse error in {p}{loc}: {exc}") from exc
 
     return load_pack_dict(data, source=str(p))
 
 
-def load_pack_dict(
-    data: Any, *, source: str = "<dict>"
-) -> PackManifest:
+def load_pack_dict(data: Any, *, source: str = "<dict>") -> PackManifest:
     if not isinstance(data, dict):
         raise PackLoadError(
             f"{source}: top-level YAML must be a mapping, got {type(data).__name__}"
@@ -57,9 +50,7 @@ def load_pack_dict(
     try:
         return PackManifest.model_validate(data)
     except ValidationError as exc:
-        raise PackLoadError(
-            f"{source}: schema validation failed:\n{exc}"
-        ) from exc
+        raise PackLoadError(f"{source}: schema validation failed:\n{exc}") from exc
 
 
 __all__ = ["PackLoadError", "load_pack", "load_pack_dict"]

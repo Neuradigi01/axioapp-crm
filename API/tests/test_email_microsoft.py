@@ -16,21 +16,21 @@ Six groups:
 Same convention as `test_email_gmail.py`: no DB, AsyncMock + stub
 clients. Manual smoke covers end-to-end DB writes.
 """
+
 from __future__ import annotations
 
 import base64
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock
 
-import httpx
 import pytest
 
+from src.app.core.email.microsoft import send as ms_send
 from src.app.core.email.microsoft import sync as ms_sync
 from src.app.core.email.microsoft import webhook as ms_webhook
-from src.app.core.email.microsoft import send as ms_send
 from src.app.core.email.microsoft.client import GraphClient, GraphHTTPError
 from src.app.core.email.microsoft.oauth import (
     MICROSOFT_SCOPES,
@@ -43,7 +43,6 @@ from src.app.core.email.models import (
 )
 from src.app.core.email.oauth import TokenSet
 from src.app.core.integrations import crypto
-
 
 _ORG_ID = uuid.uuid4()
 _USER_ID = uuid.uuid4()
@@ -60,15 +59,15 @@ def _make_account(**overrides) -> EmailAccount:
         display_name="Asha Patel",
         access_token_enc=crypto.encrypt("current-access"),
         refresh_token_enc=crypto.encrypt("current-refresh"),
-        token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        token_expires_at=datetime.now(UTC) + timedelta(hours=1),
         scopes_granted=list(MICROSOFT_SCOPES),
         sync_cursor=None,
         sync_state=EmailAccountSyncState.live,
         last_sync_at=None,
         last_sync_error=None,
         daily_sent_count=0,
-        daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-        connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+        connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         disconnected_at=None,
         disconnected_by=None,
     )
@@ -81,20 +80,20 @@ def _make_account(**overrides) -> EmailAccount:
 
 class _FakeResp:
     def __init__(
-        self, status_code: int, body: Any, *, headers: Optional[dict] = None,
-        content: Optional[bytes] = None,
+        self,
+        status_code: int,
+        body: Any,
+        *,
+        headers: dict | None = None,
+        content: bytes | None = None,
     ) -> None:
         self.status_code = status_code
         self._body = body
         self.headers = headers or {}
         self.content = (
-            content
-            if content is not None
-            else (b"" if body is None else json.dumps(body).encode())
+            content if content is not None else (b"" if body is None else json.dumps(body).encode())
         )
-        self.text = (
-            body if isinstance(body, str) else json.dumps(body) if body else ""
-        )
+        self.text = body if isinstance(body, str) else json.dumps(body) if body else ""
 
     def json(self) -> Any:
         if isinstance(self._body, (dict, list)):
@@ -112,26 +111,28 @@ class _StubHttp:
 
     async def post(self, url, *, data=None, json=None, headers=None):
         self.calls.append(
-            {"method": "POST", "url": url, "data": data, "json": json,
-             "headers": headers}
+            {"method": "POST", "url": url, "data": data, "json": json, "headers": headers}
         )
         if not self.queue:
             raise AssertionError(f"unexpected POST {url}")
         return self.queue.pop(0)
 
     async def get(self, url, *, params=None, headers=None):
-        self.calls.append(
-            {"method": "GET", "url": url, "params": params, "headers": headers}
-        )
+        self.calls.append({"method": "GET", "url": url, "params": params, "headers": headers})
         if not self.queue:
             raise AssertionError(f"unexpected GET {url}")
         return self.queue.pop(0)
 
-    async def request(self, method, url, *, headers=None, params=None,
-                      json=None, content=None):
+    async def request(self, method, url, *, headers=None, params=None, json=None, content=None):
         self.calls.append(
-            {"method": method, "url": url, "headers": headers,
-             "params": params, "json": json, "content": content}
+            {
+                "method": method,
+                "url": url,
+                "headers": headers,
+                "params": params,
+                "json": json,
+                "content": content,
+            }
         )
         if not self.queue:
             raise AssertionError(f"unexpected {method} {url}")
@@ -159,9 +160,7 @@ class TestMicrosoftProvider:
         assert "offline_access" in url
 
     def test_authorize_url_503_when_client_missing(self, monkeypatch):
-        monkeypatch.setattr(
-            "src.app.core.email.microsoft.oauth.MICROSOFT_CLIENT_ID", ""
-        )
+        monkeypatch.setattr("src.app.core.email.microsoft.oauth.MICROSOFT_CLIENT_ID", "")
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc:
@@ -170,12 +169,8 @@ class TestMicrosoftProvider:
 
     @pytest.mark.asyncio
     async def test_exchange_code_decodes_token_set(self, monkeypatch):
-        monkeypatch.setattr(
-            "src.app.core.email.microsoft.oauth.MICROSOFT_CLIENT_ID", "x"
-        )
-        monkeypatch.setattr(
-            "src.app.core.email.microsoft.oauth.MICROSOFT_CLIENT_SECRET", "y"
-        )
+        monkeypatch.setattr("src.app.core.email.microsoft.oauth.MICROSOFT_CLIENT_ID", "x")
+        monkeypatch.setattr("src.app.core.email.microsoft.oauth.MICROSOFT_CLIENT_SECRET", "y")
         http = _StubHttp()
         http.queue_response(
             _FakeResp(
@@ -203,12 +198,8 @@ class TestMicrosoftProvider:
         """Microsoft DOES return a new refresh_token on refresh —
         opposite of Google's behaviour. The TokenSet must carry it
         so `service.refresh_if_expired` persists the rotation."""
-        monkeypatch.setattr(
-            "src.app.core.email.microsoft.oauth.MICROSOFT_CLIENT_ID", "x"
-        )
-        monkeypatch.setattr(
-            "src.app.core.email.microsoft.oauth.MICROSOFT_CLIENT_SECRET", "y"
-        )
+        monkeypatch.setattr("src.app.core.email.microsoft.oauth.MICROSOFT_CLIENT_ID", "x")
+        monkeypatch.setattr("src.app.core.email.microsoft.oauth.MICROSOFT_CLIENT_SECRET", "y")
         http = _StubHttp()
         http.queue_response(
             _FakeResp(
@@ -220,9 +211,7 @@ class TestMicrosoftProvider:
                 },
             )
         )
-        tokens = await MicrosoftProvider().refresh(
-            refresh_token="old-refresh", http_client=http
-        )
+        tokens = await MicrosoftProvider().refresh(refresh_token="old-refresh", http_client=http)
         assert tokens.access_token == "refreshed-access"
         assert tokens.refresh_token == "rotated-refresh"
 
@@ -250,12 +239,8 @@ class TestGraphClient:
         )
         account = _make_account()
         http = _StubHttp()
-        http.queue_response(
-            _FakeResp(200, {"value": [{"id": "msg-1"}]})
-        )
-        client = GraphClient(
-            account=account, session=AsyncMock(), http_client=http
-        )
+        http.queue_response(_FakeResp(200, {"value": [{"id": "msg-1"}]}))
+        client = GraphClient(account=account, session=AsyncMock(), http_client=http)
         body = await client.list_messages(
             filter_expr="receivedDateTime ge 2026-05-12T00:00:00Z",
             select="id,subject",
@@ -263,10 +248,7 @@ class TestGraphClient:
         assert body == {"value": [{"id": "msg-1"}]}
         call = http.calls[0]
         assert call["headers"]["Authorization"] == "Bearer usable-access"
-        assert (
-            call["params"]["$filter"]
-            == "receivedDateTime ge 2026-05-12T00:00:00Z"
-        )
+        assert call["params"]["$filter"] == "receivedDateTime ge 2026-05-12T00:00:00Z"
 
     @pytest.mark.asyncio
     async def test_429_honours_retry_after_then_succeeds(self, monkeypatch):
@@ -280,18 +262,12 @@ class TestGraphClient:
         async def fake_sleep(s):
             slept.append(s)
 
-        monkeypatch.setattr(
-            "src.app.core.email.microsoft.client.asyncio.sleep", fake_sleep
-        )
+        monkeypatch.setattr("src.app.core.email.microsoft.client.asyncio.sleep", fake_sleep)
         http = _StubHttp()
-        http.queue_response(
-            _FakeResp(429, {"err": "throttled"}, headers={"retry-after": "5"})
-        )
+        http.queue_response(_FakeResp(429, {"err": "throttled"}, headers={"retry-after": "5"}))
         http.queue_response(_FakeResp(200, {"value": []}))
         account = _make_account()
-        client = GraphClient(
-            account=account, session=AsyncMock(), http_client=http
-        )
+        client = GraphClient(account=account, session=AsyncMock(), http_client=http)
         body = await client.list_messages()
         assert body == {"value": []}
         assert slept == [5.0]
@@ -303,13 +279,9 @@ class TestGraphClient:
             _fake_refresh,
         )
         http = _StubHttp()
-        http.queue_response(
-            _FakeResp(410, {"error": {"code": "syncStateInvalid"}})
-        )
+        http.queue_response(_FakeResp(410, {"error": {"code": "syncStateInvalid"}}))
         account = _make_account()
-        client = GraphClient(
-            account=account, session=AsyncMock(), http_client=http
-        )
+        client = GraphClient(account=account, session=AsyncMock(), http_client=http)
         with pytest.raises(GraphHTTPError) as exc:
             await client.get_absolute(
                 "https://graph.microsoft.com/v1.0/me/messages/delta?$deltatoken=stale"
@@ -348,12 +320,8 @@ def _ms_msg(
         "conversationId": conversation_id or msg_id,
         "internetMessageId": f"<{msg_id}@graph.local>",
         "receivedDateTime": "2026-06-10T10:00:00Z",
-        "from": {
-            "emailAddress": {"name": "Sender", "address": from_addr}
-        },
-        "toRecipients": [
-            {"emailAddress": {"address": a}} for a in (to_addrs or [])
-        ],
+        "from": {"emailAddress": {"name": "Sender", "address": from_addr}},
+        "toRecipients": [{"emailAddress": {"address": a}} for a in (to_addrs or [])],
     }
 
 
@@ -364,8 +332,8 @@ class _FakeGraphClient:
         self,
         *,
         list_pages: list[dict],
-        delta_pages: Optional[list[dict]] = None,
-        get_absolute_pages: Optional[dict[str, dict]] = None,
+        delta_pages: list[dict] | None = None,
+        get_absolute_pages: dict[str, dict] | None = None,
     ) -> None:
         self._list_pages = list(list_pages)
         self._delta_pages = list(delta_pages or [])
@@ -374,8 +342,7 @@ class _FakeGraphClient:
         self.delta_calls = 0
         self.absolute_calls: list[str] = []
 
-    async def list_messages(self, *, filter_expr=None, select=None,
-                            top=50, order_by=None):
+    async def list_messages(self, *, filter_expr=None, select=None, top=50, order_by=None):
         self.list_calls += 1
         if not self._list_pages:
             return {"value": []}
@@ -412,9 +379,7 @@ class TestSyncBackfill:
     @pytest.mark.asyncio
     async def test_filter_walk_matches_recipients(self):
         contact_id = uuid.uuid4()
-        session = _FakeSession(
-            contacts_by_email={"mehta@designs.com": contact_id}
-        )
+        session = _FakeSession(contacts_by_email={"mehta@designs.com": contact_id})
         client = _FakeGraphClient(
             list_pages=[
                 {
@@ -433,14 +398,10 @@ class TestSyncBackfill:
                     ]
                 }
             ],
-            delta_pages=[
-                {"value": [], "@odata.deltaLink": "delta://seeded-cursor"}
-            ],
+            delta_pages=[{"value": [], "@odata.deltaLink": "delta://seeded-cursor"}],
         )
         account = _make_account()
-        result = await ms_sync.backfill(
-            account, session, client=client, days=30
-        )
+        result = await ms_sync.backfill(account, session, client=client, days=30)
         assert result.scanned_count == 2
         assert len(result.matched) == 1
         assert result.matched[0].graph_message_id == "m1"
@@ -452,15 +413,12 @@ class TestSyncBackfill:
     @pytest.mark.asyncio
     async def test_pagination_follows_nextlink(self):
         contact_id = uuid.uuid4()
-        session = _FakeSession(
-            contacts_by_email={"a@x.com": contact_id}
-        )
+        session = _FakeSession(contacts_by_email={"a@x.com": contact_id})
         client = _FakeGraphClient(
             list_pages=[
                 {
                     "value": [
-                        _ms_msg("m1", from_addr="a@x.com",
-                                to_addrs=["asha@contoso.com"]),
+                        _ms_msg("m1", from_addr="a@x.com", to_addrs=["asha@contoso.com"]),
                     ],
                     "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/messages?$skiptoken=p2",
                 }
@@ -468,19 +426,14 @@ class TestSyncBackfill:
             get_absolute_pages={
                 "https://graph.microsoft.com/v1.0/me/messages?$skiptoken=p2": {
                     "value": [
-                        _ms_msg("m2", from_addr="a@x.com",
-                                to_addrs=["asha@contoso.com"]),
+                        _ms_msg("m2", from_addr="a@x.com", to_addrs=["asha@contoso.com"]),
                     ]
                 }
             },
-            delta_pages=[
-                {"value": [], "@odata.deltaLink": "delta://seeded"}
-            ],
+            delta_pages=[{"value": [], "@odata.deltaLink": "delta://seeded"}],
         )
         account = _make_account()
-        result = await ms_sync.backfill(
-            account, session, client=client, days=30
-        )
+        result = await ms_sync.backfill(account, session, client=client, days=30)
         assert result.scanned_count == 2
         assert len(result.matched) == 2
         assert client.absolute_calls == [
@@ -492,25 +445,22 @@ class TestSyncIncremental:
     @pytest.mark.asyncio
     async def test_walks_delta_chain_and_returns_new_cursor(self):
         contact_id = uuid.uuid4()
-        session = _FakeSession(
-            contacts_by_email={"mehta@designs.com": contact_id}
-        )
+        session = _FakeSession(contacts_by_email={"mehta@designs.com": contact_id})
         client = _FakeGraphClient(
             list_pages=[],
             get_absolute_pages={
                 "delta://stored-cursor": {
                     "value": [
-                        _ms_msg("m-new", from_addr="mehta@designs.com",
-                                to_addrs=["asha@contoso.com"]),
+                        _ms_msg(
+                            "m-new", from_addr="mehta@designs.com", to_addrs=["asha@contoso.com"]
+                        ),
                     ],
                     "@odata.deltaLink": "delta://new-cursor",
                 }
             },
         )
         account = _make_account(sync_cursor="delta://stored-cursor")
-        result = await ms_sync.sync_incremental(
-            account, session, client=client
-        )
+        result = await ms_sync.sync_incremental(account, session, client=client)
         assert result.scanned_count == 1
         assert len(result.matched) == 1
         assert result.new_cursor == "delta://new-cursor"
@@ -530,9 +480,7 @@ class TestSyncIncremental:
 
         client.get_absolute = raise_410  # type: ignore[method-assign]
         account = _make_account(sync_cursor="delta://stale-cursor")
-        result = await ms_sync.sync_incremental(
-            account, session, client=client
-        )
+        result = await ms_sync.sync_incremental(account, session, client=client)
         assert result.delta_link_expired is True
 
     @pytest.mark.asyncio
@@ -541,9 +489,7 @@ class TestSyncIncremental:
         client = _FakeGraphClient(list_pages=[])
         account = _make_account(sync_cursor=None)
         with pytest.raises(RuntimeError, match="no sync_cursor"):
-            await ms_sync.sync_incremental(
-                account, session, client=client
-            )
+            await ms_sync.sync_incremental(account, session, client=client)
 
 
 # --- 4. send.send -------------------------------------------------------
@@ -578,9 +524,12 @@ class TestSend:
         session = _CapturingSession()
         client = _SendStubGraph()
         result = await ms_send.send(
-            account, session,
+            account,
+            session,
             raw_mime=b"From: a\r\nTo: b\r\n\r\nbody",
-            client=client, soft_cap=200, hard_cap=500,
+            client=client,
+            soft_cap=200,
+            hard_cap=500,
         )
         assert result.provider_message_id is None
         assert result.daily_sent_after == 11
@@ -597,8 +546,12 @@ class TestSend:
         client = _SendStubGraph()
         with pytest.raises(ms_send.DailyCapExceeded) as exc:
             await ms_send.send(
-                account, session, raw_mime=b"x", client=client,
-                soft_cap=200, hard_cap=500,
+                account,
+                session,
+                raw_mime=b"x",
+                client=client,
+                soft_cap=200,
+                hard_cap=500,
             )
         assert exc.value.status_code == 429
         assert client.calls == []
@@ -608,13 +561,15 @@ class TestSend:
     async def test_graph_failure_rolls_back_counter(self):
         account = _make_account(daily_sent_count=10)
         session = _CapturingSession()
-        client = _SendStubGraph(
-            raise_with=GraphHTTPError(503, {"err": "down"})
-        )
+        client = _SendStubGraph(raise_with=GraphHTTPError(503, {"err": "down"}))
         with pytest.raises(GraphHTTPError):
             await ms_send.send(
-                account, session, raw_mime=b"x", client=client,
-                soft_cap=200, hard_cap=500,
+                account,
+                session,
+                raw_mime=b"x",
+                client=client,
+                soft_cap=200,
+                hard_cap=500,
             )
         assert account.daily_sent_count == 10
         # Two commits: +1 then -1.
@@ -668,17 +623,13 @@ class TestWebhook:
         assert exc.value.status_code == 400
 
     def test_assert_client_state_match(self):
-        ms_webhook.assert_client_state(
-            {"clientState": "abc"}, expected="abc"
-        )  # no raise
+        ms_webhook.assert_client_state({"clientState": "abc"}, expected="abc")  # no raise
 
     def test_assert_client_state_mismatch_401(self):
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc:
-            ms_webhook.assert_client_state(
-                {"clientState": "wrong"}, expected="abc"
-            )
+            ms_webhook.assert_client_state({"clientState": "wrong"}, expected="abc")
         assert exc.value.status_code == 401
 
 
@@ -693,12 +644,8 @@ class TestAddressExtraction:
                 {"emailAddress": {"address": "to1@y.com"}},
                 {"emailAddress": {"address": "to2@y.com"}},
             ],
-            "ccRecipients": [
-                {"emailAddress": {"address": "cc@z.com"}}
-            ],
-            "bccRecipients": [
-                {"emailAddress": {"address": "bcc@w.com"}}
-            ],
+            "ccRecipients": [{"emailAddress": {"address": "cc@z.com"}}],
+            "bccRecipients": [{"emailAddress": {"address": "bcc@w.com"}}],
         }
         addrs = ms_sync._collect_addresses(msg)
         assert "from@x.com" in addrs
@@ -708,9 +655,7 @@ class TestAddressExtraction:
 
     def test_collect_addresses_handles_missing(self):
         assert ms_sync._collect_addresses({}) == []
-        assert ms_sync._collect_addresses(
-            {"from": {}, "toRecipients": []}
-        ) == []
+        assert ms_sync._collect_addresses({"from": {}, "toRecipients": []}) == []
 
     def test_extract_headers_includes_subject_and_conversation(self):
         msg = {
@@ -718,12 +663,8 @@ class TestAddressExtraction:
             "subject": "Hello",
             "internetMessageId": "<m1@x>",
             "conversationId": "thread-abc",
-            "from": {
-                "emailAddress": {"name": "Mr Mehta", "address": "mehta@x.com"}
-            },
-            "toRecipients": [
-                {"emailAddress": {"address": "asha@y.com"}}
-            ],
+            "from": {"emailAddress": {"name": "Mr Mehta", "address": "mehta@x.com"}},
+            "toRecipients": [{"emailAddress": {"address": "asha@y.com"}}],
             "sentDateTime": "2026-06-10T10:00:00Z",
         }
         h = ms_sync._extract_headers(msg)

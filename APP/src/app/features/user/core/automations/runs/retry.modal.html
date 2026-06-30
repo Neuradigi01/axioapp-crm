@@ -20,18 +20,21 @@
 
     <div class="px-4 py-3 text-sm text-zinc-700">
       <p>
-        We'll re-queue this run with the same payload. The send happens
-        through the same channel adapter — if the failure was
-        transient (network blip, rate limit), the retry should succeed.
-        If the cause was structural (invalid template variable,
-        suppressed recipient), it'll fail again with the same error.
+        We'll re-queue this run with the same payload. The send happens through the same channel
+        adapter — if the failure was transient (network blip, rate limit), the retry should succeed.
+        If the cause was structural (invalid template variable, suppressed recipient), it'll fail
+        again with the same error.
       </p>
-      <div class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+      <div
+        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+      >
         <p class="font-semibold">Original error</p>
         <p class="mt-1">{{ run().error ?? '(no error message recorded)' }}</p>
       </div>
       @if (submitError(); as err) {
-        <div class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <div
+          class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+        >
           {{ err }}
         </div>
       }

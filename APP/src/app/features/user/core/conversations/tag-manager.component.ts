@@ -44,31 +44,20 @@ import { TagChipComponent } from './tag-chip.component';
   selector: 'app-tag-manager',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    CommonModule,
-    FormsModule,
-    LucideAngularModule,
-    TagChipComponent,
-  ],
+  imports: [CommonModule, FormsModule, LucideAngularModule, TagChipComponent],
   template: `
     <div
       class="absolute right-0 top-full z-30 mt-1 w-72 rounded-md border border-zinc-200 bg-white shadow-lg"
       (click)="$event.stopPropagation()"
     >
       <div class="border-b border-zinc-100 p-2">
-        <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-          Applied
-        </p>
+        <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Applied</p>
         @if (assignedTags.length === 0) {
           <p class="text-xs text-zinc-500">No tags yet.</p>
         } @else {
           <div class="flex flex-wrap gap-1">
             @for (t of assignedTags; track t.id) {
-              <app-tag-chip
-                [tag]="t"
-                [removable]="true"
-                (remove)="onUnassign($event)"
-              />
+              <app-tag-chip [tag]="t" [removable]="true" (remove)="onUnassign($event)" />
             }
           </div>
         }
@@ -95,7 +84,9 @@ import { TagChipComponent } from './tag-chip.component';
 
         <ul class="max-h-48 space-y-0.5 overflow-y-auto">
           @for (t of filteredTags(); track t.id) {
-            <li class="flex items-center justify-between gap-1 rounded px-1 py-0.5 hover:bg-zinc-50">
+            <li
+              class="flex items-center justify-between gap-1 rounded px-1 py-0.5 hover:bg-zinc-50"
+            >
               <button
                 type="button"
                 (click)="onAssign(t)"
@@ -103,10 +94,7 @@ import { TagChipComponent } from './tag-chip.component';
                 class="flex flex-1 items-center gap-2 text-left text-xs disabled:opacity-40"
               >
                 <span
-                  [class]="
-                    'inline-block h-2.5 w-2.5 rounded-full ring-1 ' +
-                    swatchClass(t.color)
-                  "
+                  [class]="'inline-block h-2.5 w-2.5 rounded-full ring-1 ' + swatchClass(t.color)"
                 ></span>
                 <span class="flex-1 truncate text-zinc-800">{{ t.name }}</span>
                 <span class="text-[10px] text-zinc-400">
@@ -129,11 +117,7 @@ import { TagChipComponent } from './tag-chip.component';
           }
         </ul>
 
-        @if (
-          canManage() &&
-          query().trim().length > 0 &&
-          !hasExactMatch()
-        ) {
+        @if (canManage() && query().trim().length > 0 && !hasExactMatch()) {
           <div class="mt-2 rounded-md border border-dashed border-zinc-300 p-2">
             <p class="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
               Create "{{ query().trim() }}"
@@ -203,9 +187,7 @@ export class TagManagerComponent {
   protected readonly filteredTags = computed(() => {
     const q = this.query().trim().toLowerCase();
     const all = this.tags();
-    return q.length === 0
-      ? all
-      : all.filter((t) => t.name.toLowerCase().includes(q));
+    return q.length === 0 ? all : all.filter((t) => t.name.toLowerCase().includes(q));
   });
 
   protected readonly hasExactMatch = computed(() => {
@@ -224,9 +206,7 @@ export class TagManagerComponent {
       .subscribe({
         next: (rows) => this.tags.set(rows),
         error: (err: HttpErrorResponse) =>
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load tags.',
-          ),
+          this.loadError.set(extractApiError(err) ?? 'Could not load tags.'),
       });
   }
 
@@ -235,9 +215,7 @@ export class TagManagerComponent {
   }
 
   protected swatchClass(color: string): string {
-    return (
-      TAG_COLOR_CLASSES[color as TagColor] ?? TAG_COLOR_CLASSES.zinc
-    );
+    return TAG_COLOR_CLASSES[color as TagColor] ?? TAG_COLOR_CLASSES.zinc;
   }
 
   protected isAssigned(tagId: string): boolean {
@@ -257,9 +235,7 @@ export class TagManagerComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.busyTagId.set(null);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not assign tag.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not assign tag.');
         },
       });
   }
@@ -276,9 +252,7 @@ export class TagManagerComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.busyTagId.set(null);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not remove tag.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not remove tag.');
         },
       });
   }
@@ -294,9 +268,7 @@ export class TagManagerComponent {
       .subscribe({
         next: (tag) => {
           this.tags.update((arr) =>
-            [...arr, { ...tag, usage_count: 0 }].sort((a, b) =>
-              a.name.localeCompare(b.name),
-            ),
+            [...arr, { ...tag, usage_count: 0 }].sort((a, b) => a.name.localeCompare(b.name)),
           );
           // Immediately assign the newly-created tag.
           this.api
@@ -310,29 +282,20 @@ export class TagManagerComponent {
               },
               error: (err: HttpErrorResponse) => {
                 this.creating.set(false);
-                this.loadError.set(
-                  extractApiError(err) ??
-                    'Could not assign the new tag.',
-                );
+                this.loadError.set(extractApiError(err) ?? 'Could not assign the new tag.');
               },
             });
         },
         error: (err: HttpErrorResponse) => {
           this.creating.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not create tag.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not create tag.');
         },
       });
   }
 
   protected onDelete(tag: ConversationTag): void {
     if (!this.canManage()) return;
-    if (
-      !confirm(
-        `Delete tag "${tag.name}"? It will be removed from every conversation it's on.`,
-      )
-    ) {
+    if (!confirm(`Delete tag "${tag.name}"? It will be removed from every conversation it's on.`)) {
       return;
     }
     this.busyTagId.set(tag.id);
@@ -342,9 +305,7 @@ export class TagManagerComponent {
       .subscribe({
         next: () => {
           this.busyTagId.set(null);
-          this.tags.update((arr) =>
-            arr.filter((t) => t.id !== tag.id),
-          );
+          this.tags.update((arr) => arr.filter((t) => t.id !== tag.id));
           // Update the assigned list locally since the cascade also
           // dropped the assignment row server-side.
           const next = this.assignedTags.filter((t) => t.id !== tag.id);
@@ -352,9 +313,7 @@ export class TagManagerComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.busyTagId.set(null);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not delete tag.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not delete tag.');
         },
       });
   }

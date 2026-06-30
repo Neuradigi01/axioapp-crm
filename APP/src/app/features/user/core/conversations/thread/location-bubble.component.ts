@@ -1,10 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  input,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, signal } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 export interface LocationAttachment {
@@ -40,15 +35,15 @@ export interface LocationAttachment {
       <div class="relative">
         <img
           [src]="staticMapUrl()"
-          [alt]="
-            'Map showing ' + lat() + ', ' + lng()
-          "
+          [alt]="'Map showing ' + lat() + ', ' + lng()"
           class="block h-32 w-full object-cover"
           loading="lazy"
           (error)="onTileError($event)"
         />
         @if (tileFailed()) {
-          <div class="absolute inset-0 flex items-center justify-center bg-zinc-100 text-xs text-zinc-500">
+          <div
+            class="absolute inset-0 flex items-center justify-center bg-zinc-100 text-xs text-zinc-500"
+          >
             <lucide-icon name="map-pin" class="mr-1 h-3 w-3" />
             {{ lat().toFixed(4) }}, {{ lng().toFixed(4) }}
           </div>

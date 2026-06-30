@@ -5,13 +5,13 @@ publish hits it once per matching trigger. Test coverage skews
 heavy on the truth table + edge cases (missing fields, malformed
 input, ReDoS defense).
 """
+
 from __future__ import annotations
 
 import pytest
 
 from src.app.core.automation import conditions
 from src.app.core.automation.exceptions import InvalidCondition
-
 
 # --- ops ----------------------------------------------------------
 
@@ -216,6 +216,4 @@ def test_validate_rejects_oversized_regex():
 
 def test_validate_walks_nested_branches():
     with pytest.raises(InvalidCondition):
-        conditions.validate(
-            {"all": [{"field": "x", "op": "weird", "value": 1}]}
-        )
+        conditions.validate({"all": [{"field": "x", "op": "weird", "value": 1}]})

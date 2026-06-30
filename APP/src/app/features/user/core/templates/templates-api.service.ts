@@ -17,32 +17,13 @@ import { buildHttpParams } from '../shared/services/query-builder';
  * checks so the UI doesn't dangle un-clickable affordances.
  */
 
-export type TemplateChannel =
-  | 'email'
-  | 'whatsapp'
-  | 'sms'
-  | 'facebook'
-  | 'instagram'
-  | 'push';
+export type TemplateChannel = 'email' | 'whatsapp' | 'sms' | 'facebook' | 'instagram' | 'push';
 
-export type TemplateInternalStatus =
-  | 'draft'
-  | 'in_review'
-  | 'approved'
-  | 'published'
-  | 'archived';
+export type TemplateInternalStatus = 'draft' | 'in_review' | 'approved' | 'published' | 'archived';
 
-export type TemplateExternalStatus =
-  | 'n_a'
-  | 'pending'
-  | 'approved'
-  | 'rejected'
-  | 'paused';
+export type TemplateExternalStatus = 'n_a' | 'pending' | 'approved' | 'rejected' | 'paused';
 
-export type TemplateCategory =
-  | 'marketing'
-  | 'transactional'
-  | 'service';
+export type TemplateCategory = 'marketing' | 'transactional' | 'service';
 
 export interface TemplateRead {
   id: string;
@@ -82,13 +63,7 @@ export interface TemplateReviewRead {
   template_id: string;
   version: number;
   reviewer_user_id: string | null;
-  action:
-    | 'submit'
-    | 'approve'
-    | 'reject'
-    | 'request_changes'
-    | 'publish'
-    | 'archive';
+  action: 'submit' | 'approve' | 'reject' | 'request_changes' | 'publish' | 'archive';
   note: string | null;
   created_at: string;
 }
@@ -166,7 +141,6 @@ export interface TestSendPayload {
   sample_context?: Record<string, unknown> | null;
 }
 
-
 export type SmsDltContentCategory =
   | 'transactional'
   | 'promotional'
@@ -195,7 +169,6 @@ export interface SmsDltMetadataPatch {
   dlt_template_status?: SmsDltTemplateStatus;
   dlt_rejection_reason?: string | null;
 }
-
 
 @Injectable({ providedIn: 'root' })
 export class TemplatesApiService {
@@ -235,9 +208,7 @@ export class TemplatesApiService {
   }
 
   getVersion(id: string, version: number): Observable<TemplateVersionRead> {
-    return this.http.get<TemplateVersionRead>(
-      `${this.base}/${id}/versions/${version}`,
-    );
+    return this.http.get<TemplateVersionRead>(`${this.base}/${id}/versions/${version}`);
   }
 
   preview(id: string, payload: PreviewRequest): Observable<PreviewResponse> {
@@ -262,43 +233,28 @@ export class TemplatesApiService {
     return this.http.post<TemplateRead>(`${this.base}/${id}/reject`, payload);
   }
 
-  requestChanges(
-    id: string,
-    payload: WorkflowActionPayload,
-  ): Observable<TemplateRead> {
-    return this.http.post<TemplateRead>(
-      `${this.base}/${id}/request-changes`,
-      payload,
-    );
+  requestChanges(id: string, payload: WorkflowActionPayload): Observable<TemplateRead> {
+    return this.http.post<TemplateRead>(`${this.base}/${id}/request-changes`, payload);
   }
 
   publish(id: string, payload: WorkflowActionPayload = {}): Observable<TemplateRead> {
     return this.http.post<TemplateRead>(`${this.base}/${id}/publish`, payload);
   }
 
-  archiveViaWorkflow(
-    id: string,
-    payload: WorkflowActionPayload = {},
-  ): Observable<TemplateRead> {
+  archiveViaWorkflow(id: string, payload: WorkflowActionPayload = {}): Observable<TemplateRead> {
     return this.http.post<TemplateRead>(`${this.base}/${id}/archive`, payload);
   }
 
   // --- test send (Step 5) ----------------------------------------------
 
   testSend(id: string, payload: TestSendPayload): Observable<TemplateTestSendRead> {
-    return this.http.post<TemplateTestSendRead>(
-      `${this.base}/${id}/test-send`,
-      payload,
-    );
+    return this.http.post<TemplateTestSendRead>(`${this.base}/${id}/test-send`, payload);
   }
 
   // --- external submission (Step 9) -----------------------------------
 
   submitExternal(id: string): Observable<TemplateRead> {
-    return this.http.post<TemplateRead>(
-      `${this.base}/${id}/submit-external`,
-      {},
-    );
+    return this.http.post<TemplateRead>(`${this.base}/${id}/submit-external`, {});
   }
 
   externalStatus(id: string): Observable<{
@@ -317,20 +273,14 @@ export class TemplatesApiService {
    *  Counterpart of the hourly Celery sweep; the editor calls this
    *  when the operator clicks the "Refresh status" button. */
   syncExternal(id: string): Observable<TemplateRead> {
-    return this.http.post<TemplateRead>(
-      `${this.base}/${id}/sync-external`,
-      {},
-    );
+    return this.http.post<TemplateRead>(`${this.base}/${id}/sync-external`, {});
   }
 
   /** Step 14 — "Resubmit" affordance for templates Meta rejected.
    *  Backend resets `internal_status='draft'` + `external_status='n_a'`
    *  so the operator can edit the body and re-submit. */
   resubmit(id: string): Observable<TemplateRead> {
-    return this.http.post<TemplateRead>(
-      `${this.base}/${id}/resubmit`,
-      {},
-    );
+    return this.http.post<TemplateRead>(`${this.base}/${id}/resubmit`, {});
   }
 
   // --- SMS DLT metadata (Step 12) -------------------------------------
@@ -339,13 +289,7 @@ export class TemplatesApiService {
     return this.http.get<SmsDltMetadata>(`${this.base}/${id}/sms-metadata`);
   }
 
-  patchSmsMetadata(
-    id: string,
-    payload: SmsDltMetadataPatch,
-  ): Observable<SmsDltMetadata> {
-    return this.http.patch<SmsDltMetadata>(
-      `${this.base}/${id}/sms-metadata`,
-      payload,
-    );
+  patchSmsMetadata(id: string, payload: SmsDltMetadataPatch): Observable<SmsDltMetadata> {
+    return this.http.patch<SmsDltMetadata>(`${this.base}/${id}/sms-metadata`, payload);
   }
 }

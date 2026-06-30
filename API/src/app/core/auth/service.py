@@ -8,21 +8,19 @@ the step file). All queries inside the login flow scope by `org_id`
 explicitly — the auto-tenant ORM filter is a no-op here because the
 request enters with no tenant context yet (no JWT decoded).
 """
+
 from __future__ import annotations
 
+import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import logging
-from pathlib import Path
-
 from src.app.core import audit
 from src.app.core.auth import data_access as auth_da
-from src.app.core.tenants import service as tenants_service
-from src.app.core.users import service as users_service
 from src.app.core.auth.models import AuthSession
 from src.app.core.auth.schemas import (
     LoginResponse,
@@ -40,11 +38,12 @@ from src.app.core.packs.loader import PackLoadError, load_pack
 from src.app.core.packs.service import get_catalog
 from src.app.core.permissions import role_templates
 from src.app.core.subscriptions.signup_hook import create_trial_subscription
+from src.app.core.tenants import service as tenants_service
 from src.app.core.tenants.service import create_organization
+from src.app.core.users import service as users_service
 from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.security.password import hash_password, verify_password
-
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +88,7 @@ async def login(
         # No tenant known → can't attribute to a row, intentionally skip audit.
         raise invalid
 
-    user = await users_service.get_user_by_email(
-        db, email, org_id=org.id, active_only=True
-    )
+    user = await users_service.get_user_by_email(db, email, org_id=org.id, active_only=True)
     if user is None or not user.is_active:
         await audit.log(
             "auth.login.failure",
@@ -140,7 +137,7 @@ async def login(
         )
 
     token_id = uuid.uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at = now + ACCESS_TOKEN_TTL
 
     # `user.id` is the bigint storage PK of `tbl_user_login` (DR.6.3).
@@ -171,9 +168,7 @@ async def login(
         ua=ua,
     )
 
-    encoded, exp = encode_token(
-        user_id=user_uuid, org_id=org.id, token_id=token_id, now=now
-    )
+    encoded, exp = encode_token(user_id=user_uuid, org_id=org.id, token_id=token_id, now=now)
     return LoginResponse(access_token=encoded, expires_at=exp)
 
 
@@ -184,13 +179,11 @@ async def refresh(db: AsyncSession, claims: TokenClaims) -> RefreshResponse:
         detail="Invalid or revoked token",
     )
 
-    session = await auth_da.get_auth_session(
-        db, session_id=claims.token_id
-    )
+    session = await auth_da.get_auth_session(db, session_id=claims.token_id)
     if session is None or session.revoked_at is not None:
         raise invalid
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if session.expires_at <= now:
         raise invalid
 
@@ -222,9 +215,7 @@ async def refresh(db: AsyncSession, claims: TokenClaims) -> RefreshResponse:
 
 async def logout(db: AsyncSession, token_id: uuid.UUID) -> None:
     """Idempotent — sets `revoked_at` to now if the row exists and isn't already revoked."""
-    await auth_da.revoke_auth_session_by_id(
-        db, token_id=token_id, now=datetime.now(timezone.utc)
-    )
+    await auth_da.revoke_auth_session_by_id(db, token_id=token_id, now=datetime.now(UTC))
     await db.commit()
 
 
@@ -241,9 +232,7 @@ async def list_user_sessions(
     so the Settings → Login history tab can hide the Sign-out button on
     that row. RLS auto-scopes the underlying SELECT to the caller's org.
     """
-    rows = await auth_da.list_auth_sessions_for_user(
-        db, user_id=user_id, limit=limit
-    )
+    rows = await auth_da.list_auth_sessions_for_user(db, user_id=user_id, limit=limit)
     return [
         {
             "id": row.id,
@@ -278,13 +267,11 @@ async def revoke_user_session(
     session id doesn't belong to the user (we don't leak existence —
     same row check as `notifications.mark_read`).
     """
-    row = await auth_da.get_auth_session(
-        db, session_id=session_id, user_id=user_id
-    )
+    row = await auth_da.get_auth_session(db, session_id=session_id, user_id=user_id)
     if row is None:
         return False
     if row.revoked_at is None:
-        row.revoked_at = datetime.now(timezone.utc)
+        row.revoked_at = datetime.now(UTC)
         await db.commit()
     return True
 
@@ -333,7 +320,7 @@ async def register_with_new_org(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"role template install failed: {exc}",
-        )
+        ) from exc
 
     # Base pack — installs the default Leads pipeline + 6 stages, lead
     # sources, call outcomes. Best-effort: if the manifest can't be
@@ -406,7 +393,7 @@ async def register_with_new_org(
     await create_trial_subscription(db, org_id=org.id)
 
     token_id = uuid.uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at = now + ACCESS_TOKEN_TTL
     auth_da.add_auth_session(
         db,
@@ -436,9 +423,7 @@ async def register_with_new_org(
         ua=ua,
     )
 
-    encoded, exp = encode_token(
-        user_id=user_uuid, org_id=org.id, token_id=token_id, now=now
-    )
+    encoded, exp = encode_token(user_id=user_uuid, org_id=org.id, token_id=token_id, now=now)
     return RegisterResponse(
         access_token=encoded,
         expires_at=exp,
@@ -514,7 +499,7 @@ async def register_user_only(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"role template install failed: {exc}",
-        )
+        ) from exc
     reset_context(token)
 
     owner_role = installed.get("owner")
@@ -564,7 +549,7 @@ async def register_user_only(
     await create_trial_subscription(db, org_id=org.id)
 
     token_id = uuid.uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at = now + ACCESS_TOKEN_TTL
     auth_da.add_auth_session(
         db,
@@ -607,9 +592,7 @@ async def register_user_only(
         full_name=f"{req.first_name.strip()} {req.last_name.strip()}",
     )
 
-    encoded, exp = encode_token(
-        user_id=user_uuid, org_id=org.id, token_id=token_id, now=now
-    )
+    encoded, exp = encode_token(user_id=user_uuid, org_id=org.id, token_id=token_id, now=now)
     return RegisterResponse(
         access_token=encoded,
         expires_at=exp,
@@ -648,7 +631,7 @@ async def _publish_user_signed_up(
                     "name": org.name,
                     "slug": org.slug,
                 },
-                "signed_up_at": datetime.now(timezone.utc).isoformat(),
+                "signed_up_at": datetime.now(UTC).isoformat(),
             },
             org_id=org.id,
             event_id=f"signup:{user_uuid}",
@@ -743,7 +726,7 @@ async def complete_onboarding(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"pack manifest unreadable: {exc}",
-        )
+        ) from exc
 
     ctx_token = set_context(RequestContext(org_id=org.id))
     try:
@@ -761,10 +744,8 @@ async def complete_onboarding(
     # Rotate JWT: revoke the current session, issue a new one. The new
     # token reflects the onboarded state so the frontend route guard
     # passes on next navigation.
-    now = datetime.now(timezone.utc)
-    await auth_da.revoke_auth_session_by_id(
-        db, token_id=current_token_id, now=now
-    )
+    now = datetime.now(UTC)
+    await auth_da.revoke_auth_session_by_id(db, token_id=current_token_id, now=now)
 
     new_token_id = uuid.uuid4()
     new_expires_at = now + ACCESS_TOKEN_TTL
@@ -818,9 +799,7 @@ async def complete_onboarding(
         token_id=new_token_id,
         now=now,
     )
-    role_name = (
-        await users_service.get_role_name_by_id(db, user.role_id) or ""
-    )
+    role_name = await users_service.get_role_name_by_id(db, user.role_id) or ""
     return OnboardingCompleteResponse(
         access_token=encoded,
         expires_at=exp,

@@ -39,7 +39,6 @@ import {
   IntegrationSubscription,
 } from './integrations-api.service';
 
-
 @Component({
   selector: 'app-google-card',
   standalone: true,
@@ -90,9 +89,7 @@ export class GoogleCardComponent {
   /** Map customer_id → forms, populated when the user expands the
    *  account row. Keeps the initial Connect view fast (one API call
    *  for accounts only). */
-  protected readonly formsByAccount = signal<Record<string, GoogleLeadForm[]>>(
-    {},
-  );
+  protected readonly formsByAccount = signal<Record<string, GoogleLeadForm[]>>({});
   protected readonly expandedAccounts = signal<Set<string>>(new Set());
   protected readonly formsLoadingFor = signal<string | null>(null);
 
@@ -101,16 +98,12 @@ export class GoogleCardComponent {
   protected readonly toggleInFlightFor = signal<string | null>(null);
 
   /** Convenience computed views. */
-  protected readonly isConnected = computed(
-    () => this.integration()?.status === 'connected',
-  );
+  protected readonly isConnected = computed(() => this.integration()?.status === 'connected');
   protected readonly needsReconnect = computed(() => {
     const s = this.integration()?.status;
     return s === 'expired' || s === 'error';
   });
-  protected readonly webhookUrl = computed(
-    () => this.integration()?.webhook_url ?? null,
-  );
+  protected readonly webhookUrl = computed(() => this.integration()?.webhook_url ?? null);
 
   /** Active subscriptions for THIS integration, keyed by form_id
    *  for O(1) toggle-state lookup in the template. */

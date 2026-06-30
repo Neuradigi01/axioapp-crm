@@ -67,17 +67,11 @@ const LANGUAGES: Array<{ code: string; label: string }> = [
 
 type ButtonGroup = 'NONE' | 'QUICK_REPLY' | 'CTA';
 
-
 @Component({
   selector: 'app-template-wizard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    CommonModule,
-    FormsModule,
-    LucideAngularModule,
-    TemplatePreviewComponent,
-  ],
+  imports: [CommonModule, FormsModule, LucideAngularModule, TemplatePreviewComponent],
   templateUrl: './template-wizard.component.html',
 })
 export class TemplateWizardComponent {
@@ -195,9 +189,7 @@ export class TemplateWizardComponent {
   protected readonly buttonsError = computed(() => {
     const group = this.buttonGroup();
     if (group === 'QUICK_REPLY') {
-      const present = this.quickReplyButtons().filter(
-        (t) => t.trim().length > 0,
-      );
+      const present = this.quickReplyButtons().filter((t) => t.trim().length > 0);
       if (present.length === 0) return 'Add at least one button or pick "None".';
       if (present.length > 3) return 'Maximum 3 quick-reply buttons.';
       const tooLong = present.find((t) => t.length > LIMITS.buttonTextMax);
@@ -235,9 +227,7 @@ export class TemplateWizardComponent {
       case 3:
         return this.bodyError() === null;
       case 4:
-        return (
-          this.footerText().length <= LIMITS.footerMax
-        );
+        return this.footerText().length <= LIMITS.footerMax;
       case 5:
         return this.buttonsError() === null;
       case 6:
@@ -305,36 +295,24 @@ export class TemplateWizardComponent {
   }
 
   protected removeQuickReply(idx: number): void {
-    this.quickReplyButtons.update((arr) =>
-      arr.filter((_, i) => i !== idx),
-    );
+    this.quickReplyButtons.update((arr) => arr.filter((_, i) => i !== idx));
   }
 
   protected updateQuickReply(idx: number, value: string): void {
-    this.quickReplyButtons.update((arr) =>
-      arr.map((v, i) => (i === idx ? value : v)),
-    );
+    this.quickReplyButtons.update((arr) => arr.map((v, i) => (i === idx ? value : v)));
   }
 
   protected addCta(): void {
     if (this.ctaButtons().length >= 2) return;
-    this.ctaButtons.update((arr) => [
-      ...arr,
-      { type: 'URL', text: '', url: '' },
-    ]);
+    this.ctaButtons.update((arr) => [...arr, { type: 'URL', text: '', url: '' }]);
   }
 
   protected removeCta(idx: number): void {
     this.ctaButtons.update((arr) => arr.filter((_, i) => i !== idx));
   }
 
-  protected updateCta(
-    idx: number,
-    patch: Partial<WhatsAppTemplateButton>,
-  ): void {
-    this.ctaButtons.update((arr) =>
-      arr.map((b, i) => (i === idx ? { ...b, ...patch } : b)),
-    );
+  protected updateCta(idx: number, patch: Partial<WhatsAppTemplateButton>): void {
+    this.ctaButtons.update((arr) => arr.map((b, i) => (i === idx ? { ...b, ...patch } : b)));
   }
 
   // --- samples -----------------------------------------------------
@@ -353,8 +331,7 @@ export class TemplateWizardComponent {
       category: this.category(),
       body: this.body(),
       header_type: this.headerType(),
-      header_text:
-        this.headerType() === 'TEXT' ? this.headerText().trim() || null : null,
+      header_text: this.headerType() === 'TEXT' ? this.headerText().trim() || null : null,
       footer_text: this.footerText().trim() || null,
       buttons: this.assembledButtons(),
     };
@@ -370,12 +347,8 @@ export class TemplateWizardComponent {
   private hydrateFrom(row: WhatsAppTemplateRead): void {
     this.name.set(row.name);
     this.language.set(row.language);
-    this.category.set(
-      (row.category as WhatsAppTemplateCategory) || 'MARKETING',
-    );
-    this.headerType.set(
-      (row.header_type as WhatsAppTemplateHeaderType) || null,
-    );
+    this.category.set((row.category as WhatsAppTemplateCategory) || 'MARKETING');
+    this.headerType.set((row.header_type as WhatsAppTemplateHeaderType) || null);
     this.headerText.set(row.header_text || '');
     this.body.set(row.body);
     this.footerText.set(row.footer_text || '');

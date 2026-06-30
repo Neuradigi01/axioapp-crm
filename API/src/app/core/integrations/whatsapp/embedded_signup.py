@@ -30,13 +30,13 @@ call fails, we never write a half-baked `connected` row. The audit
 log records both the attempt (`code_exchanged`) and the final outcome
 (`completed` / `failed`) so an auditor can reconstruct what happened.
 """
+
 from __future__ import annotations
 
 import logging
 import secrets
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -83,7 +83,7 @@ class EmbeddedSignupNotConfigured(Exception):
 
 
 def _build_client(
-    http_client_factory: Optional[HttpClientFactory] = None,
+    http_client_factory: HttpClientFactory | None = None,
 ) -> MetaGraphClient:
     if not META_APP_ID or not META_APP_SECRET:
         raise EmbeddedSignupNotConfigured(
@@ -116,11 +116,11 @@ async def complete_embedded_signup(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
     code: str,
     phone_number_id: str,
     waba_id: str,
-    http_client_factory: Optional[HttpClientFactory] = None,
+    http_client_factory: HttpClientFactory | None = None,
 ) -> dict[str, object]:
     """Run the full ES orchestration. Returns the projection the router
     serialises into `EmbeddedSignupExchangeOut`.
@@ -163,9 +163,7 @@ async def complete_embedded_signup(
     # changed the selection between code-issue and exchange.
     try:
         waba = await client.get_waba(waba_id=waba_id, token=token)
-        phones = await client.list_phone_numbers(
-            waba_id=waba_id, token=token
-        )
+        phones = await client.list_phone_numbers(waba_id=waba_id, token=token)
     except MetaGraphError as exc:
         await _audit_failed(
             org_id=org_id,
@@ -179,9 +177,7 @@ async def complete_embedded_signup(
         # Fall back to direct phone lookup — some WABAs occasionally
         # return an empty `data: []` immediately post-creation.
         try:
-            phone = await client.get_phone_number(
-                phone_id=phone_number_id, token=token
-            )
+            phone = await client.get_phone_number(phone_id=phone_number_id, token=token)
         except MetaGraphError as exc:
             await _audit_failed(
                 org_id=org_id,
@@ -201,9 +197,7 @@ async def complete_embedded_signup(
 
     # Step 3 — subscribe Meta App to WABA webhooks.
     try:
-        await client.subscribe_app_to_waba(
-            waba_id=waba_id, token=token
-        )
+        await client.subscribe_app_to_waba(waba_id=waba_id, token=token)
     except MetaGraphError as exc:
         await _audit_failed(
             org_id=org_id,
@@ -216,9 +210,7 @@ async def complete_embedded_signup(
     # Step 4 — register phone for Cloud API with a fresh PIN.
     pin = _generate_six_digit_pin()
     try:
-        await client.register_phone_number(
-            phone_id=selected.id, token=token, pin=pin
-        )
+        await client.register_phone_number(phone_id=selected.id, token=token, pin=pin)
     except MetaGraphError as exc:
         await _audit_failed(
             org_id=org_id,
@@ -329,20 +321,18 @@ async def complete_embedded_signup(
 
 async def _get_integration_row(
     session: AsyncSession,
-) -> Optional[Integration]:
+) -> Integration | None:
     """Return the active tenant's WhatsApp `Integration` row, or None."""
     return (
         await session.execute(
-            select(Integration).where(
-                Integration.provider == IntegrationProvider.whatsapp
-            )
+            select(Integration).where(Integration.provider == IntegrationProvider.whatsapp)
         )
     ).scalar_one_or_none()
 
 
 async def _get_config_row(
     session: AsyncSession, *, integration_id: uuid.UUID
-) -> Optional[WhatsAppAccountConfig]:
+) -> WhatsAppAccountConfig | None:
     return (
         await session.execute(
             select(WhatsAppAccountConfig).where(
@@ -356,11 +346,11 @@ async def _upsert_integration(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
     token: str,
     selected: PhoneInfo,
     waba: WabaInfo,
-    meta_user_id: Optional[str] = None,
+    meta_user_id: str | None = None,
 ) -> Integration:
     """Insert-or-update the (org, whatsapp) row with the long-lived
     system-user token. Encrypts before write. Status flips to
@@ -372,7 +362,7 @@ async def _upsert_integration(
     `/debug_token` lookup failed mid-connect."""
     existing = await _get_integration_row(session)
     access_enc = encrypt(token)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     label = selected.display_phone_number or selected.id
 
     if existing is None:
@@ -450,7 +440,7 @@ async def _upsert_config(
     display = selected.display_phone_number or selected.id
     verified_name = selected.verified_name or waba.verified_name
     verify_token_seed = secrets.token_urlsafe(32)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if existing is None:
         row = WhatsAppAccountConfig(
@@ -493,7 +483,7 @@ async def _upsert_config(
 async def _audit_failed(
     *,
     org_id: uuid.UUID,
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
     reason: str,
     message: str,
 ) -> None:

@@ -6,6 +6,7 @@ resolve_audience integration (group_id → resolve_group_contacts
 delegation) is covered by manual smoke + the downstream
 dispatch_chunk tests; here we just guard the validator.
 """
+
 from __future__ import annotations
 
 import uuid

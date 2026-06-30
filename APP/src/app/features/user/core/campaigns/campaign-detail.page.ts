@@ -55,8 +55,7 @@ export class CampaignDetailPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly id: string =
-    this.route.snapshot.paramMap.get('id') ?? '';
+  protected readonly id: string = this.route.snapshot.paramMap.get('id') ?? '';
 
   protected readonly campaign = signal<Campaign | null>(null);
   protected readonly stats = signal<CampaignStats | null>(null);
@@ -133,9 +132,7 @@ export class CampaignDetailPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load messages.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load messages.');
         },
       });
   }
@@ -152,9 +149,7 @@ export class CampaignDetailPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.retryingId.set(null);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not retry message.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not retry message.');
         },
       });
   }
@@ -198,9 +193,7 @@ export class CampaignDetailPageComponent {
    *   `pending`   → clock     — queued, not yet attempted
    *   `failed`    → x         — terminal failure
    */
-  protected tickState(
-    m: CampaignMessage,
-  ): 'read' | 'delivered' | 'sent' | 'pending' | 'failed' {
+  protected tickState(m: CampaignMessage): 'read' | 'delivered' | 'sent' | 'pending' | 'failed' {
     if (m.status === 'failed') return 'failed';
     if (m.read_at) return 'read';
     if (m.delivered_at) return 'delivered';
@@ -235,10 +228,7 @@ export class CampaignDetailPageComponent {
     if (!c) return;
     if (c.status === 'scheduled' || c.status === 'running') {
       if (this.pollTimer !== null) return;
-      this.pollTimer = setInterval(
-        () => this.refreshStatsAndMessages(),
-        POLL_INTERVAL_MS,
-      );
+      this.pollTimer = setInterval(() => this.refreshStatsAndMessages(), POLL_INTERVAL_MS);
     } else {
       this.stopPolling();
     }
@@ -250,5 +240,4 @@ export class CampaignDetailPageComponent {
       this.pollTimer = null;
     }
   }
-
 }

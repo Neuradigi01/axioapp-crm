@@ -12,10 +12,10 @@ Reads need `campaigns.read`; mutations need `campaigns.write`; starting
 a campaign needs the separate `campaigns.send` permission so an admin
 can grant edit rights without granting send-to-customers rights.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,7 +45,6 @@ from src.app.core.campaigns.service import (
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
 
 
@@ -65,9 +64,7 @@ async def list_endpoint(
     )
 
 
-@router.post(
-    "", response_model=CampaignOut, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=CampaignOut, status_code=status.HTTP_201_CREATED)
 async def create_endpoint(
     payload: CampaignCreate,
     db: AsyncSession = Depends(get_db),
@@ -96,15 +93,11 @@ async def update_endpoint(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("campaigns.write")),
 ) -> CampaignOut:
-    campaign = await update_campaign(
-        db, campaign_id=campaign_id, payload=payload
-    )
+    campaign = await update_campaign(db, campaign_id=campaign_id, payload=payload)
     return CampaignOut.model_validate(campaign)
 
 
-@router.delete(
-    "/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_endpoint(
     campaign_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -114,9 +107,7 @@ async def delete_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post(
-    "/{campaign_id}/start", response_model=CampaignStartResponse
-)
+@router.post("/{campaign_id}/start", response_model=CampaignStartResponse)
 async def start_endpoint(
     campaign_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -142,9 +133,7 @@ async def stats_endpoint(
 )
 async def list_messages_endpoint(
     campaign_id: uuid.UUID,
-    status_: Optional[CampaignMessageStatus] = Query(
-        default=None, alias="status"
-    ),
+    status_: CampaignMessageStatus | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
@@ -170,7 +159,5 @@ async def retry_message_endpoint(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("campaigns.send")),
 ) -> CampaignMessageOut:
-    msg = await retry_message(
-        db, campaign_id=campaign_id, message_id=message_id
-    )
+    msg = await retry_message(db, campaign_id=campaign_id, message_id=message_id)
     return CampaignMessageOut.model_validate(msg)

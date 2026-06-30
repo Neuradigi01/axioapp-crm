@@ -1,5 +1,7 @@
 @if (rows().length === 0) {
-  <div class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500">
+  <div
+    class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+  >
     No staff to inspect yet.
   </div>
 } @else {
@@ -12,10 +14,7 @@
         class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       >
         @for (row of rows(); track row.staff.id) {
-          <option
-            [value]="row.staff.id"
-            [selected]="row.staff.id === selectedUserId()"
-          >
+          <option [value]="row.staff.id" [selected]="row.staff.id === selectedUserId()">
             {{ row.staff.full_name }}
           </option>
         }
@@ -47,16 +46,13 @@
         <div class="mb-3 flex items-baseline justify-between">
           <h3 class="text-sm font-semibold text-zinc-900">Sessions this month</h3>
           <span class="text-xs text-zinc-500">
-            {{ attendance().length }} sessions ·
-            {{ totalHours() }} hrs total
+            {{ attendance().length }} sessions · {{ totalHours() }} hrs total
           </span>
         </div>
         @if (loading()) {
           <div class="py-6 text-center text-sm text-zinc-500">Loading…</div>
         } @else if (attendance().length === 0) {
-          <div class="py-6 text-center text-sm text-zinc-500">
-            No sessions in this month.
-          </div>
+          <div class="py-6 text-center text-sm text-zinc-500">No sessions in this month.</div>
         } @else {
           <ul class="divide-y divide-zinc-100">
             @for (a of attendance(); track a.id) {

@@ -6,19 +6,9 @@ import { ConversationChannel } from '../conversations/conversations-api.service'
 import { BaseCrudApiService } from '../shared/services/base-crud-api.service';
 import { buildHttpParams } from '../shared/services/query-builder';
 
-export type CampaignStatus =
-  | 'draft'
-  | 'scheduled'
-  | 'running'
-  | 'done'
-  | 'failed';
+export type CampaignStatus = 'draft' | 'scheduled' | 'running' | 'done' | 'failed';
 
-export type CampaignMessageStatus =
-  | 'queued'
-  | 'sent'
-  | 'delivered'
-  | 'read'
-  | 'failed';
+export type CampaignMessageStatus = 'queued' | 'sent' | 'delivered' | 'read' | 'failed';
 
 export interface AudienceFilter {
   q?: string;
@@ -141,25 +131,16 @@ export class CampaignsApiService extends BaseCrudApiService<
   }
 
   start(id: string): Observable<CampaignStartResponse> {
-    return this.http.post<CampaignStartResponse>(
-      `${this.base}/${id}/start`,
-      {},
-    );
+    return this.http.post<CampaignStartResponse>(`${this.base}/${id}/start`, {});
   }
 
   stats(id: string): Observable<CampaignStats> {
     return this.http.get<CampaignStats>(`${this.base}/${id}/stats`);
   }
 
-  listMessages(
-    id: string,
-    status?: CampaignMessageStatus,
-  ): Observable<CampaignMessage[]> {
+  listMessages(id: string, status?: CampaignMessageStatus): Observable<CampaignMessage[]> {
     const params = buildHttpParams({ status });
-    return this.http.get<CampaignMessage[]>(
-      `${this.base}/${id}/messages`,
-      { params },
-    );
+    return this.http.get<CampaignMessage[]>(`${this.base}/${id}/messages`, { params });
   }
 
   retry(campaignId: string, messageId: string): Observable<CampaignMessage> {

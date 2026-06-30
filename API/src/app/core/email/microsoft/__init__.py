@@ -11,8 +11,8 @@ The registration runs once per process. `register_provider` is
 idempotent — re-registering the same name overwrites silently (used
 in tests to swap in mocks).
 """
+
 from src.app.core.email.microsoft.oauth import MicrosoftProvider
 from src.app.core.email.oauth import register_provider
-
 
 register_provider(MicrosoftProvider())

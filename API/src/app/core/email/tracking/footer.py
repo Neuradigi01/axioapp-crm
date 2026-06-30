@@ -14,11 +14,11 @@ CAN-SPAM (US) requires unsubscribe + physical address. India DPDP
 Pure transform — same signature as `pixel.inject` / `link_rewriter.
 rewrite` so the email adapter can compose them in a tidy sequence.
 """
+
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
-
 from html import escape
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # avoid import cycle at module load.
     from src.app.core.settings.models import OrgSettings
@@ -31,7 +31,7 @@ _FOOTER_STYLE = (
 )
 
 
-def _compose_address(settings: "Optional[OrgSettings]") -> str:
+def _compose_address(settings: OrgSettings | None) -> str:
     """Build a comma-separated single-line address from the org's
     structured address fields. Returns empty string when no parts
     populated — the adapter rejects sends in that case (CAN-SPAM)."""
@@ -51,7 +51,7 @@ def _compose_address(settings: "Optional[OrgSettings]") -> str:
 def build(
     *,
     org_name: str,
-    org_settings: "Optional[OrgSettings]",
+    org_settings: OrgSettings | None,
     unsubscribe_url: str,
 ) -> str:
     """Return the HTML fragment to append to outbound `body_html`.
@@ -67,13 +67,11 @@ def build(
     identity_line = ""
     if safe_name or safe_address:
         identity_line = (
-            f'<div>{safe_name}'
-            f'{" · " if safe_name and safe_address else ""}'
-            f'{safe_address}</div>'
+            f"<div>{safe_name}{' · ' if safe_name and safe_address else ''}{safe_address}</div>"
         )
     return (
         f'<div style="{_FOOTER_STYLE}">'
-        f'{identity_line}'
+        f"{identity_line}"
         f'<div style="margin-top:6px;">'
         f'<a href="{safe_unsub}" '
         'style="color:#888;text-decoration:underline;">'
@@ -83,7 +81,7 @@ def build(
     )
 
 
-def has_required_address(org_settings: "Optional[OrgSettings]") -> bool:
+def has_required_address(org_settings: OrgSettings | None) -> bool:
     """CAN-SPAM compliance gate: at least one address line must be set.
 
     The email adapter calls this before sending; sends fail-fast with

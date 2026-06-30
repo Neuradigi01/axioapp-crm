@@ -1,12 +1,13 @@
 import firebase_admin
 from firebase_admin import credentials, messaging
-from src.core.logger import logger
+
 from config import (
-    PUSH_NOTIFICATION_ENABLED,
-    FIREBASE_PROJECT_ID,
     FIREBASE_CLIENT_EMAIL,
     FIREBASE_PRIVATE_KEY,
+    FIREBASE_PROJECT_ID,
+    PUSH_NOTIFICATION_ENABLED,
 )
+from src.core.logger import logger
 
 _firebase_initialized: bool = False
 
@@ -23,13 +24,15 @@ def initialize_firebase() -> None:
 
     try:
         private_key = FIREBASE_PRIVATE_KEY.replace("\\n", "\n")
-        cred = credentials.Certificate({
-            "type": "service_account",
-            "project_id": FIREBASE_PROJECT_ID,
-            "client_email": FIREBASE_CLIENT_EMAIL,
-            "private_key": private_key,
-            "token_uri": "https://oauth2.googleapis.com/token",
-        })
+        cred = credentials.Certificate(
+            {
+                "type": "service_account",
+                "project_id": FIREBASE_PROJECT_ID,
+                "client_email": FIREBASE_CLIENT_EMAIL,
+                "private_key": private_key,
+                "token_uri": "https://oauth2.googleapis.com/token",
+            }
+        )
         firebase_admin.initialize_app(cred)
         _firebase_initialized = True
         logger.info("Firebase initialized successfully")
@@ -54,7 +57,9 @@ def send_push_notification(token: str, title: str, message: str, data: dict | No
         return False
 
 
-def send_push_to_multiple(tokens: list[str], title: str, message: str, data: dict | None = None) -> list[str]:
+def send_push_to_multiple(
+    tokens: list[str], title: str, message: str, data: dict | None = None
+) -> list[str]:
     if not PUSH_NOTIFICATION_ENABLED or not _firebase_initialized:
         return []
 
@@ -66,7 +71,8 @@ def send_push_to_multiple(tokens: list[str], title: str, message: str, data: dic
         )
         response = messaging.send_each_for_multicast(msg)
         failed_tokens = [
-            tokens[i] for i, send_response in enumerate(response.responses)
+            tokens[i]
+            for i, send_response in enumerate(response.responses)
             if not send_response.success
         ]
         if failed_tokens:

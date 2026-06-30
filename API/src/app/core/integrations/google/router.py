@@ -14,6 +14,7 @@ verified in `oauth.handle_callback`).
 The callback redirects to the frontend with a status param so the
 Settings page can show "Connected!" or "Couldn't connect: <reason>".
 """
+
 from __future__ import annotations
 
 import uuid
@@ -37,7 +38,6 @@ from src.app.shared.context import (
 )
 from src.app.shared.db import async_session, get_db
 
-
 # Prefix is `/google` because this subrouter is included under the
 # parent `/integrations` router. Full path becomes
 # `/api/v1/integrations/google/...` (the outer `/api/v1` is added by
@@ -52,9 +52,7 @@ _SETTINGS_RETURN_PATH = "/user/settings/integrations"
 
 @router.get("/authorize")
 async def authorize_endpoint(
-    user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> dict:
     """Return the Google consent URL as JSON so the SPA can navigate
     to it. We do NOT 302 here because a top-level browser GET to
@@ -67,9 +65,7 @@ async def authorize_endpoint(
     The signed `state` inside the URL encodes the active tenant +
     actor so the eventual `/callback` (which is unauthenticated —
     Google's browser hits it) can re-establish org context."""
-    url = oauth.start_authorize(
-        org_id=user.org_id, actor_id=user.legacy_uuid
-    )
+    url = oauth.start_authorize(org_id=user.org_id, actor_id=user.legacy_uuid)
     return {"url": url}
 
 
@@ -98,9 +94,7 @@ async def callback_endpoint(
         # message instead of a generic failure.
         return _settings_redirect(status="google_denied", reason=error)
     if not code or not state:
-        return _settings_redirect(
-            status="google_error", reason="missing_params"
-        )
+        return _settings_redirect(status="google_error", reason="missing_params")
 
     # Verify state (cheap, no I/O) BEFORE touching the DB. Lets us
     # bail out on forged/expired callbacks without opening a session.
@@ -108,35 +102,23 @@ async def callback_endpoint(
         payload = oauth.verify_state(state)
         org_id = uuid.UUID(payload["org_id"])
     except HTTPException:
-        return _settings_redirect(
-            status="google_error", reason="invalid_state"
-        )
+        return _settings_redirect(status="google_error", reason="invalid_state")
 
-    ctx_token = set_context(
-        RequestContext(org_id=org_id, user_id=None)
-    )
+    ctx_token = set_context(RequestContext(org_id=org_id, user_id=None))
     try:
         async with async_session() as session:
             try:
-                await oauth.handle_callback(
-                    session, code=code, state=state
-                )
+                await oauth.handle_callback(session, code=code, state=state)
             except HTTPException:
-                return _settings_redirect(
-                    status="google_error", reason="token_exchange_failed"
-                )
+                return _settings_redirect(status="google_error", reason="token_exchange_failed")
             except Exception as exc:
-                return _settings_redirect(
-                    status="google_error", reason=type(exc).__name__
-                )
+                return _settings_redirect(status="google_error", reason=type(exc).__name__)
     finally:
         reset_context(ctx_token)
     return _settings_redirect(status="google_connected")
 
 
-def _settings_redirect(
-    *, status: str, reason: str | None = None
-) -> RedirectResponse:
+def _settings_redirect(*, status: str, reason: str | None = None) -> RedirectResponse:
     """Bounce back to the Settings page with `?status=…` (and an
     optional `&reason=…`). URL-encodes both so a reason carrying
     spaces / unicode lands cleanly in the address bar."""
@@ -152,16 +134,12 @@ def _settings_redirect(
 @router.get("/accounts")
 async def list_accounts_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> list[dict]:
     """List the Google Ads accounts the connected identity can see.
     Returns `[{customer_id, resource_name}]`. The Settings UI in
     Step 7 uses this to drive the "pick which account" panel."""
-    integration = await get_integration(
-        db, provider=IntegrationProvider.google_ads
-    )
+    integration = await get_integration(db, provider=IntegrationProvider.google_ads)
     if integration is None:
         return []
     client = GoogleAdsRestClient(integration=integration, session=db)
@@ -179,22 +157,16 @@ async def list_accounts_endpoint(
 async def list_lead_forms_endpoint(
     customer_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> list[dict]:
     """List Lead Form assets on the given customer. `customer_id` may
     include hyphens (e.g. "123-456-7890") — we strip them before the
     API call."""
-    integration = await get_integration(
-        db, provider=IntegrationProvider.google_ads
-    )
+    integration = await get_integration(db, provider=IntegrationProvider.google_ads)
     if integration is None:
         return []
     client = GoogleAdsRestClient(integration=integration, session=db)
-    forms = await sync_forms.list_lead_forms(
-        client, customer_id=customer_id.replace("-", "")
-    )
+    forms = await sync_forms.list_lead_forms(client, customer_id=customer_id.replace("-", ""))
     return [
         {
             "form_id": f.form_id,

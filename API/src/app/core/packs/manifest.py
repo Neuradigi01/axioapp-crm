@@ -20,23 +20,21 @@ idempotently. The schema below enforces:
   - exactly one `is_won` stage per pipeline (the pipelines engine
     relies on this for the leaderboard's "won this month" query)
 """
+
 from __future__ import annotations
 
 import re
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
 
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
 
 
 def _validate_key(value: str, *, field_name: str = "key") -> str:
     if not _KEY_RE.match(value):
-        raise ValueError(
-            f"{field_name} {value!r} must match [a-z][a-z0-9_-]*"
-        )
+        raise ValueError(f"{field_name} {value!r} must match [a-z][a-z0-9_-]*")
     return value
 
 
@@ -56,18 +54,16 @@ class StageManifest(BaseModel):
 
     key: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=128)
-    color: Optional[str] = Field(default=None, max_length=16)
+    color: str | None = Field(default=None, max_length=16)
     display_order: int = Field(ge=0)
     is_won: bool = False
     is_lost: bool = False
 
     @model_validator(mode="after")
-    def _check_key(self) -> "StageManifest":
+    def _check_key(self) -> StageManifest:
         _validate_key(self.key, field_name="stage.key")
         if self.is_won and self.is_lost:
-            raise ValueError(
-                f"stage {self.key!r} cannot be both is_won and is_lost"
-            )
+            raise ValueError(f"stage {self.key!r} cannot be both is_won and is_lost")
         return self
 
 
@@ -81,15 +77,14 @@ class PipelineManifest(BaseModel):
     stages: list[StageManifest] = Field(min_length=1)
 
     @model_validator(mode="after")
-    def _check(self) -> "PipelineManifest":
+    def _check(self) -> PipelineManifest:
         _validate_key(self.key, field_name="pipeline.key")
         _check_unique_keys(self.stages, key_attr="key", label="stage")
         # Ensure exactly one is_won stage (leaderboards depend on this).
         wons = [s for s in self.stages if s.is_won]
         if len(wons) != 1:
             raise ValueError(
-                f"pipeline {self.key!r} must have exactly one is_won stage "
-                f"(found {len(wons)})"
+                f"pipeline {self.key!r} must have exactly one is_won stage (found {len(wons)})"
             )
         return self
 
@@ -103,14 +98,14 @@ class CustomFieldManifest(BaseModel):
     field_key: str = Field(min_length=1, max_length=64)
     field_label: str = Field(min_length=1, max_length=255)
     field_type: str = Field(min_length=1, max_length=32)
-    options: Optional[list[str]] = None
+    options: list[str] | None = None
     is_required: bool = False
     is_hidden: bool = False
     display_order: int = Field(default=0, ge=0)
-    validation: Optional[dict[str, Any]] = None
+    validation: dict[str, Any] | None = None
 
     @model_validator(mode="after")
-    def _check_key(self) -> "CustomFieldManifest":
+    def _check_key(self) -> CustomFieldManifest:
         _validate_key(self.field_key, field_name="custom_field.field_key")
         return self
 
@@ -125,7 +120,7 @@ class RoleManifest(BaseModel):
     permissions: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _check_key(self) -> "RoleManifest":
+    def _check_key(self) -> RoleManifest:
         _validate_key(self.key, field_name="role.key")
         return self
 
@@ -140,7 +135,7 @@ class LeadSourceManifest(BaseModel):
     display_order: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
-    def _check_key(self) -> "LeadSourceManifest":
+    def _check_key(self) -> LeadSourceManifest:
         _validate_key(self.key, field_name="lead_source.key")
         return self
 
@@ -156,7 +151,7 @@ class CallOutcomeManifest(BaseModel):
     display_order: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
-    def _check_key(self) -> "CallOutcomeManifest":
+    def _check_key(self) -> CallOutcomeManifest:
         _validate_key(self.key, field_name="call_outcome.key")
         return self
 
@@ -171,13 +166,13 @@ class DefaultsManifest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    currency: Optional[str] = Field(default=None, min_length=3, max_length=3)
-    tax_rate: Optional[Decimal] = Field(default=None, ge=0, le=100)
-    timezone: Optional[str] = Field(default=None, max_length=64)
-    locale: Optional[str] = Field(default=None, max_length=16)
-    review_source: Optional[str] = Field(default=None, max_length=32)
-    ai_personality: Optional[str] = None
-    ai_welcome_message: Optional[str] = None
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
+    tax_rate: Decimal | None = Field(default=None, ge=0, le=100)
+    timezone: str | None = Field(default=None, max_length=64)
+    locale: str | None = Field(default=None, max_length=16)
+    review_source: str | None = Field(default=None, max_length=32)
+    ai_personality: str | None = None
+    ai_welcome_message: str | None = None
 
 
 class FollowUpManifest(BaseModel):
@@ -218,24 +213,18 @@ class PackManifest(BaseModel):
     module_permissions: dict[str, list[str]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _check(self) -> "PackManifest":
+    def _check(self) -> PackManifest:
         _validate_key(self.template_id, field_name="template_id")
         _check_unique_keys(self.pipelines, key_attr="key", label="pipeline")
         _check_unique_keys(self.roles, key_attr="key", label="role")
-        _check_unique_keys(
-            self.lead_sources, key_attr="key", label="lead_source"
-        )
-        _check_unique_keys(
-            self.call_outcomes, key_attr="key", label="call_outcome"
-        )
+        _check_unique_keys(self.lead_sources, key_attr="key", label="lead_source")
+        _check_unique_keys(self.call_outcomes, key_attr="key", label="call_outcome")
         # custom_fields uniqueness: (entity_type, field_key)
         seen: set[tuple[str, str]] = set()
         for cf in self.custom_fields:
             pair = (cf.entity_type, cf.field_key)
             if pair in seen:
-                raise ValueError(
-                    f"duplicate custom_field {pair!r}"
-                )
+                raise ValueError(f"duplicate custom_field {pair!r}")
             seen.add(pair)
         return self
 

@@ -16,27 +16,26 @@ Three concerns:
 
 3. Photos — uploaded via `StorageBackend`, URL persisted here.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.shared.audit import log_entity_change
 from src.app.core.appointments import service as appointments_service
 from src.app.core.appointments.models import Appointment, AppointmentStatus
 from src.app.core.appointments.service import (
     create_appointment as core_create_appointment,
 )
-from src.app.packs.furniture.modules.custom_orders.service import (
-    add_measurement as co_add_measurement,
-)
 from src.app.packs.furniture.modules.custom_orders.schemas import (
     MeasurementCreate,
+)
+from src.app.packs.furniture.modules.custom_orders.service import (
+    add_measurement as co_add_measurement,
 )
 from src.app.packs.furniture.modules.field_ops import data_access as _da
 from src.app.packs.furniture.modules.field_ops.models import (
@@ -49,9 +48,8 @@ from src.app.packs.furniture.modules.field_ops.schemas import (
     FieldVisitCreate,
     FieldVisitUpdate,
 )
-from src.app.shared.db.queries import ensure_found
+from src.app.shared.audit import log_entity_change
 from src.app.shared.storage import get_storage
-
 
 # --- reads ----------------------------------------------------------------
 
@@ -59,10 +57,10 @@ from src.app.shared.storage import get_storage
 async def list_visits(
     session: AsyncSession,
     *,
-    assigned_to_id: Optional[uuid.UUID] = None,
-    purpose: Optional[FieldVisitPurpose] = None,
-    completed: Optional[bool] = None,
-    custom_order_id: Optional[uuid.UUID] = None,
+    assigned_to_id: uuid.UUID | None = None,
+    purpose: FieldVisitPurpose | None = None,
+    completed: bool | None = None,
+    custom_order_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[FieldVisit], int]:
@@ -78,9 +76,7 @@ async def list_visits(
     )
 
 
-async def get_visit(
-    session: AsyncSession, visit_id: uuid.UUID
-) -> FieldVisit:
+async def get_visit(session: AsyncSession, visit_id: uuid.UUID) -> FieldVisit:
     row = await _da.get_visit_by_id(session, visit_id)
     if row is None:
         raise HTTPException(
@@ -90,12 +86,8 @@ async def get_visit(
     return row
 
 
-async def get_appointment_for_visit(
-    session: AsyncSession, visit: FieldVisit
-) -> Appointment:
-    appt = await appointments_service.get_appointment(
-        session, visit.appointment_id
-    )
+async def get_appointment_for_visit(session: AsyncSession, visit: FieldVisit) -> Appointment:
+    appt = await appointments_service.get_appointment(session, visit.appointment_id)
     if appt is None:
         # Schema-level CASCADE means this should never happen, but the
         # caller wants an Appointment to merge into the response.
@@ -149,9 +141,7 @@ async def create_visit(
         after={
             "purpose": visit.purpose.value,
             "appointment_id": str(visit.appointment_id),
-            "custom_order_id": (
-                str(visit.custom_order_id) if visit.custom_order_id else None
-            ),
+            "custom_order_id": (str(visit.custom_order_id) if visit.custom_order_id else None),
         },
         user_id=user_id,
     )
@@ -186,9 +176,7 @@ async def update_visit(
     return visit
 
 
-async def delete_visit(
-    session: AsyncSession, *, visit_id: uuid.UUID
-) -> None:
+async def delete_visit(session: AsyncSession, *, visit_id: uuid.UUID) -> None:
     visit = await get_visit(session, visit_id)
     await _da.delete_visit_row(session, visit)
     await session.commit()
@@ -212,7 +200,7 @@ async def complete_visit(
         # Idempotent — don't re-write or double-copy measurements.
         return visit
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     visit.completed_at = now
     if payload.signature_url is not None:
         visit.signature_url = payload.signature_url
@@ -263,9 +251,7 @@ async def complete_visit(
 # --- photos ---------------------------------------------------------------
 
 
-async def list_photos(
-    session: AsyncSession, *, visit_id: uuid.UUID
-) -> list[FieldVisitPhoto]:
+async def list_photos(session: AsyncSession, *, visit_id: uuid.UUID) -> list[FieldVisitPhoto]:
     return await _da.list_photos_for_visit(session, visit_id)
 
 
@@ -276,13 +262,11 @@ async def add_photo(
     data: bytes,
     content_type: str,
     file_extension: str,
-    caption: Optional[str] = None,
+    caption: str | None = None,
 ) -> FieldVisitPhoto:
     visit = await get_visit(session, visit_id)
     photo_id = uuid.uuid4()
-    storage_path = (
-        f"{visit.org_id}/field_visits/{visit.id}/photo-{photo_id}.{file_extension}"
-    )
+    storage_path = f"{visit.org_id}/field_visits/{visit.id}/photo-{photo_id}.{file_extension}"
     ref = get_storage().put(storage_path, data, content_type=content_type)
 
     photo = FieldVisitPhoto(
@@ -291,7 +275,7 @@ async def add_photo(
         visit_id=visit.id,
         url=ref.url,
         caption=caption,
-        taken_at=datetime.now(timezone.utc),
+        taken_at=datetime.now(UTC),
     )
     _da.insert_photo(session, photo)
     await session.commit()
@@ -302,9 +286,7 @@ async def add_photo(
 # --- helpers --------------------------------------------------------------
 
 
-async def _ensure_custom_order_in_scope(
-    session: AsyncSession, custom_order_id: uuid.UUID
-) -> None:
+async def _ensure_custom_order_in_scope(session: AsyncSession, custom_order_id: uuid.UUID) -> None:
     if not await _da.custom_order_exists_in_org(session, custom_order_id):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

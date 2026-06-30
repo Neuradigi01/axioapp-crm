@@ -13,8 +13,11 @@ with the `core.standard_fields` registry so the Settings page's
 "Standard Fields" tab can offer per-org label/required/visibility
 overrides on the schedule-visit modal.
 """
+
 from src.app.core.standard_fields import (
     StandardFieldDef,
+)
+from src.app.core.standard_fields import (
     register as register_standard_field,
 )
 from src.app.packs.furniture.modules.field_ops.service import (
@@ -28,13 +31,10 @@ from src.app.packs.furniture.modules.field_ops.service import (
     update_visit,
 )
 
-
 _BASIC_TEXT_PROPS = frozenset(
     {"label", "placeholder", "help", "required", "hidden", "display_order"}
 )
-_LOCKED_REQUIRED_PROPS = frozenset(
-    {"label", "placeholder", "help", "display_order"}
-)
+_LOCKED_REQUIRED_PROPS = frozenset({"label", "placeholder", "help", "display_order"})
 
 
 def _register_field_visit_fields() -> None:
@@ -71,9 +71,7 @@ def _register_field_visit_fields() -> None:
             default_display_order=1,
             backend_required=False,
             backend_validators=("one of: measurement, installation, inspection",),
-            overridable_props=frozenset(
-                {"label", "help", "required", "hidden", "display_order"}
-            ),
+            overridable_props=frozenset({"label", "help", "required", "hidden", "display_order"}),
         )
     )
     register_standard_field(
@@ -147,9 +145,7 @@ def _register_field_visit_fields() -> None:
             default_display_order=5,
             backend_required=True,
             backend_validators=("must be an active staff member",),
-            overridable_props=frozenset(
-                {"label", "help", "display_order"}
-            ),
+            overridable_props=frozenset({"label", "help", "display_order"}),
         )
     )
     register_standard_field(

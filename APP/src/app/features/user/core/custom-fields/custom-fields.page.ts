@@ -58,7 +58,7 @@ export class CustomFieldsPageComponent {
   readonly formOpen = computed(() => this.editing() !== null);
   readonly editingField = computed(() => {
     const v = this.editing();
-    return v === undefined ? null : v ?? null;
+    return v === undefined ? null : (v ?? null);
   });
   readonly submitting = signal(false);
   readonly formError = signal<string | null>(null);
@@ -158,9 +158,7 @@ export class CustomFieldsPageComponent {
 
   protected onDelete(field: CustomField): void {
     if (field.source !== 'user') return; // belt + braces; UI hides the button.
-    const ok = window.confirm(
-      `Delete field "${field.field_label}"? This cannot be undone.`,
-    );
+    const ok = window.confirm(`Delete field "${field.field_label}"? This cannot be undone.`);
     if (!ok) return;
     const snapshot = this.fields();
     this.fields.update((rows) => rows.filter((f) => f.id !== field.id));
@@ -223,5 +221,4 @@ export class CustomFieldsPageComponent {
         return 'User';
     }
   }
-
 }

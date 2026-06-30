@@ -19,11 +19,12 @@ Operations grouped by concern:
       user_has_active_membership — User ⋈ OrganizationMember check
         used by the reassign target validator
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +33,6 @@ from src.app.core.contacts.models import Contact
 from src.app.core.users.models import OrganizationMember, User
 from src.app.core.walk_ins.models import WalkIn, WalkInStatus
 from src.app.shared.db.pagination import paginate
-
 
 _SORT_COLUMNS = {
     "time_in": WalkIn.time_in,
@@ -44,13 +44,9 @@ _SORT_COLUMNS = {
 # --- Single-row reads ---------------------------------------------------
 
 
-async def get_walk_in_by_id(
-    session: AsyncSession, walk_in_id: uuid.UUID
-) -> Optional[WalkIn]:
+async def get_walk_in_by_id(session: AsyncSession, walk_in_id: uuid.UUID) -> WalkIn | None:
     """Single-row read by PK. ``None`` on miss."""
-    result = await session.execute(
-        select(WalkIn).where(WalkIn.id == walk_in_id)
-    )
+    result = await session.execute(select(WalkIn).where(WalkIn.id == walk_in_id))
     return result.scalar_one_or_none()
 
 
@@ -60,11 +56,11 @@ async def get_walk_in_by_id(
 async def list_walk_ins_paginated(
     session: AsyncSession,
     *,
-    status_filter: Optional[WalkInStatus] = None,
-    assigned_to: Optional[uuid.UUID] = None,
+    status_filter: WalkInStatus | None = None,
+    assigned_to: uuid.UUID | None = None,
     open_only: bool = False,
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     sort: Literal["time_in", "created_at", "last_activity_at"] = "time_in",
     order: Literal["asc", "desc"] = "desc",
     page: int = 1,
@@ -95,11 +91,7 @@ async def list_walk_ins_paginated(
 
     sort_col = _SORT_COLUMNS[sort]
     if sort == "last_activity_at":
-        primary = (
-            sort_col.asc().nulls_last()
-            if order == "asc"
-            else sort_col.desc().nulls_last()
-        )
+        primary = sort_col.asc().nulls_last() if order == "asc" else sort_col.desc().nulls_last()
     else:
         primary = sort_col.asc() if order == "asc" else sort_col.desc()
     base = base.order_by(primary, WalkIn.id.desc())
@@ -115,9 +107,7 @@ def insert_walk_in(session: AsyncSession, walk_in: WalkIn) -> None:
     session.add(walk_in)
 
 
-async def delete_walk_in_row(
-    session: AsyncSession, walk_in: WalkIn
-) -> None:
+async def delete_walk_in_row(session: AsyncSession, walk_in: WalkIn) -> None:
     """Mark a WalkIn row for DELETE. Caller commits."""
     await session.delete(walk_in)
 
@@ -125,16 +115,12 @@ async def delete_walk_in_row(
 # --- Cross-module verifiers ---------------------------------------------
 
 
-async def contact_exists_in_org(
-    session: AsyncSession, contact_id: uuid.UUID
-) -> bool:
+async def contact_exists_in_org(session: AsyncSession, contact_id: uuid.UUID) -> bool:
     """Narrow-column existence check used by the walk-in create
     validator. The tenant ORM filter ensures only in-org contacts
     are visible; missing → caller raises 422."""
     row = (
-        await session.execute(
-            select(Contact.id).where(Contact.id == contact_id)
-        )
+        await session.execute(select(Contact.id).where(Contact.id == contact_id))
     ).scalar_one_or_none()
     return row is not None
 

@@ -17,7 +17,8 @@ We test:
 from __future__ import annotations
 
 import uuid
-from datetime import date as Date, datetime, timezone
+from datetime import UTC, datetime
+from datetime import date as Date
 from decimal import Decimal
 from enum import Enum
 from types import SimpleNamespace
@@ -26,7 +27,6 @@ import pytest
 
 from src.app.shared.audit import snapshot
 from src.app.shared.audit.snapshots import _coerce
-
 
 # --- _coerce ---------------------------------------------------------------
 
@@ -41,7 +41,7 @@ def test_coerce_uuid_to_str() -> None:
 
 
 def test_coerce_datetime_to_iso() -> None:
-    dt = datetime(2026, 6, 2, 12, 0, tzinfo=timezone.utc)
+    dt = datetime(2026, 6, 2, 12, 0, tzinfo=UTC)
     assert _coerce(dt) == "2026-06-02T12:00:00+00:00"
 
 
@@ -90,7 +90,7 @@ def test_snapshot_returns_keys_in_fields_order() -> None:
 def test_snapshot_coerces_each_value() -> None:
     row = SimpleNamespace(
         id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
-        when=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        when=datetime(2026, 1, 1, tzinfo=UTC),
         price=Decimal("9.99"),
         note=None,
     )

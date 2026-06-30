@@ -14,16 +14,10 @@ import { LucideAngularModule } from 'lucide-angular';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
-import {
-  ContactsApiService,
-} from '../../../../core/contacts/contacts-api.service';
+import { ContactsApiService } from '../../../../core/contacts/contacts-api.service';
 import { InrPipe } from '../../../../core/shared/pipes/inr.pipe';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  BillingApiService,
-  Invoice,
-  InvoiceStatus,
-} from '../billing-api.service';
+import { BillingApiService, Invoice, InvoiceStatus } from '../billing-api.service';
 
 type StatusFilter = 'all' | InvoiceStatus;
 
@@ -120,9 +114,7 @@ export class InvoicesTabComponent {
         error: (err: HttpErrorResponse) => {
           this.invoices.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load invoices.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load invoices.');
         },
       });
   }
@@ -174,11 +166,7 @@ export class InvoicesTabComponent {
   }
 
   private fetchContacts(ids: string[]): void {
-    forkJoin(
-      ids.map((id) =>
-        this.contactsApi.get(id).pipe(catchError(() => of(null))),
-      ),
-    )
+    forkJoin(ids.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((rows) => {
         this.contactsById.update((cache) => {
@@ -196,5 +184,4 @@ export class InvoicesTabComponent {
         });
       });
   }
-
 }

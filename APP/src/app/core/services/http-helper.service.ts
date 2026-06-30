@@ -12,7 +12,7 @@ export class HttpHelperService {
     return firstValueFrom(
       this.http.post<IApiResponse<T>>(this.buildUrl(url), body, {
         headers: this.getHeaders(),
-      })
+      }),
     );
   }
 
@@ -20,7 +20,7 @@ export class HttpHelperService {
     return firstValueFrom(
       this.http.get<IApiResponse<T>>(this.buildUrl(url), {
         headers: this.getHeaders(),
-      })
+      }),
     );
   }
 
@@ -28,7 +28,7 @@ export class HttpHelperService {
     return firstValueFrom(
       this.http.put<IApiResponse<T>>(this.buildUrl(url), body, {
         headers: this.getHeaders(),
-      })
+      }),
     );
   }
 
@@ -36,7 +36,7 @@ export class HttpHelperService {
     return firstValueFrom(
       this.http.delete<IApiResponse<T>>(this.buildUrl(url), {
         headers: this.getHeaders(),
-      })
+      }),
     );
   }
 
@@ -44,13 +44,14 @@ export class HttpHelperService {
     const formData = new FormData();
     formData.append(fieldName, file);
 
-    return firstValueFrom(
-      this.http.post<IApiResponse<T>>(this.buildUrl(url), formData)
-    );
+    return firstValueFrom(this.http.post<IApiResponse<T>>(this.buildUrl(url), formData));
   }
 
   async UploadWithFields<T = unknown>(
-    url: string, file: File, fields: Record<string, string> = {}, fieldName = 'file'
+    url: string,
+    file: File,
+    fields: Record<string, string> = {},
+    fieldName = 'file',
   ): Promise<IApiResponse<T>> {
     const formData = new FormData();
     formData.append(fieldName, file);
@@ -58,20 +59,20 @@ export class HttpHelperService {
       formData.append(key, value);
     }
 
-    return firstValueFrom(
-      this.http.post<IApiResponse<T>>(this.buildUrl(url), formData)
-    );
+    return firstValueFrom(this.http.post<IApiResponse<T>>(this.buildUrl(url), formData));
   }
 
-  async UploadMultiple<T = unknown>(url: string, files: File[], fieldName = 'files'): Promise<IApiResponse<T>> {
+  async UploadMultiple<T = unknown>(
+    url: string,
+    files: File[],
+    fieldName = 'files',
+  ): Promise<IApiResponse<T>> {
     const formData = new FormData();
     for (const file of files) {
       formData.append(fieldName, file);
     }
 
-    return firstValueFrom(
-      this.http.post<IApiResponse<T>>(this.buildUrl(url), formData)
-    );
+    return firstValueFrom(this.http.post<IApiResponse<T>>(this.buildUrl(url), formData));
   }
 
   private buildUrl(url: string): string {

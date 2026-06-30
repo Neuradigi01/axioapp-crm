@@ -20,13 +20,13 @@ The fixture stack here avoids the `seeded_admin` conftest fixture
 (known-broken in this branch) by stubbing every collaborator the
 submission service touches.
 """
+
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
@@ -42,7 +42,6 @@ from src.app.core.embed.schemas import (
     WidgetConfigPublicDocument,
     WidgetConfigSpamProtection,
 )
-
 
 # --- 1. min-fill-time pure function ---------------------------------------
 
@@ -60,60 +59,34 @@ def _payload_defaults(**overrides) -> EmbedSubmission:
 
 class TestMinFillTime:
     def test_none_rendered_at_fails(self):
-        assert (
-            submissions._passes_min_fill_time(
-                rendered_at=None, min_fill_time_ms=2000
-            )
-            is False
-        )
+        assert submissions._passes_min_fill_time(rendered_at=None, min_fill_time_ms=2000) is False
 
     def test_future_rendered_at_fails(self):
-        future = datetime.now(timezone.utc) + timedelta(hours=1)
-        assert (
-            submissions._passes_min_fill_time(
-                rendered_at=future, min_fill_time_ms=2000
-            )
-            is False
-        )
+        future = datetime.now(UTC) + timedelta(hours=1)
+        assert submissions._passes_min_fill_time(rendered_at=future, min_fill_time_ms=2000) is False
 
     def test_too_recent_fails(self):
-        recent = datetime.now(timezone.utc) - timedelta(milliseconds=500)
-        assert (
-            submissions._passes_min_fill_time(
-                rendered_at=recent, min_fill_time_ms=2000
-            )
-            is False
-        )
+        recent = datetime.now(UTC) - timedelta(milliseconds=500)
+        assert submissions._passes_min_fill_time(rendered_at=recent, min_fill_time_ms=2000) is False
 
     def test_more_than_24h_old_fails(self):
-        ancient = datetime.now(timezone.utc) - timedelta(hours=25)
+        ancient = datetime.now(UTC) - timedelta(hours=25)
         assert (
-            submissions._passes_min_fill_time(
-                rendered_at=ancient, min_fill_time_ms=2000
-            )
-            is False
+            submissions._passes_min_fill_time(rendered_at=ancient, min_fill_time_ms=2000) is False
         )
 
     def test_within_window_passes(self):
-        rendered = datetime.now(timezone.utc) - timedelta(seconds=5)
+        rendered = datetime.now(UTC) - timedelta(seconds=5)
         assert (
-            submissions._passes_min_fill_time(
-                rendered_at=rendered, min_fill_time_ms=2000
-            )
-            is True
+            submissions._passes_min_fill_time(rendered_at=rendered, min_fill_time_ms=2000) is True
         )
 
     def test_naive_datetime_treated_as_utc(self):
         # Pydantic strips tz on some inputs; the helper must normalise.
-        rendered = datetime.now(timezone.utc).replace(
-            tzinfo=None
-        ) - timedelta(seconds=5)
+        rendered = datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=5)
         assert rendered.tzinfo is None
         assert (
-            submissions._passes_min_fill_time(
-                rendered_at=rendered, min_fill_time_ms=2000
-            )
-            is True
+            submissions._passes_min_fill_time(rendered_at=rendered, min_fill_time_ms=2000) is True
         )
 
 
@@ -140,13 +113,13 @@ class _FakeClient:
     def __init__(
         self,
         *,
-        response: Optional[_FakeResponse] = None,
-        raise_exc: Optional[Exception] = None,
+        response: _FakeResponse | None = None,
+        raise_exc: Exception | None = None,
     ):
         self._response = response
         self._raise = raise_exc
-        self.last_url: Optional[str] = None
-        self.last_data: Optional[dict] = None
+        self.last_url: str | None = None
+        self.last_data: dict | None = None
 
     async def post(self, url, data=None):
         self.last_url = url
@@ -165,9 +138,7 @@ class TestRecaptchaVerify:
                 body={"success": True, "score": 0.9, "action": "submit"},
             )
         )
-        ok = await recaptcha.verify_token(
-            token="t", secret="s", http_client=client
-        )
+        ok = await recaptcha.verify_token(token="t", secret="s", http_client=client)
         assert ok is True
         assert client.last_url == recaptcha.VERIFY_URL
         assert client.last_data == {"secret": "s", "response": "t"}
@@ -180,9 +151,7 @@ class TestRecaptchaVerify:
                 body={"success": True, "score": 0.9, "action": "submit"},
             )
         )
-        await recaptcha.verify_token(
-            token="t", secret="s", remote_ip="1.2.3.4", http_client=client
-        )
+        await recaptcha.verify_token(token="t", secret="s", remote_ip="1.2.3.4", http_client=client)
         assert client.last_data == {
             "secret": "s",
             "response": "t",
@@ -197,12 +166,7 @@ class TestRecaptchaVerify:
                 body={"success": False, "error-codes": ["invalid-input-response"]},
             )
         )
-        assert (
-            await recaptcha.verify_token(
-                token="t", secret="s", http_client=client
-            )
-            is False
-        )
+        assert await recaptcha.verify_token(token="t", secret="s", http_client=client) is False
 
     @pytest.mark.asyncio
     async def test_low_score_rejected(self):
@@ -212,12 +176,7 @@ class TestRecaptchaVerify:
                 body={"success": True, "score": 0.2, "action": "submit"},
             )
         )
-        assert (
-            await recaptcha.verify_token(
-                token="t", secret="s", http_client=client
-            )
-            is False
-        )
+        assert await recaptcha.verify_token(token="t", secret="s", http_client=client) is False
 
     @pytest.mark.asyncio
     async def test_action_mismatch_rejected(self):
@@ -227,48 +186,22 @@ class TestRecaptchaVerify:
                 body={"success": True, "score": 0.9, "action": "login"},
             )
         )
-        assert (
-            await recaptcha.verify_token(
-                token="t", secret="s", http_client=client
-            )
-            is False
-        )
+        assert await recaptcha.verify_token(token="t", secret="s", http_client=client) is False
 
     @pytest.mark.asyncio
     async def test_non_200_status_rejected(self):
-        client = _FakeClient(
-            response=_FakeResponse(status_code=500, body={}, text="boom")
-        )
-        assert (
-            await recaptcha.verify_token(
-                token="t", secret="s", http_client=client
-            )
-            is False
-        )
+        client = _FakeClient(response=_FakeResponse(status_code=500, body={}, text="boom"))
+        assert await recaptcha.verify_token(token="t", secret="s", http_client=client) is False
 
     @pytest.mark.asyncio
     async def test_non_json_body_rejected(self):
-        client = _FakeClient(
-            response=_FakeResponse(
-                status_code=200, body=None, raise_on_json=True
-            )
-        )
-        assert (
-            await recaptcha.verify_token(
-                token="t", secret="s", http_client=client
-            )
-            is False
-        )
+        client = _FakeClient(response=_FakeResponse(status_code=200, body=None, raise_on_json=True))
+        assert await recaptcha.verify_token(token="t", secret="s", http_client=client) is False
 
     @pytest.mark.asyncio
     async def test_network_error_fails_closed(self):
         client = _FakeClient(raise_exc=httpx.ConnectError("dns"))
-        assert (
-            await recaptcha.verify_token(
-                token="t", secret="s", http_client=client
-            )
-            is False
-        )
+        assert await recaptcha.verify_token(token="t", secret="s", http_client=client) is False
 
 
 # --- 3. submissions.submit integration ------------------------------------
@@ -294,11 +227,17 @@ def _config_row(*, spam: WidgetConfigSpamProtection | None = None):
     doc = WidgetConfigDocument(
         fields=[
             WidgetConfigField(
-                key="full_name", label="Name", required=True, order=0,
+                key="full_name",
+                label="Name",
+                required=True,
+                order=0,
                 field_type="text",
             ),
             WidgetConfigField(
-                key="phone", label="Phone", required=True, order=1,
+                key="phone",
+                label="Phone",
+                required=True,
+                order=1,
                 field_type="tel",
             ),
         ],
@@ -361,9 +300,7 @@ class _SubmitHarness:
         monkeypatch.setattr(submissions, "public_get_config", _public_get)
         monkeypatch.setattr(submissions, "check_per_key", lambda _p: _allow())
         monkeypatch.setattr(submissions, "check_per_ip", lambda _ip: _allow())
-        monkeypatch.setattr(
-            submissions, "find_existing_contact", _find_existing
-        )
+        monkeypatch.setattr(submissions, "find_existing_contact", _find_existing)
         monkeypatch.setattr(submissions, "create_contact", _create_contact)
         monkeypatch.setattr(submissions, "create_lead", _create_lead)
         monkeypatch.setattr(submissions, "async_session", lambda: _NullCM())
@@ -385,12 +322,10 @@ class TestSubmitSpamGates:
         h = harness_factory()
         payload = _payload_defaults(
             honeypot="trapped",
-            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            rendered_at=datetime.now(UTC) - timedelta(seconds=10),
         )
 
-        result = await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-        )
+        result = await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
 
         assert result.accepted is False
         assert result.lead_id is None
@@ -405,13 +340,9 @@ class TestSubmitSpamGates:
     @pytest.mark.asyncio
     async def test_min_time_too_fast_silent_drops(self, harness_factory):
         h = harness_factory()
-        payload = _payload_defaults(
-            rendered_at=datetime.now(timezone.utc)
-        )
+        payload = _payload_defaults(rendered_at=datetime.now(UTC))
 
-        result = await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-        )
+        result = await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
         assert result.accepted is False
         assert h.created_leads == []
         assert h.audit_events[-1]["after"]["reason"] == "min_time"
@@ -419,35 +350,23 @@ class TestSubmitSpamGates:
     @pytest.mark.asyncio
     async def test_min_time_future_silent_drops(self, harness_factory):
         h = harness_factory()
-        payload = _payload_defaults(
-            rendered_at=datetime(2099, 1, 1, tzinfo=timezone.utc)
-        )
+        payload = _payload_defaults(rendered_at=datetime(2099, 1, 1, tzinfo=UTC))
 
-        result = await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-        )
+        result = await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
         assert result.accepted is False
         assert h.audit_events[-1]["after"]["reason"] == "min_time"
 
     @pytest.mark.asyncio
     async def test_min_time_skipped_when_disabled(self, harness_factory):
-        h = harness_factory(
-            spam=WidgetConfigSpamProtection(min_fill_time_ms=0)
-        )
-        payload = _payload_defaults(
-            rendered_at=datetime.now(timezone.utc)
-        )
+        h = harness_factory(spam=WidgetConfigSpamProtection(min_fill_time_ms=0))
+        payload = _payload_defaults(rendered_at=datetime.now(UTC))
 
-        result = await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-        )
+        result = await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
         assert result.accepted is True
         assert h.created_leads == [SimpleNamespace(id=_LEAD_ID)]
 
     @pytest.mark.asyncio
-    async def test_recaptcha_missing_token_when_enabled(
-        self, harness_factory
-    ):
+    async def test_recaptcha_missing_token_when_enabled(self, harness_factory):
         spam = WidgetConfigSpamProtection(
             recaptcha_enabled=True,
             recaptcha_site_key="6Lc-site",
@@ -455,19 +374,15 @@ class TestSubmitSpamGates:
         )
         h = harness_factory(spam=spam)
         payload = _payload_defaults(
-            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            rendered_at=datetime.now(UTC) - timedelta(seconds=10),
         )
 
-        result = await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-        )
+        result = await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
         assert result.accepted is False
         assert h.audit_events[-1]["after"]["reason"] == "recaptcha_invalid"
 
     @pytest.mark.asyncio
-    async def test_recaptcha_low_score_silent_drops(
-        self, harness_factory, monkeypatch
-    ):
+    async def test_recaptcha_low_score_silent_drops(self, harness_factory, monkeypatch):
         spam = WidgetConfigSpamProtection(
             recaptcha_enabled=True,
             recaptcha_site_key="6Lc-site",
@@ -475,25 +390,19 @@ class TestSubmitSpamGates:
         )
         h = harness_factory(spam=spam)
         verify_mock = AsyncMock(return_value=False)
-        monkeypatch.setattr(
-            submissions, "verify_recaptcha_token", verify_mock
-        )
+        monkeypatch.setattr(submissions, "verify_recaptcha_token", verify_mock)
         payload = _payload_defaults(
-            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            rendered_at=datetime.now(UTC) - timedelta(seconds=10),
             recaptcha_token="t",
         )
 
-        result = await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-        )
+        result = await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
         assert result.accepted is False
         assert h.audit_events[-1]["after"]["reason"] == "recaptcha_low_score"
         verify_mock.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_recaptcha_happy_path(
-        self, harness_factory, monkeypatch
-    ):
+    async def test_recaptcha_happy_path(self, harness_factory, monkeypatch):
         spam = WidgetConfigSpamProtection(
             recaptcha_enabled=True,
             recaptcha_site_key="6Lc-site",
@@ -506,13 +415,11 @@ class TestSubmitSpamGates:
             AsyncMock(return_value=True),
         )
         payload = _payload_defaults(
-            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            rendered_at=datetime.now(UTC) - timedelta(seconds=10),
             recaptcha_token="t",
         )
 
-        result = await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-        )
+        result = await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
         assert result.accepted is True
         assert result.lead_id == _LEAD_ID
         # Final audit event is the `accepted` row, not a spam rejection.
@@ -522,12 +429,10 @@ class TestSubmitSpamGates:
     async def test_all_gates_pass_happy_path(self, harness_factory):
         h = harness_factory()
         payload = _payload_defaults(
-            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            rendered_at=datetime.now(UTC) - timedelta(seconds=10),
         )
 
-        result = await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-        )
+        result = await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
         assert result.accepted is True
         assert result.lead_id == _LEAD_ID
         assert len(h.created_contacts) == 1
@@ -544,23 +449,42 @@ def _config_row_with_custom_field(*, with_lead_custom: bool = False):
     the Owner adding both via the picker."""
     fields = [
         WidgetConfigField(
-            key="full_name", label="Name", required=True, order=0,
-            field_type="text", field_source="standard", entity="contact",
+            key="full_name",
+            label="Name",
+            required=True,
+            order=0,
+            field_type="text",
+            field_source="standard",
+            entity="contact",
         ),
         WidgetConfigField(
-            key="phone", label="Phone", required=True, order=1,
-            field_type="tel", field_source="standard", entity="contact",
+            key="phone",
+            label="Phone",
+            required=True,
+            order=1,
+            field_type="tel",
+            field_source="standard",
+            entity="contact",
         ),
         WidgetConfigField(
-            key="address", label="Address", required=False, order=2,
-            field_type="text", field_source="custom", entity="contact",
+            key="address",
+            label="Address",
+            required=False,
+            order=2,
+            field_type="text",
+            field_source="custom",
+            entity="contact",
         ),
     ]
     if with_lead_custom:
         fields.append(
             WidgetConfigField(
-                key="companyname", label="Company", required=False,
-                order=3, field_type="text", field_source="custom",
+                key="companyname",
+                label="Company",
+                required=False,
+                order=3,
+                field_type="text",
+                field_source="custom",
                 entity="lead",
             )
         )
@@ -570,17 +494,13 @@ def _config_row_with_custom_field(*, with_lead_custom: bool = False):
 
 class TestCustomFieldRouting:
     @pytest.mark.asyncio
-    async def test_custom_field_value_routes_into_contact_custom_data(
-        self, monkeypatch
-    ):
+    async def test_custom_field_value_routes_into_contact_custom_data(self, monkeypatch):
         # Build our own harness so we can intercept the ContactCreate
         # payload and inspect what custom_data was passed in.
         created_payloads: list = []
 
         async def _find_key(plain, ip=None):
-            return SimpleNamespace(
-                id=_KEY_ID, org_id=_ORG_ID, prefix="pk_live_xx"
-            )
+            return SimpleNamespace(id=_KEY_ID, org_id=_ORG_ID, prefix="pk_live_xx")
 
         async def _public_get(_):
             return _config_row_with_custom_field()
@@ -613,47 +533,33 @@ class TestCustomFieldRouting:
         monkeypatch.setattr(
             submissions,
             "check_per_key",
-            lambda _p: RateLimitResult(
-                allowed=True, remaining=100, retry_after=0.0
-            ),
+            lambda _p: RateLimitResult(allowed=True, remaining=100, retry_after=0.0),
         )
         monkeypatch.setattr(
             submissions,
             "check_per_ip",
-            lambda _ip: RateLimitResult(
-                allowed=True, remaining=10, retry_after=0.0
-            ),
+            lambda _ip: RateLimitResult(allowed=True, remaining=10, retry_after=0.0),
         )
-        monkeypatch.setattr(
-            submissions, "find_existing_contact", _find_existing
-        )
+        monkeypatch.setattr(submissions, "find_existing_contact", _find_existing)
         monkeypatch.setattr(submissions, "create_contact", _create_contact)
         monkeypatch.setattr(submissions, "create_lead", _create_lead)
         monkeypatch.setattr(submissions, "async_session", lambda: _NullCM())
         monkeypatch.setattr(submissions.audit, "log", _audit_log)
-        monkeypatch.setattr(
-            submissions.log_service, "record", _record_log
-        )
+        monkeypatch.setattr(submissions.log_service, "record", _record_log)
 
         payload = _payload_defaults(
-            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            rendered_at=datetime.now(UTC) - timedelta(seconds=10),
             custom_data={"address": "42 MG Road, Pune"},
         )
 
-        result = await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-        )
+        result = await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
 
         assert result.accepted is True
         assert len(created_payloads) == 1
-        assert created_payloads[0].custom_data == {
-            "address": "42 MG Road, Pune"
-        }
+        assert created_payloads[0].custom_data == {"address": "42 MG Road, Pune"}
 
     @pytest.mark.asyncio
-    async def test_lead_entity_custom_field_routes_into_lead_custom_data(
-        self, monkeypatch
-    ):
+    async def test_lead_entity_custom_field_routes_into_lead_custom_data(self, monkeypatch):
         # Owner exposes a lead-entity `companyname` custom field on the
         # widget. Submitted value must land in the LEAD's custom_data
         # (not the contact's).
@@ -661,9 +567,7 @@ class TestCustomFieldRouting:
         lead_payloads: list = []
 
         async def _find_key(plain, ip=None):
-            return SimpleNamespace(
-                id=_KEY_ID, org_id=_ORG_ID, prefix="pk_live_xx"
-            )
+            return SimpleNamespace(id=_KEY_ID, org_id=_ORG_ID, prefix="pk_live_xx")
 
         async def _public_get(_):
             return _config_row_with_custom_field(with_lead_custom=True)
@@ -697,62 +601,44 @@ class TestCustomFieldRouting:
         monkeypatch.setattr(
             submissions,
             "check_per_key",
-            lambda _p: RateLimitResult(
-                allowed=True, remaining=100, retry_after=0.0
-            ),
+            lambda _p: RateLimitResult(allowed=True, remaining=100, retry_after=0.0),
         )
         monkeypatch.setattr(
             submissions,
             "check_per_ip",
-            lambda _ip: RateLimitResult(
-                allowed=True, remaining=10, retry_after=0.0
-            ),
+            lambda _ip: RateLimitResult(allowed=True, remaining=10, retry_after=0.0),
         )
-        monkeypatch.setattr(
-            submissions, "find_existing_contact", _find_existing
-        )
+        monkeypatch.setattr(submissions, "find_existing_contact", _find_existing)
         monkeypatch.setattr(submissions, "create_contact", _create_contact)
         monkeypatch.setattr(submissions, "create_lead", _create_lead)
         monkeypatch.setattr(submissions, "async_session", lambda: _NullCM())
         monkeypatch.setattr(submissions.audit, "log", _audit_log)
-        monkeypatch.setattr(
-            submissions.log_service, "record", _record_log
-        )
+        monkeypatch.setattr(submissions.log_service, "record", _record_log)
 
         payload = _payload_defaults(
-            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            rendered_at=datetime.now(UTC) - timedelta(seconds=10),
             custom_data={
                 "address": "42 MG Road, Pune",
                 "companyname": "Acme Furniture Pvt Ltd",
             },
         )
 
-        result = await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-        )
+        result = await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
 
         assert result.accepted is True
         # Address lives on contact, companyname lives on lead.
         assert len(contact_payloads) == 1
-        assert contact_payloads[0].custom_data == {
-            "address": "42 MG Road, Pune"
-        }
+        assert contact_payloads[0].custom_data == {"address": "42 MG Road, Pune"}
         assert len(lead_payloads) == 1
-        assert lead_payloads[0].custom_data == {
-            "companyname": "Acme Furniture Pvt Ltd"
-        }
+        assert lead_payloads[0].custom_data == {"companyname": "Acme Furniture Pvt Ltd"}
 
     @pytest.mark.asyncio
-    async def test_unconfigured_custom_field_rejected_422(
-        self, monkeypatch
-    ):
+    async def test_unconfigured_custom_field_rejected_422(self, monkeypatch):
         # Org's config does NOT include `internal_notes` — visitor's
         # custom_data payload contains it. Must be rejected so a forged
         # request can't write to fields the Owner hasn't opted in.
         async def _find_key(plain, ip=None):
-            return SimpleNamespace(
-                id=_KEY_ID, org_id=_ORG_ID, prefix="pk_live_xx"
-            )
+            return SimpleNamespace(id=_KEY_ID, org_id=_ORG_ID, prefix="pk_live_xx")
 
         async def _public_get(_):
             return _config_row_with_custom_field()  # only `address` exposed
@@ -765,32 +651,24 @@ class TestCustomFieldRouting:
         monkeypatch.setattr(
             submissions,
             "check_per_key",
-            lambda _p: RateLimitResult(
-                allowed=True, remaining=100, retry_after=0.0
-            ),
+            lambda _p: RateLimitResult(allowed=True, remaining=100, retry_after=0.0),
         )
         monkeypatch.setattr(
             submissions,
             "check_per_ip",
-            lambda _ip: RateLimitResult(
-                allowed=True, remaining=10, retry_after=0.0
-            ),
+            lambda _ip: RateLimitResult(allowed=True, remaining=10, retry_after=0.0),
         )
-        monkeypatch.setattr(
-            submissions.log_service, "record", _record_log
-        )
+        monkeypatch.setattr(submissions.log_service, "record", _record_log)
 
         from fastapi import HTTPException
 
         payload = _payload_defaults(
-            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            rendered_at=datetime.now(UTC) - timedelta(seconds=10),
             custom_data={"internal_notes": "forged"},
         )
 
         with pytest.raises(HTTPException) as exc:
-            await submissions.submit(
-                payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-            )
+            await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
         assert exc.value.status_code == 422
         assert "internal_notes" in str(exc.value.detail)
 
@@ -803,7 +681,10 @@ class TestPublicProjection:
         full = WidgetConfigDocument(
             fields=[
                 WidgetConfigField(
-                    key="full_name", label="Name", required=True, order=0,
+                    key="full_name",
+                    label="Name",
+                    required=True,
+                    order=0,
                     field_type="text",
                 )
             ],
@@ -813,9 +694,7 @@ class TestPublicProjection:
                 recaptcha_secret_key="6Lc-secret-HIDDEN",
             ),
         )
-        public = WidgetConfigPublicDocument.model_validate(
-            full.model_dump(mode="json")
-        )
+        public = WidgetConfigPublicDocument.model_validate(full.model_dump(mode="json"))
         dump = public.model_dump(mode="json")
         # The public projection's spam_protection has no secret_key field.
         assert "recaptcha_secret_key" not in dump["spam_protection"]

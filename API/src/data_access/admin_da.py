@@ -1,9 +1,10 @@
-from sqlalchemy import select, update, delete, func, or_
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+from src.data_access import generic_da
 from src.models.admin import Admin
 from src.models.routes import AdminRoute
-from src.data_access import generic_da
 
 
 async def get_by_user_id(db: AsyncSession, admin_user_id: str) -> Admin | None:
@@ -31,13 +32,18 @@ async def get_total_admin_count(db: AsyncSession) -> int:
 
 
 async def update_two_factor(
-    db: AsyncSession, admin_user_id: str, *,
+    db: AsyncSession,
+    admin_user_id: str,
+    *,
     two_factor_enabled: bool,
     two_factor_method: str | None,
     two_factor_secret: str | None = None,
 ):
     await generic_da.update_two_factor(
-        db, Admin, Admin.admin_user_id, admin_user_id,
+        db,
+        Admin,
+        Admin.admin_user_id,
+        admin_user_id,
         two_factor_enabled=two_factor_enabled,
         two_factor_method=two_factor_method,
         two_factor_secret=two_factor_secret,
@@ -52,7 +58,9 @@ async def clear_two_factor(db: AsyncSession, admin_user_id: str):
     await generic_da.clear_two_factor(db, Admin, Admin.admin_user_id, admin_user_id)
 
 
-async def update_profile_image(db: AsyncSession, admin_user_id: str, profile_image: str | None) -> bool:
+async def update_profile_image(
+    db: AsyncSession, admin_user_id: str, profile_image: str | None
+) -> bool:
     stmt = (
         update(Admin)
         .where(func.lower(Admin.admin_user_id) == admin_user_id.strip().lower())
@@ -67,7 +75,9 @@ async def get_sub_admin_count(db: AsyncSession) -> int:
     return (await db.execute(stmt)).scalar()
 
 
-async def update_profile(db: AsyncSession, admin_user_id: str, email: str | None, mobile_no: str | None) -> bool:
+async def update_profile(
+    db: AsyncSession, admin_user_id: str, email: str | None, mobile_no: str | None
+) -> bool:
     stmt = (
         update(Admin)
         .where(func.lower(Admin.admin_user_id) == admin_user_id.strip().lower())
@@ -107,8 +117,7 @@ async def get_sub_admins_paginated(
     total = (await db.execute(count_stmt)).scalar()
 
     items_stmt = (
-        base
-        .options(selectinload(Admin.admin_routes))
+        base.options(selectinload(Admin.admin_routes))
         .order_by(Admin.created_at.desc())
         .offset(page_index * page_size)
         .limit(page_size)
@@ -133,7 +142,9 @@ async def get_admin_with_routes(db: AsyncSession, admin_user_id: str) -> Admin |
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
-async def update_sub_admin(db: AsyncSession, admin_user_id: str, name: str, email: str | None, mobile_no: str | None) -> bool:
+async def update_sub_admin(
+    db: AsyncSession, admin_user_id: str, name: str, email: str | None, mobile_no: str | None
+) -> bool:
     stmt = (
         update(Admin)
         .where(func.lower(Admin.admin_user_id) == admin_user_id.strip().lower())
@@ -149,7 +160,9 @@ async def delete_admin_routes(db: AsyncSession, admin_id: int) -> bool:
     return result.rowcount > 0
 
 
-async def insert_admin_routes(db: AsyncSession, admin_id: int, route_ids: list[int], assigned_by: int):
+async def insert_admin_routes(
+    db: AsyncSession, admin_id: int, route_ids: list[int], assigned_by: int
+):
     for route_id in route_ids:
         db.add(AdminRoute(admin_id=admin_id, route_id=route_id, assigned_by=assigned_by))
     await db.flush()

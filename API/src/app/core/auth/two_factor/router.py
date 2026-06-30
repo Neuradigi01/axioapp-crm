@@ -3,11 +3,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.tenants import service as tenants_service
-from src.app.core.users import service as users_service
 from src.app.core.auth import service as auth_service
 from src.app.core.auth.schemas import TryAnotherWayRequest, TryAnotherWayResponse
 from src.app.core.auth.two_factor import service as two_factor_service
+from src.app.core.tenants import service as tenants_service
+from src.app.core.users import service as users_service
 from src.app.shared.db import get_db
 from src.app.shared.security.password import verify_password
 from src.services.auth import login_service
@@ -52,9 +52,7 @@ async def try_another_way(
             available_methods=data.get("available_methods", []),
         )
 
-    invalid = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
-    )
+    invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     user_email = req.email or req.identifier
     if not user_email:
         raise invalid
@@ -66,9 +64,7 @@ async def try_another_way(
     if org is None:
         raise invalid
 
-    user = await users_service.get_user_by_email(
-        db, user_email, org_id=org.id, active_only=True
-    )
+    user = await users_service.get_user_by_email(db, user_email, org_id=org.id, active_only=True)
     if user is None or not user.is_active:
         raise invalid
     if not verify_password(req.password, user.password_hash):
@@ -81,6 +77,4 @@ async def try_another_way(
         mobile=user.info.mobile_no if user.info else None,
         method=req.method,
     )
-    return TryAnotherWayResponse(
-        method=result.method, available_methods=result.available_methods
-    )
+    return TryAnotherWayResponse(method=result.method, available_methods=result.available_methods)

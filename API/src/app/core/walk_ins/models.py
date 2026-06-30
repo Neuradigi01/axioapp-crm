@@ -16,6 +16,7 @@ Tenant-scoped (RLS on, ORM filter applied). Indexed for the two hot
 queries: "today's walk-ins" by `(org_id, time_in)` and "assigned to
 me" by `(assigned_to_id, status)`.
 """
+
 from __future__ import annotations
 
 import enum
@@ -29,7 +30,6 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Numeric,
-    String,
     Text,
     text,
 )
@@ -73,9 +73,7 @@ class WalkIn(Base, TenantScoped):
         nullable=False,
         server_default=text("now()"),
     )
-    time_out: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    time_out: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Generated column: minutes between time_in and time_out, NULL
     # until checkout. STORED so the planner can read it without
     # recomputation on every list query.

@@ -4,6 +4,7 @@ Pure query helpers — no transactions, no audit. Operates on the legacy
 `UserLogin` / `UserInfo` mappers (the layered `User` mapper hides
 several columns the reset flow needs to touch).
 """
+
 from __future__ import annotations
 
 from sqlalchemy import select, update
@@ -62,13 +63,9 @@ async def get_active_reset_token_for_user(
     return result.scalar_one_or_none()
 
 
-async def get_user_login_by_id(
-    session: AsyncSession, member_id: int
-) -> UserLogin | None:
+async def get_user_login_by_id(session: AsyncSession, member_id: int) -> UserLogin | None:
     """Load the legacy `UserLogin` row by bigint PK."""
-    result = await session.execute(
-        select(UserLogin).where(UserLogin.id == member_id)
-    )
+    result = await session.execute(select(UserLogin).where(UserLogin.id == member_id))
     return result.scalar_one_or_none()
 
 
@@ -80,9 +77,7 @@ def add_password_change_history(
     return row
 
 
-async def invalidate_outstanding_reset_tokens(
-    session: AsyncSession, *, member_id: int
-) -> None:
+async def invalidate_outstanding_reset_tokens(session: AsyncSession, *, member_id: int) -> None:
     """Mark every non-used User-pool reset token for this member as used.
 
     Defensive cleanup so a recently-completed reset can't be retried via

@@ -12,15 +12,16 @@ Reads need `staff.read`; profile writes need `staff.write`; clock
 in/out needs `attendance.write`. Tenant scoping is automatic via the
 ORM filter on `TenantScoped`.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import date as Date
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.activities.schemas import ActivityOut
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.staff.schemas import (
     AttendanceOut,
@@ -33,17 +34,19 @@ from src.app.core.staff.schemas import (
 )
 from src.app.core.staff.service import (
     clock_in as svc_clock_in,
+)
+from src.app.core.staff.service import (
     clock_out as svc_clock_out,
+)
+from src.app.core.staff.service import (
     compute_performance,
     list_activities_for,
     list_attendance,
     list_staff,
     upsert_profile,
 )
-from src.app.core.activities.schemas import ActivityOut
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/staff", tags=["Staff"])
 
@@ -63,9 +66,7 @@ async def upsert_profile_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("staff.write")),
 ) -> StaffProfileOut:
-    profile = await upsert_profile(
-        db, org_id=user.org_id, user_id=user_id, payload=payload
-    )
+    profile = await upsert_profile(db, org_id=user.org_id, user_id=user_id, payload=payload)
     return StaffProfileOut.model_validate(profile)
 
 
@@ -82,8 +83,8 @@ async def performance_endpoint(
 @router.get("/{user_id}/attendance", response_model=list[AttendanceOut])
 async def attendance_endpoint(
     user_id: uuid.UUID,
-    from_: Optional[Date] = Query(default=None, alias="from"),
-    to: Optional[Date] = Query(default=None),
+    from_: Date | None = Query(default=None, alias="from"),
+    to: Date | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("staff.read")),
 ) -> list[AttendanceOut]:
@@ -113,9 +114,7 @@ async def clock_in_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("attendance.write")),
 ) -> AttendanceOut:
-    row = await svc_clock_in(
-        db, org_id=user.org_id, user_id=user_id, payload=payload
-    )
+    row = await svc_clock_in(db, org_id=user.org_id, user_id=user_id, payload=payload)
     return AttendanceOut.model_validate(row)
 
 

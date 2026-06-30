@@ -16,6 +16,7 @@ outbound send. Spread across multiple chunks running in parallel
 (Celery workers), the bucket prevents a thundering-herd burst that
 would trigger Meta's 429 rate-limit response.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -34,7 +35,7 @@ class _Bucket:
     call — no background thread needed."""
 
     capacity: float
-    refill_rate: float            # tokens/sec
+    refill_rate: float  # tokens/sec
     tokens: float = field(default=0.0)
     last: float = field(default_factory=time.monotonic)
 
@@ -71,14 +72,10 @@ class InMemoryTokenBucketLimiter:
         elapsed = now - bucket.last
         if elapsed <= 0:
             return
-        bucket.tokens = min(
-            bucket.capacity, bucket.tokens + elapsed * bucket.refill_rate
-        )
+        bucket.tokens = min(bucket.capacity, bucket.tokens + elapsed * bucket.refill_rate)
         bucket.last = now
 
-    async def acquire(
-        self, key: str, *, rate_per_sec: float, count: float = 1.0
-    ) -> float:
+    async def acquire(self, key: str, *, rate_per_sec: float, count: float = 1.0) -> float:
         """Block until `count` tokens are available; return the total
         seconds spent waiting (0 when no wait was needed).
 
@@ -132,9 +129,7 @@ def get_wa_rate_limiter() -> InMemoryTokenBucketLimiter:
     return _wa_limiter
 
 
-async def acquire_wa_rate_token(
-    org_id: uuid.UUID, *, rate_per_sec: int, count: int = 1
-) -> float:
+async def acquire_wa_rate_token(org_id: uuid.UUID, *, rate_per_sec: int, count: int = 1) -> float:
     """Convenience wrapper — `acquire(str(org_id), ...)` with int
     rate/count. Returns waited-seconds."""
     return await _wa_limiter.acquire(

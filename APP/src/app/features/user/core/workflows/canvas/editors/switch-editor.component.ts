@@ -1,17 +1,9 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { CanvasNode } from '../canvas-state.service';
-
 
 @Component({
   selector: 'app-switch-editor',
@@ -25,22 +17,18 @@ export class SwitchEditorComponent {
   readonly configChange = output<Record<string, unknown>>();
   readonly validityChange = output<boolean>();
 
-  readonly path = computed<string>(
-    () => (this.node().config?.['path'] as string) ?? '',
-  );
-  readonly cases = computed<string[]>(
-    () => (this.node().config?.['cases'] as string[]) ?? [],
-  );
+  readonly path = computed<string>(() => (this.node().config?.['path'] as string) ?? '');
+  readonly cases = computed<string[]>(() => (this.node().config?.['cases'] as string[]) ?? []);
 
   constructor() {
     effect(() =>
-      this.validityChange.emit(
-        this.path().trim().length > 0 && this.cases().length > 0,
-      ),
+      this.validityChange.emit(this.path().trim().length > 0 && this.cases().length > 0),
     );
   }
 
-  onPathChange(v: string): void { this.configChange.emit({ path: v }); }
+  onPathChange(v: string): void {
+    this.configChange.emit({ path: v });
+  }
 
   onCaseChange(idx: number, v: string): void {
     const next = [...this.cases()];

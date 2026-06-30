@@ -18,24 +18,21 @@ Covers:
 Tests exercise the parsers + DAL writes + send_guard directly;
 the HTTP endpoints are one-line passthroughs over those primitives.
 """
+
 from __future__ import annotations
 
 import hashlib
 import hmac
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.automation import send_guard
 from src.app.core.automation.models import (
-    AutomationRun,
-    AutomationRunStatus,
     AutomationSuppression,
-    AutomationTrigger,
     EmailBounceEvent,
     SuppressionReason,
 )
@@ -56,7 +53,6 @@ from src.app.core.email.bounce_handler import (
     verify_mailgun_signature,
 )
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -69,10 +65,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -164,7 +157,7 @@ def test_mailgun_signature_valid():
     token = "abc"
     expected = hmac.new(
         signing_key.encode("utf-8"),
-        f"{timestamp}{token}".encode("utf-8"),
+        f"{timestamp}{token}".encode(),
         hashlib.sha256,
     ).hexdigest()
     payload = {
@@ -185,9 +178,7 @@ def test_mailgun_signature_forged_rejected():
             "signature": "deadbeef",
         }
     }
-    assert (
-        verify_mailgun_signature(payload, signing_key="supersecret") is False
-    )
+    assert verify_mailgun_signature(payload, signing_key="supersecret") is False
 
 
 # ---------------------------------------------------------------------------
@@ -205,19 +196,19 @@ async def test_hard_bounce_writes_suppression(test_db, org_id):
             raw_payload={},
         )
     ]
-    summary = await persist_bounce_events(
-        test_db, org_id=org_id, events=events
-    )
+    summary = await persist_bounce_events(test_db, org_id=org_id, events=events)
     assert summary["recorded"] == 1
     assert summary["suppressed"] == 1
 
     rows = (
-        await test_db.execute(
-            select(AutomationSuppression).where(
-                AutomationSuppression.org_id == org_id
+        (
+            await test_db.execute(
+                select(AutomationSuppression).where(AutomationSuppression.org_id == org_id)
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
     assert rows[0].address == "asha@x.com"
     assert rows[0].reason == SuppressionReason.hard_bounce
@@ -233,26 +224,24 @@ async def test_soft_bounce_does_not_suppress(test_db, org_id):
             raw_payload={},
         )
     ]
-    summary = await persist_bounce_events(
-        test_db, org_id=org_id, events=events
-    )
+    summary = await persist_bounce_events(test_db, org_id=org_id, events=events)
     assert summary["suppressed"] == 0
 
     rows = (
-        await test_db.execute(
-            select(AutomationSuppression).where(
-                AutomationSuppression.org_id == org_id
+        (
+            await test_db.execute(
+                select(AutomationSuppression).where(AutomationSuppression.org_id == org_id)
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(rows) == 0
     bounces = (
-        await test_db.execute(
-            select(EmailBounceEvent).where(
-                EmailBounceEvent.org_id == org_id
-            )
-        )
-    ).scalars().all()
+        (await test_db.execute(select(EmailBounceEvent).where(EmailBounceEvent.org_id == org_id)))
+        .scalars()
+        .all()
+    )
     assert len(bounces) == 1
 
 
@@ -266,12 +255,8 @@ async def test_duplicate_provider_event_id_skipped(test_db, org_id):
             raw_payload={},
         )
     ]
-    first = await persist_bounce_events(
-        test_db, org_id=org_id, events=events
-    )
-    second = await persist_bounce_events(
-        test_db, org_id=org_id, events=events
-    )
+    first = await persist_bounce_events(test_db, org_id=org_id, events=events)
+    second = await persist_bounce_events(test_db, org_id=org_id, events=events)
     assert first["recorded"] == 1
     assert second["skipped_dupes"] == 1
     assert second["recorded"] == 0
@@ -379,9 +364,7 @@ def test_inject_tracking_pixel_appends_image_tag():
 
 def test_inject_tracking_rewrites_anchor_hrefs():
     run_id = uuid.uuid4()
-    html = (
-        '<html><body><a href="https://example.com/p?q=1">x</a></body></html>'
-    )
+    html = '<html><body><a href="https://example.com/p?q=1">x</a></body></html>'
     rewritten = inject_tracking_pixel_and_links(
         run_id=run_id,
         html_body=html,

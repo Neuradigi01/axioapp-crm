@@ -55,13 +55,15 @@ Clock-skew note:
   precision is ever required, swap the Celery enqueue for a tight
   asyncio.sleep + same-worker continuation (much higher ops cost).
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,6 +71,8 @@ from src.app.core.workflows import data_access as _da
 from src.app.core.workflows.actions import (
     ActionNotRegistered,
     is_registered,
+)
+from src.app.core.workflows.actions import (
     resolve as resolve_action,
 )
 from src.app.core.workflows.models import (
@@ -80,7 +84,6 @@ from src.app.core.workflows.models import (
     WorkflowStepRun,
     WorkflowStepRunStatus,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +105,7 @@ _WAIT_TYPES = frozenset(
 )
 # Wait-for-event variants — handler self-parks; engine should NOT
 # advance past them automatically.
-_WAIT_FOR_EVENT_TYPES = frozenset(
-    {"flow.wait_for_event", "flow_control.wait_for_event"}
-)
+_WAIT_FOR_EVENT_TYPES = frozenset({"flow.wait_for_event", "flow_control.wait_for_event"})
 
 # Status set that means "engine should not advance this run further".
 _TERMINAL_STATUSES = frozenset(
@@ -190,7 +191,7 @@ async def start_run(
     trigger_event_id: str | None,
     trigger_payload: dict[str, Any] | None = None,
     dry_run: bool = False,
-) -> "WorkflowRun | DryRunResult":
+) -> WorkflowRun | DryRunResult:
     """Enrol a contact into a workflow. Inserts the run row pointed
     at the trigger node + enqueues the first :func:`process_step`
     Celery dispatch.
@@ -205,17 +206,13 @@ async def start_run(
         None,
     )
     if trigger_node is None:
-        raise ValueError(
-            f"workflow {workflow.id} has no trigger node — refusing to start"
-        )
+        raise ValueError(f"workflow {workflow.id} has no trigger node — refusing to start")
 
     if dry_run:
         # Test-fire path: walk the graph in memory + return a synthetic
         # trace. No rows are written; no adapter calls run. The frontend
         # uses this to preview what a real fire would do.
-        return _dry_walk(
-            workflow=workflow, start_node_id=trigger_node["id"]
-        )
+        return _dry_walk(workflow=workflow, start_node_id=trigger_node["id"])
 
     run = WorkflowRun(
         org_id=workflow.org_id,
@@ -234,8 +231,7 @@ async def start_run(
 
     _schedule_process_step(run.id)
     logger.info(
-        "workflows.engine.start_run org=%s workflow=%s run=%s contact=%s "
-        "trigger_node=%s",
+        "workflows.engine.start_run org=%s workflow=%s run=%s contact=%s trigger_node=%s",
         workflow.org_id,
         workflow.id,
         run.id,
@@ -290,15 +286,11 @@ async def process_step(run_id: uuid.UUID) -> dict[str, Any]:
             reset_context(token)
 
 
-async def _execute_current_node(
-    session: AsyncSession, run: WorkflowRun
-) -> dict[str, Any]:
+async def _execute_current_node(session: AsyncSession, run: WorkflowRun) -> dict[str, Any]:
     """Hot path. Loads the workflow, picks the current node, runs
     the action handler, persists the step_run + run outcome, then
     either parks (wait) / terminates / advances."""
-    workflow = await _da.get_workflow(
-        session, org_id=run.org_id, workflow_id=run.workflow_id
-    )
+    workflow = await _da.get_workflow(session, org_id=run.org_id, workflow_id=run.workflow_id)
     if workflow is None:
         _mark_run_errored(run, error="workflow not found")
         await session.commit()
@@ -310,7 +302,7 @@ async def _execute_current_node(
         run.status = WorkflowRunStatus.canceled
         run.outcome = WorkflowRunOutcome.canceled
         run.current_node_id = None
-        run.completed_at = datetime.now(timezone.utc)
+        run.completed_at = datetime.now(UTC)
         await session.commit()
         return {"status": "canceled", "reason": "workflow_archived"}
 
@@ -351,13 +343,9 @@ async def _execute_current_node(
             context=context,
         )
     except ActionNotRegistered as exc:
-        return await _finalize_step_error(
-            session, run=run, step_run=step_run, error=str(exc)
-        )
+        return await _finalize_step_error(session, run=run, step_run=step_run, error=str(exc))
     except Exception as exc:
-        return await _finalize_step_error(
-            session, run=run, step_run=step_run, error=str(exc)
-        )
+        return await _finalize_step_error(session, run=run, step_run=step_run, error=str(exc))
 
     # Persist step outcome.
     if result.skip_reason:
@@ -366,7 +354,7 @@ async def _execute_current_node(
     else:
         step_run.status = WorkflowStepRunStatus.completed
     step_run.output_edge_label = result.next_edge_label
-    step_run.completed_at = datetime.now(timezone.utc)
+    step_run.completed_at = datetime.now(UTC)
 
     # Merge handler output into run.state for downstream variable
     # resolution.
@@ -405,7 +393,7 @@ async def _finalize_step_error(
     the run."""
     step_run.status = WorkflowStepRunStatus.errored
     step_run.error = error
-    step_run.completed_at = datetime.now(timezone.utc)
+    step_run.completed_at = datetime.now(UTC)
     _mark_run_errored(run, error=error)
     await session.commit()
     logger.warning(
@@ -421,7 +409,7 @@ def _mark_run_errored(run: WorkflowRun, *, error: str) -> None:
     run.status = WorkflowRunStatus.errored
     run.outcome = WorkflowRunOutcome.errored
     run.error = error
-    run.completed_at = datetime.now(timezone.utc)
+    run.completed_at = datetime.now(UTC)
 
 
 def _resolve_handler_for_node(node: dict[str, Any]) -> ActionHandler:
@@ -443,9 +431,7 @@ def _resolve_handler_for_node(node: dict[str, Any]) -> ActionHandler:
     return resolve_action(node_type)
 
 
-async def _build_handler_context(
-    session: AsyncSession, run: WorkflowRun
-) -> dict[str, Any]:
+async def _build_handler_context(session: AsyncSession, run: WorkflowRun) -> dict[str, Any]:
     """Context dict passed to every action handler. Steps 7-11 read
     ``contact`` / ``trigger_payload`` / ``run_state`` from here to
     render variables."""
@@ -456,9 +442,7 @@ async def _build_handler_context(
         from src.app.core.contacts.models import Contact
 
         contact = (
-            await session.execute(
-                _select(Contact).where(Contact.id == run.contact_id)
-            )
+            await session.execute(_select(Contact).where(Contact.id == run.contact_id))
         ).scalar_one_or_none()
         if contact is not None:
             contact_dict = {
@@ -508,9 +492,7 @@ async def _advance(
     Celery enqueue from here for the wait path.
     """
     edges = (workflow.graph or {}).get("edges") or []
-    outbound = [
-        e for e in edges if e.get("source") == run.current_node_id
-    ]
+    outbound = [e for e in edges if e.get("source") == run.current_node_id]
 
     next_node_id: str | None = None
     if output_edge_label is not None:
@@ -522,17 +504,10 @@ async def _advance(
 
     if next_node_id is None or next_node_id not in nodes_by_id:
         # Terminal — workflow ends here.
-        is_goal = (
-            workflow.goal_node_id is not None
-            and workflow.goal_node_id == run.current_node_id
-        )
+        is_goal = workflow.goal_node_id is not None and workflow.goal_node_id == run.current_node_id
         run.status = WorkflowRunStatus.completed
-        run.outcome = (
-            WorkflowRunOutcome.goal_reached
-            if is_goal
-            else WorkflowRunOutcome.completed
-        )
-        run.completed_at = datetime.now(timezone.utc)
+        run.outcome = WorkflowRunOutcome.goal_reached if is_goal else WorkflowRunOutcome.completed
+        run.completed_at = datetime.now(UTC)
         run.current_node_id = None
         run.next_step_at = None
         await session.commit()
@@ -545,9 +520,7 @@ async def _advance(
     if next_type in _WAIT_TYPES:
         delay_seconds = _extract_wait_seconds(next_node)
         run.current_node_id = next_node_id
-        run.next_step_at = datetime.now(timezone.utc) + timedelta(
-            seconds=delay_seconds
-        )
+        run.next_step_at = datetime.now(UTC) + timedelta(seconds=delay_seconds)
         run.status = WorkflowRunStatus.pending
         await session.commit()
         return
@@ -658,10 +631,7 @@ def _dry_walk(
         )
 
         if next_node_id is None:
-            is_goal = (
-                workflow.goal_node_id is not None
-                and workflow.goal_node_id == current
-            )
+            is_goal = workflow.goal_node_id is not None and workflow.goal_node_id == current
             return DryRunResult(
                 workflow_id=workflow.id,
                 steps=steps,
@@ -694,13 +664,11 @@ async def resume_after_wait(now: datetime | None = None) -> dict[str, int]:
     """
     from src.app.shared.db import async_session
 
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     dispatched = 0
 
     async with async_session() as session:
-        rows = await _da.list_runs_due_for_resume(
-            session, now=now, limit=200
-        )
+        rows = await _da.list_runs_due_for_resume(session, now=now, limit=200)
         for run in rows:
             _schedule_process_step(run.id)
             dispatched += 1
@@ -778,8 +746,7 @@ async def resume_run(
             return {"status": "skipped_or_locked"}
         if run.status in _TERMINAL_STATUSES:
             logger.info(
-                "workflows.engine.resume_run already_terminal run=%s "
-                "status=%s",
+                "workflows.engine.resume_run already_terminal run=%s status=%s",
                 run.id,
                 run.status.value,
             )
@@ -808,9 +775,7 @@ async def resume_run(
             # Validate the edge label exists out of the wait node.
             edges = (workflow.graph or {}).get("edges") or []
             outbound_labels = {
-                e.get("label")
-                for e in edges
-                if e.get("source") == current_id and e.get("label")
+                e.get("label") for e in edges if e.get("source") == current_id and e.get("label")
             }
             if output_edge_label not in outbound_labels:
                 _mark_run_errored(
@@ -835,7 +800,7 @@ async def resume_run(
                 status=WorkflowStepRunStatus.completed,
                 payload=wait_node.get("config") or {},
                 output_edge_label=output_edge_label,
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
             _da.insert_step_run(session, step_run)
 

@@ -1,5 +1,6 @@
-from sqlalchemy import select, func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.models.contact_us import ContactUs
 
 
@@ -35,10 +36,7 @@ async def get_contacts_paginated(
     total = (await db.execute(count_stmt)).scalar()
 
     items_stmt = (
-        base
-        .order_by(ContactUs.created_at.desc())
-        .offset(page_index * page_size)
-        .limit(page_size)
+        base.order_by(ContactUs.created_at.desc()).offset(page_index * page_size).limit(page_size)
     )
     items = list((await db.execute(items_stmt)).scalars().all())
 

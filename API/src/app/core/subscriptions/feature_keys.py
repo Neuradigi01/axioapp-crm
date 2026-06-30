@@ -21,8 +21,8 @@ check in ``tests/test_subscriptions_feature_keys.py``:
 Either direction failing is a developer bug — fix the YAML, the registry
 set, and this module together.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 # ----- Core CRM read/write surfaces (granted on every plan, trial+) --------
 FEATURE_CONTACTS_READ: str = "contacts.read"

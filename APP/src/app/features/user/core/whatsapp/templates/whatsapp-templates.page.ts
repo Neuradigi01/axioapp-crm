@@ -40,10 +40,7 @@ import { TemplateWizardComponent } from './template-wizard.component';
 
 type WizardMode = 'create' | 'edit' | null;
 
-const STATUS_BADGE: Record<
-  WhatsAppTemplateSubmissionStatus,
-  { label: string; classes: string }
-> = {
+const STATUS_BADGE: Record<WhatsAppTemplateSubmissionStatus, { label: string; classes: string }> = {
   draft: {
     label: 'Draft',
     classes: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
@@ -81,7 +78,6 @@ const FILTER_TABS: Array<{
   { key: 'rejected', label: 'Rejected' },
 ];
 
-
 @Component({
   selector: 'app-whatsapp-templates-page',
   standalone: true,
@@ -109,8 +105,7 @@ export class WhatsAppTemplatesPageComponent {
   protected readonly loadError = signal<string | null>(null);
   protected readonly toast = signal<string | null>(null);
 
-  protected readonly activeFilter =
-    signal<WhatsAppTemplateSubmissionStatus | 'all'>('all');
+  protected readonly activeFilter = signal<WhatsAppTemplateSubmissionStatus | 'all'>('all');
   protected readonly searchQuery = signal<string>('');
 
   protected readonly wizardMode = signal<WizardMode>(null);
@@ -120,15 +115,12 @@ export class WhatsAppTemplatesPageComponent {
 
   /** Step 10: when set, render the per-template performance card
    *  instead of the list / wizard. Click "Back to list" clears it. */
-  protected readonly viewingPerformance =
-    signal<WhatsAppTemplateRead | null>(null);
+  protected readonly viewingPerformance = signal<WhatsAppTemplateRead | null>(null);
 
   /** Per-row spinner state for submit / duplicate / delete. */
   protected readonly busyRowId = signal<string | null>(null);
 
-  protected readonly canWrite = computed(() =>
-    this.auth.hasPermission('whatsapp.templates.write'),
-  );
+  protected readonly canWrite = computed(() => this.auth.hasPermission('whatsapp.templates.write'));
   protected readonly canSubmit = computed(() =>
     this.auth.hasPermission('whatsapp.templates.submit'),
   );
@@ -163,16 +155,12 @@ export class WhatsAppTemplatesPageComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load templates.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load templates.');
         },
       });
   }
 
-  protected setFilter(
-    filter: WhatsAppTemplateSubmissionStatus | 'all',
-  ): void {
+  protected setFilter(filter: WhatsAppTemplateSubmissionStatus | 'all'): void {
     this.activeFilter.set(filter);
   }
 
@@ -205,7 +193,7 @@ export class WhatsAppTemplatesPageComponent {
     if (!this.canWrite()) return;
     if (row.submission_status !== 'draft' && row.submission_status !== 'rejected') {
       this.toast.set(
-        'Approved and pending templates can\'t be edited. Use Duplicate to clone instead.',
+        "Approved and pending templates can't be edited. Use Duplicate to clone instead.",
       );
       return;
     }
@@ -225,29 +213,21 @@ export class WhatsAppTemplatesPageComponent {
     this.wizardSubmitting.set(true);
     this.wizardError.set(null);
     const editing = this.editingTemplate();
-    const request$ = editing
-      ? this.api.update(editing.id, payload)
-      : this.api.create(payload);
-    request$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (row) => {
-          this.wizardSubmitting.set(false);
-          this.upsertRow(row);
-          this.toast.set(
-            editing
-              ? 'Template saved.'
-              : 'Draft saved. Submit it to send to Meta for approval.',
-          );
-          this.closeWizard();
-        },
-        error: (err: HttpErrorResponse) => {
-          this.wizardSubmitting.set(false);
-          this.wizardError.set(
-            extractApiError(err) ?? 'Could not save the template.',
-          );
-        },
-      });
+    const request$ = editing ? this.api.update(editing.id, payload) : this.api.create(payload);
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (row) => {
+        this.wizardSubmitting.set(false);
+        this.upsertRow(row);
+        this.toast.set(
+          editing ? 'Template saved.' : 'Draft saved. Submit it to send to Meta for approval.',
+        );
+        this.closeWizard();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.wizardSubmitting.set(false);
+        this.wizardError.set(extractApiError(err) ?? 'Could not save the template.');
+      },
+    });
   }
 
   // --- row actions ------------------------------------------------
@@ -273,15 +253,11 @@ export class WhatsAppTemplatesPageComponent {
                 : r,
             ),
           );
-          this.toast.set(
-            'Template submitted — Meta review usually takes 30 min to 24 hr.',
-          );
+          this.toast.set('Template submitted — Meta review usually takes 30 min to 24 hr.');
         },
         error: (err: HttpErrorResponse) => {
           this.busyRowId.set(null);
-          this.toast.set(
-            extractApiError(err) ?? 'Could not submit the template.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not submit the template.');
         },
       });
   }
@@ -300,19 +276,16 @@ export class WhatsAppTemplatesPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.busyRowId.set(null);
-          this.toast.set(
-            extractApiError(err) ?? 'Could not duplicate the template.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not duplicate the template.');
         },
       });
   }
 
   protected confirmDelete(row: WhatsAppTemplateRead): void {
     if (!this.canWrite()) return;
-    const message =
-      row.meta_template_id
-        ? `Delete template "${row.name}"? It will also be removed from Meta.`
-        : `Delete draft "${row.name}"?`;
+    const message = row.meta_template_id
+      ? `Delete template "${row.name}"? It will also be removed from Meta.`
+      : `Delete draft "${row.name}"?`;
     if (!confirm(message)) return;
     this.busyRowId.set(row.id);
     this.api
@@ -326,9 +299,7 @@ export class WhatsAppTemplatesPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.busyRowId.set(null);
-          this.toast.set(
-            extractApiError(err) ?? 'Could not delete the template.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not delete the template.');
         },
       });
   }

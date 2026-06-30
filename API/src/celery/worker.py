@@ -1,7 +1,7 @@
-from celery import Celery
 from celery.signals import task_prerun, worker_process_init
-from config import COMPOSE_PROJECT_NAME, CELERY_ENABLED
-from . import celery_config as config
+
+from celery import Celery
+from config import CELERY_ENABLED, COMPOSE_PROJECT_NAME
 
 # Eagerly import ORM models that are referenced by ForeignKey strings in
 # other models so SQLAlchemy can resolve them at first metadata use inside
@@ -12,49 +12,53 @@ from . import celery_config as config
 # the DLQ table. Import for side-effects only.
 from src.app.core.tenants import models as _tenants_models  # noqa: F401
 
+from . import celery_config as config
+
 celery = Celery(COMPOSE_PROJECT_NAME)
 celery.config_from_object(config)
-celery.autodiscover_tasks([
-    "src.celery.tasks",
-    "src.app.core.leads.imports.tasks",
-    "src.app.core.integrations.google.tasks",
-    "src.app.core.integrations.meta.tasks",
-    # Step 3.5.14 — campaign chunk sender + scheduled-campaigns beat.
-    "src.app.core.campaigns.tasks",
-    # Pricing-and-Billing Step 5 — usage-counter rollover + daily reset.
-    "src.app.core.subscriptions.tasks",
-    # App-updates Email Step 4 — mailbox sync daemon (backfill,
-    # incremental, renewal, poll fallback, daily counter reset).
-    "src.app.core.email.tasks",
-    # App-updates Email Step 7 — sequence scheduler tick (every 60s).
-    "src.app.core.email_sequences.tasks",
-    # whatsapp-platform-upgrade Step 12 — hourly phone-health refresh.
-    "src.app.core.integrations.whatsapp.health_tasks",
-    # tasks/template-library Step 14 — hourly external-status sync for
-    # WA templates. Without this entry the beat-scheduled task lands
-    # in the worker with `KeyError: 'src.app.core.templates.tasks.
-    # sync_external_status_all'` because autodiscover doesn't reach it.
-    "src.app.core.templates.tasks",
-    # tasks/automation-engine Step 4 — deliver_run task fires once
-    # per queued automation run. The dispatcher .apply_async()'s the
-    # run id; without this entry the worker can't find the task.
-    "src.app.core.automation.tasks",
-    # tasks/automation-engine Step 10 — every-15-min sweep that
-    # publishes appointment.reminder_24h + appointment.reminder_1h
-    # events for upcoming appointments. Without this entry the beat
-    # scheduler can't find the task.
-    "src.app.core.appointments.tasks",
-    # tasks/automation-engine Step 11 — daily overdue-invoice sweep
-    # that publishes invoice.overdue_7d for issued invoices older
-    # than 7 days. Without this entry the beat scheduler can't find
-    # the task.
-    "src.app.core.billing.tasks",
-    # tasks/workflows Step 4 — workflow execution engine. Two tasks:
-    # process_step (re-enqueued per hop) + sweep_waits (60s beat).
-    # Without this entry the engine can't dispatch + parked waits
-    # never resume.
-    "src.app.core.workflows.tasks",
-])
+celery.autodiscover_tasks(
+    [
+        "src.celery.tasks",
+        "src.app.core.leads.imports.tasks",
+        "src.app.core.integrations.google.tasks",
+        "src.app.core.integrations.meta.tasks",
+        # Step 3.5.14 — campaign chunk sender + scheduled-campaigns beat.
+        "src.app.core.campaigns.tasks",
+        # Pricing-and-Billing Step 5 — usage-counter rollover + daily reset.
+        "src.app.core.subscriptions.tasks",
+        # App-updates Email Step 4 — mailbox sync daemon (backfill,
+        # incremental, renewal, poll fallback, daily counter reset).
+        "src.app.core.email.tasks",
+        # App-updates Email Step 7 — sequence scheduler tick (every 60s).
+        "src.app.core.email_sequences.tasks",
+        # whatsapp-platform-upgrade Step 12 — hourly phone-health refresh.
+        "src.app.core.integrations.whatsapp.health_tasks",
+        # tasks/template-library Step 14 — hourly external-status sync for
+        # WA templates. Without this entry the beat-scheduled task lands
+        # in the worker with `KeyError: 'src.app.core.templates.tasks.
+        # sync_external_status_all'` because autodiscover doesn't reach it.
+        "src.app.core.templates.tasks",
+        # tasks/automation-engine Step 4 — deliver_run task fires once
+        # per queued automation run. The dispatcher .apply_async()'s the
+        # run id; without this entry the worker can't find the task.
+        "src.app.core.automation.tasks",
+        # tasks/automation-engine Step 10 — every-15-min sweep that
+        # publishes appointment.reminder_24h + appointment.reminder_1h
+        # events for upcoming appointments. Without this entry the beat
+        # scheduler can't find the task.
+        "src.app.core.appointments.tasks",
+        # tasks/automation-engine Step 11 — daily overdue-invoice sweep
+        # that publishes invoice.overdue_7d for issued invoices older
+        # than 7 days. Without this entry the beat scheduler can't find
+        # the task.
+        "src.app.core.billing.tasks",
+        # tasks/workflows Step 4 — workflow execution engine. Two tasks:
+        # process_step (re-enqueued per hop) + sweep_waits (60s beat).
+        # Without this entry the engine can't dispatch + parked waits
+        # never resume.
+        "src.app.core.workflows.tasks",
+    ]
+)
 
 if not CELERY_ENABLED:
     celery.conf.task_always_eager = True

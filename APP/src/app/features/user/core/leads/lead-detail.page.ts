@@ -24,15 +24,13 @@ import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
 import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
 import { FieldDef } from '../shared/dynamic-form/types';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
-import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
+import {
+  ReassignConfirm,
+  ReassignModalComponent,
+} from '../shared/reassign-modal/reassign-modal.component';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { Contact, ContactsApiService } from '../contacts/contacts-api.service';
-import {
-  Lead,
-  LeadCreate,
-  LeadUpdate,
-  LeadsApiService,
-} from './leads-api.service';
+import { Lead, LeadCreate, LeadUpdate, LeadsApiService } from './leads-api.service';
 import { LeadFormModalComponent } from './lead-form-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
@@ -97,9 +95,7 @@ export class LeadDetailPageComponent implements OnInit {
   readonly deleteSubmitting = signal(false);
   readonly deleteError = signal<string | null>(null);
 
-  readonly canReassign = computed(() =>
-    this.auth.hasPermission('leads.reassign'),
-  );
+  readonly canReassign = computed(() => this.auth.hasPermission('leads.reassign'));
 
   readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
 
@@ -162,11 +158,13 @@ export class LeadDetailPageComponent implements OnInit {
 
   readonly stageTone = computed(() => {
     const stage = (this.lead()?.pipeline_stage ?? '').toLowerCase();
-    return STAGE_TONES[stage] ?? {
-      bg: 'bg-zinc-100',
-      text: 'text-zinc-700',
-      ring: 'ring-zinc-200',
-    };
+    return (
+      STAGE_TONES[stage] ?? {
+        bg: 'bg-zinc-100',
+        text: 'text-zinc-700',
+        ring: 'ring-zinc-200',
+      }
+    );
   });
 
   readonly headerTitle = computed(() => {

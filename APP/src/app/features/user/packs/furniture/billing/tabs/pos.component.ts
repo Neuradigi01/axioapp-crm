@@ -13,7 +13,6 @@ import { LucideAngularModule } from 'lucide-angular';
 import { Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
-import { environment } from '../../../../../../../environments/environment';
 import { CatalogApiService } from '../../../../core/catalog/catalog-api.service';
 import {
   ContactListItem,
@@ -23,15 +22,8 @@ import {
 import { InrPipe } from '../../../../core/shared/pipes/inr.pipe';
 import { extractApiError } from '@core/services/api-error.util';
 import { deriveApiOrigin } from '@core/services/url.util';
-import {
-  InventoryApiService,
-  InventoryItem,
-} from '../../inventory/inventory-api.service';
-import {
-  BillingApiService,
-  PaymentMethod,
-  PosCheckoutResponse,
-} from '../billing-api.service';
+import { InventoryApiService, InventoryItem } from '../../inventory/inventory-api.service';
+import { BillingApiService, PaymentMethod, PosCheckoutResponse } from '../billing-api.service';
 
 /** A line in the live cart â€” keyed by inventory item id. */
 interface CartLine {
@@ -139,9 +131,7 @@ export class PosTabComponent {
 
   protected readonly canCheckout = computed(
     () =>
-      this.cart().length > 0
-      && this.phoneControl.value.trim().length >= 3
-      && !this.submitting(),
+      this.cart().length > 0 && this.phoneControl.value.trim().length >= 3 && !this.submitting(),
   );
 
   /** Total *after* discount but BEFORE tax â€” for the bill summary box. */
@@ -154,24 +144,18 @@ export class PosTabComponent {
    * time. We show this as "estimated GST" so the cashier has a number
    * to read aloud; the printed receipt always carries the authoritative
    * snapshot. */
-  protected readonly taxEstimate = computed(() =>
-    Math.round(this.afterDiscount() * 0.18 * 100) / 100,
+  protected readonly taxEstimate = computed(
+    () => Math.round(this.afterDiscount() * 0.18 * 100) / 100,
   );
 
-  protected readonly grandEstimate = computed(
-    () => this.afterDiscount() + this.taxEstimate(),
-  );
+  protected readonly grandEstimate = computed(() => this.afterDiscount() + this.taxEstimate());
 
   constructor() {
     this.reloadItems('');
     this.loadCatalogPrices();
 
     this.searchControl.valueChanges
-      .pipe(
-        debounceTime(200),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef),
-      )
+      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe((q) => this.reloadItems(q.trim()));
 
     // Auto-fill name when the user types a phone that matches a contact.
@@ -182,9 +166,7 @@ export class PosTabComponent {
         switchMap((q): typeof emptyResp$ => {
           if (q.length < 3) return emptyResp$;
           this.lookupBusy.set(true);
-          return this.contactsApi
-            .list({ q, size: 5 })
-            .pipe(catchError(() => emptyResp$));
+          return this.contactsApi.list({ q, size: 5 }).pipe(catchError(() => emptyResp$));
         }),
         takeUntilDestroyed(this.destroyRef),
       )
@@ -214,11 +196,7 @@ export class PosTabComponent {
         next: (resp) => {
           // Only sellable rows: positive stock + linked to catalog (POS
           // needs the catalog_item_id to drive inventory dispatch).
-          this.items.set(
-            resp.items.filter(
-              (i) => i.qty_on_hand > 0 && i.catalog_item_id !== null,
-            ),
-          );
+          this.items.set(resp.items.filter((i) => i.qty_on_hand > 0 && i.catalog_item_id !== null));
           this.loadingItems.set(false);
         },
         error: () => {
@@ -256,10 +234,7 @@ export class PosTabComponent {
           l.inv_id === invId
             ? {
                 ...l,
-                qty: Math.max(
-                  1,
-                  Math.min(l.qty + delta, l.qty_on_hand),
-                ),
+                qty: Math.max(1, Math.min(l.qty + delta, l.qty_on_hand)),
               }
             : l,
         )
@@ -313,9 +288,7 @@ export class PosTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.submitError.set(
-            extractApiError(err) ?? 'Checkout failed.',
-          );
+          this.submitError.set(extractApiError(err) ?? 'Checkout failed.');
         },
       });
   }
@@ -371,6 +344,4 @@ export class PosTabComponent {
         error: () => this.catalogPricesById.set({}),
       });
   }
-
-
 }

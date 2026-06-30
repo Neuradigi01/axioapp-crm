@@ -8,6 +8,7 @@ Asserts the single-call POS flow does everything in one transaction:
   - inventory decremented for catalog-linked lines
   - PDF endpoint returns binary PDF content
 """
+
 from __future__ import annotations
 
 import uuid
@@ -40,9 +41,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -68,9 +67,7 @@ async def _seed_org(org_id: uuid.UUID) -> dict[str, uuid.UUID]:
             settings.gst_number = "29ABCDE1234F1Z5"
             settings.tax_rate = Decimal("18.00")
 
-            warehouse = Warehouse(
-                org_id=org_id, name="Main", is_default=True
-            )
+            warehouse = Warehouse(org_id=org_id, name="Main", is_default=True)
             session.add(warehouse)
             await session.flush()
 
@@ -167,9 +164,7 @@ async def test_pos_checkout_happy_path(layered_client, seeded_admin):
         async with TestSession() as session:
             inv_row = (
                 await session.execute(
-                    select(InventoryItem).where(
-                        InventoryItem.id == ids["inventory_id"]
-                    )
+                    select(InventoryItem).where(InventoryItem.id == ids["inventory_id"])
                 )
             ).scalar_one()
             assert inv_row.qty_on_hand == 7
@@ -289,9 +284,7 @@ async def test_pos_pdf_endpoint_returns_pdf(layered_client, seeded_admin):
     )
     inv_id = checkout.json()["invoice"]["id"]
 
-    pdf = await layered_client.get(
-        f"/api/v1/invoices/{inv_id}/pdf", headers=headers
-    )
+    pdf = await layered_client.get(f"/api/v1/invoices/{inv_id}/pdf", headers=headers)
     assert pdf.status_code == 200
     assert pdf.headers["content-type"].startswith("application/pdf")
     # PDF files start with the %PDF magic bytes

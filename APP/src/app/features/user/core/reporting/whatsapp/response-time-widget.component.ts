@@ -210,9 +210,7 @@ export class ResponseTimeWidgetComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not load response times.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load response times.');
         },
       });
   }

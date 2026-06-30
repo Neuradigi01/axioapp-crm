@@ -9,6 +9,7 @@ Four cases:
   3. `GET /contacts/check-duplicate?email=...` matches case-insensitive.
   4. `?exclude_id=` skips the row currently being edited.
 """
+
 from __future__ import annotations
 
 import csv
@@ -35,9 +36,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -77,9 +76,7 @@ async def _make_contact(
 
 
 @pytest.mark.asyncio
-async def test_csv_export_returns_streamed_csv_with_header_and_row(
-    layered_client, seeded_admin
-):
+async def test_csv_export_returns_streamed_csv_with_header_and_row(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "contacts.read", "contacts.write")
@@ -98,9 +95,7 @@ async def test_csv_export_returns_streamed_csv_with_header_and_row(
         email="export@example.com",
     )
 
-    resp = await layered_client.get(
-        "/api/v1/contacts/export.csv", headers=headers
-    )
+    resp = await layered_client.get("/api/v1/contacts/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"].startswith("text/csv")
     cd = resp.headers["content-disposition"]
@@ -124,9 +119,7 @@ async def test_csv_export_returns_streamed_csv_with_header_and_row(
 
 
 @pytest.mark.asyncio
-async def test_dup_check_phone_suffix_matches_e164_variants(
-    layered_client, seeded_admin
-):
+async def test_dup_check_phone_suffix_matches_e164_variants(layered_client, seeded_admin):
     """Saved phone '+91 9000000001' matches incoming query '9000000001'."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -139,9 +132,7 @@ async def test_dup_check_phone_suffix_matches_e164_variants(
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    cid = await _make_contact(
-        org.id, full_name="Asha", phone="+91 9000000001"
-    )
+    cid = await _make_contact(org.id, full_name="Asha", phone="+91 9000000001")
 
     resp = await layered_client.get(
         "/api/v1/contacts/check-duplicate?phone=9000000001", headers=headers
@@ -154,9 +145,7 @@ async def test_dup_check_phone_suffix_matches_e164_variants(
 
 
 @pytest.mark.asyncio
-async def test_dup_check_email_is_case_insensitive(
-    layered_client, seeded_admin
-):
+async def test_dup_check_email_is_case_insensitive(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "contacts.read", "contacts.write")
@@ -168,9 +157,7 @@ async def test_dup_check_email_is_case_insensitive(
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    cid = await _make_contact(
-        org.id, full_name="Rahul", email="rahul@example.com"
-    )
+    cid = await _make_contact(org.id, full_name="Rahul", email="rahul@example.com")
 
     resp = await layered_client.get(
         "/api/v1/contacts/check-duplicate?email=RAHUL%40Example.com",
@@ -183,9 +170,7 @@ async def test_dup_check_email_is_case_insensitive(
 
 
 @pytest.mark.asyncio
-async def test_dup_check_exclude_id_skips_self(
-    layered_client, seeded_admin
-):
+async def test_dup_check_exclude_id_skips_self(layered_client, seeded_admin):
     """Edit modal passes its own id so the row doesn't match itself."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -198,9 +183,7 @@ async def test_dup_check_exclude_id_skips_self(
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    cid = await _make_contact(
-        org.id, full_name="Self", phone="9000000077"
-    )
+    cid = await _make_contact(org.id, full_name="Self", phone="9000000077")
 
     resp = await layered_client.get(
         f"/api/v1/contacts/check-duplicate?phone=9000000077&exclude_id={cid}",

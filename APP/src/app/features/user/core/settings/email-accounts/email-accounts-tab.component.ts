@@ -42,15 +42,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  EmailAccount,
-  EmailAccountsApiService,
-} from '../../services/email-accounts-api.service';
+import { EmailAccount, EmailAccountsApiService } from '../../services/email-accounts-api.service';
 import { ConnectAccountCardComponent } from './connect-account-card.component';
 import { DisconnectConfirmDialogComponent } from './disconnect-confirm-dialog.component';
 import { DomainStatusComponent } from './domain-status.component';
 import { SuppressionListComponent } from './suppression-list.component';
-
 
 /** Hard cap matches the backend `DEFAULT_HARD_CAP` constant in
  *  `core/email/gmail/send.py` + `core/email/microsoft/send.py`.
@@ -63,11 +59,7 @@ const DAILY_SOFT_CAP = 200;
 
 const REFRESH_MS = 30_000;
 
-const TRANSIENT_STATES = new Set<EmailAccount['sync_state']>([
-  'pending',
-  'backfilling',
-]);
-
+const TRANSIENT_STATES = new Set<EmailAccount['sync_state']>(['pending', 'backfilling']);
 
 @Component({
   selector: 'app-email-accounts-tab',
@@ -111,9 +103,7 @@ export class EmailAccountsTabComponent implements OnInit, OnDestroy {
     return rows.some((r) => TRANSIENT_STATES.has(r.sync_state));
   });
 
-  protected readonly emptyState = computed(
-    () => (this.accounts()?.length ?? 0) === 0,
-  );
+  protected readonly emptyState = computed(() => (this.accounts()?.length ?? 0) === 0);
 
   protected readonly cap = DAILY_HARD_CAP;
   protected readonly softCap = DAILY_SOFT_CAP;
@@ -177,10 +167,7 @@ export class EmailAccountsTabComponent implements OnInit, OnDestroy {
 
   // --- helpers --------------------------------------------------
 
-  protected readonly stateLabel: Record<
-    EmailAccount['sync_state'],
-    string
-  > = {
+  protected readonly stateLabel: Record<EmailAccount['sync_state'], string> = {
     pending: 'Pending',
     backfilling: 'Backfilling',
     live: 'Live',
@@ -188,18 +175,12 @@ export class EmailAccountsTabComponent implements OnInit, OnDestroy {
     disconnected: 'Disconnected',
   };
 
-  protected readonly statePillClasses: Record<
-    EmailAccount['sync_state'],
-    string
-  > = {
-    pending:
-      'bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200',
-    backfilling:
-      'bg-blue-50 text-blue-700 ring-1 ring-blue-200 animate-pulse',
+  protected readonly statePillClasses: Record<EmailAccount['sync_state'], string> = {
+    pending: 'bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200',
+    backfilling: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 animate-pulse',
     live: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
     error: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
-    disconnected:
-      'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200',
+    disconnected: 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200',
   };
 
   sentCountTone(row: EmailAccount): string {
@@ -271,8 +252,7 @@ export class EmailAccountsTabComponent implements OnInit, OnDestroy {
     } else if (status === 'gmail_denied' || status === 'microsoft_denied') {
       this.toast.set({
         tone: 'error',
-        message:
-          'OAuth consent was declined. The mailbox is not connected.',
+        message: 'OAuth consent was declined. The mailbox is not connected.',
       });
     } else if (status.endsWith('_error') || status === 'error') {
       this.toast.set({

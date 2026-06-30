@@ -9,16 +9,15 @@
     <span class="sr-only">Loading form fields…</span>
   </div>
 } @else if (fields().length === 0) {
-  <p class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
+  <p
+    class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+  >
     No fields defined.
   </p>
 } @else {
   <form [formGroup]="form()" class="space-y-4" novalidate>
     @for (def of fields(); track def.field_key) {
-      <app-field-renderer
-        [def]="def"
-        [control]="control(def.field_key)"
-      />
+      <app-field-renderer [def]="def" [control]="control(def.field_key)" />
     }
   </form>
 }

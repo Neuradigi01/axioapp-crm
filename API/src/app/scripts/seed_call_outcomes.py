@@ -12,6 +12,7 @@ operator can replay it against a non-seeded DB.
 Usage:
     python -m src.app.scripts.seed_call_outcomes
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -25,7 +26,6 @@ from src.app.core.calls.models import CallOutcome
 from src.app.scripts.seed_demo_org import DEMO_ORG_ID
 from src.app.shared.context import RequestContext, set_context
 from src.app.shared.db import async_session
-
 
 DEFAULT_OUTCOMES: list[dict[str, Any]] = [
     {"key": "connected", "label": "Connected", "color": "#10b981", "display_order": 10},
@@ -76,9 +76,7 @@ async def seed_call_outcomes() -> None:
                     color=row["color"],
                     display_order=row["display_order"],
                 )
-                .on_conflict_do_nothing(
-                    index_elements=["org_id", "key"]
-                )
+                .on_conflict_do_nothing(index_elements=["org_id", "key"])
             )
             await session.execute(stmt)
             inserted += 1

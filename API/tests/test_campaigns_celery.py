@@ -14,9 +14,8 @@ in `test_campaigns_template_dispatch.py`. Here we just lock down:
 The full inline-vs-Celery branch in `service.enqueue` is exercised by
 the existing campaign happy-path tests + the manual smoke.
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from src.app.core.campaigns import tasks
 
@@ -51,15 +50,9 @@ class TestBeatSchedule:
         apart, the beat fires a task that nothing handles."""
         from pathlib import Path
 
-        src = (
-            Path("/app/src/celery/celery_config.py")
-            .read_text(encoding="utf-8")
-        )
+        src = Path("/app/src/celery/celery_config.py").read_text(encoding="utf-8")
         assert "dispatch-scheduled-campaigns" in src
-        assert (
-            "src.app.core.campaigns.tasks.dispatch_scheduled_campaigns"
-            in src
-        )
+        assert "src.app.core.campaigns.tasks.dispatch_scheduled_campaigns" in src
         # 60-second cadence per pre-impl choice (a).
         assert "'schedule': 60.0" in src
 
@@ -68,7 +61,5 @@ class TestBeatSchedule:
         up the @shared_task decorators at boot."""
         from pathlib import Path
 
-        src = (
-            Path("/app/src/celery/worker.py").read_text(encoding="utf-8")
-        )
+        src = Path("/app/src/celery/worker.py").read_text(encoding="utf-8")
         assert "src.app.core.campaigns.tasks" in src

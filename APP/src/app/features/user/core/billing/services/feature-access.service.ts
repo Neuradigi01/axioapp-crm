@@ -10,12 +10,7 @@ import { SubscriptionStateService } from './subscription-state.service';
  *  is a UX concern; the backend's `Entitlements` (Step 3) remains the
  *  source of truth at runtime.
  */
-export const PLAN_TIER_ORDER = [
-  'trial',
-  'basic',
-  'standard',
-  'enterprise',
-] as const;
+export const PLAN_TIER_ORDER = ['trial', 'basic', 'standard', 'enterprise'] as const;
 
 export type PlanCode = (typeof PLAN_TIER_ORDER)[number];
 
@@ -44,8 +39,8 @@ export const FEATURE_REQUIRED_PLAN: Readonly<Record<string, PlanCode>> = {
   'campaigns.email': 'standard',
   'sso.saml': 'enterprise',
   'audit.full_log': 'enterprise',
-  'multi_branch': 'enterprise',
-  'white_label': 'enterprise',
+  multi_branch: 'enterprise',
+  white_label: 'enterprise',
 };
 
 const PLAN_LABELS: Readonly<Record<PlanCode, string>> = {
@@ -82,9 +77,7 @@ export class FeatureAccessService {
   readonly currentPlan = computed<PlanCode | null>(() => {
     const code = this.subscriptionState.current()?.plan.code;
     if (code === undefined) return null;
-    return PLAN_TIER_ORDER.includes(code as PlanCode)
-      ? (code as PlanCode)
-      : null;
+    return PLAN_TIER_ORDER.includes(code as PlanCode) ? (code as PlanCode) : null;
   });
 
   /** True iff the current plan tier is >= the minimum tier that

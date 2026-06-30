@@ -9,6 +9,7 @@ revoked / expired session differently — middleware raises 401, the WS
 upgrade closes with policy-violation, the logout endpoint returns
 204 no-op. The DAL just returns the row.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -42,9 +43,7 @@ async def get_auth_session(
     return result.scalar_one_or_none()
 
 
-def add_auth_session(
-    session: AsyncSession, row: AuthSession
-) -> AuthSession:
+def add_auth_session(session: AsyncSession, row: AuthSession) -> AuthSession:
     """Stage a new `auth_sessions` row in the unit-of-work."""
     session.add(row)
     return row
@@ -83,9 +82,7 @@ async def list_auth_sessions_for_user(
     return list(result.scalars().all())
 
 
-async def get_organization_for_email(
-    session: AsyncSession, email: str
-) -> Organization | None:
+async def get_organization_for_email(session: AsyncSession, email: str) -> Organization | None:
     """Walk email → active membership → org.
 
     Used by the email-only login path: when no `org_slug` is supplied,

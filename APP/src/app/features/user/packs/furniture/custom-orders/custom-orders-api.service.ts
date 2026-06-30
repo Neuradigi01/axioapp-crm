@@ -118,11 +118,7 @@ export class CustomOrdersApiService extends BaseCrudApiService<
     return this.http.get<CustomOrderListResponse>(this.base, { params });
   }
 
-  moveStage(
-    id: string,
-    toStage: string,
-    notes?: string | null,
-  ): Observable<CustomOrder> {
+  moveStage(id: string, toStage: string, notes?: string | null): Observable<CustomOrder> {
     return this.http.post<CustomOrder>(`${this.base}/${id}/move-stage`, {
       to_stage: toStage,
       notes: notes ?? null,
@@ -130,42 +126,25 @@ export class CustomOrdersApiService extends BaseCrudApiService<
   }
 
   listMeasurements(orderId: string): Observable<Measurement[]> {
-    return this.http.get<Measurement[]>(
-      `${this.base}/${orderId}/measurements`,
-    );
+    return this.http.get<Measurement[]>(`${this.base}/${orderId}/measurements`);
   }
 
-  addMeasurement(
-    orderId: string,
-    payload: MeasurementCreate,
-  ): Observable<Measurement> {
-    return this.http.post<Measurement>(
-      `${this.base}/${orderId}/measurements`,
-      payload,
-    );
+  addMeasurement(orderId: string, payload: MeasurementCreate): Observable<Measurement> {
+    return this.http.post<Measurement>(`${this.base}/${orderId}/measurements`, payload);
   }
 
   listPhotos(orderId: string): Observable<OrderPhoto[]> {
     return this.http.get<OrderPhoto[]>(`${this.base}/${orderId}/photos`);
   }
 
-  uploadPhoto(
-    orderId: string,
-    file: File,
-    caption: string | null,
-  ): Observable<OrderPhoto> {
+  uploadPhoto(orderId: string, file: File, caption: string | null): Observable<OrderPhoto> {
     const form = new FormData();
     form.append('file', file, file.name);
     if (caption) form.append('caption', caption);
-    return this.http.post<OrderPhoto>(
-      `${this.base}/${orderId}/photos`,
-      form,
-    );
+    return this.http.post<OrderPhoto>(`${this.base}/${orderId}/photos`, form);
   }
 
   listStageHistory(orderId: string): Observable<StageHistoryEntry[]> {
-    return this.http.get<StageHistoryEntry[]>(
-      `${this.base}/${orderId}/stage-history`,
-    );
+    return this.http.get<StageHistoryEntry[]>(`${this.base}/${orderId}/stage-history`);
   }
 }

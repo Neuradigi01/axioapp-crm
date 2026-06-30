@@ -56,9 +56,7 @@ export class StaffApiService {
 
   /** Per-entity open-record counts for `userId`. Reads `users.read`. */
   getOpenRecordsCounts(userId: string): Observable<OpenRecordsCounts> {
-    return this.http.get<OpenRecordsCounts>(
-      `${this.base}/users/${userId}/open-records-counts`,
-    );
+    return this.http.get<OpenRecordsCounts>(`${this.base}/users/${userId}/open-records-counts`);
   }
 
   /** Atomic bulk-reassign across the named entities (defaults to all

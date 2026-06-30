@@ -20,17 +20,17 @@ Responsibilities:
    primary surface where users look for "what's coming up with this
    customer".
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta
-from typing import Any, Literal, Optional
+from datetime import datetime, timedelta
+from typing import Any, Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import activities, audit
-from src.app.core.users import service as users_service
 from src.app.core.activities.models import ActivityType
 from src.app.core.appointments import data_access as _da
 from src.app.core.appointments.models import Appointment, AppointmentStatus
@@ -40,11 +40,11 @@ from src.app.core.appointments.schemas import (
 )
 from src.app.core.appointments.status_workflow import ALLOWED_TRANSITIONS
 from src.app.core.notifications import service as notifications
+from src.app.core.users import service as users_service
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.context import get_context
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.queries import ensure_found
-
 
 _APPT_ENTITY = "appointment"
 # Statuses that DON'T block a slot — the assignee can have another
@@ -85,9 +85,7 @@ def _snapshot(a: Appointment) -> dict[str, Any]:
 # A failure to deliver never rolls back the appointment write.
 
 
-async def _resolve_contact_name(
-    session: AsyncSession, contact_id: uuid.UUID | None
-) -> str | None:
+async def _resolve_contact_name(session: AsyncSession, contact_id: uuid.UUID | None) -> str | None:
     if contact_id is None:
         return None
     return await _da.get_contact_name(session, contact_id)
@@ -158,9 +156,7 @@ async def _notify_appointment_event(
 # --- in-scope existence helpers ---
 
 
-async def _ensure_contact_in_scope(
-    session: AsyncSession, contact_id: uuid.UUID
-) -> None:
+async def _ensure_contact_in_scope(session: AsyncSession, contact_id: uuid.UUID) -> None:
     if not await _da.contact_exists(session, contact_id):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -168,9 +164,7 @@ async def _ensure_contact_in_scope(
         )
 
 
-async def _ensure_user_in_scope(
-    session: AsyncSession, user_id: uuid.UUID
-) -> None:
+async def _ensure_user_in_scope(session: AsyncSession, user_id: uuid.UUID) -> None:
     user = await users_service.get_user_by_uuid(session, user_id)
     if user is None:
         raise HTTPException(
@@ -188,7 +182,7 @@ async def find_conflicts(
     assigned_to_id: uuid.UUID,
     scheduled_at: datetime,
     duration_min: int,
-    exclude_id: Optional[uuid.UUID] = None,
+    exclude_id: uuid.UUID | None = None,
 ) -> list[uuid.UUID]:
     """Return ids of appointments that overlap the proposed slot for the
     same assignee. Cancelled / no-show appointments don't block.
@@ -230,9 +224,7 @@ def _raise_conflict_409(conflicts: list[uuid.UUID]) -> None:
 # --- CRUD ---
 
 
-async def get_appointment(
-    session: AsyncSession, appointment_id: uuid.UUID
-) -> Optional[Appointment]:
+async def get_appointment(session: AsyncSession, appointment_id: uuid.UUID) -> Appointment | None:
     return await _da.get_appointment_by_id(session, appointment_id)
 
 
@@ -289,10 +281,7 @@ async def create_appointment(
         entity_id=appt.contact_id,
         type=ActivityType.note,
         payload={
-            "text": (
-                f"Appointment scheduled: {appt.title} on "
-                f"{appt.scheduled_at.isoformat()}"
-            ),
+            "text": (f"Appointment scheduled: {appt.title} on {appt.scheduled_at.isoformat()}"),
         },
         user_id=current_user_id,
     )
@@ -315,9 +304,7 @@ async def create_appointment(
     # confirmation message. After-commit so a publish failure can't
     # roll back the appointment write. Handler exceptions are logged
     # + swallowed inside ``events.bus.publish``.
-    await _publish_appointment_booked(
-        session=session, org_id=org_id, appt=appt
-    )
+    await _publish_appointment_booked(session=session, org_id=org_id, appt=appt)
 
     return appt
 
@@ -341,19 +328,14 @@ async def update_appointment(
     if "status" in changes and changes["status"] is not None:
         new_status = changes["status"]
         new_value = (
-            new_status.value
-            if isinstance(new_status, AppointmentStatus)
-            else str(new_status)
+            new_status.value if isinstance(new_status, AppointmentStatus) else str(new_status)
         )
         current = appt.status.value
         allowed = ALLOWED_TRANSITIONS.get(current, frozenset())
         if new_value not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    f"invalid appointment status transition "
-                    f"{current!r} → {new_value!r}"
-                ),
+                detail=(f"invalid appointment status transition {current!r} → {new_value!r}"),
             )
 
     # In-scope checks for any FKs being updated.
@@ -370,9 +352,7 @@ async def update_appointment(
 
     # Conflict re-check if anything time/assignee-relevant changed.
     time_changed = (
-        "scheduled_at" in changes
-        or "duration_min" in changes
-        or "assigned_to_id" in changes
+        "scheduled_at" in changes or "duration_min" in changes or "assigned_to_id" in changes
     )
     if time_changed:
         new_scheduled = changes.get("scheduled_at", appt.scheduled_at)
@@ -413,8 +393,7 @@ async def update_appointment(
             type=ActivityType.note,
             payload={
                 "text": (
-                    f"Appointment rescheduled: {appt.title} → "
-                    f"{appt.scheduled_at.isoformat()}"
+                    f"Appointment rescheduled: {appt.title} → {appt.scheduled_at.isoformat()}"
                 ),
             },
             user_id=current_user_id,
@@ -446,9 +425,7 @@ async def update_appointment(
     return appt
 
 
-async def delete_appointment(
-    session: AsyncSession, *, appointment_id: uuid.UUID
-) -> None:
+async def delete_appointment(session: AsyncSession, *, appointment_id: uuid.UUID) -> None:
     appt = ensure_found(await get_appointment(session, appointment_id), entity="appointment")
     before = _snapshot(appt)
     appt_uuid = appt.id
@@ -466,13 +443,11 @@ async def delete_appointment(
 async def list_appointments(
     session: AsyncSession,
     *,
-    from_dt: Optional[datetime] = None,
-    to_dt: Optional[datetime] = None,
-    assigned_to: Optional[uuid.UUID] = None,
-    status_filter: Optional[AppointmentStatus] = None,
-    sort: Literal[
-        "scheduled_at", "created_at", "last_activity_at"
-    ] = "scheduled_at",
+    from_dt: datetime | None = None,
+    to_dt: datetime | None = None,
+    assigned_to: uuid.UUID | None = None,
+    status_filter: AppointmentStatus | None = None,
+    sort: Literal["scheduled_at", "created_at", "last_activity_at"] = "scheduled_at",
     order: Literal["asc", "desc"] = "asc",
 ) -> list[Appointment]:
     """Calendar / list reading.
@@ -511,9 +486,7 @@ async def _assert_user_in_org(
 
     Same join + check as contacts/leads/walk-ins reassign services —
     keeps the cross-tenant guard uniform across modules."""
-    if not await _da.user_has_active_membership(
-        session, org_id=org_id, user_uuid=user_uuid
-    ):
+    if not await _da.user_has_active_membership(session, org_id=org_id, user_uuid=user_uuid):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="target user is not a member of this organisation",
@@ -654,9 +627,7 @@ async def reassign_appointment(
         entity_type=_APPT_ENTITY,
         entity_id=appt.id,
         type=ActivityType.reassign,
-        payload=_reassign_payload(
-            from_id=before_id, to_id=assigned_to_id, note=note
-        ),
+        payload=_reassign_payload(from_id=before_id, to_id=assigned_to_id, note=note),
         user_id=actor_user_id,
     )
     await session.commit()
@@ -724,9 +695,7 @@ async def bulk_reassign_appointments(
             entity_type=_APPT_ENTITY,
             entity_id=appt.id,
             type=ActivityType.reassign,
-            payload=_reassign_payload(
-                from_id=before_id, to_id=assigned_to_id, note=note
-            ),
+            payload=_reassign_payload(from_id=before_id, to_id=assigned_to_id, note=note),
             user_id=actor_user_id,
         )
         reassigned += 1
@@ -827,14 +796,10 @@ async def _publish_appointment_booked(
         from src.app.core.tenants.models import Organization
 
         contact = (
-            await session.execute(
-                _select(Contact).where(Contact.id == appt.contact_id)
-            )
+            await session.execute(_select(Contact).where(Contact.id == appt.contact_id))
         ).scalar_one_or_none()
         org = (
-            await session.execute(
-                _select(Organization).where(Organization.id == org_id)
-            )
+            await session.execute(_select(Organization).where(Organization.id == org_id))
         ).scalar_one_or_none()
 
         payload: dict[str, Any] = {
@@ -875,8 +840,7 @@ async def _publish_appointment_booked(
         import logging
 
         logging.getLogger(__name__).exception(
-            "appointments.create publish_appointment_booked_failed "
-            "org=%s appt=%s",
+            "appointments.create publish_appointment_booked_failed org=%s appt=%s",
             org_id,
             appt.id,
         )

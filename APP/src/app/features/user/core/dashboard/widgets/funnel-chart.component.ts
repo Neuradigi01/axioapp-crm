@@ -25,10 +25,7 @@ import {
 
 import { environment } from '../../../../../../environments/environment';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  dashboardRange,
-  type DashboardRange,
-} from '../shared/dashboard-range.signal';
+import { dashboardRange, type DashboardRange } from '../shared/dashboard-range.signal';
 
 interface FunnelStageBucket {
   stage_id: string;
@@ -48,14 +45,7 @@ interface DashboardFunnelResponse {
 
 // Zinc ramp from dark → light. Cycles for stages beyond index 5 so the
 // chart stays readable even on pipelines with many stages.
-const FUNNEL_COLORS = [
-  '#18181b',
-  '#27272a',
-  '#3f3f46',
-  '#52525b',
-  '#71717a',
-  '#a1a1aa',
-];
+const FUNNEL_COLORS = ['#18181b', '#27272a', '#3f3f46', '#52525b', '#71717a', '#a1a1aa'];
 
 /**
  * Dashboard funnel widget: ApexCharts horizontal-bar chart styled as a

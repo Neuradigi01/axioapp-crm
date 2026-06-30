@@ -11,6 +11,7 @@ entity:
   4. Cross-tenant target user → 422.
   5. Caller without `leads.reassign` → 403.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -39,9 +40,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -120,9 +119,7 @@ async def _seed_lead(org_id: uuid.UUID, contact_id: uuid.UUID) -> uuid.UUID:
 
 
 @pytest.mark.asyncio
-async def test_reassign_writes_owner_activity_and_bumps_last_activity(
-    layered_client, seeded_admin
-):
+async def test_reassign_writes_owner_activity_and_bumps_last_activity(layered_client, seeded_admin):
     """One endpoint hit covers test cases 1-3 (owner + activity + bump)."""
     from tests.conftest import TestSession
 
@@ -158,20 +155,22 @@ async def test_reassign_writes_owner_activity_and_bumps_last_activity(
     ctx = set_context(RequestContext(org_id=org.id))
     try:
         async with TestSession() as session:
-            row = (
-                await session.execute(select(Lead).where(Lead.id == lead_id))
-            ).scalar_one()
+            row = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one()
             assert row.assigned_to_id == user.legacy_uuid
             assert row.last_activity_at is not None  # bumped by hook
 
             activities = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_type == "lead")
-                    .where(Activity.entity_id == lead_id)
-                    .where(Activity.type == ActivityType.reassign)
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_type == "lead")
+                        .where(Activity.entity_id == lead_id)
+                        .where(Activity.type == ActivityType.reassign)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(activities) == 1
             payload = activities[0].payload
             assert payload["to"] == str(user.legacy_uuid)
@@ -181,9 +180,7 @@ async def test_reassign_writes_owner_activity_and_bumps_last_activity(
 
 
 @pytest.mark.asyncio
-async def test_bulk_reassign_updates_all_and_writes_activities(
-    layered_client, seeded_admin
-):
+async def test_bulk_reassign_updates_all_and_writes_activities(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -222,19 +219,21 @@ async def test_bulk_reassign_updates_all_and_writes_activities(
     try:
         async with TestSession() as session:
             for lid in ids:
-                row = (
-                    await session.execute(select(Lead).where(Lead.id == lid))
-                ).scalar_one()
+                row = (await session.execute(select(Lead).where(Lead.id == lid))).scalar_one()
                 assert row.assigned_to_id == user.legacy_uuid
 
             count = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_type == "lead")
-                    .where(Activity.entity_id.in_(ids))
-                    .where(Activity.type == ActivityType.reassign)
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_type == "lead")
+                        .where(Activity.entity_id.in_(ids))
+                        .where(Activity.type == ActivityType.reassign)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(count) == 3
     finally:
         reset_context(ctx)
@@ -271,19 +270,15 @@ async def test_bulk_delete_removes_rows(layered_client, seeded_admin):
     try:
         async with TestSession() as session:
             remaining = (
-                await session.execute(
-                    select(Lead).where(Lead.id.in_(ids))
-                )
-            ).scalars().all()
+                (await session.execute(select(Lead).where(Lead.id.in_(ids)))).scalars().all()
+            )
             assert remaining == []
     finally:
         reset_context(ctx)
 
 
 @pytest.mark.asyncio
-async def test_reassign_cross_tenant_target_rejected(
-    layered_client, seeded_admin
-):
+async def test_reassign_cross_tenant_target_rejected(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(
@@ -313,9 +308,7 @@ async def test_reassign_cross_tenant_target_rejected(
 
 
 @pytest.mark.asyncio
-async def test_reassign_without_permission_returns_403(
-    layered_client, seeded_admin
-):
+async def test_reassign_without_permission_returns_403(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     # Deliberately omit `leads.reassign`.

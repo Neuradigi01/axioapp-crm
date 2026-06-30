@@ -9,12 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
 /**
  * Push notification sub-form for the central template editor (Step 13).
@@ -45,7 +40,6 @@ export type PushFormGroup = FormGroup<{
   body_text: FormControl<string>;
   action_url: FormControl<string>;
 }>;
-
 
 @Component({
   selector: 'app-push-form',

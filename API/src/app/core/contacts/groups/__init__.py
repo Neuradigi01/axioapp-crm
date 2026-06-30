@@ -14,6 +14,7 @@ discriminator:
 Public re-exports keep the import surface small for callers — the
 campaign audience builder (Step 3.5.9) reaches in via these names.
 """
+
 from src.app.core.contacts.groups.service import (
     create_group,
     delete_group,

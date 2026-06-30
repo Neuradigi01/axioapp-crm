@@ -50,7 +50,6 @@ const DESCRIPTORS: Record<TemplateChannel, ChannelDescriptor> = {
   },
 };
 
-
 @Component({
   selector: 'app-channel-chip',
   standalone: true,
@@ -62,10 +61,12 @@ export class ChannelChipComponent {
   readonly channel = input.required<TemplateChannel>();
 
   protected readonly descriptor = computed<ChannelDescriptor>(() => {
-    return DESCRIPTORS[this.channel()] ?? {
-      label: this.channel(),
-      icon: 'tag',
-      classes: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
-    };
+    return (
+      DESCRIPTORS[this.channel()] ?? {
+        label: this.channel(),
+        icon: 'tag',
+        classes: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+      }
+    );
   });
 }

@@ -1,15 +1,5 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  inject,
-  input,
-} from '@angular/core';
-import {
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
 /**
  * Email sub-form — subject + preview text + plain body.
@@ -24,7 +14,6 @@ export type EmailFormGroup = FormGroup<{
   preview_text: FormControl<string>;
   body_text: FormControl<string>;
 }>;
-
 
 @Component({
   selector: 'app-email-form',

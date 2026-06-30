@@ -8,6 +8,7 @@ Covers:
   - preferences: missing → empty list; PATCH upserts; disabled `in_app`
     causes `notify()` to skip persistence
 """
+
 from __future__ import annotations
 
 import uuid
@@ -16,8 +17,8 @@ import pytest
 
 from src.app.core.notifications import notify
 from src.app.core.notifications.models import NotificationChannel
-from src.app.core.notifications.service import update_preferences
 from src.app.core.notifications.schemas import PreferenceUpdate
+from src.app.core.notifications.service import update_preferences
 from src.app.shared.context import RequestContext, reset_context, set_context
 
 
@@ -61,21 +62,15 @@ async def test_notify_then_list_then_mark_read(layered_client, seeded_admin):
     assert items[0]["read_at"] is None
     assert "lead_id" in items[0]["payload"]
 
-    unread_only = await layered_client.get(
-        "/api/v1/notifications?unread=true", headers=headers
-    )
+    unread_only = await layered_client.get("/api/v1/notifications?unread=true", headers=headers)
     assert unread_only.status_code == 200
     assert len(unread_only.json()) == 1
 
-    patch = await layered_client.patch(
-        f"/api/v1/notifications/{nid}/read", headers=headers
-    )
+    patch = await layered_client.patch(f"/api/v1/notifications/{nid}/read", headers=headers)
     assert patch.status_code == 200
     assert patch.json()["read_at"] is not None
 
-    unread_after = await layered_client.get(
-        "/api/v1/notifications?unread=true", headers=headers
-    )
+    unread_after = await layered_client.get("/api/v1/notifications?unread=true", headers=headers)
     assert unread_after.json() == []
 
 
@@ -99,26 +94,20 @@ async def test_mark_all_read(layered_client, seeded_admin):
             title=f"Task {i} is due",
         )
 
-    resp = await layered_client.post(
-        "/api/v1/notifications/read-all", headers=headers
-    )
+    resp = await layered_client.post("/api/v1/notifications/read-all", headers=headers)
     assert resp.status_code == 200
     assert resp.json()["marked"] == 3
 
-    unread = await layered_client.get(
-        "/api/v1/notifications?unread=true", headers=headers
-    )
+    unread = await layered_client.get("/api/v1/notifications?unread=true", headers=headers)
     assert unread.json() == []
 
 
 @pytest.mark.asyncio
-async def test_other_user_cannot_read_my_notifications(
-    layered_client, seeded_admin
-):
+async def test_other_user_cannot_read_my_notifications(layered_client, seeded_admin):
     """Even if a notification is in the same org, only the recipient sees it."""
-    from tests.conftest import TestSession
     from src.app.core.users.models import User
     from src.app.shared.security.password import hash_password
+    from tests.conftest import TestSession
 
     org = seeded_admin["org"]
     me = seeded_admin["user"]
@@ -162,9 +151,7 @@ async def test_other_user_cannot_read_my_notifications(
 
 
 @pytest.mark.asyncio
-async def test_mark_read_404_for_missing_or_foreign(
-    layered_client, seeded_admin
-):
+async def test_mark_read_404_for_missing_or_foreign(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     token = await _login(
@@ -175,18 +162,13 @@ async def test_mark_read_404_for_missing_or_foreign(
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    resp = await layered_client.patch(
-        f"/api/v1/notifications/{uuid.uuid4()}/read", headers=headers
-    )
+    resp = await layered_client.patch(f"/api/v1/notifications/{uuid.uuid4()}/read", headers=headers)
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_preferences_upsert_then_in_app_disabled_skips(
-    layered_client, seeded_admin
-):
+async def test_preferences_upsert_then_in_app_disabled_skips(layered_client, seeded_admin):
     """Disabling `in_app` for a type causes `notify()` to not persist."""
-    from tests.conftest import TestSession
 
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -199,9 +181,7 @@ async def test_preferences_upsert_then_in_app_disabled_skips(
     headers = {"Authorization": f"Bearer {token}"}
 
     # Initially: no explicit prefs.
-    resp = await layered_client.get(
-        "/api/v1/notification-preferences", headers=headers
-    )
+    resp = await layered_client.get("/api/v1/notification-preferences", headers=headers)
     assert resp.status_code == 200
     assert resp.json() == []
 
@@ -238,9 +218,7 @@ async def test_preferences_upsert_then_in_app_disabled_skips(
 
 
 @pytest.mark.asyncio
-async def test_preferences_patch_rejects_unknown_channel(
-    layered_client, seeded_admin
-):
+async def test_preferences_patch_rejects_unknown_channel(layered_client, seeded_admin):
     """`extra='forbid'` rejects unknown keys (typo guard)."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]

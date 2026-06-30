@@ -12,6 +12,7 @@ Public re-exports keep the service surface small for callers in other
 modules — the campaigns dispatch (Step 3.5.3+) and template sync
 (Step 3.5.4) both go through `connect.get_active_config`.
 """
+
 from src.app.core.integrations.whatsapp.connect import (
     connect_account,
     disconnect_account,

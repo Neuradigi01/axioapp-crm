@@ -14,10 +14,10 @@ the URL — that's the well-known noise floor on email-open metrics.
 No new dependency: stdlib regex is enough since `</body>` is a fixed
 literal we only need to locate, not parse.
 """
+
 from __future__ import annotations
 
 import re
-
 
 _BODY_CLOSE_RE = re.compile(r"</\s*body\s*>", re.IGNORECASE)
 
