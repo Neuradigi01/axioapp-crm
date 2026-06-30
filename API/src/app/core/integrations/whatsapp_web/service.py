@@ -39,6 +39,7 @@ from src.app.core.integrations.whatsapp_web.schemas import (
     WhatsAppWebStatus,
 )
 from src.app.core.integrations.whatsapp_web.sidecar_client import SidecarClient
+from src.app.core.integrations.whatsapp_web.sse_hub import hub as _sse_hub
 from src.app.shared.context import get_context
 
 logger = logging.getLogger(__name__)
@@ -171,6 +172,13 @@ async def connect_session(
     integration.last_error = None
     await db.commit()
     await db.refresh(session_row)
+
+    # Push an immediate "pairing" frame so the SPA's EventSource
+    # (Step 6) shows state before the first sidecar event arrives.
+    _sse_hub.publish(
+        integration.id,
+        {"type": "pairing", "status": "pairing"},
+    )
 
     await audit.log(
         "integrations.whatsapp_web.connect_initiated",

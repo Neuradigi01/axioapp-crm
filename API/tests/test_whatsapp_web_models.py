@@ -93,9 +93,9 @@ class TestSchemas:
 
 
 class TestRouter:
-    def test_router_prefix_and_step5_endpoints_mounted(self) -> None:
-        # Step 5 adds /connect, /disconnect, /status. Step 6 will add
-        # /events + /qr/{id}/stream on the same router.
+    def test_router_prefix_and_endpoints_mounted(self) -> None:
+        # Step 5 added /connect, /disconnect, /status.
+        # Step 6 added /events (HMAC inbound) + /qr-stream (SSE).
         assert ww_router.prefix == "/whatsapp-web"
         paths = sorted(
             getattr(r, "path", "") for r in ww_router.routes
@@ -103,6 +103,8 @@ class TestRouter:
         assert paths == [
             "/whatsapp-web/connect",
             "/whatsapp-web/disconnect",
+            "/whatsapp-web/events",
+            "/whatsapp-web/qr-stream",
             "/whatsapp-web/status",
         ]
 

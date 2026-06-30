@@ -251,15 +251,29 @@ async def receive_webhook(
     channel: ConversationChannel,
     payload: dict[str, Any],
     received_via_phone_id: str | None = None,
+    pre_parsed: InboundMessage | None = None,
 ) -> Message | None:
     """Process an inbound webhook event.
 
     Returns the persisted `Message` row for text/media inbound events.
     Returns `None` when the event was a reaction (Step 7) — those don't
     create a new row, they patch the target message's `reactions` JSONB
-    in-place. The router still responds 202 in both cases."""
-    adapter = resolve(channel)
-    parsed: InboundMessage = adapter.parse_webhook(payload)
+    in-place. The router still responds 202 in both cases.
+
+    ``pre_parsed`` skips the adapter's ``parse_webhook`` step when the
+    caller has already built the canonical ``InboundMessage`` itself —
+    used by the WhatsApp Web (unofficial) events receiver, where the
+    Node sidecar has already translated Baileys events into the
+    canonical shape before forwarding to FastAPI. ``payload`` is still
+    passed because downstream code (attribution match in particular)
+    keys off it; the caller passes ``inbound.raw`` there for parity
+    with the adapter-parsed path.
+    """
+    if pre_parsed is not None:
+        parsed: InboundMessage = pre_parsed
+    else:
+        adapter = resolve(channel)
+        parsed = adapter.parse_webhook(payload)
 
     conv = await _find_or_create_conversation(
         session,
