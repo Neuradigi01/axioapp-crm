@@ -59,6 +59,17 @@ class GalleryTemplate:
     clone endpoint). ``graph_preview`` is the same dict shape as
     ``tbl_workflows.graph`` so the canvas can render it directly. The
     clone path strips template_id references before persisting.
+
+    Step 21 adds two flags:
+
+      * ``auto_activate`` — seeder installs ``status='active'`` (vs
+        the default ``draft``). Use ONLY for internal-only workflows
+        with no contact-facing sends so a freshly-provisioned org
+        doesn't blast marketing emails before the operator reviews.
+      * ``is_system_default`` — seeder stamps the column +
+        ``service.archive_workflow`` refuses to archive the row.
+        Operator can still pause + edit, so they can tune cadence
+        without dropping the day-one safety net.
     """
 
     id: str
@@ -73,6 +84,8 @@ class GalleryTemplate:
     graph_preview: dict[str, Any] = field(default_factory=dict)
     is_marketing: bool = True
     re_enrollment_rule: str = "once"
+    auto_activate: bool = False
+    is_system_default: bool = False
 
 
 # --- Placeholder graph factory ------------------------------------------
@@ -153,26 +166,254 @@ def _placeholder_graph(
     return {"nodes": nodes, "edges": edges, "goal_node_id": goal_id}
 
 
+# --- Step 21: Lead Auto-Triage graph (the system-default day-one
+# safety net). Matches the Salesforce / HubSpot / Zoho default-
+# assignment pattern: every new lead gets a route + stamp + notify +
+# follow-up task, with a Slack alert on the hot path. Internal-only —
+# no contact-facing sends. -------------------------------------------
+
+
+def _lead_auto_triage_graph() -> dict[str, Any]:
+    """Build the 10-node Lead Auto-Triage graph.
+
+    Layout (top-to-bottom, two branch.switch nodes drive the source +
+    score paths, all paths converge on the routing node):
+
+        trigger(lead.created)
+          → branch.switch by lead.source     # tag with priority + source
+              ↓ (default arm)
+          → branch.switch by score band      # senior pool vs sales pool
+              ↓ (chosen arm sets pool var, default = "sales")
+          → routing.round_robin
+          → record.update_lead_field
+          → record.update_contact_field
+          → tagging.add_tag
+          → flow_control.notify_user
+          → record.create_task
+          → flow_control.goal "Lead triaged"
+
+    Slack alert for hot leads is wired off the score-branch's "hot"
+    arm with its own goal.
+    """
+    trigger_id = "lead-triage-trigger"
+    source_branch_id = "lead-triage-source-branch"
+    score_branch_id = "lead-triage-score-branch"
+    route_id = "lead-triage-route"
+    stamp_lead_id = "lead-triage-stamp-lead"
+    stamp_contact_id = "lead-triage-stamp-contact"
+    tag_id = "lead-triage-tag"
+    notify_id = "lead-triage-notify"
+    task_id = "lead-triage-task"
+    goal_id = "lead-triage-goal"
+    slack_id = "lead-triage-slack-hot"
+    slack_goal_id = "lead-triage-slack-goal"
+
+    nodes: list[dict[str, Any]] = [
+        {
+            "id": trigger_id,
+            "type": "trigger",
+            "position": {"x": 360, "y": 40},
+            "config": {
+                "label": "New lead created",
+                "event_type": "lead.created",
+                "re_enrollment_rule": "once",
+                "conditions": None,
+            },
+        },
+        {
+            "id": source_branch_id,
+            "type": "branch.switch",
+            "position": {"x": 360, "y": 180},
+            "config": {
+                "label": "By source",
+                "path": "lead.source",
+                "branches": [
+                    {"label": "paid_ad", "value": "paid_ad"},
+                    {"label": "web_form", "value": "web_form"},
+                    {"label": "import", "value": "import"},
+                    {"label": "manual", "value": "manual"},
+                ],
+            },
+        },
+        {
+            "id": score_branch_id,
+            "type": "branch.switch",
+            "position": {"x": 360, "y": 340},
+            "config": {
+                "label": "By score band",
+                "path": "lead.score_band",
+                "branches": [
+                    {"label": "hot", "value": "hot"},
+                    {"label": "warm", "value": "warm"},
+                ],
+            },
+        },
+        {
+            "id": route_id,
+            "type": "routing.round_robin",
+            "position": {"x": 360, "y": 500},
+            "config": {
+                "label": "Round-robin assign",
+                "role": "Sales",
+                "fallback_role": "Owner",
+            },
+        },
+        {
+            "id": stamp_lead_id,
+            "type": "record.update_lead_field",
+            "position": {"x": 360, "y": 640},
+            "config": {
+                "label": "Stamp lead",
+                "fields": {
+                    "status": "new",
+                    "assigned_to_id": "{{routing.assignee_id}}",
+                    "first_touch_at": "{{now}}",
+                },
+            },
+        },
+        {
+            "id": stamp_contact_id,
+            "type": "record.update_contact_field",
+            "position": {"x": 360, "y": 780},
+            "config": {
+                "label": "Sync contact owner",
+                "fields": {
+                    "assigned_to_id": "{{routing.assignee_id}}",
+                },
+            },
+        },
+        {
+            "id": tag_id,
+            "type": "tagging.add_tag",
+            "position": {"x": 360, "y": 920},
+            "config": {
+                "label": "Tag priority + source",
+                "tags": ["{{lead.source}}", "auto-triaged"],
+            },
+        },
+        {
+            "id": notify_id,
+            "type": "flow_control.notify_user",
+            "position": {"x": 360, "y": 1060},
+            "config": {
+                "label": "Notify assignee",
+                "user_id": "{{routing.assignee_id}}",
+                "title": "New lead assigned to you",
+                "body": (
+                    "{{lead.full_name}} from {{lead.source}} "
+                    "(score {{lead.score}})"
+                ),
+                "channels": ["in_app", "email", "push"],
+            },
+        },
+        {
+            "id": task_id,
+            "type": "record.create_task",
+            "position": {"x": 360, "y": 1200},
+            "config": {
+                "label": "Follow-up task",
+                "title": "Follow up with {{lead.full_name}}",
+                "description": (
+                    "Lead from {{lead.source}}, score {{lead.score}}. "
+                    "Contact: {{contact.email}} / {{contact.phone}}"
+                ),
+                "assigned_to_id": "{{routing.assignee_id}}",
+                "due_in_hours": 24,
+                "priority": "normal",
+            },
+        },
+        {
+            "id": goal_id,
+            "type": "flow_control.goal",
+            "position": {"x": 360, "y": 1340},
+            "config": {
+                "label": "Lead triaged",
+                "name": "Lead triaged + assigned",
+            },
+        },
+        {
+            "id": slack_id,
+            "type": "send.slack",
+            "position": {"x": 640, "y": 500},
+            "config": {
+                "label": "Slack #sales-hot-leads",
+                "channel": "#sales-hot-leads",
+                "message": (
+                    ":fire: Hot lead {{lead.full_name}} "
+                    "(score {{lead.score}}) — assigned to "
+                    "{{routing.assignee_name}}"
+                ),
+            },
+        },
+        {
+            "id": slack_goal_id,
+            "type": "flow_control.goal",
+            "position": {"x": 640, "y": 640},
+            "config": {
+                "label": "Hot lead alert sent",
+                "name": "Hot lead Slack alert",
+            },
+        },
+    ]
+
+    edges: list[dict[str, Any]] = [
+        # Trigger → source branch
+        {"id": "e-1", "source": trigger_id, "target": source_branch_id, "label": None},
+        # Source branch (every arm) → score branch
+        {"id": "e-2a", "source": source_branch_id, "target": score_branch_id, "label": "paid_ad"},
+        {"id": "e-2b", "source": source_branch_id, "target": score_branch_id, "label": "web_form"},
+        {"id": "e-2c", "source": source_branch_id, "target": score_branch_id, "label": "import"},
+        {"id": "e-2d", "source": source_branch_id, "target": score_branch_id, "label": "manual"},
+        {"id": "e-2e", "source": source_branch_id, "target": score_branch_id, "label": "default"},
+        # Score branch → main path (warm / default) + Slack on hot
+        {"id": "e-3a", "source": score_branch_id, "target": route_id, "label": "warm"},
+        {"id": "e-3b", "source": score_branch_id, "target": route_id, "label": "default"},
+        {"id": "e-3c", "source": score_branch_id, "target": slack_id, "label": "hot"},
+        # Slack → its own goal (hot path still falls through to main
+        # via a second edge so the lead also gets the standard assign)
+        {"id": "e-4", "source": slack_id, "target": route_id, "label": None},
+        {"id": "e-4b", "source": slack_id, "target": slack_goal_id, "label": None},
+        # Main flow
+        {"id": "e-5", "source": route_id, "target": stamp_lead_id, "label": None},
+        {"id": "e-6", "source": stamp_lead_id, "target": stamp_contact_id, "label": None},
+        {"id": "e-7", "source": stamp_contact_id, "target": tag_id, "label": None},
+        {"id": "e-8", "source": tag_id, "target": notify_id, "label": None},
+        {"id": "e-9", "source": notify_id, "target": task_id, "label": None},
+        {"id": "e-10", "source": task_id, "target": goal_id, "label": None},
+    ]
+
+    return {"nodes": nodes, "edges": edges, "goal_node_id": goal_id}
+
+
 # --- The 15 catalogue entries -------------------------------------------
 
 
 CATALOG: tuple[GalleryTemplate, ...] = (
     # Sales lifecycle (3)
     GalleryTemplate(
-        id="lead.welcome_auto_assign",
-        name="New Lead Welcome + Auto-Assign",
-        description="Send a welcome email to every new lead and round-robin assign to a rep.",
-        category=CATEGORY_SALES,
-        channels=["email"],
-        goal_node_label="Lead assigned",
-        est_setup_time_minutes=5,
-        est_completion_rate_pct=92,
-        screenshot_url=None,
-        graph_preview=_placeholder_graph(
-            trigger_event_type="lead.created",
-            send_actions=[("send.email", "Welcome email")],
-            goal_label="Lead assigned",
+        # Step 21 — renamed from "New Lead Welcome + Auto-Assign" +
+        # rebuilt as the full 10-node intake graph. Internal-only
+        # (round-robin assign + stamp + notify + follow-up task +
+        # Slack on hot path) — no contact-facing email send. Installs
+        # active + is_system_default per the day-one safety net plan.
+        id="lead.auto_triage",
+        name="New Lead Auto-Triage",
+        description=(
+            "Round-robin assign every new lead to a sales rep, stamp "
+            "the status, notify the assignee, create a follow-up task, "
+            "and ping #sales-hot-leads on high-score arrivals. "
+            "Day-one system default — install active."
         ),
+        category=CATEGORY_SALES,
+        channels=["internal", "slack"],
+        goal_node_label="Lead triaged",
+        est_setup_time_minutes=0,
+        est_completion_rate_pct=98,
+        screenshot_url=None,
+        graph_preview=_lead_auto_triage_graph(),
+        is_marketing=False,
+        auto_activate=True,
+        is_system_default=True,
     ),
     GalleryTemplate(
         id="lead.hot_nurture",
@@ -405,13 +646,18 @@ CATALOG: tuple[GalleryTemplate, ...] = (
         is_marketing=False,
     ),
     GalleryTemplate(
+        # Step 21 — flagged as auto-active system default. Internal-
+        # only (Slack send to a channel — no contact-facing message).
         id="internal.deal_won_alert",
         name="Deal Won Alert (Slack)",
-        description="Slack ping to #sales when a lead converts.",
+        description=(
+            "Internal Slack ping to #sales-wins when a lead converts. "
+            "Day-one system default — install active."
+        ),
         category=CATEGORY_INTERNAL,
         channels=["slack"],
         goal_node_label="Alert sent",
-        est_setup_time_minutes=2,
+        est_setup_time_minutes=0,
         est_completion_rate_pct=100,
         screenshot_url=None,
         graph_preview=_placeholder_graph(
@@ -420,15 +666,22 @@ CATALOG: tuple[GalleryTemplate, ...] = (
             goal_label="Alert sent",
         ),
         is_marketing=False,
+        auto_activate=True,
+        is_system_default=True,
     ),
     GalleryTemplate(
+        # Step 21 — flagged as auto-active system default. Internal
+        # email to managers, no outbound to contacts.
         id="internal.daily_digest",
         name="Daily Digest to Sales Manager",
-        description="Daily 9am IST digest of pipeline movement to the sales manager.",
+        description=(
+            "Daily 9am IST internal digest of pipeline movement to "
+            "the sales manager. Day-one system default — install active."
+        ),
         category=CATEGORY_INTERNAL,
         channels=["email"],
         goal_node_label="Digest sent",
-        est_setup_time_minutes=6,
+        est_setup_time_minutes=0,
         est_completion_rate_pct=100,
         screenshot_url=None,
         graph_preview=_placeholder_graph(
@@ -437,6 +690,8 @@ CATALOG: tuple[GalleryTemplate, ...] = (
             goal_label="Digest sent",
         ),
         is_marketing=False,
+        auto_activate=True,
+        is_system_default=True,
     ),
 )
 

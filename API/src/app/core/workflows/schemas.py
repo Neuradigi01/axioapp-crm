@@ -205,6 +205,9 @@ class WorkflowRead(ORMModel):
     # ``tasks.refresh_workflow_cached_counters``.
     cached_running_count: int = 0
     cached_completed_today_count: int = 0
+    # Step 21 — system-default flag (drives "System" badge + delete
+    # protection in the list page).
+    is_system_default: bool = False
     created_at: datetime
     updated_at: datetime
 

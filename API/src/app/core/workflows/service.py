@@ -348,7 +348,22 @@ async def archive_workflow(
     workflow_id: uuid.UUID,
 ) -> Workflow:
     """Soft archive — flips status to ``archived`` so outstanding
-    runs continue under the archived version (immutable history)."""
+    runs continue under the archived version (immutable history).
+
+    Step 21 — system-default workflows (the day-one safety nets:
+    Lead Auto-Triage, Deal Won Slack, Daily Digest) refuse archive.
+    Operator can pause + edit them but not remove. Re-installing
+    requires the seeder, which is operator-only via the backfill
+    migration."""
+    workflow = await get_workflow(
+        session, org_id=org_id, workflow_id=workflow_id
+    )
+    if workflow.is_system_default:
+        raise WorkflowLocked(
+            "cannot archive a system-default workflow — pause it "
+            "instead. System defaults are the CRM's day-one safety "
+            "nets and stay in the org."
+        )
     return await change_status(
         session,
         org_id=org_id,

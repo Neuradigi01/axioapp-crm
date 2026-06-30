@@ -123,25 +123,29 @@
           class="mt-2 flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5"
         >
           <span class="text-xs font-medium text-zinc-700"> {{ selectedIds().size }} selected </span>
-          <button
-            type="button"
-            (click)="bulkActivate()"
-            [disabled]="mutating()"
-            class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-          >
-            <lucide-icon name="play" size="11" />
-            Activate
-          </button>
-          <button
-            type="button"
-            (click)="bulkPause()"
-            [disabled]="mutating()"
-            class="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
-          >
-            <lucide-icon name="pause-circle" size="11" />
-            Pause
-          </button>
-          @if (canWrite()) {
+          @if (canBulkActivate()) {
+            <button
+              type="button"
+              (click)="bulkActivate()"
+              [disabled]="mutating()"
+              class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <lucide-icon name="play" size="11" />
+              Activate
+            </button>
+          }
+          @if (canBulkPause()) {
+            <button
+              type="button"
+              (click)="bulkPause()"
+              [disabled]="mutating()"
+              class="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+            >
+              <lucide-icon name="pause-circle" size="11" />
+              Pause
+            </button>
+          }
+          @if (canWrite() && canBulkArchive()) {
             <button
               type="button"
               (click)="bulkArchive()"
@@ -264,6 +268,14 @@
                       @if (row.is_marketing) {
                         <span class="rounded bg-zinc-100 px-1 py-0.5">marketing</span>
                       }
+                      @if (row.is_system_default) {
+                        <span
+                          class="rounded bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700"
+                          title="System-default workflow — installed automatically on org create. Can be paused but not archived."
+                        >
+                          System
+                        </span>
+                      }
                       @if (row.ab_paired_workflow_id) {
                         <a
                           [routerLink]="['/user/workflows', row.id, 'ab-compare']"
@@ -342,7 +354,7 @@
                               Clone
                             </button>
                           }
-                          @if (canWrite() && row.status !== 'archived') {
+                          @if (canWrite() && row.status !== 'archived' && !row.is_system_default) {
                             <button
                               type="button"
                               (click)="onArchiveRow(row, $event)"

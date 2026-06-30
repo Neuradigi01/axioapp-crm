@@ -20,9 +20,33 @@ DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT
 _USE_NULL_POOL = os.getenv("DB_NULL_POOL", "").lower() in ("1", "true", "yes")
 
 if _USE_NULL_POOL:
-    engine = create_async_engine(DATABASE_URL, echo=False, poolclass=NullPool)
+    # NullPool + pool_pre_ping evicts broken sockets cleanly per session.
+    # The "pool_pre_ping" here is a no-op for NullPool (no pool to ping)
+    # but is set so future moves between Null/Queue pools keep the
+    # liveness check.
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=False,
+        poolclass=NullPool,
+        pool_pre_ping=True,
+    )
 else:
-    engine = create_async_engine(DATABASE_URL, echo=False, pool_size=20, max_overflow=10)
+    # Tightened from 20+10 (=30 caps) to 10+5 (=15 caps) after the
+    # 2026-06-30 ``TooManyConnectionsError`` incident: remote Postgres
+    # ships with ``max_connections=100`` and the api + worker + beat +
+    # flower processes were jointly exceeding the budget. Pool-pre-
+    # ping evicts connections the DB has dropped (asyncpg "connection
+    # was closed in the middle of operation" race); recycle bounces
+    # any pooled connection older than 15 minutes so stale sockets
+    # never resurrect.
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=False,
+        pool_size=10,
+        max_overflow=5,
+        pool_pre_ping=True,
+        pool_recycle=900,
+    )
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 

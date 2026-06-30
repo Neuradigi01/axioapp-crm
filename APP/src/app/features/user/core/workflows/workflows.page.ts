@@ -126,6 +126,33 @@ export class WorkflowsPageComponent {
   protected readonly selectedIds = signal<Set<string>>(new Set());
   protected readonly mutating = signal<boolean>(false);
 
+  /** Rows in the current page that the operator has ticked. */
+  protected readonly selectedRows = computed(() => {
+    const ids = this.selectedIds();
+    return this.items().filter((row) => ids.has(row.id));
+  });
+
+  /** Activate is only useful when at least one selected row is NOT
+   * already running. Active rows refusing re-activation is a no-op
+   * server-side, but the button looking enabled when there's nothing
+   * to do is misleading UX. */
+  protected readonly canBulkActivate = computed(() =>
+    this.selectedRows().some((r) => r.status !== 'active'),
+  );
+
+  /** Pause only makes sense when at least one selected row IS active. */
+  protected readonly canBulkPause = computed(() =>
+    this.selectedRows().some((r) => r.status === 'active'),
+  );
+
+  /** Archive is hidden when ANY selected row is a system default
+   * (the backend refuses 409 on those) or already archived. */
+  protected readonly canBulkArchive = computed(() => {
+    const rows = this.selectedRows();
+    if (rows.length === 0) return false;
+    return rows.every((r) => r.status !== 'archived' && !r.is_system_default);
+  });
+
   // Run-history drawer.
   protected readonly runHistoryWorkflow = signal<WorkflowRead | null>(null);
 
