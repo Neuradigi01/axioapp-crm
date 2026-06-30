@@ -62,6 +62,14 @@ Thumbs.db
 /api/storage/
 /storage/
 
+# Sidecar services (Node). node_modules/ is already ignored globally;
+# dist/ and storage/ are anchored above, so name them explicitly per
+# sidecar so the patterns also match sidecars/<name>/dist and
+# sidecars/<name>/storage.
+sidecars/*/node_modules/
+sidecars/*/dist/
+sidecars/*/storage/
+
 # Docker volumes
 postgres-data/
 redis-data/
