@@ -4,9 +4,11 @@ WORKDIR /app
 
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends libmagic1 && \
+    apt-get install -y --no-install-recommends libmagic1 libatomic1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+# libatomic1: Pyright's bundled Node crashes on slim Debian without it
+# (libatomic.so.1). Required for running the type checker inside the container.
 
 RUN groupadd -g 1000 sharedgroup \
     && useradd -u 1000 -g sharedgroup -m appuser

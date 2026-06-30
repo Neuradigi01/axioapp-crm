@@ -1,0 +1,8 @@
+# Root-level line-ending pins. Intentionally NOT a global `text=auto` rule — the
+# rest of the tree keeps its current handling; only files that MUST stay LF on
+# every platform are pinned here, so they don't break under sh/bash on Windows.
+#
+# The pre-commit hook has no extension and runs via sh; a CRLF shebang fails with
+# "/usr/bin/env sh^M: bad interpreter". Same for shell scripts.
+.githooks/* text eol=lf
+*.sh        text eol=lf
