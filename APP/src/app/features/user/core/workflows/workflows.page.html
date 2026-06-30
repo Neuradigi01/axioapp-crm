@@ -264,6 +264,14 @@
                       @if (row.is_marketing) {
                         <span class="rounded bg-zinc-100 px-1 py-0.5">marketing</span>
                       }
+                      @if (row.is_system_default) {
+                        <span
+                          class="rounded bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700"
+                          title="System-default workflow — installed automatically on org create. Can be paused but not archived."
+                        >
+                          System
+                        </span>
+                      }
                       @if (row.ab_paired_workflow_id) {
                         <a
                           [routerLink]="['/user/workflows', row.id, 'ab-compare']"
@@ -342,7 +350,7 @@
                               Clone
                             </button>
                           }
-                          @if (canWrite() && row.status !== 'archived') {
+                          @if (canWrite() && row.status !== 'archived' && !row.is_system_default) {
                             <button
                               type="button"
                               (click)="onArchiveRow(row, $event)"

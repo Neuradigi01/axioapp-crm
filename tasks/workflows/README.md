@@ -112,8 +112,9 @@ The `actions/` sub-package is the only one allowed beyond the single-file conven
 | 18 | [A/B test entire workflows + winner selection](step-18-ab-testing.md) | **COMPLETED** | ~1 day |
 | 19 | [Analytics + "why didn't this fire?" diagnostics](step-19-analytics-and-diagnostics.md) | **COMPLETED** | ~1.5 days |
 | 20 | [Default workflow seeder + email_sequences absorption](step-20-seeded-workflows-and-sequences-absorption.md) | **COMPLETED** | ~1.5 days |
+| 21 | [System-default auto-active workflows (day-one CRM safety net)](step-21-system-default-workflows.md) | **COMPLETED** | ~0.5 days |
 
-**Total: 20 steps, ~21 days.**
+**Total: 21 steps, ~21.5 days.**
 
 After this track closes, **all three modules of the three-track plan are shipped**. The CRM has a complete templates → automation → workflows pipeline matching the manager's HubSpot/Zoho/Salesforce reference pattern.
 

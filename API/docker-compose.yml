@@ -41,7 +41,12 @@ services:
 
   celery:
     build: .
-    command: celery -A src.celery.worker.celery worker --loglevel=info --hostname=celery_worker@%h
+    # --concurrency=4 — remote Postgres max_connections=100 budget;
+    # api pool eats 15, beat ~1, flower ~3, leaving ~80 for worker
+    # tasks. Default ``--concurrency`` was the host's CPU count (12
+    # on dev) which over-subscribed the DB during bursty sweeps and
+    # triggered ``TooManyConnectionsError`` on 2026-06-30.
+    command: celery -A src.celery.worker.celery worker --loglevel=info --concurrency=4 --hostname=celery_worker@%h
     env_file:
       - config.env
     environment:

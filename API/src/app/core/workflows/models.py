@@ -250,6 +250,13 @@ class Workflow(Base, TenantScoped):
     is_marketing: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sql_text("true")
     )
+    # Step 21 — system-default workflows install active + are protected
+    # from delete/archive (operator can pause but not remove). Used for
+    # the day-one safety-net seeds (Lead Auto-Triage, Deal Won Slack,
+    # Daily Digest).
+    is_system_default: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("false")
+    )
     graph: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,

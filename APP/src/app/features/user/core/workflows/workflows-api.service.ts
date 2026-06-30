@@ -71,6 +71,10 @@ export interface WorkflowRead {
   ab_test_min_runs_per_variant?: number | null;
   ab_test_winner_workflow_id?: string | null;
   ab_test_decided_at?: string | null;
+  // Step 21 — system-default workflows install active + are protected
+  // from archive. List page renders a "System" badge + hides the
+  // archive affordance on these rows.
+  is_system_default?: boolean;
   created_at: string;
   updated_at: string;
 }

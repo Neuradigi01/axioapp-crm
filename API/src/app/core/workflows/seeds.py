@@ -64,22 +64,32 @@ def _build_seed_workflow(
     user_id: uuid.UUID | None,
     entry: _gallery.GalleryTemplate,
 ) -> Workflow:
-    """Compose a draft :class:`Workflow` ORM instance from a gallery
+    """Compose a :class:`Workflow` ORM instance from a gallery
     template. Strips send-action ``template_id`` references the same
     way ``clone_from_gallery`` does; the operator picks the real
-    template per node at activation."""
+    template per node at activation.
+
+    Step 21 — when ``entry.auto_activate`` is True the row lands as
+    ``status='active'`` (default: ``draft``). When
+    ``entry.is_system_default`` is True the row is stamped + the
+    service layer refuses to archive it.
+    """
     graph_dict = _gallery._strip_send_template_ids(entry.graph_preview)
     goal_node_id = entry.graph_preview.get("goal_node_id")
+    initial_status = (
+        WorkflowStatus.active if entry.auto_activate else WorkflowStatus.draft
+    )
     return Workflow(
         id=uuid.uuid4(),
         org_id=org_id,
         name=entry.name,
         description=entry.description,
         category=entry.category,
-        status=WorkflowStatus.draft,
+        status=initial_status,
         current_version=1,
         re_enrollment_rule=WorkflowReEnrollmentRule(entry.re_enrollment_rule),
         is_marketing=entry.is_marketing,
+        is_system_default=entry.is_system_default,
         graph=graph_dict,
         goal_node_id=goal_node_id,
         cost_per_run_cents=0,
