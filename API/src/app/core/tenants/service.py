@@ -75,6 +75,25 @@ async def create_organization(
 
     await install_default_org_seeds(session, org_id=org.id)
 
+    # tasks/workflows Step 20 — install the 15 default core workflows
+    # for the new org. Drafts by default — operator activates per
+    # workflow. Idempotent: skips templates whose canonical name is
+    # already present (re-running from the backfill is safe). Soft-
+    # fails per-template inside the seeder so one bad clone doesn't
+    # roll back the rest of org creation.
+    from src.app.core.workflows.seeds import install_seeded_workflows
+
+    try:
+        await install_seeded_workflows(session, org_id=org.id, user_id=None)
+    except Exception:
+        # Hard catch — workflow seeding must NEVER block org creation.
+        # The backfill migration picks up any missed installs.
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "tenants.create_organization workflow_seed_failed org=%s", org.id
+        )
+
     return org
 
 

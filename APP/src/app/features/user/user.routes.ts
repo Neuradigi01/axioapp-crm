@@ -97,34 +97,15 @@ export const userRoutes: Routes = [
         pathMatch: 'prefix',
       },
       {
-        // App-updates Email Step 11a — sequence library list lives
-        // inside the settings page (tab=email-sequences); builder +
-        // detail are standalone routes.
+        // tasks/workflows Step 20 — Email Sequences absorbed into
+        // Workflows. The list, builder and detail routes all collapse
+        // into a single prefix redirect to the Workflows Marketing
+        // category. Old bookmarks land on the Workflows list filtered
+        // to Marketing where each migrated sequence appears as a
+        // "Sequence: <name>" draft.
         path: 'settings/email-sequences',
-        data: { tab: 'email-sequences' },
-        loadComponent: () =>
-          import('./core/settings/settings-page.component').then((m) => m.SettingsPageComponent),
-      },
-      {
-        path: 'settings/email-sequences/new',
-        loadComponent: () =>
-          import('./core/settings/email-sequences/sequence-builder.page').then(
-            (m) => m.SequenceBuilderPageComponent,
-          ),
-      },
-      {
-        path: 'settings/email-sequences/:id/edit',
-        loadComponent: () =>
-          import('./core/settings/email-sequences/sequence-builder.page').then(
-            (m) => m.SequenceBuilderPageComponent,
-          ),
-      },
-      {
-        path: 'settings/email-sequences/:id',
-        loadComponent: () =>
-          import('./core/settings/email-sequences/sequence-detail.component').then(
-            (m) => m.SequenceDetailComponent,
-          ),
+        redirectTo: '/user/workflows?category=Marketing',
+        pathMatch: 'prefix',
       },
       {
         // SaaS subscription billing — promoted to a top-level sidebar
