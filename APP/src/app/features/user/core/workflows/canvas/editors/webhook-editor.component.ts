@@ -24,6 +24,12 @@ export class WebhookEditorComponent {
   readonly configChange = output<Record<string, unknown>>();
   readonly validityChange = output<boolean>();
 
+  // Pre-built string so the template binds via `[placeholder]` without
+  // Angular trying to interpolate the literal `{{...}}` tokens it
+  // contains.
+  readonly bodyPlaceholder =
+    '{"contact_id": "{{contact.id}}", "score": "{{lead.lead_score}}"}';
+
   readonly url = computed<string>(
     () => (this.node().config?.['url'] as string) ?? '',
   );
