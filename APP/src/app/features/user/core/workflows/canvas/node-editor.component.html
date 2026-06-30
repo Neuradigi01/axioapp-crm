@@ -1,0 +1,248 @@
+<div class="flex flex-col h-full">
+  <!-- Header -->
+  <header class="px-4 py-3 border-b border-zinc-200 space-y-2">
+    <div class="flex items-center gap-2">
+      @if (nodeType()) {
+        <lucide-icon
+          [name]="nodeType()!.icon"
+          class="w-4 h-4 text-zinc-600 shrink-0"
+        ></lucide-icon>
+      }
+      <input
+        type="text"
+        [ngModel]="displayLabel()"
+        (ngModelChange)="onLabelChange($event)"
+        class="flex-1 min-w-0 text-sm font-medium text-zinc-800 bg-transparent border-b border-transparent focus:border-zinc-400 focus:outline-none px-1"
+      />
+      <button
+        type="button"
+        class="text-zinc-400 hover:text-zinc-700"
+        (click)="close.emit()"
+        title="Close"
+      >
+        <lucide-icon name="X" class="w-4 h-4"></lucide-icon>
+      </button>
+    </div>
+    <div class="flex items-center gap-1 text-[10px]">
+      <span class="font-mono text-zinc-500">{{ node().type }}</span>
+      <div class="flex-1"></div>
+      <button
+        type="button"
+        class="px-2 py-0.5 rounded text-zinc-600 hover:bg-zinc-100"
+        (click)="onDuplicate()"
+        title="Duplicate"
+      >
+        Duplicate
+      </button>
+      <button
+        type="button"
+        class="px-2 py-0.5 rounded text-zinc-600 hover:bg-zinc-100"
+        (click)="onDisconnect()"
+        title="Disconnect all edges"
+      >
+        Disconnect
+      </button>
+      <button
+        type="button"
+        class="px-2 py-0.5 rounded text-rose-600 hover:bg-rose-50"
+        (click)="onDelete()"
+      >
+        Delete
+      </button>
+    </div>
+  </header>
+
+  <!-- Body — typed editor per node type -->
+  <div class="flex-1 overflow-y-auto px-4 py-4">
+    @switch (editorKey()) {
+      @case ('trigger') {
+        <app-trigger-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('send_email') {
+        <app-send-email-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('send_whatsapp') {
+        <app-send-whatsapp-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('send_sms') {
+        <app-send-sms-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('send_fb') {
+        <app-send-fb-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('send_ig') {
+        <app-send-ig-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('send_push') {
+        <app-send-push-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('send_slack') {
+        <app-send-slack-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('update_field') {
+        <app-update-field-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('create_task') {
+        <app-create-task-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('create_note') {
+        <app-create-note-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('create_appointment') {
+        <app-create-appointment-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('create_quote') {
+        <app-create-quote-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('create_invoice') {
+        <app-create-invoice-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('routing') {
+        <app-routing-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('tagging') {
+        <app-tagging-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('lifecycle') {
+        <app-lifecycle-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('enroll') {
+        <app-enroll-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('wait') {
+        <app-wait-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('branch') {
+        <app-branch-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('switch') {
+        <app-switch-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('ab_split') {
+        <app-ab-split-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('goal') {
+        <app-goal-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('wait_for_event') {
+        <app-wait-for-event-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('webhook') {
+        <app-webhook-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @case ('notify_user') {
+        <app-notify-user-editor
+          [node]="node()"
+          (configChange)="onConfigChange($event)"
+          (validityChange)="onValidityChange($event)"
+        />
+      }
+      @default {
+        <p class="text-xs text-zinc-500 italic">
+          No editor registered for node type
+          <code>{{ node().type }}</code>.
+        </p>
+      }
+    }
+  </div>
+</div>

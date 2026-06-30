@@ -1,0 +1,65 @@
+<div class="space-y-4">
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">
+      Event type
+    </label>
+    <select
+      [ngModel]="eventType()"
+      (ngModelChange)="onEventTypeChange($event)"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+    >
+      <option value="">— pick an event —</option>
+      @for (e of eventTypes; track e.type) {
+        <option [value]="e.type">{{ e.label }} ({{ e.type }})</option>
+      }
+    </select>
+    @if (eventType()) {
+      <p class="text-[10px] text-zinc-500 mt-1">
+        @for (e of eventTypes; track e.type) {
+          @if (e.type === eventType()) {
+            {{ e.description }}
+          }
+        }
+      </p>
+    } @else {
+      <p class="text-[10px] text-rose-600 mt-1">
+        Event type is required.
+      </p>
+    }
+  </div>
+
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">
+      Re-enrolment rule
+    </label>
+    <select
+      [ngModel]="reEnrollmentRule()"
+      (ngModelChange)="onReEnrollmentChange($event)"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+    >
+      @for (opt of reEnrollmentOptions; track opt.value) {
+        <option [value]="opt.value">{{ opt.label }}</option>
+      }
+    </select>
+    @for (opt of reEnrollmentOptions; track opt.value) {
+      @if (opt.value === reEnrollmentRule()) {
+        <p class="text-[10px] text-zinc-500 mt-1">{{ opt.description }}</p>
+      }
+    }
+  </div>
+
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">
+      Conditions
+    </label>
+    <p class="text-[10px] text-zinc-500 mb-2">
+      Filter which events of this type should fire the workflow. Leave
+      empty to fire on every event.
+    </p>
+    <app-conditions-builder
+      [tree]="conditions()"
+      [variableGroups]="variableGroups()"
+      (treeChange)="onConditionsChange($event)"
+    />
+  </div>
+</div>

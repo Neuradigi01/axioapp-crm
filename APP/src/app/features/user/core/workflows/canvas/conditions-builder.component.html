@@ -1,0 +1,169 @@
+<div class="space-y-2">
+  @if (tree(); as root) {
+    <ng-container
+      *ngTemplateOutlet="nodeTpl; context: { node: root, path: [] }"
+    ></ng-container>
+  } @else {
+    <p class="text-[11px] text-zinc-500 italic">
+      No conditions — this branch always matches.
+    </p>
+  }
+
+  <div class="flex items-center gap-2">
+    <button
+      type="button"
+      class="text-[11px] px-2 py-1 rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+      (click)="addRootLeaf()"
+    >
+      <lucide-icon name="Plus" class="inline-block w-3 h-3 mr-1"></lucide-icon>
+      Add condition
+    </button>
+    @if (tree()) {
+      <button
+        type="button"
+        class="text-[11px] px-2 py-1 rounded text-rose-600 hover:bg-rose-50"
+        (click)="clearAll()"
+      >
+        Clear all
+      </button>
+    }
+  </div>
+</div>
+
+<ng-template #nodeTpl let-node="node" let-path="path">
+  @if (isGroup(node)) {
+    <div class="border-l-2 pl-3 py-2"
+         [class.border-sky-300]="node.kind === 'and'"
+         [class.border-amber-300]="node.kind === 'or'"
+    >
+      <div class="flex items-center gap-2 mb-1">
+        <button
+          type="button"
+          class="text-[10px] font-bold px-2 py-0.5 rounded uppercase"
+          [class.bg-sky-100]="node.kind === 'and'"
+          [class.text-sky-700]="node.kind === 'and'"
+          [class.bg-amber-100]="node.kind === 'or'"
+          [class.text-amber-700]="node.kind === 'or'"
+          (click)="toggleAndOr(path)"
+          title="Toggle AND / OR"
+        >
+          {{ node.kind }}
+        </button>
+        <button
+          type="button"
+          class="text-[10px] text-zinc-500 hover:text-zinc-700"
+          (click)="wrapInNot(path)"
+          title="Wrap in NOT"
+        >
+          ¬
+        </button>
+        @if (path.length > 0) {
+          <button
+            type="button"
+            class="text-[10px] text-rose-500 hover:text-rose-700 ml-auto"
+            (click)="removeAt(path)"
+            title="Delete group"
+          >
+            <lucide-icon name="X" class="w-3 h-3"></lucide-icon>
+          </button>
+        }
+      </div>
+      @for (child of node.children; track $index) {
+        <ng-container
+          *ngTemplateOutlet="
+            nodeTpl;
+            context: { node: child, path: childPath(path, $index) }
+          "
+        ></ng-container>
+      }
+      <div class="flex items-center gap-1 mt-1">
+        <button
+          type="button"
+          class="text-[10px] px-1.5 py-0.5 rounded text-zinc-600 hover:bg-zinc-100"
+          (click)="addChildLeaf(path)"
+        >
+          + condition
+        </button>
+        <button
+          type="button"
+          class="text-[10px] px-1.5 py-0.5 rounded text-zinc-600 hover:bg-zinc-100"
+          (click)="addChildGroup(path)"
+        >
+          + group
+        </button>
+      </div>
+    </div>
+  } @else if (isNot(node)) {
+    <div class="border-l-2 border-rose-300 pl-3 py-2">
+      <div class="flex items-center gap-2 mb-1">
+        <span
+          class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700"
+        >NOT</span>
+        <button
+          type="button"
+          class="text-[10px] text-zinc-500 hover:text-zinc-700"
+          (click)="unwrapNot(path)"
+          title="Unwrap NOT"
+        >
+          unwrap
+        </button>
+        <button
+          type="button"
+          class="text-[10px] text-rose-500 hover:text-rose-700 ml-auto"
+          (click)="removeAt(path)"
+        >
+          <lucide-icon name="X" class="w-3 h-3"></lucide-icon>
+        </button>
+      </div>
+      <ng-container
+        *ngTemplateOutlet="
+          nodeTpl;
+          context: { node: node.child, path: childPath(path, 0) }
+        "
+      ></ng-container>
+    </div>
+  } @else if (isLeaf(node)) {
+    <div class="flex items-center gap-1.5 py-1">
+      <input
+        type="text"
+        [value]="node.path"
+        (input)="onLeafPathChange(path, $any($event.target).value)"
+        list="conditions-builder-paths"
+        placeholder="path (e.g. lead.score)"
+        class="flex-1 text-xs px-2 py-1 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500 min-w-0"
+      />
+      <select
+        [value]="node.op"
+        (change)="onLeafOpChange(path, $any($event.target).value)"
+        class="text-xs px-1.5 py-1 rounded border border-zinc-300"
+      >
+        @for (op of ops; track op.value) {
+          <option [value]="op.value">{{ op.label }}</option>
+        }
+      </select>
+      @if (needsValueInput(node.op)) {
+        <input
+          type="text"
+          [value]="node.value ?? ''"
+          (input)="onLeafValueChange(path, $any($event.target).value)"
+          placeholder="value"
+          class="w-24 text-xs px-2 py-1 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+        />
+      }
+      <button
+        type="button"
+        class="text-zinc-400 hover:text-rose-600"
+        (click)="removeAt(path)"
+        title="Delete"
+      >
+        <lucide-icon name="X" class="w-3 h-3"></lucide-icon>
+      </button>
+    </div>
+  }
+</ng-template>
+
+<datalist id="conditions-builder-paths">
+  @for (p of suggestedPaths(); track p) {
+    <option [value]="p"></option>
+  }
+</datalist>

@@ -1,0 +1,77 @@
+<div class="space-y-3">
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">HTTPS URL</label>
+    <input
+      type="url"
+      [ngModel]="url()"
+      (ngModelChange)="onUrlChange($event)"
+      placeholder="https://example.com/hook"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500 font-mono"
+    />
+    @if (!isValidUrl()) {
+      <p class="text-[10px] text-rose-600 mt-1">
+        HTTPS URL required (http:// is rejected by the engine).
+      </p>
+    }
+  </div>
+
+  <div class="grid grid-cols-2 gap-2">
+    <div>
+      <label class="block text-[11px] font-medium text-zinc-600 mb-1">Method</label>
+      <select
+        [ngModel]="method()"
+        (ngModelChange)="onMethodChange($event)"
+        class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+      >
+        <option value="POST">POST</option>
+        <option value="GET">GET</option>
+        <option value="PUT">PUT</option>
+        <option value="PATCH">PATCH</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-[11px] font-medium text-zinc-600 mb-1">On failure</label>
+      <select
+        [ngModel]="onFailure()"
+        (ngModelChange)="onFailureChange($event)"
+        class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+      >
+        <option value="skip">Skip step</option>
+        <option value="error">Error the run</option>
+      </select>
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Body (JSON template)</label>
+    <textarea
+      rows="3"
+      [ngModel]="body()"
+      (ngModelChange)="onBodyChange($event)"
+      placeholder='{"contact_id": "{{contact.id}}", "score": "{{lead.lead_score}}"}'
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500 font-mono"
+    ></textarea>
+  </div>
+
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Extra headers (one per line, Key: Value)</label>
+    <textarea
+      rows="2"
+      [ngModel]="headers()"
+      (ngModelChange)="onHeadersChange($event)"
+      placeholder="X-API-Key: secret"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500 font-mono"
+    ></textarea>
+  </div>
+
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Expected status codes (CSV)</label>
+    <input
+      type="text"
+      [ngModel]="expectedStatuses()"
+      (ngModelChange)="onStatusChange($event)"
+      placeholder="200,201,202,204"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500 font-mono"
+    />
+  </div>
+</div>

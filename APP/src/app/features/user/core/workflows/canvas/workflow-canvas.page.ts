@@ -24,6 +24,7 @@ import {
   CanvasStateService,
 } from './canvas-state.service';
 import { WorkflowEdgeComponent } from './edge.component';
+import { NodeEditorComponent } from './node-editor.component';
 import { NodePaletteComponent } from './node-palette.component';
 import {
   NODE_HEIGHT,
@@ -85,6 +86,7 @@ const AUTOSAVE_INTERVAL_MS = 30_000;
     FormsModule,
     RouterLink,
     LucideAngularModule,
+    NodeEditorComponent,
     NodePaletteComponent,
     WorkflowNodeComponent,
     WorkflowEdgeComponent,
