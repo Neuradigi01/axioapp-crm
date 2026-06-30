@@ -91,9 +91,28 @@ async def delete_session(
     return True
 
 
+async def set_session_status(
+    db: AsyncSession,
+    *,
+    integration_id: uuid.UUID,
+    status: str,
+    **patches: Any,
+) -> Optional[WhatsAppWebSession]:
+    """Update a session row's status (and optionally other fields).
+    Returns the mutated row, or ``None`` if no row exists."""
+    row = await get_session_by_integration(db, integration_id=integration_id)
+    if row is None:
+        return None
+    row.status = status
+    for field, value in patches.items():
+        setattr(row, field, value)
+    return row
+
+
 __all__ = [
     "delete_session",
     "get_session_by_integration",
     "get_session_by_sidecar_id",
+    "set_session_status",
     "upsert_session",
 ]

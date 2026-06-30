@@ -42,11 +42,17 @@ class WhatsAppWebSessionOut(BaseModel):
 
     Never includes the ``sidecar_session_id`` — that is an internal
     correlation key, not something the SPA should learn or pin to.
+
+    ``qr_data_url`` field shape lands here so Step 6's SSE stream can
+    push a value into it without a follow-up schema change. The
+    Step-5 endpoints never populate it (QR transport is event-bus →
+    SSE, never via REST poll).
     """
 
     id: UUID
     status: WhatsAppWebStatus
     phone_number: Optional[str] = None
+    qr_data_url: Optional[str] = None
     last_event_at: Optional[datetime] = None
     last_error: Optional[str] = None
     created_at: datetime
@@ -55,4 +61,15 @@ class WhatsAppWebSessionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-__all__ = ["WhatsAppWebSessionOut", "WhatsAppWebStatus"]
+class WhatsAppWebConnectRequest(BaseModel):
+    """Body for ``POST /connect``. Empty for v1 — a future revision
+    may carry a human-readable label for the paired number."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+__all__ = [
+    "WhatsAppWebConnectRequest",
+    "WhatsAppWebSessionOut",
+    "WhatsAppWebStatus",
+]

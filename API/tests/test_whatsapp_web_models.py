@@ -93,11 +93,18 @@ class TestSchemas:
 
 
 class TestRouter:
-    def test_router_prefix_and_no_routes_yet(self) -> None:
-        # Step 5 will add endpoints. The scaffold mounts an empty
-        # router so callers / mounts don't churn when that happens.
+    def test_router_prefix_and_step5_endpoints_mounted(self) -> None:
+        # Step 5 adds /connect, /disconnect, /status. Step 6 will add
+        # /events + /qr/{id}/stream on the same router.
         assert ww_router.prefix == "/whatsapp-web"
-        assert ww_router.routes == []
+        paths = sorted(
+            getattr(r, "path", "") for r in ww_router.routes
+        )
+        assert paths == [
+            "/whatsapp-web/connect",
+            "/whatsapp-web/disconnect",
+            "/whatsapp-web/status",
+        ]
 
 
 # --- DAL round-trip via fake session ----------------------------------
