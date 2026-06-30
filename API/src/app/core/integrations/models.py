@@ -32,12 +32,15 @@ from src.app.shared.orm import TenantScoped
 class IntegrationProvider(str, enum.Enum):
     """Which platform this integration speaks to. Postgres enum
     `integration_provider` — base values from migration 0048
-    (`google_ads`, `meta_ads`); `whatsapp` added in 0053 for the
-    WhatsApp Business Cloud API messaging channel."""
+    (`google_ads`, `meta_ads`); `whatsapp` added in 0061 for the
+    WhatsApp Business Cloud API messaging channel; `whatsapp_web`
+    added in 0141 for the unofficial Baileys-based WhatsApp Web
+    integration (see `tasks/whatsapp-unofficial/`)."""
 
     google_ads = "google_ads"
     meta_ads = "meta_ads"
     whatsapp = "whatsapp"
+    whatsapp_web = "whatsapp_web"
 
 
 class IntegrationStatus(str, enum.Enum):

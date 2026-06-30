@@ -37,6 +37,9 @@ from src.app.core.integrations.meta.webhook import (
 from src.app.core.integrations.whatsapp.router import (
     router as whatsapp_router,
 )
+from src.app.core.integrations.whatsapp_web.router import (
+    router as whatsapp_web_router,
+)
 from src.app.core.integrations.models import IntegrationProvider
 from src.app.core.integrations.schemas import (
     IntegrationDLQListResponse,
@@ -91,6 +94,11 @@ router.include_router(meta_webhook_router)
 # the WhatsApp Business Cloud API channel. Full paths become
 # /api/v1/integrations/whatsapp/...
 router.include_router(whatsapp_router)
+# WhatsApp Web (unofficial / Baileys) subrouter — Step 4 of the
+# whatsapp-unofficial track. Mount is in place now; the first
+# endpoint (POST /connect) lands in Step 5. Full paths become
+# /api/v1/integrations/whatsapp-web/...
+router.include_router(whatsapp_web_router)
 
 
 @router.get("", response_model=list[IntegrationRead])
