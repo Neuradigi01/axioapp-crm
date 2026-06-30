@@ -121,9 +121,7 @@ export abstract class BaseFormModalComponent implements OnInit {
 
   // --- Standard-fields override state -------------------------------
 
-  protected readonly stdFields = signal<
-    Record<string, StandardFieldRendered>
-  >({});
+  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>({});
 
   // --- Subclass hooks ----------------------------------------------
 
@@ -135,9 +133,7 @@ export abstract class BaseFormModalComponent implements OnInit {
    * registry override row) onto the subclass's static
    * (``Validators.email`` / ``Validators.maxLength``) validators. Called
    * after the override map is fetched. */
-  protected abstract applyStandardValidators(
-    map: Record<string, StandardFieldRendered>,
-  ): void;
+  protected abstract applyStandardValidators(map: Record<string, StandardFieldRendered>): void;
 
   // --- Lifecycle ---------------------------------------------------
 
@@ -158,9 +154,7 @@ export abstract class BaseFormModalComponent implements OnInit {
           this.fieldsLoading.set(false);
         },
         error: (err: HttpErrorResponse) => {
-          this.fieldsError.set(
-            extractApiError(err) ?? 'Could not load custom field definitions.',
-          );
+          this.fieldsError.set(extractApiError(err) ?? 'Could not load custom field definitions.');
           this.fieldsLoading.set(false);
         },
       });

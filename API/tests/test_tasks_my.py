@@ -5,10 +5,11 @@ Asserts:
 - ordering is earliest-due first with nulls last;
 - the `status` filter narrows.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -30,9 +31,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -47,9 +46,7 @@ async def _login(client, *, org_slug: str, email: str, password: str) -> str:
 
 
 @pytest.mark.asyncio
-async def test_my_tasks_returns_only_callers_tasks_in_due_order(
-    layered_client, seeded_admin
-):
+async def test_my_tasks_returns_only_callers_tasks_in_due_order(layered_client, seeded_admin):
     """Caller sees only their own assigned tasks, earliest-due first."""
     from tests.conftest import TestSession
 
@@ -83,7 +80,7 @@ async def test_my_tasks_returns_only_callers_tasks_in_due_order(
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     in_2h = (now + timedelta(hours=2)).isoformat()
     in_3d = (now + timedelta(days=3)).isoformat()
 
@@ -140,9 +137,7 @@ async def test_my_tasks_status_filter(layered_client, seeded_admin):
     headers = {"Authorization": f"Bearer {token}"}
 
     for title in ("a", "b", "c"):
-        resp = await layered_client.post(
-            "/api/v1/tasks", json={"title": title}, headers=headers
-        )
+        resp = await layered_client.post("/api/v1/tasks", json={"title": title}, headers=headers)
         assert resp.status_code == 201
         if title == "b":
             tid = resp.json()["id"]
@@ -152,14 +147,10 @@ async def test_my_tasks_status_filter(layered_client, seeded_admin):
                 headers=headers,
             )
 
-    open_only = await layered_client.get(
-        "/api/v1/tasks/me?status=open", headers=headers
-    )
+    open_only = await layered_client.get("/api/v1/tasks/me?status=open", headers=headers)
     titles = {i["title"] for i in open_only.json()["items"]}
     assert titles == {"a", "c"}
 
-    done_only = await layered_client.get(
-        "/api/v1/tasks/me?status=done", headers=headers
-    )
+    done_only = await layered_client.get("/api/v1/tasks/me?status=done", headers=headers)
     titles = {i["title"] for i in done_only.json()["items"]}
     assert titles == {"b"}

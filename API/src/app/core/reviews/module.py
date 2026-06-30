@@ -3,8 +3,8 @@
 Sidebar entry at `menu_position=540` (after Call Center at 520).
 Permission keys `reviews.read` / `reviews.write` register on startup.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="reviews",

@@ -30,20 +30,17 @@
  */
 import { Injectable, signal } from '@angular/core';
 
-
 export interface EmbeddedSignupResult {
   code: string;
   phoneNumberId: string;
   wabaId: string;
 }
 
-
 export type EmbeddedSignupCancelReason =
   | 'user_cancelled'
   | 'popup_blocked'
   | 'session_info_missing'
   | 'sdk_load_failed';
-
 
 export class EmbeddedSignupCancelled extends Error {
   constructor(
@@ -54,7 +51,6 @@ export class EmbeddedSignupCancelled extends Error {
     this.name = 'EmbeddedSignupCancelled';
   }
 }
-
 
 // Minimal type surface for window.FB — only what we call.
 interface FBLoginAuthResponse {
@@ -87,11 +83,9 @@ interface FBWindow extends Window {
   fbAsyncInit?: () => void;
 }
 
-
 const SDK_SCRIPT_ID = 'whatsapp-fb-jssdk';
 const SDK_URL = 'https://connect.facebook.net/en_US/sdk.js';
 const FB_ORIGIN = 'https://www.facebook.com';
-
 
 @Injectable({ providedIn: 'root' })
 export class WhatsAppFbSdkService {
@@ -248,7 +242,9 @@ export class WhatsAppFbSdkService {
         ) {
           return;
         }
-        const data = (payload as { data?: { phone_number_id?: string; waba_id?: string; event?: string } }).data;
+        const data = (
+          payload as { data?: { phone_number_id?: string; waba_id?: string; event?: string } }
+        ).data;
         if (!data) return;
         // FINISH = customer completed all steps; CANCEL = bailed.
         if (data.event === 'FINISH' && data.phone_number_id && data.waba_id) {

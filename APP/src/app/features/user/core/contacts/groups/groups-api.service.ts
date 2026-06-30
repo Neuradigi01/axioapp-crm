@@ -18,7 +18,6 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { buildHttpParams } from '../../shared/services/query-builder';
 
-
 export interface GroupFilter {
   q?: string;
   source?: string;
@@ -27,7 +26,6 @@ export interface GroupFilter {
    *  column accepts `extra='allow'`). */
   [key: string]: string | undefined;
 }
-
 
 export interface ContactGroup {
   id: string;
@@ -44,13 +42,11 @@ export interface ContactGroup {
   member_count: number | null;
 }
 
-
 export interface ContactGroupDetail extends ContactGroup {
   /** First 10 contact ids for the edit-page preview. Full member
    *  list pagination is deferred to a future endpoint if needed. */
   sample_contact_ids: string[];
 }
-
 
 export interface ContactGroupListResponse {
   items: ContactGroup[];
@@ -58,7 +54,6 @@ export interface ContactGroupListResponse {
   page: number;
   size: number;
 }
-
 
 export interface ContactGroupCreate {
   name: string;
@@ -71,7 +66,6 @@ export interface ContactGroupCreate {
   contact_ids?: string[] | null;
 }
 
-
 export interface ContactGroupUpdate {
   name?: string;
   description?: string | null;
@@ -81,7 +75,6 @@ export interface ContactGroupUpdate {
   contact_ids?: string[] | null;
 }
 
-
 export interface PreviewSizeIn {
   /** Exactly one of `filter_json` or `group_id` — backend rejects
    *  both/neither with 422. */
@@ -89,21 +82,16 @@ export interface PreviewSizeIn {
   group_id?: string;
 }
 
-
 export interface PreviewSizeOut {
   count: number;
 }
-
 
 @Injectable({ providedIn: 'root' })
 export class ContactGroupsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/contact-groups`;
 
-  list(
-    page: number = 1,
-    size: number = 50,
-  ): Observable<ContactGroupListResponse> {
+  list(page: number = 1, size: number = 50): Observable<ContactGroupListResponse> {
     const params = buildHttpParams({ page, size });
     return this.http.get<ContactGroupListResponse>(this.base, { params });
   }
@@ -125,9 +113,6 @@ export class ContactGroupsApiService {
   }
 
   previewSize(payload: PreviewSizeIn): Observable<PreviewSizeOut> {
-    return this.http.post<PreviewSizeOut>(
-      `${this.base}/preview-size`,
-      payload,
-    );
+    return this.http.post<PreviewSizeOut>(`${this.base}/preview-size`, payload);
   }
 }

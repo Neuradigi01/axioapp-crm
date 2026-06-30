@@ -5,13 +5,8 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { WorkflowsPageComponent } from './workflows.page';
-import {
-  WorkflowRead,
-  WorkflowStatus,
-  WorkflowsApiService,
-} from './workflows-api.service';
+import { WorkflowRead, WorkflowStatus, WorkflowsApiService } from './workflows-api.service';
 import { FurnitureAuthService } from '../auth/auth.service';
-
 
 function makeWorkflow(overrides: Partial<WorkflowRead> = {}): WorkflowRead {
   return {
@@ -36,34 +31,26 @@ function makeWorkflow(overrides: Partial<WorkflowRead> = {}): WorkflowRead {
   };
 }
 
-
 describe('WorkflowsPageComponent', () => {
   let apiSpy: jasmine.SpyObj<WorkflowsApiService>;
   let authStub: { hasPermission: (k: string) => boolean };
   let permissions: string[];
 
-  function makeFixture(
-    initialRows: WorkflowRead[] = [],
-  ): ComponentFixture<WorkflowsPageComponent> {
-    apiSpy = jasmine.createSpyObj<WorkflowsApiService>(
-      'WorkflowsApiService',
-      [
-        'list',
-        'listFolders',
-        'activate',
-        'pause',
-        'archive',
-        'clone',
-        'createFolder',
-        'patchFolder',
-        'deleteFolder',
-        'listRuns',
-        'listRunSteps',
-      ],
-    );
-    apiSpy.list.and.returnValue(
-      of({ items: initialRows, total: initialRows.length }),
-    );
+  function makeFixture(initialRows: WorkflowRead[] = []): ComponentFixture<WorkflowsPageComponent> {
+    apiSpy = jasmine.createSpyObj<WorkflowsApiService>('WorkflowsApiService', [
+      'list',
+      'listFolders',
+      'activate',
+      'pause',
+      'archive',
+      'clone',
+      'createFolder',
+      'patchFolder',
+      'deleteFolder',
+      'listRuns',
+      'listRunSteps',
+    ]);
+    apiSpy.list.and.returnValue(of({ items: initialRows, total: initialRows.length }));
     apiSpy.listFolders.and.returnValue(of([]));
 
     authStub = { hasPermission: (k: string) => permissions.includes(k) };
@@ -85,12 +72,7 @@ describe('WorkflowsPageComponent', () => {
   }
 
   beforeEach(() => {
-    permissions = [
-      'workflows.read',
-      'workflows.write',
-      'workflows.activate',
-      'workflows.clone',
-    ];
+    permissions = ['workflows.read', 'workflows.write', 'workflows.activate', 'workflows.clone'];
   });
 
   it('renders the empty state when the API returns no rows', () => {

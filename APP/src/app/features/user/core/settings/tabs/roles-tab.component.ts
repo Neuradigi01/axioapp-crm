@@ -8,11 +8,7 @@
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
@@ -123,9 +119,7 @@ export class RolesTabComponent {
   });
 
   /** True iff the user is editing or viewing a system role. */
-  protected readonly isReadOnly = computed(
-    () => this.editingRole()?.is_system === true,
-  );
+  protected readonly isReadOnly = computed(() => this.editingRole()?.is_system === true);
 
   constructor() {
     this.reload();
@@ -133,8 +127,7 @@ export class RolesTabComponent {
       .me()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (me) =>
-          this.canWrite.set(me.permission_keys.includes('roles.write')),
+        next: (me) => this.canWrite.set(me.permission_keys.includes('roles.write')),
         error: () => this.canWrite.set(false),
       });
   }
@@ -175,10 +168,7 @@ export class RolesTabComponent {
     this.installingKey.set(t.key);
     this.templateError.set(null);
     this.http
-      .post<{ id: string }>(
-        `${this.base}/role-templates/${t.key}/install`,
-        {},
-      )
+      .post<{ id: string }>(`${this.base}/role-templates/${t.key}/install`, {})
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
@@ -187,9 +177,7 @@ export class RolesTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.installingKey.set(null);
-          this.templateError.set(
-            extractApiError(err) ?? 'Could not install template.',
-          );
+          this.templateError.set(extractApiError(err) ?? 'Could not install template.');
         },
       });
   }
@@ -249,29 +237,23 @@ export class RolesTabComponent {
           permission_keys: keys,
         });
 
-    request$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => {
-          this.saving.set(false);
-          this.mode.set('list');
-          this.editingRole.set(null);
-          this.reload();
-        },
-        error: (err: HttpErrorResponse) => {
-          this.saving.set(false);
-          this.editorError.set(
-            extractApiError(err) ?? 'Could not save role.',
-          );
-        },
-      });
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.mode.set('list');
+        this.editingRole.set(null);
+        this.reload();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.saving.set(false);
+        this.editorError.set(extractApiError(err) ?? 'Could not save role.');
+      },
+    });
   }
 
   protected deleteRole(role: RoleRow): void {
     if (!this.canWrite() || role.is_system || this.saving()) return;
-    if (!window.confirm(
-      `Delete role "${role.name}"? This cannot be undone.`,
-    )) {
+    if (!window.confirm(`Delete role "${role.name}"? This cannot be undone.`)) {
       return;
     }
     this.saving.set(true);
@@ -290,5 +272,4 @@ export class RolesTabComponent {
         },
       });
   }
-
 }

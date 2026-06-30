@@ -1,10 +1,14 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.models.profile_change_history import ProfileChangeHistory
 
 
 async def insert_history(
-    db: AsyncSession, member_id: int, user_type: str,
-    old_data: dict, new_data: dict,
+    db: AsyncSession,
+    member_id: int,
+    user_type: str,
+    old_data: dict,
+    new_data: dict,
 ):
     record = ProfileChangeHistory(
         member_id=member_id,

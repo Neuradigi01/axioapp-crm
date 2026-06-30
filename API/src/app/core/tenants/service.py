@@ -4,6 +4,7 @@ Helpers around the `organizations` table. Used by signup, by every
 endpoint that needs to hydrate the tenant row off a JWT's `org_id`
 claim, and by ownership transfer.
 """
+
 from __future__ import annotations
 
 import re
@@ -15,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.tenants import data_access as tenants_data_access
 from src.app.core.tenants.models import Organization
-
 
 _SLUG_CLEAN = re.compile(r"[^a-z0-9]+")
 
@@ -78,9 +78,7 @@ async def create_organization(
     return org
 
 
-async def get_organization_by_id(
-    session: AsyncSession, org_id: uuid.UUID
-) -> Organization | None:
+async def get_organization_by_id(session: AsyncSession, org_id: uuid.UUID) -> Organization | None:
     """Resolve an organisation by its UUID PK.
 
     Thin service wrapper over the tenants DAL so callers in other
@@ -90,9 +88,7 @@ async def get_organization_by_id(
     return await tenants_data_access.get_organization_by_id(session, org_id)
 
 
-async def get_organization_by_slug(
-    session: AsyncSession, slug: str
-) -> Organization | None:
+async def get_organization_by_slug(session: AsyncSession, slug: str) -> Organization | None:
     """Resolve an organisation by URL slug.
 
     Public service wrapper so router code never reaches into the

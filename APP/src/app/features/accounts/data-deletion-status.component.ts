@@ -39,14 +39,7 @@ import { ActivatedRoute } from '@angular/router';
 
 import { environment } from '../../../environments/environment';
 
-
-type DeletionStatus =
-  | 'pending'
-  | 'in_progress'
-  | 'completed'
-  | 'failed'
-  | 'unknown';
-
+type DeletionStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'unknown';
 
 interface StatusResponse {
   status: DeletionStatus;
@@ -57,12 +50,10 @@ interface StatusResponse {
   is_demo: boolean;
 }
 
-
 // Polling cadence chosen to match Meta's typical user expectation
 // (status feedback within a few seconds). Anything faster wastes
 // backend cycles on a slow-changing async job.
 const POLL_INTERVAL_MS = 3_000;
-
 
 @Component({
   selector: 'app-data-deletion-status',
@@ -114,10 +105,9 @@ export class DataDeletionStatusComponent implements OnInit, OnDestroy {
     const code = this.confirmationCode();
     if (!code) return;
     this.http
-      .get<StatusResponse>(
-        `${environment.apiBaseUrl}/integrations/meta/data-deletion/status`,
-        { params: { confirmation_code: code } },
-      )
+      .get<StatusResponse>(`${environment.apiBaseUrl}/integrations/meta/data-deletion/status`, {
+        params: { confirmation_code: code },
+      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
@@ -127,10 +117,7 @@ export class DataDeletionStatusComponent implements OnInit, OnDestroy {
           // observe — terminal states stop the cycle to keep the page
           // idle.
           if (res.status === 'pending' || res.status === 'in_progress') {
-            this.pollHandle = setTimeout(
-              () => this.pollOnce(),
-              POLL_INTERVAL_MS,
-            );
+            this.pollHandle = setTimeout(() => this.pollOnce(), POLL_INTERVAL_MS);
           }
         },
         error: (err) => {
@@ -141,9 +128,7 @@ export class DataDeletionStatusComponent implements OnInit, OnDestroy {
                 'expired or been copied incorrectly.',
             );
           } else {
-            this.error.set(
-              'Unable to load deletion status. Please try again in a moment.',
-            );
+            this.error.set('Unable to load deletion status. Please try again in a moment.');
           }
         },
       });

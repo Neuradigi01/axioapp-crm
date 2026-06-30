@@ -43,14 +43,14 @@ Two extra utilities:
     ``unsubscribe_link_required_in_marketing_email=True`` AND the
     rendered body lacks an ``unsubscribe`` token.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -121,9 +121,7 @@ async def _load_settings(session, *, org_id: uuid.UUID) -> _ComplianceSettings:
     from src.app.core.settings.models import OrgSettings
 
     row = (
-        await session.execute(
-            select(OrgSettings).where(OrgSettings.org_id == org_id)
-        )
+        await session.execute(select(OrgSettings).where(OrgSettings.org_id == org_id))
     ).scalar_one_or_none()
     if row is None:
         return _ComplianceSettings(
@@ -157,9 +155,7 @@ async def _load_settings(session, *, org_id: uuid.UUID) -> _ComplianceSettings:
 # ---------------------------------------------------------------------------
 
 
-async def _check_block_list(
-    session, *, org_id: uuid.UUID, contact_id: uuid.UUID | None
-) -> bool:
+async def _check_block_list(session, *, org_id: uuid.UUID, contact_id: uuid.UUID | None) -> bool:
     """Returns True iff the contact is on a block list. v1 has no
     dedicated ``tbl_block_list`` table — the check is a no-op +
     returns False so all sends proceed. A future track that ships
@@ -184,9 +180,7 @@ async def _check_opt_out(
     from src.app.core.contacts.models import Contact
 
     contact = (
-        await session.execute(
-            select(Contact).where(Contact.id == contact_id)
-        )
+        await session.execute(select(Contact).where(Contact.id == contact_id))
     ).scalar_one_or_none()
     if contact is None:
         return False
@@ -204,9 +198,7 @@ async def _check_opt_out(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_quiet_hours_defer(
-    settings: _ComplianceSettings, *, now: datetime
-) -> datetime | None:
+def _resolve_quiet_hours_defer(settings: _ComplianceSettings, *, now: datetime) -> datetime | None:
     """Return the UTC ``defer_until`` datetime when ``now`` falls
     inside the org's quiet-hours window, otherwise None.
 
@@ -226,7 +218,7 @@ def _resolve_quiet_hours_defer(
             "compliance.quiet_hours bad_timezone tz=%s — defaulting to UTC",
             settings.quiet_hours_timezone,
         )
-        tz = timezone.utc
+        tz = UTC
 
     local_now = now.astimezone(tz)
     start = settings.quiet_hours_start
@@ -258,10 +250,8 @@ def _resolve_quiet_hours_defer(
             defer_local = datetime.combine(local_now.date(), end, tzinfo=tz)
         else:
             # Before midnight, end is tomorrow.
-            defer_local = datetime.combine(
-                local_now.date() + timedelta(days=1), end, tzinfo=tz
-            )
-    return defer_local.astimezone(timezone.utc)
+            defer_local = datetime.combine(local_now.date() + timedelta(days=1), end, tzinfo=tz)
+    return defer_local.astimezone(UTC)
 
 
 # ---------------------------------------------------------------------------
@@ -335,7 +325,7 @@ async def check_send(
     ActionResult shape the engine expects.
     """
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
     org_id = getattr(run, "org_id", None)
     contact_id = getattr(run, "contact_id", None)
@@ -346,18 +336,14 @@ async def check_send(
     settings = await _load_settings(session, org_id=org_id)
 
     # 1) Block list applies to ALL categories. v1 is a no-op.
-    if await _check_block_list(
-        session, org_id=org_id, contact_id=contact_id
-    ):
+    if await _check_block_list(session, org_id=org_id, contact_id=contact_id):
         return Skip(reason="blocked")
 
     category_lower = (category or "").lower()
 
     if category_lower == "marketing":
         # 2) Channel-aware opt-out.
-        if await _check_opt_out(
-            session, contact_id=contact_id, channel=channel
-        ):
+        if await _check_opt_out(session, contact_id=contact_id, channel=channel):
             return Skip(reason="opt_out")
 
         # 3) Quiet hours.
@@ -386,10 +372,7 @@ async def check_send(
         if defer_until is not None:
             return Defer(until=defer_until, reason="deferred_quiet_hours")
 
-    if (
-        not settings.transactional_bypass_frequency_cap
-        and contact_id is not None
-    ):
+    if not settings.transactional_bypass_frequency_cap and contact_id is not None:
         cap_reason = await _check_frequency_caps(
             session,
             org_id=org_id,
@@ -439,9 +422,7 @@ async def ensure_unsubscribe_link(
         return body, False
 
     footer = (
-        "\n\n---\n"
-        "To unsubscribe from these emails, reply with STOP or visit "
-        "{{ unsubscribe_url }}."
+        "\n\n---\nTo unsubscribe from these emails, reply with STOP or visit {{ unsubscribe_url }}."
     )
     return (body or "") + footer, True
 

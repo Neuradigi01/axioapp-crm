@@ -10,6 +10,7 @@ subset (``MissingTemplateForChannel``, ``InvalidCondition``) at run
 time and flips the run row to ``status='skipped'`` so the operator
 sees the reason in the run-history UI.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -41,9 +42,7 @@ class DuplicateTriggerName(AutomationError):
     code = "automation.duplicate_trigger_name"
 
     def __init__(self, name: str) -> None:
-        super().__init__(
-            f"a trigger named {name!r} already exists in this org"
-        )
+        super().__init__(f"a trigger named {name!r} already exists in this org")
         self.name = name
 
 

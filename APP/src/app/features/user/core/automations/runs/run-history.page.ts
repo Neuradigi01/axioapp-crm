@@ -25,7 +25,6 @@ import {
 } from '../automations-api.service';
 import { RetryModalComponent } from './retry.modal';
 
-
 /**
  * Run-history page — `/user/automations/:id/runs`.
  *
@@ -65,7 +64,6 @@ const STATUS_PALETTE: Record<AutomationRunStatus, string> = {
   skipped: 'bg-amber-50 text-amber-700 ring-amber-200',
 };
 
-
 @Component({
   selector: 'app-run-history-page',
   standalone: true,
@@ -104,30 +102,22 @@ export class RunHistoryPageComponent {
   protected readonly expandedId = signal<string | null>(null);
   protected readonly retryTarget = signal<RunRead | null>(null);
 
-  protected readonly canWrite = computed(() =>
-    this.auth.hasPermission('automations.write'),
-  );
+  protected readonly canWrite = computed(() => this.auth.hasPermission('automations.write'));
 
   protected readonly triggerId = signal<string | null>(null);
 
-  protected readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.total() / PAGE_SIZE)),
-  );
+  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / PAGE_SIZE)));
   protected readonly hasPrev = computed(() => this.pageIndex() > 0);
-  protected readonly hasNext = computed(
-    () => this.pageIndex() < this.totalPages() - 1,
-  );
+  protected readonly hasNext = computed(() => this.pageIndex() < this.totalPages() - 1);
 
   constructor() {
-    this.route.paramMap
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((params) => {
-        const id = params.get('id');
-        if (id) {
-          this.triggerId.set(id);
-          this.loadTrigger(id);
-        }
-      });
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const id = params.get('id');
+      if (id) {
+        this.triggerId.set(id);
+        this.loadTrigger(id);
+      }
+    });
 
     effect(() => {
       const id = this.triggerId();
@@ -173,9 +163,7 @@ export class RunHistoryPageComponent {
           this.items.set([]);
           this.total.set(0);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load runs.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load runs.');
         },
       });
   }
@@ -227,9 +215,7 @@ export class RunHistoryPageComponent {
   protected onRetried(updated: RunRead): void {
     // Optimistic patch — the deliver_run task will flip status to
     // sent/failed once it re-runs.
-    this.items.update((rows) =>
-      rows.map((r) => (r.id === updated.id ? updated : r)),
-    );
+    this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
     this.retryTarget.set(null);
   }
 

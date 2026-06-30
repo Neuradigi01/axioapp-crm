@@ -25,14 +25,12 @@ import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
 import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
 import { FieldDef } from '../shared/dynamic-form/types';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
-import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
-import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import {
-  Contact,
-  ContactCreate,
-  ContactUpdate,
-  ContactsApiService,
-} from './contacts-api.service';
+  ReassignConfirm,
+  ReassignModalComponent,
+} from '../shared/reassign-modal/reassign-modal.component';
+import { UsersDirectoryService } from '../shared/services/users-directory.service';
+import { Contact, ContactCreate, ContactUpdate, ContactsApiService } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
 import { OptInChipComponent } from './opt-in/opt-in-chip.component';
 import { OptInSectionComponent } from './opt-in/opt-in-section.component';
@@ -92,9 +90,7 @@ export class ContactDetailPageComponent implements OnInit {
   readonly deleteError = signal<string | null>(null);
 
   /** Tied to `*ngIf` on the pencil-icon — junior staff shouldn't see it. */
-  readonly canReassign = computed(() =>
-    this.auth.hasPermission('contacts.reassign'),
-  );
+  readonly canReassign = computed(() => this.auth.hasPermission('contacts.reassign'));
 
   /** Owner-id → "Full Name" lookup so the header can show a name
    * without a per-contact round-trip. */
@@ -159,7 +155,6 @@ export class ContactDetailPageComponent implements OnInit {
     this.activeTab.set(tab);
   }
 
-
   protected openEdit(): void {
     const c = this.contact();
     if (c) this.editingContact.set(c);
@@ -219,9 +214,7 @@ export class ContactDetailPageComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.deleteSubmitting.set(false);
-          this.deleteError.set(
-            extractApiError(err) ?? 'Could not delete contact.',
-          );
+          this.deleteError.set(extractApiError(err) ?? 'Could not delete contact.');
         },
       });
   }
@@ -255,9 +248,7 @@ export class ContactDetailPageComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.reassignSubmitting.set(false);
-          this.reassignError.set(
-            extractApiError(err) ?? 'Could not reassign contact.',
-          );
+          this.reassignError.set(extractApiError(err) ?? 'Could not reassign contact.');
         },
       });
   }
@@ -306,5 +297,4 @@ export class ContactDetailPageComponent implements OnInit {
     }
     return String(value);
   }
-
 }

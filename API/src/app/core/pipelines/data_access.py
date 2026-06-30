@@ -21,18 +21,17 @@ validated the name against the ``_PIPELINE_TRACKED_TABLES`` registry
 + the ``_TABLE_NAME_RE`` regex. The DAL re-checks the regex as a
 second line of defence.
 """
+
 from __future__ import annotations
 
 import re
 import uuid
-from typing import Optional
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.app.core.pipelines.models import Pipeline, PipelineStage
-
 
 # Same identifier pattern the service registry enforces; re-checked
 # here so a typo / direct call from outside still can't slip a
@@ -45,10 +44,7 @@ def _validated_table(table: str) -> str:
     Raises ``ValueError`` on a bad name — the service should have
     rejected it upstream."""
     if not _TABLE_NAME_RE.match(table):
-        raise ValueError(
-            f"pipeline-tracked table name {table!r} must match "
-            "[a-z][a-z0-9_]*"
-        )
+        raise ValueError(f"pipeline-tracked table name {table!r} must match [a-z][a-z0-9_]*")
     return table
 
 
@@ -65,39 +61,27 @@ async def list_pipelines_with_stages(
 ) -> list[Pipeline]:
     """All pipelines for the active tenant, stages eager-loaded,
     ordered by name."""
-    result = await session.execute(
-        _pipeline_select_with_stages().order_by(Pipeline.name)
-    )
+    result = await session.execute(_pipeline_select_with_stages().order_by(Pipeline.name))
     return list(result.scalars().all())
 
 
-async def get_pipeline_by_key_with_stages(
-    session: AsyncSession, key: str
-) -> Optional[Pipeline]:
+async def get_pipeline_by_key_with_stages(session: AsyncSession, key: str) -> Pipeline | None:
     """Single pipeline by ``key`` with stages eager-loaded."""
-    result = await session.execute(
-        _pipeline_select_with_stages().where(Pipeline.key == key)
-    )
+    result = await session.execute(_pipeline_select_with_stages().where(Pipeline.key == key))
     return result.scalar_one_or_none()
 
 
 async def get_pipeline_by_id_with_stages(
     session: AsyncSession, pipeline_id: uuid.UUID
-) -> Optional[Pipeline]:
+) -> Pipeline | None:
     """Single pipeline by PK with stages eager-loaded."""
-    result = await session.execute(
-        _pipeline_select_with_stages().where(Pipeline.id == pipeline_id)
-    )
+    result = await session.execute(_pipeline_select_with_stages().where(Pipeline.id == pipeline_id))
     return result.scalar_one_or_none()
 
 
-async def get_stage_by_id(
-    session: AsyncSession, stage_id: uuid.UUID
-) -> Optional[PipelineStage]:
+async def get_stage_by_id(session: AsyncSession, stage_id: uuid.UUID) -> PipelineStage | None:
     """Single PipelineStage by PK."""
-    result = await session.execute(
-        select(PipelineStage).where(PipelineStage.id == stage_id)
-    )
+    result = await session.execute(select(PipelineStage).where(PipelineStage.id == stage_id))
     return result.scalar_one_or_none()
 
 
@@ -107,7 +91,7 @@ async def find_stage_at_order(
     pipeline_id: uuid.UUID,
     display_order: int,
     exclude_id: uuid.UUID,
-) -> Optional[PipelineStage]:
+) -> PipelineStage | None:
     """Locate the stage that currently holds ``display_order`` in
     ``pipeline_id``, excluding the row being updated. Used by the
     swap-orders logic in ``update_stage``."""
@@ -121,16 +105,12 @@ async def find_stage_at_order(
     ).scalar_one_or_none()
 
 
-def insert_pipeline_stage(
-    session: AsyncSession, stage: PipelineStage
-) -> None:
+def insert_pipeline_stage(session: AsyncSession, stage: PipelineStage) -> None:
     """Register an already-constructed PipelineStage for INSERT."""
     session.add(stage)
 
 
-async def delete_pipeline_stage_row(
-    session: AsyncSession, stage: PipelineStage
-) -> None:
+async def delete_pipeline_stage_row(session: AsyncSession, stage: PipelineStage) -> None:
     """Mark a PipelineStage row for DELETE. Caller commits."""
     await session.delete(stage)
 
@@ -143,16 +123,13 @@ async def read_card_pipeline_stage(
     *,
     table: str,
     card_id: uuid.UUID,
-) -> Optional[str]:
+) -> str | None:
     """Read the ``pipeline_stage`` value for one row in a pipeline-
     tracked table. Returns ``None`` when the row doesn't exist."""
     safe_table = _validated_table(table)
     row = (
         await session.execute(
-            text(
-                f"SELECT pipeline_stage FROM {safe_table} "
-                "WHERE id = :card_id"
-            ),
+            text(f"SELECT pipeline_stage FROM {safe_table} WHERE id = :card_id"),
             {"card_id": card_id},
         )
     ).first()
@@ -190,10 +167,7 @@ async def count_cards_in_stage_for_table(
     safe_table = _validated_table(table)
     row = (
         await session.execute(
-            text(
-                f"SELECT count(*) FROM {safe_table} "
-                "WHERE pipeline_stage = :key"
-            ),
+            text(f"SELECT count(*) FROM {safe_table} WHERE pipeline_stage = :key"),
             {"key": key},
         )
     ).first()

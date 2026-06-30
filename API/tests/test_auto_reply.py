@@ -17,9 +17,10 @@ Cases:
   9. Malformed interval (bad HH:MM) is silently skipped.
  10. Multiple matching days don't double-count (we just return True).
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 from src.app.core.integrations.whatsapp.auto_reply import (
@@ -27,12 +28,11 @@ from src.app.core.integrations.whatsapp.auto_reply import (
     substitute_variables,
 )
 
-
 # Mon 2026-06-22 11:00 UTC — a typical "in business hours" time for
 # the tests that follow.
-_MON_11AM = datetime(2026, 6, 22, 11, 0, 0, tzinfo=timezone.utc)
-_MON_3AM = datetime(2026, 6, 22, 3, 0, 0, tzinfo=timezone.utc)
-_SUN_3PM = datetime(2026, 6, 28, 15, 0, 0, tzinfo=timezone.utc)
+_MON_11AM = datetime(2026, 6, 22, 11, 0, 0, tzinfo=UTC)
+_MON_3AM = datetime(2026, 6, 22, 3, 0, 0, tzinfo=UTC)
+_SUN_3PM = datetime(2026, 6, 28, 15, 0, 0, tzinfo=UTC)
 
 
 def _contact(full_name: str | None = "Asha Kumar") -> SimpleNamespace:
@@ -69,9 +69,7 @@ class TestSubstituteVariables:
         assert out == "Hi Asha Kumar."
 
     def test_null_contact_renders_empty(self):
-        out = substitute_variables(
-            "Hi {{contact.first_name}}!", contact=None, org=_org()
-        )
+        out = substitute_variables("Hi {{contact.first_name}}!", contact=None, org=_org())
         # Empty-string substitution rather than a NameError or
         # crash — the operator sees a slightly-awkward "Hi !" rather
         # than a 500.
@@ -84,15 +82,11 @@ class TestSubstituteVariables:
 
 class TestBusinessHours:
     def test_inside_interval(self):
-        hours = [
-            {"day": 0, "intervals": [{"open": "10:00", "close": "19:00"}]}
-        ]
+        hours = [{"day": 0, "intervals": [{"open": "10:00", "close": "19:00"}]}]
         assert is_within_business_hours(hours, now=_MON_11AM) is True
 
     def test_outside_interval(self):
-        hours = [
-            {"day": 0, "intervals": [{"open": "10:00", "close": "19:00"}]}
-        ]
+        hours = [{"day": 0, "intervals": [{"open": "10:00", "close": "19:00"}]}]
         assert is_within_business_hours(hours, now=_MON_3AM) is False
 
     def test_none_treated_as_always_open(self):
@@ -105,9 +99,7 @@ class TestBusinessHours:
 
     def test_wrong_weekday_returns_false(self):
         # Mon 10-19 schedule, evaluated on Sunday → closed.
-        hours = [
-            {"day": 0, "intervals": [{"open": "10:00", "close": "19:00"}]}
-        ]
+        hours = [{"day": 0, "intervals": [{"open": "10:00", "close": "19:00"}]}]
         assert is_within_business_hours(hours, now=_SUN_3PM) is False
 
     def test_split_shift_inside_second_interval(self):
@@ -133,7 +125,7 @@ class TestBusinessHours:
                 ],
             }
         ]
-        lunchtime = datetime(2026, 6, 28, 13, 30, 0, tzinfo=timezone.utc)
+        lunchtime = datetime(2026, 6, 28, 13, 30, 0, tzinfo=UTC)
         assert is_within_business_hours(hours, now=lunchtime) is False
 
     def test_malformed_interval_skipped(self):
@@ -151,17 +143,13 @@ class TestBusinessHours:
         assert is_within_business_hours(hours, now=_MON_11AM) is True
 
     def test_at_open_boundary_inclusive(self):
-        hours = [
-            {"day": 0, "intervals": [{"open": "10:00", "close": "19:00"}]}
-        ]
+        hours = [{"day": 0, "intervals": [{"open": "10:00", "close": "19:00"}]}]
         # 10:00 on Monday — open_t <= current < close_t makes the
         # opening boundary inclusive.
-        at_open = datetime(2026, 6, 22, 10, 0, 0, tzinfo=timezone.utc)
+        at_open = datetime(2026, 6, 22, 10, 0, 0, tzinfo=UTC)
         assert is_within_business_hours(hours, now=at_open) is True
 
     def test_at_close_boundary_exclusive(self):
-        hours = [
-            {"day": 0, "intervals": [{"open": "10:00", "close": "19:00"}]}
-        ]
-        at_close = datetime(2026, 6, 22, 19, 0, 0, tzinfo=timezone.utc)
+        hours = [{"day": 0, "intervals": [{"open": "10:00", "close": "19:00"}]}]
+        at_close = datetime(2026, 6, 22, 19, 0, 0, tzinfo=UTC)
         assert is_within_business_hours(hours, now=at_close) is False

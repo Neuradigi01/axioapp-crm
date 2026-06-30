@@ -5,13 +5,8 @@ import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { RunHistoryPageComponent } from './run-history.page';
-import {
-  AutomationsApiService,
-  RunRead,
-  TriggerRead,
-} from '../automations-api.service';
+import { AutomationsApiService, RunRead, TriggerRead } from '../automations-api.service';
 import { FurnitureAuthService } from '../../auth/auth.service';
-
 
 function makeRun(overrides: Partial<RunRead> = {}): RunRead {
   return {
@@ -32,30 +27,24 @@ function makeRun(overrides: Partial<RunRead> = {}): RunRead {
   };
 }
 
-
 describe('RunHistoryPageComponent', () => {
   let apiSpy: jasmine.SpyObj<AutomationsApiService>;
   let authStub: { hasPermission: (k: string) => boolean };
 
-  function makeFixture(
-    rows: RunRead[] = [],
-  ): ComponentFixture<RunHistoryPageComponent> {
-    apiSpy = jasmine.createSpyObj<AutomationsApiService>(
-      'AutomationsApiService',
-      ['get', 'listRuns', 'retry'],
-    );
+  function makeFixture(rows: RunRead[] = []): ComponentFixture<RunHistoryPageComponent> {
+    apiSpy = jasmine.createSpyObj<AutomationsApiService>('AutomationsApiService', [
+      'get',
+      'listRuns',
+      'retry',
+    ]);
     apiSpy.get.and.returnValue(
       of({
         id: 'trg-1',
         name: 'User Welcome',
       } as unknown as TriggerRead),
     );
-    apiSpy.listRuns.and.returnValue(
-      of({ items: rows, total: rows.length, limit: 50, offset: 0 }),
-    );
-    apiSpy.retry.and.callFake((id: string) =>
-      of(makeRun({ id, status: 'queued', error: null })),
-    );
+    apiSpy.listRuns.and.returnValue(of({ items: rows, total: rows.length, limit: 50, offset: 0 }));
+    apiSpy.retry.and.callFake((id: string) => of(makeRun({ id, status: 'queued', error: null })));
 
     authStub = { hasPermission: (_k: string) => true };
 

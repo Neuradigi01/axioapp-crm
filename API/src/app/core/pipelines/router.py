@@ -10,6 +10,7 @@ Read gates by `pipelines.read`; mutations by `pipelines.manage`. The
 move-card flow has no HTTP surface in this step — `pipelines.move_card`
 is consumed in-process by Leads / Custom Orders routers in later steps.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -33,7 +34,6 @@ from src.app.core.pipelines.service import (
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/pipelines", tags=["Pipelines"])
 
@@ -73,15 +73,11 @@ async def create_stage_endpoint(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("pipelines.manage")),
 ) -> PipelineStageOut:
-    stage = await create_stage(
-        db, pipeline_key=pipeline_key, payload=payload
-    )
+    stage = await create_stage(db, pipeline_key=pipeline_key, payload=payload)
     return PipelineStageOut.model_validate(stage)
 
 
-@router.patch(
-    "/{pipeline_key}/stages/{stage_id}", response_model=PipelineStageOut
-)
+@router.patch("/{pipeline_key}/stages/{stage_id}", response_model=PipelineStageOut)
 async def update_stage_endpoint(
     pipeline_key: str,
     stage_id: uuid.UUID,
@@ -89,9 +85,7 @@ async def update_stage_endpoint(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("pipelines.manage")),
 ) -> PipelineStageOut:
-    stage = await update_stage(
-        db, pipeline_key=pipeline_key, stage_id=stage_id, payload=payload
-    )
+    stage = await update_stage(db, pipeline_key=pipeline_key, stage_id=stage_id, payload=payload)
     return PipelineStageOut.model_validate(stage)
 
 

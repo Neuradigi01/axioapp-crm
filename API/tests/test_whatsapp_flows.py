@@ -33,10 +33,11 @@ Cases:
  14.  Template JSON for every bundled file has a top-level
       ``version`` and ``screens`` array.
 """
+
 from __future__ import annotations
 
 import json
-from datetime import timezone
+from datetime import UTC
 
 import pytest
 
@@ -60,15 +61,7 @@ def _adapter() -> WhatsAppAdapter:
 
 
 def _wrap_message(message: dict) -> dict:
-    return {
-        "entry": [
-            {
-                "changes": [
-                    {"value": {"messages": [message]}}
-                ]
-            }
-        ]
-    }
+    return {"entry": [{"changes": [{"value": {"messages": [message]}}]}]}
 
 
 class TestTemplateLoader:
@@ -133,19 +126,15 @@ class TestTemplateLoader:
 
 class TestParseScheduledAt:
     def test_date_plus_time(self):
-        ts = _parse_scheduled_at(
-            {"preferred_date": "2026-07-15", "preferred_time": "14:30"}
-        )
+        ts = _parse_scheduled_at({"preferred_date": "2026-07-15", "preferred_time": "14:30"})
         assert ts is not None
         assert ts.tzinfo is not None
         assert ts.year == 2026 and ts.month == 7 and ts.day == 15
         assert ts.hour == 14 and ts.minute == 30
-        assert ts.utcoffset() == timezone.utc.utcoffset(None)
+        assert ts.utcoffset() == UTC.utcoffset(None)
 
     def test_missing_date(self):
-        assert (
-            _parse_scheduled_at({"preferred_time": "14:30"}) is None
-        )
+        assert _parse_scheduled_at({"preferred_time": "14:30"}) is None
 
     def test_missing_time_falls_back_to_10am(self):
         ts = _parse_scheduled_at({"preferred_date": "2026-07-15"})
@@ -200,9 +189,7 @@ class TestNfmReplyParser:
                 "type": "nfm_reply",
                 "nfm_reply": {
                     "name": "flow-token-y",
-                    "response_json": json.dumps(
-                        {"full_name": "Ada", "email": "ada@x.test"}
-                    ),
+                    "response_json": json.dumps({"full_name": "Ada", "email": "ada@x.test"}),
                 },
             },
         }

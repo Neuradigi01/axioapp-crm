@@ -19,7 +19,6 @@ import {
   RunRead,
 } from '../../automations/automations-api.service';
 
-
 /**
  * Automations tab on the contact detail page.
  *
@@ -42,7 +41,6 @@ const STATUS_PALETTE: Record<AutomationRunStatus, string> = {
   failed: 'bg-rose-50 text-rose-700 ring-rose-200',
   skipped: 'bg-amber-50 text-amber-700 ring-amber-200',
 };
-
 
 @Component({
   selector: 'app-contact-automations-tab',

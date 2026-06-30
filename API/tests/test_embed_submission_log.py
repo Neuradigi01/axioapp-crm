@@ -21,13 +21,13 @@ isn't safe to drive from pytest-asyncio inside a fixture (asyncpg's
     exercised by manual smoke (submit a lead in the dev environment;
     open Settings → Embed → Submission log; confirm the row appears).
 """
+
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from typing import Optional
 from unittest.mock import MagicMock
 
 import pytest
@@ -42,7 +42,6 @@ from src.app.core.embed.schemas import (
     WidgetConfigField,
     WidgetConfigSpamProtection,
 )
-
 
 # --- 1. hash_ip pure function ---------------------------------------------
 
@@ -96,11 +95,17 @@ def _config_row(*, spam=None):
     doc = WidgetConfigDocument(
         fields=[
             WidgetConfigField(
-                key="full_name", label="Name", required=True, order=0,
+                key="full_name",
+                label="Name",
+                required=True,
+                order=0,
                 field_type="text",
             ),
             WidgetConfigField(
-                key="phone", label="Phone", required=True, order=1,
+                key="phone",
+                label="Phone",
+                required=True,
+                order=1,
                 field_type="tel",
             ),
         ],
@@ -127,9 +132,7 @@ class _SubmitHarness:
         self.log_capture = _LogCapture(calls=[])
 
         async def _find_key(plain, ip=None):
-            return SimpleNamespace(
-                id=_KEY_ID, org_id=org_id, prefix="pk_live_xx"
-            )
+            return SimpleNamespace(id=_KEY_ID, org_id=org_id, prefix="pk_live_xx")
 
         async def _public_get(_):
             return _config_row(spam=spam)
@@ -158,30 +161,22 @@ class _SubmitHarness:
         monkeypatch.setattr(
             submissions,
             "check_per_key",
-            lambda _p: RateLimitResult(
-                allowed=True, remaining=100, retry_after=0.0
-            ),
+            lambda _p: RateLimitResult(allowed=True, remaining=100, retry_after=0.0),
         )
         monkeypatch.setattr(
             submissions,
             "check_per_ip",
-            lambda _ip: RateLimitResult(
-                allowed=True, remaining=10, retry_after=0.0
-            ),
+            lambda _ip: RateLimitResult(allowed=True, remaining=10, retry_after=0.0),
         )
-        monkeypatch.setattr(
-            submissions, "find_existing_contact", _find_existing
-        )
+        monkeypatch.setattr(submissions, "find_existing_contact", _find_existing)
         monkeypatch.setattr(submissions, "create_contact", _create_contact)
         monkeypatch.setattr(submissions, "create_lead", _create_lead)
         monkeypatch.setattr(submissions, "async_session", lambda: _NullCM())
         monkeypatch.setattr(submissions.audit, "log", _audit_log)
         # The log_service.record call goes through both modules' names.
-        monkeypatch.setattr(
-            submissions.log_service, "record", self.log_capture
-        )
+        monkeypatch.setattr(submissions.log_service, "record", self.log_capture)
 
-    def find_log(self, outcome: EmbedSubmissionOutcome) -> Optional[dict]:
+    def find_log(self, outcome: EmbedSubmissionOutcome) -> dict | None:
         for call in self.log_capture.calls:
             if call.get("outcome") == outcome:
                 return call
@@ -191,9 +186,7 @@ class _SubmitHarness:
 @pytest.fixture
 def harness_factory(monkeypatch):
     def _factory(*, spam=None):
-        return _SubmitHarness(
-            monkeypatch, org_id=uuid.uuid4(), spam=spam
-        )
+        return _SubmitHarness(monkeypatch, org_id=uuid.uuid4(), spam=spam)
 
     return _factory
 
@@ -202,9 +195,7 @@ class TestSubmitWritesLog:
     @pytest.mark.asyncio
     async def test_accepted_writes_one_accepted_row(self, harness_factory):
         h = harness_factory()
-        payload = _payload(
-            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10)
-        )
+        payload = _payload(rendered_at=datetime.now(UTC) - timedelta(seconds=10))
 
         result = await submissions.submit(
             payload=payload, header_key="pk_live_xx", ip="203.0.113.5"
@@ -223,12 +214,10 @@ class TestSubmitWritesLog:
         h = harness_factory()
         payload = _payload(
             honeypot="trapped",
-            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            rendered_at=datetime.now(UTC) - timedelta(seconds=10),
         )
 
-        await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="9.9.9.9"
-        )
+        await submissions.submit(payload=payload, header_key="pk_live_xx", ip="9.9.9.9")
 
         row = h.find_log(EmbedSubmissionOutcome.rejected_spam)
         assert row is not None
@@ -240,11 +229,9 @@ class TestSubmitWritesLog:
     @pytest.mark.asyncio
     async def test_min_time_writes_spam_row(self, harness_factory):
         h = harness_factory()
-        payload = _payload(rendered_at=datetime.now(timezone.utc))
+        payload = _payload(rendered_at=datetime.now(UTC))
 
-        await submissions.submit(
-            payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-        )
+        await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
 
         row = h.find_log(EmbedSubmissionOutcome.rejected_spam)
         assert row is not None
@@ -257,9 +244,7 @@ class TestSubmitWritesLog:
         monkeypatch.setattr(
             submissions,
             "check_per_key",
-            lambda _p: RateLimitResult(
-                allowed=False, remaining=0, retry_after=60.0
-            ),
+            lambda _p: RateLimitResult(allowed=False, remaining=0, retry_after=60.0),
         )
 
         from fastapi import HTTPException
@@ -277,23 +262,19 @@ class TestSubmitWritesLog:
         assert row["reason"] == "per_key"
 
     @pytest.mark.asyncio
-    async def test_invalid_payload_writes_error_row(
-        self, harness_factory
-    ):
+    async def test_invalid_payload_writes_error_row(self, harness_factory):
         h = harness_factory()
         # Force a validation failure: send a field name the config doesn't
         # know about. The widget config only declares full_name + phone.
         payload = _payload(
             email="bot@example.com",  # not configured
-            rendered_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            rendered_at=datetime.now(UTC) - timedelta(seconds=10),
         )
 
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc:
-            await submissions.submit(
-                payload=payload, header_key="pk_live_xx", ip="1.1.1.1"
-            )
+            await submissions.submit(payload=payload, header_key="pk_live_xx", ip="1.1.1.1")
         assert exc.value.status_code == 422
 
         row = h.find_log(EmbedSubmissionOutcome.invalid_payload)
@@ -305,6 +286,7 @@ class TestSubmitWritesLog:
         """Per the Step 9 decision: missing/invalid keys don't get logged
         — no org context to attach the row to."""
         h = harness_factory()
+
         # Override find_by_plain_key to return None (bad key).
         async def _no_key(plain, ip=None):
             return None

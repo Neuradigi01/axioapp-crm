@@ -1,10 +1,11 @@
-from sqlalchemy import Integer, Text, Boolean, ForeignKey, Index
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column
+
 from src.models import Base
 
 
 class Country(Base):
-    __tablename__ = 'tbl_countries'
+    __tablename__ = "tbl_countries"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
@@ -17,21 +18,19 @@ class Country(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     __table_args__ = (
-        Index('idx_tbl_countries_iso2', 'iso2'),
-        Index('idx_tbl_countries_iso3', 'iso3'),
+        Index("idx_tbl_countries_iso2", "iso2"),
+        Index("idx_tbl_countries_iso3", "iso3"),
     )
 
 
 class State(Base):
-    __tablename__ = 'tbl_states'
+    __tablename__ = "tbl_states"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    country_id: Mapped[int] = mapped_column(Integer, ForeignKey('tbl_countries.id'), nullable=False)
+    country_id: Mapped[int] = mapped_column(Integer, ForeignKey("tbl_countries.id"), nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     code: Mapped[str | None] = mapped_column(Text, nullable=True)
     adm1_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    __table_args__ = (
-        Index('idx_tbl_states_country_id', 'country_id'),
-    )
+    __table_args__ = (Index("idx_tbl_states_country_id", "country_id"),)

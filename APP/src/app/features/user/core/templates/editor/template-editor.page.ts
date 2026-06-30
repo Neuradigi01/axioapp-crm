@@ -10,12 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -43,7 +38,6 @@ import { SmsFormComponent, SmsFormGroup } from './sms-form.component';
 import { VariablePickerComponent } from './variable-picker.component';
 import { WaFormComponent, WaFormGroup } from './wa-form.component';
 
-
 /**
  * Template editor page — used for both `/new` and `/:id` routes.
  *
@@ -61,17 +55,9 @@ import { WaFormComponent, WaFormGroup } from './wa-form.component';
  * reviewers via reject) which Step 8's review modal handles. v1 just
  * shows the banner — the unlock path lives in Step 8.
  */
-type ChannelOption =
-  | ''
-  | 'whatsapp'
-  | 'email'
-  | 'sms'
-  | 'facebook'
-  | 'instagram'
-  | 'push';
+type ChannelOption = '' | 'whatsapp' | 'email' | 'sms' | 'facebook' | 'instagram' | 'push';
 
 const LOCKED_STATUSES = new Set(['in_review', 'approved', 'published']);
-
 
 @Component({
   selector: 'app-template-editor-page',
@@ -147,15 +133,9 @@ export class TemplateEditorPageComponent {
     return t !== null && LOCKED_STATUSES.has(t.internal_status);
   });
 
-  protected readonly canWrite = computed(() =>
-    this.auth.hasPermission('templates.write'),
-  );
-  protected readonly canReview = computed(() =>
-    this.auth.hasPermission('templates.review'),
-  );
-  protected readonly canPublish = computed(() =>
-    this.auth.hasPermission('templates.publish'),
-  );
+  protected readonly canWrite = computed(() => this.auth.hasPermission('templates.write'));
+  protected readonly canReview = computed(() => this.auth.hasPermission('templates.review'));
+  protected readonly canPublish = computed(() => this.auth.hasPermission('templates.publish'));
   protected readonly canSubmitExternal = computed(() =>
     this.auth.hasPermission('templates.submit_external'),
   );
@@ -164,12 +144,7 @@ export class TemplateEditorPageComponent {
 
   protected readonly showSubmitButton = computed(() => {
     const t = this.template();
-    return (
-      t !== null &&
-      t.internal_status === 'draft' &&
-      this.canWrite() &&
-      !this.locked()
-    );
+    return t !== null && t.internal_status === 'draft' && this.canWrite() && !this.locked();
   });
   protected readonly showReviewButton = computed(() => {
     const t = this.template();
@@ -181,18 +156,10 @@ export class TemplateEditorPageComponent {
   });
   protected readonly showArchiveButton = computed(() => {
     const t = this.template();
-    return (
-      t !== null &&
-      t.internal_status !== 'archived' &&
-      this.canWrite()
-    );
+    return t !== null && t.internal_status !== 'archived' && this.canWrite();
   });
-  protected readonly showTestSendButton = computed(
-    () => this.template() !== null,
-  );
-  protected readonly showVersionsButton = computed(
-    () => this.template() !== null,
-  );
+  protected readonly showTestSendButton = computed(() => this.template() !== null);
+  protected readonly showVersionsButton = computed(() => this.template() !== null);
   /** Step 9 — Submit-to-Meta is visible only on WhatsApp templates that
    *  are published (or approved internally) AND whose external status
    *  is either n_a (never submitted) or rejected (resubmission).
@@ -202,10 +169,8 @@ export class TemplateEditorPageComponent {
     if (t === null) return false;
     if (t.channel !== 'whatsapp') return false;
     if (!this.canSubmitExternal()) return false;
-    const internalOk =
-      t.internal_status === 'published' || t.internal_status === 'approved';
-    const externalOk =
-      t.external_status === 'n_a' || t.external_status === 'rejected';
+    const internalOk = t.internal_status === 'published' || t.internal_status === 'approved';
+    const externalOk = t.external_status === 'n_a' || t.external_status === 'rejected';
     return internalOk && externalOk;
   });
   /** Step 14 — Refresh-status button. Visible for WhatsApp templates
@@ -245,9 +210,7 @@ export class TemplateEditorPageComponent {
 
   // The textarea / input the variable-picker click should insert into.
   private focusedField: HTMLTextAreaElement | HTMLInputElement | null = null;
-  protected readonly trackFocus = (
-    el: HTMLTextAreaElement | HTMLInputElement,
-  ): void => {
+  protected readonly trackFocus = (el: HTMLTextAreaElement | HTMLInputElement): void => {
     this.focusedField = el;
   };
 
@@ -269,10 +232,7 @@ export class TemplateEditorPageComponent {
       if (channel === 'sms' && this.smsForm() === null) {
         this.smsForm.set(SmsFormComponent.build());
       }
-      if (
-        (channel === 'facebook' || channel === 'instagram') &&
-        this.fbForm() === null
-      ) {
+      if ((channel === 'facebook' || channel === 'instagram') && this.fbForm() === null) {
         this.fbForm.set(FbFormComponent.build());
       }
       if (channel === 'push' && this.pushForm() === null) {
@@ -387,12 +347,10 @@ export class TemplateEditorPageComponent {
 
     // Load existing template when the route carries an `:id` (or stays
     // empty for the `/new` path).
-    this.route.paramMap
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((params) => {
-        const id = params.get('id');
-        if (id) this.loadTemplate(id);
-      });
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const id = params.get('id');
+      if (id) this.loadTemplate(id);
+    });
   }
 
   // --- load / hydrate -------------------------------------------------
@@ -406,9 +364,7 @@ export class TemplateEditorPageComponent {
         next: (row) => {
           this.template.set(row);
           this.headerForm.controls.name.setValue(row.name);
-          this.headerForm.controls.channel.setValue(
-            row.channel as ChannelOption,
-          );
+          this.headerForm.controls.channel.setValue(row.channel as ChannelOption);
           // Channel-locked once saved.
           this.headerForm.controls.channel.disable({ emitEvent: false });
           if (row.channel === 'whatsapp') {
@@ -431,10 +387,7 @@ export class TemplateEditorPageComponent {
             f.patchValue({ body_text: row.body_text });
             this.smsForm.set(f);
             this.loadSmsDltMetadata(row.id);
-          } else if (
-            row.channel === 'facebook' ||
-            row.channel === 'instagram'
-          ) {
+          } else if (row.channel === 'facebook' || row.channel === 'instagram') {
             // Step 13 — quick replies aren't persisted at the central
             // model level yet; they'll round-trip once the FB/IG
             // adapter ships. body_text is the source of truth in v1.
@@ -463,17 +416,12 @@ export class TemplateEditorPageComponent {
           // Step 14 — Meta's rejection_reason lives on the WA extension
           // row, surfaced through GET /external-status. Fetch it when
           // we land on a rejected WA template so the banner can render.
-          if (
-            row.channel === 'whatsapp' &&
-            row.external_status === 'rejected'
-          ) {
+          if (row.channel === 'whatsapp' && row.external_status === 'rejected') {
             this.loadExternalStatus(row.id);
           }
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load template.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load template.');
         },
       });
   }
@@ -645,8 +593,7 @@ export class TemplateEditorPageComponent {
                   this.saving.set(false);
                   this.template.set(row);
                   this.saveError.set(
-                    extractApiError(err) ??
-                      'Saved the body, but DLT metadata failed to save.',
+                    extractApiError(err) ?? 'Saved the body, but DLT metadata failed to save.',
                   );
                 },
               });
@@ -815,9 +762,7 @@ export class TemplateEditorPageComponent {
 
   private applyTransitionError(err: HttpErrorResponse): void {
     this.transitioning.set(null);
-    this.saveError.set(
-      extractApiError(err) ?? 'Could not complete the action.',
-    );
+    this.saveError.set(extractApiError(err) ?? 'Could not complete the action.');
   }
 
   // --- modal / drawer triggers ---------------------------------------
@@ -862,15 +807,9 @@ export class TemplateEditorPageComponent {
         { emitEvent: false },
       );
     } else if (row.channel === 'sms') {
-      this.smsForm()?.patchValue(
-        { body_text: row.body_text },
-        { emitEvent: false },
-      );
+      this.smsForm()?.patchValue({ body_text: row.body_text }, { emitEvent: false });
     } else if (row.channel === 'facebook' || row.channel === 'instagram') {
-      this.fbForm()?.patchValue(
-        { body_text: row.body_text },
-        { emitEvent: false },
-      );
+      this.fbForm()?.patchValue({ body_text: row.body_text }, { emitEvent: false });
     } else if (row.channel === 'push') {
       this.pushForm()?.patchValue(
         { title: row.subject ?? '', body_text: row.body_text },

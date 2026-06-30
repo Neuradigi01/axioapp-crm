@@ -1,15 +1,16 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from config import ACTION_TOKEN_EXPIRY_MINUTES, JWT_ALGORITHM, JWT_SECRET_KEY
+from src.constants import messages
 from src.core.db import get_db
 from src.core.security.jwt import get_current_user
 from src.data_access import action_token_da
-from src.constants import messages
-from config import JWT_SECRET_KEY, JWT_ALGORITHM, ACTION_TOKEN_EXPIRY_MINUTES
 
 SECRET_KEY = JWT_SECRET_KEY
 ALGORITHM = JWT_ALGORITHM
@@ -17,7 +18,7 @@ ALGORITHM = JWT_ALGORITHM
 
 def create_action_token(user_id: str, user_type: str) -> tuple[str, str, datetime]:
     jti = str(uuid.uuid4())
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=ACTION_TOKEN_EXPIRY_MINUTES)
+    expires_at = datetime.now(UTC) + timedelta(minutes=ACTION_TOKEN_EXPIRY_MINUTES)
     payload = {
         "sub": user_id,
         "role": user_type,
@@ -69,7 +70,7 @@ class ActionTokenGuard:
         token_payload: dict = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> None:
-        from src.data_access import user_da, admin_da
+        from src.data_access import admin_da, user_da
 
         user_id = token_payload.get("user_id")
         user_type = token_payload.get("role")
@@ -125,5 +126,5 @@ class ActionTokenGuard:
                 },
             )
 
-        expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        expires_at = datetime.fromtimestamp(payload["exp"], tz=UTC)
         await action_token_da.mark_token_used(db, jti, record.id, user_type, expires_at)

@@ -22,8 +22,8 @@ app-startup lifespan via the module registry — see
 (``0118_bf_templates_perm``) can import them by name instead of
 hard-coding the strings in three places.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 PERM_READ = "templates.read"
 PERM_WRITE = "templates.write"

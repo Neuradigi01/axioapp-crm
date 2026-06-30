@@ -15,10 +15,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
-import {
-  BlockListService,
-  BlockReason,
-} from '../../whatsapp/block-list/block-list.service';
+import { BlockListService, BlockReason } from '../../whatsapp/block-list/block-list.service';
 
 /**
  * "Block this number" quick action on the chat-thread header
@@ -51,9 +48,7 @@ import {
             class="absolute right-0 z-50 mt-1 w-64 rounded-md border border-zinc-200 bg-white p-3 text-xs shadow-lg"
             (click)="$event.stopPropagation()"
           >
-            <p class="mb-2 font-semibold text-zinc-800">
-              Block {{ phoneNumber() }}
-            </p>
+            <p class="mb-2 font-semibold text-zinc-800">Block {{ phoneNumber() }}</p>
             <label class="mb-2 block">
               <span class="mb-1 block text-zinc-700">Reason</span>
               <select
@@ -151,9 +146,7 @@ export class ConversationBlockNumberActionComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.busy.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not block number.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not block number.');
         },
       });
   }

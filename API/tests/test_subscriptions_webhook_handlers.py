@@ -12,10 +12,11 @@ The handlers' contracts:
   - Missing local state → raise (the router converts to 500 → Stripe
     retries).
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -44,7 +45,6 @@ from src.app.core.subscriptions.webhooks.handlers.subscription_updated import (
 from src.app.core.subscriptions.webhooks.router import _HANDLERS
 from src.app.core.tenants.models import Organization
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ async def _seed_org_with_sub(
     test_db.add(org)
     await test_db.flush()
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = Subscription(
         org_id=org.id,
         plan_code=plan_code,
@@ -147,11 +147,7 @@ def _invoice_event(
                 "period_end": 1702592000,
                 "hosted_invoice_url": "https://invoice.stripe.com/i/test",
                 "invoice_pdf": "https://pay.stripe.com/test/pdf",
-                "status_transitions": (
-                    {"paid_at": paid_at_ts}
-                    if paid_at_ts is not None
-                    else {}
-                ),
+                "status_transitions": ({"paid_at": paid_at_ts} if paid_at_ts is not None else {}),
             },
         },
     }
@@ -245,9 +241,7 @@ async def test_checkout_completed_flips_subscription(test_db):
     await on_checkout_completed(test_db, event)
 
     fresh = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     await test_db.refresh(fresh)
     assert fresh.status == "active"
@@ -275,16 +269,17 @@ async def test_checkout_completed_missing_metadata_raises(test_db):
 async def test_checkout_completed_is_idempotent(test_db):
     org, sub = await _seed_org_with_sub(test_db, plan_code="trial")
     event = _checkout_completed_event(
-        org.id, plan_code="basic", billing_cycle="monthly", seats=5,
+        org.id,
+        plan_code="basic",
+        billing_cycle="monthly",
+        seats=5,
     )
 
     await on_checkout_completed(test_db, event)
     await on_checkout_completed(test_db, event)
 
     fresh = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     await test_db.refresh(fresh)
     assert fresh.plan_code == "basic"
@@ -300,7 +295,8 @@ async def test_checkout_completed_is_idempotent(test_db):
 async def test_invoice_paid_upserts_row_and_resumes_past_due(test_db):
     org, sub = await _seed_org_with_sub(
         test_db,
-        plan_code="basic", status="past_due",
+        plan_code="basic",
+        status="past_due",
         stripe_subscription_id="sub_test_99",
     )
     event = _invoice_event(
@@ -308,7 +304,8 @@ async def test_invoice_paid_upserts_row_and_resumes_past_due(test_db):
         subscription="sub_test_99",
         invoice_id="in_99",
         status="paid",
-        amount_due=6000, amount_paid=6000,
+        amount_due=6000,
+        amount_paid=6000,
         paid_at_ts=1701000000,
     )
 
@@ -317,9 +314,7 @@ async def test_invoice_paid_upserts_row_and_resumes_past_due(test_db):
     # Invoice row created with status=paid.
     inv = (
         await test_db.execute(
-            select(SubscriptionInvoice).where(
-                SubscriptionInvoice.stripe_invoice_id == "in_99"
-            )
+            select(SubscriptionInvoice).where(SubscriptionInvoice.stripe_invoice_id == "in_99")
         )
     ).scalar_one()
     assert inv.status == "paid"
@@ -328,9 +323,7 @@ async def test_invoice_paid_upserts_row_and_resumes_past_due(test_db):
 
     # past_due resumed to active.
     fresh = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     await test_db.refresh(fresh)
     assert fresh.status == "active"
@@ -339,7 +332,9 @@ async def test_invoice_paid_upserts_row_and_resumes_past_due(test_db):
 @pytest.mark.asyncio
 async def test_invoice_paid_is_idempotent_single_invoice_row(test_db):
     org, _ = await _seed_org_with_sub(
-        test_db, status="active", stripe_subscription_id="sub_x",
+        test_db,
+        status="active",
+        stripe_subscription_id="sub_x",
     )
     event = _invoice_event(
         event_type="invoice.paid",
@@ -351,35 +346,40 @@ async def test_invoice_paid_is_idempotent_single_invoice_row(test_db):
     await on_invoice_paid(test_db, event)
 
     rows = (
-        await test_db.execute(
-            select(SubscriptionInvoice).where(
-                SubscriptionInvoice.stripe_invoice_id == "in_idem"
+        (
+            await test_db.execute(
+                select(SubscriptionInvoice).where(
+                    SubscriptionInvoice.stripe_invoice_id == "in_idem"
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
 
 
 @pytest.mark.asyncio
 async def test_invoice_finalized_inserts_open_invoice(test_db):
     org, _ = await _seed_org_with_sub(
-        test_db, status="active", stripe_subscription_id="sub_fin",
+        test_db,
+        status="active",
+        stripe_subscription_id="sub_fin",
     )
     event = _invoice_event(
         event_type="invoice.finalized",
         subscription="sub_fin",
         invoice_id="in_fin",
         status="open",
-        amount_due=14500, amount_paid=0,
+        amount_due=14500,
+        amount_paid=0,
     )
 
     await on_invoice_finalized(test_db, event)
 
     inv = (
         await test_db.execute(
-            select(SubscriptionInvoice).where(
-                SubscriptionInvoice.stripe_invoice_id == "in_fin"
-            )
+            select(SubscriptionInvoice).where(SubscriptionInvoice.stripe_invoice_id == "in_fin")
         )
     ).scalar_one()
     assert inv.status == "open"
@@ -406,7 +406,8 @@ async def test_invoice_paid_raises_when_subscription_unknown(test_db):
 async def test_invoice_failed_flips_active_to_past_due(test_db):
     org, sub = await _seed_org_with_sub(
         test_db,
-        plan_code="basic", status="active",
+        plan_code="basic",
+        status="active",
         stripe_subscription_id="sub_pf",
     )
     event = _invoice_event(
@@ -414,15 +415,14 @@ async def test_invoice_failed_flips_active_to_past_due(test_db):
         subscription="sub_pf",
         invoice_id="in_pf",
         status="open",
-        amount_due=6000, amount_paid=0,
+        amount_due=6000,
+        amount_paid=0,
     )
 
     await on_invoice_failed(test_db, event)
 
     fresh = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     await test_db.refresh(fresh)
     assert fresh.status == "past_due"
@@ -437,7 +437,9 @@ async def test_invoice_failed_flips_active_to_past_due(test_db):
 async def test_subscription_updated_syncs_quantity(test_db):
     org, sub = await _seed_org_with_sub(
         test_db,
-        plan_code="standard", status="active", seats_purchased=5,
+        plan_code="standard",
+        status="active",
+        seats_purchased=5,
         stripe_subscription_id="sub_q",
     )
     event = _subscription_updated_event(
@@ -450,9 +452,7 @@ async def test_subscription_updated_syncs_quantity(test_db):
     await on_subscription_updated(test_db, event)
 
     fresh = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     await test_db.refresh(fresh)
     assert fresh.seats_purchased == 8
@@ -476,7 +476,8 @@ async def test_subscription_updated_unknown_sub_is_silent_noop(test_db):
 async def test_subscription_deleted_cancels_local_row(test_db):
     org, sub = await _seed_org_with_sub(
         test_db,
-        plan_code="basic", status="active",
+        plan_code="basic",
+        status="active",
         stripe_subscription_id="sub_del",
     )
 
@@ -484,9 +485,7 @@ async def test_subscription_deleted_cancels_local_row(test_db):
     await on_subscription_cancelled(test_db, event)
 
     fresh = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     await test_db.refresh(fresh)
     assert fresh.status == "cancelled"
@@ -497,7 +496,8 @@ async def test_subscription_deleted_cancels_local_row(test_db):
 async def test_subscription_deleted_is_idempotent(test_db):
     org, sub = await _seed_org_with_sub(
         test_db,
-        plan_code="basic", status="active",
+        plan_code="basic",
+        status="active",
         stripe_subscription_id="sub_del2",
     )
 
@@ -505,9 +505,7 @@ async def test_subscription_deleted_is_idempotent(test_db):
     await on_subscription_cancelled(test_db, event)
     # First cancellation timestamp must be preserved on the second call.
     first = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     await test_db.refresh(first)
     first_cancelled_at = first.cancelled_at
@@ -515,9 +513,7 @@ async def test_subscription_deleted_is_idempotent(test_db):
     await on_subscription_cancelled(test_db, event)
 
     second = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     await test_db.refresh(second)
     assert second.status == "cancelled"
@@ -533,16 +529,23 @@ async def test_subscription_deleted_is_idempotent(test_db):
 async def test_audit_event_written_for_checkout_completed(test_db):
     org, sub = await _seed_org_with_sub(test_db, plan_code="trial")
     event = _checkout_completed_event(
-        org.id, plan_code="basic", billing_cycle="monthly", seats=5,
+        org.id,
+        plan_code="basic",
+        billing_cycle="monthly",
+        seats=5,
     )
     await on_checkout_completed(test_db, event)
 
     rows = (
-        await test_db.execute(
-            select(AuditLog).where(
-                AuditLog.action == "subscription.upgraded",
-                AuditLog.entity_id == sub.id,
+        (
+            await test_db.execute(
+                select(AuditLog).where(
+                    AuditLog.action == "subscription.upgraded",
+                    AuditLog.entity_id == sub.id,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(rows) >= 1

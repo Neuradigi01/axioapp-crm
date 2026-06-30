@@ -22,6 +22,7 @@ Per-record verdicts:
   * ``dmarc``: looks for ``v=DMARC1`` in the TXT record on
     ``_dmarc.<domain>``.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -29,7 +30,6 @@ import logging
 import time
 from dataclasses import dataclass
 from typing import Literal
-
 
 logger = logging.getLogger(__name__)
 
@@ -85,16 +85,12 @@ async def _resolve_txt(name: str) -> list[str]:
 
         try:
             answer = await dns.asyncresolver.resolve(name, "TXT")
-            return [
-                b"".join(rd.strings).decode("utf-8", errors="replace")
-                for rd in answer
-            ]
+            return [b"".join(rd.strings).decode("utf-8", errors="replace") for rd in answer]
         except Exception:
             return []
     except ImportError:
         logger.debug(
-            "email.dkim_spf_check dnspython unavailable; "
-            "returning unknown for %s",
+            "email.dkim_spf_check dnspython unavailable; returning unknown for %s",
             name,
         )
         return []
@@ -148,10 +144,7 @@ async def check_domain(
     now = time.time()
     if not force_refresh:
         cached = _cache.get(key)
-        if (
-            cached is not None
-            and (now - cached.last_checked_at) < _CACHE_TTL_SECONDS
-        ):
+        if cached is not None and (now - cached.last_checked_at) < _CACHE_TTL_SECONDS:
             return cached
 
     spf_task = asyncio.create_task(_check_spf(domain))

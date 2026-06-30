@@ -1,9 +1,7 @@
 <div class="h-full flex flex-col border-r border-zinc-200 bg-white">
   <div class="px-4 pt-4 pb-3 border-b border-zinc-200">
     <h2 class="text-sm font-semibold text-zinc-700">Node palette</h2>
-    <p class="text-[11px] text-zinc-500 mt-0.5">
-      Drag a node onto the canvas to add it.
-    </p>
+    <p class="text-[11px] text-zinc-500 mt-0.5">Drag a node onto the canvas to add it.</p>
     <div class="relative mt-3">
       <lucide-icon
         name="Search"
@@ -23,9 +21,7 @@
     @for (section of sections; track section.key) {
       @if (itemsByCategory()[section.key].length > 0) {
         <section>
-          <h3
-            class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2"
-          >
+          <h3 class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
             {{ section.label }}
           </h3>
           <div class="space-y-1.5">

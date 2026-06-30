@@ -13,7 +13,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { environment } from '../../../../../../environments/environment';
-import { extractApiError } from '@core/services/api-error.util';
 
 interface AttributionResponse {
   conversation_id: string;
@@ -104,9 +103,7 @@ export class AttributionChipComponent {
 
   private load(id: string): void {
     this.http
-      .get<AttributionResponse>(
-        `${environment.apiBaseUrl}/conversations/${id}/attribution`,
-      )
+      .get<AttributionResponse>(`${environment.apiBaseUrl}/conversations/${id}/attribution`)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (a) => this.attribution.set(a),

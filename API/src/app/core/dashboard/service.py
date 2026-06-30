@@ -13,10 +13,11 @@ Adding a card later is a one-line entry in `_assemble_org_cards()` or
 `_assemble_personal_cards()` plus a matching frontend template branch
 on `format`. No new modules, no new permission keys.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
 from sqlalchemy import case, func, or_, select
@@ -48,7 +49,6 @@ from src.app.core.tasks.models import Task, TaskStatus
 from src.app.core.tenants import data_access
 from src.app.core.users.models import User, UserInfo
 
-
 # Action prefixes that show up on the dashboard's recent-activity feed.
 # Everything else (login, password change, access denied, self-profile
 # edits) is intentionally hidden — those are security/audit signals,
@@ -73,13 +73,11 @@ _ACTIVITY_INCLUDE_EXACT = {
 
 def _week_start(now: datetime) -> datetime:
     """Monday 00:00 of the current ISO week, in UTC."""
-    midnight = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    midnight = datetime(now.year, now.month, now.day, tzinfo=UTC)
     return midnight - timedelta(days=now.weekday())
 
 
-def _delta(
-    current: float, previous: float
-) -> tuple[float, Literal["up", "down", "flat"]]:
+def _delta(current: float, previous: float) -> tuple[float, Literal["up", "down", "flat"]]:
     """Return `(signed_pct, direction)` for a current/previous pair.
 
     Zero baseline collapses to `+100` when current > 0 so the frontend
@@ -137,11 +135,7 @@ async def _greeting(session: AsyncSession, user: User) -> Greeting:
     first = (info.first_name if info else "") or ""
     org = await data_access.get_organization_by_id(session, user.org_id)
     assert org is not None  # authed user implies their org exists
-    role = (
-        await session.execute(
-            select(Role).where(Role.id == user.role_id)
-        )
-    ).scalar_one_or_none()
+    role = (await session.execute(select(Role).where(Role.id == user.role_id))).scalar_one_or_none()
     return Greeting(
         first_name=first or "there",
         role_name=role.name if role else "",
@@ -325,9 +319,7 @@ async def _assemble_org_cards(
 
     # contacts.total (cumulative)  vs  cumulative count as-of 30d ago
     contacts_total = (
-        await session.execute(
-            select(func.count(Contact.id)).where(Contact.org_id == org_id)
-        )
+        await session.execute(select(func.count(Contact.id)).where(Contact.org_id == org_id))
     ).scalar_one()
     contacts_prev = (
         await session.execute(
@@ -352,17 +344,13 @@ async def _assemble_org_cards(
     # NULLIF on the denominator collapses the zero-leads case to NULL,
     # which COALESCE turns into 0 so the card is always renderable.
     # Prior period is the 30 days before that.
-    closed_filter = (Lead.status == LeadStatus.won) | (
-        Lead.status == LeadStatus.lost
-    )
+    closed_filter = (Lead.status == LeadStatus.won) | (Lead.status == LeadStatus.lost)
     won_count_expr = func.sum(case((Lead.status == LeadStatus.won, 1), else_=0))
     closed_count_expr = func.sum(case((closed_filter, 1), else_=0))
     conversion = (
         await session.execute(
             select(
-                func.coalesce(
-                    won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0
-                )
+                func.coalesce(won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0)
             ).where(
                 Lead.org_id == org_id,
                 Lead.updated_at >= thirty_days_ago,
@@ -372,9 +360,7 @@ async def _assemble_org_cards(
     conversion_prev = (
         await session.execute(
             select(
-                func.coalesce(
-                    won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0
-                )
+                func.coalesce(won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0)
             ).where(
                 Lead.org_id == org_id,
                 Lead.updated_at >= sixty_days_ago,
@@ -424,8 +410,7 @@ async def _assemble_org_cards(
                 label="Top performers (this week)",
                 value=[
                     {
-                        "name": f"{r.first_name or ''} {r.last_name or ''}".strip()
-                        or "Unknown",
+                        "name": f"{r.first_name or ''} {r.last_name or ''}".strip() or "Unknown",
                         "count": int(r.c),
                     }
                     for r in perf_rows
@@ -580,17 +565,13 @@ async def _assemble_personal_cards(
     )
 
     # conversion.my_rate (last 30d)  vs  the 30d before
-    closed_filter = (Lead.status == LeadStatus.won) | (
-        Lead.status == LeadStatus.lost
-    )
+    closed_filter = (Lead.status == LeadStatus.won) | (Lead.status == LeadStatus.lost)
     won_count_expr = func.sum(case((Lead.status == LeadStatus.won, 1), else_=0))
     closed_count_expr = func.sum(case((closed_filter, 1), else_=0))
     my_conversion = (
         await session.execute(
             select(
-                func.coalesce(
-                    won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0
-                )
+                func.coalesce(won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0)
             ).where(
                 Lead.org_id == org_id,
                 Lead.assigned_to_id == user_uuid,
@@ -601,9 +582,7 @@ async def _assemble_personal_cards(
     my_conversion_prev = (
         await session.execute(
             select(
-                func.coalesce(
-                    won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0
-                )
+                func.coalesce(won_count_expr * 100.0 / func.nullif(closed_count_expr, 0), 0)
             ).where(
                 Lead.org_id == org_id,
                 Lead.assigned_to_id == user_uuid,
@@ -697,9 +676,7 @@ async def _recent_activity(
             label_map[("appointment", aid)] = title or "appointment"
 
     if ids := ids_by_type.get("task"):
-        result = await session.execute(
-            select(Task.id, Task.title).where(Task.id.in_(ids))
-        )
+        result = await session.execute(select(Task.id, Task.title).where(Task.id.in_(ids)))
         for tid, title in result.all():
             label_map[("task", tid)] = title or "task"
 
@@ -720,9 +697,7 @@ async def _recent_activity(
             .where(User.legacy_uuid.in_(actor_ids))
         )
         for uid, first, last in result.all():
-            actor_map[uid] = (
-                f"{first or ''} {last or ''}".strip() or "Someone"
-            )
+            actor_map[uid] = f"{first or ''} {last or ''}".strip() or "Someone"
 
     items: list[ActivityItem] = []
     for r in visible:
@@ -799,7 +774,7 @@ async def get_summary(session: AsyncSession, caller: User) -> DashboardSummary:
             upcoming_appointments=[],
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     greeting = await _greeting(session, caller)
 
     is_org_scope = await _has_users_read(session, caller.role_id)
@@ -807,16 +782,12 @@ async def get_summary(session: AsyncSession, caller: User) -> DashboardSummary:
 
     if is_org_scope:
         cards = await _assemble_org_cards(session, org_id, now)
-        recent = await _recent_activity(
-            session, org_id, caller_uuid, personal_only=False
-        )
+        recent = await _recent_activity(session, org_id, caller_uuid, personal_only=False)
         upcoming = await _upcoming_appointments(session, org_id, None, now)
         scope = "org"
     else:
         cards = await _assemble_personal_cards(session, org_id, caller_uuid, now)
-        recent = await _recent_activity(
-            session, org_id, caller_uuid, personal_only=True
-        )
+        recent = await _recent_activity(session, org_id, caller_uuid, personal_only=True)
         upcoming = await _upcoming_appointments(session, org_id, caller_uuid, now)
         scope = "personal"
 
@@ -853,7 +824,7 @@ async def assemble_trend(
     """
     org_id = caller.org_id
     range_days = _RANGE_DAYS[range_str]
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     start = today - timedelta(days=range_days - 1)
 
     if org_id is None:
@@ -953,7 +924,7 @@ async def assemble_funnel(
     """
     org_id = caller.org_id
     range_days = _RANGE_DAYS[range_str]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     start = now - timedelta(days=range_days)
 
     if org_id is None:

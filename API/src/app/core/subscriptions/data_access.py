@@ -19,11 +19,11 @@ Operations grouped by entity:
       get_usage_counter_value, upsert_usage_counter_returning,
       insert_zero_counter_if_absent
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,13 +35,12 @@ from src.app.core.subscriptions.models import (
     UsageCounter,
 )
 
-
 # --- Subscriptions ------------------------------------------------------
 
 
 async def get_active_subscription_for_org(
     session: AsyncSession, org_id: uuid.UUID
-) -> Optional[Subscription]:
+) -> Subscription | None:
     """Return the org's currently-active subscription, or ``None``.
     ``Active`` means ``status IN ACTIVE_STATUSES`` — the same set the
     partial unique index enforces."""
@@ -59,7 +58,7 @@ async def get_active_subscription_for_org(
 
 async def get_latest_subscription_for_org(
     session: AsyncSession, org_id: uuid.UUID
-) -> Optional[Subscription]:
+) -> Subscription | None:
     """Most-recent subscription row regardless of status. Used by the
     cancellation idempotent path which needs to see a ``cancelled``
     row to short-circuit."""
@@ -73,15 +72,11 @@ async def get_latest_subscription_for_org(
     ).scalar_one_or_none()
 
 
-async def get_subscription_by_id(
-    session: AsyncSession, sub_id: uuid.UUID
-) -> Optional[Subscription]:
+async def get_subscription_by_id(session: AsyncSession, sub_id: uuid.UUID) -> Subscription | None:
     """Single-row read by PK. Used by the race-loss re-read paths
     after a conditional UPDATE fails to touch any row."""
     return (
-        await session.execute(
-            select(Subscription).where(Subscription.id == sub_id)
-        )
+        await session.execute(select(Subscription).where(Subscription.id == sub_id))
     ).scalar_one_or_none()
 
 
@@ -116,9 +111,7 @@ async def update_subscription_next_seats(
     """UPDATE only ``next_seats`` on one subscription row. Used by
     the seat-change scheduled path."""
     await session.execute(
-        update(Subscription)
-        .where(Subscription.id == sub_id)
-        .values(next_seats=next_seats)
+        update(Subscription).where(Subscription.id == sub_id).values(next_seats=next_seats)
     )
 
 
@@ -189,12 +182,16 @@ async def list_invoices_for_org(
     Explicit ``org_id`` predicate + the ``TenantScoped`` listener
     together belt-and-suspenders the tenant scoping."""
     rows = (
-        await session.execute(
-            select(SubscriptionInvoice)
-            .where(SubscriptionInvoice.org_id == org_id)
-            .order_by(SubscriptionInvoice.created_at.desc())
+        (
+            await session.execute(
+                select(SubscriptionInvoice)
+                .where(SubscriptionInvoice.org_id == org_id)
+                .order_by(SubscriptionInvoice.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -236,7 +233,7 @@ async def get_usage_counter_value(
     org_id: uuid.UUID,
     resource: str,
     period_start: datetime,
-) -> Optional[int]:
+) -> int | None:
     """Read one counter's ``value`` for the specified period. ``None``
     if no row exists yet (caller defaults to 0)."""
     row = (

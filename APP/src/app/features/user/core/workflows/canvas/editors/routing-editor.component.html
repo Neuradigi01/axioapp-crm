@@ -31,7 +31,13 @@
         type="text"
         [ngModel]="poolValue()"
         (ngModelChange)="onPoolValueChange($event)"
-        [placeholder]="poolType() === 'role' ? 'role name (e.g. Sales rep)' : poolType() === 'team' ? 'team id' : 'uuid1,uuid2,…'"
+        [placeholder]="
+          poolType() === 'role'
+            ? 'role name (e.g. Sales rep)'
+            : poolType() === 'team'
+              ? 'team id'
+              : 'uuid1,uuid2,…'
+        "
         class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
       />
       @if (!poolValue().trim()) {
@@ -40,9 +46,7 @@
     </div>
   } @else {
     <div>
-      <label class="block text-[11px] font-medium text-zinc-600 mb-1">
-        Specific user UUID
-      </label>
+      <label class="block text-[11px] font-medium text-zinc-600 mb-1"> Specific user UUID </label>
       <input
         type="text"
         [ngModel]="specificUserId()"

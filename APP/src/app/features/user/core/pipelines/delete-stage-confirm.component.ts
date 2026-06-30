@@ -36,9 +36,7 @@ export class DeleteStageConfirmComponent {
   readonly cancelled = output<void>();
 
   protected readonly orderedCandidates = computed<PipelineStage[]>(() =>
-    [...this.candidateStages()].sort(
-      (a, b) => a.display_order - b.display_order,
-    ),
+    [...this.candidateStages()].sort((a, b) => a.display_order - b.display_order),
   );
 
   protected readonly moveLeadsTo = signal<string>('');
@@ -54,9 +52,7 @@ export class DeleteStageConfirmComponent {
         this.moveLeadsTo.set('');
         return;
       }
-      const before = [...candidates]
-        .reverse()
-        .find((s) => s.display_order < deleted.display_order);
+      const before = [...candidates].reverse().find((s) => s.display_order < deleted.display_order);
       this.moveLeadsTo.set((before ?? candidates[0]).key);
     });
   }

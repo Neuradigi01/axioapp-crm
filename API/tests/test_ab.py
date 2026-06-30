@@ -28,6 +28,7 @@ Cases:
  13.  `_pick_winner` falls back to the other variant when one had 0 samples.
  14.  `_pick_winner` tie-breaks to A on equal rates.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -62,22 +63,15 @@ class TestVariantAssignment:
     def test_deterministic(self):
         cid = uuid.uuid4()
         contact = uuid.uuid4()
-        first = _assign_ab_variant(
-            campaign_id=cid, contact_id=contact, split_ratio=50
-        )
-        second = _assign_ab_variant(
-            campaign_id=cid, contact_id=contact, split_ratio=50
-        )
+        first = _assign_ab_variant(campaign_id=cid, contact_id=contact, split_ratio=50)
+        second = _assign_ab_variant(campaign_id=cid, contact_id=contact, split_ratio=50)
         assert first == second
 
     def test_distribution_50_50(self):
         cid = uuid.uuid4()
         contacts = [uuid.uuid4() for _ in range(1000)]
         assignments = [
-            _assign_ab_variant(
-                campaign_id=cid, contact_id=c, split_ratio=50
-            )
-            for c in contacts
+            _assign_ab_variant(campaign_id=cid, contact_id=c, split_ratio=50) for c in contacts
         ]
         a_count = assignments.count("A")
         # Allow generous 10% slack — SHA-256 isn't perfectly uniform
@@ -88,10 +82,7 @@ class TestVariantAssignment:
         cid = uuid.uuid4()
         contacts = [uuid.uuid4() for _ in range(1000)]
         assignments = [
-            _assign_ab_variant(
-                campaign_id=cid, contact_id=c, split_ratio=80
-            )
-            for c in contacts
+            _assign_ab_variant(campaign_id=cid, contact_id=c, split_ratio=80) for c in contacts
         ]
         a_count = assignments.count("A")
         assert 700 <= a_count <= 900, a_count
@@ -100,37 +91,23 @@ class TestVariantAssignment:
         cid = uuid.uuid4()
         contacts = [uuid.uuid4() for _ in range(50)]
         for c in contacts:
-            assert (
-                _assign_ab_variant(
-                    campaign_id=cid, contact_id=c, split_ratio=0
-                )
-                == "B"
-            )
+            assert _assign_ab_variant(campaign_id=cid, contact_id=c, split_ratio=0) == "B"
 
     def test_split_hundred_all_a(self):
         cid = uuid.uuid4()
         contacts = [uuid.uuid4() for _ in range(50)]
         for c in contacts:
-            assert (
-                _assign_ab_variant(
-                    campaign_id=cid, contact_id=c, split_ratio=100
-                )
-                == "A"
-            )
+            assert _assign_ab_variant(campaign_id=cid, contact_id=c, split_ratio=100) == "A"
 
 
 class TestCampaignCreateValidation:
     def test_missing_variant_b_rejected(self):
         with pytest.raises(ValidationError):
-            CampaignCreate.model_validate(
-                _ab_payload(variant_b_template_id=None)
-            )
+            CampaignCreate.model_validate(_ab_payload(variant_b_template_id=None))
 
     def test_missing_variant_a_rejected(self):
         with pytest.raises(ValidationError):
-            CampaignCreate.model_validate(
-                _ab_payload(variant_a_template_id=None)
-            )
+            CampaignCreate.model_validate(_ab_payload(variant_a_template_id=None))
 
     def test_identical_variants_rejected(self):
         shared = str(uuid.uuid4())
@@ -161,15 +138,11 @@ class TestCampaignCreateValidation:
         # The legacy "exactly one of template / template_id" check
         # must still fire for non-A/B campaigns.
         with pytest.raises(ValidationError):
-            CampaignCreate.model_validate(
-                {"name": "T", "channel": "whatsapp"}
-            )
+            CampaignCreate.model_validate({"name": "T", "channel": "whatsapp"})
 
 
 class TestPickWinner:
-    def _metrics(
-        self, variant: str, samples: int, numerator: int
-    ) -> VariantMetrics:
+    def _metrics(self, variant: str, samples: int, numerator: int) -> VariantMetrics:
         rate = (numerator / samples) if samples else 0.0
         return VariantMetrics(
             variant=variant,

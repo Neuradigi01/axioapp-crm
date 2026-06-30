@@ -35,7 +35,10 @@ import {
 } from '../shared/directives/url-filter-state.directive';
 import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
-import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
+import {
+  ReassignConfirm,
+  ReassignModalComponent,
+} from '../shared/reassign-modal/reassign-modal.component';
 import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { extractApiError } from '@core/services/api-error.util';
@@ -106,10 +109,9 @@ export class ContactsListPageComponent {
     this.sourceControl.valueChanges.pipe(distinctUntilChanged()),
     { initialValue: '' },
   );
-  private readonly tagFilter = toSignal(
-    this.tagControl.valueChanges.pipe(distinctUntilChanged()),
-    { initialValue: '' },
-  );
+  private readonly tagFilter = toSignal(this.tagControl.valueChanges.pipe(distinctUntilChanged()), {
+    initialValue: '',
+  });
 
   /** Distinct source/tag chips for filter dropdowns â€” derived from the loaded page. */
   readonly sourceOptions = computed(() => {
@@ -209,9 +211,20 @@ export class ContactsListPageComponent {
 
   constructor() {
     this.state.bulkActions.set([
-      { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'contacts.reassign' },
+      {
+        key: 'reassign',
+        label: 'Reassign to…',
+        icon: 'user-cog',
+        permissionKey: 'contacts.reassign',
+      },
       { key: 'tag', label: 'Add tag', icon: 'tag', permissionKey: 'contacts.write' },
-      { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'contacts.write' },
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: 'trash-2',
+        danger: true,
+        permissionKey: 'contacts.write',
+      },
     ]);
     // Initial load â€” runs after the effect below subscribes to the filter signals.
     this.reload();
@@ -239,19 +252,17 @@ export class ContactsListPageComponent {
     // so landing on the page from elsewhere drops the user straight
     // into the create-contact modal. Strip the param after consuming
     // it so a refresh doesn't re-open.
-    this.route.queryParamMap
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((params) => {
-        if (params.get('new') !== null && this.modalState() === null) {
-          this.openCreate();
-          this.router.navigate([], {
-            relativeTo: this.route,
-            queryParams: { new: null },
-            queryParamsHandling: 'merge',
-            replaceUrl: true,
-          });
-        }
-      });
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      if (params.get('new') !== null && this.modalState() === null) {
+        this.openCreate();
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { new: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      }
+    });
 
     this.assigneeControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
@@ -379,8 +390,7 @@ export class ContactsListPageComponent {
         error: (err: HttpErrorResponse) => {
           this.exporting.set(false);
           this.state.loadError.set(
-            extractApiError(err) ??
-              'Could not export. Narrow the filter and try again.',
+            extractApiError(err) ?? 'Could not export. Narrow the filter and try again.',
           );
         },
       });
@@ -401,7 +411,6 @@ export class ContactsListPageComponent {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
-
 
   private submitCreate(payload: ContactCreate): void {
     this.submitting.set(true);
@@ -563,5 +572,4 @@ export class ContactsListPageComponent {
         },
       });
   }
-
 }

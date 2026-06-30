@@ -21,9 +21,15 @@
         autocomplete="username"
         class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       />
-      @if (loginForm.controls['identifier'].invalid && (loginForm.controls['identifier'].touched || loginForm.controls['identifier'].dirty)) {
+      @if (
+        loginForm.controls['identifier'].invalid &&
+        (loginForm.controls['identifier'].touched || loginForm.controls['identifier'].dirty)
+      ) {
         <p class="mt-1 text-xs text-rose-600">
-          <app-validation-message [control]="loginForm.controls['identifier']" [label]="isAdmin ? 'Admin ID or Email' : 'User ID or Email'" />
+          <app-validation-message
+            [control]="loginForm.controls['identifier']"
+            [label]="isAdmin ? 'Admin ID or Email' : 'User ID or Email'"
+          />
         </p>
       }
     </div>
@@ -48,7 +54,10 @@
           <lucide-icon [name]="pwToggle.hidden() ? 'eye' : 'eye-off'" class="h-4 w-4" />
         </button>
       </div>
-      @if (loginForm.controls['password'].invalid && (loginForm.controls['password'].touched || loginForm.controls['password'].dirty)) {
+      @if (
+        loginForm.controls['password'].invalid &&
+        (loginForm.controls['password'].touched || loginForm.controls['password'].dirty)
+      ) {
         <p class="mt-1 text-xs text-rose-600">
           <app-validation-message [control]="loginForm.controls['password']" label="Password" />
         </p>
@@ -83,7 +92,10 @@
   </form>
 
   <div class="mt-6 flex flex-col items-center gap-2 text-center">
-    <a [routerLink]="forgotPasswordUrl" class="text-sm font-medium text-zinc-600 transition hover:text-zinc-900">
+    <a
+      [routerLink]="forgotPasswordUrl"
+      class="text-sm font-medium text-zinc-600 transition hover:text-zinc-900"
+    >
       Forgot password?
     </a>
     @if (!isAdmin) {

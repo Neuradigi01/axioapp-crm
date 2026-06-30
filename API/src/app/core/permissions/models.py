@@ -12,6 +12,7 @@ Layered model:
 filter + RLS policy via the 0003 migration). `Permission` and
 `RolePermission` do not — they are not filtered by request context.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -27,9 +28,7 @@ from src.app.shared.orm import TenantScoped
 
 class Role(Base, TenantScoped):
     __tablename__ = "tbl_roles"
-    __table_args__ = (
-        UniqueConstraint("org_id", "name", name="uq_roles_org_id_name"),
-    )
+    __table_args__ = (UniqueConstraint("org_id", "name", name="uq_roles_org_id_name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -37,9 +36,7 @@ class Role(Base, TenantScoped):
         server_default=text("gen_random_uuid()"),
     )
     name: Mapped[str] = mapped_column(String(64), nullable=False)
-    is_system: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
+    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

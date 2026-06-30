@@ -39,6 +39,7 @@ The renderer pointedly avoids Jinja2:
   * The spec rejects ``{% ... %}`` constructs anyway; a hand-rolled
     50-line engine is more auditable.
 """
+
 from __future__ import annotations
 
 import enum
@@ -49,13 +50,10 @@ from typing import Any
 
 from src.app.core.conversations.models import ConversationChannel
 
-
 # Variable token: ``{{ a.b.c }}``. Whitespace tolerated inside; path
 # is lowercase + underscores + dots, strict enough that a stray ``{``
 # doesn't get eaten.
-_VAR_TOKEN_RE = re.compile(
-    r"\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}"
-)
+_VAR_TOKEN_RE = re.compile(r"\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}")
 
 # Forbidden constructs: Jinja statements + comments. Either triggers a
 # save-time rejection.
@@ -274,8 +272,7 @@ def reject_jinja_statements(text: str) -> None:
         )
     if _JINJA_COMMENT_RE.search(text):
         raise TemplateSyntaxError(
-            "Templates do not support `{# ... #}` comments. "
-            "Strip them before saving."
+            "Templates do not support `{# ... #}` comments. Strip them before saving."
         )
 
 

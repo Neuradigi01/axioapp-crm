@@ -14,9 +14,10 @@ client — this is a server-push channel only. Any client send is
 silently ignored (we just await `receive_text()` to keep the
 connection open until the client closes).
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
 
@@ -24,7 +25,6 @@ from src.app.core.auth import data_access
 from src.app.core.auth.tokens import InvalidToken, decode_token
 from src.app.core.notifications.manager import manager
 from src.app.shared.db import async_session
-
 
 ws_router = APIRouter()
 
@@ -43,14 +43,8 @@ async def notifications_stream(
 
     # 2) Verify the session row exists and is still live.
     async with async_session() as session:
-        row = await data_access.get_auth_session(
-            session, session_id=claims.token_id
-        )
-    if (
-        row is None
-        or row.revoked_at is not None
-        or row.expires_at <= datetime.now(timezone.utc)
-    ):
+        row = await data_access.get_auth_session(session, session_id=claims.token_id)
+    if row is None or row.revoked_at is not None or row.expires_at <= datetime.now(UTC):
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 

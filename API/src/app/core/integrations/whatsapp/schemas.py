@@ -9,21 +9,19 @@ connect/test endpoints return. It DELIBERATELY OMITS `access_token` and
 `app_secret` — the encrypted forms live in the DB, plaintext never
 leaves the server.
 """
+
 from __future__ import annotations
 
 import re
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.app.shared.schemas import ORMModel
 
-
-WhatsAppIntegrationStatus = Literal[
-    "connected", "disconnected", "expired", "error"
-]
+WhatsAppIntegrationStatus = Literal["connected", "disconnected", "expired", "error"]
 
 
 class WhatsAppConnectIn(BaseModel):
@@ -89,13 +87,13 @@ class EmbeddedSignupExchangeOut(BaseModel):
     phone_id: str
     waba_id: str
     display_phone_number: str
-    verified_name: Optional[str] = None
+    verified_name: str | None = None
     api_version: str
     rate_limit_per_sec: int
     phone_numbers_available: int
     selected_index: int
-    messaging_limit_tier: Optional[str] = None
-    quality_rating: Optional[str] = None
+    messaging_limit_tier: str | None = None
+    quality_rating: str | None = None
 
 
 class WhatsAppStatusOut(ORMModel):
@@ -105,25 +103,19 @@ class WhatsAppStatusOut(ORMModel):
     at rest and decrypted only inside the dispatch / webhook paths."""
 
     status: WhatsAppIntegrationStatus
-    phone_id: Optional[str] = None
-    waba_id: Optional[str] = None
-    display_phone_number: Optional[str] = None
-    verified_name: Optional[str] = None
-    api_version: Optional[str] = None
-    rate_limit_per_sec: Optional[int] = None
-    last_error: Optional[str] = None
-    connected_at: Optional[datetime] = None
+    phone_id: str | None = None
+    waba_id: str | None = None
+    display_phone_number: str | None = None
+    verified_name: str | None = None
+    api_version: str | None = None
+    rate_limit_per_sec: int | None = None
+    last_error: str | None = None
+    connected_at: datetime | None = None
 
 
-WhatsAppTemplateStatus = Literal[
-    "APPROVED", "PENDING", "REJECTED", "DISABLED"
-]
-WhatsAppTemplateCategory = Literal[
-    "MARKETING", "UTILITY", "AUTHENTICATION"
-]
-WhatsAppTemplateHeaderType = Literal[
-    "TEXT", "IMAGE", "VIDEO", "DOCUMENT"
-]
+WhatsAppTemplateStatus = Literal["APPROVED", "PENDING", "REJECTED", "DISABLED"]
+WhatsAppTemplateCategory = Literal["MARKETING", "UTILITY", "AUTHENTICATION"]
+WhatsAppTemplateHeaderType = Literal["TEXT", "IMAGE", "VIDEO", "DOCUMENT"]
 
 
 class WhatsAppTemplateRead(ORMModel):
@@ -141,18 +133,18 @@ class WhatsAppTemplateRead(ORMModel):
     category: str
     status: str
     body: str
-    header_type: Optional[str] = None
-    header_text: Optional[str] = None
-    footer_text: Optional[str] = None
+    header_type: str | None = None
+    header_text: str | None = None
+    footer_text: str | None = None
     variable_count: int
-    meta_template_id: Optional[str] = None
+    meta_template_id: str | None = None
     # whatsapp-platform-upgrade Step 8 — operator-side lifecycle +
     # rejection metadata + structured component payload.
     submission_status: str = "draft"
-    rejection_reason: Optional[str] = None
-    submitted_by_user_id: Optional[uuid.UUID] = None
-    submitted_at: Optional[datetime] = None
-    body_components: Optional[list[dict[str, Any]]] = None
+    rejection_reason: str | None = None
+    submitted_by_user_id: uuid.UUID | None = None
+    submitted_at: datetime | None = None
+    body_components: list[dict[str, Any]] | None = None
     last_synced_at: datetime
 
 
@@ -189,27 +181,21 @@ class WhatsAppTemplateButton(BaseModel):
 
     type: WhatsAppTemplateButtonType
     text: str = Field(min_length=1, max_length=_TEMPLATE_BUTTON_TITLE_MAX)
-    url: Optional[str] = Field(
+    url: str | None = Field(
         default=None,
         max_length=_TEMPLATE_BUTTON_URL_MAX,
         pattern=r"^https?://.+",
     )
-    phone_number: Optional[str] = Field(
-        default=None, max_length=_TEMPLATE_BUTTON_PHONE_MAX
-    )
+    phone_number: str | None = Field(default=None, max_length=_TEMPLATE_BUTTON_PHONE_MAX)
 
     @model_validator(mode="after")
-    def _check_button_payload(self) -> "WhatsAppTemplateButton":
+    def _check_button_payload(self) -> WhatsAppTemplateButton:
         if self.type == "URL" and not self.url:
             raise ValueError("URL buttons require a `url`.")
         if self.type == "PHONE_NUMBER" and not self.phone_number:
-            raise ValueError(
-                "PHONE_NUMBER buttons require a `phone_number`."
-            )
+            raise ValueError("PHONE_NUMBER buttons require a `phone_number`.")
         if self.type == "QUICK_REPLY" and (self.url or self.phone_number):
-            raise ValueError(
-                "QUICK_REPLY buttons must not carry url / phone_number."
-            )
+            raise ValueError("QUICK_REPLY buttons must not carry url / phone_number.")
         return self
 
 
@@ -229,26 +215,20 @@ class WhatsAppTemplateUpsert(BaseModel):
     language: str = Field(min_length=2, max_length=16)
     category: Literal["MARKETING", "UTILITY", "AUTHENTICATION"]
     body: str = Field(min_length=1, max_length=_TEMPLATE_BODY_MAX)
-    header_type: Optional[Literal["TEXT", "IMAGE", "VIDEO", "DOCUMENT"]] = None
-    header_text: Optional[str] = Field(
-        default=None, max_length=_TEMPLATE_HEADER_TEXT_MAX
-    )
-    footer_text: Optional[str] = Field(
-        default=None, max_length=_TEMPLATE_FOOTER_MAX
-    )
+    header_type: Literal["TEXT", "IMAGE", "VIDEO", "DOCUMENT"] | None = None
+    header_text: str | None = Field(default=None, max_length=_TEMPLATE_HEADER_TEXT_MAX)
+    footer_text: str | None = Field(default=None, max_length=_TEMPLATE_FOOTER_MAX)
     buttons: list[WhatsAppTemplateButton] = Field(
         default_factory=list, max_length=_TEMPLATE_BUTTONS_MAX
     )
 
     @model_validator(mode="after")
-    def _check_buttons_and_header(self) -> "WhatsAppTemplateUpsert":
+    def _check_buttons_and_header(self) -> WhatsAppTemplateUpsert:
         # TEXT header carries `header_text`; media headers (IMAGE /
         # VIDEO / DOCUMENT) come with a sample asset attached at
         # submit-time and don't carry text. Reject the mismatch early.
         if self.header_type == "TEXT" and not self.header_text:
-            raise ValueError(
-                "TEXT header requires `header_text`."
-            )
+            raise ValueError("TEXT header requires `header_text`.")
         if self.header_type not in (None, "TEXT") and self.header_text:
             raise ValueError(
                 "Media headers (IMAGE/VIDEO/DOCUMENT) don't take "
@@ -275,8 +255,8 @@ class WhatsAppTemplateSubmissionOut(BaseModel):
 
     id: uuid.UUID
     submission_status: str
-    meta_template_id: Optional[str] = None
-    meta_status: Optional[str] = None
+    meta_template_id: str | None = None
+    meta_status: str | None = None
 
 
 # --- Per-template performance (whatsapp-platform-upgrade Step 10) ----
@@ -321,8 +301,8 @@ class WhatsAppPhoneHealthEventRead(BaseModel):
     id: uuid.UUID
     phone_id: str
     event_type: str
-    old_value: Optional[dict[str, Any]] = None
-    new_value: Optional[dict[str, Any]] = None
+    old_value: dict[str, Any] | None = None
+    new_value: dict[str, Any] | None = None
     occurred_at: datetime
     recorded_at: datetime
 
@@ -337,14 +317,14 @@ class WhatsAppPhoneHealthRead(BaseModel):
 
     phone_id: str
     display_phone_number: str
-    verified_name: Optional[str] = None
+    verified_name: str | None = None
     quality_rating: WhatsAppQualityRating = "UNKNOWN"
-    messaging_limit_tier: Optional[str] = None
-    tier_label: Optional[str] = None
-    name_status: Optional[str] = None
-    throughput: Optional[int] = None
+    messaging_limit_tier: str | None = None
+    tier_label: str | None = None
+    name_status: str | None = None
+    throughput: int | None = None
     restrictions: list[dict[str, Any]] = Field(default_factory=list)
-    health_synced_at: Optional[datetime] = None
+    health_synced_at: datetime | None = None
     daily_limit: int = 0
     used_today: int = 0
     remaining: int = 0
@@ -368,7 +348,7 @@ class AISettingsRead(BaseModel):
     ai_handling_default_enabled: bool = False
     ai_confidence_threshold: float = 0.6
     ai_handover_keywords: list[str] = Field(default_factory=list)
-    ai_system_prompt: Optional[str] = None
+    ai_system_prompt: str | None = None
 
 
 class AISettingsPatch(BaseModel):
@@ -377,14 +357,10 @@ class AISettingsPatch(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    ai_handling_default_enabled: Optional[bool] = None
-    ai_confidence_threshold: Optional[float] = Field(
-        default=None, ge=0.0, le=1.0
-    )
-    ai_handover_keywords: Optional[list[str]] = Field(
-        default=None, max_length=50
-    )
-    ai_system_prompt: Optional[str] = Field(default=None, max_length=4096)
+    ai_handling_default_enabled: bool | None = None
+    ai_confidence_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    ai_handover_keywords: list[str] | None = Field(default=None, max_length=50)
+    ai_system_prompt: str | None = Field(default=None, max_length=4096)
 
 
 class AIHandlingToggle(BaseModel):
@@ -398,9 +374,7 @@ class AIHandlingToggle(BaseModel):
 # --- Assignment rules (whatsapp-platform-upgrade Step 18) ------------
 
 
-AssignmentStrategyLiteral = Literal[
-    "round_robin", "load_balanced", "tag_based", "team_based"
-]
+AssignmentStrategyLiteral = Literal["round_robin", "load_balanced", "tag_based", "team_based"]
 
 
 class AssignmentRuleUpsert(BaseModel):
@@ -426,18 +400,14 @@ class AssignmentRuleUpsert(BaseModel):
     skip_outside_hours: bool = False
 
     @model_validator(mode="after")
-    def _check_config(self) -> "AssignmentRuleUpsert":
+    def _check_config(self) -> AssignmentRuleUpsert:
         cfg = self.config or {}
         if self.strategy in ("round_robin", "load_balanced"):
             users = cfg.get("eligible_user_ids")
             if not isinstance(users, list) or not users:
-                raise ValueError(
-                    "`eligible_user_ids` must be a non-empty list."
-                )
+                raise ValueError("`eligible_user_ids` must be a non-empty list.")
             if len(users) > 200:
-                raise ValueError(
-                    "`eligible_user_ids` cannot exceed 200 entries."
-                )
+                raise ValueError("`eligible_user_ids` cannot exceed 200 entries.")
             for u in users:
                 # Cheapest validation we can do client-side; UUID
                 # parsing failure surfaces a clear 422.
@@ -449,26 +419,18 @@ class AssignmentRuleUpsert(BaseModel):
                     ) from exc
             if self.strategy == "load_balanced":
                 cap = cfg.get("cap_per_user")
-                if cap is not None and (
-                    not isinstance(cap, int) or cap <= 0
-                ):
-                    raise ValueError(
-                        "`cap_per_user` must be a positive integer or null."
-                    )
+                if cap is not None and (not isinstance(cap, int) or cap <= 0):
+                    raise ValueError("`cap_per_user` must be a positive integer or null.")
         elif self.strategy == "tag_based":
             mapping = cfg.get("mapping")
             if not isinstance(mapping, dict) or not mapping:
-                raise ValueError(
-                    "`mapping` must be a non-empty {tag_id: user_id} object."
-                )
+                raise ValueError("`mapping` must be a non-empty {tag_id: user_id} object.")
             for tag_id, user_id in mapping.items():
                 try:
                     uuid.UUID(str(tag_id))
                     uuid.UUID(str(user_id))
                 except (TypeError, ValueError) as exc:
-                    raise ValueError(
-                        "`mapping` keys + values must be UUIDs."
-                    ) from exc
+                    raise ValueError("`mapping` keys + values must be UUIDs.") from exc
         elif self.strategy == "team_based":
             team_id = cfg.get("team_id")
             if not team_id:
@@ -490,8 +452,8 @@ class AssignmentRuleRead(BaseModel):
     enabled: bool
     priority: int
     skip_outside_hours: bool
-    last_assigned_user_id: Optional[uuid.UUID] = None
-    created_by_user_id: Optional[uuid.UUID] = None
+    last_assigned_user_id: uuid.UUID | None = None
+    created_by_user_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -548,12 +510,10 @@ class KeywordRuleUpsert(BaseModel):
     match_type: KeywordMatchTypeLiteral = "contains"
     enabled: bool = True
     priority: int = Field(default=100, ge=0, le=10000)
-    actions: list[KeywordActionPayload] = Field(
-        default_factory=list, max_length=10
-    )
+    actions: list[KeywordActionPayload] = Field(default_factory=list, max_length=10)
 
     @model_validator(mode="after")
-    def _check_keyword_lengths(self) -> "KeywordRuleUpsert":
+    def _check_keyword_lengths(self) -> KeywordRuleUpsert:
         # Regex patterns get extra scrutiny — cap length at 200 chars
         # to bound match runtime; the engine's eval also wraps in a
         # try/except so a bad regex doesn't crash the inbound webhook.
@@ -562,9 +522,7 @@ class KeywordRuleUpsert(BaseModel):
             if not k.strip():
                 raise ValueError("Keywords cannot be blank.")
             if len(k) > cap:
-                raise ValueError(
-                    f"Keyword exceeds the {cap}-character limit."
-                )
+                raise ValueError(f"Keyword exceeds the {cap}-character limit.")
         return self
 
 
@@ -586,7 +544,7 @@ class KeywordRuleRead(BaseModel):
     match_type: str
     enabled: bool
     priority: int
-    created_by_user_id: Optional[uuid.UUID] = None
+    created_by_user_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
     actions: list[KeywordActionRead] = Field(default_factory=list)
@@ -614,8 +572,8 @@ class RuleTestRequest(BaseModel):
 
 
 class RuleTestResponse(BaseModel):
-    matched_rule_id: Optional[uuid.UUID] = None
-    matched_rule_name: Optional[str] = None
+    matched_rule_id: uuid.UUID | None = None
+    matched_rule_name: str | None = None
     actions: list[KeywordActionRead] = Field(default_factory=list)
 
 
@@ -634,12 +592,12 @@ class AutoReplySettingsRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     greeting_enabled: bool = False
-    greeting_message: Optional[str] = None
-    greeting_template_id: Optional[uuid.UUID] = None
+    greeting_message: str | None = None
+    greeting_template_id: uuid.UUID | None = None
 
     away_enabled: bool = False
-    away_message: Optional[str] = None
-    away_template_id: Optional[uuid.UUID] = None
+    away_message: str | None = None
+    away_template_id: uuid.UUID | None = None
 
     business_hours: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -655,13 +613,13 @@ class AutoReplySettingsPatch(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    greeting_enabled: Optional[bool] = None
-    greeting_message: Optional[str] = Field(default=None, max_length=4096)
-    greeting_template_id: Optional[uuid.UUID] = None
+    greeting_enabled: bool | None = None
+    greeting_message: str | None = Field(default=None, max_length=4096)
+    greeting_template_id: uuid.UUID | None = None
 
-    away_enabled: Optional[bool] = None
-    away_message: Optional[str] = Field(default=None, max_length=4096)
-    away_template_id: Optional[uuid.UUID] = None
+    away_enabled: bool | None = None
+    away_message: str | None = Field(default=None, max_length=4096)
+    away_template_id: uuid.UUID | None = None
 
 
 # --- Business profile editor (whatsapp-platform-upgrade Step 11) ----
@@ -725,16 +683,16 @@ class WhatsAppBusinessProfilePatch(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    about: Optional[str] = Field(default=None, max_length=139)
-    description: Optional[str] = Field(default=None, max_length=512)
-    address: Optional[str] = Field(default=None, max_length=256)
-    email: Optional[str] = Field(default=None, max_length=128)
-    websites: Optional[list[str]] = Field(default=None, max_length=2)
-    vertical: Optional[WhatsAppBusinessVertical] = None
+    about: str | None = Field(default=None, max_length=139)
+    description: str | None = Field(default=None, max_length=512)
+    address: str | None = Field(default=None, max_length=256)
+    email: str | None = Field(default=None, max_length=128)
+    websites: list[str] | None = Field(default=None, max_length=2)
+    vertical: WhatsAppBusinessVertical | None = None
     # Core-CRM-only fields. Stored verbatim; Step 16 reads them.
-    business_hours: Optional[list[WhatsAppBusinessHoursDay]] = None
-    greeting_message: Optional[str] = Field(default=None, max_length=4096)
-    away_message: Optional[str] = Field(default=None, max_length=4096)
+    business_hours: list[WhatsAppBusinessHoursDay] | None = None
+    greeting_message: str | None = Field(default=None, max_length=4096)
+    away_message: str | None = Field(default=None, max_length=4096)
 
 
 class WhatsAppBusinessProfileRead(BaseModel):
@@ -748,18 +706,18 @@ class WhatsAppBusinessProfileRead(BaseModel):
 
     phone_id: str
     display_phone_number: str
-    verified_name: Optional[str] = None
-    about: Optional[str] = None
-    description: Optional[str] = None
-    address: Optional[str] = None
-    email: Optional[str] = None
+    verified_name: str | None = None
+    about: str | None = None
+    description: str | None = None
+    address: str | None = None
+    email: str | None = None
     websites: list[str] = Field(default_factory=list)
-    vertical: Optional[str] = None
-    profile_picture_url: Optional[str] = None
-    last_synced_at: Optional[datetime] = None
+    vertical: str | None = None
+    profile_picture_url: str | None = None
+    last_synced_at: datetime | None = None
     business_hours: list[WhatsAppBusinessHoursDay] = Field(default_factory=list)
-    greeting_message: Optional[str] = None
-    away_message: Optional[str] = None
+    greeting_message: str | None = None
+    away_message: str | None = None
 
 
 class WhatsAppTemplatePerformanceOut(BaseModel):

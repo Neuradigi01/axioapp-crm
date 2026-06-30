@@ -62,9 +62,7 @@ export class StaffFieldOpsTabComponent {
         error: (err: HttpErrorResponse) => {
           this.visits.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load field visits.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load field visits.');
         },
       });
   }
@@ -78,6 +76,4 @@ export class StaffFieldOpsTabComponent {
       month: 'short',
     });
   }
-
-
 }

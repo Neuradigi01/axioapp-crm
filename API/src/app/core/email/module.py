@@ -9,8 +9,8 @@ adapter (Step 5) all gate on these keys.
 account management lives as a tab inside Settings → Email Accounts
 (Step 9 of this track).
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="email",

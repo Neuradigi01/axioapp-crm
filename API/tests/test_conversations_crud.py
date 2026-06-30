@@ -4,6 +4,7 @@ Covers: empty list, list filtering, get-by-id, send (via fake adapter),
 PATCH triage fields, webhook intake creates a conversation + inbound
 message, permission gate.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -18,7 +19,6 @@ from src.app.core.conversations.adapters import (
 from src.app.core.conversations.models import (
     Conversation,
     ConversationChannel,
-    ConversationStatus,
 )
 from src.app.core.conversations.registry import (
     list_registered,
@@ -70,9 +70,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -95,9 +93,7 @@ async def _insert_conversation(
     from tests.conftest import TestSession
 
     async with TestSession() as session:
-        c = Conversation(
-            org_id=org_id, channel=channel, external_id=external_id
-        )
+        c = Conversation(org_id=org_id, channel=channel, external_id=external_id)
         session.add(c)
         await session.commit()
         await session.refresh(c)
@@ -132,9 +128,7 @@ async def test_send_message_routes_through_adapter(
 ):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "conversations.read", "conversations.write"
-    )
+    await _grant(seeded_admin["role"].id, "conversations.read", "conversations.write")
     token = await _login(
         layered_client,
         org_slug=org.slug,
@@ -164,9 +158,7 @@ async def test_send_message_routes_through_adapter(
 async def test_patch_assign_status_ai(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "conversations.read", "conversations.write"
-    )
+    await _grant(seeded_admin["role"].id, "conversations.read", "conversations.write")
     token = await _login(
         layered_client,
         org_slug=org.slug,
@@ -231,9 +223,7 @@ async def test_webhook_intake_creates_conversation_and_message(
 
 
 @pytest.mark.asyncio
-async def test_send_requires_conversations_write(
-    layered_client, seeded_admin
-):
+async def test_send_requires_conversations_write(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "conversations.read")

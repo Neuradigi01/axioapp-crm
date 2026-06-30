@@ -88,25 +88,19 @@ export class NotificationsApiService {
   }
 
   list(limit = 20): Observable<Notification[]> {
-    return this.http
-      .get<Notification[]>(`${this.base}?limit=${limit}`)
-      .pipe(
-        tap((rows) => {
-          this.recent.set(rows);
-          this._unread.set(rows.filter((r) => r.read_at === null).length);
-        }),
-      );
+    return this.http.get<Notification[]>(`${this.base}?limit=${limit}`).pipe(
+      tap((rows) => {
+        this.recent.set(rows);
+        this._unread.set(rows.filter((r) => r.read_at === null).length);
+      }),
+    );
   }
 
   markRead(id: string): Observable<Notification> {
     return this.http.patch<Notification>(`${this.base}/${id}/read`, {}).pipe(
       tap((updated) => {
-        this.recent.update((rows) =>
-          rows.map((r) => (r.id === updated.id ? updated : r)),
-        );
-        this._unread.set(
-          this.recent().filter((r) => r.read_at === null).length,
-        );
+        this.recent.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+        this._unread.set(this.recent().filter((r) => r.read_at === null).length);
       }),
     );
   }

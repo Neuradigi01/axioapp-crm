@@ -3,6 +3,7 @@
 Image-captcha is stateless (fernet-encrypted token carries the answer)
 so no DB / no HTTP needed here.
 """
+
 from __future__ import annotations
 
 import time
@@ -60,8 +61,10 @@ def test_issue_challenge_returns_image_challenge():
 
 
 def test_issue_challenge_returns_recaptcha_site_key():
-    with patch.object(captcha_service, "CAPTCHA_TYPE", "recaptcha_v2"), \
-         patch.object(captcha_service, "RECAPTCHA_SITE_KEY", "test-site-key"):
+    with (
+        patch.object(captcha_service, "CAPTCHA_TYPE", "recaptcha_v2"),
+        patch.object(captcha_service, "RECAPTCHA_SITE_KEY", "test-site-key"),
+    ):
         ch = captcha_service.issue_challenge()
     assert ch.type == "recaptcha_v2"
     assert ch.site_key == "test-site-key"

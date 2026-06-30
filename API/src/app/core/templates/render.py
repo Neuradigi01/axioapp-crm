@@ -18,10 +18,11 @@ missing variable as a permanent skip with a clear "render_failed"
 skip-reason. The lenient ``resolve`` is reserved for automation
 triggers / previews where partial payloads are normal.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -29,22 +30,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.contacts import data_access as contacts_da
 from src.app.core.leads.models import Lead
-from src.app.core.tenants.models import Organization
 from src.app.core.templates.models import MessageTemplate
 from src.app.core.templates.variables import MissingVariable, render
+from src.app.core.tenants.models import Organization
 
 
 async def build_context(
     session: AsyncSession,
     *,
-    org: Optional[Organization],
+    org: Organization | None,
     contact_id: uuid.UUID,
-    lead_id: Optional[uuid.UUID] = None,
-    sender_user_id: Optional[uuid.UUID] = None,
-    sender_first_name: Optional[str] = None,
-    sender_last_name: Optional[str] = None,
-    sender_email: Optional[str] = None,
-    sender_signature: Optional[str] = None,
+    lead_id: uuid.UUID | None = None,
+    sender_user_id: uuid.UUID | None = None,
+    sender_first_name: str | None = None,
+    sender_last_name: str | None = None,
+    sender_email: str | None = None,
+    sender_signature: str | None = None,
 ) -> dict[str, Any]:
     """Load the contact (required), optional lead, sender, org and
     fold them into the nested dict the variable engine consumes.
@@ -61,11 +62,9 @@ async def build_context(
             detail=f"Contact {contact_id} not found.",
         )
 
-    lead: Optional[Lead] = None
+    lead: Lead | None = None
     if lead_id is not None:
-        lead = (
-            await session.execute(select(Lead).where(Lead.id == lead_id))
-        ).scalar_one_or_none()
+        lead = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
 
     full_name = (
         getattr(contact, "full_name", None)
@@ -81,9 +80,9 @@ async def build_context(
         or ""
     )
 
-    sender_full = " ".join(
-        x for x in (sender_first_name, sender_last_name) if x
-    ) or (sender_email or "")
+    sender_full = " ".join(x for x in (sender_first_name, sender_last_name) if x) or (
+        sender_email or ""
+    )
 
     contact_dict: dict[str, Any] = {
         "id": str(contact.id),

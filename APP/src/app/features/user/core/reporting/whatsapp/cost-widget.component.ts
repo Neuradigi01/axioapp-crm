@@ -12,11 +12,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  CostReport,
-  ReportRange,
-  WhatsAppReportsService,
-} from './whatsapp-reports.service';
+import { CostReport, ReportRange, WhatsAppReportsService } from './whatsapp-reports.service';
 
 /**
  * Estimated cost widget (Step 21).
@@ -38,12 +34,8 @@ import {
     <div class="rounded-md border border-zinc-200 bg-white p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Estimated cost
-          </p>
-          <p class="text-[11px] text-zinc-500">
-            List-rate estimate, not the Meta invoice.
-          </p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Estimated cost</p>
+          <p class="text-[11px] text-zinc-500">List-rate estimate, not the Meta invoice.</p>
         </div>
         <div
           class="inline-flex items-center rounded-md border border-zinc-300 bg-white p-0.5 text-[11px]"
@@ -55,9 +47,7 @@ import {
               type="button"
               [class]="
                 'rounded px-2 py-0.5 ' +
-                (region() === r
-                  ? 'bg-zinc-900 text-white'
-                  : 'text-zinc-700 hover:bg-zinc-100')
+                (region() === r ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100')
               "
               (click)="region.set(r)"
             >

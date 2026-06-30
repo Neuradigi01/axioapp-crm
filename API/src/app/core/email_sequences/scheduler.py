@@ -31,15 +31,15 @@ holds the business logic so it stays testable without a Celery worker.
 Per-row exceptions are caught + logged so a single bad row doesn't
 kill the tick.
 """
+
 from __future__ import annotations
 
-import asyncio
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, exists, select, text as sql_text
+from sqlalchemy import and_, exists, select
+from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.conversations.adapters.email import (
@@ -73,7 +73,6 @@ from src.app.core.users.models import User
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 
-
 log = logging.getLogger(__name__)
 
 
@@ -104,9 +103,7 @@ async def tick() -> int:
     return processed
 
 
-async def _pick_due_step_ids(
-    *, limit: int
-) -> list[tuple[uuid.UUID, uuid.UUID]]:
+async def _pick_due_step_ids(*, limit: int) -> list[tuple[uuid.UUID, uuid.UUID]]:
     """Cross-org raw-SQL sweep. Beat has no tenant context, so we use
     raw SQL (which the daemon DB role can run across all orgs) rather
     than the ORM (which short-circuits without `app.org_id` set).
@@ -116,12 +113,13 @@ async def _pick_due_step_ids(
     with `FOR UPDATE SKIP LOCKED` inside its own transaction so two
     concurrent workers ticking simultaneously never double-send.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     async with async_session() as session:
         rows = (
-            await session.execute(
-                sql_text(
-                    """
+            (
+                await session.execute(
+                    sql_text(
+                        """
                     SELECT id, org_id
                     FROM tbl_email_sequence_enrollment_steps
                     WHERE sent_at IS NULL
@@ -130,16 +128,17 @@ async def _pick_due_step_ids(
                     ORDER BY scheduled_at ASC
                     LIMIT :limit
                     """
-                ),
-                {"now": now, "limit": limit},
+                    ),
+                    {"now": now, "limit": limit},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
     return [(r["id"], r["org_id"]) for r in rows]
 
 
-async def _process_one(
-    *, step_row_id: uuid.UUID, org_id: uuid.UUID
-) -> None:
+async def _process_one(*, step_row_id: uuid.UUID, org_id: uuid.UUID) -> None:
     """Process a single due step under the row's tenant context."""
     async with async_session() as session:
         token = set_context(RequestContext(org_id=org_id, user_id=None))
@@ -149,9 +148,7 @@ async def _process_one(
             reset_context(token)
 
 
-async def _process_one_locked(
-    session: AsyncSession, *, step_row_id: uuid.UUID
-) -> None:
+async def _process_one_locked(session: AsyncSession, *, step_row_id: uuid.UUID) -> None:
     """Inner: tenant context is already set on `session`. Wraps the
     step row in `FOR UPDATE SKIP LOCKED` so concurrent workers don't
     double-send."""
@@ -178,19 +175,14 @@ async def _process_one_locked(
             )
         )
     ).scalar_one_or_none()
-    if (
-        enrollment is None
-        or enrollment.state != EnrollmentState.active.value
-    ):
+    if enrollment is None or enrollment.state != EnrollmentState.active.value:
         _skip(step_row, "enrollment_not_active")
         await session.commit()
         return
 
     step_def = (
         await session.execute(
-            select(EmailSequenceStep).where(
-                EmailSequenceStep.id == step_row.step_id
-            )
+            select(EmailSequenceStep).where(EmailSequenceStep.id == step_row.step_id)
         )
     ).scalar_one_or_none()
     if step_def is None:
@@ -200,33 +192,22 @@ async def _process_one_locked(
 
     sequence = (
         await session.execute(
-            select(EmailSequence).where(
-                EmailSequence.id == enrollment.sequence_id
-            )
+            select(EmailSequence).where(EmailSequence.id == enrollment.sequence_id)
         )
     ).scalar_one_or_none()
-    if (
-        sequence is None
-        or sequence.deleted_at is not None
-        or not sequence.is_active
-    ):
+    if sequence is None or sequence.deleted_at is not None or not sequence.is_active:
         _skip(step_row, "sequence_inactive_or_deleted")
         enrollment.state = EnrollmentState.completed.value
-        enrollment.state_changed_at = datetime.now(timezone.utc)
+        enrollment.state_changed_at = datetime.now(UTC)
         await session.commit()
         return
 
     template = (
         await session.execute(
-            select(MessageTemplate).where(
-                MessageTemplate.id == step_def.template_id
-            )
+            select(MessageTemplate).where(MessageTemplate.id == step_def.template_id)
         )
     ).scalar_one_or_none()
-    if (
-        template is None
-        or template.internal_status == TemplateInternalStatus.archived
-    ):
+    if template is None or template.internal_status == TemplateInternalStatus.archived:
         _skip(step_row, "template_archived")
         await session.commit()
         return
@@ -239,13 +220,11 @@ async def _process_one_locked(
     ):
         _skip(step_row, "paused_on_reply")
         enrollment.state = EnrollmentState.paused_on_reply.value
-        enrollment.state_changed_at = datetime.now(timezone.utc)
+        enrollment.state_changed_at = datetime.now(UTC)
         await session.commit()
         return
 
-    account = await _resolve_sender_account(
-        session, sender_user_id=enrollment.enrolled_by
-    )
+    account = await _resolve_sender_account(session, sender_user_id=enrollment.enrolled_by)
     if account is None:
         _skip(step_row, "sender_no_live_email_account")
         await session.commit()
@@ -253,16 +232,10 @@ async def _process_one_locked(
 
     # Render.
     sender = (
-        await session.execute(
-            select(User).where(User.id == enrollment.enrolled_by)
-        )
+        await session.execute(select(User).where(User.id == enrollment.enrolled_by))
     ).scalar_one_or_none()
     org = (
-        await session.execute(
-            select(Organization).where(
-                Organization.id == enrollment.org_id
-            )
-        )
+        await session.execute(select(Organization).where(Organization.id == enrollment.org_id))
     ).scalar_one_or_none()
     try:
         context = await templates_render.build_context(
@@ -278,9 +251,7 @@ async def _process_one_locked(
         )
         rendered = templates_render.render_email_template(template, context)
     except Exception:
-        log.exception(
-            "email_sequences: render failed step_row=%s", step_row.id
-        )
+        log.exception("email_sequences: render failed step_row=%s", step_row.id)
         _skip(step_row, "render_failed")
         await session.commit()
         return
@@ -307,7 +278,7 @@ async def _process_one_locked(
         return
 
     # Advance.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     step_row.sent_at = now
     step_row.message_id = result.message.id
 
@@ -371,7 +342,7 @@ async def _has_inbound_reply(
 
 async def _resolve_sender_account(
     session: AsyncSession, *, sender_user_id: uuid.UUID
-) -> Optional[EmailAccount]:
+) -> EmailAccount | None:
     """First live email account owned by the rep — None if none.
 
     Ordered by `connected_at` so the rep's first-connected mailbox is

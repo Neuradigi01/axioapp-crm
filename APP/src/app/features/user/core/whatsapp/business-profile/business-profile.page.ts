@@ -60,32 +60,18 @@ const VERTICALS: WhatsAppBusinessVertical[] = [
   'RESTAURANT',
 ];
 
-const DAY_LABELS = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-];
+const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 const DEFAULT_HOURS: BusinessHoursDay[] = [0, 1, 2, 3, 4, 5].map((d) => ({
   day: d,
   intervals: [{ open: '10:00', close: '19:00' }],
 }));
 
-
 @Component({
   selector: 'app-whatsapp-business-profile-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    CommonModule,
-    FormsModule,
-    LucideAngularModule,
-    AutoReplySectionComponent,
-  ],
+  imports: [CommonModule, FormsModule, LucideAngularModule, AutoReplySectionComponent],
   templateUrl: './business-profile.page.html',
 })
 export class WhatsAppBusinessProfilePageComponent {
@@ -159,10 +145,7 @@ export class WhatsAppBusinessProfilePageComponent {
         error: (err: HttpErrorResponse) => {
           this.profile.set(null);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ??
-              'Could not load WhatsApp business profile.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load WhatsApp business profile.');
         },
       });
   }
@@ -173,12 +156,8 @@ export class WhatsAppBusinessProfilePageComponent {
     this.address.set(p.address || '');
     this.email.set(p.email || '');
     this.websites.set([...p.websites]);
-    this.vertical.set(
-      (p.vertical as WhatsAppBusinessVertical) || 'UNDEFINED',
-    );
-    this.hours.set(
-      p.business_hours.length > 0 ? this.cloneHours(p.business_hours) : DEFAULT_HOURS,
-    );
+    this.vertical.set((p.vertical as WhatsAppBusinessVertical) || 'UNDEFINED');
+    this.hours.set(p.business_hours.length > 0 ? this.cloneHours(p.business_hours) : DEFAULT_HOURS);
     this.greetingMessage.set(p.greeting_message || '');
     this.awayMessage.set(p.away_message || '');
   }
@@ -230,9 +209,7 @@ export class WhatsAppBusinessProfilePageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.toast.set(
-            extractApiError(err) ?? 'Could not save the profile.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not save the profile.');
         },
       });
   }
@@ -252,9 +229,7 @@ export class WhatsAppBusinessProfilePageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.refreshing.set(false);
-          this.toast.set(
-            extractApiError(err) ?? 'Could not refresh from Meta.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not refresh from Meta.');
         },
       });
   }
@@ -267,9 +242,7 @@ export class WhatsAppBusinessProfilePageComponent {
   }
 
   protected updateWebsite(idx: number, value: string): void {
-    this.websites.update((arr) =>
-      arr.map((v, i) => (i === idx ? value : v)),
-    );
+    this.websites.update((arr) => arr.map((v, i) => (i === idx ? value : v)));
   }
 
   protected removeWebsite(idx: number): void {
@@ -290,10 +263,7 @@ export class WhatsAppBusinessProfilePageComponent {
     if (this.isDayOpen(day)) {
       this.hours.update((arr) => arr.filter((h) => h.day !== day));
     } else {
-      this.hours.update((arr) => [
-        ...arr,
-        { day, intervals: [{ open: '10:00', close: '19:00' }] },
-      ]);
+      this.hours.update((arr) => [...arr, { day, intervals: [{ open: '10:00', close: '19:00' }] }]);
     }
   }
 
@@ -314,19 +284,13 @@ export class WhatsAppBusinessProfilePageComponent {
     );
   }
 
-  protected updateInterval(
-    day: number,
-    idx: number,
-    patch: Partial<BusinessHoursInterval>,
-  ): void {
+  protected updateInterval(day: number, idx: number, patch: Partial<BusinessHoursInterval>): void {
     this.hours.update((arr) =>
       arr.map((h) =>
         h.day === day
           ? {
               ...h,
-              intervals: h.intervals.map((iv, i) =>
-                i === idx ? { ...iv, ...patch } : iv,
-              ),
+              intervals: h.intervals.map((iv, i) => (i === idx ? { ...iv, ...patch } : iv)),
             }
           : h,
       ),
@@ -336,9 +300,7 @@ export class WhatsAppBusinessProfilePageComponent {
   protected removeInterval(day: number, idx: number): void {
     this.hours.update((arr) =>
       arr.map((h) =>
-        h.day === day
-          ? { ...h, intervals: h.intervals.filter((_, i) => i !== idx) }
-          : h,
+        h.day === day ? { ...h, intervals: h.intervals.filter((_, i) => i !== idx) } : h,
       ),
     );
   }
@@ -394,9 +356,7 @@ export class WhatsAppBusinessProfilePageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.uploadingPhoto.set(false);
-          this.toast.set(
-            extractApiError(err) ?? 'Could not upload the picture.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not upload the picture.');
         },
       });
   }

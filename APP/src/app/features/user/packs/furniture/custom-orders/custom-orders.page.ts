@@ -14,22 +14,14 @@ import { LucideAngularModule } from 'lucide-angular';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
-import {
-  ContactsApiService,
-} from '../../../core/contacts/contacts-api.service';
-import {
-  ItemMovedEvent,
-  PipelineItem,
-} from '../../../core/pipelines/pipelines-api.service';
+import { ContactsApiService } from '../../../core/contacts/contacts-api.service';
+import { ItemMovedEvent, PipelineItem } from '../../../core/pipelines/pipelines-api.service';
 import { PipelineBoardComponent } from '../../../core/pipelines/pipeline-board.component';
 import { PipelineListComponent } from '../../../core/pipelines/pipeline-list.component';
 import { CustomOrderCardComponent } from './custom-order-card.component';
 import { CustomOrderFormModalComponent } from './custom-order-form-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  CustomOrder,
-  CustomOrdersApiService,
-} from './custom-orders-api.service';
+import { CustomOrder, CustomOrdersApiService } from './custom-orders-api.service';
 
 /** Stage keys in display order â€” used for the % progress hint on cards. */
 const STAGE_ORDER = [
@@ -77,18 +69,14 @@ export class CustomOrdersPageComponent {
 
   readonly contactsById = signal<Record<string, ContactSummary>>({});
 
-  readonly pipelineItems = computed<PipelineItem[]>(
-    () => this.orders() as PipelineItem[],
-  );
+  readonly pipelineItems = computed<PipelineItem[]>(() => this.orders() as PipelineItem[]);
 
   // --- summary tiles ----------------------------------------------------
 
   readonly activeCount = computed(
     () =>
       this.orders().filter(
-        (o) =>
-          o.pipeline_stage !== 'delivered'
-          && o.pipeline_stage !== 'cancelled',
+        (o) => o.pipeline_stage !== 'delivered' && o.pipeline_stage !== 'cancelled',
       ).length,
   );
 
@@ -105,10 +93,7 @@ export class CustomOrdersPageComponent {
   );
 
   readonly measurementsPending = computed(
-    () =>
-      this.orders().filter(
-        (o) => o.pipeline_stage === 'measurement_scheduled',
-      ).length,
+    () => this.orders().filter((o) => o.pipeline_stage === 'measurement_scheduled').length,
   );
 
   constructor() {
@@ -161,9 +146,7 @@ export class CustomOrdersPageComponent {
         error: (err: HttpErrorResponse) => {
           this.orders.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load custom orders.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load custom orders.');
         },
       });
   }
@@ -171,26 +154,18 @@ export class CustomOrdersPageComponent {
   protected onItemMoved(event: ItemMovedEvent): void {
     const before = this.orders();
     this.orders.update((rows) =>
-      rows.map((r) =>
-        r.id === event.itemId
-          ? { ...r, pipeline_stage: event.toStage }
-          : r,
-      ),
+      rows.map((r) => (r.id === event.itemId ? { ...r, pipeline_stage: event.toStage } : r)),
     );
     this.api
       .moveStage(event.itemId, event.toStage)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.orders.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.orders.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
         },
         error: (err: HttpErrorResponse) => {
           this.orders.set(before);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not move order.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not move order.');
         },
       });
   }
@@ -218,11 +193,7 @@ export class CustomOrdersPageComponent {
   }
 
   private fetchContacts(ids: string[]): void {
-    forkJoin(
-      ids.map((id) =>
-        this.contactsApi.get(id).pipe(catchError(() => of(null))),
-      ),
-    )
+    forkJoin(ids.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((results) => {
         this.contactsById.update((cache) => {
@@ -240,5 +211,4 @@ export class CustomOrdersPageComponent {
         });
       });
   }
-
 }

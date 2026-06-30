@@ -5,6 +5,7 @@ separate per-org seeding required. The pack installer (4.2) will
 still call `patch_settings` to overwrite the generic defaults with
 furniture-specific values once a pack is installed.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -21,9 +22,7 @@ from src.app.core.settings.schemas import (
 )
 
 
-async def get_or_create(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> OrgSettings:
+async def get_or_create(session: AsyncSession, *, org_id: uuid.UUID) -> OrgSettings:
     """Return the single settings row for `org_id`, creating it on
     first call. The defaults baked into the model (server_default) +
     the migration cover every column."""

@@ -13,23 +13,23 @@ Reads — single-user lookups, membership predicates, role guards, profile
 fetches — live in `src.app.core.users.data_access`. This service file
 holds orchestration only: transactions, audit, business rules.
 """
+
 from __future__ import annotations
 
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.users import data_access
 from src.app.core.permissions.models import Role
+from src.app.core.users import data_access
 from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.core.users.schemas import MeUpdate, UserCreate, UserUpdate
 from src.app.shared.audit import log_entity_change
 from src.app.shared.security.password import hash_password, verify_password
-
 
 # --- list (the one read kept here — non-trivial cross-table list query) -
 
@@ -42,9 +42,7 @@ async def list_users(
     offset: int = 0,
 ) -> list[User]:
     """List CRM users, optionally scoped to an org membership."""
-    return await data_access.list_users_in_org(
-        session, org_id=org_id, limit=limit, offset=offset
-    )
+    return await data_access.list_users_in_org(session, org_id=org_id, limit=limit, offset=offset)
 
 
 async def get_user_by_email(
@@ -62,9 +60,7 @@ async def get_user_by_email(
     )
 
 
-async def get_user_by_uuid(
-    session: AsyncSession, user_uuid: uuid.UUID
-) -> User | None:
+async def get_user_by_uuid(session: AsyncSession, user_uuid: uuid.UUID) -> User | None:
     """Public lookup-by-uuid wrapper. Used by other modules
     (appointments, staff) to resolve a user without reaching into
     `users.data_access` directly."""
@@ -104,17 +100,13 @@ def add_organization_member(session: AsyncSession, member):
     return data_access.add_organization_member(session, member)
 
 
-async def get_role_name_by_id(
-    session: AsyncSession, role_id: uuid.UUID
-) -> str | None:
+async def get_role_name_by_id(session: AsyncSession, role_id: uuid.UUID) -> str | None:
     """Public role-name lookup wrapper. Used by auth's onboarding
     response to project the role name into the JWT response."""
     return await data_access.get_role_name_by_id(session, role_id)
 
 
-async def get_role_in_org(
-    session: AsyncSession, *, role_id: uuid.UUID, org_id: uuid.UUID
-):
+async def get_role_in_org(session: AsyncSession, *, role_id: uuid.UUID, org_id: uuid.UUID):
     """Validate that `role_id` exists in `org_id`. Raises 422 if not —
     used by user-create / user-update / invitation-accept to gate
     the chosen role assignment before persisting it.
@@ -122,9 +114,7 @@ async def get_role_in_org(
     Business rule (422 vs 404 vs returning None) lives here, not in
     the DAL; DAL just answers "does this row exist".
     """
-    role = await data_access.get_role_by_id_in_org(
-        session, role_id=role_id, org_id=org_id
-    )
+    role = await data_access.get_role_by_id_in_org(session, role_id=role_id, org_id=org_id)
     if role is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -174,8 +164,7 @@ async def require_membership(
     if membership is None:
         raise HTTPException(
             status_code=on_missing,
-            detail=not_member_detail
-            or f"user {user_uuid} is not a member of this org",
+            detail=not_member_detail or f"user {user_uuid} is not a member of this org",
         )
     return user, membership
 
@@ -196,9 +185,7 @@ async def assert_not_owner_role(
     user = await data_access.get_user_by_uuid(session, user_uuid)
     if user is None:
         return
-    membership = await data_access.get_membership(
-        session, user_member_id=user.id, org_id=org_id
-    )
+    membership = await data_access.get_membership(session, user_member_id=user.id, org_id=org_id)
     if membership is None:
         return
     role = await data_access.get_role_by_id(session, membership.role_id)
@@ -207,27 +194,18 @@ async def assert_not_owner_role(
     if role.name == "Owner" and role.is_system:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "the workspace Owner cannot be deactivated — "
-                "transfer ownership first"
-            ),
+            detail=("the workspace Owner cannot be deactivated — transfer ownership first"),
         )
 
 
-async def get_role_by_id_in_org(
-    session: AsyncSession, *, role_id: uuid.UUID, org_id: uuid.UUID
-):
+async def get_role_by_id_in_org(session: AsyncSession, *, role_id: uuid.UUID, org_id: uuid.UUID):
     """Public role lookup that returns None on miss. Used by
     permissions service for guard-checks where the caller picks
     the HTTP status."""
-    return await data_access.get_role_by_id_in_org(
-        session, role_id=role_id, org_id=org_id
-    )
+    return await data_access.get_role_by_id_in_org(session, role_id=role_id, org_id=org_id)
 
 
-async def count_active_members(
-    session: AsyncSession, org_id: uuid.UUID
-) -> int:
+async def count_active_members(session: AsyncSession, org_id: uuid.UUID) -> int:
     """Public active-seats counter. Used by the subscriptions
     service to compute `seats.in_use`."""
     return await data_access.count_active_members(session, org_id)
@@ -274,9 +252,7 @@ async def create_user(
     we write a random unguessable password so the bcrypt verify path
     can never short-circuit on an empty/NULL hash.
     """
-    await get_role_in_org(
-        session, role_id=payload.role_id, org_id=org_id
-    )
+    await get_role_in_org(session, role_id=payload.role_id, org_id=org_id)
 
     if await data_access.email_exists(session, payload.email):
         raise HTTPException(
@@ -387,9 +363,7 @@ async def update_user(
     if "phone" in changes:
         profile.mobile_no = changes["phone"]
     if "role_id" in changes and changes["role_id"] is not None:
-        new_role = await get_role_in_org(
-            session, role_id=changes["role_id"], org_id=org_id
-        )
+        new_role = await get_role_in_org(session, role_id=changes["role_id"], org_id=org_id)
         if membership.role_id != changes["role_id"]:
             role_changed = True
         membership.role_id = changes["role_id"]
@@ -414,9 +388,7 @@ async def update_user(
     # auditor can query role-assignment history without parsing every
     # `users.updated` diff.
     if role_changed and new_role is not None:
-        before_role_name = await data_access.get_role_name_by_id(
-            session, before_role_id
-        )
+        before_role_name = await data_access.get_role_name_by_id(session, before_role_id)
         await audit.log(
             "roles.assigned_to_user",
             entity_type="user",
@@ -460,9 +432,7 @@ async def set_user_status(
 
     if not is_active:
         # Owner guard first — the most authoritative refusal.
-        await assert_not_owner_role(
-            session, user_uuid=user_id, org_id=org_id
-        )
+        await assert_not_owner_role(session, user_uuid=user_id, org_id=org_id)
         counts = await data_access.compute_open_records_counts(
             session, user_uuid=user_id, org_id=org_id
         )
@@ -473,8 +443,7 @@ async def set_user_status(
                     "error": "user has open records",
                     "open_records": counts,
                     "hint": (
-                        "POST /users/{id}/transfer-records to a new owner "
-                        "before deactivating."
+                        "POST /users/{id}/transfer-records to a new owner before deactivating."
                     ),
                 },
             )
@@ -485,7 +454,7 @@ async def set_user_status(
     if not is_active:
         # Revoke open sessions so existing JWTs stop working.
         await data_access.revoke_user_auth_sessions(
-            session, user_uuid=user_id, now=datetime.now(timezone.utc)
+            session, user_uuid=user_id, now=datetime.now(UTC)
         )
 
     await session.commit()
@@ -589,7 +558,7 @@ async def change_password(
         await data_access.revoke_user_auth_sessions(
             session,
             user_uuid=user.legacy_uuid,
-            now=datetime.now(timezone.utc),
+            now=datetime.now(UTC),
             except_token_id=current_token_id,
         )
 

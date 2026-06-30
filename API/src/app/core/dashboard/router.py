@@ -13,6 +13,7 @@ None of these endpoints require a permission key — every authenticated
 user gets a dashboard. The response shape adapts to the caller's
 permissions inside the service layer.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
@@ -33,7 +34,6 @@ from src.app.core.dashboard.service import (
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 

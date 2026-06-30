@@ -13,10 +13,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  EmbedApiService,
-  EmbedKeyIssueResponse,
-} from './embed-api.service';
+import { EmbedApiService, EmbedKeyIssueResponse } from './embed-api.service';
 
 /**
  * Two-phase modal:
@@ -58,9 +55,7 @@ export class IssueKeyModalComponent {
   protected readonly savedConfirmed = signal(false);
   protected readonly copied = signal(false);
 
-  protected readonly canClose = computed(
-    () => this.issuedKey() === null || this.savedConfirmed(),
-  );
+  protected readonly canClose = computed(() => this.issuedKey() === null || this.savedConfirmed());
 
   protected onNameInput(event: Event): void {
     this.name.set((event.target as HTMLInputElement).value);
@@ -87,9 +82,7 @@ export class IssueKeyModalComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not issue the key.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not issue the key.');
         },
       });
   }

@@ -16,11 +16,15 @@
     </table>
   </div>
 } @else if (stages().length === 0) {
-  <p class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
+  <p
+    class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+  >
     This pipeline has no stages defined.
   </p>
 } @else if (items().length === 0) {
-  <p class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
+  <p
+    class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+  >
     No items.
   </p>
 } @else {
@@ -28,10 +32,16 @@
     <table class="min-w-full divide-y divide-zinc-200">
       <thead class="bg-zinc-50">
         <tr>
-          <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+          <th
+            scope="col"
+            class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+          >
             Item
           </th>
-          <th scope="col" class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+          <th
+            scope="col"
+            class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+          >
             Stage
           </th>
         </tr>

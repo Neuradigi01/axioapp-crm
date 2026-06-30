@@ -1,9 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 import { InrPipe } from '../../shared/pipes/inr.pipe';
 import { StaffWithPerformance } from '../staff-api.service';

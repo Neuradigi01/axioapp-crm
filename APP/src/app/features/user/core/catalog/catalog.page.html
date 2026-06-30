@@ -3,8 +3,8 @@
     <div>
       <h1 class="text-lg font-semibold text-zinc-900">Catalog</h1>
       <p class="mt-0.5 text-xs text-zinc-500">
-        {{ totalProducts() }} product{{ totalProducts() === 1 ? '' : 's' }} ·
-        what your contacts &amp; leads can show interest in.
+        {{ totalProducts() }} product{{ totalProducts() === 1 ? '' : 's' }} · what your contacts
+        &amp; leads can show interest in.
       </p>
     </div>
     <button
@@ -82,9 +82,13 @@
       }
     </div>
   } @else if (items().length === 0) {
-    <p class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-500">
+    <p
+      class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-500"
+    >
       No products yet.
-      <span class="block text-xs text-zinc-400">Click "Add Product" to create your first item.</span>
+      <span class="block text-xs text-zinc-400"
+        >Click "Add Product" to create your first item.</span
+      >
     </p>
   } @else {
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -101,23 +105,32 @@
                 class="h-12 w-12 shrink-0 rounded-md object-cover ring-1 ring-zinc-200"
               />
             } @else {
-              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-2xl" aria-hidden="true">
+              <span
+                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-2xl"
+                aria-hidden="true"
+              >
                 {{ emojiFor(item.category) }}
               </span>
             }
             <div class="min-w-0 flex-1">
-              <p class="text-[11px] font-mono uppercase tracking-wider text-zinc-500">{{ item.sku }}</p>
+              <p class="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+                {{ item.sku }}
+              </p>
               <h3 class="mt-0.5 truncate text-sm font-semibold text-zinc-900">{{ item.name }}</h3>
               <p class="mt-0.5 text-xs text-zinc-500">
                 {{ item.category ?? 'Uncategorized' }}
               </p>
             </div>
             @if (!item.is_active) {
-              <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 ring-1 ring-zinc-200">
+              <span
+                class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 ring-1 ring-zinc-200"
+              >
                 inactive
               </span>
             } @else {
-              <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">
+              <span
+                class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+              >
                 active
               </span>
             }
@@ -151,17 +164,9 @@
 </div>
 
 @if (modalOpen()) {
-  <app-add-item-modal
-    [item]="editingItem()"
-    (saved)="onSaved($event)"
-    (cancel)="closeModal()"
-  />
+  <app-add-item-modal [item]="editingItem()" (saved)="onSaved($event)" (cancel)="closeModal()" />
 }
 
 @if (viewingItem(); as v) {
-  <app-view-item-modal
-    [item]="v"
-    (close)="closeView()"
-    (edit)="onEditFromView($event)"
-  />
+  <app-view-item-modal [item]="v" (close)="closeView()" (edit)="onEditFromView($event)" />
 }

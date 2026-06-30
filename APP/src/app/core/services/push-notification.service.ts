@@ -1,6 +1,13 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage, Messaging, MessagePayload, Unsubscribe } from 'firebase/messaging';
+import {
+  getMessaging,
+  getToken,
+  onMessage,
+  Messaging,
+  MessagePayload,
+  Unsubscribe,
+} from 'firebase/messaging';
 import { IFirebaseConfig } from '@app/schemas/common';
 import { DeviceTokenApiService } from '@app/services/device-token-api.service';
 import { STORAGE_KEY_FCM_TOKEN } from '@core/constants/app.constants';

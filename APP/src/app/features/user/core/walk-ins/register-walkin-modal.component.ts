@@ -13,20 +13,14 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
-import {
-  ContactListItem,
-  ContactsApiService,
-} from '../contacts/contacts-api.service';
+import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { extractApiError } from '@core/services/api-error.util';
 import { nullableTrim } from '@core/services/form.util';
-import {
-  QuickRegisterResponse,
-  WalkInsApiService,
-} from './walk-ins-api.service';
+import { QuickRegisterResponse, WalkInsApiService } from './walk-ins-api.service';
 
 /**
  * Reception-desk one-shot modal. Phone-first: when the operator types
@@ -87,19 +81,11 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
    * other four (email, source, requirement, budget) accept `required`
    * overrides; `budget` additionally accepts `min`/`max`.
    */
-  protected applyStandardValidators(
-    map: Record<string, StandardFieldRendered>,
-  ): void {
-    this.form.controls.phone.setValidators([
-      Validators.required,
-      Validators.maxLength(32),
-    ]);
+  protected applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
+    this.form.controls.phone.setValidators([Validators.required, Validators.maxLength(32)]);
     this.form.controls.phone.updateValueAndValidity({ emitEvent: false });
 
-    this.form.controls.full_name.setValidators([
-      Validators.required,
-      Validators.maxLength(255),
-    ]);
+    this.form.controls.full_name.setValidators([Validators.required, Validators.maxLength(255)]);
     this.form.controls.full_name.updateValueAndValidity({ emitEvent: false });
 
     const setReq = (
@@ -209,9 +195,7 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
         },
         error: (err: HttpErrorResponse) => {
           this._submitting.set(false);
-          this._submitError.set(
-            extractApiError(err) ?? 'Could not register walk-in.',
-          );
+          this._submitError.set(extractApiError(err) ?? 'Could not register walk-in.');
         },
       });
   }

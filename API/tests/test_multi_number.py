@@ -41,6 +41,7 @@ Cases:
  14.  `WhatsAppAccountConfig.__table_args__` carries the composite
        unique constraint.
 """
+
 from __future__ import annotations
 
 import inspect
@@ -101,9 +102,7 @@ class TestMessageSendPayloadSchema:
     def test_send_from_phone_id_round_trip(self):
         from src.app.core.conversations.schemas import MessageSendPayload
 
-        msg = MessageSendPayload(
-            text="hi", send_from_phone_id="123456789012345"
-        )
+        msg = MessageSendPayload(text="hi", send_from_phone_id="123456789012345")
         assert msg.send_from_phone_id == "123456789012345"
 
     def test_send_from_phone_id_defaults_to_none(self):
@@ -116,18 +115,14 @@ class TestMessageSendPayloadSchema:
         from src.app.core.conversations.schemas import MessageSendPayload
 
         with pytest.raises(ValidationError):
-            MessageSendPayload(
-                text="hi", send_from_phone_id="x" * 65
-            )
+            MessageSendPayload(text="hi", send_from_phone_id="x" * 65)
 
 
 class TestOrmAttributes:
     def test_conversation_has_received_via_phone_id(self):
         from src.app.core.conversations.models import Conversation
 
-        column = Conversation.__table__.columns.get(
-            "received_via_phone_id"
-        )
+        column = Conversation.__table__.columns.get("received_via_phone_id")
         assert column is not None
         assert column.nullable is True
 
@@ -146,17 +141,11 @@ class TestOrmAttributes:
         table_args = WhatsAppAccountConfig.__table_args__
         if not isinstance(table_args, tuple):
             table_args = (table_args,)
-        constraints = [
-            a for a in table_args if isinstance(a, UniqueConstraint)
-        ]
+        constraints = [a for a in table_args if isinstance(a, UniqueConstraint)]
         names = {c.name for c in constraints}
         assert "uq_wa_config_integration_phone" in names
         # The composite constraint covers BOTH columns; the old
         # integration-only constraint must be gone.
-        composite = next(
-            c
-            for c in constraints
-            if c.name == "uq_wa_config_integration_phone"
-        )
+        composite = next(c for c in constraints if c.name == "uq_wa_config_integration_phone")
         cols = {col.name for col in composite.columns}
         assert cols == {"integration_id", "phone_id"}

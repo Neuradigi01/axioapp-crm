@@ -1,8 +1,6 @@
 <div class="h-[calc(100vh-3.5rem)] flex flex-col bg-zinc-50">
   <!-- Header bar -->
-  <header
-    class="h-14 flex items-center gap-3 px-4 bg-white border-b border-zinc-200 shrink-0"
-  >
+  <header class="h-14 flex items-center gap-3 px-4 bg-white border-b border-zinc-200 shrink-0">
     <a
       routerLink="/user/workflows"
       class="p-1.5 rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
@@ -164,9 +162,7 @@
       (drop)="onDrop($event)"
     >
       @if (loading()) {
-        <div
-          class="absolute inset-0 flex items-center justify-center text-zinc-500 text-sm"
-        >
+        <div class="absolute inset-0 flex items-center justify-center text-zinc-500 text-sm">
           Loading workflow…
         </div>
       } @else {
@@ -177,12 +173,7 @@
           (wheel)="onWheel($event)"
         >
           <defs>
-            <pattern
-              id="workflow-grid"
-              width="40"
-              height="40"
-              patternUnits="userSpaceOnUse"
-            >
+            <pattern id="workflow-grid" width="40" height="40" patternUnits="userSpaceOnUse">
               <circle cx="2" cy="2" r="1" class="fill-zinc-300" />
             </pattern>
             <marker
@@ -199,24 +190,14 @@
             </marker>
           </defs>
 
-          <rect
-            id="workflow-bg"
-            width="100%"
-            height="100%"
-            fill="url(#workflow-grid)"
-          />
+          <rect id="workflow-bg" width="100%" height="100%" fill="url(#workflow-grid)" />
 
           <g [attr.transform]="transform()">
             <!-- Edges -->
             @for (edge of state.edges(); track edge.id) {
               @if (nodeById().get(edge.source); as src) {
                 @if (nodeById().get(edge.target); as tgt) {
-                  <g
-                    appWorkflowEdge
-                    [edge]="edge"
-                    [source]="src"
-                    [target]="tgt"
-                  ></g>
+                  <g appWorkflowEdge [edge]="edge" [source]="src" [target]="tgt"></g>
                 }
               }
             }
@@ -260,9 +241,7 @@
           >
             <lucide-icon name="ZoomOut" class="w-4 h-4"></lucide-icon>
           </button>
-          <span class="text-[11px] text-zinc-600 w-10 text-center">
-            {{ zoomPercent() }}%
-          </span>
+          <span class="text-[11px] text-zinc-600 w-10 text-center"> {{ zoomPercent() }}% </span>
           <button
             type="button"
             class="px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 rounded"
@@ -301,9 +280,7 @@
     </main>
 
     <!-- Right drawer — version history (Step 17) / typed node editor (Step 15) / test-fire trace -->
-    <aside
-      class="w-[440px] shrink-0 bg-white border-l border-zinc-200 flex flex-col"
-    >
+    <aside class="w-[440px] shrink-0 bg-white border-l border-zinc-200 flex flex-col">
       @if (showVersionDrawer() && state.workflowId(); as wfId) {
         <app-version-history-drawer
           [workflowId]="wfId"
@@ -314,65 +291,53 @@
           (restoreVersion)="rollbackToVersion($event)"
         />
       } @else if (selectedNode(); as node) {
-        <app-node-editor
-          [node]="node"
-          (close)="state.selectNode(null)"
-        />
+        <app-node-editor [node]="node" (close)="state.selectNode(null)" />
       } @else {
-      <header
-        class="px-4 py-3 border-b border-zinc-200 flex items-center justify-between"
-      >
-        <h3 class="text-sm font-semibold text-zinc-700">
-          @if (testFireTrace()) {
-            Test fire trace
-          } @else {
-            Inspector
-          }
-        </h3>
-      </header>
-      <div class="flex-1 overflow-y-auto px-4 py-4 text-sm text-zinc-700">
-        @if (testFireTrace(); as trace) {
-          <div class="space-y-2">
-            <p class="text-[11px] text-zinc-500">
-              Synthetic trace — no real sends were performed.
-            </p>
-            @for (hop of trace.steps; track $index) {
-              <div
-                class="border border-zinc-200 rounded p-2 text-xs flex items-center gap-2"
-              >
-                <span class="font-mono text-[10px] text-zinc-500 w-5"
-                  >{{ $index + 1 }}.</span
-                >
-                <div class="flex-1 min-w-0">
-                  <div class="font-medium text-zinc-800 truncate">
-                    {{ hop.node_type }}
-                  </div>
-                  @if (hop.skip_reason) {
-                    <div class="text-rose-600 text-[10px]">
-                      skipped: {{ hop.skip_reason }}
-                    </div>
-                  } @else {
-                    <div class="text-emerald-700 text-[10px]">
-                      would execute
-                      @if (hop.edge_label) {
-                        — next: {{ hop.edge_label }}
-                      }
-                    </div>
-                  }
-                </div>
-              </div>
+        <header class="px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-zinc-700">
+            @if (testFireTrace()) {
+              Test fire trace
+            } @else {
+              Inspector
             }
-            <div class="text-[11px] text-zinc-500 pt-2">
-              Outcome: <strong>{{ trace.outcome }}</strong>
+          </h3>
+        </header>
+        <div class="flex-1 overflow-y-auto px-4 py-4 text-sm text-zinc-700">
+          @if (testFireTrace(); as trace) {
+            <div class="space-y-2">
+              <p class="text-[11px] text-zinc-500">
+                Synthetic trace — no real sends were performed.
+              </p>
+              @for (hop of trace.steps; track $index) {
+                <div class="border border-zinc-200 rounded p-2 text-xs flex items-center gap-2">
+                  <span class="font-mono text-[10px] text-zinc-500 w-5">{{ $index + 1 }}.</span>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-medium text-zinc-800 truncate">
+                      {{ hop.node_type }}
+                    </div>
+                    @if (hop.skip_reason) {
+                      <div class="text-rose-600 text-[10px]">skipped: {{ hop.skip_reason }}</div>
+                    } @else {
+                      <div class="text-emerald-700 text-[10px]">
+                        would execute
+                        @if (hop.edge_label) {
+                          — next: {{ hop.edge_label }}
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+              <div class="text-[11px] text-zinc-500 pt-2">
+                Outcome: <strong>{{ trace.outcome }}</strong>
+              </div>
             </div>
-          </div>
-        } @else {
-          <p class="text-xs text-zinc-500">
-            Select a node to configure it, or click <em>Test fire</em> to dry-run
-            the workflow.
-          </p>
-        }
-      </div>
+          } @else {
+            <p class="text-xs text-zinc-500">
+              Select a node to configure it, or click <em>Test fire</em> to dry-run the workflow.
+            </p>
+          }
+        </div>
       }
     </aside>
   </div>
@@ -387,9 +352,6 @@
 
   <!-- Step 17 — import JSON modal -->
   @if (showImportModal()) {
-    <app-import-modal
-      (cancel)="cancelImport()"
-      (confirm)="confirmImport($event)"
-    />
+    <app-import-modal (cancel)="cancelImport()" (confirm)="confirmImport($event)" />
   }
 </div>

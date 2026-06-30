@@ -13,10 +13,10 @@ Operations:
     ``IntegrityError`` path.
   * ``insert_view`` / ``delete_view_row`` — caller commits.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,14 +24,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.saved_views.models import SavedView
 
 
-async def get_view_by_id(
-    session: AsyncSession, view_id: uuid.UUID
-) -> Optional[SavedView]:
+async def get_view_by_id(session: AsyncSession, view_id: uuid.UUID) -> SavedView | None:
     """Single-row read by PK. RLS keeps cross-tenant rows invisible;
     service-level ownership / sharing is enforced by callers."""
-    result = await session.execute(
-        select(SavedView).where(SavedView.id == view_id)
-    )
+    result = await session.execute(select(SavedView).where(SavedView.id == view_id))
     return result.scalar_one_or_none()
 
 
@@ -69,7 +65,7 @@ async def find_view_by_owner_entity_name(
     owner_user_id: uuid.UUID,
     entity: str,
     name: str,
-) -> Optional[SavedView]:
+) -> SavedView | None:
     """Pre-check on the unique ``(owner_user_id, entity, name)`` tuple
     — used by create + rename to surface 409 without relying on the
     commit-side IntegrityError path."""
@@ -88,9 +84,7 @@ def insert_view(session: AsyncSession, view: SavedView) -> None:
     session.add(view)
 
 
-async def delete_view_row(
-    session: AsyncSession, view: SavedView
-) -> None:
+async def delete_view_row(session: AsyncSession, view: SavedView) -> None:
     """Mark a SavedView row for DELETE. Caller commits."""
     await session.delete(view)
 

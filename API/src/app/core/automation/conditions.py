@@ -33,12 +33,12 @@ The evaluator is intentionally I/O-free. The recipient resolver
 payload doesn't carry the relevant contact/user dict; conditions
 operate only on what's in the published envelope.
 """
+
 from __future__ import annotations
 
 import logging
 import re
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -183,13 +183,11 @@ def _validate_leaf(node: dict[str, Any]) -> None:
         if not isinstance(pattern, str):
             raise _ConditionError("'regex' op requires a string pattern")
         if len(pattern) > _REGEX_MAX_LEN:
-            raise _ConditionError(
-                f"'regex' pattern exceeds {_REGEX_MAX_LEN}-char cap"
-            )
+            raise _ConditionError(f"'regex' pattern exceeds {_REGEX_MAX_LEN}-char cap")
         try:
             re.compile(pattern)
         except re.error as exc:
-            raise _ConditionError(f"'regex' pattern does not compile: {exc}")
+            raise _ConditionError(f"'regex' pattern does not compile: {exc}") from exc
 
 
 def _eval_leaf(node: dict[str, Any], payload: dict[str, Any]) -> bool:

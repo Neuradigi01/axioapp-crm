@@ -18,9 +18,10 @@ Same checks but against `staff_sessions` and `scope == "staff"`.
 gated admin routes. Staff-portal endpoints don't use the RBAC
 permission keys — every authenticated staff user can hit them.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
@@ -28,12 +29,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.auth import data_access as auth_da
-from src.app.core.users import data_access as users_da
 from src.app.core.permissions.service import list_permissions_for_role
+from src.app.core.users import data_access as users_da
 from src.app.core.users.models import User
 from src.app.shared.context import get_context
 from src.app.shared.db import get_db
-
 
 UNAUTHORIZED = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -53,7 +53,7 @@ async def get_current_user(db: AsyncSession = Depends(get_db)) -> User:
     session = await auth_da.get_auth_session(db, session_id=ctx.token_id)
     if session is None or session.revoked_at is not None:
         raise UNAUTHORIZED
-    if session.expires_at <= datetime.now(timezone.utc):
+    if session.expires_at <= datetime.now(UTC):
         raise UNAUTHORIZED
 
     user = await users_da.get_user_by_uuid(db, ctx.user_id)
@@ -78,13 +78,11 @@ async def get_current_staff(db: AsyncSession = Depends(get_db)) -> User:
         raise UNAUTHORIZED
 
     session = (
-        await db.execute(
-            select(StaffSession).where(StaffSession.id == ctx.token_id)
-        )
+        await db.execute(select(StaffSession).where(StaffSession.id == ctx.token_id))
     ).scalar_one_or_none()
     if session is None or session.revoked_at is not None:
         raise UNAUTHORIZED
-    if session.expires_at <= datetime.now(timezone.utc):
+    if session.expires_at <= datetime.now(UTC):
         raise UNAUTHORIZED
 
     user = await users_da.get_user_by_uuid(db, ctx.user_id)

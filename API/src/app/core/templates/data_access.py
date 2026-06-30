@@ -16,6 +16,7 @@ listener on every SELECT, but we also pass ``org_id`` explicitly in
 the WHERE clause as a belt to the suspenders — defends callers that
 forget to set ``RequestContext.org_id`` (Celery tasks, scripts).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -31,7 +32,6 @@ from src.app.core.templates.models import (
     TemplateInternalStatus,
 )
 from src.app.core.templates.sms_extension import SMSDLTTemplate
-
 
 # --- tbl_message_templates ----------------------------------------------
 
@@ -130,18 +130,12 @@ async def list_templates(
             )
         )
 
-    total = (
-        await session.execute(
-            select(func.count()).select_from(base.subquery())
-        )
-    ).scalar_one()
+    total = (await session.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
 
     rows = (
         (
             await session.execute(
-                base.order_by(MessageTemplate.updated_at.desc())
-                .offset(offset)
-                .limit(limit)
+                base.order_by(MessageTemplate.updated_at.desc()).offset(offset).limit(limit)
             )
         )
         .scalars()
@@ -234,9 +228,7 @@ async def find_by_dlt_template_id(
     return result.scalar_one_or_none()
 
 
-def add_template(
-    session: AsyncSession, template: MessageTemplate
-) -> MessageTemplate:
+def add_template(session: AsyncSession, template: MessageTemplate) -> MessageTemplate:
     """Stage a new `tbl_message_templates` row in the unit-of-work."""
     session.add(template)
     return template

@@ -5,16 +5,9 @@ import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { AutomationEditorPageComponent } from './automation-editor.page';
-import {
-  AutomationsApiService,
-  TriggerRead,
-} from '../automations-api.service';
-import {
-  TemplateRead,
-  TemplatesApiService,
-} from '../../templates/templates-api.service';
+import { AutomationsApiService, TriggerRead } from '../automations-api.service';
+import { TemplateRead, TemplatesApiService } from '../../templates/templates-api.service';
 import { FurnitureAuthService } from '../../auth/auth.service';
-
 
 function makeTrigger(overrides: Partial<TriggerRead> = {}): TriggerRead {
   return {
@@ -37,20 +30,24 @@ function makeTrigger(overrides: Partial<TriggerRead> = {}): TriggerRead {
   };
 }
 
-
 describe('AutomationEditorPageComponent', () => {
   let apiSpy: jasmine.SpyObj<AutomationsApiService>;
   let templatesSpy: jasmine.SpyObj<TemplatesApiService>;
   let authStub: { hasPermission: (k: string) => boolean };
 
-  function makeFixture(opts: {
-    triggerId?: string;
-    initialTrigger?: TriggerRead;
-  } = {}): ComponentFixture<AutomationEditorPageComponent> {
-    apiSpy = jasmine.createSpyObj<AutomationsApiService>(
-      'AutomationsApiService',
-      ['get', 'create', 'update', 'listEventTypes', 'dryRun'],
-    );
+  function makeFixture(
+    opts: {
+      triggerId?: string;
+      initialTrigger?: TriggerRead;
+    } = {},
+  ): ComponentFixture<AutomationEditorPageComponent> {
+    apiSpy = jasmine.createSpyObj<AutomationsApiService>('AutomationsApiService', [
+      'get',
+      'create',
+      'update',
+      'listEventTypes',
+      'dryRun',
+    ]);
     apiSpy.listEventTypes.and.returnValue(
       of([
         {
@@ -72,9 +69,7 @@ describe('AutomationEditorPageComponent', () => {
         },
       ]),
     );
-    apiSpy.get.and.returnValue(
-      of(opts.initialTrigger ?? makeTrigger()),
-    );
+    apiSpy.get.and.returnValue(of(opts.initialTrigger ?? makeTrigger()));
     apiSpy.create.and.returnValue(of(makeTrigger()));
     apiSpy.update.and.returnValue(of(makeTrigger()));
     apiSpy.dryRun.and.returnValue(
@@ -87,19 +82,17 @@ describe('AutomationEditorPageComponent', () => {
       }),
     );
 
-    templatesSpy = jasmine.createSpyObj<TemplatesApiService>(
-      'TemplatesApiService',
-      ['get', 'list'],
-    );
+    templatesSpy = jasmine.createSpyObj<TemplatesApiService>('TemplatesApiService', [
+      'get',
+      'list',
+    ]);
     templatesSpy.get.and.returnValue(
       of({
         id: 'tpl-1',
         name: 'User Welcome',
       } as unknown as TemplateRead),
     );
-    templatesSpy.list.and.returnValue(
-      of({ items: [], total: 0, limit: 100, offset: 0 }),
-    );
+    templatesSpy.list.and.returnValue(of({ items: [], total: 0, limit: 100, offset: 0 }));
 
     authStub = { hasPermission: (_k: string) => true };
 
@@ -138,7 +131,13 @@ describe('AutomationEditorPageComponent', () => {
       }),
     });
     const cmp = fixture.componentInstance as unknown as {
-      form: { controls: { name: { value: string }; event_type: { value: string }; delay_seconds: { value: number } } };
+      form: {
+        controls: {
+          name: { value: string };
+          event_type: { value: string };
+          delay_seconds: { value: number };
+        };
+      };
     };
     fixture.detectChanges();
     expect(apiSpy.get).toHaveBeenCalledWith('trg-1');

@@ -5,6 +5,7 @@ enforcement is dynamic against the code-defined registry and happens
 in the service layer at upsert time — Pydantic alone can't express
 "this prop is allowed only if the field's registry def lists it."
 """
+
 from __future__ import annotations
 
 import uuid

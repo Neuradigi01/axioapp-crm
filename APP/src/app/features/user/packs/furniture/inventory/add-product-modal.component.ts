@@ -13,11 +13,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  InventoryApiService,
-  InventoryItem,
-  Warehouse,
-} from './inventory-api.service';
+import { InventoryApiService, InventoryItem, Warehouse } from './inventory-api.service';
 
 /**
  * Add New Product modal.
@@ -173,9 +169,7 @@ export class AddProductModalComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.submitError.set(
-            extractApiError(err) ?? 'Could not create product.',
-          );
+          this.submitError.set(extractApiError(err) ?? 'Could not create product.');
         },
       });
   }
@@ -184,5 +178,4 @@ export class AddProductModalComponent {
     if (this.previewUrl()) URL.revokeObjectURL(this.previewUrl()!);
     this.cancel.emit();
   }
-
 }

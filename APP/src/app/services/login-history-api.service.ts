@@ -12,7 +12,9 @@ export class LoginHistoryApiService {
     page_index?: number;
     page_size?: number;
   }): Promise<IPaginatedApiResponse<ILoginHistoryRecord>> {
-    return this.http.Post('/login-history/list', payload) as Promise<IPaginatedApiResponse<ILoginHistoryRecord>>;
+    return this.http.Post('/login-history/list', payload) as Promise<
+      IPaginatedApiResponse<ILoginHistoryRecord>
+    >;
   }
 
   logoutSession(token_id: number): Promise<IApiResponse> {

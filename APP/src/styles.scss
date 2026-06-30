@@ -39,7 +39,9 @@ body {
   font: var(--mat-sys-body-medium);
   margin: 0;
   height: 100%;
-  transition: background-color var(--transition-normal), color var(--transition-normal);
+  transition:
+    background-color var(--transition-normal),
+    color var(--transition-normal);
 }
 
 // ---------------------------------------------------------------------------

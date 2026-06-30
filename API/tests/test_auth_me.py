@@ -1,4 +1,5 @@
 """Tests for `/api/v1/users/me` under the new JWT auth contract."""
+
 from __future__ import annotations
 
 import pytest
@@ -51,9 +52,7 @@ async def test_me_with_revoked_token_returns_401(layered_client, seeded_admin):
         seeded_admin["password"],
     )
     # The token works before logout.
-    ok = await layered_client.get(
-        "/api/v1/users/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    ok = await layered_client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
     assert ok.status_code == 200
 
     # Log out revokes the session.

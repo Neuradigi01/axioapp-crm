@@ -39,7 +39,9 @@
       }
     </div>
   } @else if (visits().length === 0) {
-    <div class="rounded-lg border border-dashed border-zinc-300 bg-white py-12 text-center text-sm text-zinc-500">
+    <div
+      class="rounded-lg border border-dashed border-zinc-300 bg-white py-12 text-center text-sm text-zinc-500"
+    >
       No open visits assigned to you right now.
     </div>
   } @else {
@@ -49,9 +51,7 @@
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
-                <p class="text-sm font-semibold text-zinc-900">
-                  Visit {{ v.id.slice(0, 8) }}…
-                </p>
+                <p class="text-sm font-semibold text-zinc-900">Visit {{ v.id.slice(0, 8) }}…</p>
                 <span
                   [class]="
                     'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ring-1 ' +
@@ -76,7 +76,9 @@
                 class="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
               >
                 @if (completing() === v.id) {
-                  <span class="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                  <span
+                    class="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                  ></span>
                   Saving…
                 } @else {
                   <lucide-icon name="check" class="h-3.5 w-3.5" />
@@ -84,7 +86,9 @@
                 }
               </button>
             } @else {
-              <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">
+              <span
+                class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+              >
                 <lucide-icon name="check" class="h-3 w-3" />
                 Completed
               </span>

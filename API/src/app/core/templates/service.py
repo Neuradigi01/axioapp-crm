@@ -35,6 +35,7 @@ Step 4 alongside the workflow transitions — the review trail
 naturally records every state-machine action. This step writes the
 content, Step 4 records who blessed it.
 """
+
 from __future__ import annotations
 
 import logging
@@ -63,7 +64,6 @@ from src.app.core.templates.variables import (
     reject_jinja_statements,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -91,9 +91,7 @@ async def get_template(
     template_id: uuid.UUID,
 ) -> MessageTemplate:
     """Return the template row or raise :class:`TemplateNotFound`."""
-    row = await data_access.get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    row = await data_access.get_template(session, org_id=org_id, template_id=template_id)
     if row is None:
         raise TemplateNotFound(str(template_id))
     return row
@@ -108,9 +106,7 @@ async def find_template(
     """Non-raising public lookup. Returns None on miss — callers
     (campaigns / automation) that want their own error message use
     this instead of :func:`get_template`."""
-    return await data_access.get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    return await data_access.get_template(session, org_id=org_id, template_id=template_id)
 
 
 async def list_templates(
@@ -166,9 +162,7 @@ async def get_version(
     is absent — clients shouldn't be able to distinguish the two
     failure modes."""
     await get_template(session, org_id=org_id, template_id=template_id)
-    row = await data_access.get_version(
-        session, template_id=template_id, version=version
-    )
+    row = await data_access.get_version(session, template_id=template_id, version=version)
     if row is None:
         raise TemplateNotFound(f"{template_id} v{version}")
     return row
@@ -218,9 +212,7 @@ async def create_template(
         await session.flush()
     except IntegrityError as exc:
         await session.rollback()
-        raise DuplicateTemplateName(
-            name=payload.name, channel=payload.channel.value
-        ) from exc
+        raise DuplicateTemplateName(name=payload.name, channel=payload.channel.value) from exc
 
     data_access.add_template_version(
         session,
@@ -263,9 +255,7 @@ async def update_template(
     (the Pydantic validator on ``TemplateCreate`` doesn't see the
     persisted channel on a partial PATCH).
     """
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
 
     if template.internal_status in _EDIT_LOCKED_STATUSES:
         raise TemplateLocked(template.internal_status.value)
@@ -293,10 +283,7 @@ async def update_template(
     if payload.language is not None and payload.language != template.language:
         template.language = payload.language
         changed = True
-    if (
-        payload.body_text is not None
-        and payload.body_text != template.body_text
-    ):
+    if payload.body_text is not None and payload.body_text != template.body_text:
         reject_jinja_statements(payload.body_text)
         template.body_text = payload.body_text
         template.variables = extract_variable_paths(payload.body_text)
@@ -304,10 +291,7 @@ async def update_template(
     if payload.subject is not None and payload.subject != template.subject:
         template.subject = payload.subject
         changed = True
-    if (
-        payload.preview_text is not None
-        and payload.preview_text != template.preview_text
-    ):
+    if payload.preview_text is not None and payload.preview_text != template.preview_text:
         template.preview_text = payload.preview_text
         changed = True
 
@@ -341,9 +325,7 @@ async def update_template(
         # only if two concurrent updates race. Surface as a generic
         # conflict so the router 409s; the caller retries with a fresh
         # read.
-        raise DuplicateTemplateName(
-            name=template.name, channel=template.channel.value
-        ) from exc
+        raise DuplicateTemplateName(name=template.name, channel=template.channel.value) from exc
 
     await session.refresh(template)
     logger.info(
@@ -368,9 +350,7 @@ async def archive_template(
     approved template stays approved on Meta's side even if our org
     archives the local copy.
     """
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
     if template.internal_status == TemplateInternalStatus.archived:
         return template
 

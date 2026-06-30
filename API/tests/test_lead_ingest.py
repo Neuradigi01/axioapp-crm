@@ -18,6 +18,7 @@ Six groups:
      verification — no DB needed; we capture the SQL shape).
   6. Routing config endpoints — GET/PUT round-trip via FastAPI.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,11 +27,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.app.core.leads import dedup, ingest as ingest_module, routing
-from src.app.core.leads.ingest import IngestResult, ingest
+from src.app.core.leads import dedup, routing
+from src.app.core.leads import ingest as ingest_module
+from src.app.core.leads.ingest import ingest
 from src.app.core.leads.models import LeadSource
 from src.app.core.leads.schemas import LeadCreate
-
 
 _ORG_ID = uuid.uuid4()
 _CONTACT_ID = uuid.uuid4()
@@ -73,6 +74,7 @@ class _CapturingSession:
 def _silence_audit_and_activities(monkeypatch):
     """`ingest()` calls audit.log + activities.log. Both open their
     own sessions in production — stub to no-ops for unit tests."""
+
     async def _noop(*_a, **_k):
         return None
 
@@ -97,6 +99,7 @@ async def test_ingest_creates_lead_with_assignee_when_no_open_lead(
     monkeypatch,
 ):
     """No open lead for the contact → pick_assignee → create new lead."""
+
     async def _no_open(*_a, **_k):
         return None
 
@@ -113,9 +116,7 @@ async def test_ingest_creates_lead_with_assignee_when_no_open_lead(
         captured["org_id"] = kwargs["org_id"]
         return MagicMock(id=new_lead_id)
 
-    monkeypatch.setattr(
-        ingest_module, "find_open_lead_for_contact", _no_open
-    )
+    monkeypatch.setattr(ingest_module, "find_open_lead_for_contact", _no_open)
     monkeypatch.setattr(ingest_module, "pick_assignee", _pick)
     monkeypatch.setattr(ingest_module, "create_lead", _create)
 
@@ -147,6 +148,7 @@ async def test_ingest_creates_lead_with_null_assignee_when_no_eligible_users(
     monkeypatch,
 ):
     """No user has `leads.own` → lead lands unassigned, no raise."""
+
     async def _no_open(*_a, **_k):
         return None
 
@@ -160,9 +162,7 @@ async def test_ingest_creates_lead_with_null_assignee_when_no_eligible_users(
         captured["payload"] = kwargs["payload"]
         return MagicMock(id=new_lead_id)
 
-    monkeypatch.setattr(
-        ingest_module, "find_open_lead_for_contact", _no_open
-    )
+    monkeypatch.setattr(ingest_module, "find_open_lead_for_contact", _no_open)
     monkeypatch.setattr(ingest_module, "pick_assignee", _no_assignee)
     monkeypatch.setattr(ingest_module, "create_lead", _create)
 
@@ -196,9 +196,7 @@ async def test_ingest_merges_to_existing_open_lead(monkeypatch):
         create_called["called"] = True
         return MagicMock(id=uuid.uuid4())
 
-    monkeypatch.setattr(
-        ingest_module, "find_open_lead_for_contact", _existing
-    )
+    monkeypatch.setattr(ingest_module, "find_open_lead_for_contact", _existing)
     monkeypatch.setattr(ingest_module, "create_lead", _create)
 
     captured_activity: dict[str, Any] = {}
@@ -241,6 +239,7 @@ async def test_ingest_overrides_caller_payload_with_resolved_values(
     """If caller passes a lead_payload with stale contact_id / source,
     ingest replaces those with the resolved values. Defence-in-depth
     against caller mistakes."""
+
     async def _no_open(*_a, **_k):
         return None
 
@@ -255,18 +254,16 @@ async def test_ingest_overrides_caller_payload_with_resolved_values(
         captured["payload"] = kwargs["payload"]
         return MagicMock(id=uuid.uuid4())
 
-    monkeypatch.setattr(
-        ingest_module, "find_open_lead_for_contact", _no_open
-    )
+    monkeypatch.setattr(ingest_module, "find_open_lead_for_contact", _no_open)
     monkeypatch.setattr(ingest_module, "pick_assignee", _pick)
     monkeypatch.setattr(ingest_module, "create_lead", _create)
 
     bad_contact = uuid.uuid4()
     bad_assignee = uuid.uuid4()
     stale_payload = LeadCreate(
-        contact_id=bad_contact,                  # caller mistake
-        source=LeadSource.manual,                # caller mistake
-        assigned_to_id=bad_assignee,             # caller mistake
+        contact_id=bad_contact,  # caller mistake
+        source=LeadSource.manual,  # caller mistake
+        assigned_to_id=bad_assignee,  # caller mistake
         custom_data={},
         attribution=None,
     )
@@ -399,9 +396,7 @@ async def test_find_open_lead_for_contact_returns_lead_id_when_found():
 
             return _R()
 
-    result = await dedup.find_open_lead_for_contact(
-        _S(), org_id=_ORG_ID, contact_id=_CONTACT_ID
-    )
+    result = await dedup.find_open_lead_for_contact(_S(), org_id=_ORG_ID, contact_id=_CONTACT_ID)
     assert result == found_id
 
 

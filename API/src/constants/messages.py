@@ -32,7 +32,9 @@ INVALID_RESET_TOKEN = "Invalid or expired reset token!"
 
 # ── Registration ─────────────────────────────────────────────────────
 REGISTRATION_SUCCESS = "Registration successful!"
-REGISTRATION_SUCCESS_VERIFY_EMAIL = "Registration successful! Please check your email to verify your account."
+REGISTRATION_SUCCESS_VERIFY_EMAIL = (
+    "Registration successful! Please check your email to verify your account."
+)
 INVALID_REFERRAL_ID = "Invalid referral ID!"
 
 # ── 2FA ──────────────────────────────────────────────────────────────
@@ -113,4 +115,3 @@ NEWS_UPDATED = "News updated successfully!"
 NEWS_DELETED = "News deleted successfully!"
 POPUP_CREATED = "Popup created successfully!"
 POPUP_DELETED = "Popup deleted successfully!"
-

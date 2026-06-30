@@ -15,6 +15,7 @@ What we prove:
      q/source/tag semantics (regression guard against drift).
   4. `_bulk_set_members` is idempotent on `(group_id, contact_id)`.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -28,7 +29,6 @@ from src.app.core.contacts.groups.schemas import (
     GroupFilter,
     PreviewSizeIn,
 )
-
 
 # --- GroupCreate mode-consistency guards --------------------------------
 
@@ -112,17 +112,11 @@ class TestPreviewSizeIn:
 
 class TestPredicateBuilder:
     def test_empty_filter_returns_no_predicates(self):
-        assert (
-            groups_service._build_contact_filter_predicates({}) == []
-        )
-        assert (
-            groups_service._build_contact_filter_predicates(None) == []
-        )
+        assert groups_service._build_contact_filter_predicates({}) == []
+        assert groups_service._build_contact_filter_predicates(None) == []
 
     def test_q_only(self):
-        preds = groups_service._build_contact_filter_predicates(
-            {"q": "asha"}
-        )
+        preds = groups_service._build_contact_filter_predicates({"q": "asha"})
         assert len(preds) == 1
 
     def test_source_and_tag_emit_two_predicates(self):

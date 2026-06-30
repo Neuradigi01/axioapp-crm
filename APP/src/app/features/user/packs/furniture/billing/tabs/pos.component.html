@@ -21,7 +21,9 @@
         }
       </div>
     } @else if (items().length === 0) {
-      <p class="rounded-md border border-dashed border-zinc-300 bg-white py-12 text-center text-sm text-zinc-500">
+      <p
+        class="rounded-md border border-dashed border-zinc-300 bg-white py-12 text-center text-sm text-zinc-500"
+      >
         No sellable items found. Make sure items have stock and a linked catalog row.
       </p>
     } @else {
@@ -34,13 +36,17 @@
           >
             <div class="flex w-full items-start justify-between gap-2">
               <p class="truncate text-sm font-semibold text-zinc-900">{{ it.sku }}</p>
-              <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+              <span
+                class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700"
+              >
                 {{ it.qty_on_hand }} in stock
               </span>
             </div>
             <p class="truncate text-[11px] text-zinc-500">
               {{ it.material || '—' }}
-              @if (it.color) { · {{ it.color }} }
+              @if (it.color) {
+                · {{ it.color }}
+              }
             </p>
             <p class="mt-1 text-sm font-semibold text-zinc-900">
               {{ resolveUnitPrice(it) | formatINR }}
@@ -81,7 +87,7 @@
                   <p class="text-zinc-500">
                     {{ l.unit_price | formatINR }} ·
                     <span class="font-medium text-zinc-700">
-                      {{ (l.unit_price * l.qty) | formatINR }}
+                      {{ l.unit_price * l.qty | formatINR }}
                     </span>
                   </p>
                 </div>
@@ -151,9 +157,7 @@
             Matched existing contact: <span class="font-medium">{{ c.full_name }}</span>
           </p>
         } @else if (phoneControl.value.trim().length >= 3) {
-          <p class="text-[11px] text-zinc-500">
-            New contact — will be created on checkout.
-          </p>
+          <p class="text-[11px] text-zinc-500">New contact — will be created on checkout.</p>
         }
       </div>
     </section>
@@ -247,7 +251,9 @@
       </p>
     }
     @if (lastInvoiceNumber(); as n) {
-      <p class="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200">
+      <p
+        class="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200"
+      >
         Last sale: <span class="font-semibold">INV-{{ n.toString().padStart(4, '0') }}</span>
         — receipt opened in a new tab.
       </p>
@@ -260,7 +266,9 @@
       class="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
     >
       @if (submitting()) {
-        <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+        <span
+          class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"
+        ></span>
         Processing…
       } @else {
         <lucide-icon name="printer" class="h-4 w-4" />

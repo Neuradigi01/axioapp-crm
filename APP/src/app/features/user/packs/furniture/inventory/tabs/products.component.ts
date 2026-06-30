@@ -12,11 +12,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
-import {
-  InventoryApiService,
-  InventoryItem,
-  Warehouse,
-} from '../inventory-api.service';
+import { InventoryApiService, InventoryItem, Warehouse } from '../inventory-api.service';
 import { AddProductModalComponent } from '../add-product-modal.component';
 import { ProductCardComponent } from '../product-card.component';
 import { extractApiError } from '@core/services/api-error.util';
@@ -78,11 +74,7 @@ export class ProductsTabComponent {
     this.reloadItems();
 
     this.searchControl.valueChanges
-      .pipe(
-        debounceTime(200),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef),
-      )
+      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.reloadItems());
   }
 
@@ -167,11 +159,8 @@ export class ProductsTabComponent {
           this.items.set([]);
           this.total.set(0);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load inventory items.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load inventory items.');
         },
       });
   }
-
 }

@@ -17,11 +17,7 @@ import {
   ConversationStatus,
 } from './conversations-api.service';
 import { StaffListItem } from '../staff/staff-api.service';
-import {
-  OwnerColor,
-  ownerColor,
-  staffInitials,
-} from '../shared/owner-color.util';
+import { OwnerColor, ownerColor, staffInitials } from '../shared/owner-color.util';
 import { TagChipComponent } from './tag-chip.component';
 import { TagFilterComponent } from './tag-filter.component';
 
@@ -98,12 +94,7 @@ const ASSIGNEE_MODES: Array<{ value: AssigneeMode; label: string }> = [
   selector: 'app-conversation-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    FormsModule,
-    LucideAngularModule,
-    TagChipComponent,
-    TagFilterComponent,
-  ],
+  imports: [FormsModule, LucideAngularModule, TagChipComponent, TagFilterComponent],
   templateUrl: './conversation-list.component.html',
 })
 export class ConversationListComponent {
@@ -146,9 +137,7 @@ export class ConversationListComponent {
 
   /** Sorted list of staff names for the "Specific…" dropdown. */
   protected readonly staffOptions = computed<StaffListItem[]>(() =>
-    Array.from(this.staffById.values()).sort((a, b) =>
-      a.full_name.localeCompare(b.full_name),
-    ),
+    Array.from(this.staffById.values()).sort((a, b) => a.full_name.localeCompare(b.full_name)),
   );
 
   protected readonly displayItems = computed(() => this.items);
@@ -176,9 +165,9 @@ export class ConversationListComponent {
     const d = new Date(iso);
     const now = new Date();
     const sameDay =
-      d.getFullYear() === now.getFullYear()
-      && d.getMonth() === now.getMonth()
-      && d.getDate() === now.getDate();
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate();
     if (sameDay) {
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
@@ -186,17 +175,13 @@ export class ConversationListComponent {
   }
 
   protected onChannelChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value as
-      | ConversationChannel
-      | '';
+    const value = (event.target as HTMLSelectElement).value as ConversationChannel | '';
     this.channelFilter.set(value);
     this.emit();
   }
 
   protected onStatusChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value as
-      | ConversationStatus
-      | '';
+    const value = (event.target as HTMLSelectElement).value as ConversationStatus | '';
     this.statusFilter.set(value);
     this.emit();
   }

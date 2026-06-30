@@ -17,12 +17,12 @@ Five groups:
 Convention: no real DB. `_CapturingSession` stages SELECT results in
 order so each test scripts the session's view of the world.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -39,7 +39,6 @@ from src.app.core.email_sequences.schemas import (
     EmailSequenceCreate,
     EmailSequenceStepCreate,
 )
-
 
 _ORG_ID = uuid.uuid4()
 _ACTOR_ID = uuid.uuid4()
@@ -71,7 +70,7 @@ class _ScalarResult:
     def scalar(self) -> Any:
         return self._value
 
-    def scalars(self) -> "_ScalarResult":
+    def scalars(self) -> _ScalarResult:
         return self
 
     def all(self) -> list[Any]:
@@ -95,16 +94,14 @@ class _CapturingSession:
 
     async def execute(self, _stmt: Any) -> Any:
         if not self.queue:
-            raise AssertionError(
-                "no staged response left; called execute() one extra time"
-            )
+            raise AssertionError("no staged response left; called execute() one extra time")
         return self.queue.pop(0)
 
     def add(self, row: Any) -> None:
         self.added.append(row)
         if getattr(row, "id", None) is None:
             row.id = uuid.uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not getattr(row, "created_at", None):
             row.created_at = now
         if hasattr(row, "updated_at") and not row.updated_at:
@@ -149,17 +146,13 @@ class TestValidateTemplateIds:
         rows = [SimpleRow(id=t) for t in tids]
         session.stage(_ScalarResult(rows=rows))
         # No exception → pass.
-        await sequences_service._validate_template_ids(
-            session, org_id=_ORG_ID, template_ids=tids
-        )
+        await sequences_service._validate_template_ids(session, org_id=_ORG_ID, template_ids=tids)
 
     @pytest.mark.asyncio
     async def test_empty_skips_query(self):
         session = _CapturingSession()
         # No stage — proves no DB call.
-        await sequences_service._validate_template_ids(
-            session, org_id=_ORG_ID, template_ids=[]
-        )
+        await sequences_service._validate_template_ids(session, org_id=_ORG_ID, template_ids=[])
 
     @pytest.mark.asyncio
     async def test_unknown_id_rejected(self):
@@ -195,11 +188,7 @@ class TestCreateSequence:
             ],
         )
         # Stage: template validation finds all three.
-        session.stage(
-            _ScalarResult(
-                rows=[SimpleRow(id=t1), SimpleRow(id=t2), SimpleRow(id=t3)]
-            )
-        )
+        session.stage(_ScalarResult(rows=[SimpleRow(id=t1), SimpleRow(id=t2), SimpleRow(id=t3)]))
         seq, steps = await sequences_service.create_sequence(
             session,
             org_id=_ORG_ID,
@@ -263,14 +252,8 @@ class TestEnroll:
             contact_ids=contact_ids,
         )
         # 5 enrollments + 5 step rows.
-        enrollments = [
-            r for r in session.added if isinstance(r, EmailSequenceEnrollment)
-        ]
-        step_rows = [
-            r
-            for r in session.added
-            if isinstance(r, EmailSequenceEnrollmentStep)
-        ]
+        enrollments = [r for r in session.added if isinstance(r, EmailSequenceEnrollment)]
+        step_rows = [r for r in session.added if isinstance(r, EmailSequenceEnrollmentStep)]
         assert len(enrollments) == 5
         assert len(step_rows) == 5
         # Every result is enrolled=True with the right contact_id.
@@ -410,14 +393,10 @@ class TestPauseResumeCancel:
         )
         assert result.state == EnrollmentState.active.value
         # A fresh enrollment-step row was added at now + 3 days.
-        es = [
-            r
-            for r in session.added
-            if isinstance(r, EmailSequenceEnrollmentStep)
-        ]
+        es = [r for r in session.added if isinstance(r, EmailSequenceEnrollmentStep)]
         assert len(es) == 1
         assert es[0].step_id == step2.id
-        delta = es[0].scheduled_at - datetime.now(timezone.utc)
+        delta = es[0].scheduled_at - datetime.now(UTC)
         assert timedelta(days=2, hours=23) < delta < timedelta(days=3, hours=1)
 
     @pytest.mark.asyncio
@@ -459,7 +438,7 @@ class TestSchedulerHelpers:
         result = await sequence_scheduler._has_inbound_reply(
             session,
             contact_id=uuid.uuid4(),
-            since=datetime.now(timezone.utc) - timedelta(days=1),
+            since=datetime.now(UTC) - timedelta(days=1),
         )
         assert result is True
 
@@ -470,7 +449,7 @@ class TestSchedulerHelpers:
         result = await sequence_scheduler._has_inbound_reply(
             session,
             contact_id=uuid.uuid4(),
-            since=datetime.now(timezone.utc) - timedelta(days=1),
+            since=datetime.now(UTC) - timedelta(days=1),
         )
         assert result is False
 
@@ -479,18 +458,14 @@ class TestSchedulerHelpers:
         session = _CapturingSession()
         fake_account = SimpleRow(id=uuid.uuid4(), user_id=_ACTOR_ID)
         session.stage(_ScalarResult(value=fake_account))
-        result = await sequence_scheduler._resolve_sender_account(
-            session, sender_user_id=_ACTOR_ID
-        )
+        result = await sequence_scheduler._resolve_sender_account(session, sender_user_id=_ACTOR_ID)
         assert result is fake_account
 
     @pytest.mark.asyncio
     async def test_resolve_sender_account_none_when_no_live(self):
         session = _CapturingSession()
         session.stage(_ScalarResult(value=None))
-        result = await sequence_scheduler._resolve_sender_account(
-            session, sender_user_id=_ACTOR_ID
-        )
+        result = await sequence_scheduler._resolve_sender_account(session, sender_user_id=_ACTOR_ID)
         assert result is None
 
 
@@ -520,8 +495,8 @@ def _make_sequence(
     )
     seq.id = sequence_id or uuid.uuid4()
     seq.deleted_at = None
-    seq.created_at = datetime.now(timezone.utc)
-    seq.updated_at = datetime.now(timezone.utc)
+    seq.created_at = datetime.now(UTC)
+    seq.updated_at = datetime.now(UTC)
     return seq
 
 
@@ -539,7 +514,7 @@ def _make_step(
         template_id=uuid.uuid4(),
     )
     step.id = uuid.uuid4()
-    step.created_at = datetime.now(timezone.utc)
+    step.created_at = datetime.now(UTC)
     return step
 
 
@@ -558,6 +533,6 @@ def _make_enrollment(
         current_step_order=current_step_order,
     )
     enrollment.id = uuid.uuid4()
-    enrollment.enrolled_at = datetime.now(timezone.utc) - timedelta(days=1)
-    enrollment.state_changed_at = datetime.now(timezone.utc)
+    enrollment.enrolled_at = datetime.now(UTC) - timedelta(days=1)
+    enrollment.state_changed_at = datetime.now(UTC)
     return enrollment

@@ -7,6 +7,7 @@ Asserts:
   - moving to a lost stage auto-syncs `status='lost'`
   - moving back to a non-terminal stage resets `status='active'`
 """
+
 from __future__ import annotations
 
 import uuid
@@ -35,9 +36,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -130,9 +129,7 @@ async def test_invalid_stage_rejected(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_valid_move_writes_audit_and_activity(
-    layered_client, seeded_admin
-):
+async def test_valid_move_writes_audit_and_activity(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -165,12 +162,16 @@ async def test_valid_move_writes_audit_and_activity(
     try:
         async with TestSession() as session:
             acts = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_type == "leads")
-                    .where(Activity.entity_id == uuid.UUID(lead_id))
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_type == "leads")
+                        .where(Activity.entity_id == uuid.UUID(lead_id))
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(acts) == 1
             assert acts[0].type.value == "status_change"
             assert acts[0].payload == {
@@ -180,12 +181,16 @@ async def test_valid_move_writes_audit_and_activity(
             }
 
             ads = (
-                await session.execute(
-                    select(AuditLog)
-                    .where(AuditLog.action == "pipelines.card_moved")
-                    .where(AuditLog.entity_id == uuid.UUID(lead_id))
+                (
+                    await session.execute(
+                        select(AuditLog)
+                        .where(AuditLog.action == "pipelines.card_moved")
+                        .where(AuditLog.entity_id == uuid.UUID(lead_id))
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(ads) == 1
             assert ads[0].before == {"pipeline": "leads", "stage": "new"}
             assert ads[0].after == {"pipeline": "leads", "stage": "qualified"}

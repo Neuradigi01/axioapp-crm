@@ -5,6 +5,7 @@ Thin functions that wrap the permissions DAL against the `Role`,
 `src.app.shared.orm` scopes `Role` selects by `org_id` when a
 `RequestContext` is set; `Permission` is global by design.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -12,31 +13,25 @@ import uuid
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.users import service as users_service
-from src.app.shared.audit import log_entity_change
 from src.app.core.permissions import data_access as _da
 from src.app.core.permissions.models import Permission, Role
 from src.app.core.permissions.schemas import RoleCreate, RoleUpdate
+from src.app.core.users import service as users_service
+from src.app.shared.audit import log_entity_change
 
 
 async def get_role_by_id(session: AsyncSession, role_id: uuid.UUID) -> Role | None:
     return await _da.get_role_by_id(session, role_id)
 
 
-async def list_permissions_for_role(
-    session: AsyncSession, role_id: uuid.UUID
-) -> list[Permission]:
+async def list_permissions_for_role(session: AsyncSession, role_id: uuid.UUID) -> list[Permission]:
     """Return every Permission row linked to `role_id` via `role_permissions`."""
     return await _da.list_role_permissions_query(session, role_id)
 
 
-async def role_has_permission(
-    session: AsyncSession, role_id: uuid.UUID, key: str
-) -> bool:
+async def role_has_permission(session: AsyncSession, role_id: uuid.UUID, key: str) -> bool:
     """`True` iff the role has been granted `key`."""
-    return await _da.role_has_permission_query(
-        session, role_id=role_id, key=key
-    )
+    return await _da.role_has_permission_query(session, role_id=role_id, key=key)
 
 
 async def register_permission(
@@ -47,17 +42,13 @@ async def register_permission(
     description: str | None = None,
 ) -> Permission:
     """Idempotently insert a permission row into the global registry."""
-    await _da.upsert_permission_key(
-        session, key=key, module=module, description=description
-    )
+    await _da.upsert_permission_key(session, key=key, module=module, description=description)
     result = await _da.get_permission_by_key(session, key)
     assert result is not None  # upsert just ensured the row exists
     return result
 
 
-async def register_permissions(
-    session: AsyncSession, keys: list[str]
-) -> list[Permission]:
+async def register_permissions(session: AsyncSession, keys: list[str]) -> list[Permission]:
     """Bulk-upsert permission keys into the global registry."""
     if not keys:
         return []
@@ -66,9 +57,7 @@ async def register_permissions(
     for key in keys:
         module_prefix, _, _ = key.partition(".")
         if not module_prefix:
-            raise ValueError(
-                f"permission key {key!r} must be '<module>.<action>'"
-            )
+            raise ValueError(f"permission key {key!r} must be '<module>.<action>'")
         rows.append({"key": key, "module": module_prefix, "description": None})
 
     await _da.bulk_upsert_permission_keys(session, rows)
@@ -80,9 +69,7 @@ async def register_permissions(
 # --- admin reads (drive the management UI) -------------------------------
 
 
-async def list_roles_in_org(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> list[dict]:
+async def list_roles_in_org(session: AsyncSession, *, org_id: uuid.UUID) -> list[dict]:
     """List the org's roles with permission + member counts."""
     rows = await _da.list_roles_with_counts_in_org(session, org_id=org_id)
     return [
@@ -108,9 +95,7 @@ async def list_all_permissions(session: AsyncSession) -> list[Permission]:
 # --- admin writes (create / update / delete custom roles) ---------------
 
 
-async def _resolve_permission_ids(
-    session: AsyncSession, keys: list[str]
-) -> list[uuid.UUID]:
+async def _resolve_permission_ids(session: AsyncSession, keys: list[str]) -> list[uuid.UUID]:
     """Map permission keys → ids. Raises 422 for unknown keys."""
     if not keys:
         return []
@@ -134,9 +119,7 @@ async def create_role(
     """Create a custom role + grant the chosen permission keys."""
     permission_ids = await _resolve_permission_ids(session, payload.permission_keys)
 
-    existing = await _da.find_role_by_name_in_org(
-        session, org_id=org_id, name=payload.name
-    )
+    existing = await _da.find_role_by_name_in_org(session, org_id=org_id, name=payload.name)
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -147,9 +130,7 @@ async def create_role(
     _da.insert_role(session, role)
     await session.flush()
 
-    await _da.bulk_insert_role_permissions(
-        session, role_id=role.id, permission_ids=permission_ids
-    )
+    await _da.bulk_insert_role_permissions(session, role_id=role.id, permission_ids=permission_ids)
 
     await session.commit()
     await session.refresh(role)
@@ -174,9 +155,7 @@ async def update_role(
     payload: RoleUpdate,
 ) -> Role:
     """Rename a role and/or replace its permission grants."""
-    role = await users_service.get_role_by_id_in_org(
-        session, role_id=role_id, org_id=org_id
-    )
+    role = await users_service.get_role_by_id_in_org(session, role_id=role_id, org_id=org_id)
     if role is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -191,9 +170,7 @@ async def update_role(
     changes = payload.model_dump(exclude_unset=True)
     before = {
         "name": role.name,
-        "permission_keys": [
-            p.key for p in await list_permissions_for_role(session, role.id)
-        ],
+        "permission_keys": [p.key for p in await list_permissions_for_role(session, role.id)],
     }
 
     if "name" in changes and changes["name"] is not None:
@@ -214,18 +191,14 @@ async def update_role(
         new_ids = await _resolve_permission_ids(session, changes["permission_keys"])
         # Replace-all semantics: wipe existing grants, insert new set.
         await _da.delete_role_permissions_for_role(session, role.id)
-        await _da.bulk_insert_role_permissions(
-            session, role_id=role.id, permission_ids=new_ids
-        )
+        await _da.bulk_insert_role_permissions(session, role_id=role.id, permission_ids=new_ids)
 
     await session.commit()
     await session.refresh(role)
 
     after = {
         "name": role.name,
-        "permission_keys": [
-            p.key for p in await list_permissions_for_role(session, role.id)
-        ],
+        "permission_keys": [p.key for p in await list_permissions_for_role(session, role.id)],
     }
     await log_entity_change(
         action="roles.updated",
@@ -247,9 +220,7 @@ async def install_role_template(
     transaction so the router stays thin."""
     from src.app.core.permissions import role_templates
 
-    result = await role_templates.install(
-        session, org_id=org_id, template_keys=[template_key]
-    )
+    result = await role_templates.install(session, org_id=org_id, template_keys=[template_key])
     await session.commit()
     role = result[template_key]
     await session.refresh(role)
@@ -263,9 +234,7 @@ async def delete_role(
     org_id: uuid.UUID,
 ) -> None:
     """Delete a custom role. 409 if anyone currently has it."""
-    role = await users_service.get_role_by_id_in_org(
-        session, role_id=role_id, org_id=org_id
-    )
+    role = await users_service.get_role_by_id_in_org(session, role_id=role_id, org_id=org_id)
     if role is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

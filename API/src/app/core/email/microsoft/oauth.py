@@ -24,9 +24,9 @@ OAuth scopes (minimum) for the email track:
   - `openid email profile` — standard OIDC scopes; tolerated by
                               Graph and round-tripped harmlessly.
 """
+
 from __future__ import annotations
 
-from typing import Optional
 from urllib.parse import urlencode
 
 import httpx
@@ -40,16 +40,11 @@ from config import (
 )
 from src.app.core.email.oauth import TokenSet
 
-
 # Microsoft consent + token endpoints. `{tenant}` is filled at call
 # time so a single OAuth client can serve `common` (default) plus
 # explicit-tenant overrides in tests.
-_AUTHORIZE_URL_TEMPLATE = (
-    "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize"
-)
-_TOKEN_URL_TEMPLATE = (
-    "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
-)
+_AUTHORIZE_URL_TEMPLATE = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize"
+_TOKEN_URL_TEMPLATE = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 _USERINFO_URL = "https://graph.microsoft.com/v1.0/me"
 
 MICROSOFT_SCOPES = [
@@ -101,7 +96,7 @@ class MicrosoftProvider:
         *,
         code: str,
         redirect_uri: str,
-        http_client: Optional[httpx.AsyncClient] = None,
+        http_client: httpx.AsyncClient | None = None,
     ) -> TokenSet:
         """Exchange the OAuth `code` for tokens."""
         data = {
@@ -124,7 +119,7 @@ class MicrosoftProvider:
         self,
         *,
         refresh_token: str,
-        http_client: Optional[httpx.AsyncClient] = None,
+        http_client: httpx.AsyncClient | None = None,
     ) -> TokenSet:
         """Trade a refresh token for a fresh access + (rotated)
         refresh token pair. Microsoft DOES rotate refresh tokens on
@@ -149,7 +144,7 @@ class MicrosoftProvider:
 async def fetch_userinfo(
     access_token: str,
     *,
-    http_client: Optional[httpx.AsyncClient] = None,
+    http_client: httpx.AsyncClient | None = None,
 ) -> dict:
     """Pull `id`, `mail`/`userPrincipalName`, `displayName` from
     Graph's `/me` endpoint. Populates `external_account_id`,
@@ -160,13 +155,9 @@ async def fetch_userinfo(
     headers = {"Authorization": f"Bearer {access_token}"}
     try:
         if http_client is not None:
-            response = await http_client.get(
-                _USERINFO_URL, headers=headers
-            )
+            response = await http_client.get(_USERINFO_URL, headers=headers)
         else:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT
-            ) as client:
+            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
                 response = await client.get(_USERINFO_URL, headers=headers)
     except (httpx.HTTPError, httpx.TimeoutException):
         return {}
@@ -186,18 +177,14 @@ def graph_redirect_uri() -> str:
 # --- Helpers --------------------------------------------------------------
 
 
-async def _post_token(
-    data: dict, http_client: Optional[httpx.AsyncClient]
-) -> dict:
+async def _post_token(data: dict, http_client: httpx.AsyncClient | None) -> dict:
     """POST `data` form-encoded to Microsoft's token endpoint."""
     url = _TOKEN_URL_TEMPLATE.format(tenant=MICROSOFT_TENANT)
     try:
         if http_client is not None:
             response = await http_client.post(url, data=data)
         else:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT
-            ) as client:
+            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
                 response = await client.post(url, data=data)
     except (httpx.HTTPError, httpx.TimeoutException) as exc:
         raise HTTPException(
@@ -212,8 +199,7 @@ async def _post_token(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Microsoft rejected the OAuth exchange "
-                f"(status={response.status_code}): {error}"
+                f"Microsoft rejected the OAuth exchange (status={response.status_code}): {error}"
             ),
         )
     try:
@@ -231,7 +217,7 @@ async def _post_token(
     return body
 
 
-def _split_scopes(scope_str: Optional[str]) -> list[str]:
+def _split_scopes(scope_str: str | None) -> list[str]:
     if not scope_str:
         return list(MICROSOFT_SCOPES)
     return [s for s in scope_str.split(" ") if s]

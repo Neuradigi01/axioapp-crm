@@ -14,13 +14,13 @@ Two responsibilities:
 Retention: the daily Celery beat task `purge_old_embed_submissions`
 in this module deletes rows older than 30 days.
 """
+
 from __future__ import annotations
 
 import hashlib
 import logging
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,14 +33,13 @@ from src.app.core.embed.schemas import (
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 
-
 logger = logging.getLogger(__name__)
 
 
 RETENTION_DAYS = 30
 
 
-def hash_ip(ip: Optional[str]) -> Optional[str]:
+def hash_ip(ip: str | None) -> str | None:
     """Same 16-char SHA-256 prefix used everywhere else in the embed
     module."""
     if not ip or ip == "unknown":
@@ -51,13 +50,13 @@ def hash_ip(ip: Optional[str]) -> Optional[str]:
 async def record(
     *,
     org_id: uuid.UUID,
-    key_id: Optional[uuid.UUID],
+    key_id: uuid.UUID | None,
     outcome: EmbedSubmissionOutcome,
-    reason: Optional[str] = None,
-    ip: Optional[str] = None,
-    referrer: Optional[str] = None,
-    landing_url: Optional[str] = None,
-    lead_id: Optional[uuid.UUID] = None,
+    reason: str | None = None,
+    ip: str | None = None,
+    referrer: str | None = None,
+    landing_url: str | None = None,
+    lead_id: uuid.UUID | None = None,
 ) -> None:
     """Append one row. Never raises — a log-write failure must not
     break the submission flow. Opens its own tenant-scoped session
@@ -90,7 +89,7 @@ async def record(
         reset_context(ctx_token)
 
 
-def _truncate(value: Optional[str], length: int) -> Optional[str]:
+def _truncate(value: str | None, length: int) -> str | None:
     if value is None:
         return None
     return value[:length]
@@ -99,9 +98,9 @@ def _truncate(value: Optional[str], length: int) -> Optional[str]:
 async def list_rows(
     session: AsyncSession,
     *,
-    outcome: Optional[EmbedSubmissionOutcome] = None,
-    range_from: Optional[datetime] = None,
-    range_to: Optional[datetime] = None,
+    outcome: EmbedSubmissionOutcome | None = None,
+    range_from: datetime | None = None,
+    range_to: datetime | None = None,
     page: int = 1,
     page_size: int = 25,
 ) -> tuple[list[EmbedSubmissionLog], int]:
@@ -132,9 +131,7 @@ async def summary(
     outcome_rows = await _da.submission_outcome_totals(
         session, range_from=range_from, range_to=range_to
     )
-    by_outcome: dict[str, int] = {
-        outcome.value: 0 for outcome in EmbedSubmissionOutcome
-    }
+    by_outcome: dict[str, int] = {outcome.value: 0 for outcome in EmbedSubmissionOutcome}
     for outcome_value, count in outcome_rows:
         key = (
             outcome_value.value
@@ -155,15 +152,11 @@ async def summary(
             if isinstance(outcome_value, EmbedSubmissionOutcome)
             else str(outcome_value)
         )
-        buckets.setdefault(
-            d, {o.value: 0 for o in EmbedSubmissionOutcome}
-        )[key] = int(count)
+        buckets.setdefault(d, {o.value: 0 for o in EmbedSubmissionOutcome})[key] = int(count)
 
     by_day: list[EmbedSubmissionDayBucket] = []
     for d in _days_between(range_from.date(), range_to.date()):
-        bucket = buckets.get(
-            d, {o.value: 0 for o in EmbedSubmissionOutcome}
-        )
+        bucket = buckets.get(d, {o.value: 0 for o in EmbedSubmissionOutcome})
         by_day.append(
             EmbedSubmissionDayBucket(
                 day=d.isoformat(),
@@ -200,11 +193,9 @@ async def purge_old_embed_submissions() -> int:
     set; the explicit WHERE-clause is the only filter. The Celery
     worker runs trusted code so this is safe.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)
+    cutoff = datetime.now(UTC) - timedelta(days=RETENTION_DAYS)
     async with async_session() as session:
-        deleted = await _da.delete_submission_logs_older_than(
-            session, cutoff
-        )
+        deleted = await _da.delete_submission_logs_older_than(session, cutoff)
         await session.commit()
     logger.info(
         "embed.purge_old_embed_submissions removed=%d cutoff=%s",

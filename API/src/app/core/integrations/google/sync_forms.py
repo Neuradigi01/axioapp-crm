@@ -17,10 +17,10 @@ We use ASSET (the modern object in v15+) rather than the older
 return the same forms; ASSET is what Google recommends + what
 matches the UI you see in the Google Ads dashboard.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from src.app.core.integrations.google.api_client import GoogleAdsRestClient
 
@@ -42,7 +42,7 @@ class GoogleLeadForm:
     asset resource id (last segment of `asset.resource_name`)."""
 
     form_id: str
-    name: Optional[str]
+    name: str | None
     resource_name: str
 
 
@@ -74,15 +74,11 @@ async def list_accessible_accounts(
 # for the picker UI in Step 7. Field mapping (Step 8) drills into the
 # form's individual question fields via a follow-up query.
 _LEAD_FORM_QUERY = (
-    "SELECT asset.id, asset.name, asset.resource_name "
-    "FROM asset "
-    "WHERE asset.type = 'LEAD_FORM'"
+    "SELECT asset.id, asset.name, asset.resource_name FROM asset WHERE asset.type = 'LEAD_FORM'"
 )
 
 
-async def list_lead_forms(
-    client: GoogleAdsRestClient, *, customer_id: str
-) -> list[GoogleLeadForm]:
+async def list_lead_forms(client: GoogleAdsRestClient, *, customer_id: str) -> list[GoogleLeadForm]:
     """Every Lead Form asset on the given customer. `customer_id`
     must NOT carry hyphens — the API expects the raw 10-digit id.
     Callers strip hyphens before passing in."""

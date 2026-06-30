@@ -11,7 +11,9 @@
 
     <div class="space-y-3 px-5 py-4">
       @if (loadingCounts()) {
-        <div class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 py-4 text-center text-xs text-zinc-500">
+        <div
+          class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 py-4 text-center text-xs text-zinc-500"
+        >
           Loading open records…
         </div>
       } @else if (counts(); as c) {
@@ -19,13 +21,20 @@
         <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs">
           <p class="mb-1.5 font-medium text-zinc-700">Open records</p>
           <dl class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-zinc-700">
-            <dt>Contacts</dt><dd class="tabular-nums">{{ c.contacts }}</dd>
-            <dt>Leads</dt><dd class="tabular-nums">{{ c.leads }}</dd>
-            <dt>Walk-ins</dt><dd class="tabular-nums">{{ c.walk_ins }}</dd>
-            <dt>Appointments</dt><dd class="tabular-nums">{{ c.appointments }}</dd>
-            <dt>Tasks</dt><dd class="tabular-nums">{{ c.tasks }}</dd>
+            <dt>Contacts</dt>
+            <dd class="tabular-nums">{{ c.contacts }}</dd>
+            <dt>Leads</dt>
+            <dd class="tabular-nums">{{ c.leads }}</dd>
+            <dt>Walk-ins</dt>
+            <dd class="tabular-nums">{{ c.walk_ins }}</dd>
+            <dt>Appointments</dt>
+            <dd class="tabular-nums">{{ c.appointments }}</dd>
+            <dt>Tasks</dt>
+            <dd class="tabular-nums">{{ c.tasks }}</dd>
             <dt class="mt-1 border-t border-zinc-200 pt-1 font-medium">Total</dt>
-            <dd class="mt-1 border-t border-zinc-200 pt-1 font-medium tabular-nums">{{ c.total }}</dd>
+            <dd class="mt-1 border-t border-zinc-200 pt-1 font-medium tabular-nums">
+              {{ c.total }}
+            </dd>
           </dl>
         </div>
 
@@ -53,12 +62,17 @@
           </div>
 
           <!-- Disabled "Skip transfer" affordance, per spec. -->
-          <p class="text-[11px] text-zinc-500" title="User has open records; choose a transfer target before deactivation.">
+          <p
+            class="text-[11px] text-zinc-500"
+            title="User has open records; choose a transfer target before deactivation."
+          >
             <lucide-icon name="user-x" class="mr-1 inline h-3 w-3 align-text-bottom" />
             Skip transfer is unavailable — the server rejects deactivation while open records exist.
           </p>
         } @else {
-          <p class="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200">
+          <p
+            class="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200"
+          >
             User has no open records. Safe to deactivate.
           </p>
         }
@@ -95,7 +109,9 @@
       }
     </div>
 
-    <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3 rounded-b-lg">
+    <footer
+      class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3 rounded-b-lg"
+    >
       <button
         type="button"
         [disabled]="submitting()"
@@ -112,9 +128,17 @@
       >
         <lucide-icon name="user-x" class="h-3.5 w-3.5" />
         @if (submitting()) {
-          @if (stage() === 'deactivating') { Deactivating… } @else { Transferring… }
+          @if (stage() === 'deactivating') {
+            Deactivating…
+          } @else {
+            Transferring…
+          }
         } @else {
-          @if (hasOpenRecords()) { Transfer & Deactivate } @else { Deactivate }
+          @if (hasOpenRecords()) {
+            Transfer & Deactivate
+          } @else {
+            Deactivate
+          }
         }
       </button>
     </footer>

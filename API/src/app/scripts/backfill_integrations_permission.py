@@ -11,6 +11,7 @@ This script idempotently inserts the missing grants. Safe to re-run.
 Usage (from `API/`):
     uv run python -m src.app.scripts.backfill_integrations_permission
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -21,7 +22,6 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.app.core.permissions.models import Permission, Role, RolePermission
 from src.app.shared.db import async_session
 
-
 _KEY = "settings.integrations.manage"
 _ROLE_NAMES = ("Owner", "Admin")
 
@@ -29,9 +29,7 @@ _ROLE_NAMES = ("Owner", "Admin")
 async def main() -> None:
     async with async_session() as session:
         perm = (
-            await session.execute(
-                select(Permission).where(Permission.key == _KEY)
-            )
+            await session.execute(select(Permission).where(Permission.key == _KEY))
         ).scalar_one_or_none()
         if perm is None:
             print(
@@ -43,9 +41,7 @@ async def main() -> None:
 
         role_rows = (
             await session.execute(
-                select(Role.id, Role.org_id, Role.name).where(
-                    Role.name.in_(_ROLE_NAMES)
-                )
+                select(Role.id, Role.org_id, Role.name).where(Role.name.in_(_ROLE_NAMES))
             )
         ).all()
         if not role_rows:

@@ -18,8 +18,6 @@ async def run_every_day():
         )
 
         deleted = await purge_old_embed_submissions()
-        logger.info(
-            "daily.purge_old_embed_submissions deleted=%d", deleted
-        )
+        logger.info("daily.purge_old_embed_submissions deleted=%d", deleted)
     except Exception:
         logger.exception("daily.purge_old_embed_submissions failed")

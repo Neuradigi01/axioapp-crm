@@ -12,12 +12,7 @@
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  ValidatorFn,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { Subject, of } from 'rxjs';
@@ -25,25 +20,13 @@ import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/
 import { extractApiError } from '@core/services/api-error.util';
 import { nullableTrim } from '@core/services/form.util';
 
-import {
-  ContactListItem,
-  ContactsApiService,
-} from '../../../core/contacts/contacts-api.service';
-import {
-  StaffApiService,
-  StaffListItem,
-} from '../../../core/staff/staff-api.service';
+import { ContactListItem, ContactsApiService } from '../../../core/contacts/contacts-api.service';
+import { StaffApiService, StaffListItem } from '../../../core/staff/staff-api.service';
 import { StandardFieldsApiService } from '../../../core/standard-fields/standard-fields-api.service';
 import { StandardFieldsSignalsService } from '../../../core/standard-fields/standard-fields-signals.service';
 import type { StandardFieldRendered } from '../../../core/standard-fields/types';
-import {
-  CustomOrder,
-  CustomOrdersApiService,
-} from '../custom-orders/custom-orders-api.service';
-import {
-  FieldOpsApiService,
-  FieldVisitPurpose,
-} from './field-ops-api.service';
+import { CustomOrder, CustomOrdersApiService } from '../custom-orders/custom-orders-api.service';
+import { FieldOpsApiService, FieldVisitPurpose } from './field-ops-api.service';
 
 /**
  * Schedule a new on-site visit. Composes an `AppointmentCreate` body
@@ -69,9 +52,7 @@ export class ScheduleVisitModalComponent implements OnInit {
   private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
-    {},
-  );
+  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>({});
 
   protected stdField(key: string): StandardFieldRendered | undefined {
     return this.stdFields()[key];
@@ -104,13 +85,8 @@ export class ScheduleVisitModalComponent implements OnInit {
 
   /** title/scheduled_date/scheduled_time/duration_min/assigned_to_id are
    *  backend-locked-required. duration_min accepts min/max overrides. */
-  private applyStandardValidators(
-    map: Record<string, StandardFieldRendered>,
-  ): void {
-    this.form.controls.title.setValidators([
-      Validators.required,
-      Validators.maxLength(255),
-    ]);
+  private applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
+    this.form.controls.title.setValidators([Validators.required, Validators.maxLength(255)]);
     this.form.controls.title.updateValueAndValidity({ emitEvent: false });
 
     this.form.controls.scheduled_date.setValidators([Validators.required]);
@@ -202,9 +178,7 @@ export class ScheduleVisitModalComponent implements OnInit {
     notes: this.fb.control<string>('', { nonNullable: true }),
   });
 
-  protected readonly canSubmit = computed(
-    () => this.form.valid && this.selectedContact() !== null,
-  );
+  protected readonly canSubmit = computed(() => this.form.valid && this.selectedContact() !== null);
 
   ngOnInit(): void {
     // Staff list for the assignee picker.
@@ -227,9 +201,7 @@ export class ScheduleVisitModalComponent implements OnInit {
     this.customOrdersApi
       .list({ size: 25 })
       .pipe(
-        catchError(() =>
-          of({ items: [] as CustomOrder[], total: 0, page: 1, size: 25 }),
-        ),
+        catchError(() => of({ items: [] as CustomOrder[], total: 0, page: 1, size: 25 })),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((resp) => this.recentOrders.set(resp.items));
@@ -243,9 +215,7 @@ export class ScheduleVisitModalComponent implements OnInit {
           this.contactsApi
             .list({ q: q || undefined, size: 8 })
             .pipe(
-              catchError(() =>
-                of({ items: [] as ContactListItem[], total: 0, page: 1, size: 8 }),
-              ),
+              catchError(() => of({ items: [] as ContactListItem[], total: 0, page: 1, size: 8 })),
             ),
         ),
         takeUntilDestroyed(this.destroyRef),
@@ -310,9 +280,7 @@ export class ScheduleVisitModalComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this._submitting.set(false);
-          this.submitError.set(
-            extractApiError(err) ?? 'Could not schedule the visit.',
-          );
+          this.submitError.set(extractApiError(err) ?? 'Could not schedule the visit.');
         },
       });
   }
@@ -333,6 +301,4 @@ export class ScheduleVisitModalComponent implements OnInit {
     const dt = new Date(y, (m ?? 1) - 1, d ?? 1, hh ?? 0, mm ?? 0, 0);
     return dt.toISOString();
   }
-
-
 }

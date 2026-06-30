@@ -1,10 +1,11 @@
 from datetime import date
 
-from sqlalchemy import select, update, func, cast, Date, or_
+from sqlalchemy import Date, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from src.models.user import UserLogin, UserInfo
+
 from src.data_access import generic_da
+from src.models.user import UserInfo, UserLogin
 
 
 async def get_by_user_id(db: AsyncSession, user_id: str) -> UserLogin | None:
@@ -51,18 +52,19 @@ async def get_total_user_count(db: AsyncSession) -> int:
 
 
 async def get_user_referral_count(db: AsyncSession, member_id: int) -> int:
-    stmt = (
-        select(func.count())
-        .select_from(UserInfo)
-        .where(UserInfo.referral_id == str(member_id))
-    )
+    stmt = select(func.count()).select_from(UserInfo).where(UserInfo.referral_id == str(member_id))
     return (await db.execute(stmt)).scalar()
 
 
 async def update_profile(
-    db: AsyncSession, member_id: int, first_name: str, last_name: str,
-    email: str, mobile_no: str | None,
-    country_id: int | None = None, state_id: int | None = None,
+    db: AsyncSession,
+    member_id: int,
+    first_name: str,
+    last_name: str,
+    email: str,
+    mobile_no: str | None,
+    country_id: int | None = None,
+    state_id: int | None = None,
 ) -> bool:
     stmt = (
         update(UserInfo)
@@ -82,22 +84,25 @@ async def update_profile(
 
 async def update_profile_image(db: AsyncSession, member_id: int, profile_image: str | None) -> bool:
     stmt = (
-        update(UserInfo)
-        .where(UserInfo.member_id == member_id)
-        .values(profile_image=profile_image)
+        update(UserInfo).where(UserInfo.member_id == member_id).values(profile_image=profile_image)
     )
     result = await db.execute(stmt)
     return result.rowcount > 0
 
 
 async def update_two_factor(
-    db: AsyncSession, user_id: str, *,
+    db: AsyncSession,
+    user_id: str,
+    *,
     two_factor_enabled: bool,
     two_factor_method: str | None,
     two_factor_secret: str | None = None,
 ):
     await generic_da.update_two_factor(
-        db, UserLogin, UserLogin.user_id, user_id,
+        db,
+        UserLogin,
+        UserLogin.user_id,
+        user_id,
         two_factor_enabled=two_factor_enabled,
         two_factor_method=two_factor_method,
         two_factor_secret=two_factor_secret,
@@ -120,9 +125,7 @@ async def get_user_count_by_status(db: AsyncSession, is_active: bool) -> int:
 async def get_today_registration_count(db: AsyncSession) -> int:
     today = date.today()
     stmt = (
-        select(func.count())
-        .select_from(UserInfo)
-        .where(cast(UserInfo.joining_date, Date) == today)
+        select(func.count()).select_from(UserInfo).where(cast(UserInfo.joining_date, Date) == today)
     )
     return (await db.execute(stmt)).scalar()
 
@@ -172,8 +175,7 @@ async def get_users_paginated(
     total = (await db.execute(count_stmt)).scalar()
 
     items_stmt = (
-        base
-        .options(selectinload(UserInfo.user_login))
+        base.options(selectinload(UserInfo.user_login))
         .order_by(UserInfo.joining_date.desc())
         .offset(page_index * page_size)
         .limit(page_size)

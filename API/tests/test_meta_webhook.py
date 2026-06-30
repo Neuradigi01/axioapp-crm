@@ -21,6 +21,7 @@ Eight groups:
   8. Subscriptions cache — `upsert_page_token` encrypts + UPSERTs;
      `delete_page_token` removes.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -37,17 +38,18 @@ from httpx import ASGITransport, AsyncClient
 from src.app.core.integrations import crypto
 from src.app.core.integrations.meta import (
     subscriptions as subs_module,
+)
+from src.app.core.integrations.meta import (
     tasks as tasks_module,
+)
+from src.app.core.integrations.meta import (
     webhook as webhook_module,
 )
 from src.app.core.integrations.meta.models import MetaPageToken
 from src.app.core.integrations.models import (
-    Integration,
     IntegrationProvider,
-    IntegrationStatus,
     IntegrationSubscription,
 )
-
 
 _APP_SECRET = "test-meta-app-secret"
 _VERIFY_TOKEN = "test-meta-verify-token"
@@ -128,16 +130,12 @@ class _CapturingSession:
 @pytest.fixture
 def _meta_webhook_env(monkeypatch):
     monkeypatch.setattr(webhook_module, "META_APP_SECRET", _APP_SECRET)
-    monkeypatch.setattr(
-        webhook_module, "META_WEBHOOK_VERIFY_TOKEN", _VERIFY_TOKEN
-    )
+    monkeypatch.setattr(webhook_module, "META_WEBHOOK_VERIFY_TOKEN", _VERIFY_TOKEN)
     monkeypatch.setattr(tasks_module, "META_GRAPH_API_VERSION", "v19.0")
 
 
 def _sign(body: bytes) -> str:
-    digest = hmac.new(
-        _APP_SECRET.encode("utf-8"), body, hashlib.sha256
-    ).hexdigest()
+    digest = hmac.new(_APP_SECRET.encode("utf-8"), body, hashlib.sha256).hexdigest()
     return f"sha256={digest}"
 
 
@@ -179,9 +177,7 @@ def _build_app() -> FastAPI:
     """Mount just the webhook router on a fresh FastAPI — bypasses
     the full src.app.main import surface (and its lifespan)."""
     app = FastAPI()
-    app.include_router(
-        webhook_module.router, prefix="/api/v1/integrations"
-    )
+    app.include_router(webhook_module.router, prefix="/api/v1/integrations")
     return app
 
 
@@ -198,22 +194,15 @@ class TestSignatureVerify:
         assert webhook_module._verify_signature(b"x", None) is False
 
     def test_wrong_prefix_returns_false(self, _meta_webhook_env):
-        assert (
-            webhook_module._verify_signature(b"x", "sha1=abc") is False
-        )
+        assert webhook_module._verify_signature(b"x", "sha1=abc") is False
 
     def test_wrong_digest_returns_false(self, _meta_webhook_env):
-        assert (
-            webhook_module._verify_signature(b"x", "sha256=deadbeef")
-            is False
-        )
+        assert webhook_module._verify_signature(b"x", "sha256=deadbeef") is False
 
     def test_missing_app_secret_refuses_all(self, monkeypatch):
         monkeypatch.setattr(webhook_module, "META_APP_SECRET", "")
         body = b"x"
-        sig = "sha256=" + hmac.new(
-            b"", body, hashlib.sha256
-        ).hexdigest()
+        sig = "sha256=" + hmac.new(b"", body, hashlib.sha256).hexdigest()
         # Even a digest of "" key wouldn't authenticate — refuse to
         # accept anything when the secret env is missing.
         assert webhook_module._verify_signature(body, sig) is False
@@ -223,18 +212,14 @@ class TestSignatureVerify:
 
 
 @pytest.mark.asyncio
-async def test_handshake_returns_challenge_on_correct_token(
-    _meta_webhook_env, monkeypatch
-):
+async def test_handshake_returns_challenge_on_correct_token(_meta_webhook_env, monkeypatch):
     async def _noop_audit(*_a, **_k):
         return None
 
     monkeypatch.setattr(webhook_module.audit, "log", _noop_audit)
 
     app = _build_app()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get(
             "/api/v1/integrations/meta/webhook",
             params={
@@ -249,18 +234,14 @@ async def test_handshake_returns_challenge_on_correct_token(
 
 
 @pytest.mark.asyncio
-async def test_handshake_wrong_token_returns_403(
-    _meta_webhook_env, monkeypatch
-):
+async def test_handshake_wrong_token_returns_403(_meta_webhook_env, monkeypatch):
     async def _noop_audit(*_a, **_k):
         return None
 
     monkeypatch.setattr(webhook_module.audit, "log", _noop_audit)
 
     app = _build_app()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get(
             "/api/v1/integrations/meta/webhook",
             params={
@@ -276,9 +257,7 @@ async def test_handshake_wrong_token_returns_403(
 
 
 @pytest.mark.asyncio
-async def test_receiver_401_on_bad_signature(
-    _meta_webhook_env, monkeypatch
-):
+async def test_receiver_401_on_bad_signature(_meta_webhook_env, monkeypatch):
     async def _noop_audit(*_a, **_k):
         return None
 
@@ -286,9 +265,7 @@ async def test_receiver_401_on_bad_signature(
 
     app = _build_app()
     body = json.dumps(_sample_envelope()).encode()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/integrations/meta/webhook",
             content=body,
@@ -301,9 +278,7 @@ async def test_receiver_401_on_bad_signature(
 
 
 @pytest.mark.asyncio
-async def test_receiver_200_and_enqueues_on_valid_signature(
-    _meta_webhook_env, monkeypatch
-):
+async def test_receiver_200_and_enqueues_on_valid_signature(_meta_webhook_env, monkeypatch):
     async def _noop_audit(*_a, **_k):
         return None
 
@@ -322,9 +297,7 @@ async def test_receiver_200_and_enqueues_on_valid_signature(
     app = _build_app()
     body = json.dumps(_sample_envelope()).encode()
     sig = _sign(body)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/integrations/meta/webhook",
             content=body,
@@ -342,9 +315,7 @@ async def test_receiver_200_and_enqueues_on_valid_signature(
 
 
 @pytest.mark.asyncio
-async def test_receiver_enqueues_one_task_per_change(
-    _meta_webhook_env, monkeypatch
-):
+async def test_receiver_enqueues_one_task_per_change(_meta_webhook_env, monkeypatch):
     async def _noop_audit(*_a, **_k):
         return None
 
@@ -362,9 +333,7 @@ async def test_receiver_enqueues_one_task_per_change(
     app = _build_app()
     body = json.dumps(_sample_envelope(count=3)).encode()
     sig = _sign(body)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/integrations/meta/webhook",
             content=body,
@@ -384,11 +353,10 @@ async def test_receiver_enqueues_one_task_per_change(
 
 
 @pytest.mark.asyncio
-async def test_receiver_skips_non_leadgen_changes(
-    _meta_webhook_env, monkeypatch
-):
+async def test_receiver_skips_non_leadgen_changes(_meta_webhook_env, monkeypatch):
     """Meta sometimes bundles other change types (feed, mentions) in
     the same envelope. Only `leadgen` changes should enqueue."""
+
     async def _noop_audit(*_a, **_k):
         return None
 
@@ -433,9 +401,7 @@ async def test_receiver_skips_non_leadgen_changes(
     sig = _sign(body)
 
     app = _build_app()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/integrations/meta/webhook",
             content=body,
@@ -451,11 +417,10 @@ async def test_receiver_skips_non_leadgen_changes(
 
 
 @pytest.mark.asyncio
-async def test_receiver_skips_non_page_object_type(
-    _meta_webhook_env, monkeypatch
-):
+async def test_receiver_skips_non_page_object_type(_meta_webhook_env, monkeypatch):
     """An `object="instagram"` envelope would carry a different
     subscription field — skip cleanly without crashing."""
+
     async def _noop_audit(*_a, **_k):
         return None
 
@@ -473,9 +438,7 @@ async def test_receiver_skips_non_page_object_type(
     body = json.dumps({"object": "instagram", "entry": []}).encode()
     sig = _sign(body)
     app = _build_app()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/integrations/meta/webhook",
             content=body,
@@ -503,16 +466,13 @@ def _sample_payload() -> dict:
 
 
 @pytest.mark.asyncio
-async def test_task_dlqs_on_missing_page_token(
-    _meta_webhook_env, monkeypatch
-):
+async def test_task_dlqs_on_missing_page_token(_meta_webhook_env, monkeypatch):
     """No cached Page token (subscribe→unsubscribe race) → DLQ."""
+
     async def _no_mapping(*_a, **_k):
         return None
 
-    monkeypatch.setattr(
-        tasks_module, "_load_page_token_unscoped", _no_mapping
-    )
+    monkeypatch.setattr(tasks_module, "_load_page_token_unscoped", _no_mapping)
 
     captured: dict[str, Any] = {}
 
@@ -521,13 +481,9 @@ async def test_task_dlqs_on_missing_page_token(
         return MagicMock(id=uuid.uuid4())
 
     monkeypatch.setattr(tasks_module, "_record_dlq", _record)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
-    result = await tasks_module.process_meta_lead_async(
-        payload=_sample_payload()
-    )
+    result = await tasks_module.process_meta_lead_async(payload=_sample_payload())
     assert result == {"status": "dlq", "reason": "no_page_token"}
     # Provider tag is correct.
     assert captured["provider"] == IntegrationProvider.meta_ads
@@ -535,15 +491,11 @@ async def test_task_dlqs_on_missing_page_token(
 
 
 @pytest.mark.asyncio
-async def test_task_dlqs_on_missing_form_id(
-    _meta_webhook_env, monkeypatch
-):
+async def test_task_dlqs_on_missing_form_id(_meta_webhook_env, monkeypatch):
     async def _ok_mapping(*_a, **_k):
         return (_ORG_ID, _INTEGRATION_ID, "page-tok")
 
-    monkeypatch.setattr(
-        tasks_module, "_load_page_token_unscoped", _ok_mapping
-    )
+    monkeypatch.setattr(tasks_module, "_load_page_token_unscoped", _ok_mapping)
 
     captured: dict[str, Any] = {}
 
@@ -552,9 +504,7 @@ async def test_task_dlqs_on_missing_form_id(
         return MagicMock(id=uuid.uuid4())
 
     monkeypatch.setattr(tasks_module, "_record_dlq", _record)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
     payload = _sample_payload()
     del payload["form_id"]
@@ -564,18 +514,14 @@ async def test_task_dlqs_on_missing_form_id(
 
 
 @pytest.mark.asyncio
-async def test_task_dlqs_on_no_subscription(
-    _meta_webhook_env, monkeypatch
-):
+async def test_task_dlqs_on_no_subscription(_meta_webhook_env, monkeypatch):
     async def _ok_mapping(*_a, **_k):
         return (_ORG_ID, _INTEGRATION_ID, "page-tok")
 
     async def _no_sub(*_a, **_k):
         return None
 
-    monkeypatch.setattr(
-        tasks_module, "_load_page_token_unscoped", _ok_mapping
-    )
+    monkeypatch.setattr(tasks_module, "_load_page_token_unscoped", _ok_mapping)
     monkeypatch.setattr(tasks_module, "find_subscription", _no_sub)
 
     captured: dict[str, Any] = {}
@@ -585,22 +531,17 @@ async def test_task_dlqs_on_no_subscription(
         return MagicMock(id=uuid.uuid4())
 
     monkeypatch.setattr(tasks_module, "_record_dlq", _record)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
-    result = await tasks_module.process_meta_lead_async(
-        payload=_sample_payload()
-    )
+    result = await tasks_module.process_meta_lead_async(payload=_sample_payload())
     assert result == {"status": "dlq", "reason": "no_subscription"}
     assert captured["provider"] == IntegrationProvider.meta_ads
 
 
 @pytest.mark.asyncio
-async def test_task_dlqs_on_fetch_failed(
-    _meta_webhook_env, monkeypatch
-):
+async def test_task_dlqs_on_fetch_failed(_meta_webhook_env, monkeypatch):
     """Meta returns 404 for a deleted lead → DLQ (not retry)."""
+
     async def _ok_mapping(*_a, **_k):
         return (_ORG_ID, _INTEGRATION_ID, "page-tok")
 
@@ -619,13 +560,9 @@ async def test_task_dlqs_on_fetch_failed(
     async def _no_existing(*_a, **_k):
         return None
 
-    monkeypatch.setattr(
-        tasks_module, "_load_page_token_unscoped", _ok_mapping
-    )
+    monkeypatch.setattr(tasks_module, "_load_page_token_unscoped", _ok_mapping)
     monkeypatch.setattr(tasks_module, "find_subscription", _sub)
-    monkeypatch.setattr(
-        tasks_module, "_find_lead_by_external_id", _no_existing
-    )
+    monkeypatch.setattr(tasks_module, "_find_lead_by_external_id", _no_existing)
 
     fake_client = _FakeAsyncClient()
     fake_client.respond(
@@ -641,9 +578,7 @@ async def test_task_dlqs_on_fetch_failed(
         return MagicMock(id=uuid.uuid4())
 
     monkeypatch.setattr(tasks_module, "_record_dlq", _record)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
     result = await tasks_module.process_meta_lead_async(
         payload=_sample_payload(), http_client=fake_client
@@ -654,10 +589,9 @@ async def test_task_dlqs_on_fetch_failed(
 
 
 @pytest.mark.asyncio
-async def test_task_creates_lead_with_attribution(
-    _meta_webhook_env, monkeypatch
-):
+async def test_task_creates_lead_with_attribution(_meta_webhook_env, monkeypatch):
     """Happy path: fetch leadgen, apply mapping, create contact+lead."""
+
     async def _ok_mapping(*_a, **_k):
         return (_ORG_ID, _INTEGRATION_ID, "page-tok")
 
@@ -708,20 +642,14 @@ async def test_task_creates_lead_with_attribution(
     async def _noop_audit(*_a, **_k):
         return None
 
-    monkeypatch.setattr(
-        tasks_module, "_load_page_token_unscoped", _ok_mapping
-    )
+    monkeypatch.setattr(tasks_module, "_load_page_token_unscoped", _ok_mapping)
     monkeypatch.setattr(tasks_module, "find_subscription", _sub)
-    monkeypatch.setattr(
-        tasks_module, "_find_lead_by_external_id", _no_existing
-    )
+    monkeypatch.setattr(tasks_module, "_find_lead_by_external_id", _no_existing)
     monkeypatch.setattr(tasks_module, "find_existing_contact", _no_contact)
     monkeypatch.setattr(tasks_module, "create_contact", _create_contact)
     monkeypatch.setattr(tasks_module, "ingest_lead", _ingest_lead)
     monkeypatch.setattr(tasks_module.audit, "log", _noop_audit)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
     fake_client = _FakeAsyncClient()
     fake_client.respond(
@@ -771,9 +699,7 @@ async def test_task_creates_lead_with_attribution(
 
 
 @pytest.mark.asyncio
-async def test_task_idempotency_skips_duplicate_leadgen(
-    _meta_webhook_env, monkeypatch
-):
+async def test_task_idempotency_skips_duplicate_leadgen(_meta_webhook_env, monkeypatch):
     async def _ok_mapping(*_a, **_k):
         return (_ORG_ID, _INTEGRATION_ID, "page-tok")
 
@@ -800,21 +726,13 @@ async def test_task_idempotency_skips_duplicate_leadgen(
         create_called["called"] = True
         return MagicMock(id=uuid.uuid4())
 
-    monkeypatch.setattr(
-        tasks_module, "_load_page_token_unscoped", _ok_mapping
-    )
+    monkeypatch.setattr(tasks_module, "_load_page_token_unscoped", _ok_mapping)
     monkeypatch.setattr(tasks_module, "find_subscription", _sub)
-    monkeypatch.setattr(
-        tasks_module, "_find_lead_by_external_id", _existing
-    )
+    monkeypatch.setattr(tasks_module, "_find_lead_by_external_id", _existing)
     monkeypatch.setattr(tasks_module, "create_contact", _create_contact)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
-    result = await tasks_module.process_meta_lead_async(
-        payload=_sample_payload()
-    )
+    result = await tasks_module.process_meta_lead_async(payload=_sample_payload())
     assert result == {
         "status": "duplicate",
         "lead_id": str(existing_lead_id),
@@ -827,9 +745,7 @@ async def test_task_idempotency_skips_duplicate_leadgen(
 
 
 @pytest.mark.asyncio
-async def test_task_reuses_existing_contact(
-    _meta_webhook_env, monkeypatch
-):
+async def test_task_reuses_existing_contact(_meta_webhook_env, monkeypatch):
     async def _ok_mapping(*_a, **_k):
         return (_ORG_ID, _INTEGRATION_ID, "page-tok")
 
@@ -880,22 +796,14 @@ async def test_task_reuses_existing_contact(
     async def _noop_audit(*_a, **_k):
         return None
 
-    monkeypatch.setattr(
-        tasks_module, "_load_page_token_unscoped", _ok_mapping
-    )
+    monkeypatch.setattr(tasks_module, "_load_page_token_unscoped", _ok_mapping)
     monkeypatch.setattr(tasks_module, "find_subscription", _sub)
-    monkeypatch.setattr(
-        tasks_module, "_find_lead_by_external_id", _no_existing_lead
-    )
-    monkeypatch.setattr(
-        tasks_module, "find_existing_contact", _existing_contact
-    )
+    monkeypatch.setattr(tasks_module, "_find_lead_by_external_id", _no_existing_lead)
+    monkeypatch.setattr(tasks_module, "find_existing_contact", _existing_contact)
     monkeypatch.setattr(tasks_module, "create_contact", _create_contact)
     monkeypatch.setattr(tasks_module, "ingest_lead", _ingest_lead)
     monkeypatch.setattr(tasks_module.audit, "log", _noop_audit)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
     fake_client = _FakeAsyncClient()
     fake_client.respond(

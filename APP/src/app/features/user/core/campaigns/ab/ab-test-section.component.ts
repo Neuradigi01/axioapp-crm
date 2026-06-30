@@ -1,9 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 
 /**
@@ -29,17 +25,14 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
         A/B test configuration
       </p>
       <p class="mb-3 text-[11px] text-zinc-500">
-        Split your audience between two templates. After the
-        hold-back window, the winner is auto-selected by the metric
-        you choose — minimum 50 recipients to keep the result
+        Split your audience between two templates. After the hold-back window, the winner is
+        auto-selected by the metric you choose — minimum 50 recipients to keep the result
         statistically meaningful.
       </p>
 
       <div class="mb-2 grid grid-cols-2 gap-2">
         <label>
-          <span class="mb-1 block font-medium text-zinc-700">
-            Variant A template
-          </span>
+          <span class="mb-1 block font-medium text-zinc-700"> Variant A template </span>
           <select
             formControlName="variant_a_template_id"
             class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5"
@@ -51,9 +44,7 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
           </select>
         </label>
         <label>
-          <span class="mb-1 block font-medium text-zinc-700">
-            Variant B template
-          </span>
+          <span class="mb-1 block font-medium text-zinc-700"> Variant B template </span>
           <select
             formControlName="variant_b_template_id"
             class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5"
@@ -68,8 +59,9 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 
       <label class="mb-2 block">
         <span class="mb-1 block font-medium text-zinc-700">
-          Split ratio — % of audience that gets variant A
-          ({{ form().controls['split_ratio'].value }}%)
+          Split ratio — % of audience that gets variant A ({{
+            form().controls['split_ratio'].value
+          }}%)
         </span>
         <input
           type="range"
@@ -80,16 +72,14 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
           class="w-full"
         />
         <span class="mt-1 block text-[10px] text-zinc-500">
-          Extremes (&lt; 10% or &gt; 90%) produce flaky winners on
-          small audiences — capped at 10–90%.
+          Extremes (&lt; 10% or &gt; 90%) produce flaky winners on small audiences — capped at
+          10–90%.
         </span>
       </label>
 
       <div class="grid grid-cols-2 gap-2">
         <label>
-          <span class="mb-1 block font-medium text-zinc-700">
-            Winner metric
-          </span>
+          <span class="mb-1 block font-medium text-zinc-700"> Winner metric </span>
           <select
             formControlName="winner_metric"
             class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5"
@@ -101,9 +91,7 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
           </select>
         </label>
         <label>
-          <span class="mb-1 block font-medium text-zinc-700">
-            Hold-back window
-          </span>
+          <span class="mb-1 block font-medium text-zinc-700"> Hold-back window </span>
           <select
             formControlName="winner_holdback_hours"
             class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5"
@@ -122,7 +110,5 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 })
 export class AbTestSectionComponent {
   readonly form = input.required<FormGroup>();
-  readonly templates = input.required<
-    Array<{ id: string; name: string }>
-  >();
+  readonly templates = input.required<Array<{ id: string; name: string }>>();
 }

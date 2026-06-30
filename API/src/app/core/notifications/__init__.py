@@ -4,6 +4,7 @@ Re-exports the `notify(...)` helper (and channel enum) so other modules
 can import `from src.app.core.notifications import notify` without
 dragging in FastAPI / Pydantic. Same pattern as audit / activities.
 """
+
 from src.app.core.notifications.models import NotificationChannel
 from src.app.core.notifications.service import (
     get_preferences,

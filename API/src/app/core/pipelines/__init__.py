@@ -6,6 +6,7 @@ modules can `from src.app.core.pipelines import move_card,
 register_pipeline_table` and wire their tables into the engine without
 pulling in HTTP-layer deps.
 """
+
 from src.app.core.pipelines.service import (
     get_pipeline_by_id,
     get_pipeline_by_key,

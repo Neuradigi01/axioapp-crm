@@ -17,10 +17,11 @@ Also asserts the `top_performers` leaderboard card returns explicit
 
 Run with: ``uv run pytest tests/test_dashboard_kpi_deltas.py``.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -44,9 +45,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -157,10 +156,8 @@ async def test_org_scope_growth_delta_up(layered_client, seeded_admin):
     headers = {"Authorization": f"Bearer {token}"}
 
     contact_id = await _make_contact(org.id, full_name="Anchor")
-    now = datetime.now(timezone.utc)
-    today_noon = datetime(
-        now.year, now.month, now.day, 12, 0, tzinfo=timezone.utc
-    )
+    now = datetime.now(UTC)
+    today_noon = datetime(now.year, now.month, now.day, 12, 0, tzinfo=UTC)
     yesterday_noon = today_noon - timedelta(days=1)
 
     for _ in range(5):
@@ -195,10 +192,8 @@ async def test_personal_scope_flat_delta(layered_client, seeded_admin):
     headers = {"Authorization": f"Bearer {token}"}
 
     contact_id = await _make_contact(org.id, full_name="Anchor")
-    now = datetime.now(timezone.utc)
-    today_noon = datetime(
-        now.year, now.month, now.day, 12, 0, tzinfo=timezone.utc
-    )
+    now = datetime.now(UTC)
+    today_noon = datetime(now.year, now.month, now.day, 12, 0, tzinfo=UTC)
     yesterday_noon = today_noon - timedelta(days=1)
 
     await _make_appointment(
@@ -241,10 +236,8 @@ async def test_org_scope_zero_baseline_delta_up(layered_client, seeded_admin):
     headers = {"Authorization": f"Bearer {token}"}
 
     contact_id = await _make_contact(org.id, full_name="Anchor")
-    now = datetime.now(timezone.utc)
-    today_noon = datetime(
-        now.year, now.month, now.day, 12, 0, tzinfo=timezone.utc
-    )
+    now = datetime.now(UTC)
+    today_noon = datetime(now.year, now.month, now.day, 12, 0, tzinfo=UTC)
 
     for _ in range(3):
         await _make_lead(org.id, contact_id=contact_id, created_at=today_noon)

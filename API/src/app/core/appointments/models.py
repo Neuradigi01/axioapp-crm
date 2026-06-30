@@ -14,6 +14,7 @@ Tenant-scoped (RLS on, ORM filter applied). Indexed for the two hot
 queries: calendar reads `(org_id, scheduled_at)` and per-user reads
 `(assigned_to_id, scheduled_at)`.
 """
+
 from __future__ import annotations
 
 import enum
@@ -64,9 +65,7 @@ class Appointment(Base, TenantScoped):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     purpose: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    scheduled_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     duration_min: Mapped[int] = mapped_column(Integer, nullable=False)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[AppointmentStatus] = mapped_column(

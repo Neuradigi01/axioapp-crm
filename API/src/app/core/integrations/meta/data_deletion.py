@@ -26,6 +26,7 @@ replay window. The endpoint collapses these by returning the existing
 ``confirmation_code`` rather than minting a new row — keeps the status
 URLs Meta has already shown to users valid.
 """
+
 from __future__ import annotations
 
 import base64
@@ -36,8 +37,8 @@ import logging
 import secrets
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -110,7 +111,7 @@ def parse_signed_request(
     signed_request: str,
     *,
     app_secret: str,
-    now: Optional[float] = None,
+    now: float | None = None,
 ) -> dict[str, Any]:
     """Verify Meta's signed_request and return the decoded payload.
 
@@ -156,18 +157,14 @@ def parse_signed_request(
 
     algorithm = data.get("algorithm")
     if algorithm != "HMAC-SHA256":
-        raise InvalidAlgorithmError(
-            f"unexpected algorithm: {algorithm!r}"
-        )
+        raise InvalidAlgorithmError(f"unexpected algorithm: {algorithm!r}")
 
     issued_at = data.get("issued_at")
     if not isinstance(issued_at, int):
         raise MalformedRequestError("issued_at missing or non-integer")
     current = now if now is not None else time.time()
     if current - issued_at > _SIGNED_REQUEST_MAX_AGE_SECONDS:
-        raise StaleRequestError(
-            f"signed_request too old: {current - issued_at:.0f}s"
-        )
+        raise StaleRequestError(f"signed_request too old: {current - issued_at:.0f}s")
 
     user_id = data.get("user_id")
     if not isinstance(user_id, str) or not user_id:
@@ -197,12 +194,12 @@ async def find_existing_request(
     *,
     meta_user_id: str,
     issued_at_epoch: int,
-) -> Optional[MetaDataDeletionRequest]:
+) -> MetaDataDeletionRequest | None:
     """Idempotency check — Meta retries identical signed_requests on
     transient failures. Collapse them by reusing the existing row +
     its confirmation_code so the status URL Meta already showed the
     user keeps working."""
-    issued_at_dt = datetime.fromtimestamp(issued_at_epoch, tz=timezone.utc)
+    issued_at_dt = datetime.fromtimestamp(issued_at_epoch, tz=UTC)
     stmt = select(MetaDataDeletionRequest).where(
         MetaDataDeletionRequest.meta_user_id == meta_user_id,
         MetaDataDeletionRequest.issued_at == issued_at_dt,
@@ -229,21 +226,22 @@ async def find_integrations_by_meta_user(
         """
     )
     rows = (
-        await session.execute(
-            sql,
-            {
-                "meta_user_id": meta_user_id,
-                "provider": IntegrationProvider.whatsapp.value,
-            },
+        (
+            await session.execute(
+                sql,
+                {
+                    "meta_user_id": meta_user_id,
+                    "provider": IntegrationProvider.whatsapp.value,
+                },
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
     # Synthesise minimal Integration objects — the caller only reads
     # `.id` and `.org_id`. Avoids hydrating the full row + skirts the
     # auto-tenant-filter that would deny these reads.
-    return [
-        Integration(id=row["id"], org_id=row["org_id"])
-        for row in rows
-    ]
+    return [Integration(id=row["id"], org_id=row["org_id"]) for row in rows]
 
 
 async def record_deletion_request(
@@ -258,7 +256,7 @@ async def record_deletion_request(
     row = MetaDataDeletionRequest(
         confirmation_code=generate_confirmation_code(),
         meta_user_id=meta_user_id,
-        issued_at=datetime.fromtimestamp(issued_at_epoch, tz=timezone.utc),
+        issued_at=datetime.fromtimestamp(issued_at_epoch, tz=UTC),
         affected_org_ids=affected_org_ids,
         status=MetaDataDeletionStatus.pending,
     )
@@ -270,7 +268,7 @@ async def record_deletion_request(
 
 async def get_status_by_code(
     session: AsyncSession, *, confirmation_code: str
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Public-facing status lookup. Returns a projection safe to render
     on an anonymous page — strips ``meta_user_id`` (PII) and the
     ``failure_reason`` internal detail.
@@ -278,7 +276,7 @@ async def get_status_by_code(
     Special-cases the demo code so Meta reviewers can confirm the page
     renders even before any real deletion has occurred."""
     if confirmation_code == DEMO_CONFIRMATION_CODE:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return {
             "status": MetaDataDeletionStatus.completed.value,
             "confirmation_code": confirmation_code,
@@ -298,9 +296,7 @@ async def get_status_by_code(
         "status": row.status.value,
         "confirmation_code": row.confirmation_code,
         "requested_at": row.requested_at.isoformat(),
-        "completed_at": (
-            row.completed_at.isoformat() if row.completed_at else None
-        ),
+        "completed_at": (row.completed_at.isoformat() if row.completed_at else None),
         "affected_org_count": len(row.affected_org_ids or []),
         "is_demo": False,
     }

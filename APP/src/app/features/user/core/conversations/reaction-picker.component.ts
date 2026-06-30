@@ -9,10 +9,7 @@ import {
 
 const DEFAULT_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
-const MORE_EMOJIS = [
-  '🔥', '🎉', '👏', '✅', '❌', '💯',
-  '🤔', '😎', '😡', '🥳', '🤝', '💔',
-];
+const MORE_EMOJIS = ['🔥', '🎉', '👏', '✅', '❌', '💯', '🤔', '😎', '😡', '🥳', '🤝', '💔'];
 
 /**
  * Inline reaction picker (whatsapp-platform-upgrade Step 7).

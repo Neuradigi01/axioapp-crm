@@ -1,4 +1,12 @@
-import { Component, ChangeDetectionStrategy, input, inject, signal, OnDestroy, effect } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  inject,
+  signal,
+  OnDestroy,
+  effect,
+} from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
@@ -6,7 +14,10 @@ import { IAttachment } from '@app/schemas/ticket';
 import { AppSettings } from '@app/app.settings';
 import { FILE_TYPE_ICONS } from '@core/constants/app.constants';
 import { firstValueFrom } from 'rxjs';
-import { AttachmentPreviewComponent, IAttachmentPreviewData } from '@shared/components/attachment-preview/attachment-preview.component';
+import {
+  AttachmentPreviewComponent,
+  IAttachmentPreviewData,
+} from '@shared/components/attachment-preview/attachment-preview.component';
 
 @Component({
   selector: 'app-attachment-list',
@@ -57,8 +68,10 @@ export class AttachmentListComponent implements OnDestroy {
     if (mime.startsWith('image/')) return FILE_TYPE_ICONS['image'];
     if (mime === 'application/pdf') return FILE_TYPE_ICONS['pdf'];
     if (mime.includes('word') || mime.includes('document')) return FILE_TYPE_ICONS['doc'];
-    if (mime.includes('sheet') || mime.includes('excel') || mime.includes('csv')) return FILE_TYPE_ICONS['xls'];
-    if (mime.includes('zip') || mime.includes('rar') || mime.includes('compressed')) return FILE_TYPE_ICONS['zip'];
+    if (mime.includes('sheet') || mime.includes('excel') || mime.includes('csv'))
+      return FILE_TYPE_ICONS['xls'];
+    if (mime.includes('zip') || mime.includes('rar') || mime.includes('compressed'))
+      return FILE_TYPE_ICONS['zip'];
     if (mime.startsWith('text/')) return FILE_TYPE_ICONS['text'];
     return FILE_TYPE_ICONS['default'];
   }
@@ -101,7 +114,7 @@ export class AttachmentListComponent implements OnDestroy {
 
       // Revoke the preview blob URL
       URL.revokeObjectURL(url);
-      this.blobUrls = this.blobUrls.filter(u => u !== url);
+      this.blobUrls = this.blobUrls.filter((u) => u !== url);
 
       if (result === 'download') {
         await this.downloadFile(attachment);
@@ -130,7 +143,7 @@ export class AttachmentListComponent implements OnDestroy {
       const blob = await this.fetchBlob(attachment.stored_name);
       const url = URL.createObjectURL(blob);
       this.blobUrls.push(url);
-      this.thumbnailUrls.update(map => ({ ...map, [attachment.stored_name]: url }));
+      this.thumbnailUrls.update((map) => ({ ...map, [attachment.stored_name]: url }));
     } catch {
       // Thumbnail load failed — will show file icon fallback
     }

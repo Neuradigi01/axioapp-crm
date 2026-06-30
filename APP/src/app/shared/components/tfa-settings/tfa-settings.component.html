@@ -1,4 +1,8 @@
-<app-form-card title="Security Settings" subtitle="Manage two-factor authentication" icon="security">
+<app-form-card
+  title="Security Settings"
+  subtitle="Manage two-factor authentication"
+  icon="security"
+>
   <!-- Loading -->
   @if (currentView() === 'loading') {
     <div class="security__loading">
@@ -15,7 +19,11 @@
     </div>
 
     <div class="security__methods">
-      <button class="security__method-card" (click)="selectMethod('authenticator')" [disabled]="isLoading()">
+      <button
+        class="security__method-card"
+        (click)="selectMethod('authenticator')"
+        [disabled]="isLoading()"
+      >
         <mat-icon class="security__method-icon">security</mat-icon>
         <div class="security__method-info">
           <span class="security__method-name">Google Authenticator</span>
@@ -25,7 +33,11 @@
       </button>
 
       @if (emailEnabled() && maskedEmail()) {
-        <button class="security__method-card" (click)="selectMethod('email')" [disabled]="isLoading()">
+        <button
+          class="security__method-card"
+          (click)="selectMethod('email')"
+          [disabled]="isLoading()"
+        >
           <mat-icon class="security__method-icon">email</mat-icon>
           <div class="security__method-info">
             <span class="security__method-name">Email OTP</span>
@@ -36,7 +48,11 @@
       }
 
       @if (smsEnabled() && maskedMobile()) {
-        <button class="security__method-card" (click)="selectMethod('sms')" [disabled]="isLoading()">
+        <button
+          class="security__method-card"
+          (click)="selectMethod('sms')"
+          [disabled]="isLoading()"
+        >
           <mat-icon class="security__method-icon">sms</mat-icon>
           <div class="security__method-info">
             <span class="security__method-name">SMS OTP</span>
@@ -104,7 +120,9 @@
           @if (resendTimer() > 0) {
             <span class="security__resend-timer">Resend in {{ resendTimer() }}s</span>
           } @else {
-            <button mat-button type="button" (click)="resendOtp()" [disabled]="isLoading()">Resend OTP</button>
+            <button mat-button type="button" (click)="resendOtp()" [disabled]="isLoading()">
+              Resend OTP
+            </button>
           }
         </div>
 
@@ -150,14 +168,15 @@
         @for (method of ['authenticator', 'email', 'sms']; track method) {
           @if (method !== currentMethod()) {
             @if (
-              (method === 'authenticator') ||
+              method === 'authenticator' ||
               (method === 'email' && emailEnabled() && maskedEmail()) ||
               (method === 'sms' && smsEnabled() && maskedMobile())
             ) {
               <button
                 class="security__method-card"
                 [class.security__method-card--selected]="selectedMethod() === method"
-                (click)="selectedMethod.set(method)">
+                (click)="selectedMethod.set(method)"
+              >
                 <mat-icon class="security__method-icon">{{ getMethodIcon(method) }}</mat-icon>
                 <span class="security__method-name">{{ getMethodLabel(method) }}</span>
               </button>

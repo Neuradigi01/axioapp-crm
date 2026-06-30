@@ -4,6 +4,7 @@ Meta signs the raw body with the app secret. We must verify exactly
 that — using the raw bytes, not a re-serialised JSON copy. These
 tests pin down the contract.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -11,14 +12,11 @@ import hmac
 
 from src.app.core.conversations.adapters.whatsapp import WhatsAppAdapter
 
-
 SECRET = "test-app-secret"
 
 
 def _adapter() -> WhatsAppAdapter:
-    return WhatsAppAdapter(
-        phone_id="x", token="x", app_secret=SECRET, verify_token="x"
-    )
+    return WhatsAppAdapter(phone_id="x", token="x", app_secret=SECRET, verify_token="x")
 
 
 def _sign(body: bytes) -> str:

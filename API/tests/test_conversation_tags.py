@@ -15,6 +15,7 @@ Cases:
   7. `AssignTagRequest` requires a UUID.
   8. Color palette set matches the documented size (12).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -23,10 +24,10 @@ import pytest
 from pydantic import ValidationError
 
 from src.app.core.conversations.schemas import (
+    _TAG_COLORS,
     AssignTagRequest,
     TagCreate,
     TagUpdate,
-    _TAG_COLORS,
 )
 
 

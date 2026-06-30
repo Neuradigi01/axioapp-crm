@@ -13,10 +13,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { InrPipe } from '../shared/pipes/inr.pipe';
-import {
-  CatalogApiService,
-  CatalogItem,
-} from './catalog-api.service';
+import { CatalogApiService, CatalogItem } from './catalog-api.service';
 import { AddItemModalComponent } from './add-item-modal.component';
 import { ViewItemModalComponent } from './view-item-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
@@ -85,12 +82,8 @@ export class CatalogPageComponent {
   // --- KPI cards ---
 
   readonly totalProducts = computed(() => this.total());
-  readonly activeProducts = computed(
-    () => this.items().filter((i) => i.is_active).length,
-  );
-  readonly inactiveProducts = computed(
-    () => this.items().filter((i) => !i.is_active).length,
-  );
+  readonly activeProducts = computed(() => this.items().filter((i) => i.is_active).length);
+  readonly inactiveProducts = computed(() => this.items().filter((i) => !i.is_active).length);
   readonly distinctCategories = computed(() => this.categoryOptions().length);
 
   constructor() {
@@ -124,9 +117,7 @@ export class CatalogPageComponent {
           this.items.set([]);
           this.total.set(0);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load catalog.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load catalog.');
         },
       });
   }
@@ -163,9 +154,7 @@ export class CatalogPageComponent {
   }
 
   protected onDelete(item: CatalogItem): void {
-    const ok = window.confirm(
-      `Delete "${item.name}" (${item.sku})? This cannot be undone.`,
-    );
+    const ok = window.confirm(`Delete "${item.name}" (${item.sku})? This cannot be undone.`);
     if (!ok) return;
     const before = this.items();
     this.items.update((rows) => rows.filter((i) => i.id !== item.id));
@@ -177,9 +166,7 @@ export class CatalogPageComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set(before);
           this.total.set(before.length);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not delete item.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not delete item.');
         },
       });
   }
@@ -203,5 +190,4 @@ export class CatalogPageComponent {
     if (c.includes('light') || c.includes('lamp')) return 'ðŸ’¡';
     return 'ðŸ“¦';
   }
-
 }

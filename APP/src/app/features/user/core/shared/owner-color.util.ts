@@ -52,7 +52,10 @@ export function ownerColor(userId: string | null | undefined): OwnerColor {
  */
 export function staffInitials(fullName: string | null | undefined): string {
   if (!fullName) return '?';
-  const parts = fullName.trim().split(/\s+/).filter((p) => p.length > 0);
+  const parts = fullName
+    .trim()
+    .split(/\s+/)
+    .filter((p) => p.length > 0);
   if (parts.length === 0) return '?';
   return parts
     .slice(0, 2)

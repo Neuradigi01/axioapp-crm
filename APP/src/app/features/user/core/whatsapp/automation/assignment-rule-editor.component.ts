@@ -7,7 +7,6 @@ import {
   EventEmitter,
   Input,
   Output,
-  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -21,10 +20,7 @@ import {
   ConversationTag,
   ConversationsApiService,
 } from '../../conversations/conversations-api.service';
-import {
-  StaffApiService,
-  StaffListItem,
-} from '../../staff/staff-api.service';
+import { StaffApiService, StaffListItem } from '../../staff/staff-api.service';
 
 import {
   AssignmentRule,
@@ -32,7 +28,6 @@ import {
   AssignmentStrategy,
   WhatsAppAutomationApiService,
 } from './whatsapp-automation-api.service';
-
 
 /**
  * Assignment rule editor (whatsapp-platform-upgrade Step 18).
@@ -96,12 +91,15 @@ import {
       <div>
         <label class="mb-1 block text-xs font-medium text-zinc-700">Strategy</label>
         <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
-          @for (s of [
-            { key: 'round_robin', label: 'Round-robin' },
-            { key: 'load_balanced', label: 'Load-balanced' },
-            { key: 'tag_based', label: 'Tag-based' },
-            { key: 'team_based', label: 'Team-based' },
-          ]; track s.key) {
+          @for (
+            s of [
+              { key: 'round_robin', label: 'Round-robin' },
+              { key: 'load_balanced', label: 'Load-balanced' },
+              { key: 'tag_based', label: 'Tag-based' },
+              { key: 'team_based', label: 'Team-based' },
+            ];
+            track s.key
+          ) {
             <button
               type="button"
               (click)="strategy.set($any(s.key))"
@@ -144,12 +142,9 @@ import {
         }
         @case ('tag_based') {
           <div>
-            <p class="mb-1 text-xs font-medium text-zinc-700">
-              Tag → user mapping
-            </p>
+            <p class="mb-1 text-xs font-medium text-zinc-700">Tag → user mapping</p>
             <p class="mb-2 text-[10px] text-zinc-500">
-              When a new conversation has the tag, route it to the
-              matching user.
+              When a new conversation has the tag, route it to the matching user.
             </p>
             <div class="space-y-2">
               @for (row of tagMapping(); track $index; let i = $index) {
@@ -199,9 +194,8 @@ import {
           <div>
             <p class="mb-1 text-xs font-medium text-zinc-700">Team</p>
             <p class="mb-2 text-[10px] text-zinc-500">
-              Teams are a placeholder — this strategy picks a random
-              active org member until the teams concept lands. Enter
-              any UUID for now (or use a different strategy).
+              Teams are a placeholder — this strategy picks a random active org member until the
+              teams concept lands. Enter any UUID for now (or use a different strategy).
             </p>
             <input
               type="text"
@@ -220,8 +214,7 @@ import {
           [checked]="skipOutsideHours()"
           (change)="skipOutsideHours.set($any($event.target).checked)"
         />
-        Skip outside business hours (uses the schedule on the
-        Business Profile page)
+        Skip outside business hours (uses the schedule on the Business Profile page)
       </label>
 
       <div class="flex items-center justify-end gap-2 border-t border-zinc-100 pt-3">
@@ -310,9 +303,9 @@ export class AssignmentRuleEditorComponent {
 
   protected readonly eligibleUserIds = signal<string[]>([]);
   protected readonly capPerUser = signal<number | null>(null);
-  protected readonly tagMapping = signal<
-    Array<{ tagId: string | null; userId: string | null }>
-  >([]);
+  protected readonly tagMapping = signal<Array<{ tagId: string | null; userId: string | null }>>(
+    [],
+  );
   protected readonly teamId = signal<string>('');
 
   protected readonly staff = signal<StaffListItem[]>([]);
@@ -338,30 +331,17 @@ export class AssignmentRuleEditorComponent {
       });
   }
 
-  private hydrateConfig(
-    strategy: AssignmentStrategy,
-    config: Record<string, unknown>,
-  ): void {
+  private hydrateConfig(strategy: AssignmentStrategy, config: Record<string, unknown>): void {
     if (strategy === 'round_robin' || strategy === 'load_balanced') {
       const raw = config['eligible_user_ids'];
-      this.eligibleUserIds.set(
-        Array.isArray(raw)
-          ? (raw as unknown[]).map((u) => String(u))
-          : [],
-      );
+      this.eligibleUserIds.set(Array.isArray(raw) ? (raw as unknown[]).map((u) => String(u)) : []);
       if (strategy === 'load_balanced') {
         const cap = config['cap_per_user'];
-        this.capPerUser.set(
-          typeof cap === 'number' ? cap : null,
-        );
+        this.capPerUser.set(typeof cap === 'number' ? cap : null);
       }
     } else if (strategy === 'tag_based') {
       const mapping = config['mapping'];
-      if (
-        mapping &&
-        typeof mapping === 'object' &&
-        !Array.isArray(mapping)
-      ) {
+      if (mapping && typeof mapping === 'object' && !Array.isArray(mapping)) {
         this.tagMapping.set(
           Object.entries(mapping).map(([tagId, userId]) => ({
             tagId,
@@ -381,16 +361,11 @@ export class AssignmentRuleEditorComponent {
   }
 
   protected toggleUser(id: string, checked: boolean): void {
-    this.eligibleUserIds.update((arr) =>
-      checked ? [...arr, id] : arr.filter((u) => u !== id),
-    );
+    this.eligibleUserIds.update((arr) => (checked ? [...arr, id] : arr.filter((u) => u !== id)));
   }
 
   protected addTagMappingRow(): void {
-    this.tagMapping.update((arr) => [
-      ...arr,
-      { tagId: null, userId: null },
-    ]);
+    this.tagMapping.update((arr) => [...arr, { tagId: null, userId: null }]);
   }
 
   protected updateTagMappingRow(
@@ -399,9 +374,7 @@ export class AssignmentRuleEditorComponent {
     value: string | null,
   ): void {
     this.tagMapping.update((arr) =>
-      arr.map((row, i) =>
-        i === idx ? { ...row, [field]: value } : row,
-      ),
+      arr.map((row, i) => (i === idx ? { ...row, [field]: value } : row)),
     );
   }
 
@@ -432,20 +405,16 @@ export class AssignmentRuleEditorComponent {
     const request$ = id
       ? this.api.updateAssignmentRule(id, payload)
       : this.api.createAssignmentRule(payload);
-    request$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (rule) => {
-          this.saving.set(false);
-          this.saved.emit(rule);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.saving.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not save the rule.',
-          );
-        },
-      });
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (rule) => {
+        this.saving.set(false);
+        this.saved.emit(rule);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.saving.set(false);
+        this.error.set(extractApiError(err) ?? 'Could not save the rule.');
+      },
+    });
   }
 
   protected onCancel(): void {
@@ -479,9 +448,7 @@ export class AssignmentRuleEditorComponent {
         }
       }
       if (Object.keys(mapping).length === 0) {
-        this.error.set(
-          'Add at least one tag → user mapping.',
-        );
+        this.error.set('Add at least one tag → user mapping.');
         return null;
       }
       return { mapping };

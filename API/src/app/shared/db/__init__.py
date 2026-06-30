@@ -17,14 +17,15 @@ makes the change transaction-local, the same scope as `SET LOCAL`). If
 no org is present in the request context the hook is a no-op — RLS
 policies then see a NULL `app.org_id` and deny all rows.
 """
+
 from __future__ import annotations
 
 from sqlalchemy import event, text
 from sqlalchemy.orm import Session
 
+from src.app.shared.context import get_context
 from src.core.db import DATABASE_URL, async_session, engine, get_db
 from src.models import Base
-from src.app.shared.context import get_context
 
 __all__ = ["DATABASE_URL", "Base", "async_session", "engine", "get_db"]
 

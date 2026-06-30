@@ -24,12 +24,13 @@ Celery may be absent in dev. The `_shared_task` shim mirrors
 synchronous async body is callable directly so dev smoke tests
 exercise the full flow without a worker.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -83,9 +84,7 @@ logger = logging.getLogger(__name__)
     retry_backoff_max=300,
     retry_jitter=True,
 )
-def send_campaign_chunk(
-    self, campaign_id: str, contact_ids: list[str]
-) -> dict[str, Any]:
+def send_campaign_chunk(self, campaign_id: str, contact_ids: list[str]) -> dict[str, Any]:
     """Celery sync entrypoint. Bridges into the async dispatch_chunk."""
     try:
         return asyncio.run(
@@ -96,7 +95,7 @@ def send_campaign_chunk(
         )
     except (ConnectionError, TimeoutError) as exc:
         if HAS_CELERY:
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
         raise
 
 
@@ -107,22 +106,25 @@ async def _send_campaign_chunk_async(
 ) -> dict[str, Any]:
     """Async body — opens a session, sets tenant context from the
     campaign row, runs `dispatch_chunk`."""
-    from src.app.core.campaigns.service import dispatch_chunk, get_campaign
+    from src.app.core.campaigns.service import dispatch_chunk
     from src.app.shared.context import RequestContext, reset_context, set_context
     from src.app.shared.db import async_session
 
     async with async_session() as session:
         # Bypass-tenant lookup of the campaign so we can set the
         # context from its org_id before any RLS-scoped query runs.
-        from src.app.core.campaigns.models import Campaign
         from sqlalchemy import text as sql_text
 
         row = (
-            await session.execute(
-                sql_text("SELECT org_id FROM tbl_campaigns WHERE id = :cid"),
-                {"cid": campaign_id},
+            (
+                await session.execute(
+                    sql_text("SELECT org_id FROM tbl_campaigns WHERE id = :cid"),
+                    {"cid": campaign_id},
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         if row is None:
             return {"campaign_id": str(campaign_id), "status": "missing"}
         org_id = row["org_id"]
@@ -165,23 +167,25 @@ def dispatch_scheduled_campaigns() -> dict[str, Any]:
 
 
 async def _dispatch_scheduled_campaigns_async() -> dict[str, Any]:
+    from sqlalchemy import text as sql_text
+
     from src.app.core.campaigns.models import Campaign, CampaignStatus
     from src.app.core.campaigns.service import dispatch_chunk
     from src.app.shared.context import RequestContext, reset_context, set_context
     from src.app.shared.db import async_session
-    from sqlalchemy import text as sql_text
 
     fired = 0
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     async with async_session() as session:
         # Bypass-tenant scan — beat has no org context. We pick the
         # campaign id + org_id, then re-enter per-campaign with the
         # right context for `dispatch_chunk` to see RLS-scoped rows.
         rows = (
-            await session.execute(
-                sql_text(
-                    """
+            (
+                await session.execute(
+                    sql_text(
+                        """
                     SELECT id, org_id
                     FROM tbl_campaigns
                     WHERE status = 'scheduled'
@@ -190,10 +194,13 @@ async def _dispatch_scheduled_campaigns_async() -> dict[str, Any]:
                     ORDER BY schedule_at ASC
                     LIMIT 100
                     """
-                ),
-                {"now": now},
+                    ),
+                    {"now": now},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         for row in rows:
             campaign_id = row["id"]
@@ -203,9 +210,7 @@ async def _dispatch_scheduled_campaigns_async() -> dict[str, Any]:
                 # Re-fetch under RLS context so we don't bypass tenancy
                 # for the write.
                 campaign = (
-                    await session.execute(
-                        select(Campaign).where(Campaign.id == campaign_id)
-                    )
+                    await session.execute(select(Campaign).where(Campaign.id == campaign_id))
                 ).scalar_one_or_none()
                 if campaign is None:
                     continue
@@ -214,12 +219,16 @@ async def _dispatch_scheduled_campaigns_async() -> dict[str, Any]:
                 from src.app.core.campaigns.models import CampaignMessage
 
                 queued_rows = (
-                    await session.execute(
-                        select(CampaignMessage.contact_id).where(
-                            CampaignMessage.campaign_id == campaign_id
+                    (
+                        await session.execute(
+                            select(CampaignMessage.contact_id).where(
+                                CampaignMessage.campaign_id == campaign_id
+                            )
                         )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 if not queued_rows:
                     campaign.status = CampaignStatus.done
                     await session.commit()
@@ -234,8 +243,7 @@ async def _dispatch_scheduled_campaigns_async() -> dict[str, Any]:
                 from src.app.core.campaigns.service import CHUNK_SIZE
 
                 chunks = [
-                    queued_rows[i : i + CHUNK_SIZE]
-                    for i in range(0, len(queued_rows), CHUNK_SIZE)
+                    queued_rows[i : i + CHUNK_SIZE] for i in range(0, len(queued_rows), CHUNK_SIZE)
                 ]
                 for chunk in chunks:
                     if HAS_CELERY:
@@ -289,10 +297,10 @@ def run_ab_decision(self: Any, campaign_id: str) -> dict[str, Any]:
     decision context."""
 
     async def _run() -> dict[str, Any]:
-        from src.app.shared.db import async_session
-        from src.app.shared.context import RequestContext, reset_context, set_context
         from src.app.core.campaigns.ab_decider import decide_winner
         from src.app.core.campaigns.models import Campaign
+        from src.app.shared.context import RequestContext, reset_context, set_context
+        from src.app.shared.db import async_session
 
         cid = uuid.UUID(campaign_id)
         async with async_session() as session:
@@ -301,15 +309,11 @@ def run_ab_decision(self: Any, campaign_id: str) -> dict[str, Any]:
             # context — the decider lookup uses the explicit
             # `campaign_id` filter as the tenant gate.
             row = (
-                await session.execute(
-                    select(Campaign).where(Campaign.id == cid)
-                )
+                await session.execute(select(Campaign).where(Campaign.id == cid))
             ).scalar_one_or_none()
             if row is None:
                 return {"decided": False, "reason": "campaign_not_found"}
-            token = set_context(
-                RequestContext(org_id=row.org_id, user_id=None)
-            )
+            token = set_context(RequestContext(org_id=row.org_id, user_id=None))
             try:
                 decision = await decide_winner(session, campaign_id=cid)
             finally:

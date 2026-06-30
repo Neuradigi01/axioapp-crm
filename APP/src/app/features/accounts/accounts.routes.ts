@@ -14,55 +14,45 @@ export const accountsRoutes: Routes = [
       },
       {
         path: getRoute('login').path,
-        loadComponent: () =>
-          import('./login/login.component').then((m) => m.LoginComponent),
+        loadComponent: () => import('./login/login.component').then((m) => m.LoginComponent),
       },
       {
         path: getRoute('admin_login').path,
-        loadComponent: () =>
-          import('./login/login.component').then((m) => m.LoginComponent),
+        loadComponent: () => import('./login/login.component').then((m) => m.LoginComponent),
         data: { userType: 'Admin' },
       },
       {
         path: getRoute('register').path,
         loadComponent: () =>
-          import('./register/register.component').then(
-            (m) => m.RegisterComponent
-          ),
+          import('./register/register.component').then((m) => m.RegisterComponent),
       },
       {
         path: getRoute('forgot_password').path,
         loadComponent: () =>
           import('./forgot-password/forgot-password.component').then(
-            (m) => m.ForgotPasswordComponent
+            (m) => m.ForgotPasswordComponent,
           ),
       },
       {
         path: getRoute('reset_password').path,
         loadComponent: () =>
-          import('./reset-password/reset-password.component').then(
-            (m) => m.ResetPasswordComponent
-          ),
+          import('./reset-password/reset-password.component').then((m) => m.ResetPasswordComponent),
       },
       {
         path: getRoute('two_factor_authentication').path,
         loadComponent: () =>
-          import('./two-factor/two-factor.component').then(
-            (m) => m.TwoFactorComponent
-          ),
+          import('./two-factor/two-factor.component').then((m) => m.TwoFactorComponent),
       },
       {
         path: getRoute('verify_email').path,
         loadComponent: () =>
-          import('./verify-email/verify-email.component').then(
-            (m) => m.VerifyEmailComponent
-          ),
+          import('./verify-email/verify-email.component').then((m) => m.VerifyEmailComponent),
       },
       {
         path: getRoute('email_verification_notice').path,
         loadComponent: () =>
           import('./email-verification-notice/email-verification-notice.component').then(
-            (m) => m.EmailVerificationNoticeComponent
+            (m) => m.EmailVerificationNoticeComponent,
           ),
       },
       {
@@ -72,9 +62,7 @@ export const accountsRoutes: Routes = [
         // route that doesn't live in the legacy `tbl_routes` registry.
         path: 'accept-invite',
         loadComponent: () =>
-          import('./accept-invite/accept-invite.component').then(
-            (m) => m.AcceptInviteComponent
-          ),
+          import('./accept-invite/accept-invite.component').then((m) => m.AcceptInviteComponent),
       },
     ],
   },

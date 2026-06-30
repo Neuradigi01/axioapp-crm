@@ -21,6 +21,7 @@ The rule-relevant-fields cache (``_RULE_FIELD_CACHE``) lets
 appear in any active rule. Cache is per-org with a short TTL; on miss
 or rule mutation we recompute.
 """
+
 from __future__ import annotations
 
 import logging
@@ -33,7 +34,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.leads import filter_dsl
 from src.app.core.leads.models import Lead, LeadScoringRule
-
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +72,7 @@ def compute_score(lead: Lead, rules: list[LeadScoringRule]) -> int:
     return max(_SCORE_MIN, min(_SCORE_MAX, total))
 
 
-async def fetch_active_rules(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> list[LeadScoringRule]:
+async def fetch_active_rules(session: AsyncSession, *, org_id: uuid.UUID) -> list[LeadScoringRule]:
     """All active rules for the tenant. RLS keeps org isolation; the
     explicit ``org_id`` predicate is belt-and-suspenders."""
     result = await session.execute(
@@ -109,9 +107,7 @@ async def recompute_lead(
     return new_score
 
 
-async def recompute_org_scores(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> int:
+async def recompute_org_scores(session: AsyncSession, *, org_id: uuid.UUID) -> int:
     """Bulk-recompute every lead in the org. Returns rows touched.
 
     Streams leads in batches of 500 to keep the working set bounded.
@@ -158,9 +154,7 @@ _RULE_FIELD_CACHE_TTL_SEC = 60.0
 _RULE_FIELD_CACHE: dict[uuid.UUID, tuple[float, set[str]]] = {}
 
 
-async def rule_relevant_fields(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> set[str]:
+async def rule_relevant_fields(session: AsyncSession, *, org_id: uuid.UUID) -> set[str]:
     """The union of fields referenced by any active rule's condition,
     used by ``update_lead`` to short-circuit unnecessary recomputes.
 
@@ -269,9 +263,7 @@ async def _recompute_all_orgs() -> None:
                 try:
                     await recompute_org_scores(session, org_id=org_id)
                 except Exception:
-                    logger.exception(
-                        "lead-score recompute failed for org=%s", org_id
-                    )
+                    logger.exception("lead-score recompute failed for org=%s", org_id)
         finally:
             reset_context(token)
 

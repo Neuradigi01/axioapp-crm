@@ -26,6 +26,7 @@ The bundle never includes:
   * Encryption keys, password hashes, anything from
     ``tbl_user_login`` / ``tbl_integrations`` etc.
 """
+
 from __future__ import annotations
 
 import io
@@ -34,7 +35,7 @@ import logging
 import uuid
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -63,7 +64,7 @@ def _json_default(value: Any) -> Any:
         return str(value)
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
+            value = value.replace(tzinfo=UTC)
         return value.isoformat()
     if hasattr(value, "value"):  # enum
         return value.value
@@ -94,21 +95,11 @@ def _serialise_contact(contact: Any) -> dict[str, Any]:
         "assigned_to_id": contact.assigned_to_id,
         "last_activity_at": contact.last_activity_at,
         "email_opt_out": bool(getattr(contact, "email_opt_out", False)),
-        "whatsapp_opt_in_status": getattr(
-            contact, "whatsapp_opt_in_status", None
-        ),
-        "whatsapp_opt_in_source": getattr(
-            contact, "whatsapp_opt_in_source", None
-        ),
-        "whatsapp_opt_in_recorded_at": getattr(
-            contact, "whatsapp_opt_in_recorded_at", None
-        ),
-        "whatsapp_opt_out_recorded_at": getattr(
-            contact, "whatsapp_opt_out_recorded_at", None
-        ),
-        "whatsapp_opt_out_reason": getattr(
-            contact, "whatsapp_opt_out_reason", None
-        ),
+        "whatsapp_opt_in_status": getattr(contact, "whatsapp_opt_in_status", None),
+        "whatsapp_opt_in_source": getattr(contact, "whatsapp_opt_in_source", None),
+        "whatsapp_opt_in_recorded_at": getattr(contact, "whatsapp_opt_in_recorded_at", None),
+        "whatsapp_opt_out_recorded_at": getattr(contact, "whatsapp_opt_out_recorded_at", None),
+        "whatsapp_opt_out_reason": getattr(contact, "whatsapp_opt_out_reason", None),
         "created_at": contact.created_at,
         "updated_at": contact.updated_at,
     }
@@ -143,9 +134,7 @@ def _serialise_lead(lead: Any) -> dict[str, Any]:
     }
 
 
-def _serialise_conversation(
-    conv: Conversation, message_count: int
-) -> dict[str, Any]:
+def _serialise_conversation(conv: Conversation, message_count: int) -> dict[str, Any]:
     return {
         "id": conv.id,
         "channel": conv.channel,
@@ -178,35 +167,33 @@ async def build_contact_data_export(
         raise LookupError(f"contact {contact_id} not found in this tenant")
 
     consent_rows = (
-        await session.execute(
-            select(ConsentEvent)
-            .where(ConsentEvent.contact_id == contact_id)
-            .order_by(ConsentEvent.recorded_at.asc())
+        (
+            await session.execute(
+                select(ConsentEvent)
+                .where(ConsentEvent.contact_id == contact_id)
+                .order_by(ConsentEvent.recorded_at.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     lead_rows = (
-        await session.execute(
-            select(Lead).where(Lead.contact_id == contact_id)
-        )
-    ).scalars().all()
+        (await session.execute(select(Lead).where(Lead.contact_id == contact_id))).scalars().all()
+    )
 
     # Conversations linked to this contact. We hit the conversations
     # table directly (no service helper exists for "by contact_id")
     # — single tenant-scoped query.
     conversations = (
-        await session.execute(
-            select(Conversation).where(
-                Conversation.contact_id == contact_id
-            )
-        )
-    ).scalars().all()
+        (await session.execute(select(Conversation).where(Conversation.contact_id == contact_id)))
+        .scalars()
+        .all()
+    )
 
     archive_buf = io.BytesIO()
     transcripts_summary: list[dict[str, Any]] = []
-    with zipfile.ZipFile(
-        archive_buf, "w", compression=zipfile.ZIP_DEFLATED
-    ) as zf:
+    with zipfile.ZipFile(archive_buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         prefix = f"{contact_id}"
 
         zf.writestr(
@@ -215,39 +202,29 @@ async def build_contact_data_export(
         )
         zf.writestr(
             f"{prefix}/consent-events.json",
-            _to_json_bytes(
-                [_serialise_consent_event(e) for e in consent_rows]
-            ),
+            _to_json_bytes([_serialise_consent_event(e) for e in consent_rows]),
         )
         zf.writestr(
             f"{prefix}/leads.json",
-            _to_json_bytes([_serialise_lead(l) for l in lead_rows]),
+            _to_json_bytes([_serialise_lead(lead) for lead in lead_rows]),
         )
 
         conversation_meta: list[dict[str, Any]] = []
         for conv in conversations:
             msgs: list[Message] = await list_messages(session, conv.id)
-            conversation_meta.append(
-                _serialise_conversation(conv, message_count=len(msgs))
-            )
+            conversation_meta.append(_serialise_conversation(conv, message_count=len(msgs)))
             csv_bytes = build_csv_bytes(conv, msgs)
-            zf.writestr(
-                f"{prefix}/transcripts/{conv.id}.csv", csv_bytes
-            )
+            zf.writestr(f"{prefix}/transcripts/{conv.id}.csv", csv_bytes)
             try:
                 pdf_bytes = build_pdf_bytes(conv, msgs)
-                zf.writestr(
-                    f"{prefix}/transcripts/{conv.id}.pdf", pdf_bytes
-                )
+                zf.writestr(f"{prefix}/transcripts/{conv.id}.pdf", pdf_bytes)
                 transcripts_summary.append(
                     {"conversation_id": str(conv.id), "formats": ["csv", "pdf"]}
                 )
             except RuntimeError:
                 # PDF dep missing — CSV still ships. Bundle stays
                 # DPDP-compliant (text transcript present).
-                transcripts_summary.append(
-                    {"conversation_id": str(conv.id), "formats": ["csv"]}
-                )
+                transcripts_summary.append({"conversation_id": str(conv.id), "formats": ["csv"]})
 
         zf.writestr(
             f"{prefix}/conversations.json",
@@ -256,10 +233,8 @@ async def build_contact_data_export(
 
         manifest = {
             "contact_id": str(contact_id),
-            "exported_at": datetime.now(timezone.utc).isoformat(),
-            "requested_by_user_id": (
-                str(requested_by_user_id) if requested_by_user_id else None
-            ),
+            "exported_at": datetime.now(UTC).isoformat(),
+            "requested_by_user_id": (str(requested_by_user_id) if requested_by_user_id else None),
             "counts": {
                 "consent_events": len(consent_rows),
                 "leads": len(lead_rows),
@@ -276,7 +251,7 @@ async def build_contact_data_export(
         }
         zf.writestr(f"{prefix}/manifest.json", _to_json_bytes(manifest))
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     filename = f"contact-{contact_id}-data-export-{timestamp}.zip"
     summary = {
         "contact_id": str(contact_id),

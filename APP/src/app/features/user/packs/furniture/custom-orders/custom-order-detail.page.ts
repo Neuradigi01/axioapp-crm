@@ -63,19 +63,12 @@ export class CustomOrderDetailPageComponent {
   /** Absolute base for `/files/...` URLs the backend persists. */
   protected readonly apiOrigin = deriveApiOrigin();
 
-  protected readonly totalInr = computed(() =>
-    fmtInr(this.order()?.total_amount),
-  );
-  protected readonly advanceInr = computed(() =>
-    fmtInr(this.order()?.advance_paid),
-  );
+  protected readonly totalInr = computed(() => fmtInr(this.order()?.total_amount));
+  protected readonly advanceInr = computed(() => fmtInr(this.order()?.advance_paid));
   protected readonly dueInr = computed(() => {
     const o = this.order();
     if (!o) return 'â€”';
-    const due = Math.max(
-      Number(o.total_amount ?? 0) - Number(o.advance_paid ?? 0),
-      0,
-    );
+    const due = Math.max(Number(o.total_amount ?? 0) - Number(o.advance_paid ?? 0), 0);
     return fmtInr(String(due));
   });
 
@@ -115,9 +108,7 @@ export class CustomOrderDetailPageComponent {
           this.loadError.set(null);
           return this.api.get(id).pipe(
             catchError((err: HttpErrorResponse) => {
-              this.loadError.set(
-                extractApiError(err) ?? 'Could not load order.',
-              );
+              this.loadError.set(extractApiError(err) ?? 'Could not load order.');
               this.loading.set(false);
               return of(null);
             }),
@@ -206,7 +197,4 @@ export class CustomOrderDetailPageComponent {
         });
     }
   }
-
-
-
 }

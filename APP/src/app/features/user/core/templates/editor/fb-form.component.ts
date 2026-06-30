@@ -9,13 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  FormArray,
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
 /**
@@ -56,7 +50,6 @@ export type FbFormGroup = FormGroup<{
   body_text: FormControl<string>;
   quick_replies: FormArray<FbQuickReplyGroup>;
 }>;
-
 
 @Component({
   selector: 'app-fb-form',
@@ -118,10 +111,7 @@ export class FbFormComponent {
     return new FormGroup({
       text: new FormControl<string>(text, {
         nonNullable: true,
-        validators: [
-          Validators.required,
-          Validators.maxLength(QUICK_REPLY_MAX_LENGTH),
-        ],
+        validators: [Validators.required, Validators.maxLength(QUICK_REPLY_MAX_LENGTH)],
       }),
     });
   }

@@ -1,7 +1,8 @@
 """Tests for `POST /api/v1/auth/forgot-password` and `/reset-password`."""
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -22,12 +23,16 @@ def _email_patch():
 
 async def _latest_token_for(db, member_id: int) -> PasswordResetToken | None:
     rows = (
-        await db.execute(
-            select(PasswordResetToken)
-            .where(PasswordResetToken.member_id == member_id)
-            .order_by(PasswordResetToken.id.desc())
+        (
+            await db.execute(
+                select(PasswordResetToken)
+                .where(PasswordResetToken.member_id == member_id)
+                .order_by(PasswordResetToken.id.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return rows[0] if rows else None
 
 
@@ -68,9 +73,7 @@ async def test_reset_password_updates_password_and_invalidates_token(
 ):
     user = seeded_admin["user"]
     with _email_patch():
-        await layered_client.post(
-            "/api/v1/auth/forgot-password", json={"identifier": user.email}
-        )
+        await layered_client.post("/api/v1/auth/forgot-password", json={"identifier": user.email})
 
     token_row = await _latest_token_for(test_db, user.id)
     assert token_row is not None and not token_row.is_used
@@ -101,15 +104,13 @@ async def test_reset_password_rejects_unknown_token(layered_client):
 
 
 @pytest.mark.asyncio
-async def test_reset_password_rejects_expired_token(
-    layered_client, seeded_admin, test_db
-):
+async def test_reset_password_rejects_expired_token(layered_client, seeded_admin, test_db):
     user = seeded_admin["user"]
     expired = PasswordResetToken(
         member_id=user.id,
         user_type="User",
         token="expired-token-xyz",
-        expires_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+        expires_at=datetime.now(UTC) - timedelta(minutes=1),
     )
     test_db.add(expired)
     await test_db.commit()
@@ -122,14 +123,10 @@ async def test_reset_password_rejects_expired_token(
 
 
 @pytest.mark.asyncio
-async def test_reset_password_rejects_reused_token(
-    layered_client, seeded_admin, test_db
-):
+async def test_reset_password_rejects_reused_token(layered_client, seeded_admin, test_db):
     user = seeded_admin["user"]
     with _email_patch():
-        await layered_client.post(
-            "/api/v1/auth/forgot-password", json={"identifier": user.email}
-        )
+        await layered_client.post("/api/v1/auth/forgot-password", json={"identifier": user.email})
     token_row = await _latest_token_for(test_db, user.id)
 
     first = await layered_client.post(
@@ -155,14 +152,10 @@ async def test_reset_password_invalidates_other_outstanding_tokens(
     the user has rotated their password."""
     user = seeded_admin["user"]
     with _email_patch():
-        await layered_client.post(
-            "/api/v1/auth/forgot-password", json={"identifier": user.email}
-        )
+        await layered_client.post("/api/v1/auth/forgot-password", json={"identifier": user.email})
         first_token = await _latest_token_for(test_db, user.id)
 
-        await layered_client.post(
-            "/api/v1/auth/forgot-password", json={"identifier": user.email}
-        )
+        await layered_client.post("/api/v1/auth/forgot-password", json={"identifier": user.email})
         second_token = await _latest_token_for(test_db, user.id)
 
     assert first_token.id != second_token.id

@@ -4,6 +4,7 @@ A fake adapter records every `send()` invocation so the test can
 assert the engine routed through it. The registry must dispatch by
 `conversation.channel`; resolving an unregistered channel raises.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -21,7 +22,6 @@ from src.app.core.conversations.adapters import (
 from src.app.core.conversations.models import (
     Conversation,
     ConversationChannel,
-    Message,
     MessageDirection,
 )
 from src.app.core.conversations.registry import (
@@ -99,9 +99,7 @@ def test_unregister_drops_factory():
 
 
 @pytest.mark.asyncio
-async def test_send_outbound_routes_through_registered_adapter(
-    test_db, seeded_admin
-):
+async def test_send_outbound_routes_through_registered_adapter(test_db, seeded_admin):
     """`send_outbound` resolves the adapter for `conversation.channel`,
     calls its `send()`, persists the outbound row, and bumps the
     conversation's `last_message_at`."""
@@ -137,9 +135,7 @@ async def test_send_outbound_routes_through_registered_adapter(
 
 
 @pytest.mark.asyncio
-async def test_send_outbound_unregistered_channel_raises(
-    test_db, seeded_admin
-):
+async def test_send_outbound_unregistered_channel_raises(test_db, seeded_admin):
     """Without a registered adapter for the conversation's channel,
     `send_outbound` propagates `ChannelNotRegistered`."""
     conv = Conversation(

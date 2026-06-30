@@ -6,12 +6,13 @@ the first stage of the `leads` pipeline (sorted by `display_order`).
 status on create or update because it's auto-synced with the stage's
 is_won/is_lost flags via the move-stage endpoint.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -21,10 +22,8 @@ from src.app.shared.schemas import (
     BulkDeleteResult,
     BulkReassign,
     BulkReassignResult,
-    ORMModel,
     TimestampedOrgScopedOut,
 )
-
 
 # Picklist for the lost-reason field. Pinned both here (Pydantic
 # rejection at the API edge) and in the `ck_leads_lost_reason_picklist`
@@ -39,33 +38,27 @@ LOST_REASONS: tuple[str, ...] = (
 )
 
 
-def _validate_lost_reason_pair(
-    lost_reason: str | None, lost_reason_other: str | None
-) -> None:
+def _validate_lost_reason_pair(lost_reason: str | None, lost_reason_other: str | None) -> None:
     """Shared validator: `lost_reason` must be in the picklist; when
     `lost_reason == 'other'`, the free-text `lost_reason_other` must
     be non-empty."""
     if lost_reason is not None and lost_reason not in LOST_REASONS:
-        raise ValueError(
-            f"lost_reason must be one of {LOST_REASONS}; got {lost_reason!r}"
-        )
+        raise ValueError(f"lost_reason must be one of {LOST_REASONS}; got {lost_reason!r}")
     if lost_reason == "other" and not (lost_reason_other and lost_reason_other.strip()):
-        raise ValueError(
-            "lost_reason_other is required when lost_reason='other'"
-        )
+        raise ValueError("lost_reason_other is required when lost_reason='other'")
 
 
 class LeadCreate(BaseModel):
     contact_id: uuid.UUID
-    pipeline_stage: Optional[str] = Field(default=None, max_length=64)
-    assigned_to_id: Optional[uuid.UUID] = None
-    budget: Optional[Decimal] = Field(default=None, ge=0)
-    expected_close_date: Optional[date] = None
+    pipeline_stage: str | None = Field(default=None, max_length=64)
+    assigned_to_id: uuid.UUID | None = None
+    budget: Decimal | None = Field(default=None, ge=0)
+    expected_close_date: date | None = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
     source: LeadSource = LeadSource.manual
     # Channel-supplied provenance (widget UTM, ad webhook ids, etc.).
     # Stays None for manual + bulk-import paths.
-    attribution: Optional[dict[str, Any]] = None
+    attribution: dict[str, Any] | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -80,18 +73,18 @@ class LeadUpdate(BaseModel):
     validators run regardless of how the row arrived at `lost`.
     """
 
-    contact_id: Optional[uuid.UUID] = None
-    assigned_to_id: Optional[uuid.UUID] = None
-    budget: Optional[Decimal] = Field(default=None, ge=0)
-    expected_close_date: Optional[date] = None
-    custom_data: Optional[dict[str, Any]] = None
-    lost_reason: Optional[str] = Field(default=None, max_length=32)
-    lost_reason_other: Optional[str] = Field(default=None, max_length=255)
+    contact_id: uuid.UUID | None = None
+    assigned_to_id: uuid.UUID | None = None
+    budget: Decimal | None = Field(default=None, ge=0)
+    expected_close_date: date | None = None
+    custom_data: dict[str, Any] | None = None
+    lost_reason: str | None = Field(default=None, max_length=32)
+    lost_reason_other: str | None = Field(default=None, max_length=255)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     @model_validator(mode="after")
-    def _check_lost_reason(self) -> "LeadUpdate":
+    def _check_lost_reason(self) -> LeadUpdate:
         _validate_lost_reason_pair(self.lost_reason, self.lost_reason_other)
         return self
 
@@ -103,37 +96,36 @@ class MoveStageRequest(BaseModel):
     """
 
     to_stage: str = Field(min_length=1, max_length=64)
-    lost_reason: Optional[str] = Field(default=None, max_length=32)
-    lost_reason_other: Optional[str] = Field(default=None, max_length=255)
+    lost_reason: str | None = Field(default=None, max_length=32)
+    lost_reason_other: str | None = Field(default=None, max_length=255)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     @model_validator(mode="after")
-    def _check_lost_reason(self) -> "MoveStageRequest":
+    def _check_lost_reason(self) -> MoveStageRequest:
         _validate_lost_reason_pair(self.lost_reason, self.lost_reason_other)
         return self
 
 
 class LeadOut(TimestampedOrgScopedOut):
-
     id: uuid.UUID
     contact_id: uuid.UUID
     pipeline_stage: str
     status: LeadStatus
     source: LeadSource
-    assigned_to_id: Optional[uuid.UUID]
-    budget: Optional[Decimal]
-    expected_close_date: Optional[date]
+    assigned_to_id: uuid.UUID | None
+    budget: Decimal | None
+    expected_close_date: date | None
     # Rule-engine output, ``[0, 100]``. Computed by
     # ``src.app.core.leads.scoring`` after every create / update that
     # touches a rule-relevant column. The hourly Celery sweep keeps the
     # value fresh when rules themselves change.
     lead_score: int = 0
     custom_data: dict[str, Any]
-    attribution: Optional[dict[str, Any]]
-    last_activity_at: Optional[datetime]
-    lost_reason: Optional[str]
-    lost_reason_other: Optional[str]
+    attribution: dict[str, Any] | None
+    last_activity_at: datetime | None
+    lost_reason: str | None
+    lost_reason_other: str | None
 
 
 class LeadListResponse(BaseModel):
@@ -150,10 +142,10 @@ class LeadListResponse(BaseModel):
     """
 
     items: list[LeadOut]
-    total: Optional[int] = None
+    total: int | None = None
     page: int = 1
     size: int = 50
-    next_cursor: Optional[str] = None
+    next_cursor: str | None = None
 
 
 # --- Reassign / bulk action request + response shapes -----------------------
@@ -199,16 +191,15 @@ class LeadScoringRuleUpdate(BaseModel):
     """Partial update. All fields optional; same validation as create
     applies whenever the field is supplied."""
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
-    condition: Optional[dict[str, Any]] = None
-    points: Optional[int] = Field(default=None, ge=-100, le=100)
-    active: Optional[bool] = None
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    condition: dict[str, Any] | None = None
+    points: int | None = Field(default=None, ge=-100, le=100)
+    active: bool | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class LeadScoringRuleOut(TimestampedOrgScopedOut):
-
     id: uuid.UUID
     name: str
     condition: dict[str, Any]

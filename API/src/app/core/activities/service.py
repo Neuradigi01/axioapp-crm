@@ -25,6 +25,7 @@ passes it explicitly because the context isn't populated yet);
 ``list_activities()`` runs through the ORM, which auto-applies the
 tenant filter.
 """
+
 from __future__ import annotations
 
 import logging
@@ -135,9 +136,7 @@ async def log(
             )
             await session.commit()
     except Exception:
-        logger.exception(
-            "activities.log failed (entity_type=%s, type=%s)", entity_type, type
-        )
+        logger.exception("activities.log failed (entity_type=%s, type=%s)", entity_type, type)
 
 
 async def record_in_session(

@@ -13,12 +13,7 @@ import { MSG_PASSWORD_RESET_SENT } from '@core/constants/messages.constants';
   selector: 'app-forgot-password',
   templateUrl: './forgot-password.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    ReactiveFormsModule,
-    RouterLink,
-    LucideAngularModule,
-    ValidationMessageComponent,
-  ],
+  imports: [ReactiveFormsModule, RouterLink, LucideAngularModule, ValidationMessageComponent],
 })
 export class ForgotPasswordComponent {
   private readonly fb = inject(FormBuilder);
@@ -49,7 +44,9 @@ export class ForgotPasswordComponent {
     } finally {
       this.isLoading.set(false);
       this.submitted.set(true);
-      this.snackBar.open(MSG_PASSWORD_RESET_SENT, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION_LONG });
+      this.snackBar.open(MSG_PASSWORD_RESET_SENT, SNACKBAR_ACTION, {
+        duration: SNACKBAR_DURATION_LONG,
+      });
     }
   }
 }

@@ -11,11 +11,11 @@ frontend route slug (`/user/templates`) is where the SPA list page
 mounts in Step 6. ``menu_position=250`` surfaces a sidebar entry for
 every role holding ``templates.read``.
 """
+
 from __future__ import annotations
 
 from src.app.core.module_registry import ModuleDescriptor
 from src.app.core.templates.permissions import ALL_KEYS
-
 
 MODULE = ModuleDescriptor(
     id="templates",

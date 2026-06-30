@@ -1,8 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 
 import { ProductsTabComponent } from './tabs/products.component';
 import { StockAlertsTabComponent } from './tabs/stock-alerts.component';

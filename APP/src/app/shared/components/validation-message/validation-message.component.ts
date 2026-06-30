@@ -1,7 +1,13 @@
 import { Component, input } from '@angular/core';
 import { AbstractControl } from '@angular/forms';
 
-const DEFAULT_MESSAGES: Record<string, string | ((err: any) => string)> = {
+interface ValidatorErrorDetail {
+  requiredLength?: number;
+  min?: number;
+  max?: number;
+}
+
+const DEFAULT_MESSAGES: Record<string, string | ((err: ValidatorErrorDetail) => string)> = {
   required: 'This field is required',
   email: 'Please enter a valid email',
   minlength: (err) => `Must be at least ${err.requiredLength} characters`,
@@ -42,9 +48,7 @@ export class ValidationMessageComponent {
 
       const defaultMsg = DEFAULT_MESSAGES[key];
       if (defaultMsg) {
-        return typeof defaultMsg === 'function'
-          ? defaultMsg(ctrl.errors![key])
-          : defaultMsg;
+        return typeof defaultMsg === 'function' ? defaultMsg(ctrl.errors![key]) : defaultMsg;
       }
 
       return 'Invalid value';

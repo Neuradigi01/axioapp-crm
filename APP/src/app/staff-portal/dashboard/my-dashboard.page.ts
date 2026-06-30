@@ -1,18 +1,9 @@
-﻿import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+﻿import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { InrPipe } from '../../features/user/core/shared/pipes/inr.pipe';
-import {
-  StaffPerformance,
-  StaffPortalApiService,
-} from '../staff-portal-api.service';
+import { StaffPerformance, StaffPortalApiService } from '../staff-portal-api.service';
 import { StaffSessionService } from '../staff-session.service';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -55,9 +46,7 @@ export class MyDashboardPageComponent {
         error: (err: HttpErrorResponse) => {
           this.perf.set(null);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load your dashboard.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load your dashboard.');
         },
       });
   }
@@ -67,5 +56,4 @@ export class MyDashboardPageComponent {
     if (v === null) return 0;
     return v > 100 ? 100 : v;
   }
-
 }

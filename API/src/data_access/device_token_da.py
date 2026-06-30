@@ -1,5 +1,6 @@
-from sqlalchemy import select, delete, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.models.device_token import DeviceToken
 
 
@@ -31,18 +32,12 @@ async def register_token(
 
 
 async def unregister_token(db: AsyncSession, fcm_token: str) -> bool:
-    stmt = (
-        update(DeviceToken)
-        .where(DeviceToken.fcm_token == fcm_token)
-        .values(is_active=False)
-    )
+    stmt = update(DeviceToken).where(DeviceToken.fcm_token == fcm_token).values(is_active=False)
     result = await db.execute(stmt)
     return result.rowcount > 0
 
 
-async def get_active_tokens_for_user(
-    db: AsyncSession, member_id: int, user_type: str
-) -> list[str]:
+async def get_active_tokens_for_user(db: AsyncSession, member_id: int, user_type: str) -> list[str]:
     stmt = select(DeviceToken.fcm_token).where(
         DeviceToken.member_id == member_id,
         DeviceToken.user_type == user_type,

@@ -1,10 +1,10 @@
 """Pydantic models for the pack catalog endpoint."""
+
 from __future__ import annotations
 
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 PackStatus = Literal["available", "coming_soon"]
 

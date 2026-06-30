@@ -26,17 +26,13 @@ export class BillingApiService {
   private readonly http = inject(HttpClient);
 
   getCurrent(): Observable<SubscriptionCurrent> {
-    return this.http.get<SubscriptionCurrent>(
-      `${environment.apiBaseUrl}/subscriptions/current`,
-    );
+    return this.http.get<SubscriptionCurrent>(`${environment.apiBaseUrl}/subscriptions/current`);
   }
 
   /** Step 13.c — Stripe-mirrored invoice list, newest first. Empty
    *  array during trial (no Stripe activity yet). */
   listInvoices(): Observable<Invoice[]> {
-    return this.http.get<Invoice[]>(
-      `${environment.apiBaseUrl}/subscriptions/invoices`,
-    );
+    return this.http.get<Invoice[]>(`${environment.apiBaseUrl}/subscriptions/invoices`);
   }
 
   /** Step 14 — public plan catalogue. Used by the upgrade modal
@@ -44,17 +40,13 @@ export class BillingApiService {
    *  server side; the auth interceptor still attaches the JWT but
    *  the endpoint ignores it. */
   getPlans(): Observable<PlansResponse> {
-    return this.http.get<PlansResponse>(
-      `${environment.apiBaseUrl}/plans`,
-    );
+    return this.http.get<PlansResponse>(`${environment.apiBaseUrl}/plans`);
   }
 
   /** Step 12 — request a Stripe Checkout Session for an upgrade.
    *  Returns the hosted URL the frontend redirects into via
    *  `window.location.href`. */
-  createCheckoutSession(
-    payload: CheckoutRequest,
-  ): Observable<CheckoutResponse> {
+  createCheckoutSession(payload: CheckoutRequest): Observable<CheckoutResponse> {
     return this.http.post<CheckoutResponse>(
       `${environment.apiBaseUrl}/subscriptions/checkout`,
       payload,
@@ -65,18 +57,16 @@ export class BillingApiService {
    *  committing. The seat-management modal calls this on every
    *  +/− click so the displayed estimate stays in sync. */
   previewSeats(totalSeats: number): Observable<SeatPreview> {
-    return this.http.get<SeatPreview>(
-      `${environment.apiBaseUrl}/subscriptions/seats/preview`,
-      { params: { total_seats: totalSeats } },
-    );
+    return this.http.get<SeatPreview>(`${environment.apiBaseUrl}/subscriptions/seats/preview`, {
+      params: { total_seats: totalSeats },
+    });
   }
 
   /** Step 9 — apply or schedule a seat change. The response shape is
    *  a discriminated union; the modal switches on `outcome`. */
   changeSeats(totalSeats: number): Observable<SeatChangeResponse> {
-    return this.http.post<SeatChangeResponse>(
-      `${environment.apiBaseUrl}/subscriptions/seats`,
-      { total_seats: totalSeats },
-    );
+    return this.http.post<SeatChangeResponse>(`${environment.apiBaseUrl}/subscriptions/seats`, {
+      total_seats: totalSeats,
+    });
   }
 }

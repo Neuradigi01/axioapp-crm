@@ -21,10 +21,10 @@ Permissions:
                             integration admin only; junior sales does
                             not get submit by default)
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,7 +42,6 @@ from src.app.core.integrations.whatsapp.schemas import (
     WhatsAppTemplateUpsert,
 )
 from src.app.core.integrations.whatsapp.templates_analytics import (
-    RangeKey,
     get_template_performance,
 )
 from src.app.core.integrations.whatsapp.templates_service import (
@@ -56,7 +55,6 @@ from src.app.core.integrations.whatsapp.templates_service import (
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(
     prefix="/whatsapp/templates/manage",
@@ -75,8 +73,7 @@ def _require_app_credentials() -> tuple[str, str]:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
-                "Server is missing Meta App credentials — "
-                "set META_APP_ID and WHATSAPP_APP_SECRET."
+                "Server is missing Meta App credentials — set META_APP_ID and WHATSAPP_APP_SECRET."
             ),
         )
     return META_APP_ID, WHATSAPP_APP_SECRET
@@ -84,26 +81,24 @@ def _require_app_credentials() -> tuple[str, str]:
 
 @router.get("", response_model=list[WhatsAppTemplateRead])
 async def list_managed_endpoint(
-    submission_status: Optional[str] = Query(default=None, max_length=32),
-    category: Optional[str] = Query(default=None, max_length=32),
-    language: Optional[str] = Query(default=None, max_length=16),
+    submission_status: str | None = Query(default=None, max_length=32),
+    category: str | None = Query(default=None, max_length=32),
+    language: str | None = Query(default=None, max_length=16),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("whatsapp.templates.read")),
 ) -> list[WhatsAppTemplateRead]:
     """Management list — includes drafts. The campaign picker keeps
     using the legacy `/templates` (`campaigns.read`-gated, approved-
     only) endpoint."""
-    sub_status: Optional[WhatsAppTemplateSubmissionStatus] = None
+    sub_status: WhatsAppTemplateSubmissionStatus | None = None
     if submission_status:
         try:
             sub_status = WhatsAppTemplateSubmissionStatus(submission_status)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    f"Unknown submission_status '{submission_status}'."
-                ),
-            )
+                detail=(f"Unknown submission_status '{submission_status}'."),
+            ) from None
     rows = await list_templates_managed(
         db,
         submission_status=sub_status,
@@ -124,13 +119,9 @@ async def create_endpoint(
     user: User = Depends(require_permissions("whatsapp.templates.write")),
 ) -> WhatsAppTemplateRead:
     try:
-        row = await create_draft(
-            db, actor_id=user.legacy_uuid, payload=payload
-        )
+        row = await create_draft(db, actor_id=user.legacy_uuid, payload=payload)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return WhatsAppTemplateRead.model_validate(row)
 
 
@@ -166,9 +157,7 @@ async def delete_endpoint(
             app_secret=app_secret,
         )
     except WhatsAppNotConnected as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -191,9 +180,7 @@ async def submit_endpoint(
             app_secret=app_secret,
         )
     except WhatsAppNotConnected as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return WhatsAppTemplateSubmissionOut(
         id=row.id,
         submission_status=row.submission_status.value,
@@ -212,9 +199,7 @@ async def duplicate_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("whatsapp.templates.write")),
 ) -> WhatsAppTemplateRead:
-    row = await duplicate_template(
-        db, actor_id=user.legacy_uuid, template_id=template_id
-    )
+    row = await duplicate_template(db, actor_id=user.legacy_uuid, template_id=template_id)
     return WhatsAppTemplateRead.model_validate(row)
 
 
@@ -243,7 +228,9 @@ async def performance_endpoint(
     # cross-tenant case (returns no row → 404).
     await get_template_or_404(db, template_id)
     result = await get_template_performance(
-        db, template_id=template_id, range_key=range  # type: ignore[arg-type]
+        db,
+        template_id=template_id,
+        range_key=range,  # type: ignore[arg-type]
     )
     return WhatsAppTemplatePerformanceOut(
         template_id=result.template_id,

@@ -20,10 +20,10 @@ Operations:
   * Session insert
       insert_staff_session
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.engine import Row
@@ -34,9 +34,7 @@ from src.app.core.staff_portal.models import StaffSession
 from src.app.core.users.models import OrganizationMember, User, UserInfo
 
 
-async def list_active_staff_for_picker(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> list[Row]:
+async def list_active_staff_for_picker(session: AsyncSession, *, org_id: uuid.UUID) -> list[Row]:
     """Active staff for the login picker. Joins:
 
       User ⋈ UserInfo ⋈ OrganizationMember ⋈ StaffProfile
@@ -71,7 +69,7 @@ async def get_active_member_user_for_org(
     *,
     user_id: uuid.UUID,
     org_id: uuid.UUID,
-) -> Optional[User]:
+) -> User | None:
     """Verify the user belongs to ``org_id`` via an active
     ``tbl_organization_members`` row. Returns the User if so,
     ``None`` otherwise (service surfaces 401 either way to avoid
@@ -92,20 +90,16 @@ async def get_active_member_user_for_org(
 
 async def get_staff_profile_by_user_id(
     session: AsyncSession, user_id: uuid.UUID
-) -> Optional[StaffProfile]:
+) -> StaffProfile | None:
     """Single-row staff profile read keyed by ``user_id``. Service
     inspects ``employment_status`` to decide whether the login is
     valid."""
     return (
-        await session.execute(
-            select(StaffProfile).where(StaffProfile.user_id == user_id)
-        )
+        await session.execute(select(StaffProfile).where(StaffProfile.user_id == user_id))
     ).scalar_one_or_none()
 
 
-def insert_staff_session(
-    session: AsyncSession, staff_session: StaffSession
-) -> None:
+def insert_staff_session(session: AsyncSession, staff_session: StaffSession) -> None:
     """Register an already-constructed StaffSession for INSERT."""
     session.add(staff_session)
 

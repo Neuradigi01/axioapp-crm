@@ -11,11 +11,12 @@ require a migration). `is_dynamic=false` rows MUST have rows in
 `contact_group_members` instead; an empty static group is legal
 but useless (resolves to zero contacts).
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -37,19 +38,13 @@ class ContactGroup(Base, TenantScoped):
         server_default=text("gen_random_uuid()"),
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    is_dynamic: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_dynamic: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     # Shape matches `AudienceFilter` from `core.campaigns.schemas` —
     # the Step 3.5.9 audience builder uses the same JSON. Dynamic
     # groups always have this set; static groups always leave it NULL.
-    filter_json: Mapped[Optional[dict[str, Any]]] = mapped_column(
-        JSONB, nullable=True
-    )
-    created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    filter_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

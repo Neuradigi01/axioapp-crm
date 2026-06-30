@@ -8,17 +8,23 @@ Two duplicate-by-shape patterns in the codebase: by id (the canonical
 "do we already know this number?" check + conversation routing's
 inbound-message-to-contact resolver).
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from sqlalchemy import (
     and_,
-    delete as sa_delete,
     func,
     or_,
     select,
+)
+from sqlalchemy import (
+    delete as sa_delete,
+)
+from sqlalchemy import (
     update as sa_update,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,9 +34,7 @@ from src.app.core.contacts.models import Contact
 from src.app.core.users.models import OrganizationMember, User
 
 
-async def get_contact(
-    session: AsyncSession, contact_id: uuid.UUID
-) -> Contact | None:
+async def get_contact(session: AsyncSession, contact_id: uuid.UUID) -> Contact | None:
     """Resolve a contact by its UUID PK.
 
     Tenant scoping is applied automatically by the `do_orm_execute`
@@ -39,15 +43,11 @@ async def get_contact(
     outside a tenant context (Celery, scripts) must set
     `RequestContext.org_id` first.
     """
-    result = await session.execute(
-        select(Contact).where(Contact.id == contact_id)
-    )
+    result = await session.execute(select(Contact).where(Contact.id == contact_id))
     return result.scalar_one_or_none()
 
 
-async def get_contact_by_phone(
-    session: AsyncSession, phone: str
-) -> Contact | None:
+async def get_contact_by_phone(session: AsyncSession, phone: str) -> Contact | None:
     """Resolve a contact by phone number.
 
     Used by walk-in reception (existing-customer detection) and by
@@ -56,9 +56,7 @@ async def get_contact_by_phone(
     can share a number across orgs (different tenants). The tenant
     auto-filter narrows the result to the active org.
     """
-    result = await session.execute(
-        select(Contact).where(Contact.phone == phone)
-    )
+    result = await session.execute(select(Contact).where(Contact.phone == phone))
     return result.scalar_one_or_none()
 
 
@@ -70,9 +68,7 @@ def insert_contact(session: AsyncSession, contact: Contact) -> None:
     session.add(contact)
 
 
-async def delete_contact_row(
-    session: AsyncSession, contact: Contact
-) -> None:
+async def delete_contact_row(session: AsyncSession, contact: Contact) -> None:
     """Hard-delete one Contact row."""
     await session.delete(contact)
 
@@ -141,9 +137,7 @@ def build_contact_list_query(
 
     if sort == "last_activity_at":
         primary = (
-            sort_column.asc().nulls_last()
-            if order == "asc"
-            else sort_column.desc().nulls_last()
+            sort_column.asc().nulls_last() if order == "asc" else sort_column.desc().nulls_last()
         )
     else:
         primary = sort_column.asc() if order == "asc" else sort_column.desc()
@@ -219,9 +213,7 @@ async def find_duplicate_candidates(
     or_filters: list[ColumnElement[bool]] = []
     if phone_suffix:
         or_filters.append(
-            func.regexp_replace(Contact.phone, r"\D", "", "g").like(
-                f"%{phone_suffix}"
-            )
+            func.regexp_replace(Contact.phone, r"\D", "", "g").like(f"%{phone_suffix}")
         )
     if email_lower:
         or_filters.append(func.lower(Contact.email) == email_lower)
@@ -314,9 +306,7 @@ async def list_contacts_for_export(
         assigned_to_id=assigned_to_id,
         custom_filters=custom_filters,
     )
-    stmt = select(Contact).order_by(
-        Contact.created_at.desc(), Contact.id.desc()
-    )
+    stmt = select(Contact).order_by(Contact.created_at.desc(), Contact.id.desc())
     if filters:
         stmt = stmt.where(and_(*filters))
     rows = (await session.execute(stmt)).scalars().all()

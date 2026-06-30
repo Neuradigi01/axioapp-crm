@@ -1,8 +1,4 @@
-import {
-  HttpErrorResponse,
-  HttpInterceptorFn,
-  HttpRequest,
-} from '@angular/common/http';
+import { HttpErrorResponse, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { Observable, of, throwError, timer } from 'rxjs';
 import { mergeMap, retry } from 'rxjs/operators';
 
@@ -75,8 +71,7 @@ export const retryInterceptor: HttpInterceptorFn = (req, next) => {
         if (Date.now() - startedAt > TOTAL_BUDGET_MS) {
           return throwError(() => err);
         }
-        const backoff =
-          BACKOFF_MS[retryCount - 1] ?? BACKOFF_MS[BACKOFF_MS.length - 1];
+        const backoff = BACKOFF_MS[retryCount - 1] ?? BACKOFF_MS[BACKOFF_MS.length - 1];
         return waitForOnline().pipe(mergeMap(() => timer(backoff)));
       },
     }),

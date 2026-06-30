@@ -20,6 +20,7 @@ Why a stub at all?
 * Push notifications never had external template approval. The
   template's :attr:`external_status` stays ``n_a`` always.
 """
+
 from __future__ import annotations
 
 import uuid

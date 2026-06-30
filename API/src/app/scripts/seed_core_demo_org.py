@@ -23,6 +23,7 @@ use fixed UUIDs + `ON CONFLICT DO NOTHING`.
 Usage:
     docker exec template_api-api-1 python -m src.app.scripts.seed_core_demo_org
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -40,7 +41,6 @@ from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 from src.app.shared.security.password import hash_password
-
 
 # Fixed UUIDs keep re-runs idempotent.
 CORE_DEMO_ORG_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
@@ -79,54 +79,86 @@ CORE_DEMO_ORG = {
 
 
 _ADMIN_KEYS: list[str] = [
-    "users.read", "users.write",
-    "roles.read", "roles.write",
+    "users.read",
+    "users.write",
+    "roles.read",
+    "roles.write",
     "audit.read",
-    "custom_fields.read", "custom_fields.write",
-    "settings.read", "settings.write",
+    "custom_fields.read",
+    "custom_fields.write",
+    "settings.read",
+    "settings.write",
     "settings.integrations.embed.manage",
-    "contacts.read", "contacts.write",
-    "leads.read", "leads.write", "leads.import",
-    "appointments.read", "appointments.write",
+    "contacts.read",
+    "contacts.write",
+    "leads.read",
+    "leads.write",
+    "leads.import",
+    "appointments.read",
+    "appointments.write",
     # Walk-ins: sidebar gates on `walkins.*` (module descriptor), but the
     # furniture pack.yaml emits `walk_ins.*` keys too. Grant both so this
     # role works against either lookup path.
-    "walkins.read", "walkins.write",
-    "walk_ins.read", "walk_ins.write",
-    "catalog.read", "catalog.write",
-    "conversations.read", "conversations.write",
-    "calls.read", "calls.write", "calls.outcomes.manage",
-    "reviews.read", "reviews.write",
-    "campaigns.read", "campaigns.write", "campaigns.send",
-    "tasks.read", "tasks.write",
+    "walkins.read",
+    "walkins.write",
+    "walk_ins.read",
+    "walk_ins.write",
+    "catalog.read",
+    "catalog.write",
+    "conversations.read",
+    "conversations.write",
+    "calls.read",
+    "calls.write",
+    "calls.outcomes.manage",
+    "reviews.read",
+    "reviews.write",
+    "campaigns.read",
+    "campaigns.write",
+    "campaigns.send",
+    "tasks.read",
+    "tasks.write",
     # Pipelines: descriptor declares `pipelines.manage` (not `.write`),
     # which is the sidebar gate. Grant both forms.
-    "pipelines.read", "pipelines.manage", "pipelines.write",
-    "activities.read", "activities.write",
-    "staff.read", "staff.write",
+    "pipelines.read",
+    "pipelines.manage",
+    "pipelines.write",
+    "activities.read",
+    "activities.write",
+    "staff.read",
+    "staff.write",
     "attendance.write",
-    "billing.read", "billing.write", "billing.refund",
+    "billing.read",
+    "billing.write",
+    "billing.refund",
 ]
 
 # Owner = Admin minus team / role config writes and refunds.
 _OWNER_KEYS: list[str] = [
-    k for k in _ADMIN_KEYS
-    if k not in {"users.write", "roles.write", "billing.refund"}
+    k for k in _ADMIN_KEYS if k not in {"users.write", "roles.write", "billing.refund"}
 ]
 
 # Employee = day-to-day workers. No settings, no team management, no
 # billing write, no refunds.
 _EMPLOYEE_KEYS: list[str] = [
-    "contacts.read", "contacts.write",
-    "leads.read", "leads.write",
-    "activities.read", "activities.write",
-    "tasks.read", "tasks.write",
-    "appointments.read", "appointments.write",
-    "walkins.read", "walkins.write",
-    "walk_ins.read", "walk_ins.write",
+    "contacts.read",
+    "contacts.write",
+    "leads.read",
+    "leads.write",
+    "activities.read",
+    "activities.write",
+    "tasks.read",
+    "tasks.write",
+    "appointments.read",
+    "appointments.write",
+    "walkins.read",
+    "walkins.write",
+    "walk_ins.read",
+    "walk_ins.write",
     "catalog.read",
-    "conversations.read", "conversations.write",
-    "calls.read", "calls.write",
+    "conversations.read",
+    "conversations.write",
+    "calls.read",
+    "calls.write",
     "billing.read",
     "pipelines.read",
 ]
@@ -140,9 +172,30 @@ _ROLES: list[tuple[uuid.UUID, str, list[str]]] = [
 
 
 _USERS: list[tuple[uuid.UUID, str, str, str, uuid.UUID, str]] = [
-    (ADMIN_USER_ID,    "admin@core-demo.local",    "Admin@123",    "Core Demo Admin",    ADMIN_ROLE_ID,    "Core CRM — Admin"),
-    (OWNER_USER_ID,    "owner@core-demo.local",    "Owner@123",    "Core Demo Owner",    OWNER_ROLE_ID,    "Core CRM — Owner"),
-    (EMPLOYEE_USER_ID, "employee@core-demo.local", "Employee@123", "Core Demo Employee", EMPLOYEE_ROLE_ID, "Core CRM — Employee"),
+    (
+        ADMIN_USER_ID,
+        "admin@core-demo.local",
+        "Admin@123",
+        "Core Demo Admin",
+        ADMIN_ROLE_ID,
+        "Core CRM — Admin",
+    ),
+    (
+        OWNER_USER_ID,
+        "owner@core-demo.local",
+        "Owner@123",
+        "Core Demo Owner",
+        OWNER_ROLE_ID,
+        "Core CRM — Owner",
+    ),
+    (
+        EMPLOYEE_USER_ID,
+        "employee@core-demo.local",
+        "Employee@123",
+        "Core Demo Employee",
+        EMPLOYEE_ROLE_ID,
+        "Core CRM — Employee",
+    ),
 ]
 
 
@@ -161,15 +214,17 @@ async def seed_core_demo_org() -> None:
             # 2) Roles.
             await session.execute(
                 pg_insert(Role)
-                .values([
-                    {
-                        "id": role_id,
-                        "org_id": CORE_DEMO_ORG_ID,
-                        "name": name,
-                        "is_system": True,
-                    }
-                    for (role_id, name, _) in _ROLES
-                ])
+                .values(
+                    [
+                        {
+                            "id": role_id,
+                            "org_id": CORE_DEMO_ORG_ID,
+                            "name": name,
+                            "is_system": True,
+                        }
+                        for (role_id, name, _) in _ROLES
+                    ]
+                )
                 .on_conflict_do_nothing(index_elements=["id"])
             )
 
@@ -177,9 +232,7 @@ async def seed_core_demo_org() -> None:
             all_keys = sorted({k for (_, _, keys) in _ROLES for k in keys})
             rows = (
                 await session.execute(
-                    select(Permission.id, Permission.key).where(
-                        Permission.key.in_(all_keys)
-                    )
+                    select(Permission.id, Permission.key).where(Permission.key.in_(all_keys))
                 )
             ).all()
             id_by_key: dict[str, uuid.UUID] = {r.key: r.id for r in rows}
@@ -187,23 +240,18 @@ async def seed_core_demo_org() -> None:
             missing = sorted(set(all_keys) - set(id_by_key))
             if missing:
                 raise RuntimeError(
-                    "Missing permission keys (registry not populated?): "
-                    + ", ".join(missing)
+                    "Missing permission keys (registry not populated?): " + ", ".join(missing)
                 )
 
             # 4) Role permissions.
             role_perm_rows: list[dict[str, uuid.UUID]] = []
-            for (role_id, _, keys) in _ROLES:
+            for role_id, _, keys in _ROLES:
                 for k in keys:
-                    role_perm_rows.append(
-                        {"role_id": role_id, "permission_id": id_by_key[k]}
-                    )
+                    role_perm_rows.append({"role_id": role_id, "permission_id": id_by_key[k]})
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_perm_rows)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
 
             # 5) Users — three-table split (DR.7+). Each user is split
@@ -214,16 +262,18 @@ async def seed_core_demo_org() -> None:
             # 5a) Auth rows.
             await session.execute(
                 pg_insert(User)
-                .values([
-                    {
-                        "legacy_uuid": user_id,
-                        "user_id": "usr_" + user_id.hex,
-                        "password": hash_password(password),
-                        "is_active": True,
-                        "two_factor_enabled": False,
-                    }
-                    for (user_id, _email, password, _fn, _rid, _l) in _USERS
-                ])
+                .values(
+                    [
+                        {
+                            "legacy_uuid": user_id,
+                            "user_id": "usr_" + user_id.hex,
+                            "password": hash_password(password),
+                            "is_active": True,
+                            "two_factor_enabled": False,
+                        }
+                        for (user_id, _email, password, _fn, _rid, _l) in _USERS
+                    ]
+                )
                 .on_conflict_do_nothing(
                     index_elements=["legacy_uuid"],
                     index_where=text("legacy_uuid IS NOT NULL"),
@@ -244,7 +294,7 @@ async def seed_core_demo_org() -> None:
 
             # 5c) Profile rows. Split full_name on first whitespace.
             profile_rows: list[dict] = []
-            for (user_id, email, _pwd, full_name, _rid, _l) in _USERS:
+            for user_id, email, _pwd, full_name, _rid, _l in _USERS:
                 first, _, last = (full_name or "").strip().partition(" ")
                 profile_rows.append(
                     {
@@ -265,7 +315,7 @@ async def seed_core_demo_org() -> None:
 
             # 5d) Org-membership rows: role + is_demo + active flag.
             membership_rows: list[dict] = []
-            for (user_id, _e, _p, _fn, role_id, _l) in _USERS:
+            for user_id, _e, _p, _fn, role_id, _l in _USERS:
                 membership_rows.append(
                     {
                         "organization_id": CORE_DEMO_ORG_ID,
@@ -279,35 +329,29 @@ async def seed_core_demo_org() -> None:
             await session.execute(
                 pg_insert(OrganizationMember)
                 .values(membership_rows)
-                .on_conflict_do_nothing(
-                    index_elements=["organization_id", "user_member_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["organization_id", "user_member_id"])
             )
             # Flip is_demo on memberships pre-existing from an earlier seed.
             await session.execute(
                 OrganizationMember.__table__.update()
-                .where(
-                    OrganizationMember.user_member_id.in_(
-                        list(id_by_uuid.values())
-                    )
-                )
-                .where(
-                    OrganizationMember.organization_id == CORE_DEMO_ORG_ID
-                )
+                .where(OrganizationMember.user_member_id.in_(list(id_by_uuid.values())))
+                .where(OrganizationMember.organization_id == CORE_DEMO_ORG_ID)
                 .values(is_demo=True)
             )
 
             # 6) Demo credential rows backing /api/v1/_dev/demo-logins.
             await session.execute(
                 pg_insert(DemoCredential)
-                .values([
-                    {
-                        "user_id": user_id,
-                        "plain_password": password,
-                        "label": label,
-                    }
-                    for (user_id, _, password, _, _, label) in _USERS
-                ])
+                .values(
+                    [
+                        {
+                            "user_id": user_id,
+                            "plain_password": password,
+                            "label": label,
+                        }
+                        for (user_id, _, password, _, _, label) in _USERS
+                    ]
+                )
                 .on_conflict_do_nothing(index_elements=["user_id"])
             )
 
@@ -321,10 +365,10 @@ async def seed_core_demo_org() -> None:
     print()
     print(f"Org:    {CORE_DEMO_ORG_ID}  slug='core-demo'  template_id='base'")
     print("Roles:")
-    for (role_id, name, keys) in _ROLES:
+    for role_id, name, keys in _ROLES:
         print(f"  {name:10s} {role_id}  perms={len(keys)}")
     print("Users:")
-    for (user_id, email, password, _, _, _) in _USERS:
+    for user_id, email, password, _, _, _ in _USERS:
         print(f"  {email:30s} {password}  id={user_id}")
     print()
     print("Done. Login via /accounts/login with org_slug='core-demo'.")

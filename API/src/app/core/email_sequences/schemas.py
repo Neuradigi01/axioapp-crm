@@ -10,16 +10,15 @@ Two halves:
   * **Enrollments** — `EnrollmentRequest` (bulk), `EnrollmentResult`
     (per-id success/skip), `EnrollmentRead` (single row projection).
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.shared.schemas import ORMModel
-
 
 # --- Steps ----------------------------------------------------------------
 
@@ -73,11 +72,9 @@ class EmailSequenceUpdate(BaseModel):
     sequence's step list entirely. Omit to keep existing steps.
     """
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    is_active: Optional[bool] = None
-    steps: Optional[list[EmailSequenceStepCreate]] = Field(
-        default=None, min_length=1, max_length=50
-    )
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    is_active: bool | None = None
+    steps: list[EmailSequenceStepCreate] | None = Field(default=None, min_length=1, max_length=50)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -116,9 +113,7 @@ class EnrollmentRequest(BaseModel):
     """
 
     contact_ids: list[uuid.UUID] = Field(min_length=1, max_length=1000)
-    lead_ids: Optional[list[uuid.UUID]] = Field(
-        default=None, max_length=1000
-    )
+    lead_ids: list[uuid.UUID] | None = Field(default=None, max_length=1000)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -131,9 +126,9 @@ class EnrollmentResultRow(BaseModel):
     """
 
     contact_id: uuid.UUID
-    enrollment_id: Optional[uuid.UUID] = None
+    enrollment_id: uuid.UUID | None = None
     enrolled: bool
-    skip_reason: Optional[str] = None
+    skip_reason: str | None = None
 
 
 class EnrollmentResponse(BaseModel):
@@ -151,7 +146,7 @@ class EnrollmentRead(ORMModel):
     org_id: uuid.UUID
     sequence_id: uuid.UUID
     contact_id: uuid.UUID
-    lead_id: Optional[uuid.UUID]
+    lead_id: uuid.UUID | None
     enrolled_by: uuid.UUID
     enrolled_at: datetime
     state: str

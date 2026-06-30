@@ -11,15 +11,14 @@ Four concerns:
 3. Measurements — append-only per order.
 4. Photos — uploaded via `StorageBackend`; URL persisted here.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.shared.audit import log_entity_change
 from src.app.core.pipelines.service import move_card as pipeline_move_card
 from src.app.packs.furniture.modules.custom_orders import data_access as _da
 from src.app.packs.furniture.modules.custom_orders.models import (
@@ -33,9 +32,9 @@ from src.app.packs.furniture.modules.custom_orders.schemas import (
     CustomOrderUpdate,
     MeasurementCreate,
 )
+from src.app.shared.audit import log_entity_change
 from src.app.shared.db.queries import ensure_found
 from src.app.shared.storage import get_storage
-
 
 _PIPELINE_KEY = "custom_orders"
 _CARD_TABLE = "fp_custom_orders"
@@ -48,9 +47,9 @@ _INITIAL_STAGE = "measurement_scheduled"
 async def list_orders(
     session: AsyncSession,
     *,
-    stage: Optional[str] = None,
-    assigned_to_id: Optional[uuid.UUID] = None,
-    contact_id: Optional[uuid.UUID] = None,
+    stage: str | None = None,
+    assigned_to_id: uuid.UUID | None = None,
+    contact_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[CustomOrder], int]:
@@ -64,12 +63,8 @@ async def list_orders(
     )
 
 
-async def get_order(
-    session: AsyncSession, order_id: uuid.UUID
-) -> CustomOrder:
-    return ensure_found(
-        await _da.get_order_by_id(session, order_id), entity="custom order"
-    )
+async def get_order(session: AsyncSession, order_id: uuid.UUID) -> CustomOrder:
+    return ensure_found(await _da.get_order_by_id(session, order_id), entity="custom order")
 
 
 # --- writes ---------------------------------------------------------------
@@ -135,9 +130,18 @@ async def update_order(
     order = await get_order(session, order_id)
     changed = False
     for field in (
-        "contact_id", "lead_id", "title", "requirement", "materials",
-        "color", "finish", "assigned_to_id", "expected_delivery_date",
-        "total_amount", "advance_paid", "custom_data",
+        "contact_id",
+        "lead_id",
+        "title",
+        "requirement",
+        "materials",
+        "color",
+        "finish",
+        "assigned_to_id",
+        "expected_delivery_date",
+        "total_amount",
+        "advance_paid",
+        "custom_data",
     ):
         value = getattr(payload, field)
         if value is not None:
@@ -149,9 +153,7 @@ async def update_order(
     return order
 
 
-async def delete_order(
-    session: AsyncSession, *, order_id: uuid.UUID
-) -> None:
+async def delete_order(session: AsyncSession, *, order_id: uuid.UUID) -> None:
     order = await get_order(session, order_id)
     await _da.delete_order_row(session, order)
     await session.commit()
@@ -166,7 +168,7 @@ async def move_stage(
     order_id: uuid.UUID,
     user_id: uuid.UUID,
     to_stage: str,
-    notes: Optional[str] = None,
+    notes: str | None = None,
 ) -> CustomOrder:
     """Reuse the core pipeline engine for the transition + the per-order
     stage history append."""
@@ -238,9 +240,7 @@ async def add_measurement(
 # --- photos --------------------------------------------------------------
 
 
-async def list_photos(
-    session: AsyncSession, *, order_id: uuid.UUID
-) -> list[CustomOrderPhoto]:
+async def list_photos(session: AsyncSession, *, order_id: uuid.UUID) -> list[CustomOrderPhoto]:
     return await _da.list_photos_for_order(session, order_id)
 
 
@@ -251,14 +251,12 @@ async def add_photo(
     data: bytes,
     content_type: str,
     file_extension: str,
-    caption: Optional[str] = None,
+    caption: str | None = None,
 ) -> CustomOrderPhoto:
     """Persist the binary via `StorageBackend`, then write the row."""
     order = await get_order(session, order_id)
     photo_id = uuid.uuid4()
-    storage_path = (
-        f"{order.org_id}/custom_orders/{order.id}/photo-{photo_id}.{file_extension}"
-    )
+    storage_path = f"{order.org_id}/custom_orders/{order.id}/photo-{photo_id}.{file_extension}"
     ref = get_storage().put(storage_path, data, content_type=content_type)
 
     photo = CustomOrderPhoto(
@@ -267,7 +265,7 @@ async def add_photo(
         order_id=order.id,
         url=ref.url,
         caption=caption,
-        taken_at=datetime.now(timezone.utc),
+        taken_at=datetime.now(UTC),
     )
     _da.insert_photo(session, photo)
     await session.commit()

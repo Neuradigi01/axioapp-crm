@@ -21,7 +21,6 @@ import {
   WorkflowsApiService,
 } from '../workflows-api.service';
 
-
 /**
  * Right-side drawer listing the workflow's version history (newest
  * first). Each row shows version number / change note / created-by
@@ -33,7 +32,6 @@ import {
  * refresh the canvas state on success). This component just lists
  * versions and emits intents.
  */
-
 
 @Component({
   selector: 'app-version-history-drawer',
@@ -83,9 +81,7 @@ export class VersionHistoryDrawerComponent {
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
-          this.error.set(
-            extractApiError(err) ?? 'Could not load version history.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load version history.');
           this.loading.set(false);
         },
       });
@@ -104,9 +100,7 @@ export class VersionHistoryDrawerComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.fetchingDetail.set(null);
-          this.error.set(
-            extractApiError(err) ?? 'Could not load version graph.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load version graph.');
         },
       });
   }
@@ -116,10 +110,7 @@ export class VersionHistoryDrawerComponent {
       `Restore version ${version}? A new version will be written that mirrors v${version}'s graph; nothing is lost.`,
     );
     if (!proceed) return;
-    const note = prompt(
-      'Change note (optional)',
-      `Rolled back to v${version}`,
-    );
+    const note = prompt('Change note (optional)', `Rolled back to v${version}`);
     if (note === null) return;
     this.restoreVersion.emit({
       version,

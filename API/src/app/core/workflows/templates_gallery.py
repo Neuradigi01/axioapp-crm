@@ -24,6 +24,7 @@ Furniture / pack-shipped workflows (Layer 2) will register additional
 gallery entries via ``pack.yaml`` — :func:`list_gallery` returns the
 merged list. For Step 16 only the core 15 are present.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -39,7 +40,6 @@ from src.app.core.workflows.schemas import (
     WorkflowCreate,
     WorkflowGraph,
 )
-
 
 # Categories the frontend tabs render. Keep stable string keys; the
 # UI maps them to display labels + Lucide icons.
@@ -572,9 +572,7 @@ async def clone_from_gallery(
         )
 
 
-async def _existing_names_in_org(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> set[str]:
+async def _existing_names_in_org(session: AsyncSession, *, org_id: uuid.UUID) -> set[str]:
     """Cached single-shot lookup of every workflow name in the org —
     avoids N+1 retries when auto-uniqifying."""
     from src.app.core.workflows import data_access as _da

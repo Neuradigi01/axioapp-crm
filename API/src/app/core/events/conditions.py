@@ -40,12 +40,12 @@ Compound shape:
 Empty ``{}`` returns True — the "always match" default for fresh
 triggers + the seeded workflows.
 """
+
 from __future__ import annotations
 
 import logging
 import re
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -113,9 +113,7 @@ def _eval_leaf(node: dict[str, Any], context: Any) -> bool:
     op = node.get("op")
     path = node.get("path")
     if not isinstance(op, str) or not isinstance(path, str) or not path:
-        raise InvalidCondition(
-            "leaf node missing 'op' or 'path' (both required strings)"
-        )
+        raise InvalidCondition("leaf node missing 'op' or 'path' (both required strings)")
     if op not in SUPPORTED_OPS:
         raise InvalidCondition(f"unsupported op '{op}'")
 
@@ -209,9 +207,7 @@ def evaluate(node: Any, context: Any) -> bool:
     if node is None:
         return True
     if not isinstance(node, dict):
-        raise InvalidCondition(
-            "condition must be a dict (got " f"{type(node).__name__})"
-        )
+        raise InvalidCondition(f"condition must be a dict (got {type(node).__name__})")
     if not node:
         # Empty {} is the always-match default.
         return True
@@ -239,9 +235,7 @@ def evaluate_safe(node: Any, context: Any) -> bool:
     try:
         return evaluate(node, context)
     except InvalidCondition as exc:
-        logger.warning(
-            "events.conditions.evaluate_safe rejected_condition: %s", exc
-        )
+        logger.warning("events.conditions.evaluate_safe rejected_condition: %s", exc)
         return False
 
 
@@ -256,24 +250,19 @@ def validate(node: Any) -> None:
     if node is None or node == {}:
         return
     if not isinstance(node, dict):
-        raise InvalidCondition(
-            "condition must be a dict (got " f"{type(node).__name__})"
-        )
+        raise InvalidCondition(f"condition must be a dict (got {type(node).__name__})")
 
     compound_keys = {"all", "any", "not"} & set(node.keys())
     if compound_keys:
         if len(compound_keys) > 1:
             raise InvalidCondition(
-                "condition must use exactly one of all/any/not, "
-                f"got {sorted(compound_keys)}"
+                f"condition must use exactly one of all/any/not, got {sorted(compound_keys)}"
             )
         key = next(iter(compound_keys))
         if key in ("all", "any"):
             children = node[key]
             if not isinstance(children, list) or not children:
-                raise InvalidCondition(
-                    f"'{key}' must be a non-empty list of conditions"
-                )
+                raise InvalidCondition(f"'{key}' must be a non-empty list of conditions")
             for child in children:
                 validate(child)
         else:  # not
@@ -282,8 +271,7 @@ def validate(node: Any) -> None:
         leaf_fields = {"op", "path", "value"} & set(node.keys())
         if leaf_fields:
             raise InvalidCondition(
-                f"compound condition cannot also carry leaf fields "
-                f"{sorted(leaf_fields)}"
+                f"compound condition cannot also carry leaf fields {sorted(leaf_fields)}"
             )
         return
 
@@ -291,18 +279,12 @@ def validate(node: Any) -> None:
     op = node.get("op")
     path = node.get("path")
     if not isinstance(op, str) or op not in SUPPORTED_OPS:
-        raise InvalidCondition(
-            f"leaf condition has invalid 'op': {op!r}"
-        )
+        raise InvalidCondition(f"leaf condition has invalid 'op': {op!r}")
     if not isinstance(path, str) or not path:
-        raise InvalidCondition(
-            "leaf condition missing non-empty 'path'"
-        )
+        raise InvalidCondition("leaf condition missing non-empty 'path'")
     # `exists` and `is_null` don't need `value`; everything else does.
     if op not in ("exists", "is_null") and "value" not in node:
-        raise InvalidCondition(
-            f"leaf condition '{op}' requires a 'value'"
-        )
+        raise InvalidCondition(f"leaf condition '{op}' requires a 'value'")
     # Cap regex pattern length at validate time so the editor
     # surfaces the rejection instead of silently fail-False'ing at
     # runtime.
@@ -311,9 +293,7 @@ def validate(node: Any) -> None:
         if not isinstance(pattern, str):
             raise InvalidCondition("'matches' value must be a string regex")
         if len(pattern) > _REGEX_MAX_LEN:
-            raise InvalidCondition(
-                f"'matches' regex exceeds {_REGEX_MAX_LEN}-char cap"
-            )
+            raise InvalidCondition(f"'matches' regex exceeds {_REGEX_MAX_LEN}-char cap")
         try:
             re.compile(pattern)
         except re.error as exc:
@@ -324,9 +304,7 @@ def validate(node: Any) -> None:
     allowed = {"op", "path", "value"}
     extra = set(node.keys()) - allowed
     if extra:
-        raise InvalidCondition(
-            f"leaf condition has unknown keys: {sorted(extra)}"
-        )
+        raise InvalidCondition(f"leaf condition has unknown keys: {sorted(extra)}")
 
 
 # --- Path extraction (Step-19 diagnostics) -----------------------------

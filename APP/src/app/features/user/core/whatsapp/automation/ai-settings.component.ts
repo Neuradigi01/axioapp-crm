@@ -1,12 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
@@ -17,7 +11,6 @@ import {
   AISettingsPatch,
   WhatsAppAutomationApiService,
 } from './whatsapp-automation-api.service';
-
 
 /**
  * AI Settings tab (whatsapp-platform-upgrade Step 19).
@@ -44,8 +37,8 @@ import {
             AI agent settings
           </p>
           <p class="text-[11px] text-zinc-500">
-            Wires the per-conversation "AI Handled" toggle. Replies
-            below the confidence threshold escalate to a human.
+            Wires the per-conversation "AI Handled" toggle. Replies below the confidence threshold
+            escalate to a human.
           </p>
         </div>
         @if (loading()) {
@@ -87,9 +80,8 @@ import {
           class="w-full"
         />
         <p class="mt-1 text-[10px] text-zinc-500">
-          Below this confidence, the AI escalates to a human. 0.6 is a
-          conservative default; raise to 0.8 for very high-stakes
-          businesses, lower to 0.4 if you trust the LLM more.
+          Below this confidence, the AI escalates to a human. 0.6 is a conservative default; raise
+          to 0.8 for very high-stakes businesses, lower to 0.4 if you trust the LLM more.
         </p>
       </div>
 
@@ -98,8 +90,8 @@ import {
           Handover keywords (one per line)
         </label>
         <p class="mb-2 text-[10px] text-zinc-500">
-          When the customer's message contains any of these phrases,
-          the AI hands off to a human immediately — no LLM call.
+          When the customer's message contains any of these phrases, the AI hands off to a human
+          immediately — no LLM call.
         </p>
         <textarea
           [ngModel]="handoverKeywordsText()"
@@ -115,9 +107,8 @@ import {
           System prompt (optional)
         </label>
         <p class="mb-2 text-[10px] text-zinc-500">
-          Persona / business context prepended to every AI call. Leave
-          blank for the built-in baseline (polite, concise, defers to
-          humans on prices).
+          Persona / business context prepended to every AI call. Leave blank for the built-in
+          baseline (polite, concise, defers to humans on prices).
         </p>
         <textarea
           [ngModel]="systemPrompt()"
@@ -127,9 +118,7 @@ import {
           placeholder="You are the customer-service assistant for Sharma Furniture, a family-run furniture store in Mumbai since 1992…"
           class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
         ></textarea>
-        <p class="mt-1 text-right text-[10px] text-zinc-400">
-          {{ systemPrompt().length }}/4096
-        </p>
+        <p class="mt-1 text-right text-[10px] text-zinc-400">{{ systemPrompt().length }}/4096</p>
       </div>
 
       <div class="flex justify-end">
@@ -178,9 +167,7 @@ export class AISettingsComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load AI settings.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load AI settings.');
         },
       });
   }
@@ -188,9 +175,7 @@ export class AISettingsComponent {
   private hydrate(s: AISettings): void {
     this.defaultEnabled.set(s.ai_handling_default_enabled);
     this.threshold.set(s.ai_confidence_threshold);
-    this.handoverKeywordsText.set(
-      (s.ai_handover_keywords || []).join('\n'),
-    );
+    this.handoverKeywordsText.set((s.ai_handover_keywords || []).join('\n'));
     this.systemPrompt.set(s.ai_system_prompt || '');
   }
 
@@ -220,9 +205,7 @@ export class AISettingsComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not save AI settings.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not save AI settings.');
         },
       });
   }

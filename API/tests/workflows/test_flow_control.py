@@ -1,6 +1,7 @@
 """Pin tests for the Step-11 flow-control action handlers (excluding
 ``wait_for_event`` which has its own file). Covers wait / ab_split /
 goal / call_webhook / notify_user / log_internal_note."""
+
 from __future__ import annotations
 
 import uuid
@@ -9,16 +10,17 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import text as sql_text
 
 from src.app.core.workflows.actions import (
     _clear_registry_for_tests,
     _register_builtins,
-    resolve as resolve_action,
 )
 from src.app.core.workflows.actions import flow_control as flow_module
+from src.app.core.workflows.actions import (
+    resolve as resolve_action,
+)
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -41,10 +43,7 @@ class _FakeStepRun:
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -319,9 +318,7 @@ async def test_notify_user_specific_user_calls_notifications(test_db, org_id):
     }
 
     fake_notify = AsyncMock()
-    with patch(
-        "src.app.core.notifications.service.notify", new=fake_notify
-    ):
+    with patch("src.app.core.notifications.service.notify", new=fake_notify):
         result = await handler(
             test_db,
             run=run,
@@ -363,18 +360,13 @@ async def test_notify_user_no_recipient_skips(test_db, org_id):
 async def test_log_internal_note_writes_timeline_entry(test_db, org_id):
     contact_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_contacts (id, org_id, full_name) "
-            "VALUES (:id, :org_id, :name)"
-        ),
+        sql_text("INSERT INTO tbl_contacts (id, org_id, full_name) VALUES (:id, :org_id, :name)"),
         {"id": str(contact_id), "org_id": str(org_id), "name": "Asha"},
     )
     await test_db.commit()
 
     handler = resolve_action("flow_control.log_internal_note")
-    run = _FakeRun(
-        org_id=org_id, workflow_id=uuid.uuid4(), contact_id=contact_id
-    )
+    run = _FakeRun(org_id=org_id, workflow_id=uuid.uuid4(), contact_id=contact_id)
     node = {
         "id": "note",
         "type": "flow_control.log_internal_note",

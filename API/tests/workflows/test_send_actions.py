@@ -6,6 +6,7 @@ transports fire. The email backend is exercised via the in-process
 ``LogEmailBackend`` (the default when ``EMAIL_ENABLED=false`` in
 the test config).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -23,11 +24,12 @@ from src.app.core.templates.schemas import TemplateCreate
 from src.app.core.workflows.actions import (
     _clear_registry_for_tests,
     _register_builtins,
+)
+from src.app.core.workflows.actions import (
     resolve as resolve_action,
 )
 from src.app.core.workflows.actions import send as send_module  # noqa: F401
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -49,10 +51,7 @@ class _FakeStepRun:
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -117,9 +116,7 @@ def _send_email_node(template_id: uuid.UUID) -> dict:
 
 
 async def test_send_email_happy_renders_and_calls_backend(test_db, org_id):
-    template = await _seed_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _seed_template(test_db, org_id=org_id, channel=ConversationChannel.email)
 
     handler = resolve_action("send.email")
     run = _FakeRun(org_id=org_id, workflow_id=uuid.uuid4(), contact_id=None)
@@ -161,9 +158,7 @@ async def test_send_email_happy_renders_and_calls_backend(test_db, org_id):
 
 
 async def test_send_email_skips_when_recipient_missing(test_db, org_id):
-    template = await _seed_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _seed_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     handler = resolve_action("send.email")
     run = _FakeRun(org_id=org_id, workflow_id=uuid.uuid4(), contact_id=None)
     context = {"contact": {}, "trigger_payload": {}, "run_state": {}}
@@ -213,9 +208,7 @@ async def test_send_email_skips_when_template_missing(test_db, org_id):
 
 
 async def test_send_whatsapp_happy_via_mocked_adapter(test_db, org_id):
-    template = await _seed_template(
-        test_db, org_id=org_id, channel=ConversationChannel.whatsapp
-    )
+    template = await _seed_template(test_db, org_id=org_id, channel=ConversationChannel.whatsapp)
     handler = resolve_action("send.whatsapp")
     run = _FakeRun(org_id=org_id, workflow_id=uuid.uuid4(), contact_id=None)
     context = {
@@ -262,9 +255,7 @@ async def test_send_whatsapp_happy_via_mocked_adapter(test_db, org_id):
 
 
 async def test_send_whatsapp_channel_not_registered_skips(test_db, org_id):
-    template = await _seed_template(
-        test_db, org_id=org_id, channel=ConversationChannel.whatsapp
-    )
+    template = await _seed_template(test_db, org_id=org_id, channel=ConversationChannel.whatsapp)
     handler = resolve_action("send.whatsapp")
     run = _FakeRun(org_id=org_id, workflow_id=uuid.uuid4(), contact_id=None)
     context = {
@@ -286,9 +277,7 @@ async def test_send_whatsapp_channel_not_registered_skips(test_db, org_id):
     def _raise(_channel):
         raise ChannelNotRegistered("whatsapp not registered in test env")
 
-    with patch(
-        "src.app.core.conversations.registry.resolve", side_effect=_raise
-    ):
+    with patch("src.app.core.conversations.registry.resolve", side_effect=_raise):
         result = await handler(
             test_db,
             run=run,
@@ -307,9 +296,7 @@ async def test_send_whatsapp_channel_not_registered_skips(test_db, org_id):
 
 
 async def test_send_slack_happy(test_db, org_id):
-    template = await _seed_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _seed_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     handler = resolve_action("send.slack")
     run = _FakeRun(org_id=org_id, workflow_id=uuid.uuid4(), contact_id=None)
     context = {
@@ -327,9 +314,7 @@ async def test_send_slack_happy(test_db, org_id):
     }
 
     fake_post = AsyncMock()
-    with patch(
-        "src.app.core.integrations.slack.post_message", new=fake_post
-    ):
+    with patch("src.app.core.integrations.slack.post_message", new=fake_post):
         result = await handler(
             test_db,
             run=run,
@@ -345,9 +330,7 @@ async def test_send_slack_happy(test_db, org_id):
 
 
 async def test_send_slack_missing_webhook_skips(test_db, org_id):
-    template = await _seed_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _seed_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     handler = resolve_action("send.slack")
     run = _FakeRun(org_id=org_id, workflow_id=uuid.uuid4(), contact_id=None)
     node = {
@@ -374,9 +357,7 @@ async def test_send_slack_missing_webhook_skips(test_db, org_id):
 @pytest.mark.parametrize(
     "action_type", ["send.sms", "send.facebook", "send.instagram", "send.push"]
 )
-async def test_stub_channels_skip_when_adapter_missing(
-    test_db, org_id, action_type
-):
+async def test_stub_channels_skip_when_adapter_missing(test_db, org_id, action_type):
     """The four stub channels share a dispatch shape — without a
     registered adapter the handler returns
     ``ActionResult(skip_reason='channel_error')`` with the
@@ -389,9 +370,7 @@ async def test_stub_channels_skip_when_adapter_missing(
         "send.instagram": ConversationChannel.instagram,
         "send.push": ConversationChannel.push,
     }
-    template = await _seed_template(
-        test_db, org_id=org_id, channel=channel_map[action_type]
-    )
+    template = await _seed_template(test_db, org_id=org_id, channel=channel_map[action_type])
     handler = resolve_action(action_type)
     run = _FakeRun(org_id=org_id, workflow_id=uuid.uuid4(), contact_id=None)
     context = {
@@ -404,11 +383,7 @@ async def test_stub_channels_skip_when_adapter_missing(
         "type": action_type,
         "config": {
             "template_id": str(template.id),
-            "recipient": (
-                "contact.email"
-                if action_type == "send.push"
-                else "contact.phone"
-            ),
+            "recipient": ("contact.email" if action_type == "send.push" else "contact.phone"),
         },
     }
 
@@ -417,9 +392,7 @@ async def test_stub_channels_skip_when_adapter_missing(
     def _raise(_channel):
         raise ChannelNotRegistered(f"{action_type} not registered")
 
-    with patch(
-        "src.app.core.conversations.registry.resolve", side_effect=_raise
-    ):
+    with patch("src.app.core.conversations.registry.resolve", side_effect=_raise):
         result = await handler(
             test_db,
             run=run,

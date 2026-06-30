@@ -23,6 +23,7 @@ Bridging to async: Celery's executor is synchronous, so the task body
 uses `asyncio.run(...)` to drive the async session + service work.
 This is the same pattern `src/celery/tasks.py` already uses.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -30,7 +31,7 @@ import csv
 import io
 import logging
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 try:
     from celery import shared_task as _shared_task
@@ -65,6 +66,7 @@ except ImportError:  # pragma: no cover - celery not always installed in dev
             return _wrap(decorator_args[0])
         return _wrap
 
+
 from sqlalchemy import select
 
 from src.app.core import audit
@@ -80,7 +82,6 @@ from src.app.core.leads.schemas import LeadCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 from src.app.shared.storage import get_storage
-
 
 logger = logging.getLogger(__name__)
 
@@ -112,9 +113,7 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
     result if the row is gone or already terminal (idempotency)."""
     async with async_session() as session:
         row = (
-            await session.execute(
-                select(LeadImport).where(LeadImport.id == import_id)
-            )
+            await session.execute(select(LeadImport).where(LeadImport.id == import_id))
         ).scalar_one_or_none()
         if row is None:
             logger.warning("process_lead_import: %s not found", import_id)
@@ -122,7 +121,8 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
         if row.status in _TERMINAL_STATUSES:
             logger.info(
                 "process_lead_import: %s already %s — no-op",
-                import_id, row.status.value,
+                import_id,
+                row.status.value,
             )
             return {"status": row.status.value, "counts": row.counts or {}}
         if row.status != LeadImportStatus.mapping_committed:
@@ -131,7 +131,8 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
             # don't double-process.
             logger.info(
                 "process_lead_import: %s in %s — refusing to run",
-                import_id, row.status.value,
+                import_id,
+                row.status.value,
             )
             return {"status": row.status.value}
         org_id = row.org_id
@@ -161,7 +162,7 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
             await _mark_failed(import_id, str(exc))
             raise
 
-        error_report_path: Optional[str] = None
+        error_report_path: str | None = None
         if error_rows:
             error_report_path = await _write_error_csv(
                 org_id=org_id,
@@ -172,9 +173,7 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
 
         async with async_session() as session:
             row = (
-                await session.execute(
-                    select(LeadImport).where(LeadImport.id == import_id)
-                )
+                await session.execute(select(LeadImport).where(LeadImport.id == import_id))
             ).scalar_one_or_none()
             if row is None:
                 return {"status": "missing"}
@@ -216,9 +215,7 @@ async def _load_custom_field_routing(
                 select(
                     CustomFieldDefinition.field_key,
                     CustomFieldDefinition.entity_type,
-                ).where(
-                    CustomFieldDefinition.entity_type.in_(("contact", "lead"))
-                )
+                ).where(CustomFieldDefinition.entity_type.in_(("contact", "lead")))
             )
         ).all()
     for field_key, entity in rows:
@@ -230,7 +227,7 @@ async def _load_custom_field_routing(
 
 
 def _split_custom_data(
-    mapped: dict[str, Optional[str]],
+    mapped: dict[str, str | None],
     contact_keys: set[str],
     lead_keys: set[str],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -257,7 +254,7 @@ def _split_custom_data(
 async def _commit_rows(
     *,
     org_id: uuid.UUID,
-    mapping: dict[str, Optional[str]],
+    mapping: dict[str, str | None],
     rows_iter,
 ) -> tuple[dict[str, int], list[dict[str, Any]]]:
     """Walk the parsed-row iterator and create one contact+lead per row.
@@ -280,16 +277,10 @@ async def _commit_rows(
 
         if not full_name:
             errors += 1
-            error_rows.append(
-                _make_error_row(
-                    parsed, "missing required field 'contact.full_name'"
-                )
-            )
+            error_rows.append(_make_error_row(parsed, "missing required field 'contact.full_name'"))
             continue
 
-        contact_custom, lead_custom = _split_custom_data(
-            mapped, contact_cf_keys, lead_cf_keys
-        )
+        contact_custom, lead_custom = _split_custom_data(mapped, contact_cf_keys, lead_cf_keys)
 
         try:
             async with async_session() as session:
@@ -323,9 +314,7 @@ async def _commit_rows(
                     contact_id=contact_id,
                     pipeline_stage=mapped.get("lead.pipeline_stage"),
                     budget=_coerce_decimal(mapped.get("lead.budget")),
-                    expected_close_date=_coerce_date(
-                        mapped.get("lead.expected_close_date")
-                    ),
+                    expected_close_date=_coerce_date(mapped.get("lead.expected_close_date")),
                     custom_data=lead_custom,
                     source=LeadSource.bulk_import,
                 )
@@ -361,7 +350,7 @@ async def _commit_rows(
     )
 
 
-def _coerce_decimal(value: Optional[str]):
+def _coerce_decimal(value: str | None):
     """Parse a money-ish string into a Decimal. Returns None on blank;
     raises on parse failure so the row lands in the error CSV."""
     if value is None or value == "":
@@ -372,7 +361,7 @@ def _coerce_decimal(value: Optional[str]):
     return Decimal(cleaned)
 
 
-def _coerce_date(value: Optional[str]):
+def _coerce_date(value: str | None):
     """Parse YYYY-MM-DD (or ISO with time) into a `date`. None if blank.
     Raises on malformed input so the row goes to errors."""
     if value is None or value == "":
@@ -434,9 +423,7 @@ async def _mark_failed(import_id: uuid.UUID, error_message: str) -> None:
     carries the catastrophic error message for the UI to surface."""
     async with async_session() as session:
         row = (
-            await session.execute(
-                select(LeadImport).where(LeadImport.id == import_id)
-            )
+            await session.execute(select(LeadImport).where(LeadImport.id == import_id))
         ).scalar_one_or_none()
         if row is None:
             return

@@ -91,7 +91,10 @@ export class FieldFormComponent {
   readonly form = this.fb.group({
     field_key: ['', [Validators.required, fieldKeyValidator]],
     field_label: ['', [Validators.required, Validators.maxLength(128)]],
-    field_type: this.fb.control<FieldType>('text', { nonNullable: true, validators: [Validators.required] }),
+    field_type: this.fb.control<FieldType>('text', {
+      nonNullable: true,
+      validators: [Validators.required],
+    }),
     is_required: [false],
     is_hidden: [false],
     choices_csv: [''],
@@ -101,10 +104,9 @@ export class FieldFormComponent {
   // signal so the `needsChoices` computed re-evaluates whenever the user
   // picks a different type from the dropdown. Without this the computed
   // never re-runs (plain `.value` accessor isn't a signal dependency).
-  private readonly fieldTypeSig = toSignal(
-    this.form.controls.field_type.valueChanges,
-    { initialValue: this.form.controls.field_type.value },
-  );
+  private readonly fieldTypeSig = toSignal(this.form.controls.field_type.valueChanges, {
+    initialValue: this.form.controls.field_type.value,
+  });
 
   readonly needsChoices = computed(() => {
     const t = this.fieldTypeSig();

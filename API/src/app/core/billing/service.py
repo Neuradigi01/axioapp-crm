@@ -19,12 +19,12 @@ Tax + GST are snapshotted at `issue()` time from `org_settings`:
 Historical invoices stay accurate even if the org later edits its
 settings.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,15 +46,14 @@ from src.app.core.billing.schemas import (
 from src.app.core.settings.service import get_or_create as get_org_settings
 from src.app.shared.db.queries import ensure_found
 
-
 # --- reads ----------------------------------------------------------------
 
 
 async def list_invoices(
     session: AsyncSession,
     *,
-    status_filter: Optional[InvoiceStatus] = None,
-    contact_id: Optional[uuid.UUID] = None,
+    status_filter: InvoiceStatus | None = None,
+    contact_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Invoice], int]:
@@ -67,12 +66,8 @@ async def list_invoices(
     )
 
 
-async def get_invoice(
-    session: AsyncSession, invoice_id: uuid.UUID
-) -> Invoice:
-    return ensure_found(
-        await _da.get_invoice_by_id(session, invoice_id), entity="invoice"
-    )
+async def get_invoice(session: AsyncSession, invoice_id: uuid.UUID) -> Invoice:
+    return ensure_found(await _da.get_invoice_by_id(session, invoice_id), entity="invoice")
 
 
 async def get_invoice_with_lines(
@@ -83,9 +78,7 @@ async def get_invoice_with_lines(
     return invoice, lines
 
 
-async def list_payments(
-    session: AsyncSession, *, invoice_id: uuid.UUID
-) -> list[Payment]:
+async def list_payments(session: AsyncSession, *, invoice_id: uuid.UUID) -> list[Payment]:
     return await _da.list_payments_query(session, invoice_id=invoice_id)
 
 
@@ -132,10 +125,7 @@ async def update_invoice(
     if inv.status != InvoiceStatus.draft:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"invoice {inv.id} is {inv.status.value}, only drafts are "
-                "editable"
-            ),
+            detail=(f"invoice {inv.id} is {inv.status.value}, only drafts are editable"),
         )
     changed = False
     for field in ("contact_id", "discount_amount", "notes", "custom_data"):
@@ -144,17 +134,13 @@ async def update_invoice(
             setattr(inv, field, v)
             changed = True
     if changed:
-        _recompute_totals(
-            inv, await _da.list_invoice_lines(session, inv.id)
-        )
+        _recompute_totals(inv, await _da.list_invoice_lines(session, inv.id))
         await session.commit()
         await session.refresh(inv)
     return inv
 
 
-async def delete_invoice(
-    session: AsyncSession, *, invoice_id: uuid.UUID
-) -> None:
+async def delete_invoice(session: AsyncSession, *, invoice_id: uuid.UUID) -> None:
     inv = await get_invoice(session, invoice_id)
     if inv.status != InvoiceStatus.draft:
         raise HTTPException(
@@ -218,9 +204,7 @@ async def remove_line(
             detail="cannot remove lines from a non-draft invoice",
         )
     line = ensure_found(
-        await _da.get_invoice_line(
-            session, invoice_id=invoice_id, line_id=line_id
-        ),
+        await _da.get_invoice_line(session, invoice_id=invoice_id, line_id=line_id),
         entity="line",
     )
     await _da.delete_invoice_line(session, line)
@@ -262,7 +246,7 @@ async def issue(
     settings = await get_org_settings(session, org_id=inv.org_id)
     inv.tax_rate_snapshot = settings.tax_rate
     inv.gst_number = settings.gst_number
-    inv.issued_at = datetime.now(timezone.utc)
+    inv.issued_at = datetime.now(UTC)
     inv.status = InvoiceStatus.issued
     inv.number = await _da.next_invoice_number(session, org_id=inv.org_id)
     _recompute_totals(inv, lines)
@@ -302,9 +286,7 @@ async def record_payment(
     if inv.status not in (InvoiceStatus.issued, InvoiceStatus.paid):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"cannot record payment against a {inv.status.value} invoice"
-            ),
+            detail=(f"cannot record payment against a {inv.status.value} invoice"),
         )
 
     pay = Payment(
@@ -322,7 +304,7 @@ async def record_payment(
     flipped_to_paid = False
     if paid_so_far >= inv.total and inv.status != InvoiceStatus.paid:
         inv.status = InvoiceStatus.paid
-        inv.paid_at = datetime.now(timezone.utc)
+        inv.paid_at = datetime.now(UTC)
         # Persist the dominant payment method when the invoice closes.
         inv.payment_method = payload.method
         flipped_to_paid = True
@@ -355,12 +337,8 @@ async def record_payment(
             event_type="invoice.paid",
             event_id_prefix="invoice_paid",
             extra={
-                "paid_at": (
-                    inv.paid_at.isoformat() if inv.paid_at else None
-                ),
-                "payment_method": (
-                    inv.payment_method.value if inv.payment_method else None
-                ),
+                "paid_at": (inv.paid_at.isoformat() if inv.paid_at else None),
+                "payment_method": (inv.payment_method.value if inv.payment_method else None),
             },
         )
 
@@ -372,16 +350,14 @@ async def void(
     *,
     invoice_id: uuid.UUID,
     user_id: uuid.UUID,
-    reason: Optional[str] = None,
+    reason: str | None = None,
 ) -> Invoice:
     inv = await get_invoice(session, invoice_id)
     if inv.status == InvoiceStatus.void:
         return inv
     inv.status = InvoiceStatus.void
     if reason:
-        inv.notes = (
-            f"{inv.notes}\n\n[void] {reason}" if inv.notes else f"[void] {reason}"
-        )
+        inv.notes = f"{inv.notes}\n\n[void] {reason}" if inv.notes else f"[void] {reason}"
     await session.commit()
     await session.refresh(inv)
     await audit.log(
@@ -441,21 +417,15 @@ async def _publish_invoice_event(
         contact = None
         if inv.contact_id is not None:
             contact = (
-                await session.execute(
-                    _select(Contact).where(Contact.id == inv.contact_id)
-                )
+                await session.execute(_select(Contact).where(Contact.id == inv.contact_id))
             ).scalar_one_or_none()
         org = (
-            await session.execute(
-                _select(Organization).where(Organization.id == inv.org_id)
-            )
+            await session.execute(_select(Organization).where(Organization.id == inv.org_id))
         ).scalar_one_or_none()
 
         payload: dict = {
             "invoice_id": str(inv.id),
-            "contact_id": (
-                str(inv.contact_id) if inv.contact_id else None
-            ),
+            "contact_id": (str(inv.contact_id) if inv.contact_id else None),
             "total_amount": str(inv.total),
             "currency": inv.currency,
             "invoice": {
@@ -463,9 +433,7 @@ async def _publish_invoice_event(
                 "number": inv.number,
                 "total_amount": str(inv.total),
                 "currency": inv.currency,
-                "issued_at": (
-                    inv.issued_at.isoformat() if inv.issued_at else None
-                ),
+                "issued_at": (inv.issued_at.isoformat() if inv.issued_at else None),
             },
         }
         if extra:
@@ -499,8 +467,7 @@ async def _publish_invoice_event(
         import logging
 
         logging.getLogger(__name__).exception(
-            "billing publish_invoice_event_failed org=%s invoice=%s "
-            "event=%s",
+            "billing publish_invoice_event_failed org=%s invoice=%s event=%s",
             inv.org_id,
             inv.id,
             event_type,

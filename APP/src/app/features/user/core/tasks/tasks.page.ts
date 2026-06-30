@@ -41,10 +41,7 @@ import {
   TaskSortDir,
   TasksApiService,
 } from './tasks-api.service';
-import {
-  TaskAssignee,
-  TaskFormModalComponent,
-} from './task-form-modal.component';
+import { TaskAssignee, TaskFormModalComponent } from './task-form-modal.component';
 
 class TasksListState extends ListPageState<Task> {}
 
@@ -137,13 +134,7 @@ export class TasksPageComponent {
     chip: {
       read: () => this.activeChip(),
       write: (v) => {
-        if (
-          v === 'all' ||
-          v === 'mine' ||
-          v === 'overdue' ||
-          v === 'today' ||
-          v === 'done'
-        ) {
+        if (v === 'all' || v === 'mine' || v === 'overdue' || v === 'today' || v === 'done') {
           this.selectChip(v);
         }
       },
@@ -210,11 +201,7 @@ export class TasksPageComponent {
       if (t.due_at) {
         const due = new Date(t.due_at).getTime();
         if (t.status === 'open' && due < now) overdue += 1;
-        if (
-          t.status === 'open' &&
-          due >= startToday.getTime() &&
-          due <= endToday.getTime()
-        ) {
+        if (t.status === 'open' && due >= startToday.getTime() && due <= endToday.getTime()) {
           dueToday += 1;
         }
       }
@@ -226,7 +213,13 @@ export class TasksPageComponent {
     this.state.bulkActions.set([
       { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'tasks.write' },
       { key: 'done', label: 'Mark done', icon: 'check-circle-2', permissionKey: 'tasks.write' },
-      { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'tasks.write' },
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: 'trash-2',
+        danger: true,
+        permissionKey: 'tasks.write',
+      },
     ]);
     // Decide scope branch from /me, then load assignees + first page.
     this.auth
@@ -248,11 +241,7 @@ export class TasksPageComponent {
       });
 
     this.searchCtrl.valueChanges
-      .pipe(
-        debounceTime(250),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef),
-      )
+      .pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe((v) => {
         this.q.set((v ?? '').trim());
         this.fetch();
@@ -332,9 +321,7 @@ export class TasksPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.togglingId.set(null);
-          this.state.loadError.set(
-            extractApiError(err) ?? 'Could not update the task.',
-          );
+          this.state.loadError.set(extractApiError(err) ?? 'Could not update the task.');
         },
       });
   }
@@ -431,28 +418,23 @@ export class TasksPageComponent {
       size: 100,
     };
 
-    const obs =
-      this.scope() === 'all'
-        ? this.api.listAll(filters)
-        : this.api.listMine(filters);
+    const obs = this.scope() === 'all' ? this.api.listAll(filters) : this.api.listMine(filters);
 
-    obs
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (res: TaskListResponse) => {
-          this.state.items.set(res.items);
-          this.state.total.set(res.total);
-          this.state.loading.set(false);
-          this.chipBusy.set(null);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.state.items.set([]);
-          this.state.total.set(0);
-          this.state.loading.set(false);
-          this.chipBusy.set(null);
-          this.state.loadError.set(extractApiError(err) ?? 'Could not load tasks.');
-        },
-      });
+    obs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (res: TaskListResponse) => {
+        this.state.items.set(res.items);
+        this.state.total.set(res.total);
+        this.state.loading.set(false);
+        this.chipBusy.set(null);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.state.items.set([]);
+        this.state.total.set(0);
+        this.state.loading.set(false);
+        this.chipBusy.set(null);
+        this.state.loadError.set(extractApiError(err) ?? 'Could not load tasks.');
+      },
+    });
   }
 
   private loadAssignees(): void {
@@ -550,9 +532,7 @@ export class TasksPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.state.bulkSubmitting.set(false);
-          this.state.bulkError.set(
-            extractApiError(err) ?? 'Could not mark tasks done.',
-          );
+          this.state.bulkError.set(extractApiError(err) ?? 'Could not mark tasks done.');
         },
       });
   }

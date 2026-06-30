@@ -20,15 +20,15 @@ The manual `/connect` endpoint is kept as the "Advanced (self-host)"
 fallback for operators who want to bring their own Meta App; the
 embedded-signup path is the default Intercom-style flow.
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import (
     APIRouter,
     Depends,
     File,
-    Form,
     HTTPException,
     Query,
     Response,
@@ -44,7 +44,21 @@ from config import (
 )
 from src.app.core.auth.dependencies import get_current_user, require_permissions
 from src.app.core.conversations.adapters.whatsapp import WhatsAppNotConnected
-from src.app.shared.rate_limit import InMemoryRateLimiter
+from src.app.core.integrations.whatsapp.business_profile import (
+    BusinessProfileError,
+)
+from src.app.core.integrations.whatsapp.business_profile import (
+    get_profile as bp_get_profile,
+)
+from src.app.core.integrations.whatsapp.business_profile import (
+    refresh_from_meta as bp_refresh_from_meta,
+)
+from src.app.core.integrations.whatsapp.business_profile import (
+    update_profile as bp_update_profile,
+)
+from src.app.core.integrations.whatsapp.business_profile import (
+    upload_picture as bp_upload_picture,
+)
 from src.app.core.integrations.whatsapp.connect import (
     MetaValidationError,
     connect_account,
@@ -53,20 +67,15 @@ from src.app.core.integrations.whatsapp.connect import (
     get_status,
     test_connection,
 )
-from src.app.core.integrations.whatsapp.business_profile import (
-    BusinessProfileError,
-    get_profile as bp_get_profile,
-    refresh_from_meta as bp_refresh_from_meta,
-    update_profile as bp_update_profile,
-    upload_picture as bp_upload_picture,
-)
-from src.app.core.integrations.whatsapp.health_service import (
-    get_phone_health,
-    refresh_from_meta as health_refresh_from_meta,
-)
 from src.app.core.integrations.whatsapp.embedded_signup import (
     EmbeddedSignupNotConfigured,
     complete_embedded_signup,
+)
+from src.app.core.integrations.whatsapp.health_service import (
+    get_phone_health,
+)
+from src.app.core.integrations.whatsapp.health_service import (
+    refresh_from_meta as health_refresh_from_meta,
 )
 from src.app.core.integrations.whatsapp.meta_graph_client import (
     MetaGraphError,
@@ -79,9 +88,9 @@ from src.app.core.integrations.whatsapp.schemas import (
     EmbeddedSignupExchangeOut,
     WhatsAppBusinessProfilePatch,
     WhatsAppBusinessProfileRead,
-    WhatsAppPhoneHealthRead,
     WhatsAppCapacityOut,
     WhatsAppConnectIn,
+    WhatsAppPhoneHealthRead,
     WhatsAppStatusOut,
     WhatsAppTemplateRead,
     WhatsAppTemplateSyncOut,
@@ -93,11 +102,9 @@ from src.app.core.integrations.whatsapp.templates import (
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
+from src.app.shared.rate_limit import InMemoryRateLimiter
 
-
-router = APIRouter(
-    prefix="/whatsapp", tags=["Integrations · WhatsApp"]
-)
+router = APIRouter(prefix="/whatsapp", tags=["Integrations · WhatsApp"])
 
 
 # Per-org rate cap on Embedded Signup exchange attempts — 5 per minute.
@@ -111,9 +118,7 @@ _es_exchange_limiter = InMemoryRateLimiter(max_hits=5, window_seconds=60.0)
 async def connect_endpoint(
     payload: WhatsAppConnectIn,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> WhatsAppStatusOut:
     """Validate the operator-supplied credentials against Meta, then
     persist (encrypted) on success. 400 with Meta's error message on
@@ -129,18 +134,14 @@ async def connect_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
-        )
+        ) from exc
     return WhatsAppStatusOut.model_validate(projection)
 
 
-@router.post(
-    "/disconnect", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.post("/disconnect", status_code=status.HTTP_204_NO_CONTENT)
 async def disconnect_endpoint(
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> Response:
     """Null the bearer token + flip the parent row to `disconnected`.
     404 if the org has never connected WhatsApp. Sidecar row (phone_id
@@ -157,9 +158,7 @@ async def disconnect_endpoint(
 @router.post("/test", response_model=WhatsAppStatusOut)
 async def test_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> WhatsAppStatusOut:
     """Ping Meta with stored credentials. Updates `status` / `last_error`
     based on the response. 400 if Meta rejects or if WA isn't connected
@@ -170,7 +169,7 @@ async def test_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
-        )
+        ) from exc
     return WhatsAppStatusOut.model_validate(projection)
 
 
@@ -204,9 +203,7 @@ async def embedded_signup_config_endpoint(
 async def embedded_signup_exchange_endpoint(
     payload: EmbeddedSignupExchangeIn,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> EmbeddedSignupExchangeOut:
     """Receive the popup's `(code, phone_number_id, waba_id)` payload,
     run the Embedded Signup orchestration, and return the connected
@@ -217,10 +214,7 @@ async def embedded_signup_exchange_endpoint(
     if not rl.allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=(
-                f"Too many connect attempts — wait "
-                f"{int(rl.retry_after)}s and retry."
-            ),
+            detail=(f"Too many connect attempts — wait {int(rl.retry_after)}s and retry."),
             headers={"Retry-After": str(int(rl.retry_after) + 1)},
         )
     try:
@@ -236,21 +230,19 @@ async def embedded_signup_exchange_endpoint(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
-        )
+        ) from exc
     except MetaGraphError as exc:
         raise HTTPException(
             status_code=exc.http_status,
             detail=exc.user_message,
-        )
+        ) from exc
     return EmbeddedSignupExchangeOut.model_validate(result)
 
 
 @router.get("/status", response_model=WhatsAppStatusOut)
 async def status_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> WhatsAppStatusOut:
     """Projection used by the Settings UI to render the WA card. Always
     returns 200 — `status='disconnected'` is the natural never-connected
@@ -290,9 +282,7 @@ async def list_numbers_endpoint(
                 "verified_name": config.verified_name,
                 "waba_id": config.waba_id,
                 "is_default": index == 0,
-                "messaging_limit_tier": getattr(
-                    config, "messaging_limit_tier", None
-                ),
+                "messaging_limit_tier": getattr(config, "messaging_limit_tier", None),
                 "quality_rating": getattr(config, "quality_rating", None),
             }
         )
@@ -308,9 +298,7 @@ async def list_numbers_endpoint(
 )
 async def sync_templates_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> WhatsAppTemplateSyncOut:
     """Pull `/{waba_id}/message_templates` from Meta and reconcile the
     local cache. Returns counts the Settings UI shows in a toast.
@@ -321,7 +309,7 @@ async def sync_templates_endpoint(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
-        )
+        ) from exc
     return WhatsAppTemplateSyncOut.model_validate(counts)
 
 
@@ -330,16 +318,14 @@ async def sync_templates_endpoint(
     response_model=list[WhatsAppTemplateRead],
 )
 async def list_templates_endpoint(
-    status_filter: Optional[str] = Query(default=None, alias="status"),
-    category: Optional[str] = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
+    category: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("campaigns.read")),
 ) -> list[WhatsAppTemplateRead]:
     """Templates for the active org, optionally filtered by status /
     category. Powers the campaign create-modal picker (Step 3.5.5)."""
-    rows = await list_templates(
-        db, status=status_filter, category=category
-    )
+    rows = await list_templates(db, status=status_filter, category=category)
     return [WhatsAppTemplateRead.model_validate(r) for r in rows]
 
 
@@ -373,11 +359,9 @@ def _config_to_profile_out(config: Any) -> WhatsAppBusinessProfileRead:
     response_model=WhatsAppBusinessProfileRead,
 )
 async def business_profile_get_endpoint(
-    phone_id: Optional[str] = None,
+    phone_id: str | None = None,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.business_profile.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.business_profile.manage")),
 ) -> WhatsAppBusinessProfileRead:
     """Local mirror of the Meta business profile + CRM-side automation
     fields. On first open this triggers a one-shot Meta refresh so the
@@ -389,9 +373,7 @@ async def business_profile_get_endpoint(
     try:
         config = await bp_get_profile(db, phone_id=phone_id)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return _config_to_profile_out(config)
 
 
@@ -401,11 +383,9 @@ async def business_profile_get_endpoint(
 )
 async def business_profile_patch_endpoint(
     payload: WhatsAppBusinessProfilePatch,
-    phone_id: Optional[str] = None,
+    phone_id: str | None = None,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.business_profile.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.business_profile.manage")),
 ) -> WhatsAppBusinessProfileRead:
     """Apply the operator's edits. Meta-bound fields push to the Graph
     API; CRM-only fields (hours / greeting / away) write straight to
@@ -421,13 +401,9 @@ async def business_profile_patch_endpoint(
             phone_id=phone_id,
         )
     except WhatsAppNotConnected as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except BusinessProfileError as exc:
-        raise HTTPException(
-            status_code=exc.http_status, detail=exc.user_message
-        )
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
     return _config_to_profile_out(config)
 
 
@@ -436,11 +412,9 @@ async def business_profile_patch_endpoint(
     response_model=WhatsAppBusinessProfileRead,
 )
 async def business_profile_refresh_endpoint(
-    phone_id: Optional[str] = None,
+    phone_id: str | None = None,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.business_profile.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.business_profile.manage")),
 ) -> WhatsAppBusinessProfileRead:
     """Pull current Meta profile values + persist to the local mirror.
     Stamps `last_synced_at` so the UI can render staleness.
@@ -449,13 +423,9 @@ async def business_profile_refresh_endpoint(
     try:
         config = await bp_refresh_from_meta(db, phone_id=phone_id)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except BusinessProfileError as exc:
-        raise HTTPException(
-            status_code=exc.http_status, detail=exc.user_message
-        )
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
     return _config_to_profile_out(config)
 
 
@@ -465,11 +435,9 @@ async def business_profile_refresh_endpoint(
 )
 async def business_profile_picture_endpoint(
     file: UploadFile = File(...),
-    phone_id: Optional[str] = None,
+    phone_id: str | None = None,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.business_profile.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.business_profile.manage")),
 ) -> WhatsAppBusinessProfileRead:
     """Upload a square JPEG/PNG profile picture. Goes through Meta's
     `/media` endpoint, then attached to the profile via
@@ -488,13 +456,9 @@ async def business_profile_picture_endpoint(
             phone_id=phone_id,
         )
     except WhatsAppNotConnected as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except BusinessProfileError as exc:
-        raise HTTPException(
-            status_code=exc.http_status, detail=exc.user_message
-        )
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
     return _config_to_profile_out(config)
 
 
@@ -507,9 +471,7 @@ async def business_profile_picture_endpoint(
 )
 async def auto_reply_settings_get_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.business_profile.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.business_profile.manage")),
 ) -> AutoReplySettingsRead:
     """Read the auto-reply toggles + linked templates for the active
     org. Reuses the same `WhatsAppAccountConfig` row that the
@@ -518,9 +480,7 @@ async def auto_reply_settings_get_endpoint(
     try:
         config = await bp_get_profile(db, auto_refresh=False)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return AutoReplySettingsRead(
         greeting_enabled=config.greeting_enabled,
         greeting_message=config.greeting_message,
@@ -539,9 +499,7 @@ async def auto_reply_settings_get_endpoint(
 async def auto_reply_settings_patch_endpoint(
     payload: AutoReplySettingsPatch,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.business_profile.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.business_profile.manage")),
 ) -> AutoReplySettingsRead:
     """Update the auto-reply toggles + linked templates. The router
     layer enforces the "if you enable a path, you must have a body
@@ -554,7 +512,7 @@ async def auto_reply_settings_patch_endpoint(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="WhatsApp is not connected for this org.",
-        )
+        ) from None
     if bundle is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -569,15 +527,11 @@ async def auto_reply_settings_patch_endpoint(
         "greeting_enabled": config.greeting_enabled,
         "greeting_message": config.greeting_message,
         "greeting_template_id": (
-            str(config.greeting_template_id)
-            if config.greeting_template_id
-            else None
+            str(config.greeting_template_id) if config.greeting_template_id else None
         ),
         "away_enabled": config.away_enabled,
         "away_message": config.away_message,
-        "away_template_id": (
-            str(config.away_template_id) if config.away_template_id else None
-        ),
+        "away_template_id": (str(config.away_template_id) if config.away_template_id else None),
     }
 
     if "greeting_enabled" in patch_dict:
@@ -596,9 +550,7 @@ async def auto_reply_settings_patch_endpoint(
     # Boundary check — refuse to save an enabled toggle with no body
     # AND no template. The pipeline would no-op silently; the
     # operator should know at save time.
-    if config.greeting_enabled and not (
-        config.greeting_message or config.greeting_template_id
-    ):
+    if config.greeting_enabled and not (config.greeting_message or config.greeting_template_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -606,9 +558,7 @@ async def auto_reply_settings_patch_endpoint(
                 "template. Add one before saving."
             ),
         )
-    if config.away_enabled and not (
-        config.away_message or config.away_template_id
-    ):
+    if config.away_enabled and not (config.away_message or config.away_template_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -632,17 +582,11 @@ async def auto_reply_settings_patch_endpoint(
             "greeting_enabled": config.greeting_enabled,
             "greeting_message": config.greeting_message,
             "greeting_template_id": (
-                str(config.greeting_template_id)
-                if config.greeting_template_id
-                else None
+                str(config.greeting_template_id) if config.greeting_template_id else None
             ),
             "away_enabled": config.away_enabled,
             "away_message": config.away_message,
-            "away_template_id": (
-                str(config.away_template_id)
-                if config.away_template_id
-                else None
-            ),
+            "away_template_id": (str(config.away_template_id) if config.away_template_id else None),
         },
     )
 
@@ -678,9 +622,7 @@ async def phone_health_endpoint(
     try:
         payload = await get_phone_health(db)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return WhatsAppPhoneHealthRead(**payload)
 
 
@@ -699,9 +641,7 @@ async def phone_health_refresh_endpoint(
         await health_refresh_from_meta(db)
         payload = await get_phone_health(db)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return WhatsAppPhoneHealthRead(**payload)
 
 
@@ -729,5 +669,5 @@ async def capacity_endpoint(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
-        )
+        ) from exc
     return WhatsAppCapacityOut.model_validate(capacity)

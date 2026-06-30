@@ -53,7 +53,9 @@ export class ImgFullscreenDirective implements OnDestroy {
     this.renderer.appendChild(document.body, this.overlay);
 
     this.renderer.listen(this.overlay, 'click', () => this.closeFullscreen());
-    this.escListener = this.renderer.listen('document', 'keydown.escape', () => this.closeFullscreen());
+    this.escListener = this.renderer.listen('document', 'keydown.escape', () =>
+      this.closeFullscreen(),
+    );
   }
 
   private closeFullscreen(): void {

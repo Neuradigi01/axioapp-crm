@@ -1,11 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  Input,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, Input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 export type KpiFormat = 'number' | 'currency' | 'percent';

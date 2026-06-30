@@ -6,6 +6,7 @@ logins where the user can't (or shouldn't) be attributed. `before` /
 `after` are JSONB snapshots of the changed entity — kept loose because
 each module decides what shape to record.
 """
+
 from __future__ import annotations
 
 import uuid

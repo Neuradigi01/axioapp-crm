@@ -45,7 +45,6 @@ import {
   MappingTarget,
 } from './integrations-api.service';
 
-
 /** Heuristic defaults applied by the "Use defaults" button. Keys are
  *  compared case-insensitively against ad-field names. The defaults
  *  match what `core.integrations.{google,meta}.tasks._apply_mapping`
@@ -59,7 +58,6 @@ const DEFAULT_RULES: ReadonlyArray<readonly [RegExp, string]> = [
   [/^email$/i, 'contact.email'],
   [/^work[_ ]?email$/i, 'contact.email'],
 ];
-
 
 @Component({
   selector: 'app-field-mapping-editor',
@@ -99,9 +97,7 @@ export class FieldMappingEditorComponent {
    *  We strip those when serialising the PUT body. */
   protected readonly IGNORE = '';
 
-  protected readonly canSave = computed(
-    () => !this.loading() && !this.saving(),
-  );
+  protected readonly canSave = computed(() => !this.loading() && !this.saving());
 
   constructor() {
     // First load: when both the subscription and form-fields inputs
@@ -135,9 +131,7 @@ export class FieldMappingEditorComponent {
   save(): void {
     const sub = this.subscription();
     if (!sub) return;
-    const filtered = Object.fromEntries(
-      Object.entries(this.mapping()).filter(([, v]) => v),
-    );
+    const filtered = Object.fromEntries(Object.entries(this.mapping()).filter(([, v]) => v));
     this.saving.set(true);
     this.error.set(null);
     this.api
@@ -180,10 +174,7 @@ export class FieldMappingEditorComponent {
 
   // --- internals ---------------------------------------------------
 
-  private _load(
-    sub: IntegrationSubscription,
-    fields: ReadonlyArray<string>,
-  ): void {
+  private _load(sub: IntegrationSubscription, fields: ReadonlyArray<string>): void {
     this.loading.set(true);
     this.error.set(null);
     forkJoin({
@@ -198,10 +189,7 @@ export class FieldMappingEditorComponent {
           const existing = sub.field_mapping ?? {};
           const next: Record<string, string> = {};
           for (const field of fields) {
-            next[field] =
-              existing[field] !== undefined
-                ? existing[field]
-                : this._defaultFor(field);
+            next[field] = existing[field] !== undefined ? existing[field] : this._defaultFor(field);
           }
           this.mapping.set(next);
           this.loading.set(false);

@@ -14,14 +14,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 import { StaffApiService, WorkloadUser } from './staff-api.service';
 
-type SortKey =
-  | 'name'
-  | 'contacts'
-  | 'leads'
-  | 'walk_ins'
-  | 'appointments'
-  | 'tasks'
-  | 'total';
+type SortKey = 'name' | 'contacts' | 'leads' | 'walk_ins' | 'appointments' | 'tasks' | 'total';
 type SortDir = 'asc' | 'desc';
 
 /**
@@ -103,9 +96,7 @@ export class StaffWorkloadComponent {
         error: (err: HttpErrorResponse) => {
           this.rows.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load workload report.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load workload report.');
         },
       });
   }

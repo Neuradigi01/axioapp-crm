@@ -15,6 +15,7 @@ Service / engine / router map these to HTTP statuses:
                                      downstream pre-flight refused
                                      — Step 12 wires compliance)
 """
+
 from __future__ import annotations
 
 
@@ -60,9 +61,7 @@ class FolderHasWorkflows(WorkflowError):
     "3 workflows still inside this folder" in the 409 detail."""
 
     def __init__(self, count: int) -> None:
-        super().__init__(
-            f"folder has {count} workflow(s); reassign or archive first"
-        )
+        super().__init__(f"folder has {count} workflow(s); reassign or archive first")
         self.count = count
 
 
@@ -86,10 +85,7 @@ class ActionNotImplemented(WorkflowError):
     instead of silently no-oping."""
 
     def __init__(self, action_type: str, reason: str | None = None) -> None:
-        message = (
-            f"action '{action_type}' not implemented"
-            + (f": {reason}" if reason else "")
-        )
+        message = f"action '{action_type}' not implemented" + (f": {reason}" if reason else "")
         super().__init__(message)
         self.action_type = action_type
         self.reason = reason

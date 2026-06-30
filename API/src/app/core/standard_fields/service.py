@@ -17,6 +17,7 @@ Responsibilities the router does not duplicate:
    explicitly so an unset request context cannot accidentally insert a
    row into the wrong tenant.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -27,7 +28,6 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.shared.audit import log_entity_change
 from src.app.core.standard_fields import data_access as _da
 from src.app.core.standard_fields import registry as field_registry
 from src.app.core.standard_fields.models import StandardFieldOverride
@@ -35,7 +35,7 @@ from src.app.core.standard_fields.schemas import (
     StandardFieldOverrideIn,
     StandardFieldRendered,
 )
-
+from src.app.shared.audit import log_entity_change
 
 # Payload field name → registry `overridable_props` token. The two
 # vocabularies differ slightly (`is_required` vs `"required"`) — this
@@ -90,9 +90,7 @@ def _validate_payload_against_registry(
         if getattr(payload, payload_key) is None:
             continue
         if prop_token not in allowed:
-            errors.append(
-                f"{payload_key} not overridable for {entity}.{field_key}"
-            )
+            errors.append(f"{payload_key} not overridable for {entity}.{field_key}")
 
     if errors:
         raise HTTPException(
@@ -112,9 +110,7 @@ async def list_for_entity(
     session: AsyncSession, *, org_id: uuid.UUID, entity: str
 ) -> tuple[list[StandardFieldOverride], int]:
     """Overrides for one entity. Used by the per-entity list endpoint."""
-    rows = await _da.list_overrides_for_entity(
-        session, org_id=org_id, entity=entity
-    )
+    rows = await _da.list_overrides_for_entity(session, org_id=org_id, entity=entity)
     return rows, len(rows)
 
 
@@ -134,9 +130,7 @@ async def upsert(
     Audit event `settings.standard_field_override.updated` fires with a
     `{before, after}` diff.
     """
-    _validate_payload_against_registry(
-        entity=entity, field_key=field_key, payload=payload
-    )
+    _validate_payload_against_registry(entity=entity, field_key=field_key, payload=payload)
 
     existing = await _da.get_override_by_keys(
         session, org_id=org_id, entity=entity, field_key=field_key
@@ -166,9 +160,7 @@ async def upsert(
     )
     await session.commit()
 
-    row = await _da.get_override_by_keys(
-        session, org_id=org_id, entity=entity, field_key=field_key
-    )
+    row = await _da.get_override_by_keys(session, org_id=org_id, entity=entity, field_key=field_key)
     assert row is not None  # upsert just guaranteed this row
 
     await log_entity_change(
@@ -208,9 +200,7 @@ async def reset(
     snapshot = _snapshot(existing)
     snapshot_id = existing.id
 
-    await _da.delete_override(
-        session, org_id=org_id, entity=entity, field_key=field_key
-    )
+    await _da.delete_override(session, org_id=org_id, entity=entity, field_key=field_key)
     await session.commit()
 
     await audit.log(
@@ -244,9 +234,7 @@ _OVERRIDE_COLUMNS: tuple[str, ...] = (
 )
 
 
-def _coalesce_numeric(
-    override_value: Any, registry_value: float | None
-) -> float | None:
+def _coalesce_numeric(override_value: Any, registry_value: float | None) -> float | None:
     """Pick the override (cast Decimal → float) if set, else the registry default."""
     if override_value is None:
         return registry_value
@@ -266,29 +254,19 @@ def _merge(
         field_type=definition.field_type,
         label=(o.label if o and o.label is not None else definition.default_label),
         placeholder=(
-            o.placeholder if o and o.placeholder is not None
-            else definition.default_placeholder
+            o.placeholder if o and o.placeholder is not None else definition.default_placeholder
         ),
-        help_text=(
-            o.help_text if o and o.help_text is not None
-            else definition.default_help
-        ),
+        help_text=(o.help_text if o and o.help_text is not None else definition.default_help),
         is_required=(
-            o.is_required if o and o.is_required is not None
-            else definition.default_required
+            o.is_required if o and o.is_required is not None else definition.default_required
         ),
         is_hidden=(o.is_hidden if o and o.is_hidden is not None else False),
-        min_value=_coalesce_numeric(
-            o.min_value if o else None, definition.default_min
-        ),
-        max_value=_coalesce_numeric(
-            o.max_value if o else None, definition.default_max
-        ),
-        step_value=_coalesce_numeric(
-            o.step_value if o else None, definition.default_step
-        ),
+        min_value=_coalesce_numeric(o.min_value if o else None, definition.default_min),
+        max_value=_coalesce_numeric(o.max_value if o else None, definition.default_max),
+        step_value=_coalesce_numeric(o.step_value if o else None, definition.default_step),
         display_order=(
-            o.display_order if o and o.display_order is not None
+            o.display_order
+            if o and o.display_order is not None
             else definition.default_display_order
         ),
         backend_required=definition.backend_required,
@@ -320,9 +298,7 @@ async def _fetch_overrides_map(
 ) -> dict[str, StandardFieldOverride]:
     """One SELECT, one dict keyed by `field_key`. Avoids N+1 in
     `render_for_entity`."""
-    rows = await _da.list_overrides_for_entity(
-        session, org_id=org_id, entity=entity
-    )
+    rows = await _da.list_overrides_for_entity(session, org_id=org_id, entity=entity)
     return {row.field_key: row for row in rows}
 
 

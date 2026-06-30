@@ -15,13 +15,9 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  WorkflowGalleryEntry,
-  WorkflowsApiService,
-} from '../workflows-api.service';
+import { WorkflowGalleryEntry, WorkflowsApiService } from '../workflows-api.service';
 import { CloneNameModalComponent } from './clone-name.modal.component';
 import { GalleryPreviewModalComponent } from './preview.modal.component';
-
 
 /**
  * Workflow templates gallery — Step 16's first frontend surface.
@@ -37,9 +33,7 @@ import { GalleryPreviewModalComponent } from './preview.modal.component';
  * channel chips + estimated setup time + completion rate.
  */
 
-
 const ALL_TAB = '__all__';
-
 
 @Component({
   selector: 'app-workflows-gallery',
@@ -101,9 +95,7 @@ export class WorkflowsGalleryPageComponent {
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
-          this.error.set(
-            extractApiError(err) ?? 'Could not load the templates gallery.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load the templates gallery.');
           this.loading.set(false);
         },
       });

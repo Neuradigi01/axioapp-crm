@@ -19,12 +19,14 @@ All operations use the same per-org credential resolver as the rest of
 the WhatsApp module (``get_active_config`` + ``decrypt``), and rely on
 ``MetaGraphError`` for typed routing of Meta failures.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,9 +49,7 @@ def _default_http_client_factory() -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=30.0)
 
 
-_META_PROFILE_FIELDS = (
-    "about,address,description,email,profile_picture_url,websites,vertical"
-)
+_META_PROFILE_FIELDS = "about,address,description,email,profile_picture_url,websites,vertical"
 
 
 class BusinessProfileError(Exception):
@@ -92,10 +92,7 @@ async def _fetch_profile_from_meta(
     Meta wraps the profile in a `data: [{...}]` list — we unwrap to
     the inner dict for caller simplicity. Returns ``{}`` when the
     array is empty (a never-edited profile)."""
-    url = (
-        f"https://graph.facebook.com/{api_version}/{phone_id}"
-        f"/whatsapp_business_profile"
-    )
+    url = f"https://graph.facebook.com/{api_version}/{phone_id}/whatsapp_business_profile"
     async with http_client_factory() as client:
         response = await client.get(
             url,
@@ -105,9 +102,7 @@ async def _fetch_profile_from_meta(
     if response.status_code >= 400:
         raise BusinessProfileError(
             http_status=502,
-            user_message=(
-                f"Meta refused the profile fetch: {_extract_meta_error(response)}"
-            ),
+            user_message=(f"Meta refused the profile fetch: {_extract_meta_error(response)}"),
         )
     body = response.json() if response.content else {}
     if not isinstance(body, dict):
@@ -131,10 +126,7 @@ async def _push_profile_to_meta(
     anything else surfaces as ``BusinessProfileError``."""
     if not payload:
         return
-    url = (
-        f"https://graph.facebook.com/{api_version}/{phone_id}"
-        f"/whatsapp_business_profile"
-    )
+    url = f"https://graph.facebook.com/{api_version}/{phone_id}/whatsapp_business_profile"
     body = {"messaging_product": "whatsapp", **payload}
     async with http_client_factory() as client:
         response = await client.post(
@@ -153,10 +145,7 @@ async def _push_profile_to_meta(
     if response.status_code >= 400:
         raise BusinessProfileError(
             http_status=400,
-            user_message=(
-                f"Meta refused the profile update: "
-                f"{_extract_meta_error(response)}"
-            ),
+            user_message=(f"Meta refused the profile update: {_extract_meta_error(response)}"),
         )
 
 
@@ -192,10 +181,7 @@ async def _upload_picture_to_meta(
     if response.status_code >= 400:
         raise BusinessProfileError(
             http_status=400,
-            user_message=(
-                f"Meta refused the picture upload: "
-                f"{_extract_meta_error(response)}"
-            ),
+            user_message=(f"Meta refused the picture upload: {_extract_meta_error(response)}"),
         )
     body = response.json()
     media_id = body.get("id") if isinstance(body, dict) else None
@@ -213,7 +199,7 @@ async def _upload_picture_to_meta(
 async def _resolve_active_config(
     session: AsyncSession,
     *,
-    phone_id: Optional[str] = None,
+    phone_id: str | None = None,
 ) -> tuple[Any, WhatsAppAccountConfig]:
     """Pull (integration, config) for the active org. Raises
     ``WhatsAppNotConnected`` mirroring the existing send / sync path.
@@ -225,14 +211,11 @@ async def _resolve_active_config(
     bundle = await get_active_config(session, phone_id=phone_id)
     if bundle is None:
         raise WhatsAppNotConnected(
-            "WhatsApp is not connected for this org. "
-            "Connect it in Settings → Integrations."
+            "WhatsApp is not connected for this org. Connect it in Settings → Integrations."
         )
     integration, config = bundle
     if integration.access_token_enc is None:
-        raise WhatsAppNotConnected(
-            "Stored credentials are missing; reconnect required."
-        )
+        raise WhatsAppNotConnected("Stored credentials are missing; reconnect required.")
     return integration, config
 
 
@@ -259,7 +242,7 @@ def _snapshot(config: WhatsAppAccountConfig) -> dict[str, Any]:
 async def get_profile(
     session: AsyncSession,
     *,
-    phone_id: Optional[str] = None,
+    phone_id: str | None = None,
     auto_refresh: bool = True,
     http_client_factory: HttpClientFactory = _default_http_client_factory,
 ) -> WhatsAppAccountConfig:
@@ -277,20 +260,16 @@ async def get_profile(
                 phone_id=phone_id,
                 http_client_factory=http_client_factory,
             )
-            _, config = await _resolve_active_config(
-                session, phone_id=phone_id
-            )
+            _, config = await _resolve_active_config(session, phone_id=phone_id)
         except BusinessProfileError:
-            logger.exception(
-                "first-open Meta refresh failed; opening empty form"
-            )
+            logger.exception("first-open Meta refresh failed; opening empty form")
     return config
 
 
 async def refresh_from_meta(
     session: AsyncSession,
     *,
-    phone_id: Optional[str] = None,
+    phone_id: str | None = None,
     http_client_factory: HttpClientFactory = _default_http_client_factory,
 ) -> WhatsAppAccountConfig:
     """Pull every Meta-side field + persist to the local row.
@@ -301,9 +280,7 @@ async def refresh_from_meta(
 
     Step 27b — ``phone_id`` selects which connected phone's profile
     to refresh; NULL falls back to the org default."""
-    integration, config = await _resolve_active_config(
-        session, phone_id=phone_id
-    )
+    integration, config = await _resolve_active_config(session, phone_id=phone_id)
     token = decrypt(integration.access_token_enc)
 
     meta_data = await _fetch_profile_from_meta(
@@ -319,12 +296,10 @@ async def refresh_from_meta(
     config.profile_address = meta_data.get("address") or None
     config.profile_email = meta_data.get("email") or None
     websites = meta_data.get("websites")
-    config.profile_websites = (
-        list(websites) if isinstance(websites, list) else None
-    )
+    config.profile_websites = list(websites) if isinstance(websites, list) else None
     config.profile_vertical = meta_data.get("vertical") or None
     config.profile_picture_url = meta_data.get("profile_picture_url") or None
-    config.profile_last_synced_at = datetime.now(timezone.utc)
+    config.profile_last_synced_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(config)
 
@@ -343,7 +318,7 @@ async def update_profile(
     *,
     actor_id: uuid.UUID,
     patch: dict[str, Any],
-    phone_id: Optional[str] = None,
+    phone_id: str | None = None,
     http_client_factory: HttpClientFactory = _default_http_client_factory,
 ) -> WhatsAppAccountConfig:
     """Apply the operator's edits to Meta + the local mirror.
@@ -354,9 +329,7 @@ async def update_profile(
 
     Step 27b — ``phone_id`` selects which connected phone's profile
     to edit. NULL falls back to the org default."""
-    integration, config = await _resolve_active_config(
-        session, phone_id=phone_id
-    )
+    integration, config = await _resolve_active_config(session, phone_id=phone_id)
     token = decrypt(integration.access_token_enc)
 
     # Split the patch into Meta-bound + Core-only fields. Meta cares
@@ -404,9 +377,7 @@ async def update_profile(
     # Core-CRM-only fields.
     if "business_hours" in patch:
         config.business_hours = (
-            list(patch["business_hours"])
-            if patch["business_hours"] is not None
-            else None
+            list(patch["business_hours"]) if patch["business_hours"] is not None else None
         )
     if "greeting_message" in patch:
         config.greeting_message = patch["greeting_message"] or None
@@ -414,7 +385,7 @@ async def update_profile(
         config.away_message = patch["away_message"] or None
 
     if meta_payload:
-        config.profile_last_synced_at = datetime.now(timezone.utc)
+        config.profile_last_synced_at = datetime.now(UTC)
 
     await session.commit()
     await session.refresh(config)
@@ -438,7 +409,7 @@ async def upload_picture(
     actor_id: uuid.UUID,
     file_bytes: bytes,
     mime_type: str,
-    phone_id: Optional[str] = None,
+    phone_id: str | None = None,
     http_client_factory: HttpClientFactory = _default_http_client_factory,
 ) -> WhatsAppAccountConfig:
     """Upload the operator's picture to Meta + attach the returned
@@ -459,9 +430,7 @@ async def upload_picture(
             user_message="Profile picture must be 5 MB or smaller.",
         )
 
-    integration, config = await _resolve_active_config(
-        session, phone_id=phone_id
-    )
+    integration, config = await _resolve_active_config(session, phone_id=phone_id)
     token = decrypt(integration.access_token_enc)
 
     handle = await _upload_picture_to_meta(
@@ -482,9 +451,7 @@ async def upload_picture(
         http_client_factory=http_client_factory,
     )
     # Re-fetch so we pick up the new public URL.
-    return await refresh_from_meta(
-        session, http_client_factory=http_client_factory
-    )
+    return await refresh_from_meta(session, http_client_factory=http_client_factory)
 
 
 __all__ = [

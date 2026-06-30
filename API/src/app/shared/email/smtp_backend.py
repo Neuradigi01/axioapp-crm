@@ -11,11 +11,11 @@ Selection happens in `shared/email/__init__.py` based on
 the failure and swallow — invite / OTP flows must not 500 because the
 mail server hiccuped; the user can resend.
 """
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-
 
 logger = logging.getLogger("src.app.shared.email")
 

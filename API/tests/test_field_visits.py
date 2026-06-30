@@ -10,10 +10,11 @@ Asserts:
       * copies passed measurements back to a linked custom order
   - Permission gate: a user with only `field_visits.read` cannot create.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -43,9 +44,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -79,7 +78,7 @@ async def _seed_contact(org_id: uuid.UUID) -> uuid.UUID:
 
 
 def _appt_payload(contact_id: uuid.UUID, user_id: uuid.UUID) -> dict:
-    when = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    when = (datetime.now(UTC) + timedelta(days=1)).isoformat()
     return {
         "contact_id": str(contact_id),
         "title": "Measurement at customer site",
@@ -93,9 +92,7 @@ def _appt_payload(contact_id: uuid.UUID, user_id: uuid.UUID) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_create_visit_creates_appointment_too(
-    layered_client, seeded_admin
-):
+async def test_create_visit_creates_appointment_too(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -134,9 +131,7 @@ async def test_create_visit_creates_appointment_too(
         async with TestSession() as session:
             appt = (
                 await session.execute(
-                    select(Appointment).where(
-                        Appointment.id == uuid.UUID(body["appointment_id"])
-                    )
+                    select(Appointment).where(Appointment.id == uuid.UUID(body["appointment_id"]))
                 )
             ).scalar_one()
             assert appt.title == "Measurement at customer site"
@@ -146,9 +141,7 @@ async def test_create_visit_creates_appointment_too(
 
 
 @pytest.mark.asyncio
-async def test_list_filters_by_assigned_and_completed(
-    layered_client, seeded_admin
-):
+async def test_list_filters_by_assigned_and_completed(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(
@@ -197,9 +190,7 @@ async def test_list_filters_by_assigned_and_completed(
 
 
 @pytest.mark.asyncio
-async def test_complete_flips_appointment_and_is_idempotent(
-    layered_client, seeded_admin
-):
+async def test_complete_flips_appointment_and_is_idempotent(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -244,9 +235,7 @@ async def test_complete_flips_appointment_and_is_idempotent(
         async with TestSession() as session:
             appt = (
                 await session.execute(
-                    select(Appointment).where(
-                        Appointment.id == uuid.UUID(appt_id)
-                    )
+                    select(Appointment).where(Appointment.id == uuid.UUID(appt_id))
                 )
             ).scalar_one()
             assert appt.status == AppointmentStatus.completed
@@ -264,9 +253,7 @@ async def test_complete_flips_appointment_and_is_idempotent(
 
 
 @pytest.mark.asyncio
-async def test_complete_copies_measurements_to_linked_custom_order(
-    layered_client, seeded_admin
-):
+async def test_complete_copies_measurements_to_linked_custom_order(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -328,12 +315,16 @@ async def test_complete_copies_measurements_to_linked_custom_order(
     try:
         async with TestSession() as session:
             rows = (
-                await session.execute(
-                    select(CustomOrderMeasurement).where(
-                        CustomOrderMeasurement.order_id == uuid.UUID(co_id)
+                (
+                    await session.execute(
+                        select(CustomOrderMeasurement).where(
+                            CustomOrderMeasurement.order_id == uuid.UUID(co_id)
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             labels = sorted(r.item_label for r in rows)
             assert labels == ["Top shelf", "Wardrobe body"]
     finally:
@@ -341,9 +332,7 @@ async def test_complete_copies_measurements_to_linked_custom_order(
 
 
 @pytest.mark.asyncio
-async def test_write_requires_write_permission(
-    layered_client, seeded_admin
-):
+async def test_write_requires_write_permission(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "field_visits.read")

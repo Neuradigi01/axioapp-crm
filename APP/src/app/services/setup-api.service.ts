@@ -29,10 +29,14 @@ export class SetupApiService {
   // ── Encryption ───────────────────────────────────────────────────
 
   encryptText(text: string): Promise<IApiResponse<IEncryptionResult>> {
-    return this.http.Get<IEncryptionResult>(`/dev/encryption/encrypt?text=${encodeURIComponent(text)}`);
+    return this.http.Get<IEncryptionResult>(
+      `/dev/encryption/encrypt?text=${encodeURIComponent(text)}`,
+    );
   }
 
   decryptText(text: string): Promise<IApiResponse<IEncryptionResult>> {
-    return this.http.Get<IEncryptionResult>(`/dev/encryption/decrypt?text=${encodeURIComponent(text)}`);
+    return this.http.Get<IEncryptionResult>(
+      `/dev/encryption/decrypt?text=${encodeURIComponent(text)}`,
+    );
   }
 }

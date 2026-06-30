@@ -46,12 +46,9 @@ import {
     <div class="rounded-md border border-zinc-200 bg-white p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Auto-replies
-          </p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Auto-replies</p>
           <p class="text-[11px] text-zinc-500">
-            Fired on inbound messages. Cooldown: one per contact per
-            type per 24 hours.
+            Fired on inbound messages. Cooldown: one per contact per type per 24 hours.
           </p>
         </div>
         @if (loading()) {
@@ -60,13 +57,17 @@ import {
       </div>
 
       @if (loadError(); as err) {
-        <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <div
+          class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+        >
           {{ err }}
         </div>
       }
 
       @if (toast(); as msg) {
-        <div class="mb-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+        <div
+          class="mb-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700"
+        >
           {{ msg }}
         </div>
       }
@@ -82,9 +83,7 @@ import {
             />
             Greeting (first-time contact)
           </label>
-          <p class="text-[10px] text-zinc-500">
-            Sent once per contact per 24 hr.
-          </p>
+          <p class="text-[10px] text-zinc-500">Sent once per contact per 24 hr.</p>
         </div>
         <textarea
           [ngModel]="greetingMessage()"
@@ -127,14 +126,12 @@ import {
         >
           <option [ngValue]="null">— None —</option>
           @for (t of approvedTemplates(); track t.id) {
-            <option [ngValue]="t.id">
-              {{ t.name }} ({{ t.language }})
-            </option>
+            <option [ngValue]="t.id">{{ t.name }} ({{ t.language }})</option>
           }
         </select>
         <p class="mt-1 text-[10px] text-zinc-500">
-          Used when the contact is outside their 24-hour session window.
-          Only approved templates appear.
+          Used when the contact is outside their 24-hour session window. Only approved templates
+          appear.
         </p>
       </div>
 
@@ -149,9 +146,7 @@ import {
             />
             Out-of-hours auto-reply
           </label>
-          <p class="text-[10px] text-zinc-500">
-            Fires outside business hours (set above).
-          </p>
+          <p class="text-[10px] text-zinc-500">Fires outside business hours (set above).</p>
         </div>
         <textarea
           [ngModel]="awayMessage()"
@@ -187,9 +182,7 @@ import {
         >
           <option [ngValue]="null">— None —</option>
           @for (t of approvedTemplates(); track t.id) {
-            <option [ngValue]="t.id">
-              {{ t.name }} ({{ t.language }})
-            </option>
+            <option [ngValue]="t.id">{{ t.name }} ({{ t.language }})</option>
           }
         </select>
       </div>
@@ -247,9 +240,7 @@ export class AutoReplySectionComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load auto-reply settings.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load auto-reply settings.');
         },
       });
     this.templatesApi
@@ -295,9 +286,7 @@ export class AutoReplySectionComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not save auto-reply settings.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not save auto-reply settings.');
         },
       });
   }

@@ -21,11 +21,11 @@ the convention across this codebase is "absent user => system."
 The Celery task `advance_trial_lifecycle` in `tasks.py` calls
 `scan_and_transition_due` + `fire_due_reminders` once per hour.
 """
+
 from __future__ import annotations
 
 import logging
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,9 +59,8 @@ _CYCLE_LENGTHS: dict[str, timedelta] = {
 # Single-row transition
 # ---------------------------------------------------------------------------
 
-async def transition_if_due(
-    session: AsyncSession, subscription: Subscription
-) -> str | None:
+
+async def transition_if_due(session: AsyncSession, subscription: Subscription) -> str | None:
     """Apply the appropriate transition if `subscription` is past its
     deadline. Returns the new status or None.
 
@@ -70,7 +69,7 @@ async def transition_if_due(
     transition silently. Audit events and emails fire only when the
     `UPDATE` actually changed a row.
     """
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
 
     if (
         subscription.status == "trialing"
@@ -124,10 +123,7 @@ async def _transition(
 ) -> str | None:
     """Run the conditional UPDATE; emit side effects only on a real change."""
     result = await session.execute(
-        text(
-            f"UPDATE tbl_subscriptions SET {set_sql} "
-            "WHERE id = :id AND status = :from_status"
-        ),
+        text(f"UPDATE tbl_subscriptions SET {set_sql} WHERE id = :id AND status = :from_status"),
         {"id": subscription.id, "from_status": from_status},
     )
     if (result.rowcount or 0) == 0:
@@ -152,18 +148,14 @@ async def _transition(
     return to_status
 
 
-async def _delete_archived(
-    session: AsyncSession, subscription: Subscription
-) -> str | None:
+async def _delete_archived(session: AsyncSession, subscription: Subscription) -> str | None:
     """Drop the archived subscription row entirely and emit org.deleted.
 
     Conditional on status='archived' so a concurrent operator-driven
     restore (manual reactivation) aborts the delete.
     """
     result = await session.execute(
-        text(
-            "DELETE FROM tbl_subscriptions WHERE id = :id AND status = 'archived'"
-        ),
+        text("DELETE FROM tbl_subscriptions WHERE id = :id AND status = 'archived'"),
         {"id": subscription.id},
     )
     if (result.rowcount or 0) == 0:
@@ -183,6 +175,7 @@ async def _delete_archived(
 # ---------------------------------------------------------------------------
 # Sweep
 # ---------------------------------------------------------------------------
+
 
 async def scan_and_transition_due(session: AsyncSession) -> dict[str, int]:
     """Walk every subscription that might be due for transition.
@@ -206,15 +199,19 @@ async def scan_and_transition_due(session: AsyncSession) -> dict[str, int]:
         "scheduled_change_applied": 0,
         "scheduled_change_skipped_due_to_race": 0,
     }
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
 
     rows = (
-        await session.execute(
-            select(Subscription).where(
-                Subscription.status.in_(("trialing", "read_only", "archived"))
+        (
+            await session.execute(
+                select(Subscription).where(
+                    Subscription.status.in_(("trialing", "read_only", "archived"))
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     for sub in rows:
         # Cheap pre-check so we don't issue a no-op UPDATE for every
@@ -238,18 +235,22 @@ async def scan_and_transition_due(session: AsyncSession) -> dict[str, int]:
     # inside `apply_scheduled_change_if_due`, so the cheap-prefilter is
     # also a correctness statement.
     pending = (
-        await session.execute(
-            select(Subscription).where(
-                (
-                    Subscription.next_plan_code.is_not(None)
-                    | Subscription.next_billing_cycle.is_not(None)
-                    | Subscription.next_seats.is_not(None)
-                ),
-                Subscription.current_period_end <= now,
-                Subscription.status.in_(ACTIVE_STATUSES),
+        (
+            await session.execute(
+                select(Subscription).where(
+                    (
+                        Subscription.next_plan_code.is_not(None)
+                        | Subscription.next_billing_cycle.is_not(None)
+                        | Subscription.next_seats.is_not(None)
+                    ),
+                    Subscription.current_period_end <= now,
+                    Subscription.status.in_(ACTIVE_STATUSES),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     for sub in pending:
         applied = await apply_scheduled_change_if_due(session, sub)
@@ -265,15 +266,9 @@ def _is_due(sub: Subscription, now: datetime) -> bool:
     if sub.status == "trialing":
         return sub.trial_ends_at is not None and now > sub.trial_ends_at
     if sub.status == "read_only":
-        return (
-            sub.read_only_at is not None
-            and now > sub.read_only_at + READ_ONLY_TO_ARCHIVED
-        )
+        return sub.read_only_at is not None and now > sub.read_only_at + READ_ONLY_TO_ARCHIVED
     if sub.status == "archived":
-        return (
-            sub.archived_at is not None
-            and now > sub.archived_at + ARCHIVED_TO_DELETED
-        )
+        return sub.archived_at is not None and now > sub.archived_at + ARCHIVED_TO_DELETED
     return False
 
 
@@ -301,7 +296,7 @@ async def apply_scheduled_change_if_due(
     outage), the period is advanced past every elapsed window so the
     counter-rollover task does not need to re-rollover.
     """
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     has_pending = (
         sub.next_plan_code is not None
         or sub.next_billing_cycle is not None
@@ -314,14 +309,13 @@ async def apply_scheduled_change_if_due(
 
     new_plan = sub.next_plan_code or sub.plan_code
     new_cycle = sub.next_billing_cycle or sub.billing_cycle
-    new_seats = (
-        sub.next_seats if sub.next_seats is not None else sub.seats_purchased
-    )
+    new_seats = sub.next_seats if sub.next_seats is not None else sub.seats_purchased
     cycle_length = _CYCLE_LENGTHS.get(new_cycle)
     if cycle_length is None:
         log.warning(
             "scheduled-change on subscription %s has unknown cycle %r",
-            sub.id, new_cycle,
+            sub.id,
+            new_cycle,
         )
         return None
 
@@ -397,6 +391,7 @@ async def apply_scheduled_change_if_due(
 # 3-day reminder
 # ---------------------------------------------------------------------------
 
+
 async def fire_due_reminders(session: AsyncSession) -> int:
     """Send the `trial_ending_soon` email to every trialing sub whose
     `trial_ends_at` is within the next 3 days and that has not been
@@ -406,18 +401,22 @@ async def fire_due_reminders(session: AsyncSession) -> int:
     we set it before the email queues (best-effort log line, can't
     really fail) so a beat retry after a crash won't double-notify.
     """
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     cutoff = now + TRIAL_REMINDER_LEAD
 
     rows = (
-        await session.execute(
-            select(Subscription).where(
-                Subscription.status == "trialing",
-                Subscription.trial_ends_at > now,
-                Subscription.trial_ends_at <= cutoff,
+        (
+            await session.execute(
+                select(Subscription).where(
+                    Subscription.status == "trialing",
+                    Subscription.trial_ends_at > now,
+                    Subscription.trial_ends_at <= cutoff,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     fired = 0
     for sub in rows:

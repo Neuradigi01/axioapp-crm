@@ -2,9 +2,7 @@
   <div class="flex items-center justify-between">
     <div>
       <h2 class="text-base font-semibold text-zinc-900">Field Operations</h2>
-      <p class="text-xs text-zinc-500">
-        Recent and upcoming site visits across the team
-      </p>
+      <p class="text-xs text-zinc-500">Recent and upcoming site visits across the team</p>
     </div>
     <a
       routerLink="/user/field-ops"
@@ -39,7 +37,9 @@
       }
     </div>
   } @else if (visits().length === 0) {
-    <p class="rounded-md border border-dashed border-zinc-300 bg-white py-8 text-center text-sm text-zinc-500">
+    <p
+      class="rounded-md border border-dashed border-zinc-300 bg-white py-8 text-center text-sm text-zinc-500"
+    >
       No field visits yet. Schedule one from the Field Operations page.
     </p>
   } @else {
@@ -73,12 +73,16 @@
               </td>
               <td class="px-3 py-2">
                 @if (v.completed_at) {
-                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">
+                  <span
+                    class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+                  >
                     <lucide-icon name="check" class="h-3 w-3" />
                     Completed
                   </span>
                 } @else {
-                  <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200">
+                  <span
+                    class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200"
+                  >
                     Open
                   </span>
                 }

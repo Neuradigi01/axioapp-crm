@@ -4,6 +4,7 @@
 `GET /staff-portal/users`. It deliberately excludes email/phone/PIN
 hash so a tablet sitting in the shop floor can't leak PII.
 """
+
 from __future__ import annotations
 
 import uuid

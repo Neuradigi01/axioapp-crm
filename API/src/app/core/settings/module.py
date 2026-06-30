@@ -7,8 +7,8 @@ tabs (Team, Roles, Integrations, Standard Fields, Embed Widget,
 AI Settings, Store Profile, Custom Fields) are individually gated
 inside the settings page; see `settings-page.component.ts::TABS`.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="settings",

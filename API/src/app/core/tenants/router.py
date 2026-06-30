@@ -10,6 +10,7 @@ The Step-13 send-rules GET/PATCH endpoints surface the quiet-hours
 marketing-category automation runs. Gated on `settings.write` —
 same key the rest of the org-wide Settings PATCH endpoints honour.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -29,7 +30,6 @@ from src.app.core.tenants.schemas import (
 from src.app.core.users.models import User
 from src.app.shared.context import get_context
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/ownership", tags=["Ownership"])
 send_rules_router = APIRouter(prefix="/tenants", tags=["Tenants"])
@@ -82,9 +82,7 @@ async def _load_active_org(session: AsyncSession) -> Organization:
             detail="no organisation in request context",
         )
     org = (
-        await session.execute(
-            select(Organization).where(Organization.id == ctx.org_id)
-        )
+        await session.execute(select(Organization).where(Organization.id == ctx.org_id))
     ).scalar_one_or_none()
     if org is None:
         raise HTTPException(

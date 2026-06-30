@@ -7,6 +7,7 @@ The PATCH endpoint must:
   - 403 when the user lacks `settings.write`
 The GET endpoint auto-creates the row on first call.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -29,9 +30,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -46,9 +45,7 @@ async def _login(client, *, org_slug, email, password) -> str:
 
 
 @pytest.mark.asyncio
-async def test_get_auto_creates_row_with_defaults(
-    layered_client, seeded_admin
-):
+async def test_get_auto_creates_row_with_defaults(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "settings.read")
@@ -76,9 +73,7 @@ async def test_get_auto_creates_row_with_defaults(
 
 
 @pytest.mark.asyncio
-async def test_patch_whitelisted_keys_succeeds(
-    layered_client, seeded_admin
-):
+async def test_patch_whitelisted_keys_succeeds(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "settings.read", "settings.write")
@@ -131,8 +126,7 @@ async def test_patch_unknown_keys_are_ignored(layered_client, seeded_admin):
 
     patch = await layered_client.patch(
         "/api/v1/settings",
-        json={"nope": "x", "org_id": "00000000-0000-0000-0000-000000000999",
-              "store_name": "Stays"},
+        json={"nope": "x", "org_id": "00000000-0000-0000-0000-000000000999", "store_name": "Stays"},
         headers=headers,
     )
     assert patch.status_code == 200
@@ -145,9 +139,7 @@ async def test_patch_unknown_keys_are_ignored(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_patch_tax_rate_out_of_range_returns_422(
-    layered_client, seeded_admin
-):
+async def test_patch_tax_rate_out_of_range_returns_422(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "settings.read", "settings.write")

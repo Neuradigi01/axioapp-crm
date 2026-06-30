@@ -30,25 +30,16 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { Subject, of } from 'rxjs';
-import {
-  catchError,
-  debounceTime,
-  distinctUntilChanged,
-  switchMap,
-} from 'rxjs/operators';
+import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  ContactListItem,
-  ContactsApiService,
-} from '../contacts-api.service';
+import { ContactListItem, ContactsApiService } from '../contacts-api.service';
 import {
   ContactGroupCreate,
   ContactGroupUpdate,
   ContactGroupsApiService,
   GroupFilter,
 } from './groups-api.service';
-
 
 @Component({
   selector: 'app-contact-group-edit-page',
@@ -114,11 +105,7 @@ export class ContactGroupEditPageComponent {
             // Only run preview if there's at least one filter set;
             // empty filter would resolve to "everyone" which is
             // expensive AND misleading on a fresh form.
-            if (
-              !filter.q &&
-              !filter.source &&
-              !filter.tag
-            ) {
+            if (!filter.q && !filter.source && !filter.tag) {
               return of({ count: 0 });
             }
             this.previewLoading.set(true);
@@ -196,9 +183,7 @@ export class ContactGroupEditPageComponent {
   }
 
   protected onContactRemove(contactId: string): void {
-    this.selectedContacts.update((rows) =>
-      rows.filter((c) => c.id !== contactId),
-    );
+    this.selectedContacts.update((rows) => rows.filter((c) => c.id !== contactId));
     this.previewTrigger$.next();
   }
 
@@ -296,16 +281,15 @@ export class ContactGroupEditPageComponent {
           if (!detail.is_dynamic && detail.sample_contact_ids.length > 0) {
             // Render placeholder chips so the operator sees that
             // members exist; full picker hydration is P2.
-            const placeholders: ContactListItem[] =
-              detail.sample_contact_ids.map(
-                (cid) =>
-                  ({
-                    id: cid,
-                    full_name: '(existing member)',
-                    phone: null,
-                    email: null,
-                  }) as ContactListItem,
-              );
+            const placeholders: ContactListItem[] = detail.sample_contact_ids.map(
+              (cid) =>
+                ({
+                  id: cid,
+                  full_name: '(existing member)',
+                  phone: null,
+                  email: null,
+                }) as ContactListItem,
+            );
             this.selectedContacts.set(placeholders);
           }
           this.previewCount.set(detail.member_count);

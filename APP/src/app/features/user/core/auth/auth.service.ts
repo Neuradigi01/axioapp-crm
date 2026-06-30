@@ -126,27 +126,18 @@ export class FurnitureAuthService {
     if (orgSlug) body.org_slug = orgSlug;
     return this.http
       .post<LoginResponse>(`${environment.apiBaseUrl}/auth/login`, body)
-      .pipe(
-        tap((res) => this.storage.setTokens(res.access_token, res.access_token)),
-      );
+      .pipe(tap((res) => this.storage.setTokens(res.access_token, res.access_token)));
   }
 
   register(req: RegisterRequest): Observable<RegisterResponse> {
     return this.http
       .post<RegisterResponse>(`${environment.apiBaseUrl}/auth/register`, req)
-      .pipe(
-        tap((res) => this.storage.setTokens(res.access_token, res.access_token)),
-      );
+      .pipe(tap((res) => this.storage.setTokens(res.access_token, res.access_token)));
   }
 
-  completeOnboarding(
-    req: OnboardingCompleteRequest,
-  ): Observable<OnboardingCompleteResponse> {
+  completeOnboarding(req: OnboardingCompleteRequest): Observable<OnboardingCompleteResponse> {
     return this.http
-      .post<OnboardingCompleteResponse>(
-        `${environment.apiBaseUrl}/auth/onboarding/complete`,
-        req,
-      )
+      .post<OnboardingCompleteResponse>(`${environment.apiBaseUrl}/auth/onboarding/complete`, req)
       .pipe(
         // Backend rotates the JWT and revokes the previous session, so
         // we MUST replace the stored token with the new one — otherwise
@@ -158,39 +149,33 @@ export class FurnitureAuthService {
   refresh(): Observable<LoginResponse> {
     return this.http
       .post<LoginResponse>(`${environment.apiBaseUrl}/auth/refresh`, {})
-      .pipe(
-        tap((res) => this.storage.setTokens(res.access_token, res.access_token)),
-      );
+      .pipe(tap((res) => this.storage.setTokens(res.access_token, res.access_token)));
   }
 
   logout(): Observable<void> {
-    return this.http
-      .post<void>(`${environment.apiBaseUrl}/auth/logout`, {})
-      .pipe(
-        tap(() => {
-          this.storage.clear();
-          this.currentOrg.set(null);
-          this.currentPermissions.set([]);
-          this.currentUserId.set(null);
-          this.userLoaded.set(false);
-          this.needsOnboarding.set(false);
-        }),
-      );
+    return this.http.post<void>(`${environment.apiBaseUrl}/auth/logout`, {}).pipe(
+      tap(() => {
+        this.storage.clear();
+        this.currentOrg.set(null);
+        this.currentPermissions.set([]);
+        this.currentUserId.set(null);
+        this.userLoaded.set(false);
+        this.needsOnboarding.set(false);
+      }),
+    );
   }
 
   me(): Observable<MeResponse> {
-    return this.http
-      .get<MeResponse>(`${environment.apiBaseUrl}/users/me`)
-      .pipe(
-        tap((res) => {
-          this.currentOrg.set(res.org);
-          this.currentPermissions.set(res.permission_keys);
-          this.currentRoleName.set(res.role_name);
-          this.currentUserId.set(res.id);
-          this.needsOnboarding.set(res.needs_onboarding);
-          this.userLoaded.set(true);
-        }),
-      );
+    return this.http.get<MeResponse>(`${environment.apiBaseUrl}/users/me`).pipe(
+      tap((res) => {
+        this.currentOrg.set(res.org);
+        this.currentPermissions.set(res.permission_keys);
+        this.currentRoleName.set(res.role_name);
+        this.currentUserId.set(res.id);
+        this.needsOnboarding.set(res.needs_onboarding);
+        this.userLoaded.set(true);
+      }),
+    );
   }
 
   isAuthenticated(): boolean {

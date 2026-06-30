@@ -13,11 +13,12 @@ Operations:
       review_rating_distribution, count_responded_reviews,
       count_pending_reviews, count_low_rating_reviews_since
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.engine import Row
@@ -27,23 +28,19 @@ from src.app.core.reviews.models import Review, ReviewStatus
 from src.app.shared.db.pagination import paginate
 
 
-async def get_review_by_id(
-    session: AsyncSession, review_id: uuid.UUID
-) -> Optional[Review]:
+async def get_review_by_id(session: AsyncSession, review_id: uuid.UUID) -> Review | None:
     """Single-row read by PK. ``None`` on miss (or cross-tenant — the
     ORM filter applies)."""
-    result = await session.execute(
-        select(Review).where(Review.id == review_id)
-    )
+    result = await session.execute(select(Review).where(Review.id == review_id))
     return result.scalar_one_or_none()
 
 
 async def list_reviews_query(
     session: AsyncSession,
     *,
-    source: Optional[str] = None,
-    rating: Optional[int] = None,
-    status_filter: Optional[ReviewStatus] = None,
+    source: str | None = None,
+    rating: int | None = None,
+    status_filter: ReviewStatus | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Review], int]:
@@ -69,9 +66,7 @@ def insert_review(session: AsyncSession, review: Review) -> None:
     session.add(review)
 
 
-async def delete_review_row(
-    session: AsyncSession, review: Review
-) -> None:
+async def delete_review_row(session: AsyncSession, review: Review) -> None:
     """Mark a Review row for DELETE. Caller commits."""
     await session.delete(review)
 
@@ -81,22 +76,13 @@ async def delete_review_row(
 
 async def count_total_reviews(session: AsyncSession) -> int:
     """Total review count for the active tenant."""
-    return int(
-        (
-            await session.execute(
-                select(func.count()).select_from(Review)
-            )
-        ).scalar_one()
-        or 0
-    )
+    return int((await session.execute(select(func.count()).select_from(Review))).scalar_one() or 0)
 
 
-async def avg_review_rating(session: AsyncSession) -> Optional[float]:
+async def avg_review_rating(session: AsyncSession) -> float | None:
     """Average rating across all reviews. ``None`` when the table is
     empty (caller defaults to 0.0)."""
-    avg = (
-        await session.execute(select(func.avg(Review.rating)))
-    ).scalar_one()
+    avg = (await session.execute(select(func.avg(Review.rating)))).scalar_one()
     return float(avg) if avg is not None else None
 
 
@@ -144,9 +130,7 @@ async def count_pending_reviews(session: AsyncSession) -> int:
     )
 
 
-async def count_low_rating_reviews_since(
-    session: AsyncSession, *, cutoff: datetime
-) -> int:
+async def count_low_rating_reviews_since(session: AsyncSession, *, cutoff: datetime) -> int:
     """Number of reviews with ``rating <= 3`` since ``cutoff``.
     Drives the "alerts in the last 7 days" card."""
     return int(

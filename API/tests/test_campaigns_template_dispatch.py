@@ -15,20 +15,18 @@ itself is exercised end-to-end via the existing campaign tests + the
 manual smoke test path; here we just lock down the resolution
 contract that Step 3.5.6's branch depends on.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
-
-import pytest
 
 from src.app.core.campaigns import service as campaigns_service
 from src.app.core.campaigns.models import Campaign, CampaignStatus
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.integrations.whatsapp.models import WhatsAppTemplate
-
 
 _ORG_ID = uuid.uuid4()
 
@@ -70,7 +68,7 @@ def _make_campaign_with_bindings(
         schedule_at=None,
         status=CampaignStatus.draft,
         created_by_id=uuid.uuid4(),
-        created_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 5, 1, tzinfo=UTC),
     )
 
 
@@ -79,9 +77,7 @@ def _make_campaign_with_bindings(
 
 class TestResolveTemplateVariables:
     def test_static_value_passes_through(self):
-        campaign = _make_campaign_with_bindings(
-            {"1": {"kind": "static", "value": "30%"}}
-        )
+        campaign = _make_campaign_with_bindings({"1": {"kind": "static", "value": "30%"}})
         contact = _make_contact()
         out = campaigns_service._resolve_template_variables(campaign, contact)
         assert out == {1: "30%"}
@@ -110,9 +106,7 @@ class TestResolveTemplateVariables:
         """Option (b) per Step 3.5.6: empty contact field → 'Customer'
         fallback rather than failing the message. Keeps delivery rate
         high; per-template fallback config is P2 work."""
-        campaign = _make_campaign_with_bindings(
-            {"1": {"kind": "field", "value": "full_name"}}
-        )
+        campaign = _make_campaign_with_bindings({"1": {"kind": "field", "value": "full_name"}})
         # NULL full_name (rare — contacts model has NOT NULL — but
         # could be empty string after a malformed import).
         contact = _make_contact(full_name="")
@@ -120,9 +114,7 @@ class TestResolveTemplateVariables:
         assert out == {1: "Customer"}
 
     def test_missing_email_falls_back(self):
-        campaign = _make_campaign_with_bindings(
-            {"1": {"kind": "field", "value": "email"}}
-        )
+        campaign = _make_campaign_with_bindings({"1": {"kind": "field", "value": "email"}})
         contact = _make_contact(email=None)
         out = campaigns_service._resolve_template_variables(campaign, contact)
         assert out == {1: "Customer"}
@@ -190,13 +182,11 @@ class TestPreviewTemplateBody:
             status="APPROVED",
             body="Hi {{1}}, enjoy {{2}} off on all sofas this Diwali!",
             variable_count=2,
-            last_synced_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+            last_synced_at=datetime(2026, 5, 1, tzinfo=UTC),
         )
         variables = {1: "Asha Walker", 2: "30%"}
         out = campaigns_service._preview_template_body(template, variables)
-        assert out == (
-            "Hi Asha Walker, enjoy 30% off on all sofas this Diwali!"
-        )
+        assert out == ("Hi Asha Walker, enjoy 30% off on all sofas this Diwali!")
 
     def test_unfilled_placeholders_pass_through(self):
         """Defensive: if the picker somehow lets a `{{3}}` through
@@ -212,7 +202,7 @@ class TestPreviewTemplateBody:
             status="APPROVED",
             body="Hi {{1}}, your order {{3}} is ready.",
             variable_count=2,
-            last_synced_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+            last_synced_at=datetime(2026, 5, 1, tzinfo=UTC),
         )
         variables = {1: "Bob"}
         out = campaigns_service._preview_template_body(template, variables)
@@ -229,7 +219,7 @@ class TestPreviewTemplateBody:
             status="APPROVED",
             body="Welcome to our store.",
             variable_count=0,
-            last_synced_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+            last_synced_at=datetime(2026, 5, 1, tzinfo=UTC),
         )
         out = campaigns_service._preview_template_body(template, {})
         assert out == "Welcome to our store."
@@ -246,7 +236,7 @@ class TestPreviewTemplateBody:
             status="APPROVED",
             body="",
             variable_count=0,
-            last_synced_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+            last_synced_at=datetime(2026, 5, 1, tzinfo=UTC),
         )
         out = campaigns_service._preview_template_body(template, {})
         assert out == ""
@@ -258,9 +248,7 @@ class TestPreviewTemplateBody:
 class TestGetContactField:
     def test_known_field_returns_value(self):
         contact = _make_contact(full_name="Asha")
-        assert (
-            campaigns_service._get_contact_field(contact, "full_name") == "Asha"
-        )
+        assert campaigns_service._get_contact_field(contact, "full_name") == "Asha"
 
     def test_unknown_field_returns_empty(self):
         contact = _make_contact()
@@ -268,16 +256,8 @@ class TestGetContactField:
 
     def test_custom_data_dot_notation(self):
         contact = _make_contact(custom_data={"loyalty_tier": "gold"})
-        assert (
-            campaigns_service._get_contact_field(
-                contact, "custom_data.loyalty_tier"
-            )
-            == "gold"
-        )
+        assert campaigns_service._get_contact_field(contact, "custom_data.loyalty_tier") == "gold"
 
     def test_custom_data_missing_key_returns_empty(self):
         contact = _make_contact(custom_data={})
-        assert (
-            campaigns_service._get_contact_field(contact, "custom_data.x")
-            == ""
-        )
+        assert campaigns_service._get_contact_field(contact, "custom_data.x") == ""

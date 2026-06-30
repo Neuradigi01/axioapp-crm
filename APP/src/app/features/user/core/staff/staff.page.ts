@@ -11,10 +11,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { InrPipe } from '../shared/pipes/inr.pipe';
-import {
-  StaffApiService,
-  StaffWithPerformance,
-} from './staff-api.service';
+import { StaffApiService, StaffWithPerformance } from './staff-api.service';
 import { StaffOverviewTabComponent } from './tabs/overview.component';
 import { StaffLeaderboardTabComponent } from './tabs/leaderboard.component';
 import { StaffTargetsTabComponent } from './tabs/targets.component';
@@ -96,20 +93,13 @@ export class StaffPageComponent {
 
   protected readonly totalRevenue = computed(() => {
     // Sum of leaderboard.sales â€” sales placeholder is 0 today.
-    return this.rows().reduce(
-      (acc, r) => acc + Number(r.performance.sales || 0),
-      0,
-    );
+    return this.rows().reduce((acc, r) => acc + Number(r.performance.sales || 0), 0);
   });
 
   protected readonly avgConversionPct = computed(() => {
     const rs = this.rows();
     if (rs.length === 0) return 0;
-    const total = rs.reduce(
-      (acc, r) =>
-        acc + (r.performance.target_progress_pct ?? 0),
-      0,
-    );
+    const total = rs.reduce((acc, r) => acc + (r.performance.target_progress_pct ?? 0), 0);
     return Math.round(total / rs.length);
   });
 
@@ -144,5 +134,4 @@ export class StaffPageComponent {
   protected setTab(tab: StaffTabId): void {
     this.activeTab.set(tab);
   }
-
 }

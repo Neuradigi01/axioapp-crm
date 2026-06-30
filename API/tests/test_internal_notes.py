@@ -14,6 +14,7 @@ Cases:
   6. Mentions must be UUIDs — non-UUID strings rejected.
   7. `extra='forbid'` rejects unknown fields.
 """
+
 from __future__ import annotations
 
 import uuid

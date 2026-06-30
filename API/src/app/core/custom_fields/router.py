@@ -10,6 +10,7 @@ scoping is automatic via the `do_orm_execute` ORM filter.
   DELETE /custom-fields/{id}                 → only source=user
   GET    /custom-fields/{entity_type}/render → visible + ordered for forms
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,7 +35,6 @@ from src.app.core.custom_fields.service import (
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/custom-fields", tags=["Custom Fields"])
 
 
@@ -45,9 +45,7 @@ async def list_custom_fields(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("custom_fields.read")),
 ) -> list[CustomFieldOut]:
-    rows = await list_fields(
-        db, entity_type=entity_type, include_hidden=include_hidden
-    )
+    rows = await list_fields(db, entity_type=entity_type, include_hidden=include_hidden)
     return [CustomFieldOut.model_validate(row) for row in rows]
 
 

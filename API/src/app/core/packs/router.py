@@ -5,6 +5,7 @@ catalog is public (no auth required) and identical for all callers —
 the response contains no PII and no org-scoped data. The onboarding
 page fetches it on init to render the template tiles.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter

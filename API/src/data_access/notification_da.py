@@ -1,5 +1,6 @@
-from sqlalchemy import select, func, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.models.notification import Notification
 
 
@@ -25,8 +26,7 @@ async def get_notifications_paginated(
     total = (await db.execute(count_stmt)).scalar()
 
     items_stmt = (
-        base
-        .order_by(Notification.created_at.desc())
+        base.order_by(Notification.created_at.desc())
         .offset(page_index * page_size)
         .limit(page_size)
     )
@@ -37,11 +37,13 @@ async def get_notifications_paginated(
 
 async def get_unread_count(db: AsyncSession, member_id: int, user_type: str) -> int:
     stmt = select(func.count()).select_from(
-        select(Notification).where(
+        select(Notification)
+        .where(
             Notification.member_id == member_id,
             Notification.user_type == user_type,
             Notification.is_read == False,
-        ).subquery()
+        )
+        .subquery()
     )
     return (await db.execute(stmt)).scalar()
 

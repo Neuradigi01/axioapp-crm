@@ -15,10 +15,11 @@ Operations grouped by entity:
   * Stage history (``fp_custom_order_stages``)
       list_stage_history_for_order, insert_stage_history
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,28 +31,23 @@ from src.app.packs.furniture.modules.custom_orders.models import (
     CustomOrderStageHistory,
 )
 
-
 # --- Custom orders ------------------------------------------------------
 
 
-async def get_order_by_id(
-    session: AsyncSession, order_id: uuid.UUID
-) -> Optional[CustomOrder]:
+async def get_order_by_id(session: AsyncSession, order_id: uuid.UUID) -> CustomOrder | None:
     """Single-row read by PK. ``None`` on miss (or cross-tenant — the
     ORM filter applies)."""
     return (
-        await session.execute(
-            select(CustomOrder).where(CustomOrder.id == order_id)
-        )
+        await session.execute(select(CustomOrder).where(CustomOrder.id == order_id))
     ).scalar_one_or_none()
 
 
 async def list_orders_query(
     session: AsyncSession,
     *,
-    stage: Optional[str] = None,
-    assigned_to_id: Optional[uuid.UUID] = None,
-    contact_id: Optional[uuid.UUID] = None,
+    stage: str | None = None,
+    assigned_to_id: uuid.UUID | None = None,
+    contact_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[CustomOrder], int]:
@@ -76,11 +72,7 @@ async def list_orders_query(
     total = (await session.execute(total_stmt)).scalar_one()
 
     offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
-    )
+    rows = (await session.execute(base.offset(offset).limit(size))).scalars().all()
     return list(rows), int(total)
 
 
@@ -89,9 +81,7 @@ def insert_order(session: AsyncSession, order: CustomOrder) -> None:
     session.add(order)
 
 
-async def delete_order_row(
-    session: AsyncSession, order: CustomOrder
-) -> None:
+async def delete_order_row(session: AsyncSession, order: CustomOrder) -> None:
     """Mark a CustomOrder row for DELETE. Caller commits."""
     await session.delete(order)
 
@@ -112,9 +102,7 @@ async def list_measurements_for_order(
     return list((await session.execute(stmt)).scalars().all())
 
 
-def insert_measurement(
-    session: AsyncSession, measurement: CustomOrderMeasurement
-) -> None:
+def insert_measurement(session: AsyncSession, measurement: CustomOrderMeasurement) -> None:
     """Register an already-constructed CustomOrderMeasurement for
     INSERT."""
     session.add(measurement)
@@ -135,9 +123,7 @@ async def list_photos_for_order(
     return list((await session.execute(stmt)).scalars().all())
 
 
-def insert_photo(
-    session: AsyncSession, photo: CustomOrderPhoto
-) -> None:
+def insert_photo(session: AsyncSession, photo: CustomOrderPhoto) -> None:
     """Register an already-constructed CustomOrderPhoto for INSERT."""
     session.add(photo)
 
@@ -158,9 +144,7 @@ async def list_stage_history_for_order(
     return list((await session.execute(stmt)).scalars().all())
 
 
-def insert_stage_history(
-    session: AsyncSession, history: CustomOrderStageHistory
-) -> None:
+def insert_stage_history(session: AsyncSession, history: CustomOrderStageHistory) -> None:
     """Register an already-constructed CustomOrderStageHistory for
     INSERT."""
     session.add(history)

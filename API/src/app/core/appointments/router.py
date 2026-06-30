@@ -10,11 +10,12 @@
 Reads gated by `appointments.read`; writes by `appointments.write`.
 Tenant scoping is automatic via the ORM filter on `TenantScoped`.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,21 +47,16 @@ from src.app.core.auth.dependencies import require_permissions
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
 
 @router.get("", response_model=list[AppointmentOut])
 async def list_appointments_endpoint(
-    from_dt: Optional[datetime] = Query(default=None, alias="from"),
-    to_dt: Optional[datetime] = Query(default=None, alias="to"),
-    assigned_to: Optional[uuid.UUID] = Query(default=None),
-    status_filter: Optional[AppointmentStatus] = Query(
-        default=None, alias="status"
-    ),
-    sort: Literal["scheduled_at", "created_at", "last_activity_at"] = Query(
-        default="scheduled_at"
-    ),
+    from_dt: datetime | None = Query(default=None, alias="from"),
+    to_dt: datetime | None = Query(default=None, alias="to"),
+    assigned_to: uuid.UUID | None = Query(default=None),
+    status_filter: AppointmentStatus | None = Query(default=None, alias="status"),
+    sort: Literal["scheduled_at", "created_at", "last_activity_at"] = Query(default="scheduled_at"),
     order: Literal["asc", "desc"] = Query(default="asc"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("appointments.read")),
@@ -77,9 +73,7 @@ async def list_appointments_endpoint(
     return [AppointmentOut.model_validate(r) for r in rows]
 
 
-@router.post(
-    "", response_model=AppointmentOut, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=AppointmentOut, status_code=status.HTTP_201_CREATED)
 async def create_appointment_endpoint(
     payload: AppointmentCreate,
     db: AsyncSession = Depends(get_db),

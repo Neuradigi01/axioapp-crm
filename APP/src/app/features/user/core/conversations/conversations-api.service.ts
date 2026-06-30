@@ -5,13 +5,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../../../environments/environment';
 import { buildHttpParams } from '../shared/services/query-builder';
 
-export type ConversationChannel =
-  | 'whatsapp'
-  | 'instagram'
-  | 'facebook'
-  | 'web'
-  | 'sms'
-  | 'email';
+export type ConversationChannel = 'whatsapp' | 'instagram' | 'facebook' | 'web' | 'sms' | 'email';
 
 export type ConversationStatus = 'open' | 'snoozed' | 'closed';
 
@@ -224,10 +218,7 @@ export class ConversationsApiService {
     // the adapter against this phone instead of the org default.
     // NULL/omitted keeps the legacy behaviour for single-number orgs.
     if (sendFromPhoneId) body['send_from_phone_id'] = sendFromPhoneId;
-    return this.http.post<ConversationMessage>(
-      `${this.base}/${id}/messages`,
-      body,
-    );
+    return this.http.post<ConversationMessage>(`${this.base}/${id}/messages`, body);
   }
 
   /**
@@ -261,10 +252,10 @@ export class ConversationsApiService {
     text: string,
     mentions: string[] = [],
   ): Observable<ConversationMessage> {
-    return this.http.post<ConversationMessage>(
-      `${this.base}/${conversationId}/notes`,
-      { text, mentions },
-    );
+    return this.http.post<ConversationMessage>(`${this.base}/${conversationId}/notes`, {
+      text,
+      mentions,
+    });
   }
 
   /**
@@ -276,10 +267,11 @@ export class ConversationsApiService {
     id: string,
     interactive: Record<string, unknown>,
   ): Observable<ConversationMessage> {
-    return this.http.post<ConversationMessage>(
-      `${this.base}/${id}/messages`,
-      { text: '', attachments: [], interactive },
-    );
+    return this.http.post<ConversationMessage>(`${this.base}/${id}/messages`, {
+      text: '',
+      attachments: [],
+      interactive,
+    });
   }
 
   /**
@@ -301,10 +293,7 @@ export class ConversationsApiService {
     if (caption) {
       form.append('caption', caption);
     }
-    return this.http.post<ConversationMessage>(
-      `${this.base}/${id}/messages/media`,
-      form,
-    );
+    return this.http.post<ConversationMessage>(`${this.base}/${id}/messages/media`, form);
   }
 
   patch(id: string, payload: ConversationPatch): Observable<Conversation> {
@@ -316,10 +305,7 @@ export class ConversationsApiService {
   /** List every tag in the active org with its assignment count. */
   listTags(search?: string): Observable<ConversationTag[]> {
     const params = buildHttpParams({ search });
-    return this.http.get<ConversationTag[]>(
-      `${this.base}/tags`,
-      { params },
-    );
+    return this.http.get<ConversationTag[]>(`${this.base}/tags`, { params });
   }
 
   /** Create a new tag. Server enforces case-insensitive uniqueness;
@@ -336,10 +322,7 @@ export class ConversationsApiService {
     tagId: string,
     patch: { name?: string; color?: TagColor },
   ): Observable<ConversationTag> {
-    return this.http.patch<ConversationTag>(
-      `${this.base}/tags/${tagId}`,
-      patch,
-    );
+    return this.http.patch<ConversationTag>(`${this.base}/tags/${tagId}`, patch);
   }
 
   /** Delete a tag. Cascade-removes every assignment. */
@@ -349,23 +332,14 @@ export class ConversationsApiService {
 
   /** Attach a tag to a conversation. Idempotent. Returns the updated
    *  tag list so the SPA can swap chips without a follow-up fetch. */
-  assignTag(
-    conversationId: string,
-    tagId: string,
-  ): Observable<ConversationTagRef[]> {
-    return this.http.post<ConversationTagRef[]>(
-      `${this.base}/${conversationId}/tags`,
-      { tag_id: tagId },
-    );
+  assignTag(conversationId: string, tagId: string): Observable<ConversationTagRef[]> {
+    return this.http.post<ConversationTagRef[]>(`${this.base}/${conversationId}/tags`, {
+      tag_id: tagId,
+    });
   }
 
   /** Detach a tag from a conversation. Idempotent. */
-  unassignTag(
-    conversationId: string,
-    tagId: string,
-  ): Observable<ConversationTagRef[]> {
-    return this.http.delete<ConversationTagRef[]>(
-      `${this.base}/${conversationId}/tags/${tagId}`,
-    );
+  unassignTag(conversationId: string, tagId: string): Observable<ConversationTagRef[]> {
+    return this.http.delete<ConversationTagRef[]>(`${this.base}/${conversationId}/tags/${tagId}`);
   }
 }

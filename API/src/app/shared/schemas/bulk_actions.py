@@ -25,7 +25,6 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # Per-request id-count cap. Aligns with the rate-limit guard on
 # `paginate(size <= 200)` in `app.shared.db.pagination` — a bulk request
 # can never touch more rows than a single page exposes.

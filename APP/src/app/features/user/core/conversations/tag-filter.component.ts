@@ -76,8 +76,7 @@ import {
                   >
                     <span
                       [class]="
-                        'inline-block h-2.5 w-2.5 rounded-full ring-1 ' +
-                        swatchClass(t.color)
+                        'inline-block h-2.5 w-2.5 rounded-full ring-1 ' + swatchClass(t.color)
                       "
                     ></span>
                     <span class="flex-1 truncate text-zinc-800">{{ t.name }}</span>
@@ -158,8 +157,6 @@ export class TagFilterComponent {
   }
 
   protected swatchClass(color: string): string {
-    return (
-      TAG_COLOR_CLASSES[color as TagColor] ?? TAG_COLOR_CLASSES.zinc
-    );
+    return TAG_COLOR_CLASSES[color as TagColor] ?? TAG_COLOR_CLASSES.zinc;
   }
 }

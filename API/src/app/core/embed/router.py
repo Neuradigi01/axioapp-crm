@@ -16,12 +16,12 @@ The public endpoint authenticates via the embed key alone — no JWT —
 so visitors on any third-party website can submit without first
 logging into FurnitureCRM.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
-from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,8 +29,14 @@ from src.app.core.auth.dependencies import require_permissions
 from src.app.core.embed import log_service
 from src.app.core.embed.config_service import (
     get_or_create as get_or_create_config,
+)
+from src.app.core.embed.config_service import (
     list_available_widget_custom_fields,
+)
+from src.app.core.embed.config_service import (
     public_get as public_get_config,
+)
+from src.app.core.embed.config_service import (
     update as update_config,
 )
 from src.app.core.embed.models import EmbedSubmissionOutcome
@@ -56,7 +62,6 @@ from src.app.core.embed.submissions import submit as submit_widget_submission
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/embed", tags=["Embeddable Widget"])
 
 # Separate router for the public submission + public-config endpoints.
@@ -72,9 +77,7 @@ public_router = APIRouter(prefix="/embed", tags=["Embeddable Widget — Public"]
 async def issue_embed_key_endpoint(
     payload: EmbedKeyIssue,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.integrations.embed.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
 ) -> EmbedKeyIssueResponse:
     """Issue a new API key for the widget. The plaintext `secret`
     appears in this response ONCE — the Owner must copy it before
@@ -98,23 +101,17 @@ async def issue_embed_key_endpoint(
 @router.get("/keys", response_model=list[EmbedKeyRead])
 async def list_embed_keys_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.embed.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.embed.manage")),
 ) -> list[EmbedKeyRead]:
     rows = await list_keys(db)
     return [EmbedKeyRead.model_validate(r) for r in rows]
 
 
-@router.delete(
-    "/keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_embed_key_endpoint(
     key_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.integrations.embed.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
 ) -> Response:
     """Soft-revoke an API key. Idempotent — re-revoking returns 204
     without emitting a second audit event."""
@@ -133,9 +130,7 @@ async def revoke_embed_key_endpoint(
 @router.get("/config", response_model=WidgetConfigRead)
 async def get_widget_config_endpoint(
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.integrations.embed.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
 ) -> WidgetConfigRead:
     """Return the org's widget config, lazily seeding defaults on
     first read so Owners always see a usable starting point."""
@@ -156,9 +151,7 @@ async def get_widget_config_endpoint(
 )
 async def list_available_custom_fields_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.embed.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.embed.manage")),
 ) -> list[AvailableCustomField]:
     """Return the custom fields (contact AND lead) the Owner can opt IN
     to the widget. Drives the Settings → Embed → "Add custom field"
@@ -173,9 +166,7 @@ async def list_available_custom_fields_endpoint(
 async def update_widget_config_endpoint(
     payload: WidgetConfigUpdate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.integrations.embed.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
 ) -> WidgetConfigRead:
     """Patch-style update — only supplied top-level fields change.
     Emits `embed.config.updated` audit event."""
@@ -206,7 +197,7 @@ _LIST_PAGE_SIZE_MAX = 200
 
 def _default_range() -> tuple[datetime, datetime]:
     """Default summary window: last 30 days, ending now (UTC)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return now - timedelta(days=30), now
 
 
@@ -216,9 +207,7 @@ def _default_range() -> tuple[datetime, datetime]:
 )
 async def list_embed_submissions_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.embed.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.embed.manage")),
     outcome: EmbedSubmissionOutcomeLiteral | None = Query(default=None),
     range_from: datetime | None = Query(default=None, alias="from"),
     range_to: datetime | None = Query(default=None, alias="to"),
@@ -229,9 +218,7 @@ async def list_embed_submissions_endpoint(
     `outcome` filter narrows to one bucket; `from`/`to` constrain the
     time window (defaults: whole table). Tenant context filters to
     the caller's org via RLS + ORM mixin."""
-    outcome_filter = (
-        EmbedSubmissionOutcome(outcome) if outcome is not None else None
-    )
+    outcome_filter = EmbedSubmissionOutcome(outcome) if outcome is not None else None
     rows, total = await log_service.list_rows(
         db,
         outcome=outcome_filter,
@@ -254,9 +241,7 @@ async def list_embed_submissions_endpoint(
 )
 async def submissions_summary_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.embed.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.embed.manage")),
     range_from: datetime | None = Query(default=None, alias="from"),
     range_to: datetime | None = Query(default=None, alias="to"),
 ) -> EmbedSubmissionSummary:
@@ -265,9 +250,7 @@ async def submissions_summary_endpoint(
     default_from, default_to = _default_range()
     resolved_from = range_from or default_from
     resolved_to = range_to or default_to
-    return await log_service.summary(
-        db, range_from=resolved_from, range_to=resolved_to
-    )
+    return await log_service.summary(db, range_from=resolved_from, range_to=resolved_to)
 
 
 # --- Public submission endpoint -------------------------------------------
@@ -313,7 +296,7 @@ async def submit_lead_preflight() -> Response:
 async def submit_embed_lead_endpoint(
     payload: EmbedSubmission,
     request: Request,
-    x_furnicrm_key: Optional[str] = Header(default=None, alias="X-FurniCRM-Key"),
+    x_furnicrm_key: str | None = Header(default=None, alias="X-FurniCRM-Key"),
 ) -> Response:
     """Public submission endpoint — no JWT, no admin auth.
 
@@ -353,8 +336,8 @@ async def public_config_preflight() -> Response:
 
 @public_router.get("/config/public", response_model=WidgetConfigPublic)
 async def public_widget_config_endpoint(
-    key: Optional[str] = None,
-    x_furnicrm_key: Optional[str] = Header(default=None, alias="X-FurniCRM-Key"),
+    key: str | None = None,
+    x_furnicrm_key: str | None = Header(default=None, alias="X-FurniCRM-Key"),
 ) -> Response:
     """Public widget-config fetch — no JWT. Resolves `key` (query OR
     header) → org via the embed-key lookup, then returns the org's
@@ -392,9 +375,7 @@ async def public_widget_config_endpoint(
     # exclude is bidirectional (recaptcha_secret_key isn't even a field
     # on `WidgetConfigSpamProtectionPublic`), so a stray field in JSONB
     # gets silently dropped on read.
-    public_doc = WidgetConfigPublicDocument.model_validate(
-        document.model_dump(mode="json")
-    )
+    public_doc = WidgetConfigPublicDocument.model_validate(document.model_dump(mode="json"))
     body = WidgetConfigPublic(config=public_doc)
     return Response(
         content=body.model_dump_json(),

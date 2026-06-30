@@ -30,6 +30,7 @@ Meta-specific quirks vs. Google:
     users on the app dashboard can grant it in dev mode without
     review — the manual-meta-oauth-setup.md checklist explains.
 """
+
 from __future__ import annotations
 
 import base64
@@ -40,7 +41,7 @@ import secrets
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from datetime import UTC
 from urllib.parse import urlencode
 
 import httpx
@@ -57,7 +58,6 @@ from config import (
 from src.app.core.integrations.models import Integration
 from src.app.core.integrations.schemas import IntegrationUpsert
 from src.app.core.integrations.service import upsert
-
 
 _AUTHORIZE_URL = "https://www.facebook.com/{ver}/dialog/oauth"
 _TOKEN_URL = "https://graph.facebook.com/{ver}/oauth/access_token"
@@ -106,12 +106,8 @@ def _b64url_decode(data: str) -> bytes:
 
 
 def _sign_state(payload: dict) -> str:
-    body = _b64url_encode(
-        json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    )
-    sig = hmac.new(
-        _state_secret(), body.encode("ascii"), hashlib.sha256
-    ).digest()
+    body = _b64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    sig = hmac.new(_state_secret(), body.encode("ascii"), hashlib.sha256).digest()
     return f"{body}.{_b64url_encode(sig)}"
 
 
@@ -126,16 +122,14 @@ def verify_state(state: str) -> dict:
             detail="Invalid OAuth state.",
         )
     body, sig = state.split(".", 1)
-    expected = hmac.new(
-        _state_secret(), body.encode("ascii"), hashlib.sha256
-    ).digest()
+    expected = hmac.new(_state_secret(), body.encode("ascii"), hashlib.sha256).digest()
     try:
         provided = _b64url_decode(sig)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid OAuth state.",
-        )
+        ) from None
     if not hmac.compare_digest(provided, expected):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -147,7 +141,7 @@ def verify_state(state: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Malformed OAuth state.",
-        )
+        ) from None
     if payload.get("provider") != _PROVIDER_TAG:
         # Defence against a Google state being replayed here. Both
         # providers use the same secret, so HMAC alone would accept it.
@@ -179,7 +173,7 @@ class MetaTokens:
 def start_authorize(
     *,
     org_id: uuid.UUID,
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
 ) -> str:
     """Build the Facebook consent URL the browser is redirected to.
     `nonce` defangs two concurrent connect attempts (e.g. user opens
@@ -213,7 +207,7 @@ def start_authorize(
 async def exchange_code_for_short_token(
     code: str,
     *,
-    http_client: Optional[httpx.AsyncClient] = None,
+    http_client: httpx.AsyncClient | None = None,
 ) -> str:
     """First leg: code → short-lived (1-hour) user token. GETs the
     token endpoint with query params — Meta accepts both GET and POST
@@ -241,7 +235,7 @@ async def exchange_code_for_short_token(
 async def exchange_for_long_lived_token(
     short_token: str,
     *,
-    http_client: Optional[httpx.AsyncClient] = None,
+    http_client: httpx.AsyncClient | None = None,
 ) -> MetaTokens:
     """Second leg: short-lived → long-lived (60-day) user token. Meta
     discards the short token after exchange. The long-lived token is
@@ -268,16 +262,14 @@ async def exchange_for_long_lived_token(
     # whether omission means "never expires" for some token classes —
     # safer to give the Settings UI a defined expiry to display).
     expires_in = int(body.get("expires_in", 60 * 24 * 60 * 60))
-    return MetaTokens(
-        access_token=token, expires_at=int(time.time()) + expires_in
-    )
+    return MetaTokens(access_token=token, expires_at=int(time.time()) + expires_in)
 
 
 async def fetch_userinfo_label(
     access_token: str,
     *,
-    http_client: Optional[httpx.AsyncClient] = None,
-) -> Optional[str]:
+    http_client: httpx.AsyncClient | None = None,
+) -> str | None:
     """Best-effort: fetch the FB user's display name + email for the
     `account_label`. Returns None on any failure — connect doesn't
     fail just because the label couldn't be fetched."""
@@ -304,32 +296,22 @@ async def handle_callback(
     *,
     code: str,
     state: str,
-    http_client: Optional[httpx.AsyncClient] = None,
+    http_client: httpx.AsyncClient | None = None,
 ) -> Integration:
     """End-to-end callback handler:
 
-      1. Verify state (signature + freshness + provider).
-      2. code → short token → long-lived token.
-      3. Fetch user label (best effort).
-      4. Upsert the integration row via Step-1's encrypted-token service.
+    1. Verify state (signature + freshness + provider).
+    2. code → short token → long-lived token.
+    3. Fetch user label (best effort).
+    4. Upsert the integration row via Step-1's encrypted-token service.
     """
     payload = verify_state(state)
     org_id = uuid.UUID(payload["org_id"])
-    actor_id = (
-        uuid.UUID(payload["actor_id"])
-        if payload.get("actor_id")
-        else None
-    )
+    actor_id = uuid.UUID(payload["actor_id"]) if payload.get("actor_id") else None
 
-    short_token = await exchange_code_for_short_token(
-        code, http_client=http_client
-    )
-    tokens = await exchange_for_long_lived_token(
-        short_token, http_client=http_client
-    )
-    label = await fetch_userinfo_label(
-        tokens.access_token, http_client=http_client
-    )
+    short_token = await exchange_code_for_short_token(code, http_client=http_client)
+    tokens = await exchange_for_long_lived_token(short_token, http_client=http_client)
+    label = await fetch_userinfo_label(tokens.access_token, http_client=http_client)
 
     integration = await upsert(
         session,
@@ -354,7 +336,7 @@ async def handle_callback(
 async def _safe_get(
     url: str,
     params: dict,
-    http_client: Optional[httpx.AsyncClient],
+    http_client: httpx.AsyncClient | None,
 ) -> httpx.Response:
     """GET wrapper that turns network errors into HTTPException(502)
     so the router can map them to a friendly redirect."""
@@ -370,18 +352,13 @@ async def _safe_get(
         ) from exc
 
 
-def _parse_meta_response(
-    response: httpx.Response, *, endpoint: str
-) -> dict:
+def _parse_meta_response(response: httpx.Response, *, endpoint: str) -> dict:
     """Decode + validate Meta's response. 4xx → 400 with the upstream
     error body so the Owner can fix their config; 5xx → 502."""
     if response.status_code >= 500:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=(
-                f"Meta {endpoint} returned {response.status_code}: "
-                f"{response.text[:200]}"
-            ),
+            detail=(f"Meta {endpoint} returned {response.status_code}: {response.text[:200]}"),
         )
     body: dict
     try:
@@ -390,7 +367,7 @@ def _parse_meta_response(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Meta {endpoint} returned non-JSON.",
-        )
+        ) from None
     if response.status_code >= 400 or "error" in body:
         err = body.get("error") or {"raw": response.text[:200]}
         raise HTTPException(
@@ -401,9 +378,9 @@ def _parse_meta_response(
 
 
 def _unix_to_aware(ts: int):
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.fromtimestamp(ts, tz=timezone.utc)
+    return datetime.fromtimestamp(ts, tz=UTC)
 
 
 __all__ = [

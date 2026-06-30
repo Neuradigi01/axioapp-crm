@@ -1,11 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
 import { WhatsAppOptInSource } from '../contacts-api.service';
 
@@ -19,26 +13,22 @@ const SOURCES: SourceOption[] = [
   {
     value: 'bulk_import',
     label: 'Existing CRM (already had consent)',
-    hint:
-      'Default for migrated contacts — backfills as "implicit". The campaign guard warns before send.',
+    hint: 'Default for migrated contacts — backfills as "implicit". The campaign guard warns before send.',
   },
   {
     value: 'explicit_opt_in_link',
     label: 'Customer clicked opt-in link',
-    hint:
-      'Explicit consent captured on a landing page or QR scan. Marketing campaigns proceed without a warning.',
+    hint: 'Explicit consent captured on a landing page or QR scan. Marketing campaigns proceed without a warning.',
   },
   {
     value: 'manual_entry',
     label: 'Captured manually (call / in-store)',
-    hint:
-      'Staff verbally captured consent. Recorded as explicit opt-in.',
+    hint: 'Staff verbally captured consent. Recorded as explicit opt-in.',
   },
   {
     value: 'form_widget',
     label: 'Website form (paper-trail in JSON)',
-    hint:
-      'Audit-grade: every imported row needs a matching consent screenshot or form submission id.',
+    hint: 'Audit-grade: every imported row needs a matching consent screenshot or form submission id.',
   },
 ];
 
@@ -67,8 +57,8 @@ const SOURCES: SourceOption[] = [
         <span class="ml-1 text-rose-600">*</span>
       </legend>
       <p class="mb-2 text-[11px] text-zinc-500">
-        How was consent captured for these contacts? DPDP requires a
-        recorded provenance for every imported row.
+        How was consent captured for these contacts? DPDP requires a recorded provenance for every
+        imported row.
       </p>
       <div class="space-y-1.5">
         @for (s of SOURCES; track s.value) {

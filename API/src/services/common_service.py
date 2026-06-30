@@ -1,11 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from config import EMAIL_ENABLED, SMS_ENABLED
+from src.constants import messages
 from src.core.security.password import hash_password, verify_password
-from src.data_access import user_da, admin_da, password_change_history_da
+from src.data_access import admin_da, password_change_history_da, user_da
 from src.providers import otp_provider, two_factor_provider
 from src.schemas.common import ChangePasswordRequest
-from src.constants import messages
-from config import EMAIL_ENABLED, SMS_ENABLED
-
 
 # ── Shared record resolution ────────────────────────────────────────
 
@@ -31,8 +31,13 @@ async def get_member_with_contact_info(db: AsyncSession, user_id: str, user_type
 
 
 async def _send_otp_by_method(
-    db: AsyncSession, member_id: int, user_type: str,
-    email: str | None, mobile: str | None, method: str, purpose: str,
+    db: AsyncSession,
+    member_id: int,
+    user_type: str,
+    email: str | None,
+    mobile: str | None,
+    method: str,
+    purpose: str,
 ) -> dict | None:
     """Send OTP via the specified method.
     Returns error dict on failure, None on success.
@@ -51,8 +56,13 @@ async def _send_otp_by_method(
 
 
 async def send_otp_to_member(
-    db: AsyncSession, user_id: str, user_type: str,
-    method: str, purpose: str, *, require_2fa_enabled: bool = False,
+    db: AsyncSession,
+    user_id: str,
+    user_type: str,
+    method: str,
+    purpose: str,
+    *,
+    require_2fa_enabled: bool = False,
 ) -> dict:
     """Lookup member, send OTP, commit. Used by 2FA setup and action verification."""
     record, email, mobile = await get_member_with_contact_info(db, user_id, user_type)
@@ -71,7 +81,12 @@ async def send_otp_to_member(
 
 
 async def verify_2fa_code(
-    db: AsyncSession, member_id: int, record, method: str, code: str, purpose: str,
+    db: AsyncSession,
+    member_id: int,
+    record,
+    method: str,
+    code: str,
+    purpose: str,
 ) -> bool:
     """Verify a 2FA code using the appropriate method (authenticator, email, or sms)."""
     if method == "authenticator":
@@ -86,7 +101,9 @@ async def verify_2fa_code(
 # ── Change password ──────────────────────────────────────────────────
 
 
-async def change_password(db: AsyncSession, user_id: str, user_type: str, req: ChangePasswordRequest) -> dict:
+async def change_password(
+    db: AsyncSession, user_id: str, user_type: str, req: ChangePasswordRequest
+) -> dict:
     if user_type == "User":
         record = await user_da.get_by_user_id(db, user_id)
     else:
@@ -101,7 +118,9 @@ async def change_password(db: AsyncSession, user_id: str, user_type: str, req: C
     hashed = hash_password(req.new_password)
 
     await password_change_history_da.insert_history(
-        db, record.id, user_type,
+        db,
+        record.id,
+        user_type,
         old_password_hash=record.password,
         new_password_hash=hashed,
         change_type="self_change",

@@ -25,7 +25,6 @@ from typing import Any
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 _MAX_SIZE = 200
 
 
@@ -44,12 +43,8 @@ async def paginate(
     page = max(1, page)
     size = max(1, min(size, _MAX_SIZE))
 
-    count_stmt = select(func.count()).select_from(
-        stmt.order_by(None).subquery()
-    )
+    count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
     total = (await session.execute(count_stmt)).scalar_one()
 
-    rows = (
-        await session.execute(stmt.offset((page - 1) * size).limit(size))
-    ).scalars().all()
+    rows = (await session.execute(stmt.offset((page - 1) * size).limit(size))).scalars().all()
     return list(rows), int(total)

@@ -12,28 +12,19 @@ import {
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
-import {
-  EmailTemplateRenderResponse,
-} from '../services/email-templates-api.service';
+import { EmailTemplateRenderResponse } from '../services/email-templates-api.service';
 import { EmailTemplatePickerComponent } from '../shared/email/template-picker.component';
 import { SendFromPickerComponent } from '../whatsapp/shared/send-from-picker.component';
 import { ConversationMessage } from './conversations-api.service';
 import { StaffListItem } from '../staff/staff-api.service';
 
-
-export type ComposerAttachmentType =
-  | 'image'
-  | 'video'
-  | 'audio'
-  | 'document';
-
+export type ComposerAttachmentType = 'image' | 'video' | 'audio' | 'document';
 
 export interface ComposerMediaPayload {
   file: File;
   type: ComposerAttachmentType;
   caption?: string;
 }
-
 
 /**
  * Internal note payload (whatsapp-platform-upgrade Step 13).
@@ -44,7 +35,6 @@ export interface ComposerNotePayload {
   text: string;
   mentions: string[];
 }
-
 
 /**
  * Outbound location share (whatsapp-platform-upgrade Step 28).
@@ -59,9 +49,7 @@ export interface ComposerLocationPayload {
   address?: string | null;
 }
 
-
 const MAX_MENTIONS = 5;
-
 
 // Mirror of backend per-type caps in `core/conversations/media_upload.py`.
 // Frontend pre-validation gives instant feedback; the backend re-checks.
@@ -71,7 +59,6 @@ const MAX_SIZE_BYTES: Record<ComposerAttachmentType, number> = {
   audio: 16 * 1024 * 1024,
   document: 100 * 1024 * 1024,
 };
-
 
 // Tighter whitelist than the backend so the picker steers the user to
 // a sensible choice. The backend trusts the user's `type` form field
@@ -87,7 +74,6 @@ const MIME_TO_TYPE: Array<[RegExp, ComposerAttachmentType]> = [
   [/^text\/(plain|csv)$/, 'document'],
 ];
 
-
 function classifyFile(file: File): ComposerAttachmentType | null {
   for (const [pattern, type] of MIME_TO_TYPE) {
     if (pattern.test(file.type)) {
@@ -96,7 +82,6 @@ function classifyFile(file: File): ComposerAttachmentType | null {
   }
   return null;
 }
-
 
 /**
  * Compose bar — input + send + "Let AI handle it" toggle + paperclip
@@ -277,20 +262,13 @@ export class ComposeBarComponent {
   /** Resolved mentions for the in-flight note. Each entry is
    *  ``{userId, displayName}`` — we keep both so the chip row can
    *  render without re-resolving from `staff` on every keystroke. */
-  protected readonly mentions = signal<
-    Array<{ userId: string; displayName: string }>
-  >([]);
+  protected readonly mentions = signal<Array<{ userId: string; displayName: string }>>([]);
 
   protected readonly mentionCandidates = computed(() => {
     const q = this.mentionQuery().toLowerCase();
     const chosen = new Set(this.mentions().map((m) => m.userId));
     return this.staff
-      .filter(
-        (s) =>
-          !chosen.has(s.id) &&
-          (q.length === 0 ||
-            s.full_name.toLowerCase().includes(q)),
-      )
+      .filter((s) => !chosen.has(s.id) && (q.length === 0 || s.full_name.toLowerCase().includes(q)))
       .slice(0, 6);
   });
 
@@ -301,9 +279,7 @@ export class ComposeBarComponent {
   protected readonly mediaError = signal<string | null>(null);
   protected readonly isDragging = signal(false);
 
-  protected readonly canAttachMedia = computed(
-    () => this.channel === 'whatsapp',
-  );
+  protected readonly canAttachMedia = computed(() => this.channel === 'whatsapp');
   protected readonly captionsSupported = computed(() => {
     const t = this.stagedType();
     return t === 'image' || t === 'video' || t === 'document';
@@ -372,29 +348,21 @@ export class ComposeBarComponent {
 
   protected pickMention(staff: StaffListItem): void {
     if (this.mentions().length >= MAX_MENTIONS) return;
-    this.mentions.update((arr) => [
-      ...arr,
-      { userId: staff.id, displayName: staff.full_name },
-    ]);
+    this.mentions.update((arr) => [...arr, { userId: staff.id, displayName: staff.full_name }]);
     // Replace the trailing `@query` token with `@FullName` so the
     // operator sees what they tagged inline with the note text.
     const current = this.text();
-    const replaced = current.replace(
-      /(?:^|\s)@(\w*)$/,
-      (match) => {
-        const prefix = match.startsWith(' ') ? ' ' : '';
-        return `${prefix}@${staff.full_name} `;
-      },
-    );
+    const replaced = current.replace(/(?:^|\s)@(\w*)$/, (match) => {
+      const prefix = match.startsWith(' ') ? ' ' : '';
+      return `${prefix}@${staff.full_name} `;
+    });
     this.text.set(replaced);
     this.mentionOpen.set(false);
     this.mentionQuery.set('');
   }
 
   protected removeMention(userId: string): void {
-    this.mentions.update((arr) =>
-      arr.filter((m) => m.userId !== userId),
-    );
+    this.mentions.update((arr) => arr.filter((m) => m.userId !== userId));
   }
 
   protected requestInteractive(): void {
@@ -429,8 +397,7 @@ export class ComposeBarComponent {
     if (this.outOfSession) return;
 
     if (file && type) {
-      const caption =
-        this.captionsSupported() && trimmed ? trimmed : undefined;
+      const caption = this.captionsSupported() && trimmed ? trimmed : undefined;
       this.sendMedia.emit({ file, type, caption });
       this.clearStaged();
       this.text.set('');
@@ -459,9 +426,7 @@ export class ComposeBarComponent {
     if (m.text) return m.text;
     const att = (m.attachments ?? []).find((a) => {
       const t = (a as { type?: string }).type;
-      return (
-        t === 'image' || t === 'video' || t === 'audio' || t === 'document'
-      );
+      return t === 'image' || t === 'video' || t === 'audio' || t === 'document';
     });
     const type = (att as { type?: string } | undefined)?.type;
     switch (type) {

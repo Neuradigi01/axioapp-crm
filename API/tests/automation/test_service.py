@@ -4,6 +4,7 @@ CRUD happy paths + duplicate-name rejection + template/channel
 consistency + matcher correctness (only enabled triggers; only
 conditions-matching triggers).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -25,7 +26,6 @@ from src.app.core.templates.models import TemplateCategory
 from src.app.core.templates.schemas import TemplateCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -36,10 +36,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {"id": str(org_id), "name": "Demo", "slug": f"demo-{org_id.hex[:6]}"},
     )
     await test_db.commit()
@@ -71,9 +68,7 @@ async def _make_template(test_db, *, org_id, channel: ConversationChannel):
 
 
 async def test_create_trigger_writes_row(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     trigger = await automation_service.create_trigger(
         test_db,
         org_id=org_id,
@@ -92,9 +87,7 @@ async def test_create_trigger_writes_row(test_db, org_id):
 
 
 async def test_create_trigger_rejects_duplicate_name(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     await automation_service.create_trigger(
         test_db,
         org_id=org_id,
@@ -121,9 +114,7 @@ async def test_create_trigger_rejects_duplicate_name(test_db, org_id):
 
 
 async def test_create_trigger_rejects_template_channel_mismatch(test_db, org_id):
-    email_template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    email_template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     with pytest.raises(MissingTemplateForChannel) as info:
         await automation_service.create_trigger(
             test_db,
@@ -141,9 +132,7 @@ async def test_create_trigger_rejects_template_channel_mismatch(test_db, org_id)
 
 
 async def test_create_trigger_persists_conditions_and_resolver(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     trigger = await automation_service.create_trigger(
         test_db,
         org_id=org_id,
@@ -171,9 +160,7 @@ async def test_create_trigger_persists_conditions_and_resolver(test_db, org_id):
 
 
 async def test_enable_disable_idempotent(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     trigger = await automation_service.create_trigger(
         test_db,
         org_id=org_id,
@@ -203,9 +190,7 @@ async def test_enable_disable_idempotent(test_db, org_id):
 
 
 async def test_update_trigger_patches_fields(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     trigger = await automation_service.create_trigger(
         test_db,
         org_id=org_id,
@@ -231,9 +216,7 @@ async def test_update_trigger_patches_fields(test_db, org_id):
 
 
 async def test_delete_trigger_removes_row(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     trigger = await automation_service.create_trigger(
         test_db,
         org_id=org_id,
@@ -245,22 +228,16 @@ async def test_delete_trigger_removes_row(test_db, org_id):
             template_id=template.id,
         ),
     )
-    await automation_service.delete_trigger(
-        test_db, org_id=org_id, trigger_id=trigger.id
-    )
+    await automation_service.delete_trigger(test_db, org_id=org_id, trigger_id=trigger.id)
     with pytest.raises(TriggerNotFound):
-        await automation_service.get_trigger(
-            test_db, org_id=org_id, trigger_id=trigger.id
-        )
+        await automation_service.get_trigger(test_db, org_id=org_id, trigger_id=trigger.id)
 
 
 # --- matcher ----------------------------------------------------
 
 
 async def test_match_triggers_returns_only_enabled(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     enabled = await automation_service.create_trigger(
         test_db,
         org_id=org_id,
@@ -295,9 +272,7 @@ async def test_match_triggers_returns_only_enabled(test_db, org_id):
 
 
 async def test_match_triggers_filters_by_conditions(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     hot = await automation_service.create_trigger(
         test_db,
         org_id=org_id,
@@ -333,6 +308,4 @@ async def test_match_triggers_filters_by_conditions(test_db, org_id):
 
 async def test_get_trigger_not_found_raises(test_db, org_id):
     with pytest.raises(TriggerNotFound):
-        await automation_service.get_trigger(
-            test_db, org_id=org_id, trigger_id=uuid.uuid4()
-        )
+        await automation_service.get_trigger(test_db, org_id=org_id, trigger_id=uuid.uuid4())

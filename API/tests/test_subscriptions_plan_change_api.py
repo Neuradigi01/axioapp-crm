@@ -16,10 +16,11 @@ Coverage matches the spec's acceptance list:
   - Unknown to_plan → 404 unknown_plan.
   - Period-rollover applies next_* and clears the columns.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -30,7 +31,8 @@ from src.app.core.subscriptions.models import Subscription
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import OrganizationMember
 from src.app.shared.security.password import hash_password
-from src.models.user import UserInfo as LegacyUserInfo, UserLogin
+from src.models.user import UserInfo as LegacyUserInfo
+from src.models.user import UserLogin
 
 
 @pytest.fixture(autouse=True)
@@ -83,7 +85,7 @@ async def _insert_subscription(
 ) -> uuid.UUID:
     from tests.conftest import TestSession
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     cps = current_period_start or trial_started_at or now
     cpe = current_period_end or trial_ends_at or (now + timedelta(days=30))
 
@@ -110,9 +112,7 @@ async def _insert_subscription(
         return sub.id
 
 
-async def _add_extra_members(
-    org_id: uuid.UUID, role_id: uuid.UUID, count: int
-) -> None:
+async def _add_extra_members(org_id: uuid.UUID, role_id: uuid.UUID, count: int) -> None:
     from tests.conftest import TestSession
 
     async with TestSession() as session:
@@ -171,7 +171,7 @@ async def _post_change(client, token: str, payload: dict):
 @pytest.mark.asyncio
 async def test_trial_to_basic_monthly_needs_payment(layered_client, seeded_admin):
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="trial",
@@ -185,7 +185,8 @@ async def test_trial_to_basic_monthly_needs_payment(layered_client, seeded_admin
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "basic", "billing_cycle": "monthly", "seats": 5},
     )
     assert resp.status_code == 200, resp.text
@@ -202,7 +203,7 @@ async def test_trial_to_basic_monthly_needs_payment(layered_client, seeded_admin
 @pytest.mark.asyncio
 async def test_trial_to_standard_annual_needs_payment(layered_client, seeded_admin):
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="trial",
@@ -214,7 +215,8 @@ async def test_trial_to_standard_annual_needs_payment(layered_client, seeded_adm
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "standard", "billing_cycle": "annual", "seats": 5},
     )
     assert resp.status_code == 200, resp.text
@@ -234,13 +236,17 @@ async def test_standard_to_basic_scheduled(layered_client, seeded_admin):
 
     org = seeded_admin["org"]
     sub_id = await _insert_subscription(
-        org.id, plan_code="standard", status="active",
-        billing_cycle="monthly", seats_purchased=5,
+        org.id,
+        plan_code="standard",
+        status="active",
+        billing_cycle="monthly",
+        seats_purchased=5,
     )
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "basic", "billing_cycle": "monthly", "seats": 5},
     )
     assert resp.status_code == 200, resp.text
@@ -253,9 +259,7 @@ async def test_standard_to_basic_scheduled(layered_client, seeded_admin):
     # Verify the row was actually mutated.
     async with TestSession() as session:
         sub = (
-            await session.execute(
-                select(Subscription).where(Subscription.id == sub_id)
-            )
+            await session.execute(select(Subscription).where(Subscription.id == sub_id))
         ).scalar_one()
         assert sub.next_plan_code == "basic"
         assert sub.next_billing_cycle == "monthly"
@@ -264,17 +268,22 @@ async def test_standard_to_basic_scheduled(layered_client, seeded_admin):
 
 @pytest.mark.asyncio
 async def test_basic_monthly_to_basic_annual_needs_payment(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
     await _insert_subscription(
-        org.id, plan_code="basic", status="active",
-        billing_cycle="monthly", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        status="active",
+        billing_cycle="monthly",
+        seats_purchased=5,
     )
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "basic", "billing_cycle": "annual", "seats": 5},
     )
     assert resp.status_code == 200, resp.text
@@ -286,17 +295,22 @@ async def test_basic_monthly_to_basic_annual_needs_payment(
 
 @pytest.mark.asyncio
 async def test_standard_annual_to_standard_monthly_scheduled(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
     await _insert_subscription(
-        org.id, plan_code="standard", status="active",
-        billing_cycle="annual", seats_purchased=5,
+        org.id,
+        plan_code="standard",
+        status="active",
+        billing_cycle="annual",
+        seats_purchased=5,
     )
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "standard", "billing_cycle": "monthly", "seats": 5},
     )
     assert resp.status_code == 200, resp.text
@@ -312,13 +326,17 @@ async def test_standard_annual_to_standard_monthly_scheduled(
 async def test_no_change_when_request_matches_current(layered_client, seeded_admin):
     org = seeded_admin["org"]
     await _insert_subscription(
-        org.id, plan_code="basic", status="active",
-        billing_cycle="monthly", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        status="active",
+        billing_cycle="monthly",
+        seats_purchased=5,
     )
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "basic", "billing_cycle": "monthly", "seats": 5},
     )
     assert resp.status_code == 200, resp.text
@@ -335,15 +353,19 @@ async def test_seats_below_in_use_rejected(layered_client, seeded_admin):
     org = seeded_admin["org"]
     role = seeded_admin["role"]
     await _insert_subscription(
-        org.id, plan_code="basic", status="active",
-        billing_cycle="monthly", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        status="active",
+        billing_cycle="monthly",
+        seats_purchased=5,
     )
     # seeded_admin gives 1 active member; 3 more makes 4 active.
     await _add_extra_members(org.id, role.id, count=3)
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "basic", "billing_cycle": "monthly", "seats": 2},
     )
     assert resp.status_code == 400, resp.text
@@ -357,13 +379,17 @@ async def test_seats_below_in_use_rejected(layered_client, seeded_admin):
 async def test_seats_below_bundle_minimum_rejected(layered_client, seeded_admin):
     org = seeded_admin["org"]
     await _insert_subscription(
-        org.id, plan_code="basic", status="active",
-        billing_cycle="monthly", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        status="active",
+        billing_cycle="monthly",
+        seats_purchased=5,
     )
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "basic", "billing_cycle": "monthly", "seats": 3},
     )
     assert resp.status_code == 400, resp.text
@@ -376,13 +402,17 @@ async def test_seats_below_bundle_minimum_rejected(layered_client, seeded_admin)
 async def test_cannot_change_to_trial(layered_client, seeded_admin):
     org = seeded_admin["org"]
     await _insert_subscription(
-        org.id, plan_code="basic", status="active",
-        billing_cycle="monthly", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        status="active",
+        billing_cycle="monthly",
+        seats_purchased=5,
     )
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "trial", "billing_cycle": "monthly", "seats": 5},
     )
     assert resp.status_code == 400, resp.text
@@ -396,15 +426,18 @@ async def test_cancelled_sub_cannot_change(layered_client, seeded_admin):
     than 404. Either way, the user cannot use this path; they need a
     fresh signup."""
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
-        org.id, plan_code="basic", status="cancelled",
+        org.id,
+        plan_code="basic",
+        status="cancelled",
         cancelled_at=now - timedelta(days=1),
     )
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "standard", "billing_cycle": "monthly", "seats": 5},
     )
     assert resp.status_code == 400, resp.text
@@ -420,7 +453,7 @@ async def test_read_only_can_change_recovery_path(layered_client, seeded_admin):
     that is the entire point of the "trial ended, choose a plan" banner.
     """
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="trial",
@@ -435,7 +468,8 @@ async def test_read_only_can_change_recovery_path(layered_client, seeded_admin):
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "basic", "billing_cycle": "monthly", "seats": 5},
     )
     assert resp.status_code == 200, resp.text
@@ -446,13 +480,17 @@ async def test_read_only_can_change_recovery_path(layered_client, seeded_admin):
 async def test_unknown_to_plan_404(layered_client, seeded_admin):
     org = seeded_admin["org"]
     await _insert_subscription(
-        org.id, plan_code="basic", status="active",
-        billing_cycle="monthly", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        status="active",
+        billing_cycle="monthly",
+        seats_purchased=5,
     )
 
     token = await _login_seeded(layered_client, seeded_admin)
     resp = await _post_change(
-        layered_client, token,
+        layered_client,
+        token,
         {"to_plan": "xyz", "billing_cycle": "monthly", "seats": 5},
     )
     assert resp.status_code == 404, resp.text
@@ -475,12 +513,14 @@ async def test_period_rollover_applies_scheduled_change(test_db):
     test.
     """
     org = Organization(
-        id=uuid.uuid4(), name="LC Co", slug=f"lc-{uuid.uuid4().hex[:6]}",
+        id=uuid.uuid4(),
+        name="LC Co",
+        slug=f"lc-{uuid.uuid4().hex[:6]}",
     )
     test_db.add(org)
     await test_db.flush()
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = Subscription(
         org_id=org.id,
         plan_code="standard",
@@ -501,9 +541,7 @@ async def test_period_rollover_applies_scheduled_change(test_db):
     assert summary["scheduled_change_applied"] == 1
 
     fresh = (
-        await test_db.execute(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        await test_db.execute(select(Subscription).where(Subscription.id == sub.id))
     ).scalar_one()
     await test_db.refresh(fresh)
     assert fresh.plan_code == "basic"

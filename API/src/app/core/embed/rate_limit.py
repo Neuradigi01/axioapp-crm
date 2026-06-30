@@ -21,6 +21,7 @@ the existing in-process `InMemoryRateLimiter` from `shared/rate_limit.py`:
 Both limiters are module-level singletons so all submission requests
 share the same counters per uvicorn worker.
 """
+
 from __future__ import annotations
 
 from src.app.shared.rate_limit import (
@@ -28,21 +29,16 @@ from src.app.shared.rate_limit import (
     RateLimitResult,
 )
 
-
 # 1 hour in seconds — both limiters use a 1-hour sliding window.
 _ONE_HOUR = 60 * 60
 
 # Per-key: 100/hour. Tolerant enough for a legit busy widget; tight
 # enough that a leaked key can't fire 10k requests before revocation.
-per_key_limiter = InMemoryRateLimiter(
-    max_hits=100, window_seconds=_ONE_HOUR
-)
+per_key_limiter = InMemoryRateLimiter(max_hits=100, window_seconds=_ONE_HOUR)
 
 # Per-IP: 10/hour. A single visitor submitting the form more than 10
 # times in an hour is almost certainly a bot or a stress-tester.
-per_ip_limiter = InMemoryRateLimiter(
-    max_hits=10, window_seconds=_ONE_HOUR
-)
+per_ip_limiter = InMemoryRateLimiter(max_hits=10, window_seconds=_ONE_HOUR)
 
 
 def check_per_key(prefix: str) -> RateLimitResult:

@@ -13,9 +13,8 @@ The session is mocked so no live DB is needed. We assert:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from sqlalchemy import Integer, String, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -51,9 +50,7 @@ def _mock_session(*, rows: list[object], total: int) -> MagicMock:
 async def test_returns_rows_and_total() -> None:
     rows = [_Row(id=1, name="a"), _Row(id=2, name="b")]
     session = _mock_session(rows=rows, total=42)
-    result_rows, total = await paginate(
-        session, select(_Row), page=1, size=10
-    )
+    result_rows, total = await paginate(session, select(_Row), page=1, size=10)
     assert result_rows == rows
     assert total == 42
     assert session.execute.await_count == 2

@@ -16,7 +16,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from src.app.shared.db.queries import ensure_found, get_or_404
 
-
 # --- ensure_found ---------------------------------------------------------
 
 

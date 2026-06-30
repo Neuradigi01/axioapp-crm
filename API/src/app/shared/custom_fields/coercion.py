@@ -13,8 +13,10 @@ the FE dynamic-form renderer keeps parsing them.
 
 from __future__ import annotations
 
-from datetime import date as _date, datetime as _datetime
-from typing import Any, Callable
+from collections.abc import Callable
+from datetime import date as _date
+from datetime import datetime as _datetime
+from typing import Any
 
 from fastapi import HTTPException, status
 

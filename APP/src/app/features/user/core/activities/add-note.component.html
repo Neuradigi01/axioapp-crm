@@ -11,8 +11,11 @@
 
   @if (text.touched && text.invalid) {
     <p class="text-xs text-red-600">
-      @if (text.errors?.['required']) { Please enter some text. }
-      @else if (text.errors?.['maxlength']) { Notes are limited to 4,000 characters. }
+      @if (text.errors?.['required']) {
+        Please enter some text.
+      } @else if (text.errors?.['maxlength']) {
+        Notes are limited to 4,000 characters.
+      }
     </p>
   }
   @if (submitError(); as err) {

@@ -1,8 +1,8 @@
 """Data-access layer for the lead-imports sub-package."""
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,21 +17,17 @@ def add_import(session: AsyncSession, row: LeadImport) -> LeadImport:
     return row
 
 
-async def get_import_by_id(
-    session: AsyncSession, import_id: uuid.UUID
-) -> LeadImport | None:
+async def get_import_by_id(session: AsyncSession, import_id: uuid.UUID) -> LeadImport | None:
     """Single import row lookup — tenant filter handles cross-org cull."""
-    result = await session.execute(
-        select(LeadImport).where(LeadImport.id == import_id)
-    )
+    result = await session.execute(select(LeadImport).where(LeadImport.id == import_id))
     return result.scalar_one_or_none()
 
 
 async def count_imports_filtered(
     session: AsyncSession,
     *,
-    status_filter: Optional[LeadImportStatus],
-    source_platform: Optional[str],
+    status_filter: LeadImportStatus | None,
+    source_platform: str | None,
 ) -> int:
     """Total imports matching the lifecycle / platform filters."""
     stmt = select(func.count()).select_from(LeadImport)
@@ -45,8 +41,8 @@ async def count_imports_filtered(
 async def list_imports_page(
     session: AsyncSession,
     *,
-    status_filter: Optional[LeadImportStatus],
-    source_platform: Optional[str],
+    status_filter: LeadImportStatus | None,
+    source_platform: str | None,
     offset: int,
     limit: int,
 ) -> list[LeadImport]:
@@ -57,8 +53,7 @@ async def list_imports_page(
     if source_platform:
         stmt = stmt.where(LeadImport.source_platform == source_platform)
     stmt = (
-        stmt
-        .order_by(LeadImport.created_at.desc(), LeadImport.id.desc())
+        stmt.order_by(LeadImport.created_at.desc(), LeadImport.id.desc())
         .offset(offset)
         .limit(limit)
     )

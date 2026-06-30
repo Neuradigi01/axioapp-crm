@@ -25,9 +25,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
-
 export type InteractiveKind = 'reply_buttons' | 'cta_url' | 'list';
-
 
 export interface ReplyButtonsPayload {
   kind: 'reply_buttons';
@@ -37,7 +35,6 @@ export interface ReplyButtonsPayload {
   footer?: string;
 }
 
-
 export interface CtaUrlPayload {
   kind: 'cta_url';
   body: string;
@@ -46,7 +43,6 @@ export interface CtaUrlPayload {
   header?: { text: string };
   footer?: string;
 }
-
 
 export interface ListPayload {
   kind: 'list';
@@ -60,12 +56,7 @@ export interface ListPayload {
   footer?: string;
 }
 
-
-export type InteractivePayload =
-  | ReplyButtonsPayload
-  | CtaUrlPayload
-  | ListPayload;
-
+export type InteractivePayload = ReplyButtonsPayload | CtaUrlPayload | ListPayload;
 
 // Mirror of backend caps in `core/conversations/schemas.py`. Keep in
 // lockstep — see module docstring.
@@ -86,7 +77,6 @@ const LIMITS = {
   listSectionsMax: 10,
 } as const;
 
-
 interface ReplyButtonForm {
   id: string;
   title: string;
@@ -102,7 +92,6 @@ interface ListSectionForm {
   title: string;
   rows: ListRowForm[];
 }
-
 
 @Component({
   selector: 'app-interactive-builder',
@@ -179,10 +168,7 @@ export class InteractiveBuilderComponent {
   protected addButton(): void {
     const current = this.buttons();
     if (current.length >= LIMITS.buttonsMax) return;
-    this.buttons.set([
-      ...current,
-      { id: `btn_${current.length + 1}`, title: '' },
-    ]);
+    this.buttons.set([...current, { id: `btn_${current.length + 1}`, title: '' }]);
   }
 
   protected removeButton(index: number): void {
@@ -192,11 +178,7 @@ export class InteractiveBuilderComponent {
   }
 
   protected updateButton(index: number, field: 'id' | 'title', value: string): void {
-    this.buttons.set(
-      this.buttons().map((b, i) =>
-        i === index ? { ...b, [field]: value } : b,
-      ),
-    );
+    this.buttons.set(this.buttons().map((b, i) => (i === index ? { ...b, [field]: value } : b)));
   }
 
   // --- CTA URL -------------------------------------------------------
@@ -231,11 +213,7 @@ export class InteractiveBuilderComponent {
   }
 
   protected updateSectionTitle(index: number, value: string): void {
-    this.sections.set(
-      this.sections().map((s, i) =>
-        i === index ? { ...s, title: value } : s,
-      ),
-    );
+    this.sections.set(this.sections().map((s, i) => (i === index ? { ...s, title: value } : s)));
   }
 
   protected addRow(sectionIndex: number): void {
@@ -264,9 +242,7 @@ export class InteractiveBuilderComponent {
     if (!section || section.rows.length <= 1) return;
     this.sections.set(
       this.sections().map((s, i) =>
-        i === sectionIndex
-          ? { ...s, rows: s.rows.filter((_, ri) => ri !== rowIndex) }
-          : s,
+        i === sectionIndex ? { ...s, rows: s.rows.filter((_, ri) => ri !== rowIndex) } : s,
       ),
     );
   }
@@ -282,9 +258,7 @@ export class InteractiveBuilderComponent {
         i === sectionIndex
           ? {
               ...s,
-              rows: s.rows.map((r, ri) =>
-                ri === rowIndex ? { ...r, [field]: value } : r,
-              ),
+              rows: s.rows.map((r, ri) => (ri === rowIndex ? { ...r, [field]: value } : r)),
             }
           : s,
       ),
@@ -423,9 +397,7 @@ export class InteractiveBuilderComponent {
           rows: s.rows.map((r) => ({
             id: r.id.trim(),
             title: r.title.trim(),
-            ...(r.description.trim()
-              ? { description: r.description.trim() }
-              : {}),
+            ...(r.description.trim() ? { description: r.description.trim() } : {}),
           })),
         })),
         ...headerBlock,

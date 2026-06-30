@@ -6,6 +6,7 @@ never imports `service.py` or `router.py`.
 The only consumer today is `/api/v1/_dev/demo-logins`, which lists every
 seeded demo login for the login-page "Test logins" dropdown.
 """
+
 from __future__ import annotations
 
 from sqlalchemy import select

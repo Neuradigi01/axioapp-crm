@@ -1,8 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 
 import { BookAppointmentModalComponent } from '../../appointments/book-appointment-modal.component';
 import { Appointment } from '../../appointments/appointments-api.service';

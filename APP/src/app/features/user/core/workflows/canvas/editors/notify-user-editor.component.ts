@@ -1,16 +1,8 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CanvasNode } from '../canvas-state.service';
-
 
 @Component({
   selector: 'app-notify-user-editor',
@@ -27,18 +19,20 @@ export class NotifyUserEditorComponent {
   readonly recipient = computed<string>(
     () => (this.node().config?.['recipient'] as string) ?? 'workflow.owner',
   );
-  readonly title = computed<string>(
-    () => (this.node().config?.['title'] as string) ?? '',
-  );
-  readonly body = computed<string>(
-    () => (this.node().config?.['body'] as string) ?? '',
-  );
+  readonly title = computed<string>(() => (this.node().config?.['title'] as string) ?? '');
+  readonly body = computed<string>(() => (this.node().config?.['body'] as string) ?? '');
 
   constructor() {
     effect(() => this.validityChange.emit(this.title().trim().length > 0));
   }
 
-  onRecipientChange(v: string): void { this.configChange.emit({ recipient: v }); }
-  onTitleChange(v: string): void { this.configChange.emit({ title: v }); }
-  onBodyChange(v: string): void { this.configChange.emit({ body: v }); }
+  onRecipientChange(v: string): void {
+    this.configChange.emit({ recipient: v });
+  }
+  onTitleChange(v: string): void {
+    this.configChange.emit({ title: v });
+  }
+  onBodyChange(v: string): void {
+    this.configChange.emit({ body: v });
+  }
 }

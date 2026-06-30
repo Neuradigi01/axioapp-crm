@@ -8,11 +8,11 @@ The log line is deliberately readable and grep-able so an engineer can
 copy an invite link out of `docker logs template_api-api-1 | grep email`
 and click it in the browser.
 """
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-
 
 logger = logging.getLogger("src.app.shared.email")
 

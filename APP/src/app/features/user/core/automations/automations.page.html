@@ -4,9 +4,9 @@
       <div>
         <h1 class="text-xl font-semibold text-zinc-900">Automations</h1>
         <p class="text-xs text-zinc-500">
-          Single-event triggers — "when X happens, send template Y over channel Z".
-          Two are seeded by default: a Welcome email on signup and a Lead
-          Confirmation email when a lead arrives from any source.
+          Single-event triggers — "when X happens, send template Y over channel Z". Two are seeded
+          by default: a Welcome email on signup and a Lead Confirmation email when a lead arrives
+          from any source.
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -23,7 +23,9 @@
     </div>
 
     @if (loadError(); as err) {
-      <div class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      <div
+        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+      >
         {{ err }}
       </div>
     }
@@ -77,12 +79,7 @@
         }
       </select>
 
-      @if (
-        eventFilter() ||
-        channelFilter() ||
-        enabledFilter() ||
-        searchQuery()
-      ) {
+      @if (eventFilter() || channelFilter() || enabledFilter() || searchQuery()) {
         <button
           type="button"
           (click)="clearFilters()"
@@ -97,18 +94,18 @@
 
   <section class="flex-1 px-6 py-4">
     @if (loading() && items().length === 0) {
-      <div class="rounded-md border border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500">
+      <div
+        class="rounded-md border border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500"
+      >
         Loading automations…
       </div>
     } @else if (items().length === 0) {
       <div class="rounded-md border border-dashed border-zinc-300 bg-white px-6 py-10 text-center">
         <lucide-icon name="workflow" size="28" class="mx-auto mb-2 text-zinc-400" />
-        <p class="text-sm font-medium text-zinc-700">
-          No automations match your filters.
-        </p>
+        <p class="text-sm font-medium text-zinc-700">No automations match your filters.</p>
         <p class="mt-1 text-xs text-zinc-500">
-          The Welcome and Lead Confirmation triggers are seeded by default —
-          clear filters above to see them.
+          The Welcome and Lead Confirmation triggers are seeded by default — clear filters above to
+          see them.
         </p>
       </div>
     } @else {
@@ -194,8 +191,8 @@
       @if (totalPages() > 1) {
         <div class="mt-3 flex items-center justify-between text-xs text-zinc-600">
           <span>
-            Showing {{ items().length }} of {{ total() }}
-            • Page {{ pageIndex() + 1 }} / {{ totalPages() }}
+            Showing {{ items().length }} of {{ total() }} • Page {{ pageIndex() + 1 }} /
+            {{ totalPages() }}
           </span>
           <div class="flex items-center gap-1">
             <button

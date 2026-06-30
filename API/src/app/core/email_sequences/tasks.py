@@ -10,13 +10,13 @@ Convention: `@shared_task` wrapper synchronously calls
 reset hooks (matches `core/subscriptions/tasks.py`, `core/email/
 tasks.py`, `core/campaigns/tasks.py`).
 """
+
 from __future__ import annotations
 
 import asyncio
 from typing import Any
 
 from celery import shared_task
-
 from src.app.core.email_sequences.scheduler import tick
 
 

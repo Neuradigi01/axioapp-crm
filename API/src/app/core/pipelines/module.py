@@ -5,8 +5,8 @@ of their own. The kanban UI for each entity (Leads, Custom Orders, …)
 embeds the pipeline visualisation; this module exists primarily to
 expose the engine's read endpoints and to register the two permissions.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="pipelines",

@@ -34,22 +34,21 @@ load the account via the unscoped helper, then `set_context(...)`
 for the duration of the actual sync so RLS-protected reads
 (contacts.email matching) work correctly.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import uuid
 from dataclasses import asdict, is_dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from celery import shared_task
-
 from src.app.core.email.models import (
     EmailAccountProvider,
     EmailAccountSyncState,
 )
-
 
 log = logging.getLogger(__name__)
 
@@ -88,9 +87,7 @@ async def _backfill_account_async(account_id: uuid.UUID) -> dict[str, Any]:
     from src.app.shared.db import async_session
 
     async with async_session() as session:
-        account = await email_service.get_account_unscoped(
-            session, account_id=account_id
-        )
+        account = await email_service.get_account_unscoped(session, account_id=account_id)
         if account is None:
             return {"skipped": "not_found", "account_id": str(account_id)}
         if account.sync_state == EmailAccountSyncState.disconnected:
@@ -99,9 +96,7 @@ async def _backfill_account_async(account_id: uuid.UUID) -> dict[str, Any]:
                 "account_id": str(account_id),
             }
 
-        ctx_token = set_context(
-            RequestContext(org_id=account.org_id, user_id=account.user_id)
-        )
+        ctx_token = set_context(RequestContext(org_id=account.org_id, user_id=account.user_id))
         try:
             account.sync_state = EmailAccountSyncState.backfilling
             account.last_sync_error = None
@@ -114,9 +109,7 @@ async def _backfill_account_async(account_id: uuid.UUID) -> dict[str, Any]:
                 account.sync_state = EmailAccountSyncState.error
                 account.last_sync_error = str(exc)[:500]
                 await session.commit()
-                log.exception(
-                    "backfill_account failed account=%s", account_id
-                )
+                log.exception("backfill_account failed account=%s", account_id)
                 return {
                     "error": str(exc)[:200],
                     "account_id": str(account_id),
@@ -130,7 +123,7 @@ async def _backfill_account_async(account_id: uuid.UUID) -> dict[str, Any]:
             if result.new_cursor:
                 account.sync_cursor = result.new_cursor
             account.sync_state = EmailAccountSyncState.live
-            account.last_sync_at = datetime.now(timezone.utc)
+            account.last_sync_at = datetime.now(UTC)
             account.last_sync_error = None
             await session.commit()
 
@@ -150,15 +143,11 @@ async def _backfill_account_async(account_id: uuid.UUID) -> dict[str, Any]:
             reset_context(ctx_token)
 
 
-@shared_task(
-    name="src.app.core.email.tasks.sync_account_incremental"
-)
+@shared_task(name="src.app.core.email.tasks.sync_account_incremental")
 def sync_account_incremental(account_id: str) -> dict[str, Any]:
     """Incremental sync. Triggered by push webhooks + poll fallback.
     Wrapped in a Redis lock to dedupe races."""
-    return asyncio.run(
-        _sync_account_incremental_async(uuid.UUID(account_id))
-    )
+    return asyncio.run(_sync_account_incremental_async(uuid.UUID(account_id)))
 
 
 async def _sync_account_incremental_async(
@@ -179,8 +168,7 @@ async def _sync_account_incremental_async(
     async with account_lock(account_id) as acquired:
         if not acquired:
             log.info(
-                "sync_account_incremental skipped (lock held) "
-                "account=%s",
+                "sync_account_incremental skipped (lock held) account=%s",
                 account_id,
             )
             return {
@@ -189,9 +177,7 @@ async def _sync_account_incremental_async(
             }
 
         async with async_session() as session:
-            account = await email_service.get_account_unscoped(
-                session, account_id=account_id
-            )
+            account = await email_service.get_account_unscoped(session, account_id=account_id)
             if account is None:
                 return {"skipped": "not_found"}
             if account.sync_state != EmailAccountSyncState.live:
@@ -203,17 +189,12 @@ async def _sync_account_incremental_async(
                 # No cursor — caller should have run backfill first.
                 # Self-heal by triggering one inline.
                 log.warning(
-                    "sync_account_incremental: no cursor for "
-                    "account=%s — running backfill instead",
+                    "sync_account_incremental: no cursor for account=%s — running backfill instead",
                     account_id,
                 )
                 return await _backfill_account_async(account_id)
 
-            ctx_token = set_context(
-                RequestContext(
-                    org_id=account.org_id, user_id=account.user_id
-                )
-            )
+            ctx_token = set_context(RequestContext(org_id=account.org_id, user_id=account.user_id))
             try:
                 try:
                     result = await _provider_incremental(account, session)
@@ -236,8 +217,7 @@ async def _sync_account_incremental_async(
                 # Provider-specific delta-expired handling.
                 if getattr(result, "delta_link_expired", False):
                     log.info(
-                        "delta link expired for account=%s — "
-                        "triggering full re-backfill",
+                        "delta link expired for account=%s — triggering full re-backfill",
                         account_id,
                     )
                     account.sync_cursor = None
@@ -245,19 +225,16 @@ async def _sync_account_incremental_async(
                     return await _backfill_account_async(account_id)
 
                 for m in result.matched:
-                    await dispatch_inbound(
-                        account, _normalise_match(account, m)
-                    )
+                    await dispatch_inbound(account, _normalise_match(account, m))
 
                 if result.new_cursor:
                     account.sync_cursor = result.new_cursor
-                account.last_sync_at = datetime.now(timezone.utc)
+                account.last_sync_at = datetime.now(UTC)
                 account.last_sync_error = None
                 await session.commit()
 
                 log.info(
-                    "sync_account_incremental ok account=%s "
-                    "matched=%d scanned=%d",
+                    "sync_account_incremental ok account=%s matched=%d scanned=%d",
                     account_id,
                     len(result.matched),
                     result.scanned_count,
@@ -274,9 +251,7 @@ async def _sync_account_incremental_async(
 @shared_task(name="src.app.core.email.tasks.renew_account_watch")
 def renew_account_watch(account_id: str) -> dict[str, Any]:
     """Provider-aware watch / subscription renewal."""
-    return asyncio.run(
-        _renew_account_watch_async(uuid.UUID(account_id))
-    )
+    return asyncio.run(_renew_account_watch_async(uuid.UUID(account_id)))
 
 
 async def _renew_account_watch_async(
@@ -291,19 +266,13 @@ async def _renew_account_watch_async(
     from src.app.shared.db import async_session
 
     async with async_session() as session:
-        account = await email_service.get_account_unscoped(
-            session, account_id=account_id
-        )
+        account = await email_service.get_account_unscoped(session, account_id=account_id)
         if account is None:
             return {"skipped": "not_found"}
         if account.sync_state != EmailAccountSyncState.live:
             return {"skipped": f"state={account.sync_state.value}"}
 
-        ctx_token = set_context(
-            RequestContext(
-                org_id=account.org_id, user_id=account.user_id
-            )
-        )
+        ctx_token = set_context(RequestContext(org_id=account.org_id, user_id=account.user_id))
         try:
             if account.provider == EmailAccountProvider.gmail:
                 # Gmail re-issues `users.watch` to extend the
@@ -311,9 +280,7 @@ async def _renew_account_watch_async(
                 # it and update the cursor.
                 from src.app.core.email.gmail import push as gmail_push
 
-                history_id = await gmail_push.watch_if_configured(
-                    account, session
-                )
+                history_id = await gmail_push.watch_if_configured(account, session)
                 if history_id:
                     account.sync_cursor = history_id
                     await session.commit()
@@ -372,7 +339,7 @@ async def _poll_fallback_async() -> dict[str, Any]:
     from src.app.core.email.sync_daemon import enqueue_incremental
     from src.app.shared.db import async_session
 
-    cutoff = datetime.now(timezone.utc) - _POLL_FRESHNESS_WINDOW
+    cutoff = datetime.now(UTC) - _POLL_FRESHNESS_WINDOW
     async with async_session() as session:
         rows = (
             await session.execute(
@@ -420,8 +387,8 @@ async def _scan_renewals_async() -> dict[str, Any]:
     from src.app.core.email.sync_daemon import enqueue_renewal
     from src.app.shared.db import async_session
 
-    gmail_cutoff = datetime.now(timezone.utc) - timedelta(days=5)
-    ms_cutoff = datetime.now(timezone.utc) - timedelta(days=2)
+    gmail_cutoff = datetime.now(UTC) - timedelta(days=5)
+    ms_cutoff = datetime.now(UTC) - timedelta(days=2)
     async with async_session() as session:
         rows = (
             await session.execute(
@@ -446,14 +413,12 @@ async def _scan_renewals_async() -> dict[str, Any]:
                 },
             )
         ).all()
-    for (aid, _provider) in rows:
+    for aid, _provider in rows:
         enqueue_renewal(aid)
     return {"enqueued": len(rows)}
 
 
-@shared_task(
-    name="src.app.core.email.tasks.reset_daily_sent_counters"
-)
+@shared_task(name="src.app.core.email.tasks.reset_daily_sent_counters")
 def reset_daily_sent_counters() -> dict[str, Any]:
     """Midnight UTC — zero every account's `daily_sent_count` and
     stamp `daily_sent_reset_at`. Idempotent."""
@@ -499,9 +464,7 @@ async def _provider_backfill(account, session):
         from src.app.core.email.microsoft import sync as ms_sync
 
         return await ms_sync.backfill(account, session, days=30)
-    raise RuntimeError(
-        f"unknown email provider: {account.provider}"
-    )
+    raise RuntimeError(f"unknown email provider: {account.provider}")
 
 
 async def _provider_incremental(account, session):
@@ -514,9 +477,7 @@ async def _provider_incremental(account, session):
         from src.app.core.email.microsoft import sync as ms_sync
 
         return await ms_sync.sync_incremental(account, session)
-    raise RuntimeError(
-        f"unknown email provider: {account.provider}"
-    )
+    raise RuntimeError(f"unknown email provider: {account.provider}")
 
 
 def _normalise_match(account, matched) -> dict:
@@ -532,24 +493,16 @@ def _normalise_match(account, matched) -> dict:
     else:
         # Best-effort attribute scrape for an unexpected shape.
         data = {
-            "gmail_message_id": getattr(
-                matched, "gmail_message_id", None
-            ),
-            "graph_message_id": getattr(
-                matched, "graph_message_id", None
-            ),
+            "gmail_message_id": getattr(matched, "gmail_message_id", None),
+            "graph_message_id": getattr(matched, "graph_message_id", None),
             "headers": getattr(matched, "headers", {}),
-            "matched_contact_id": getattr(
-                matched, "matched_contact_id", None
-            ),
+            "matched_contact_id": getattr(matched, "matched_contact_id", None),
         }
 
     return {
         "provider": account.provider.value,
-        "message_id": data.get("gmail_message_id")
-        or data.get("graph_message_id"),
-        "conversation_id": data.get("gmail_thread_id")
-        or data.get("graph_conversation_id"),
+        "message_id": data.get("gmail_message_id") or data.get("graph_message_id"),
+        "conversation_id": data.get("gmail_thread_id") or data.get("graph_conversation_id"),
         "headers": data.get("headers", {}),
         "contact_id": data.get("matched_contact_id"),
         "raw_b64": None,

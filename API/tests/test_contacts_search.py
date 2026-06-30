@@ -4,6 +4,7 @@ Verifies the `q`, `source`, `tag`, and `custom.<key>=<value>` filters
 each narrow the result set as documented, and that combining them
 applies AND semantics.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -32,9 +33,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -85,9 +84,7 @@ async def _create(client, headers, **payload) -> str:
 
 
 @pytest.mark.asyncio
-async def test_search_by_q_source_tag_and_custom_field(
-    layered_client, seeded_admin
-):
+async def test_search_by_q_source_tag_and_custom_field(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "contacts.read", "contacts.write")
@@ -132,23 +129,17 @@ async def test_search_by_q_source_tag_and_custom_field(
     )
 
     # q narrows by full_name
-    by_q = await layered_client.get(
-        "/api/v1/contacts?q=John", headers=headers
-    )
+    by_q = await layered_client.get("/api/v1/contacts?q=John", headers=headers)
     assert by_q.status_code == 200
     names = {i["full_name"] for i in by_q.json()["items"]}
     assert names == {"John Premium", "John Entry"}
 
     # source narrows
-    by_source = await layered_client.get(
-        "/api/v1/contacts?source=referral", headers=headers
-    )
+    by_source = await layered_client.get("/api/v1/contacts?source=referral", headers=headers)
     assert {i["full_name"] for i in by_source.json()["items"]} == {"John Entry"}
 
     # tag narrows
-    by_tag = await layered_client.get(
-        "/api/v1/contacts?tag=cold", headers=headers
-    )
+    by_tag = await layered_client.get("/api/v1/contacts?tag=cold", headers=headers)
     assert {i["full_name"] for i in by_tag.json()["items"]} == {
         "John Entry",
         "Mary Other",
@@ -201,14 +192,10 @@ async def test_q_matches_phone_and_email_too(layered_client, seeded_admin):
         email="bigboss@store.local",
     )
 
-    by_phone = await layered_client.get(
-        "/api/v1/contacts?q=12345", headers=headers
-    )
+    by_phone = await layered_client.get("/api/v1/contacts?q=12345", headers=headers)
     assert {i["full_name"] for i in by_phone.json()["items"]} == {"No-Match Name"}
 
-    by_email = await layered_client.get(
-        "/api/v1/contacts?q=bigboss", headers=headers
-    )
+    by_email = await layered_client.get("/api/v1/contacts?q=bigboss", headers=headers)
     assert {i["full_name"] for i in by_email.json()["items"]} == {"Other"}
 
 
@@ -228,9 +215,7 @@ async def test_pagination_total_and_page_size(layered_client, seeded_admin):
     for n in range(7):
         await _create(layered_client, headers, full_name=f"P{n}")
 
-    page1 = await layered_client.get(
-        "/api/v1/contacts?page=1&size=3", headers=headers
-    )
+    page1 = await layered_client.get("/api/v1/contacts?page=1&size=3", headers=headers)
     assert page1.status_code == 200
     body = page1.json()
     assert body["total"] == 7
@@ -238,7 +223,5 @@ async def test_pagination_total_and_page_size(layered_client, seeded_admin):
     assert body["size"] == 3
     assert len(body["items"]) == 3
 
-    page3 = await layered_client.get(
-        "/api/v1/contacts?page=3&size=3", headers=headers
-    )
+    page3 = await layered_client.get("/api/v1/contacts?page=3&size=3", headers=headers)
     assert len(page3.json()["items"]) == 1

@@ -59,7 +59,6 @@ const ENABLED_OPTIONS: Array<{ value: '' | 'true' | 'false'; label: string }> = 
   { value: 'false', label: 'Disabled only' },
 ];
 
-
 @Component({
   selector: 'app-automations-page',
   standalone: true,
@@ -105,17 +104,11 @@ export class AutomationsPageComponent {
   // in flight the row's checkbox is disabled to avoid double-clicks.
   protected readonly togglingIds = signal<Set<string>>(new Set());
 
-  protected readonly canWrite = computed(() =>
-    this.auth.hasPermission('automations.write'),
-  );
+  protected readonly canWrite = computed(() => this.auth.hasPermission('automations.write'));
 
-  protected readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.total() / PAGE_SIZE)),
-  );
+  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / PAGE_SIZE)));
   protected readonly hasPrev = computed(() => this.pageIndex() > 0);
-  protected readonly hasNext = computed(
-    () => this.pageIndex() < this.totalPages() - 1,
-  );
+  protected readonly hasNext = computed(() => this.pageIndex() < this.totalPages() - 1);
 
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -213,16 +206,12 @@ export class AutomationsPageComponent {
     call.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (updated) => {
         // Optimistic update — patch the local row without a full reload.
-        this.items.update((rows) =>
-          rows.map((r) => (r.id === row.id ? updated : r)),
-        );
+        this.items.update((rows) => rows.map((r) => (r.id === row.id ? updated : r)));
         this.endToggle(row.id);
       },
       error: (err: HttpErrorResponse) => {
         this.endToggle(row.id);
-        this.loadError.set(
-          extractApiError(err) ?? 'Could not change trigger state.',
-        );
+        this.loadError.set(extractApiError(err) ?? 'Could not change trigger state.');
       },
     });
   }
@@ -240,12 +229,7 @@ export class AutomationsPageComponent {
     this.loadError.set(null);
     const offset = this.pageIndex() * PAGE_SIZE;
     const enabledFilter = this.enabledFilter();
-    const enabled =
-      enabledFilter === 'true'
-        ? true
-        : enabledFilter === 'false'
-          ? false
-          : undefined;
+    const enabled = enabledFilter === 'true' ? true : enabledFilter === 'false' ? false : undefined;
     this.api
       .list({
         event_type: this.eventFilter() || undefined,
@@ -266,9 +250,7 @@ export class AutomationsPageComponent {
           this.items.set([]);
           this.total.set(0);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load automations.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load automations.');
         },
       });
   }

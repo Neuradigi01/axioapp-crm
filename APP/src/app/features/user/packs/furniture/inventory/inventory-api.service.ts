@@ -148,30 +148,23 @@ export class InventoryApiService {
   uploadCover(itemId: string, file: File): Observable<CoverUploadResponse> {
     const form = new FormData();
     form.append('file', file);
-    return this.http.post<CoverUploadResponse>(
-      `${this.base}/items/${itemId}/cover`,
-      form,
-    );
+    return this.http.post<CoverUploadResponse>(`${this.base}/items/${itemId}/cover`, form);
   }
 
   // --- Movements ---
   listMovements(itemId: string, limit = 100): Observable<Movement[]> {
     const params = buildHttpParams({ limit });
-    return this.http.get<Movement[]>(
-      `${this.base}/items/${itemId}/movements`,
-      { params },
-    );
+    return this.http.get<Movement[]>(`${this.base}/items/${itemId}/movements`, { params });
   }
 
   recordMovement(itemId: string, payload: MovementCreate): Observable<Movement> {
-    return this.http.post<Movement>(
-      `${this.base}/items/${itemId}/movements`,
-      payload,
-    );
+    return this.http.post<Movement>(`${this.base}/items/${itemId}/movements`, payload);
   }
 
   // --- Alerts ---
-  listAlerts(opts: { severity?: AlertSeverity; status?: AlertStatus } = {}): Observable<StockAlert[]> {
+  listAlerts(
+    opts: { severity?: AlertSeverity; status?: AlertStatus } = {},
+  ): Observable<StockAlert[]> {
     const params = buildHttpParams({
       severity: opts.severity,
       status: opts.status,

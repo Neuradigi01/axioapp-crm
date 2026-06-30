@@ -10,10 +10,11 @@ Six cases (mirrors `test_walkins_last_activity_and_status.py`):
   6. `list?sort=last_activity_at&order=desc` returns expected order
      (newest activity first, NULLs last).
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -37,9 +38,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -90,8 +89,7 @@ async def _seed_appointment(
                 org_id=org_id,
                 contact_id=contact_id,
                 title="Showroom visit",
-                scheduled_at=scheduled_at
-                or datetime.now(timezone.utc) + timedelta(days=1),
+                scheduled_at=scheduled_at or datetime.now(UTC) + timedelta(days=1),
                 duration_min=60,
                 assigned_to_id=assigned_to_id,
                 status=status,
@@ -109,9 +107,7 @@ async def _seed_appointment(
 async def test_scheduled_to_completed_succeeds(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id)
     appt_id = await _seed_appointment(
         org.id, contact_id=contact_id, assigned_to_id=user.legacy_uuid
@@ -140,9 +136,7 @@ async def test_identity_transition_rejected(layered_client, seeded_admin):
     ride along on a PATCH that's only changing other fields."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id)
     appt_id = await _seed_appointment(
         org.id, contact_id=contact_id, assigned_to_id=user.legacy_uuid
@@ -165,14 +159,10 @@ async def test_identity_transition_rejected(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_terminal_completed_cannot_be_changed(
-    layered_client, seeded_admin
-):
+async def test_terminal_completed_cannot_be_changed(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id)
     appt_id = await _seed_appointment(
         org.id,
@@ -198,18 +188,14 @@ async def test_terminal_completed_cannot_be_changed(
 
 
 @pytest.mark.asyncio
-async def test_cancelled_can_be_rebooked_to_scheduled(
-    layered_client, seeded_admin
-):
+async def test_cancelled_can_be_rebooked_to_scheduled(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id)
     # Future slot so the conflict re-check on `scheduled_at` doesn't
     # complain about a past appointment.
-    future = datetime.now(timezone.utc) + timedelta(days=2)
+    future = datetime.now(UTC) + timedelta(days=2)
     appt_id = await _seed_appointment(
         org.id,
         contact_id=contact_id,
@@ -236,9 +222,7 @@ async def test_cancelled_can_be_rebooked_to_scheduled(
 
 
 @pytest.mark.asyncio
-async def test_activity_insert_bumps_appointment_last_activity_at(
-    layered_client, seeded_admin
-):
+async def test_activity_insert_bumps_appointment_last_activity_at(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -279,9 +263,7 @@ async def test_activity_insert_bumps_appointment_last_activity_at(
     try:
         async with TestSession() as session:
             row = (
-                await session.execute(
-                    select(Appointment).where(Appointment.id == appt_id)
-                )
+                await session.execute(select(Appointment).where(Appointment.id == appt_id))
             ).scalar_one()
             assert row.last_activity_at is not None
     finally:
@@ -289,17 +271,13 @@ async def test_activity_insert_bumps_appointment_last_activity_at(
 
 
 @pytest.mark.asyncio
-async def test_list_sort_by_last_activity_desc_nulls_last(
-    layered_client, seeded_admin
-):
+async def test_list_sort_by_last_activity_desc_nulls_last(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Three appointments with disjoint scheduled slots so the
     # default conflict check is happy on seed.
     older = await _seed_appointment(

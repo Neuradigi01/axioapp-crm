@@ -16,16 +16,17 @@ Five groups:
      rejects non-dict shapes; router validates target keys against
      `list_target_keys` (covered by integration-style assertion).
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any
-from unittest.mock import MagicMock
+from datetime import UTC, datetime, timedelta
 
 import pytest
+from pydantic import ValidationError
 
-from src.app.core.integrations import service, status as status_module
+from src.app.core.integrations import service
+from src.app.core.integrations import status as status_module
 from src.app.core.integrations.models import (
     Integration,
     IntegrationDLQ,
@@ -37,7 +38,6 @@ from src.app.core.integrations.schemas import (
     IntegrationStatusResponse,
     SubscriptionMappingUpdate,
 )
-
 
 _ORG_ID = uuid.uuid4()
 _INTEGRATION_ID = uuid.uuid4()
@@ -140,9 +140,7 @@ async def test_update_subscription_mapping_replaces_jsonb():
 async def test_update_subscription_mapping_404_when_missing():
     session = _CapturingSession(existing=None)
     with pytest.raises(Exception) as exc:
-        await service.update_subscription_mapping(
-            session, subscription_id=uuid.uuid4(), mapping={}
-        )
+        await service.update_subscription_mapping(session, subscription_id=uuid.uuid4(), mapping={})
     assert exc.value.status_code == 404
 
 
@@ -160,9 +158,7 @@ async def test_update_subscription_mapping_empty_is_allowed():
         enabled=True,
     )
     session = _CapturingSession(existing=sub)
-    row = await service.update_subscription_mapping(
-        session, subscription_id=_SUB_ID, mapping={}
-    )
+    row = await service.update_subscription_mapping(session, subscription_id=_SUB_ID, mapping={})
     assert row.field_mapping == {}
 
 
@@ -195,7 +191,7 @@ async def test_discard_dlq_stamps_replayed_at_with_null_replayed_by():
 async def test_discard_dlq_idempotent_on_already_replayed():
     """Discarding (or re-discarding) an already-replayed row is a
     no-op — no second audit event, no re-stamp."""
-    old_ts = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    old_ts = datetime(2026, 1, 1, tzinfo=UTC)
     row = IntegrationDLQ(
         id=uuid.uuid4(),
         org_id=_ORG_ID,
@@ -297,12 +293,8 @@ async def test_build_status_returns_one_entry_per_provider(monkeypatch):
     async def _no_dlq_count(_s):
         return 0
 
-    monkeypatch.setattr(
-        status_module, "_provider_counts", _no_provider_counts
-    )
-    monkeypatch.setattr(
-        status_module, "_open_dlq_count", _no_dlq_count
-    )
+    monkeypatch.setattr(status_module, "_provider_counts", _no_provider_counts)
+    monkeypatch.setattr(status_module, "_open_dlq_count", _no_dlq_count)
 
     class _NoIntegrationsSession:
         async def execute(self, _stmt):
@@ -337,7 +329,7 @@ async def test_build_status_reflects_connected_status_and_counts(monkeypatch):
         status=IntegrationStatus.expired,
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     async def _counts(_s, *, provider, since):
         if provider == "google_ads":
@@ -376,15 +368,11 @@ class TestMappingPayloadSchema:
         assert p.mapping == {}
 
     def test_accepts_string_to_string_mapping(self):
-        p = SubscriptionMappingUpdate(
-            mapping={"FULL_NAME": "contact.full_name"}
-        )
+        p = SubscriptionMappingUpdate(mapping={"FULL_NAME": "contact.full_name"})
         assert p.mapping == {"FULL_NAME": "contact.full_name"}
 
     def test_rejects_unknown_top_level_keys(self):
         # `extra="forbid"` — sending fields other than `mapping`
         # raises ValidationError. Defends against typo'd request bodies.
-        with pytest.raises(Exception):
-            SubscriptionMappingUpdate.model_validate(
-                {"mapping": {}, "extra_field": "x"}
-            )
+        with pytest.raises(ValidationError):
+            SubscriptionMappingUpdate.model_validate({"mapping": {}, "extra_field": "x"})

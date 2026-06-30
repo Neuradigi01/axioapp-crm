@@ -1,17 +1,30 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.data_access import user_da, admin_da
+
+from config import EMAIL_ENABLED, SMS_ENABLED
+from src.constants import messages
+from src.data_access import admin_da, user_da
 from src.providers import two_factor_provider
 from src.services.common_service import get_member_with_contact_info, verify_2fa_code
 from src.utilities.formatting import mask_email, mask_mobile
-from src.constants import messages
-from config import EMAIL_ENABLED, SMS_ENABLED
 
 
 async def _update_2fa(db, user_id, user_type, *, enabled, method, secret=None):
     if user_type == "User":
-        await user_da.update_two_factor(db, user_id, two_factor_enabled=enabled, two_factor_method=method, two_factor_secret=secret)
+        await user_da.update_two_factor(
+            db,
+            user_id,
+            two_factor_enabled=enabled,
+            two_factor_method=method,
+            two_factor_secret=secret,
+        )
     else:
-        await admin_da.update_two_factor(db, user_id, two_factor_enabled=enabled, two_factor_method=method, two_factor_secret=secret)
+        await admin_da.update_two_factor(
+            db,
+            user_id,
+            two_factor_enabled=enabled,
+            two_factor_method=method,
+            two_factor_secret=secret,
+        )
 
 
 async def _clear_2fa(db, user_id, user_type):
@@ -65,8 +78,11 @@ async def setup_2fa_authenticator(db: AsyncSession, user_id: str, user_type: str
 
 
 async def verify_and_enable_2fa(
-    db: AsyncSession, user_id: str, user_type: str,
-    code: str, method: str,
+    db: AsyncSession,
+    user_id: str,
+    user_type: str,
+    code: str,
+    method: str,
 ) -> dict:
     record, _, _ = await get_member_with_contact_info(db, user_id, user_type)
     if not record:
@@ -106,7 +122,10 @@ async def disable_2fa(db: AsyncSession, user_id: str, user_type: str) -> dict:
 
 
 async def change_2fa_method(
-    db: AsyncSession, user_id: str, user_type: str, new_method: str,
+    db: AsyncSession,
+    user_id: str,
+    user_type: str,
+    new_method: str,
 ) -> dict:
     record, _, _ = await get_member_with_contact_info(db, user_id, user_type)
     if not record:

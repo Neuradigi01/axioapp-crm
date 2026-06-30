@@ -178,7 +178,9 @@
                   placeholder="https://example.com/path"
                   class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-xs focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                 />
-                <span class="mt-1 block text-[10px] text-zinc-500">Must start with http:// or https://</span>
+                <span class="mt-1 block text-[10px] text-zinc-500"
+                  >Must start with http:// or https://</span
+                >
               </label>
             </div>
           } @else {
@@ -195,8 +197,9 @@
               </label>
               <div class="flex items-center justify-between text-xs text-zinc-700">
                 <span>
-                  Sections: {{ sections().length }} ·
-                  Rows total: {{ totalListRows() }}/{{ LIMITS.listRowsMax }}
+                  Sections: {{ sections().length }} · Rows total: {{ totalListRows() }}/{{
+                    LIMITS.listRowsMax
+                  }}
                 </span>
                 <button
                   type="button"
@@ -211,7 +214,9 @@
                 <div class="space-y-2 rounded border border-zinc-200 bg-white p-2">
                   <div class="flex items-end gap-2">
                     <label class="flex-1">
-                      <span class="text-[10px] uppercase tracking-wide text-zinc-500">Section title</span>
+                      <span class="text-[10px] uppercase tracking-wide text-zinc-500"
+                        >Section title</span
+                      >
                       <input
                         type="text"
                         [ngModel]="s.title"
@@ -234,7 +239,9 @@
                     <div class="rounded border border-zinc-200 bg-zinc-50 p-2">
                       <div class="flex items-end gap-2">
                         <label class="flex-1">
-                          <span class="text-[10px] uppercase tracking-wide text-zinc-500">Row title</span>
+                          <span class="text-[10px] uppercase tracking-wide text-zinc-500"
+                            >Row title</span
+                          >
                           <input
                             type="text"
                             [ngModel]="r.title"
@@ -244,7 +251,9 @@
                           />
                         </label>
                         <label class="flex-1">
-                          <span class="text-[10px] uppercase tracking-wide text-zinc-500">Row id</span>
+                          <span class="text-[10px] uppercase tracking-wide text-zinc-500"
+                            >Row id</span
+                          >
                           <input
                             type="text"
                             [ngModel]="r.id"
@@ -264,7 +273,9 @@
                         </button>
                       </div>
                       <label class="mt-1 block">
-                        <span class="text-[10px] uppercase tracking-wide text-zinc-500">Description (optional)</span>
+                        <span class="text-[10px] uppercase tracking-wide text-zinc-500"
+                          >Description (optional)</span
+                        >
                         <input
                           type="text"
                           [ngModel]="r.description"
@@ -319,11 +330,15 @@
                   }
                 </div>
               } @else if (kind() === 'cta_url') {
-                <div class="mt-2 rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-center text-xs font-medium text-emerald-700">
+                <div
+                  class="mt-2 rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-center text-xs font-medium text-emerald-700"
+                >
                   {{ ctaButtonText().trim() || '(button)' }}
                 </div>
               } @else {
-                <div class="mt-2 rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-center text-xs font-medium text-zinc-700">
+                <div
+                  class="mt-2 rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-center text-xs font-medium text-zinc-700"
+                >
                   {{ listButtonText().trim() || 'Choose' }}
                 </div>
               }
@@ -333,13 +348,22 @@
       </div>
 
       @if (validationError(); as err) {
-        <div class="flex items-start gap-2 border-t border-rose-200 bg-rose-50 px-5 py-2 text-xs text-rose-800">
-          <lucide-icon name="alert-triangle" size="14" class="mt-0.5 shrink-0" aria-hidden="true"></lucide-icon>
+        <div
+          class="flex items-start gap-2 border-t border-rose-200 bg-rose-50 px-5 py-2 text-xs text-rose-800"
+        >
+          <lucide-icon
+            name="alert-triangle"
+            size="14"
+            class="mt-0.5 shrink-0"
+            aria-hidden="true"
+          ></lucide-icon>
           <span>{{ err }}</span>
         </div>
       }
 
-      <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-white px-5 py-3">
+      <footer
+        class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-white px-5 py-3"
+      >
         <button
           type="button"
           (click)="onCancel()"

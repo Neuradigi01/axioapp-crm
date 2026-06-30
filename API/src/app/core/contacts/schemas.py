@@ -7,6 +7,7 @@ boundary. The router's auto-422 only catches the shape issues that
 are independent of tenant data — type-of-each-key cannot be expressed
 statically here.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,7 +27,6 @@ from src.app.shared.schemas import (
     PaginatedResponse,
     TimestampedOrgScopedOut,
 )
-
 
 _TAG_MAX = 64
 _TAG_COUNT_MAX = 32
@@ -74,7 +74,6 @@ class ContactUpdate(BaseModel):
 
 
 class ContactOut(TimestampedOrgScopedOut):
-
     id: uuid.UUID
     full_name: str
     phone: str | None
@@ -133,8 +132,7 @@ class OptOutRecordRequest(BaseModel):
     reason: str | None = Field(
         default=None,
         max_length=500,
-        description="Optional free-text justification (e.g. "
-        "'customer requested by phone').",
+        description="Optional free-text justification (e.g. 'customer requested by phone').",
     )
     request_evidence: dict[str, Any] = Field(default_factory=dict)
 

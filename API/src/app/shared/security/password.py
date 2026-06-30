@@ -5,6 +5,7 @@ own canonical entry point. Behaviour is identical; same bcrypt library,
 same salt strategy. The legacy module continues to back the existing
 auth pages until Step 1.6 finishes the auth migration.
 """
+
 from __future__ import annotations
 
 import bcrypt

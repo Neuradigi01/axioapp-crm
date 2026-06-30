@@ -10,11 +10,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import {
-  Call,
-  CallOutcome,
-  CallsApiService,
-} from '../calls-api.service';
+import { Call, CallOutcome, CallsApiService } from '../calls-api.service';
 import { LogCallModalComponent } from '../log-call-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -63,19 +59,17 @@ export class CallLogsTabComponent {
     // Honour `/user/calls?new=1` (dashboard quick-action) so landing
     // on the call-center from elsewhere opens the log-call modal
     // directly on the default (Logs) tab. Strip the param after.
-    this.route.queryParamMap
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((params) => {
-        if (params.get('new') !== null && !this.modalOpen()) {
-          this.openModal();
-          this.router.navigate([], {
-            relativeTo: this.route,
-            queryParams: { new: null },
-            queryParamsHandling: 'merge',
-            replaceUrl: true,
-          });
-        }
-      });
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      if (params.get('new') !== null && !this.modalOpen()) {
+        this.openModal();
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { new: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      }
+    });
   }
 
   protected reload(): void {
@@ -92,9 +86,7 @@ export class CallLogsTabComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load calls.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load calls.');
         },
       });
   }
@@ -124,7 +116,6 @@ export class CallLogsTabComponent {
   }
 
   protected outcomeFor(call: Call): CallOutcome | null {
-    return call.outcome_id ? this.outcomeById().get(call.outcome_id) ?? null : null;
+    return call.outcome_id ? (this.outcomeById().get(call.outcome_id) ?? null) : null;
   }
-
 }

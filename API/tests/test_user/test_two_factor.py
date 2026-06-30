@@ -1,20 +1,21 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
 import pytest_asyncio
-from unittest.mock import patch, AsyncMock
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
-from src.models import Base
-from src.models.user import UserLogin, UserInfo
-from src.models.routes import Route
-from src.core.security.password import hash_password
 from src.core.security.jwt import create_access_token
-from tests.conftest import test_engine, TestSession
+from src.core.security.password import hash_password
+from src.models import Base
+from src.models.routes import Route
+from src.models.user import UserInfo, UserLogin
+from tests.conftest import TestSession, test_engine
 
 
 @pytest_asyncio.fixture
 async def client():
-    from main import app
     import src.core.db as db_module
+    from main import app
 
     original_session = db_module.async_session
     db_module.async_session = TestSession
@@ -54,9 +55,15 @@ async def _seed(db, two_factor_enabled=False, two_factor_method=None, two_factor
 
     # 2FA route (user route_id=14)
     route = Route(
-        parent_id=0, control_id="user_2fa", user_type="User",
-        name="2FA Settings", path="2fa", url="/user/2fa",
-        is_nav_menu_item=True, order_no=4, is_compulsory=True,
+        parent_id=0,
+        control_id="user_2fa",
+        user_type="User",
+        name="2FA Settings",
+        path="2fa",
+        url="/user/2fa",
+        is_nav_menu_item=True,
+        order_no=4,
+        is_compulsory=True,
     )
     db.add(route)
     await db.flush()
@@ -65,11 +72,13 @@ async def _seed(db, two_factor_enabled=False, two_factor_method=None, two_factor
 
 
 def _make_token(route_id):
-    return create_access_token({
-        "user_id": "test_user",
-        "role": "User",
-        "access_rights": str(route_id),
-    })
+    return create_access_token(
+        {
+            "user_id": "test_user",
+            "role": "User",
+            "access_rights": str(route_id),
+        }
+    )
 
 
 @pytest.mark.asyncio
@@ -157,7 +166,8 @@ async def test_enable_email_otp(mock_verify, mock_send, client):
 async def test_disable_2fa_with_valid_code(mock_verify, client):
     async with TestSession() as db:
         user, info, route = await _seed(
-            db, two_factor_enabled=True,
+            db,
+            two_factor_enabled=True,
             two_factor_method="authenticator",
             two_factor_secret="JBSWY3DPEHPK3PXP",
         )
@@ -181,7 +191,8 @@ async def test_disable_2fa_with_valid_code(mock_verify, client):
 async def test_disable_2fa_with_invalid_code(mock_verify, client):
     async with TestSession() as db:
         user, info, route = await _seed(
-            db, two_factor_enabled=True,
+            db,
+            two_factor_enabled=True,
             two_factor_method="authenticator",
             two_factor_secret="JBSWY3DPEHPK3PXP",
         )
@@ -205,7 +216,8 @@ async def test_disable_2fa_with_invalid_code(mock_verify, client):
 async def test_change_method_from_authenticator_to_email(mock_verify, client):
     async with TestSession() as db:
         user, info, route = await _seed(
-            db, two_factor_enabled=True,
+            db,
+            two_factor_enabled=True,
             two_factor_method="authenticator",
             two_factor_secret="JBSWY3DPEHPK3PXP",
         )

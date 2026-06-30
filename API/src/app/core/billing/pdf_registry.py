@@ -9,12 +9,12 @@ configuration error rather than a hidden default.
 This is the same pattern the conversations channel registry uses
 (adapters register at import time; core never imports the pack).
 """
+
 from __future__ import annotations
 
-from typing import Awaitable, Callable, Optional
+from collections.abc import Awaitable, Callable
 
 from src.app.core.billing.models import Invoice, InvoiceLine
-
 
 # (Invoice, list[InvoiceLine], dict[str, str | None]) -> (bytes, filename)
 RendererFn = Callable[
@@ -23,7 +23,7 @@ RendererFn = Callable[
 ]
 
 
-_renderer: Optional[RendererFn] = None
+_renderer: RendererFn | None = None
 
 
 def register_renderer(fn: RendererFn) -> None:
@@ -32,5 +32,5 @@ def register_renderer(fn: RendererFn) -> None:
     _renderer = fn
 
 
-def get_renderer() -> Optional[RendererFn]:
+def get_renderer() -> RendererFn | None:
     return _renderer

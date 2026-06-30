@@ -4,10 +4,10 @@
     role="region"
     aria-label="Bulk actions"
   >
-    <div class="flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm text-white shadow-lg ring-1 ring-zinc-700">
-      <span class="font-medium">
-        {{ _selectedCount() }} selected
-      </span>
+    <div
+      class="flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm text-white shadow-lg ring-1 ring-zinc-700"
+    >
+      <span class="font-medium"> {{ _selectedCount() }} selected </span>
       <span class="h-4 w-px bg-zinc-700"></span>
       @for (a of visibleActions(); track a.key) {
         <button

@@ -34,8 +34,8 @@ Sourced from one place so the role-template seeds in
 :mod:`core.permissions.role_templates` and the backfill migration
 import them by name instead of hard-coding the strings.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 PERM_READ = "workflows.read"
 PERM_WRITE = "workflows.write"

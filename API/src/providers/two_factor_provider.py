@@ -1,7 +1,9 @@
-import io
 import base64
+import io
+
 import pyotp
 import pyqrcode
+
 from config import APP_NAME
 
 

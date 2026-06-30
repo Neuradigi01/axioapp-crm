@@ -48,9 +48,7 @@ export class PipelineListComponent {
 
   readonly itemMoved = output<ItemMovedEvent>();
 
-  readonly itemTemplate = contentChild<TemplateRef<{ $implicit: PipelineItem }>>(
-    TemplateRef,
-  );
+  readonly itemTemplate = contentChild<TemplateRef<{ $implicit: PipelineItem }>>(TemplateRef);
 
   protected readonly pipeline = signal<Pipeline | null>(null);
   protected readonly loading = signal(false);
@@ -105,12 +103,9 @@ export class PipelineListComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.pipeline.set(null);
-          this.loadError.set(
-            extractApiError(err) ?? `Could not load pipeline '${key}'.`,
-          );
+          this.loadError.set(extractApiError(err) ?? `Could not load pipeline '${key}'.`);
           this.loading.set(false);
         },
       });
   }
-
 }

@@ -14,10 +14,11 @@ Five tiny cases driven through the layered FastAPI app:
 
 Run with: ``uv run pytest tests/test_contacts_assignee_and_last_activity.py``.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -40,9 +41,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -115,9 +114,7 @@ async def test_list_filters_by_assignee(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_list_sort_by_last_activity_desc_nulls_last(
-    layered_client, seeded_admin
-):
+async def test_list_sort_by_last_activity_desc_nulls_last(layered_client, seeded_admin):
     """`?sort=last_activity_at&order=desc` returns newest first; NULLs sink."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -130,7 +127,7 @@ async def test_list_sort_by_last_activity_desc_nulls_last(
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     older_id = await _make_contact(
         org.id, full_name="Older", last_activity_at=now - timedelta(hours=2)
     )
@@ -166,19 +163,16 @@ async def test_list_rejects_unknown_sort_key(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    bad = await layered_client.get(
-        "/api/v1/contacts?sort=evil", headers=headers
-    )
+    bad = await layered_client.get("/api/v1/contacts?sort=evil", headers=headers)
     assert bad.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_activity_insert_bumps_last_activity_at(
-    layered_client, seeded_admin
-):
+async def test_activity_insert_bumps_last_activity_at(layered_client, seeded_admin):
     """`POST /activities` on a contact bumps the contact's last_activity_at."""
-    from tests.conftest import TestSession
     from sqlalchemy import select
+
+    from tests.conftest import TestSession
 
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -215,9 +209,7 @@ async def test_activity_insert_bumps_last_activity_at(
     try:
         async with TestSession() as session:
             row = (
-                await session.execute(
-                    select(Contact).where(Contact.id == contact_id)
-                )
+                await session.execute(select(Contact).where(Contact.id == contact_id))
             ).scalar_one()
             assert row.last_activity_at is not None
     finally:
@@ -225,13 +217,12 @@ async def test_activity_insert_bumps_last_activity_at(
 
 
 @pytest.mark.asyncio
-async def test_older_activity_does_not_regress_last_activity_at(
-    layered_client, seeded_admin
-):
+async def test_older_activity_does_not_regress_last_activity_at(layered_client, seeded_admin):
     """The `<` guard prevents backfilling a past timestamp over a newer one."""
+    from sqlalchemy import select
+
     from src.app.core.activities import log
     from tests.conftest import TestSession
-    from sqlalchemy import select
 
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -245,16 +236,12 @@ async def test_older_activity_does_not_regress_last_activity_at(
     )
 
     # Pre-seed a contact with a forward-dated last_activity_at.
-    future = datetime.now(timezone.utc) + timedelta(hours=1)
-    contact_id = await _make_contact(
-        org.id, full_name="Forward Dated", last_activity_at=future
-    )
+    future = datetime.now(UTC) + timedelta(hours=1)
+    contact_id = await _make_contact(org.id, full_name="Forward Dated", last_activity_at=future)
 
     # Drive `log()` under the tenant context — it will insert an
     # activity whose created_at is `now()` (i.e. older than `future`).
-    ctx_token = set_context(
-        RequestContext(org_id=org.id, user_id=user.legacy_uuid)
-    )
+    ctx_token = set_context(RequestContext(org_id=org.id, user_id=user.legacy_uuid))
     try:
         await log(
             entity_type="contact",
@@ -273,9 +260,7 @@ async def test_older_activity_does_not_regress_last_activity_at(
     try:
         async with TestSession() as session:
             row = (
-                await session.execute(
-                    select(Contact).where(Contact.id == contact_id)
-                )
+                await session.execute(select(Contact).where(Contact.id == contact_id))
             ).scalar_one()
             # Allow tiny serialization drift between SET and SELECT
             # (TZ-aware comparison only). Assert >= the original future

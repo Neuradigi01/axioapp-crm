@@ -10,6 +10,7 @@ exercises one endpoint or behaviour:
   - list filters: stage / status / assigned_to / q / source / custom.*
   - perm-gated write
 """
+
 from __future__ import annotations
 
 import uuid
@@ -40,9 +41,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -170,21 +169,15 @@ async def test_create_list_get_patch_delete(layered_client, seeded_admin):
     assert patch.json()["budget"] == "200000.00"
 
     # DELETE
-    delete = await layered_client.delete(
-        f"/api/v1/leads/{lead_id}", headers=headers
-    )
+    delete = await layered_client.delete(f"/api/v1/leads/{lead_id}", headers=headers)
     assert delete.status_code == 204
 
-    after = await layered_client.get(
-        f"/api/v1/leads/{lead_id}", headers=headers
-    )
+    after = await layered_client.get(f"/api/v1/leads/{lead_id}", headers=headers)
     assert after.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_create_defaults_to_first_stage_when_omitted(
-    layered_client, seeded_admin
-):
+async def test_create_defaults_to_first_stage_when_omitted(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "leads.read", "leads.write")
@@ -316,7 +309,7 @@ async def test_list_filters_combine(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    for (cid, stage, priority) in [
+    for cid, stage, priority in [
         (c_a, "qualified", "high"),
         (c_b, "new", "low"),
         (c_c, "qualified", "high"),
@@ -333,9 +326,7 @@ async def test_list_filters_combine(layered_client, seeded_admin):
         assert r.status_code == 201, r.text
 
     # by stage
-    by_stage = await layered_client.get(
-        "/api/v1/leads?stage=qualified", headers=headers
-    )
+    by_stage = await layered_client.get("/api/v1/leads?stage=qualified", headers=headers)
     assert by_stage.json()["total"] == 2
 
     # by q (full_name across contacts join)
@@ -343,21 +334,15 @@ async def test_list_filters_combine(layered_client, seeded_admin):
     assert by_q.json()["total"] == 2
 
     # by source (contacts join)
-    by_source = await layered_client.get(
-        "/api/v1/leads?source=walk_in", headers=headers
-    )
+    by_source = await layered_client.get("/api/v1/leads?source=walk_in", headers=headers)
     assert by_source.json()["total"] == 2
 
     # by custom.priority
-    by_custom = await layered_client.get(
-        "/api/v1/leads?custom.priority=high", headers=headers
-    )
+    by_custom = await layered_client.get("/api/v1/leads?custom.priority=high", headers=headers)
     assert by_custom.json()["total"] == 2
 
     # combo: q=John AND stage=qualified — only "John Premium"
-    combo = await layered_client.get(
-        "/api/v1/leads?q=John&stage=qualified", headers=headers
-    )
+    combo = await layered_client.get("/api/v1/leads?q=John&stage=qualified", headers=headers)
     assert combo.json()["total"] == 1
 
 

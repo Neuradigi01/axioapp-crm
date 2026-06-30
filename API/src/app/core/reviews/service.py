@@ -18,11 +18,12 @@ Five concerns:
 
 All mutations fire `audit.log`.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,16 +41,15 @@ from src.app.core.reviews.schemas import (
 from src.app.shared.audit import log_entity_change
 from src.app.shared.db.queries import ensure_found
 
-
 # --- reads ----------------------------------------------------------------
 
 
 async def list_reviews(
     session: AsyncSession,
     *,
-    source: Optional[str] = None,
-    rating: Optional[int] = None,
-    status_filter: Optional[ReviewStatus] = None,
+    source: str | None = None,
+    rating: int | None = None,
+    status_filter: ReviewStatus | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Review], int]:
@@ -64,9 +64,7 @@ async def list_reviews(
 
 
 async def get_review(session: AsyncSession, review_id: uuid.UUID) -> Review:
-    return ensure_found(
-        await _da.get_review_by_id(session, review_id), entity="review"
-    )
+    return ensure_found(await _da.get_review_by_id(session, review_id), entity="review")
 
 
 # --- writes ---------------------------------------------------------------
@@ -156,9 +154,7 @@ async def update_review(
     return review
 
 
-async def delete_review(
-    session: AsyncSession, *, review_id: uuid.UUID
-) -> None:
+async def delete_review(session: AsyncSession, *, review_id: uuid.UUID) -> None:
     review = await get_review(session, review_id)
     before = _snapshot(review)
     await _da.delete_review_row(session, review)
@@ -181,7 +177,7 @@ async def reply_to_review(
     review = await get_review(session, review_id)
     before = _snapshot(review)
     review.reply_text = payload.text
-    review.replied_at = datetime.now(timezone.utc)
+    review.replied_at = datetime.now(UTC)
     review.replied_by_id = user_id
     review.status = ReviewStatus.replied
     await session.commit()
@@ -252,16 +248,14 @@ async def stats(session: AsyncSession) -> dict[str, Any]:
     avg = avg if avg is not None else 0.0
 
     dist_rows = await _da.review_rating_distribution(session)
-    distribution = [
-        {"rating": int(r.rating), "count": int(r[1])} for r in dist_rows
-    ]
+    distribution = [{"rating": int(r.rating), "count": int(r[1])} for r in dist_rows]
 
     responded = await _da.count_responded_reviews(session)
     response_rate = (responded / total) * 100 if total else 0.0
 
     pending = await _da.count_pending_reviews(session)
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    cutoff = datetime.now(UTC) - timedelta(days=7)
     alerts = await _da.count_low_rating_reviews_since(session, cutoff=cutoff)
 
     return {

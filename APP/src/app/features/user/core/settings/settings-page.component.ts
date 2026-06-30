@@ -144,17 +144,11 @@ export class SettingsPageComponent {
   readonly active = signal<SettingsTab>(this._resolveInitialTab());
 
   private _resolveInitialTab(): SettingsTab {
-    const routeData = this.route.snapshot.data['tab'] as
-      | SettingsTab
-      | undefined;
+    const routeData = this.route.snapshot.data['tab'] as SettingsTab | undefined;
     if (routeData && this._isVisible(routeData)) return routeData;
-    const qp = this.route.snapshot.queryParamMap.get('tab') as
-      | SettingsTab
-      | null;
+    const qp = this.route.snapshot.queryParamMap.get('tab') as SettingsTab | null;
     if (qp && this._isVisible(qp)) return qp;
-    const visible = TABS.filter(
-      (t) => !t.permission || this.auth.hasPermission(t.permission),
-    );
+    const visible = TABS.filter((t) => !t.permission || this.auth.hasPermission(t.permission));
     return (visible[0]?.id ?? TABS[0].id) as SettingsTab;
   }
 

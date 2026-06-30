@@ -78,10 +78,9 @@ export class ComplianceSettingsComponent implements OnInit {
     transactional_bypass_frequency_cap: this.fb.control<boolean>(true, {
       nonNullable: true,
     }),
-    unsubscribe_link_required_in_marketing_email: this.fb.control<boolean>(
-      true,
-      { nonNullable: true },
-    ),
+    unsubscribe_link_required_in_marketing_email: this.fb.control<boolean>(true, {
+      nonNullable: true,
+    }),
   });
 
   ngOnInit(): void {
@@ -102,12 +101,8 @@ export class ComplianceSettingsComponent implements OnInit {
       // The API expects ``HH:MM:SS`` for TIME columns; the form
       // input gives ``HH:MM`` — pad with ``:00`` so Pydantic
       // parses cleanly.
-      quiet_hours_start: this._padSeconds(
-        this.form.controls.quiet_hours_start.value,
-      ),
-      quiet_hours_end: this._padSeconds(
-        this.form.controls.quiet_hours_end.value,
-      ),
+      quiet_hours_start: this._padSeconds(this.form.controls.quiet_hours_start.value),
+      quiet_hours_end: this._padSeconds(this.form.controls.quiet_hours_end.value),
     };
 
     this.api
@@ -156,21 +151,13 @@ export class ComplianceSettingsComponent implements OnInit {
   }): void {
     this.form.patchValue({
       quiet_hours_enabled: settings.quiet_hours_enabled ?? true,
-      quiet_hours_start: this._stripSeconds(
-        settings.quiet_hours_start ?? '21:00:00',
-      ),
-      quiet_hours_end: this._stripSeconds(
-        settings.quiet_hours_end ?? '09:00:00',
-      ),
+      quiet_hours_start: this._stripSeconds(settings.quiet_hours_start ?? '21:00:00'),
+      quiet_hours_end: this._stripSeconds(settings.quiet_hours_end ?? '09:00:00'),
       quiet_hours_timezone: settings.quiet_hours_timezone ?? 'Asia/Kolkata',
-      frequency_cap_marketing_per_week:
-        settings.frequency_cap_marketing_per_week ?? 5,
-      frequency_cap_marketing_per_day:
-        settings.frequency_cap_marketing_per_day ?? 2,
-      transactional_bypass_quiet_hours:
-        settings.transactional_bypass_quiet_hours ?? true,
-      transactional_bypass_frequency_cap:
-        settings.transactional_bypass_frequency_cap ?? true,
+      frequency_cap_marketing_per_week: settings.frequency_cap_marketing_per_week ?? 5,
+      frequency_cap_marketing_per_day: settings.frequency_cap_marketing_per_day ?? 2,
+      transactional_bypass_quiet_hours: settings.transactional_bypass_quiet_hours ?? true,
+      transactional_bypass_frequency_cap: settings.transactional_bypass_frequency_cap ?? true,
       unsubscribe_link_required_in_marketing_email:
         settings.unsubscribe_link_required_in_marketing_email ?? true,
     });

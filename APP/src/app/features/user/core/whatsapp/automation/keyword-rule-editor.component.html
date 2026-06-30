@@ -42,16 +42,13 @@
         class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
       />
       <p class="mt-1 text-[10px] text-zinc-500">
-        Lower = evaluated first. Use the drag-handles on the rule
-        list to reorder visually.
+        Lower = evaluated first. Use the drag-handles on the rule list to reorder visually.
       </p>
     </div>
   </div>
 
   <div>
-    <label class="mb-1 block text-xs font-medium text-zinc-700">
-      Keywords (comma-separated)
-    </label>
+    <label class="mb-1 block text-xs font-medium text-zinc-700"> Keywords (comma-separated) </label>
     <input
       type="text"
       [ngModel]="keywordsInput()"
@@ -88,12 +85,8 @@
   <!-- Action stack -->
   <div>
     <div class="mb-2 flex items-center justify-between">
-      <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-        Actions
-      </p>
-      <p class="text-[10px] text-zinc-500">
-        {{ actions().length }} / 10 — run in order on match.
-      </p>
+      <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Actions</p>
+      <p class="text-[10px] text-zinc-500">{{ actions().length }} / 10 — run in order on match.</p>
     </div>
 
     @if (actions().length === 0) {
@@ -105,9 +98,7 @@
     @for (a of actions(); track $index; let i = $index) {
       <div class="mb-2 rounded-md border border-zinc-200 p-2">
         <div class="mb-1 flex items-center justify-between">
-          <span class="text-xs font-medium text-zinc-700">
-            {{ i + 1 }}. {{ a.action_type }}
-          </span>
+          <span class="text-xs font-medium text-zinc-700"> {{ i + 1 }}. {{ a.action_type }} </span>
           <button
             type="button"
             (click)="removeAction(i)"
@@ -137,9 +128,7 @@
             >
               <option [ngValue]="null">— Pick a template —</option>
               @for (t of approvedTemplates(); track t.id) {
-                <option [ngValue]="t.id">
-                  {{ t.name }} ({{ t.language }})
-                </option>
+                <option [ngValue]="t.id">{{ t.name }} ({{ t.language }})</option>
               }
             </select>
           }
@@ -169,8 +158,8 @@
           }
           @case ('escalate_to_ai') {
             <p class="text-xs text-zinc-500">
-              Flips the conversation's "AI handling" toggle on. Step 19
-              wires the actual AI agent; the toggle is the hook.
+              Flips the conversation's "AI handling" toggle on. Step 19 wires the actual AI agent;
+              the toggle is the hook.
             </p>
           }
         }

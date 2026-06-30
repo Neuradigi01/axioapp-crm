@@ -12,11 +12,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
-import {
-  Activity,
-  ActivityType,
-  ActivitiesApiService,
-} from './activities-api.service';
+import { Activity, ActivityType, ActivitiesApiService } from './activities-api.service';
 import { RelativeTimePipe } from './relative-time.pipe';
 import type { LucideIconName } from '../shared/icons';
 import { extractApiError } from '@core/services/api-error.util';
@@ -134,9 +130,7 @@ export class ActivityTimelineComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load activities.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load activities.');
           this.loading.set(false);
         },
       });
@@ -192,5 +186,4 @@ export class ActivityTimelineComponent {
       year: 'numeric',
     });
   }
-
 }

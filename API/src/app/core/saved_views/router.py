@@ -10,6 +10,7 @@ granted to every authenticated user via the module's default permission
 template (not a privilege). Owner-only checks for mutation live in the
 service layer so the router stays declarative.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -32,7 +33,6 @@ from src.app.core.saved_views.service import (
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/saved-views", tags=["Saved Views"])
 

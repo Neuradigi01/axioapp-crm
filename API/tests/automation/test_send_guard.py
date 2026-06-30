@@ -14,18 +14,17 @@ the cap test inserts real runs + asserts the count + the verdict.
 Quiet-hours tests run with ``zoneinfo`` directly — no real wall
 clock — so the verdict matrix is deterministic in CI.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, time, timedelta, timezone
-from decimal import Decimal
+from datetime import UTC, datetime, time, timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 import pytest_asyncio
 from sqlalchemy import text as sql_text
-from zoneinfo import ZoneInfo
 
 from src.app.core.automation import send_guard
 from src.app.core.automation.models import (
@@ -40,8 +39,6 @@ from src.app.core.templates.models import (
     TemplateExternalStatus,
     TemplateInternalStatus,
 )
-from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -55,10 +52,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo Workspace",
@@ -126,9 +120,7 @@ async def _make_marketing_template(test_db, *, org_id) -> MessageTemplate:
     return template
 
 
-async def _make_trigger(
-    test_db, *, org_id, template_id
-) -> AutomationTrigger:
+async def _make_trigger(test_db, *, org_id, template_id) -> AutomationTrigger:
     trigger = AutomationTrigger(
         org_id=org_id,
         name=f"trg-{uuid.uuid4().hex[:6]}",
@@ -180,27 +172,21 @@ async def _insert_marketing_run(
 
 def test_dpdp_blocks_whatsapp_opted_out():
     contact = _fake_contact(whatsapp_status="opted_out")
-    decision = send_guard.check_dpdp_suppression(
-        channel="whatsapp", contact=contact
-    )
+    decision = send_guard.check_dpdp_suppression(channel="whatsapp", contact=contact)
     assert not decision.allow
     assert decision.skip_reason == "dpdp_suppressed"
 
 
 def test_dpdp_blocks_email_opt_out():
     contact = _fake_contact(email_opt_out=True)
-    decision = send_guard.check_dpdp_suppression(
-        channel="email", contact=contact
-    )
+    decision = send_guard.check_dpdp_suppression(channel="email", contact=contact)
     assert not decision.allow
     assert decision.skip_reason == "dpdp_suppressed"
 
 
 def test_dpdp_allows_opted_in_whatsapp():
     contact = _fake_contact(whatsapp_status="opted_in")
-    decision = send_guard.check_dpdp_suppression(
-        channel="whatsapp", contact=contact
-    )
+    decision = send_guard.check_dpdp_suppression(channel="whatsapp", contact=contact)
     assert decision.allow
 
 
@@ -211,11 +197,9 @@ def test_dpdp_allows_opted_in_whatsapp():
 
 async def test_frequency_cap_allows_within_limit(test_db, org_id):
     template = await _make_marketing_template(test_db, org_id=org_id)
-    trigger = await _make_trigger(
-        test_db, org_id=org_id, template_id=template.id
-    )
+    trigger = await _make_trigger(test_db, org_id=org_id, template_id=template.id)
     contact_id = uuid.uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Two previous sends in the last 7 days, cap=3 → still under.
     for _ in range(2):
         await _insert_marketing_run(
@@ -236,11 +220,9 @@ async def test_frequency_cap_allows_within_limit(test_db, org_id):
 
 async def test_frequency_cap_blocks_past_limit(test_db, org_id):
     template = await _make_marketing_template(test_db, org_id=org_id)
-    trigger = await _make_trigger(
-        test_db, org_id=org_id, template_id=template.id
-    )
+    trigger = await _make_trigger(test_db, org_id=org_id, template_id=template.id)
     contact_id = uuid.uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for _ in range(3):
         await _insert_marketing_run(
             test_db,
@@ -265,7 +247,7 @@ async def test_frequency_cap_zero_blocks_all_marketing(test_db, org_id):
         test_db,
         org=org,
         contact_id=uuid.uuid4(),
-        now_utc=datetime.now(timezone.utc),
+        now_utc=datetime.now(UTC),
     )
     assert not decision.allow
     assert decision.skip_reason == "frequency_cap_exceeded"
@@ -277,7 +259,7 @@ async def test_frequency_cap_disabled_bypasses(test_db, org_id):
         test_db,
         org=org,
         contact_id=uuid.uuid4(),
-        now_utc=datetime.now(timezone.utc),
+        now_utc=datetime.now(UTC),
     )
     assert decision.allow
 
@@ -285,11 +267,9 @@ async def test_frequency_cap_disabled_bypasses(test_db, org_id):
 async def test_frequency_cap_only_counts_recent_window(test_db, org_id):
     """Marketing runs older than 7 days don't count toward the cap."""
     template = await _make_marketing_template(test_db, org_id=org_id)
-    trigger = await _make_trigger(
-        test_db, org_id=org_id, template_id=template.id
-    )
+    trigger = await _make_trigger(test_db, org_id=org_id, template_id=template.id)
     contact_id = uuid.uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # 4 runs > 7 days ago — should NOT count.
     for _ in range(4):
         await _insert_marketing_run(
@@ -316,7 +296,7 @@ def test_quiet_hours_wrap_midnight_inside_window():
     """22:00 IST is inside the 21:00→09:00 quiet window — defer."""
     ist = ZoneInfo("Asia/Kolkata")
     now_local = datetime(2026, 6, 29, 22, 0, tzinfo=ist)
-    now_utc = now_local.astimezone(timezone.utc)
+    now_utc = now_local.astimezone(UTC)
     org = _fake_org(
         org_id=uuid.uuid4(),
         quiet_start=time(21, 0),
@@ -336,7 +316,7 @@ def test_quiet_hours_outside_window_allows():
     """12:00 IST is OUTSIDE the 21:00→09:00 window — allow."""
     ist = ZoneInfo("Asia/Kolkata")
     now_local = datetime(2026, 6, 29, 12, 0, tzinfo=ist)
-    now_utc = now_local.astimezone(timezone.utc)
+    now_utc = now_local.astimezone(UTC)
     org = _fake_org(
         org_id=uuid.uuid4(),
         quiet_start=time(21, 0),
@@ -359,9 +339,7 @@ def test_quiet_hours_respects_org_timezone():
     )
     inside = datetime(2026, 6, 29, 22, 0, tzinfo=utc_tz)
     outside = datetime(2026, 6, 29, 12, 0, tzinfo=utc_tz)
-    assert not send_guard.check_quiet_hours(
-        org=org, now_utc=inside
-    ).allow
+    assert not send_guard.check_quiet_hours(org=org, now_utc=inside).allow
     assert send_guard.check_quiet_hours(org=org, now_utc=outside).allow
 
 
@@ -383,7 +361,7 @@ async def test_evaluate_transactional_bypasses_all_checks(test_db, org_id):
         contact=contact,
         contact_id=uuid.uuid4(),
         channel="email",
-        now_utc=datetime(2026, 6, 29, 22, 0, tzinfo=timezone.utc),
+        now_utc=datetime(2026, 6, 29, 22, 0, tzinfo=UTC),
     )
     assert decision.allow
 
@@ -401,7 +379,7 @@ async def test_evaluate_marketing_opted_out_blocks_first(test_db, org_id):
         contact=contact,
         contact_id=uuid.uuid4(),
         channel="email",
-        now_utc=datetime.now(timezone.utc),
+        now_utc=datetime.now(UTC),
     )
     assert not decision.allow
     assert decision.skip_reason == "dpdp_suppressed"

@@ -51,12 +51,16 @@
           </label>
 
           @if (profileError(); as err) {
-            <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            <div
+              class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+            >
               {{ err }}
             </div>
           }
           @if (profileOk()) {
-            <div class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            <div
+              class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700"
+            >
               Profile saved.
             </div>
           }
@@ -116,12 +120,16 @@
           </label>
 
           @if (passwordError(); as err) {
-            <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            <div
+              class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+            >
               {{ err }}
             </div>
           }
           @if (passwordOk()) {
-            <div class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            <div
+              class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700"
+            >
               Password changed.
             </div>
           }

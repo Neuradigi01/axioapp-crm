@@ -11,10 +11,10 @@ Permissions:
   - `inventory.dispatch` → `type='dispatch'` movements
   - `inventory.transfer` → `type='transfer'` movements
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import (
     APIRouter,
@@ -70,7 +70,6 @@ from src.app.packs.furniture.modules.inventory.service import (
 )
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
 
@@ -121,9 +120,7 @@ async def update_warehouse_endpoint(
     return WarehouseOut.model_validate(w)
 
 
-@router.delete(
-    "/warehouses/{warehouse_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/warehouses/{warehouse_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_warehouse_endpoint(
     warehouse_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -138,9 +135,9 @@ async def delete_warehouse_endpoint(
 
 @router.get("/items", response_model=InventoryItemListResponse)
 async def list_items_endpoint(
-    warehouse_id: Optional[uuid.UUID] = Query(default=None),
-    category: Optional[str] = Query(default=None, max_length=64),
-    q: Optional[str] = Query(default=None, max_length=255),
+    warehouse_id: uuid.UUID | None = Query(default=None),
+    category: str | None = Query(default=None, max_length=64),
+    q: str | None = Query(default=None, max_length=255),
     active_only: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
@@ -194,9 +191,7 @@ async def create_item_full_endpoint(
     return InventoryItemOut.model_validate(inv)
 
 
-@router.post(
-    "/items/{item_id}/cover", response_model=CoverUploadResponse
-)
+@router.post("/items/{item_id}/cover", response_model=CoverUploadResponse)
 async def upload_cover_endpoint(
     item_id: uuid.UUID,
     file: UploadFile = File(...),
@@ -252,9 +247,7 @@ async def delete_item_endpoint(
 # --- movements ----------------------------------------------------------
 
 
-@router.get(
-    "/items/{item_id}/movements", response_model=list[MovementOut]
-)
+@router.get("/items/{item_id}/movements", response_model=list[MovementOut])
 async def list_movements_endpoint(
     item_id: uuid.UUID,
     limit: int = Query(default=100, ge=1, le=500),
@@ -288,9 +281,7 @@ async def create_movement_endpoint(
 
     from src.app.core.permissions.service import list_permissions_for_role
 
-    granted = {
-        p.key for p in await list_permissions_for_role(db, user.role_id)
-    }
+    granted = {p.key for p in await list_permissions_for_role(db, user.role_id)}
     if required not in granted:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -315,8 +306,8 @@ async def create_movement_endpoint(
 
 @router.get("/alerts", response_model=list[StockAlertOut])
 async def list_alerts_endpoint(
-    severity: Optional[AlertSeverity] = Query(default=None),
-    status_: Optional[AlertStatus] = Query(default=None, alias="status"),
+    severity: AlertSeverity | None = Query(default=None),
+    status_: AlertStatus | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -339,7 +330,5 @@ async def update_alert_endpoint(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("inventory.write")),
 ) -> StockAlertOut:
-    alert = await update_alert_status(
-        db, alert_id=alert_id, new_status=payload.status
-    )
+    alert = await update_alert_status(db, alert_id=alert_id, new_status=payload.status)
     return StockAlertOut.model_validate(alert)

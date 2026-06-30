@@ -15,13 +15,13 @@ rows, the upload is rejected.
 `get_import` and `list_imports` are pure reads, tenant-scoped by the
 ORM filter so each org sees only its own imports.
 """
+
 from __future__ import annotations
 
 import csv
 import io
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +31,6 @@ from src.app.core.leads.imports import data_access
 from src.app.core.leads.imports.models import LeadImport, LeadImportStatus
 from src.app.core.leads.imports.schemas import SourcePlatform
 from src.app.shared.storage import get_storage
-
 
 # Whitelist of CRM field keys a mapping may target. System-managed
 # columns (`id`, `org_id`, `source`, `status`, `created_at`,
@@ -70,7 +69,7 @@ _ALLOWED_XLSX_MIMES = {
 }
 
 
-def _classify(filename: Optional[str], mime: Optional[str]) -> tuple[str, str]:
+def _classify(filename: str | None, mime: str | None) -> tuple[str, str]:
     """Return (kind, ext) for a CSV/XLSX upload. Raises 415 otherwise.
 
     `kind` is one of {"csv", "xlsx"}; `ext` is the lowercase extension
@@ -149,9 +148,9 @@ async def upload(
     uploader_id: uuid.UUID,
     data: bytes,
     filename: str,
-    content_type: Optional[str],
+    content_type: str | None,
     source_platform: SourcePlatform,
-    name: Optional[str],
+    name: str | None,
 ) -> LeadImport:
     """Persist a freshly-uploaded import file + create its job row."""
     if not data:
@@ -162,16 +161,11 @@ async def upload(
     if len(data) > _MAX_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail=(
-                f"File exceeds {_MAX_BYTES // (1024 * 1024)} MB cap "
-                f"(got {len(data)} bytes)."
-            ),
+            detail=(f"File exceeds {_MAX_BYTES // (1024 * 1024)} MB cap (got {len(data)} bytes)."),
         )
 
     kind, ext = _classify(filename, content_type)
-    row_count = (
-        _estimate_csv_rows(data) if kind == "csv" else _estimate_xlsx_rows(data)
-    )
+    row_count = _estimate_csv_rows(data) if kind == "csv" else _estimate_xlsx_rows(data)
     if row_count > _MAX_ROWS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -224,9 +218,7 @@ async def upload(
     return row
 
 
-async def get_import(
-    session: AsyncSession, import_id: uuid.UUID
-) -> Optional[LeadImport]:
+async def get_import(session: AsyncSession, import_id: uuid.UUID) -> LeadImport | None:
     """Fetch one import row. Tenant filter scopes to the caller's org —
     a foreign-org id surfaces as None (the router maps that to 404).
     """
@@ -236,8 +228,8 @@ async def get_import(
 async def list_imports(
     session: AsyncSession,
     *,
-    status_filter: Optional[LeadImportStatus] = None,
-    source_platform: Optional[str] = None,
+    status_filter: LeadImportStatus | None = None,
+    source_platform: str | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[LeadImport], int]:
@@ -295,7 +287,7 @@ async def commit_mapping(
     session: AsyncSession,
     *,
     import_id: uuid.UUID,
-    mapping: dict[str, Optional[str]],
+    mapping: dict[str, str | None],
     actor_id: uuid.UUID,
 ) -> LeadImport:
     """Validate + persist a mapping, transition to `mapping_committed`,
@@ -308,9 +300,7 @@ async def commit_mapping(
     """
     row = await data_access.get_import_by_id(session, import_id)
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
     if row.status != LeadImportStatus.awaiting_mapping:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -384,9 +374,7 @@ async def cancel_import(
     once terminal there's nothing to do."""
     row = await data_access.get_import_by_id(session, import_id)
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
     if row.status not in (
         LeadImportStatus.awaiting_mapping,
         LeadImportStatus.mapping_committed,
@@ -404,7 +392,7 @@ async def cancel_import(
     return row
 
 
-def read_preview(import_row: LeadImport, limit: int) -> "PreviewPayload":
+def read_preview(import_row: LeadImport, limit: int) -> PreviewPayload:
     """Read the first `limit` data rows from the import's source file.
 
     Returns the original column header + a list-of-lists of stringified
@@ -421,7 +409,7 @@ def read_preview(import_row: LeadImport, limit: int) -> "PreviewPayload":
     capped_limit = max(1, min(int(limit), 50))
     header, rows_iter = parse_rows(import_row.storage_path, mapping={})
 
-    rows: list[list[Optional[str]]] = []
+    rows: list[list[str | None]] = []
     for parsed in rows_iter:
         if len(rows) >= capped_limit:
             break
@@ -437,7 +425,7 @@ class PreviewPayload:
     parser internals."""
 
     columns: list[str]
-    rows: list[list[Optional[str]]]
+    rows: list[list[str | None]]
 
 
 def read_error_csv(import_row: LeadImport) -> bytes:

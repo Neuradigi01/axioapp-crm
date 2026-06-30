@@ -11,8 +11,8 @@
     (submitEvent)="onSubmit()"
     (clearEvent)="clearFilters()"
     (pageEvent)="onPageChange($event)"
-    (exportEvent)="exportToCSV()">
-
+    (exportEvent)="exportToCSV()"
+  >
     <ng-template #requiredFilters>
       <mat-form-field appearance="outline">
         <mat-label>Search</mat-label>
@@ -66,7 +66,8 @@
       <tr
         class="ticket-list__row"
         [class.ticket-list__row--unread]="d.has_unread_reply"
-        (click)="viewTicket(d.id)">
+        (click)="viewTicket(d.id)"
+      >
         <td>{{ srNo }}</td>
         <td>{{ d.ticket_no }}</td>
         @if (isAdmin()) {
@@ -80,12 +81,16 @@
         </td>
         <td>
           @let statusBadge = getStatusBadge(d.status);
-          <span class="ticket-list__badge" [style.color]="statusBadge.color" [style.background-color]="statusBadge.bgVar">
+          <span
+            class="ticket-list__badge"
+            [style.color]="statusBadge.color"
+            [style.background-color]="statusBadge.bgVar"
+          >
             {{ statusBadge.label }}
           </span>
         </td>
         <td>{{ d.priority }}</td>
-        <td>{{ d.created_at | date:'mediumDate' }}</td>
+        <td>{{ d.created_at | date: 'mediumDate' }}</td>
         <td class="ticket-list__center-col">
           @if (d.attachment_count > 0) {
             <mat-icon class="ticket-list__attach-icon">attach_file</mat-icon>

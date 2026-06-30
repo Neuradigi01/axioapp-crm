@@ -22,6 +22,7 @@ What this module owns:
 Outbound errors (non-2xx from the Cloud API) raise `WhatsAppSendError`,
 which the engine surfaces as a 502 to the caller.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -30,7 +31,7 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -87,7 +88,7 @@ def _normalize_phone(raw: str) -> str:
     return f"+{digits}"
 
 
-def _make_rate_limit_error(response: httpx.Response) -> "WhatsAppRateLimited":
+def _make_rate_limit_error(response: httpx.Response) -> WhatsAppRateLimited:
     """Translate Meta's 429 into our typed exception.
 
     Honours the `Retry-After` header when present (Meta sends seconds
@@ -226,9 +227,7 @@ def _first_media_attachment(
         if not isinstance(att, dict):
             continue
         t = att.get("type")
-        if t in _MEDIA_ATTACHMENT_TYPES and isinstance(
-            att.get("media_id"), str
-        ):
+        if t in _MEDIA_ATTACHMENT_TYPES and isinstance(att.get("media_id"), str):
             return att
     return None
 
@@ -245,10 +244,7 @@ def _first_location_attachment(
             continue
         if att.get("type") != "location":
             continue
-        if (
-            att.get("latitude") is not None
-            and att.get("longitude") is not None
-        ):
+        if att.get("latitude") is not None and att.get("longitude") is not None:
             return att
     return None
 
@@ -348,16 +344,11 @@ def _render_template_components(
             out.append(
                 {
                     "type": "header",
-                    "parameters": [
-                        {"type": "text", "text": str(header_value)}
-                    ],
+                    "parameters": [{"type": "text", "text": str(header_value)}],
                 }
             )
 
-    body_params = [
-        {"type": "text", "text": str(variables[n])}
-        for n in sorted(variables)
-    ]
+    body_params = [{"type": "text", "text": str(variables[n])} for n in sorted(variables)]
     if body_params:
         out.append({"type": "body", "parameters": body_params})
 
@@ -385,16 +376,11 @@ class WhatsAppAdapter:
         # Tests inject an httpx.AsyncClient or a stand-in. Default is a
         # fresh client per call so we never leak connections across
         # process restarts.
-        self._http_factory = http_client_factory or (
-            lambda: httpx.AsyncClient(timeout=10.0)
-        )
+        self._http_factory = http_client_factory or (lambda: httpx.AsyncClient(timeout=10.0))
 
     @property
     def endpoint(self) -> str:
-        return (
-            f"https://graph.facebook.com/{self._api_version}/"
-            f"{self._phone_id}/messages"
-        )
+        return f"https://graph.facebook.com/{self._api_version}/{self._phone_id}/messages"
 
     # --- outbound ----------------------------------------------------------
 
@@ -443,9 +429,7 @@ class WhatsAppAdapter:
         # future direct adapter call doesn't silently bypass the
         # compliance gate.
         if interactive:
-            envelope = _build_interactive_envelope(
-                to=to, interactive=interactive
-            )
+            envelope = _build_interactive_envelope(to=to, interactive=interactive)
         else:
             # whatsapp-platform-upgrade Step 28 — outbound location.
             # The composer attaches an envelope of shape
@@ -453,14 +437,10 @@ class WhatsAppAdapter:
             # which we forward to Meta's documented `location` payload.
             location_attachment = _first_location_attachment(attachments)
             media = (
-                None
-                if location_attachment is not None
-                else _first_media_attachment(attachments)
+                None if location_attachment is not None else _first_media_attachment(attachments)
             )
             if location_attachment is not None:
-                envelope = _build_location_envelope(
-                    to=to, attachment=location_attachment
-                )
+                envelope = _build_location_envelope(to=to, attachment=location_attachment)
             elif media is not None:
                 envelope = _build_media_envelope(
                     to=to,
@@ -482,24 +462,16 @@ class WhatsAppAdapter:
             "Content-Type": "application/json",
         }
         async with self._http_factory() as client:
-            resp = await client.post(
-                self.endpoint, json=envelope, headers=headers
-            )
+            resp = await client.post(self.endpoint, json=envelope, headers=headers)
         if resp.status_code == 429:
             raise _make_rate_limit_error(resp)
         if resp.status_code >= 400:
-            raise WhatsAppSendError(
-                f"whatsapp send failed: {resp.status_code} {resp.text}"
-            )
+            raise WhatsAppSendError(f"whatsapp send failed: {resp.status_code} {resp.text}")
         body = resp.json()
-        msg_id = (
-            body.get("messages", [{}])[0].get("id")
-            if isinstance(body, dict)
-            else None
-        )
+        msg_id = body.get("messages", [{}])[0].get("id") if isinstance(body, dict) else None
         return ChannelMessageRef(
             channel_message_id=str(msg_id) if msg_id else "",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
         )
 
     # --- outbound (reaction) ----------------------------------------------
@@ -540,25 +512,18 @@ class WhatsAppAdapter:
             "Content-Type": "application/json",
         }
         async with self._http_factory() as client:
-            resp = await client.post(
-                self.endpoint, json=envelope, headers=headers
-            )
+            resp = await client.post(self.endpoint, json=envelope, headers=headers)
         if resp.status_code == 429:
             raise _make_rate_limit_error(resp)
         if resp.status_code >= 400:
             raise WhatsAppSendError(
-                f"whatsapp reaction send failed: "
-                f"{resp.status_code} {resp.text}"
+                f"whatsapp reaction send failed: {resp.status_code} {resp.text}"
             )
         body = resp.json()
-        msg_id = (
-            body.get("messages", [{}])[0].get("id")
-            if isinstance(body, dict)
-            else None
-        )
+        msg_id = body.get("messages", [{}])[0].get("id") if isinstance(body, dict) else None
         return ChannelMessageRef(
             channel_message_id=str(msg_id) if msg_id else "",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
         )
 
     # --- outbound (template) ----------------------------------------------
@@ -609,9 +574,7 @@ class WhatsAppAdapter:
             "Content-Type": "application/json",
         }
         async with self._http_factory() as client:
-            resp = await client.post(
-                self.endpoint, json=envelope, headers=headers
-            )
+            resp = await client.post(self.endpoint, json=envelope, headers=headers)
         if resp.status_code == 429:
             raise _make_rate_limit_error(resp)
         if resp.status_code >= 400:
@@ -619,14 +582,10 @@ class WhatsAppAdapter:
                 f"whatsapp template send failed: {resp.status_code} {resp.text}"
             )
         body = resp.json()
-        msg_id = (
-            body.get("messages", [{}])[0].get("id")
-            if isinstance(body, dict)
-            else None
-        )
+        msg_id = body.get("messages", [{}])[0].get("id") if isinstance(body, dict) else None
         return ChannelMessageRef(
             channel_message_id=str(msg_id) if msg_id else "",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
         )
 
     # --- inbound -----------------------------------------------------------
@@ -654,9 +613,7 @@ class WhatsAppAdapter:
             value = payload["entry"][0]["changes"][0]["value"]
             message = value["messages"][0]
         except (KeyError, IndexError, TypeError) as exc:
-            raise ValueError(
-                f"unrecognised whatsapp webhook envelope: {exc}"
-            ) from exc
+            raise ValueError(f"unrecognised whatsapp webhook envelope: {exc}") from exc
 
         external_id = _normalize_phone(str(message.get("from", "")))
         text_body: str | None = None
@@ -690,9 +647,7 @@ class WhatsAppAdapter:
                     "latitude": lat,
                     "longitude": lng,
                     "name": name if isinstance(name, str) else None,
-                    "address": address
-                    if isinstance(address, str)
-                    else None,
+                    "address": address if isinstance(address, str) else None,
                 }
             )
             if not text_body:
@@ -714,40 +669,22 @@ class WhatsAppAdapter:
         contacts = message.get("contacts")
         if isinstance(contacts, list) and contacts:
             primary = contacts[0] if isinstance(contacts[0], dict) else {}
-            name_obj = primary.get("name") if isinstance(
-                primary.get("name"), dict
-            ) else {}
-            formatted = (
-                name_obj.get("formatted_name")
-                if isinstance(name_obj, dict)
-                else None
-            )
-            phones = primary.get("phones") if isinstance(
-                primary.get("phones"), list
-            ) else []
+            name_obj = primary.get("name") if isinstance(primary.get("name"), dict) else {}
+            formatted = name_obj.get("formatted_name") if isinstance(name_obj, dict) else None
+            phones = primary.get("phones") if isinstance(primary.get("phones"), list) else []
             primary_phone = None
             if phones and isinstance(phones[0], dict):
-                primary_phone = phones[0].get("phone") or phones[0].get(
-                    "wa_id"
-                )
-            emails = primary.get("emails") if isinstance(
-                primary.get("emails"), list
-            ) else []
+                primary_phone = phones[0].get("phone") or phones[0].get("wa_id")
+            emails = primary.get("emails") if isinstance(primary.get("emails"), list) else []
             primary_email = None
             if emails and isinstance(emails[0], dict):
                 primary_email = emails[0].get("email")
             attachments.append(
                 {
                     "type": "contacts",
-                    "formatted_name": formatted
-                    if isinstance(formatted, str)
-                    else None,
-                    "primary_phone": str(primary_phone)
-                    if primary_phone
-                    else None,
-                    "primary_email": str(primary_email)
-                    if primary_email
-                    else None,
+                    "formatted_name": formatted if isinstance(formatted, str) else None,
+                    "primary_phone": str(primary_phone) if primary_phone else None,
+                    "primary_email": str(primary_email) if primary_email else None,
                     "cards": contacts,
                 }
             )
@@ -755,8 +692,7 @@ class WhatsAppAdapter:
                 label = (
                     formatted
                     if isinstance(formatted, str) and formatted.strip()
-                    else primary_phone
-                    or "contact"
+                    else primary_phone or "contact"
                 )
                 text_body = f"📇 Shared contact: {label}"
 
@@ -820,9 +756,7 @@ class WhatsAppAdapter:
         if isinstance(interactive, dict):
             kind = interactive.get("type")
             context = message.get("context")
-            original_id = (
-                context.get("id") if isinstance(context, dict) else None
-            )
+            original_id = context.get("id") if isinstance(context, dict) else None
             if kind == "button_reply":
                 payload = interactive.get("button_reply") or {}
                 if isinstance(payload, dict):
@@ -850,9 +784,7 @@ class WhatsAppAdapter:
                             "reply_kind": "list",
                             "reply_to_id": payload.get("id"),
                             "reply_to_title": title,
-                            "reply_to_description": payload.get(
-                                "description"
-                            ),
+                            "reply_to_description": payload.get("description"),
                             "reply_to_message_id": original_id,
                         }
                     )
@@ -877,18 +809,13 @@ class WhatsAppAdapter:
                             import json as _json
 
                             decoded = _json.loads(response_raw or "{}")
-                            response_data = (
-                                decoded if isinstance(decoded, dict) else {}
-                            )
+                            response_data = decoded if isinstance(decoded, dict) else {}
                         except _json.JSONDecodeError:
                             response_data = {}
                     else:
                         response_data = {}
                     if not text_body:
-                        text_body = (
-                            str(payload.get("body") or "").strip()
-                            or "[Flow submission]"
-                        )
+                        text_body = str(payload.get("body") or "").strip() or "[Flow submission]"
                     attachments.append(
                         {
                             "type": "nfm_reply",
@@ -900,11 +827,7 @@ class WhatsAppAdapter:
         ts_raw = message.get("timestamp")
         sent_at: datetime | None
         try:
-            sent_at = (
-                datetime.fromtimestamp(int(ts_raw), tz=timezone.utc)
-                if ts_raw
-                else None
-            )
+            sent_at = datetime.fromtimestamp(int(ts_raw), tz=UTC) if ts_raw else None
         except (TypeError, ValueError):
             sent_at = None
 
@@ -918,15 +841,9 @@ class WhatsAppAdapter:
         # (click-tracking id). We pass the whole dict through so
         # future Meta-side additions don't need a schema migration.
         referral_block: dict[str, Any] | None = None
-        raw_referral = message.get("referral") if isinstance(
-            message, dict
-        ) else None
+        raw_referral = message.get("referral") if isinstance(message, dict) else None
         if isinstance(raw_referral, dict) and raw_referral:
-            referral_block = {
-                k: v
-                for k, v in raw_referral.items()
-                if isinstance(k, str)
-            }
+            referral_block = {k: v for k, v in raw_referral.items() if isinstance(k, str)}
 
         return InboundMessage(
             external_id=external_id,
@@ -959,9 +876,7 @@ class WhatsAppAdapter:
         ).hexdigest()
         return hmac.compare_digest(provided, digest)
 
-    def verify_subscription(
-        self, mode: str | None, token: str | None
-    ) -> bool:
+    def verify_subscription(self, mode: str | None, token: str | None) -> bool:
         """Meta's GET-time subscription handshake."""
         return mode == "subscribe" and token == self._verify_token
 
@@ -970,7 +885,7 @@ async def resolve_whatsapp_adapter(
     session: AsyncSession,
     *,
     phone_id: str | None = None,
-) -> "WhatsAppAdapter":
+) -> WhatsAppAdapter:
     """Build a fully-configured `WhatsAppAdapter` for the active tenant.
 
     ``phone_id`` (whatsapp-platform-upgrade Step 27a) — when set,
@@ -1006,8 +921,7 @@ async def resolve_whatsapp_adapter(
                 "Settings → Integrations."
             )
         raise WhatsAppNotConnected(
-            "WhatsApp is not connected for this org. "
-            "Connect it in Settings → Integrations."
+            "WhatsApp is not connected for this org. Connect it in Settings → Integrations."
         )
     integration, config = bundle
     # `app_secret_enc` is NULL for orgs that connected via Embedded
@@ -1016,9 +930,7 @@ async def resolve_whatsapp_adapter(
     # never touches the adapter's `_app_secret` attribute at all. Pass
     # an empty string here so the constructor doesn't trip on `None`;
     # the signature path keeps reading from env for ES-connected orgs.
-    app_secret = (
-        decrypt(config.app_secret_enc) if config.app_secret_enc else ""
-    )
+    app_secret = decrypt(config.app_secret_enc) if config.app_secret_enc else ""
     return WhatsAppAdapter(
         phone_id=config.phone_id,
         token=decrypt(integration.access_token_enc),
@@ -1049,7 +961,7 @@ class WhatsAppStatusEvent:
     error: str | None = None
 
 
-def parse_statuses(payload: dict[str, Any]) -> list["WhatsAppStatusEvent"]:
+def parse_statuses(payload: dict[str, Any]) -> list[WhatsAppStatusEvent]:
     """Extract delivery-status events from a Meta webhook payload.
 
     Webhook envelopes carry EITHER `messages[]` (inbound replies) OR
@@ -1081,23 +993,15 @@ def parse_statuses(payload: dict[str, Any]) -> list["WhatsAppStatusEvent"]:
         recipient = str(status.get("recipient_id") or "")
         ts_raw = status.get("timestamp")
         try:
-            timestamp = (
-                datetime.fromtimestamp(int(ts_raw), tz=timezone.utc)
-                if ts_raw
-                else datetime.now(timezone.utc)
-            )
+            timestamp = datetime.fromtimestamp(int(ts_raw), tz=UTC) if ts_raw else datetime.now(UTC)
         except (TypeError, ValueError):
-            timestamp = datetime.now(timezone.utc)
+            timestamp = datetime.now(UTC)
         error_msg: str | None = None
         errors_list = status.get("errors")
         if isinstance(errors_list, list) and errors_list:
             first = errors_list[0]
             if isinstance(first, dict):
-                error_msg = (
-                    first.get("title")
-                    or first.get("message")
-                    or str(first)
-                )[:512]
+                error_msg = (first.get("title") or first.get("message") or str(first))[:512]
         out.append(
             WhatsAppStatusEvent(
                 channel_message_id=str(msg_id),

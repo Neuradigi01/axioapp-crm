@@ -21,19 +21,19 @@ The function is pure — no DB hits, no clocks beyond `datetime.now`
 — so the router/service layer can call it cheaply on every detail
 fetch.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
-
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 SESSION_WINDOW = timedelta(hours=24)
 
 
 def compute_session_state(
-    last_customer_message_at: Optional[datetime],
+    last_customer_message_at: datetime | None,
     *,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """Return the session-state dict for the given last-customer-
     message timestamp.
@@ -41,7 +41,7 @@ def compute_session_state(
     `now` is exposed only for tests — production callers should let
     it default to ``datetime.now(timezone.utc)`` so the window math
     is consistent across requests."""
-    current = now or datetime.now(timezone.utc)
+    current = now or datetime.now(UTC)
 
     if last_customer_message_at is None:
         return {

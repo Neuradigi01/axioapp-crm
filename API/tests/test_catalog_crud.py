@@ -3,6 +3,7 @@
 Covers: create / get / list / patch / delete, SKU uniqueness per org,
 SKU normalization (case + whitespace), q + category filters, perm gates.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -25,9 +26,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -85,9 +84,7 @@ async def test_create_get_patch_delete(layered_client, seeded_admin):
     assert patch.json()["price"] == "27500.00"
     assert patch.json()["is_active"] is False
 
-    delete = await layered_client.delete(
-        f"/api/v1/catalog/{item_id}", headers=headers
-    )
+    delete = await layered_client.delete(f"/api/v1/catalog/{item_id}", headers=headers)
     assert delete.status_code == 204
 
 
@@ -132,9 +129,7 @@ async def test_duplicate_sku_per_org_returns_409(layered_client, seeded_admin):
     headers = {"Authorization": f"Bearer {token}"}
 
     payload = {"sku": "DUP001", "name": "Original", "price": 1000}
-    first = await layered_client.post(
-        "/api/v1/catalog", json=payload, headers=headers
-    )
+    first = await layered_client.post("/api/v1/catalog", json=payload, headers=headers)
     assert first.status_code == 201
 
     # Same SKU (and case-variant) under the same org → 409.
@@ -166,31 +161,23 @@ async def test_list_q_and_category_filters(layered_client, seeded_admin):
         {"sku": "TBL010", "name": "Coffee Table", "price": 8000, "category": "Table"},
         {"sku": "SOF011", "name": "Recliner", "price": 35000, "category": "Sofa"},
     ]:
-        r = await layered_client.post(
-            "/api/v1/catalog", json=item, headers=headers
-        )
+        r = await layered_client.post("/api/v1/catalog", json=item, headers=headers)
         assert r.status_code == 201, r.text
 
     # Spec line: `GET /catalog?q=sofa` → returns it
-    by_q = await layered_client.get(
-        "/api/v1/catalog?q=sofa", headers=headers
-    )
+    by_q = await layered_client.get("/api/v1/catalog?q=sofa", headers=headers)
     assert by_q.status_code == 200
     names = {i["name"] for i in by_q.json()["items"]}
     assert "Premium Sofa" in names
     # SKU starting with SOF also matches via OR
     assert "Recliner" in names
 
-    by_cat = await layered_client.get(
-        "/api/v1/catalog?category=Table", headers=headers
-    )
+    by_cat = await layered_client.get("/api/v1/catalog?category=Table", headers=headers)
     names = {i["name"] for i in by_cat.json()["items"]}
     assert names == {"Coffee Table"}
 
     # Combo
-    combo = await layered_client.get(
-        "/api/v1/catalog?q=Recliner&category=Sofa", headers=headers
-    )
+    combo = await layered_client.get("/api/v1/catalog?q=Recliner&category=Sofa", headers=headers)
     assert combo.json()["total"] == 1
 
 
@@ -228,9 +215,7 @@ async def test_active_only_filter(layered_client, seeded_admin):
     skus_all = {i["sku"] for i in all_list.json()["items"]}
     assert "ACT001" in skus_all and "INACT001" in skus_all
 
-    active_only = await layered_client.get(
-        "/api/v1/catalog?active_only=true", headers=headers
-    )
+    active_only = await layered_client.get("/api/v1/catalog?active_only=true", headers=headers)
     skus_active = {i["sku"] for i in active_only.json()["items"]}
     assert "ACT001" in skus_active and "INACT001" not in skus_active
 

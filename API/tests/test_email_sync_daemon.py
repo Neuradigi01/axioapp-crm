@@ -17,15 +17,14 @@ Convention: no DB. Stub `email_service.get_account_unscoped` to
 return a pre-built EmailAccount; stub the provider sync routines
 to return canned SyncResult objects; stub session.commit / refresh.
 """
+
 from __future__ import annotations
 
-import asyncio
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Optional
-from unittest.mock import AsyncMock, MagicMock
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -36,7 +35,6 @@ from src.app.core.email.models import (
     EmailAccountProvider,
     EmailAccountSyncState,
 )
-
 
 _ORG_ID = uuid.uuid4()
 _USER_ID = uuid.uuid4()
@@ -53,15 +51,15 @@ def _make_account(**overrides) -> EmailAccount:
         display_name="Asha",
         access_token_enc="enc",
         refresh_token_enc="enc",
-        token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        token_expires_at=datetime.now(UTC) + timedelta(hours=1),
         scopes_granted=[],
         sync_cursor="history-100",
         sync_state=EmailAccountSyncState.pending,
         last_sync_at=None,
         last_sync_error=None,
         daily_sent_count=0,
-        daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-        connected_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+        connected_at=datetime(2026, 6, 1, tzinfo=UTC),
         disconnected_at=None,
         disconnected_by=None,
     )
@@ -76,6 +74,7 @@ class TestEnqueueHelpers:
     def test_enqueue_backfill_swallows_celery_import_failure(self, monkeypatch):
         """If Celery's import raises (broker down, etc.), the helper
         must log and return — the connect flow must keep working."""
+
         # Force the lazy import to raise by inserting a fake task.
         def boom(*_a, **_k):
             raise RuntimeError("celery broker down")
@@ -173,9 +172,7 @@ class TestInboundHandler:
     async def test_dispatch_no_op_when_no_handler(self):
         sync_daemon._clear_inbound_handler_for_tests()
         # Should not raise.
-        await sync_daemon.dispatch_inbound(
-            _make_account(), {"message_id": "x"}
-        )
+        await sync_daemon.dispatch_inbound(_make_account(), {"message_id": "x"})
 
     @pytest.mark.asyncio
     async def test_dispatch_calls_registered_handler(self):
@@ -200,9 +197,7 @@ class TestInboundHandler:
 
         sync_daemon.register_inbound_handler(handler)
         # Daemon must not propagate the handler's exception.
-        await sync_daemon.dispatch_inbound(
-            _make_account(), {"message_id": "m1"}
-        )
+        await sync_daemon.dispatch_inbound(_make_account(), {"message_id": "m1"})
         sync_daemon._clear_inbound_handler_for_tests()
 
 
@@ -251,7 +246,7 @@ class TestNormaliseMatch:
 class _FakeSyncResult:
     matched: list = field(default_factory=list)
     scanned_count: int = 0
-    new_cursor: Optional[str] = None
+    new_cursor: str | None = None
     truncated: bool = False
     delta_link_expired: bool = False
 
@@ -288,9 +283,7 @@ def patch_session_ctx(monkeypatch):
     async def fake_async_session():
         yield session
 
-    monkeypatch.setattr(
-        "src.app.shared.db.async_session", fake_async_session
-    )
+    monkeypatch.setattr("src.app.shared.db.async_session", fake_async_session)
     # tasks.py imports `async_session` lazily inside the helpers, so
     # we don't need to patch in tasks's own namespace.
     return session
@@ -309,12 +302,8 @@ def patch_context(monkeypatch):
     def reset_context(_token):
         tokens.append("reset")
 
-    monkeypatch.setattr(
-        "src.app.shared.context.set_context", set_context
-    )
-    monkeypatch.setattr(
-        "src.app.shared.context.reset_context", reset_context
-    )
+    monkeypatch.setattr("src.app.shared.context.set_context", set_context)
+    monkeypatch.setattr("src.app.shared.context.reset_context", reset_context)
     return tokens
 
 
@@ -347,9 +336,7 @@ class TestBackfillStateMachine:
                 new_cursor="history-200",
             )
 
-        monkeypatch.setattr(
-            email_tasks, "_provider_backfill", fake_backfill
-        )
+        monkeypatch.setattr(email_tasks, "_provider_backfill", fake_backfill)
 
         result = await email_tasks._backfill_account_async(account.id)
         assert result["matched"] == 0
@@ -360,12 +347,8 @@ class TestBackfillStateMachine:
         assert account.last_sync_error is None
 
     @pytest.mark.asyncio
-    async def test_skips_disconnected_account(
-        self, patch_session_ctx, patch_context, monkeypatch
-    ):
-        account = _make_account(
-            sync_state=EmailAccountSyncState.disconnected
-        )
+    async def test_skips_disconnected_account(self, patch_session_ctx, patch_context, monkeypatch):
+        account = _make_account(sync_state=EmailAccountSyncState.disconnected)
 
         async def fake_loader(_session, *, account_id):
             return account
@@ -394,9 +377,7 @@ class TestBackfillStateMachine:
         async def boom(_acc, _sess):
             raise RuntimeError("gmail quota exhausted")
 
-        monkeypatch.setattr(
-            email_tasks, "_provider_backfill", boom
-        )
+        monkeypatch.setattr(email_tasks, "_provider_backfill", boom)
         result = await email_tasks._backfill_account_async(account.id)
         assert "error" in result
         assert account.sync_state == EmailAccountSyncState.error
@@ -429,13 +410,9 @@ class TestBackfillStateMachine:
         ]
 
         async def fake_backfill(_acc, _sess):
-            return _FakeSyncResult(
-                matched=matches, scanned_count=5, new_cursor="cursor-x"
-            )
+            return _FakeSyncResult(matched=matches, scanned_count=5, new_cursor="cursor-x")
 
-        monkeypatch.setattr(
-            email_tasks, "_provider_backfill", fake_backfill
-        )
+        monkeypatch.setattr(email_tasks, "_provider_backfill", fake_backfill)
 
         seen: list = []
 
@@ -449,9 +426,7 @@ class TestBackfillStateMachine:
 
 class TestIncrementalStateMachine:
     @pytest.mark.asyncio
-    async def test_skips_when_not_live(
-        self, patch_session_ctx, patch_context, monkeypatch
-    ):
+    async def test_skips_when_not_live(self, patch_session_ctx, patch_context, monkeypatch):
         account = _make_account(
             sync_state=EmailAccountSyncState.error,
             sync_cursor="cur",
@@ -467,9 +442,7 @@ class TestIncrementalStateMachine:
             "src.app.core.email.service.get_account_unscoped",
             fake_loader,
         )
-        result = await email_tasks._sync_account_incremental_async(
-            account.id
-        )
+        result = await email_tasks._sync_account_incremental_async(account.id)
         assert result["skipped"] == "state=error"
 
     @pytest.mark.asyncio
@@ -509,16 +482,10 @@ class TestIncrementalStateMachine:
             backfill_called.append(aid)
             return {"backfilled": True}
 
-        monkeypatch.setattr(
-            email_tasks, "_provider_incremental", fake_incremental
-        )
-        monkeypatch.setattr(
-            email_tasks, "_backfill_account_async", fake_backfill_async
-        )
+        monkeypatch.setattr(email_tasks, "_provider_incremental", fake_incremental)
+        monkeypatch.setattr(email_tasks, "_backfill_account_async", fake_backfill_async)
 
-        result = await email_tasks._sync_account_incremental_async(
-            account.id
-        )
+        result = await email_tasks._sync_account_incremental_async(account.id)
         assert result == {"backfilled": True}
         assert backfill_called == [account.id]
         # Cursor cleared on delta-expired before re-backfill.
@@ -550,13 +517,9 @@ class TestIncrementalStateMachine:
                 new_cursor="cur-new",
             )
 
-        monkeypatch.setattr(
-            email_tasks, "_provider_incremental", fake_incremental
-        )
+        monkeypatch.setattr(email_tasks, "_provider_incremental", fake_incremental)
 
-        result = await email_tasks._sync_account_incremental_async(
-            account.id
-        )
+        result = await email_tasks._sync_account_incremental_async(account.id)
         assert result["scanned"] == 4
         assert account.sync_cursor == "cur-new"
         assert account.last_sync_at is not None

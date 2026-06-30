@@ -3,6 +3,7 @@
 Pure query helpers — no transactions, no audit. Leaf module; never
 imports a `service.py`.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -49,36 +50,32 @@ def _build_contact_filter_predicates(
     return filters
 
 
-async def get_group_by_id(
-    session: AsyncSession, group_id: uuid.UUID
-) -> ContactGroup | None:
+async def get_group_by_id(session: AsyncSession, group_id: uuid.UUID) -> ContactGroup | None:
     """Single group lookup — caller raises 404."""
-    result = await session.execute(
-        select(ContactGroup).where(ContactGroup.id == group_id)
-    )
+    result = await session.execute(select(ContactGroup).where(ContactGroup.id == group_id))
     return result.scalar_one_or_none()
 
 
 async def count_groups(session: AsyncSession) -> int:
     """Total contact-groups count (auto-tenant-scoped)."""
-    result = await session.execute(
-        select(func.count()).select_from(ContactGroup)
-    )
+    result = await session.execute(select(func.count()).select_from(ContactGroup))
     return int(result.scalar_one())
 
 
-async def list_groups_page(
-    session: AsyncSession, *, offset: int, limit: int
-) -> list[ContactGroup]:
+async def list_groups_page(session: AsyncSession, *, offset: int, limit: int) -> list[ContactGroup]:
     """Page of contact-groups sorted newest-first."""
     rows = (
-        await session.execute(
-            select(ContactGroup)
-            .order_by(ContactGroup.created_at.desc())
-            .offset(offset)
-            .limit(limit)
+        (
+            await session.execute(
+                select(ContactGroup)
+                .order_by(ContactGroup.created_at.desc())
+                .offset(offset)
+                .limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -88,21 +85,15 @@ def add_group(session: AsyncSession, group: ContactGroup) -> ContactGroup:
     return group
 
 
-async def delete_group_row(
-    session: AsyncSession, group: ContactGroup
-) -> None:
+async def delete_group_row(session: AsyncSession, group: ContactGroup) -> None:
     """Hard-delete a contact-group row (member rows CASCADE)."""
     await session.delete(group)
 
 
-async def delete_members_for_group(
-    session: AsyncSession, group_id: uuid.UUID
-) -> None:
+async def delete_members_for_group(session: AsyncSession, group_id: uuid.UUID) -> None:
     """Drop every member row for one group — used by full-replace update."""
     await session.execute(
-        ContactGroupMember.__table__.delete().where(
-            ContactGroupMember.group_id == group_id
-        )
+        ContactGroupMember.__table__.delete().where(ContactGroupMember.group_id == group_id)
     )
 
 
@@ -120,16 +111,11 @@ async def bulk_upsert_members(
     """
     if not contact_ids:
         return
-    rows = [
-        {"org_id": org_id, "group_id": group_id, "contact_id": cid}
-        for cid in contact_ids
-    ]
+    rows = [{"org_id": org_id, "group_id": group_id, "contact_id": cid} for cid in contact_ids]
     await session.execute(
         pg_insert(ContactGroupMember)
         .values(rows)
-        .on_conflict_do_nothing(
-            index_elements=["group_id", "contact_id"]
-        )
+        .on_conflict_do_nothing(index_elements=["group_id", "contact_id"])
     )
 
 
@@ -153,12 +139,16 @@ async def list_static_member_contact_ids(
 ) -> list[uuid.UUID]:
     """Static-group resolver: `tbl_contact_group_members.contact_id` rows."""
     rows = (
-        await session.execute(
-            select(ContactGroupMember.contact_id)
-            .where(ContactGroupMember.group_id == group_id)
-            .order_by(ContactGroupMember.contact_id)
+        (
+            await session.execute(
+                select(ContactGroupMember.contact_id)
+                .where(ContactGroupMember.group_id == group_id)
+                .order_by(ContactGroupMember.contact_id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -175,9 +165,7 @@ async def count_contacts_matching_filter(
     return int((await session.execute(stmt)).scalar_one())
 
 
-async def count_static_members(
-    session: AsyncSession, group_id: uuid.UUID
-) -> int:
+async def count_static_members(session: AsyncSession, group_id: uuid.UUID) -> int:
     """Member count for a static group."""
     result = await session.execute(
         select(func.count())
@@ -206,13 +194,17 @@ async def list_static_member_contact_ids_limited(
 ) -> list[uuid.UUID]:
     """First `limit` static-group hits for the detail-page sample."""
     rows = (
-        await session.execute(
-            select(ContactGroupMember.contact_id)
-            .where(ContactGroupMember.group_id == group_id)
-            .order_by(ContactGroupMember.contact_id)
-            .limit(limit)
+        (
+            await session.execute(
+                select(ContactGroupMember.contact_id)
+                .where(ContactGroupMember.group_id == group_id)
+                .order_by(ContactGroupMember.contact_id)
+                .limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 

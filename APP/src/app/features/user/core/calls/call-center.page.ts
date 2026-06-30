@@ -1,8 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { CallLogsTabComponent } from './tabs/logs.component';
@@ -11,12 +7,7 @@ import { CallTranscriptsTabComponent } from './tabs/transcripts.component';
 import { CallBookAppointmentTabComponent } from './tabs/book-appointment.component';
 import { CallAnalyticsTabComponent } from './tabs/analytics.component';
 
-export type CallTabId =
-  | 'logs'
-  | 'phone-book'
-  | 'transcripts'
-  | 'book-appointment'
-  | 'analytics';
+export type CallTabId = 'logs' | 'phone-book' | 'transcripts' | 'book-appointment' | 'analytics';
 
 /**
  * Call Center page — five-tab host matching the master prompt's

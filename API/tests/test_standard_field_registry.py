@@ -5,10 +5,12 @@ at `StandardFieldDef.__post_init__`, so most of the contract is enforced
 at registration time; these tests pin the same invariants against the
 already-seeded core entries and against direct dataclass construction.
 """
+
 from __future__ import annotations
 
 import pytest
 
+from src.app.core.permissions.role_templates import ROLE_TEMPLATES
 from src.app.core.standard_fields import (
     StandardFieldDef,
     get,
@@ -17,8 +19,6 @@ from src.app.core.standard_fields import (
     list_entities,
     list_for_entity,
 )
-from src.app.core.permissions.role_templates import ROLE_TEMPLATES
-
 
 # ---------------------------------------------------------------------------
 # Registry coverage
@@ -104,9 +104,7 @@ def test_unknown_overridable_prop_rejected() -> None:
 
 def test_numeric_only_props_rejected_on_text_field() -> None:
     with pytest.raises(ValueError, match="only valid on number/currency"):
-        StandardFieldDef(
-            **_minimal(field_type="text", overridable_props=frozenset({"min"}))
-        )
+        StandardFieldDef(**_minimal(field_type="text", overridable_props=frozenset({"min"})))
 
 
 def test_numeric_only_props_allowed_on_currency_field() -> None:

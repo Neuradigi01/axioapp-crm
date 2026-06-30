@@ -16,6 +16,7 @@ CSRF on the callback. Steps 2 + 3 call `issue_state(...)` before
 redirecting and `verify_state(...)` inside the callback before
 trusting the inbound `code`.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -24,7 +25,7 @@ import json
 import secrets
 import time
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Protocol
 
 from config import JWT_SECRET_KEY
 
@@ -40,8 +41,8 @@ class TokenSet:
     """
 
     access_token: str
-    refresh_token: Optional[str]
-    expires_in_seconds: Optional[int]
+    refresh_token: str | None
+    expires_in_seconds: int | None
     scopes_granted: list[str]
 
 
@@ -64,9 +65,7 @@ class OAuthProvider(Protocol):
         the same `state` echoed back."""
         ...
 
-    async def exchange_code(
-        self, *, code: str, redirect_uri: str
-    ) -> TokenSet:
+    async def exchange_code(self, *, code: str, redirect_uri: str) -> TokenSet:
         """POST `code` to the provider's token endpoint; return the
         plaintext token set. Caller passes this to
         `service.upsert(...)` to persist."""
@@ -89,7 +88,7 @@ def register_provider(provider: OAuthProvider) -> None:
     _providers[provider.name] = provider
 
 
-def get_provider(name: str) -> Optional[OAuthProvider]:
+def get_provider(name: str) -> OAuthProvider | None:
     """Return the registered provider, or None. The caller decides
     how to handle the missing case — typically the OAuth callback
     raises 503 ("Provider not configured")."""
@@ -175,9 +174,7 @@ def verify_state(state: str) -> OAuthStatePayload:
     try:
         import base64
 
-        body = base64.urlsafe_b64decode(body_b64.encode("ascii")).decode(
-            "utf-8"
-        )
+        body = base64.urlsafe_b64decode(body_b64.encode("ascii")).decode("utf-8")
     except Exception as exc:  # noqa: BLE001
         raise OAuthStateError("state body not decodable") from exc
     expected = _sign(body)
@@ -205,9 +202,7 @@ def _sign(body: str) -> str:
     if not key:
         # Refuse to issue/verify state without a real signing key —
         # better to fail loudly than to ship an unsigned state.
-        raise OAuthStateError(
-            "JWT_SECRET_KEY is not configured; cannot sign OAuth state"
-        )
+        raise OAuthStateError("JWT_SECRET_KEY is not configured; cannot sign OAuth state")
     return hmac.new(key, body.encode("utf-8"), hashlib.sha256).hexdigest()
 
 

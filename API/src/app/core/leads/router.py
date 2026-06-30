@@ -19,12 +19,13 @@ CSV export is gated by `leads.export`; scoring-rule mutation by
 parsed off `Request.query_params` the same way the contacts router
 handles it.
 """
+
 from __future__ import annotations
 
 import json
 import uuid
 from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
@@ -73,12 +74,13 @@ from src.app.core.settings.schemas import (
 )
 from src.app.core.settings.service import (
     get_or_create as get_or_create_settings,
+)
+from src.app.core.settings.service import (
     set_lead_routing_config,
 )
 from src.app.core.tenants.service import get_organization_by_id
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
 
@@ -93,7 +95,7 @@ def _extract_custom_filters(request: Request) -> list[tuple[str, str]]:
     return out
 
 
-def _parse_filter_param(raw: Optional[str]) -> Optional[dict[str, Any]]:
+def _parse_filter_param(raw: str | None) -> dict[str, Any] | None:
     """Decode the URL-encoded JSON filter DSL from the ``filter`` query
     param. Malformed JSON is a 422 with a pointer; ``None``/empty
     string means "no DSL filter."""
@@ -117,16 +119,16 @@ def _parse_filter_param(raw: Optional[str]) -> Optional[dict[str, Any]]:
 @router.get("", response_model=LeadListResponse)
 async def list_leads_endpoint(
     request: Request,
-    stage: Optional[str] = Query(default=None, max_length=64),
-    status_filter: Optional[LeadStatus] = Query(default=None, alias="status"),
-    assigned_to: Optional[uuid.UUID] = Query(default=None),
-    q: Optional[str] = Query(default=None, max_length=255),
-    source: Optional[str] = Query(default=None, max_length=64),
-    last_activity_lt: Optional[datetime] = Query(default=None),
-    last_activity_gt: Optional[datetime] = Query(default=None),
-    sort: Literal[
-        "created_at", "last_activity_at", "lead_score", "contact_name"
-    ] = Query(default="created_at"),
+    stage: str | None = Query(default=None, max_length=64),
+    status_filter: LeadStatus | None = Query(default=None, alias="status"),
+    assigned_to: uuid.UUID | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=255),
+    source: str | None = Query(default=None, max_length=64),
+    last_activity_lt: datetime | None = Query(default=None),
+    last_activity_gt: datetime | None = Query(default=None),
+    sort: Literal["created_at", "last_activity_at", "lead_score", "contact_name"] = Query(
+        default="created_at"
+    ),
     order: Literal["asc", "desc"] = Query(default="desc"),
     # Offset mode (legacy callers): page + size.
     page: int = Query(default=1, ge=1),
@@ -134,13 +136,11 @@ async def list_leads_endpoint(
     # Cursor mode (Step 6 FE): cursor + limit. When ``cursor`` is set,
     # ``page`` is ignored. ``with_total`` controls whether the count
     # query runs; opt-out to skip it on large data sets.
-    cursor: Optional[str] = Query(default=None, max_length=512),
-    limit: Optional[int] = Query(default=None, ge=1, le=200),
+    cursor: str | None = Query(default=None, max_length=512),
+    limit: int | None = Query(default=None, ge=1, le=200),
     with_total: bool = Query(default=True),
     # Filter DSL: URL-encoded JSON object (see ``leads.filter_dsl``).
-    filter_param: Optional[str] = Query(
-        default=None, alias="filter", max_length=4096
-    ),
+    filter_param: str | None = Query(default=None, alias="filter", max_length=4096),
     db: AsyncSession = Depends(get_db),
     caller: User = Depends(require_permissions("leads.read")),
 ) -> LeadListResponse:
@@ -210,19 +210,17 @@ async def create_lead_endpoint(
 @router.get("/export.csv")
 async def export_leads_csv_endpoint(
     request: Request,
-    stage: Optional[str] = Query(default=None, max_length=64),
-    status_filter: Optional[LeadStatus] = Query(default=None, alias="status"),
-    assigned_to: Optional[uuid.UUID] = Query(default=None),
-    q: Optional[str] = Query(default=None, max_length=255),
-    source: Optional[str] = Query(default=None, max_length=64),
-    last_activity_lt: Optional[datetime] = Query(default=None),
-    last_activity_gt: Optional[datetime] = Query(default=None),
-    sort: Literal[
-        "created_at", "last_activity_at", "lead_score", "contact_name"
-    ] = Query(default="created_at"),
-    filter_param: Optional[str] = Query(
-        default=None, alias="filter", max_length=4096
+    stage: str | None = Query(default=None, max_length=64),
+    status_filter: LeadStatus | None = Query(default=None, alias="status"),
+    assigned_to: uuid.UUID | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=255),
+    source: str | None = Query(default=None, max_length=64),
+    last_activity_lt: datetime | None = Query(default=None),
+    last_activity_gt: datetime | None = Query(default=None),
+    sort: Literal["created_at", "last_activity_at", "lead_score", "contact_name"] = Query(
+        default="created_at"
     ),
+    filter_param: str | None = Query(default=None, alias="filter", max_length=4096),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("leads.export")),
 ) -> StreamingResponse:
@@ -253,9 +251,7 @@ async def export_leads_csv_endpoint(
     filename = export_filename(org.slug)
 
     return StreamingResponse(
-        export_rows(
-            db, where_clause=where_clause, needs_contact_join=needs_join
-        ),
+        export_rows(db, where_clause=where_clause, needs_contact_join=needs_join),
         media_type="text/csv",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
@@ -301,9 +297,7 @@ async def update_scoring_rule_endpoint(
     return LeadScoringRuleOut.model_validate(rule)
 
 
-@router.delete(
-    "/scoring-rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/scoring-rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_scoring_rule_endpoint(
     rule_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -313,9 +307,7 @@ async def delete_scoring_rule_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post(
-    "/scoring-rules/recompute", response_model=LeadScoringRecomputeResult
-)
+@router.post("/scoring-rules/recompute", response_model=LeadScoringRecomputeResult)
 async def recompute_scoring_rule_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("leads.scoring.manage")),
@@ -457,5 +449,3 @@ async def bulk_delete_leads_endpoint(
 ) -> LeadBulkDeleteResult:
     n = await bulk_delete_leads(db, ids=payload.ids, org_id=user.org_id)
     return LeadBulkDeleteResult(deleted=n)
-
-

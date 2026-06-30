@@ -15,13 +15,15 @@ Three scenarios exercised end-to-end through the layered FastAPI app:
 Run with:
   ``uv run pytest tests/test_dashboard_funnel_endpoint.py -v``.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.app.core.contacts.models import Contact
@@ -32,8 +34,8 @@ from src.app.core.pipelines.models import Pipeline, PipelineStage
 from src.app.core.users.models import OrganizationMember, User
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.security.password import hash_password
-from src.models.user import UserInfo as LegacyUserInfo, UserLogin
-
+from src.models.user import UserInfo as LegacyUserInfo
+from src.models.user import UserLogin
 
 _STAGES: list[tuple[str, str, bool, bool]] = [
     ("new", "New", False, False),
@@ -56,9 +58,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -123,7 +123,7 @@ async def _make_lead(
 ) -> None:
     from tests.conftest import TestSession
 
-    when = created_at or datetime.now(timezone.utc)
+    when = created_at or datetime.now(UTC)
     token = set_context(RequestContext(org_id=org_id))
     try:
         async with TestSession() as session:
@@ -350,7 +350,7 @@ async def test_funnel_excludes_out_of_range(layered_client, seeded_admin):
     await _seed_leads_pipeline(org.id)
     contact_id = await _make_contact(org.id, full_name="Anchor")
 
-    long_ago = datetime.now(timezone.utc) - timedelta(days=120)
+    long_ago = datetime.now(UTC) - timedelta(days=120)
     await _make_lead(
         org.id,
         contact_id=contact_id,
@@ -366,17 +366,13 @@ async def test_funnel_excludes_out_of_range(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    res = await layered_client.get(
-        "/api/v1/dashboard/funnel?range=30d", headers=headers
-    )
+    res = await layered_client.get("/api/v1/dashboard/funnel?range=30d", headers=headers)
     assert res.status_code == 200, res.text
     payload = res.json()
     assert payload["total_leads_in_range"] == 0
     assert all(s["count"] == 0 for s in payload["stages"])
 
-    res = await layered_client.get(
-        "/api/v1/dashboard/funnel?range=365d", headers=headers
-    )
+    res = await layered_client.get("/api/v1/dashboard/funnel?range=365d", headers=headers)
     assert res.status_code == 200, res.text
     payload = res.json()
     assert payload["total_leads_in_range"] == 1

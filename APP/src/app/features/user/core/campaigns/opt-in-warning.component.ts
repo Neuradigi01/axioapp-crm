@@ -1,10 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 /**
  * Inline opt-in warning rendered above the campaign create / dispatch
@@ -41,26 +36,29 @@ import {
         "
       >
         <p class="font-semibold">
-          {{ severity() === 'block' ? 'Send guard will skip contacts.' : 'Sending without explicit consent.' }}
+          {{
+            severity() === 'block'
+              ? 'Send guard will skip contacts.'
+              : 'Sending without explicit consent.'
+          }}
         </p>
         <ul class="mt-1 space-y-0.5">
           @if (optedOut() > 0) {
             <li>
-              <strong>{{ optedOut() }}</strong> opted-out contacts will be
-              skipped automatically (DPDP compliance).
+              <strong>{{ optedOut() }}</strong> opted-out contacts will be skipped automatically
+              (DPDP compliance).
             </li>
           }
           @if (implicit() > 0) {
             <li>
-              <strong>{{ implicit() }}</strong> contacts have only implicit
-              consent. Marketing templates may be flagged by Meta if
-              recipients report your number.
+              <strong>{{ implicit() }}</strong> contacts have only implicit consent. Marketing
+              templates may be flagged by Meta if recipients report your number.
             </li>
           }
           @if (neverContacted() > 0) {
             <li>
-              <strong>{{ neverContacted() }}</strong> contacts have no opt-in
-              record — first WhatsApp message from your business.
+              <strong>{{ neverContacted() }}</strong> contacts have no opt-in record — first
+              WhatsApp message from your business.
             </li>
           }
         </ul>

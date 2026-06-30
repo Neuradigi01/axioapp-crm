@@ -45,6 +45,13 @@ print_help() {
     echo "  ${C_CMD}lock${C_RESET}               Regenerate uv.lock from pyproject.toml"
     echo "  ${C_CMD}lock-upgrade${C_RESET}       Regenerate uv.lock with upgrades"
     echo ""
+    echo "${C_SECTION}Code quality${C_RESET}"
+    echo "  ${C_CMD}lint${C_RESET}               Check format + lint (ruff in container; prettier/eslint in APP)"
+    echo "  ${C_CMD}lint-fix${C_RESET}           Auto-format + autofix (ruff --fix; prettier --write; eslint --fix)"
+    echo "  ${C_CMD}hooks-on${C_RESET}           Enable the committed pre-commit hook (core.hooksPath)"
+    echo "  ${C_CMD}hooks-off${C_RESET}          Disable the committed pre-commit hook"
+    echo "  ${C_CMD}hooks-status${C_RESET}       Show the current git hooks path"
+    echo ""
     echo "${C_SECTION}Secrets (SOPS + age)${C_RESET}"
     echo "  ${C_CMD}secrets-install${C_RESET}    Install sops + age (brew on Mac, GitHub binaries on Linux)"
     echo "  ${C_CMD}secrets-keygen${C_RESET}     Generate this machine's age key; print the public key"
@@ -62,8 +69,57 @@ require_secrets() {
 # Run a compose command with secrets decrypted into its env in-memory (never to disk).
 dc() { require_secrets; sops exec-env "$SECRETS_FILE" "docker compose $ENV_FILE_FLAGS $COMPOSE_FILES $*"; }
 
-do_up()     { require_secrets; echo "Starting the full API stack..."; chmod -R 777 logs/ 2>/dev/null || true; chmod -R 777 flower/ 2>/dev/null || true; dc --profile celery up --build -d; echo "Started."; }
-do_up_api() { require_secrets; echo "Starting the API stack (api + redis only)..."; chmod -R 777 logs/ 2>/dev/null || true; dc up --build -d; echo "Started."; }
+APP_DIR="../APP"
+
+# Idempotently point git at the committed hooks (check-then-set). Relative
+# core.hooksPath resolves to the working-tree root, so this works from anywhere.
+ensure_hooks() {
+    if [ "$(git config core.hooksPath 2>/dev/null)" != ".githooks" ]; then
+        git config core.hooksPath .githooks && echo "Git hooks enabled (core.hooksPath -> .githooks)."
+    fi
+}
+
+# Locate the running `api` container (no secrets needed for exec).
+api_cid() { docker compose $COMPOSE_FILES ps -q api 2>/dev/null | head -n1; }
+
+do_lint() {
+    set +e; rc=0
+    CID=$(api_cid)
+    if [ -n "$CID" ] && docker exec "$CID" sh -c 'command -v ruff >/dev/null 2>&1'; then
+        echo "== ruff format --check (container) =="; docker exec "$CID" ruff format --check src tests || rc=1
+        echo "== ruff check (container) ==";          docker exec "$CID" ruff check src tests || rc=1
+    else
+        echo "Skipping Python lint: dev 'api' container not running (./run.sh up) or ruff not in image."
+    fi
+    if [ -d "$APP_DIR/node_modules" ]; then
+        echo "== prettier --check (APP) =="; ( cd "$APP_DIR" && npx --no-install prettier --check "src/**/*.{ts,html,scss,css,json}" ) || rc=1
+        echo "== eslint (APP) ==";           ( cd "$APP_DIR" && npx --no-install eslint . ) || rc=1
+    else
+        echo "Skipping frontend lint: APP/node_modules missing (npm ci)."
+    fi
+    set -e; return $rc
+}
+
+do_lint_fix() {
+    set +e
+    CID=$(api_cid)
+    if [ -n "$CID" ] && docker exec "$CID" sh -c 'command -v ruff >/dev/null 2>&1'; then
+        echo "== ruff format (container) ==";    docker exec "$CID" ruff format src tests
+        echo "== ruff check --fix (container) =="; docker exec "$CID" ruff check --fix src tests
+    else
+        echo "Skipping Python autofix: dev 'api' container not running or ruff not in image."
+    fi
+    if [ -d "$APP_DIR/node_modules" ]; then
+        echo "== prettier --write (APP) =="; ( cd "$APP_DIR" && npx --no-install prettier --write "src/**/*.{ts,html,scss,css,json}" )
+        echo "== eslint --fix (APP) ==";      ( cd "$APP_DIR" && npx --no-install eslint . --fix )
+    else
+        echo "Skipping frontend autofix: APP/node_modules missing (npm ci)."
+    fi
+    set -e
+}
+
+do_up()     { require_secrets; ensure_hooks; echo "Starting the full API stack..."; chmod -R 777 logs/ 2>/dev/null || true; chmod -R 777 flower/ 2>/dev/null || true; dc --profile celery up --build -d; echo "Started."; }
+do_up_api() { require_secrets; ensure_hooks; echo "Starting the API stack (api + redis only)..."; chmod -R 777 logs/ 2>/dev/null || true; dc up --build -d; echo "Started."; }
 do_down()   { require_secrets; echo "Stopping the full API stack..."; dc --profile celery down -v; echo "Stopped."; }
 
 case "$1" in
@@ -87,6 +143,11 @@ case "$1" in
         else dc run --rm --entrypoint python api -m src.seeds.run "$SEED_TYPE"; fi ;;
     lock) docker run --rm -v "$(pwd)":/app -w /app "$UV_IMAGE" uv lock ;;
     lock-upgrade) docker run --rm -v "$(pwd)":/app -w /app "$UV_IMAGE" uv lock --upgrade ;;
+    lint) do_lint ;;
+    lint-fix) do_lint_fix ;;
+    hooks-on) git config core.hooksPath .githooks && echo "Git hooks enabled (core.hooksPath -> .githooks)." ;;
+    hooks-off) git config --unset core.hooksPath 2>/dev/null || true; echo "Git hooks disabled (using default .git/hooks)." ;;
+    hooks-status) echo "core.hooksPath = $(git config core.hooksPath 2>/dev/null || echo '(default .git/hooks)')" ;;
     secrets-install)
         if command -v sops >/dev/null 2>&1 && command -v age-keygen >/dev/null 2>&1; then
             echo "sops and age are already installed."; exit 0

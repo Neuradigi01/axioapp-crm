@@ -16,11 +16,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FlowPreviewComponent } from './flow-preview.component';
-import {
-  FlowCategory,
-  FlowRow,
-  FlowsService,
-} from './flows.service';
+import { FlowCategory, FlowRow, FlowsService } from './flows.service';
 
 interface ScreenDraft {
   id: string;
@@ -161,7 +157,9 @@ interface FlowDraft {
       </div>
 
       <details>
-        <summary class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700">
+        <summary
+          class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700"
+        >
           Preview
         </summary>
         <div class="mt-2">
@@ -170,10 +168,15 @@ interface FlowDraft {
       </details>
 
       <details>
-        <summary class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700">
+        <summary
+          class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700"
+        >
           Raw JSON (advanced)
         </summary>
-        <pre class="mt-2 max-h-72 overflow-auto rounded-md bg-zinc-900 p-3 text-[11px] text-zinc-100">{{ rawJsonText() }}</pre>
+        <pre
+          class="mt-2 max-h-72 overflow-auto rounded-md bg-zinc-900 p-3 text-[11px] text-zinc-100"
+          >{{ rawJsonText() }}</pre
+        >
       </details>
     </div>
   `,
@@ -201,9 +204,7 @@ export class FlowBuilderComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly toast = signal<string | null>(null);
 
-  protected readonly rawJsonText = computed(() =>
-    JSON.stringify(this.draft().raw, null, 2),
-  );
+  protected readonly rawJsonText = computed(() => JSON.stringify(this.draft().raw, null, 2));
 
   constructor() {
     effect(() => {
@@ -238,23 +239,13 @@ export class FlowBuilderComponent {
 
   protected patchScreenTitle(screenId: string, value: string): void {
     this.draft.update((d) => {
-      const screens = d.screens.map((s) =>
-        s.id === screenId ? { ...s, title: value } : s,
-      );
-      const raw = this.rebuildRaw(
-        d.raw,
-        screens,
-        d.fields,
-      );
+      const screens = d.screens.map((s) => (s.id === screenId ? { ...s, title: value } : s));
+      const raw = this.rebuildRaw(d.raw, screens, d.fields);
       return { ...d, screens, raw };
     });
   }
 
-  protected patchFieldLabel(
-    screenId: string,
-    fieldName: string,
-    value: string,
-  ): void {
+  protected patchFieldLabel(screenId: string, fieldName: string, value: string): void {
     this.draft.update((d) => {
       const screenFields = (d.fields[screenId] || []).map((f) =>
         f.name === fieldName ? { ...f, label: value } : f,
@@ -265,11 +256,7 @@ export class FlowBuilderComponent {
     });
   }
 
-  protected toggleRequired(
-    screenId: string,
-    fieldName: string,
-    required: boolean,
-  ): void {
+  protected toggleRequired(screenId: string, fieldName: string, required: boolean): void {
     this.draft.update((d) => {
       const screenFields = (d.fields[screenId] || []).map((f) =>
         f.name === fieldName ? { ...f, required } : f,
@@ -316,14 +303,11 @@ export class FlowBuilderComponent {
     return { ...draft, name: row.name };
   }
 
-  private fromSeed(
-    category: FlowCategory,
-    raw: Record<string, unknown>,
-  ): FlowDraft {
+  private fromSeed(category: FlowCategory, raw: Record<string, unknown>): FlowDraft {
     const screens: ScreenDraft[] = [];
     const fields: Record<string, FieldDraft[]> = {};
     const rawScreens = Array.isArray((raw as { screens?: unknown }).screens)
-      ? ((raw as { screens: Array<Record<string, unknown>> }).screens)
+      ? (raw as { screens: Array<Record<string, unknown>> }).screens
       : [];
     for (const s of rawScreens) {
       const id = String(s['id'] ?? '');
@@ -331,10 +315,8 @@ export class FlowBuilderComponent {
       if (!id) continue;
       screens.push({ id, title });
       const collected: FieldDraft[] = [];
-      const layoutChildren = (
-        (s['layout'] as { children?: Array<Record<string, unknown>> })
-          ?.children ?? []
-      );
+      const layoutChildren =
+        (s['layout'] as { children?: Array<Record<string, unknown>> })?.children ?? [];
       this.collectFields(layoutChildren, collected);
       fields[id] = collected;
     }
@@ -347,27 +329,17 @@ export class FlowBuilderComponent {
     };
   }
 
-  private collectFields(
-    nodes: Array<Record<string, unknown>>,
-    out: FieldDraft[],
-  ): void {
+  private collectFields(nodes: Array<Record<string, unknown>>, out: FieldDraft[]): void {
     for (const node of nodes) {
       const type = String(node['type'] ?? '');
       if (type === 'Form' || type === 'SingleColumnLayout') {
         const inner = node['children'];
         if (Array.isArray(inner)) {
-          this.collectFields(
-            inner as Array<Record<string, unknown>>,
-            out,
-          );
+          this.collectFields(inner as Array<Record<string, unknown>>, out);
         }
         continue;
       }
-      if (
-        type === 'Footer' ||
-        type === 'TextHeading' ||
-        type === 'TextBody'
-      ) {
+      if (type === 'Footer' || type === 'TextHeading' || type === 'TextBody') {
         continue;
       }
       const name = String(node['name'] ?? '');
@@ -377,9 +349,7 @@ export class FlowBuilderComponent {
         name,
         label: String(node['label'] ?? ''),
         required: node['required'] === true || node['required'] === 'true',
-        helperText: node['helper-text']
-          ? String(node['helper-text'])
-          : undefined,
+        helperText: node['helper-text'] ? String(node['helper-text']) : undefined,
       });
     }
   }
@@ -400,27 +370,20 @@ export class FlowBuilderComponent {
         s['title'] = matchedScreen.title;
       }
       this.applyFieldEdits(
-        (s['layout'] as { children?: Array<Record<string, unknown>> })
-          ?.children ?? [],
+        (s['layout'] as { children?: Array<Record<string, unknown>> })?.children ?? [],
         fields[id] || [],
       );
     }
     return next;
   }
 
-  private applyFieldEdits(
-    nodes: Array<Record<string, unknown>>,
-    edits: FieldDraft[],
-  ): void {
+  private applyFieldEdits(nodes: Array<Record<string, unknown>>, edits: FieldDraft[]): void {
     for (const node of nodes) {
       const type = String(node['type'] ?? '');
       if (type === 'Form' || type === 'SingleColumnLayout') {
         const inner = node['children'];
         if (Array.isArray(inner)) {
-          this.applyFieldEdits(
-            inner as Array<Record<string, unknown>>,
-            edits,
-          );
+          this.applyFieldEdits(inner as Array<Record<string, unknown>>, edits);
         }
         continue;
       }

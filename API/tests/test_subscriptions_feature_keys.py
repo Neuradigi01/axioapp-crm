@@ -13,6 +13,7 @@ These two tests enforce that lock-step in both directions:
   - Every key in ``KNOWN_FEATURE_KEYS`` has a matching ``FEATURE_*``
     constant. Catches new YAML keys the constants module forgot to add.
 """
+
 from __future__ import annotations
 
 from src.app.core.subscriptions import feature_keys
@@ -60,6 +61,4 @@ def test_constants_use_screaming_snake_case_naming():
     """Defensive: catch a constant accidentally introduced in the wrong shape."""
     for name in _collect_feature_constants():
         assert name == name.upper(), f"{name!r} is not SCREAMING_SNAKE_CASE"
-        assert " " not in name and "-" not in name, (
-            f"{name!r} must use underscores only"
-        )
+        assert " " not in name and "-" not in name, f"{name!r} must use underscores only"

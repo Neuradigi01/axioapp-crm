@@ -4,6 +4,7 @@ The state machine lives in `service.py`; routes in `router.py`. The
 PDF surface uses a registry (`pdf_registry`) so verticals can plug in
 their own template without `core/` importing from `packs/`.
 """
+
 from src.app.core.billing.service import (
     add_line,
     create_draft,

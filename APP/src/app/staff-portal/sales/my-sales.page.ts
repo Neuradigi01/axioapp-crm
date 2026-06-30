@@ -1,19 +1,10 @@
-﻿import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+﻿import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { InrPipe } from '../../features/user/core/shared/pipes/inr.pipe';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  StaffPerformance,
-  StaffPortalApiService,
-} from '../staff-portal-api.service';
+import { StaffPerformance, StaffPortalApiService } from '../staff-portal-api.service';
 
 /**
  * My Sales â€” leads/conversion + sales-MTD snapshot for the signed-in
@@ -58,5 +49,4 @@ export class MySalesPageComponent {
         },
       });
   }
-
 }

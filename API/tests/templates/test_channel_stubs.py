@@ -15,6 +15,7 @@ Covers:
 These three adapters mirror the SMS pattern (Step 12). The intent is
 identical: ship the editor surface, fail the send cleanly.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -35,7 +36,6 @@ from src.app.core.conversations.adapters.push import (
     PushNotConfigured,
 )
 from src.app.core.conversations.models import ConversationChannel
-
 
 pytestmark = pytest.mark.asyncio
 

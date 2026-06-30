@@ -1,15 +1,9 @@
 <div class="flex flex-col h-full bg-white">
-  <header
-    class="px-4 py-3 border-b border-zinc-200 flex items-center justify-between"
-  >
+  <header class="px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
     <div>
-      <h3 class="text-sm font-semibold text-zinc-800">
-        Version history
-      </h3>
+      <h3 class="text-sm font-semibold text-zinc-800">Version history</h3>
       @if (total() > 0) {
-        <p class="text-[11px] text-zinc-500">
-          {{ versions().length }} of {{ total() }} versions
-        </p>
+        <p class="text-[11px] text-zinc-500">{{ versions().length }} of {{ total() }} versions</p>
       }
     </div>
     <button
@@ -52,8 +46,7 @@
       <p class="text-xs text-zinc-500 italic">Loading versions…</p>
     } @else if (versions().length === 0) {
       <p class="text-xs text-zinc-500 italic">
-        No saved versions yet — versions land each time you save a graph
-        change.
+        No saved versions yet — versions land each time you save a graph change.
       </p>
     } @else {
       <ol class="space-y-2">
@@ -74,10 +67,7 @@
               <button
                 type="button"
                 class="text-[11px] px-2 py-0.5 rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
-                [disabled]="
-                  fetchingDetail() !== null ||
-                  viewingVersion() === entry.version
-                "
+                [disabled]="fetchingDetail() !== null || viewingVersion() === entry.version"
                 (click)="onView(entry.version)"
               >
                 @if (fetchingDetail() === entry.version) {
@@ -101,9 +91,7 @@
                 {{ entry.change_note }}
               </p>
             } @else {
-              <p class="mt-1 text-[11px] text-zinc-400 italic">
-                No change note recorded.
-              </p>
+              <p class="mt-1 text-[11px] text-zinc-400 italic">No change note recorded.</p>
             }
           </li>
         }

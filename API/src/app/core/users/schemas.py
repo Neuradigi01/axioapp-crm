@@ -4,11 +4,11 @@
 `UserMe` extends it with the role + permission keys so the frontend
 can render gated UI from a single `/users/me` round-trip.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -128,16 +128,14 @@ class TransferRecordsRequest(BaseModel):
 
     to_user_id: uuid.UUID
     entities: list[str] = Field(default_factory=lambda: list(_TRANSFER_ENTITIES))
-    reason: Optional[str] = Field(default=None, max_length=500)
+    reason: str | None = Field(default=None, max_length=500)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     @classmethod
     def _validate_entity(cls, name: str) -> str:
         if name not in _TRANSFER_ENTITIES:
-            raise ValueError(
-                f"unknown entity {name!r}; expected one of {_TRANSFER_ENTITIES}"
-            )
+            raise ValueError(f"unknown entity {name!r}; expected one of {_TRANSFER_ENTITIES}")
         return name
 
     def normalised_entities(self) -> list[str]:

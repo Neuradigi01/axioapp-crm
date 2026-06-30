@@ -9,10 +9,11 @@ Both events flow into the same `subscription_invoices` upsert keyed by
 `invoice.paid` additionally resumes a `past_due` subscription back to
 `active` — the customer's card succeeded.
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import update
@@ -35,13 +36,12 @@ log = logging.getLogger(__name__)
 
 # Stripe-side statuses we accept on `subscription_invoices`. Anything
 # else gets mapped to `open` so the CHECK constraint doesn't trip.
-_KNOWN_INVOICE_STATUSES = frozenset(
-    {"paid", "open", "void", "uncollectible", "draft"}
-)
+_KNOWN_INVOICE_STATUSES = frozenset({"paid", "open", "void", "uncollectible", "draft"})
 
 
 async def on_invoice_paid(
-    db: AsyncSession, event: dict[str, Any],
+    db: AsyncSession,
+    event: dict[str, Any],
 ) -> None:
     invoice = event.get("data", {}).get("object", {}) or {}
     sub = await _upsert_invoice(db, invoice, force_status="paid")
@@ -84,14 +84,14 @@ async def on_invoice_paid(
         template_key="payment_succeeded",
         context={
             "amount_paid_usd": (invoice.get("amount_paid") or 0) // 100,
-            "invoice_pdf_url": invoice.get("invoice_pdf")
-            or invoice.get("hosted_invoice_url"),
+            "invoice_pdf_url": invoice.get("invoice_pdf") or invoice.get("hosted_invoice_url"),
         },
     )
 
 
 async def on_invoice_finalized(
-    db: AsyncSession, event: dict[str, Any],
+    db: AsyncSession,
+    event: dict[str, Any],
 ) -> None:
     invoice = event.get("data", {}).get("object", {}) or {}
     await _upsert_invoice(db, invoice)
@@ -130,20 +130,13 @@ async def _upsert_invoice(
             f"{stripe_sub_id!r}; deferring invoice upsert."
         )
 
-    status_raw = (
-        force_status
-        if force_status is not None
-        else invoice.get("status") or "open"
-    )
+    status_raw = force_status if force_status is not None else invoice.get("status") or "open"
     status = status_raw if status_raw in _KNOWN_INVOICE_STATUSES else "open"
 
     paid_at: datetime | None = None
     if status == "paid":
         transitions = invoice.get("status_transitions") or {}
-        paid_at = (
-            parse_unix_ts(transitions.get("paid_at"))
-            or datetime.now(tz=timezone.utc)
-        )
+        paid_at = parse_unix_ts(transitions.get("paid_at")) or datetime.now(tz=UTC)
 
     currency = (invoice.get("currency") or "usd").upper()
 

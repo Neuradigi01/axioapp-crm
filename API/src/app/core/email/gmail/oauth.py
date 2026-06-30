@@ -13,10 +13,9 @@ Google only returns a refresh token on the FIRST grant for a given
 flows (the second grant has no refresh token, every subsequent token
 expiry then bricks the connection).
 """
+
 from __future__ import annotations
 
-import time
-from typing import Optional
 from urllib.parse import urlencode
 
 import httpx
@@ -28,7 +27,6 @@ from config import (
     GOOGLE_OAUTH_CLIENT_SECRET,
 )
 from src.app.core.email.oauth import TokenSet
-
 
 _AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -87,7 +85,7 @@ class GmailProvider:
         *,
         code: str,
         redirect_uri: str,
-        http_client: Optional[httpx.AsyncClient] = None,
+        http_client: httpx.AsyncClient | None = None,
     ) -> TokenSet:
         """Exchange the OAuth `code` for an access + refresh token
         pair. Raises `HTTPException(502)` on transport failure or
@@ -111,7 +109,7 @@ class GmailProvider:
         self,
         *,
         refresh_token: str,
-        http_client: Optional[httpx.AsyncClient] = None,
+        http_client: httpx.AsyncClient | None = None,
     ) -> TokenSet:
         """Trade a refresh token for a fresh access token. Google
         does NOT return a new refresh token on refresh — the caller
@@ -137,7 +135,7 @@ class GmailProvider:
 async def fetch_userinfo(
     access_token: str,
     *,
-    http_client: Optional[httpx.AsyncClient] = None,
+    http_client: httpx.AsyncClient | None = None,
 ) -> dict:
     """Pull the `email` + `name` from Google's userinfo endpoint —
     populates `email_address` + `display_name` on the freshly-created
@@ -146,13 +144,9 @@ async def fetch_userinfo(
     headers = {"Authorization": f"Bearer {access_token}"}
     try:
         if http_client is not None:
-            response = await http_client.get(
-                _USERINFO_URL, headers=headers
-            )
+            response = await http_client.get(_USERINFO_URL, headers=headers)
         else:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT
-            ) as client:
+            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
                 response = await client.get(_USERINFO_URL, headers=headers)
     except (httpx.HTTPError, httpx.TimeoutException):
         return {}
@@ -167,18 +161,14 @@ async def fetch_userinfo(
 # --- Helpers --------------------------------------------------------------
 
 
-async def _post_token(
-    data: dict, http_client: Optional[httpx.AsyncClient]
-) -> dict:
+async def _post_token(data: dict, http_client: httpx.AsyncClient | None) -> dict:
     """POST `data` form-encoded to Google's token endpoint, return the
     decoded JSON body. Surface clear errors on transport + 4xx."""
     try:
         if http_client is not None:
             response = await http_client.post(_TOKEN_URL, data=data)
         else:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT
-            ) as client:
+            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
                 response = await client.post(_TOKEN_URL, data=data)
     except (httpx.HTTPError, httpx.TimeoutException) as exc:
         raise HTTPException(
@@ -192,10 +182,7 @@ async def _post_token(
             error = {"raw": response.text[:200]}
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Google rejected the OAuth exchange "
-                f"(status={response.status_code}): {error}"
-            ),
+            detail=(f"Google rejected the OAuth exchange (status={response.status_code}): {error}"),
         )
     try:
         body = response.json()
@@ -212,7 +199,7 @@ async def _post_token(
     return body
 
 
-def _split_scopes(scope_str: Optional[str]) -> list[str]:
+def _split_scopes(scope_str: str | None) -> list[str]:
     """Google returns the granted scopes as a single space-separated
     string. The Protocol expects a list."""
     if not scope_str:

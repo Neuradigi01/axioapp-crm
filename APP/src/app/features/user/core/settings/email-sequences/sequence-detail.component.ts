@@ -25,7 +25,6 @@ import {
   OnInit,
   computed,
   inject,
-  input,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -41,9 +40,7 @@ import {
   EnrollmentState,
 } from '../../services/email-sequences-api.service';
 
-
 type StateFilter = 'all' | EnrollmentState;
-
 
 @Component({
   selector: 'app-sequence-detail',
@@ -84,9 +81,7 @@ export class SequenceDetailComponent implements OnInit {
     if (!s) return '';
     if (s.steps.length === 0) return 'No steps';
     return s.steps
-      .map((step, i) =>
-        i === 0 ? 'day 0' : `day ${this._cumulative(s.steps, i)}`,
-      )
+      .map((step, i) => (i === 0 ? 'day 0' : `day ${this._cumulative(s.steps, i)}`))
       .join(' → ');
   });
 
@@ -117,16 +112,14 @@ export class SequenceDetailComponent implements OnInit {
   };
 
   ngOnInit(): void {
-    this.route.paramMap
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((params) => {
-        const id = params.get('id');
-        this.sequenceId.set(id);
-        if (id) {
-          this._loadSequence(id);
-          this._loadEnrollments(id, this.stateFilter());
-        }
-      });
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const id = params.get('id');
+      this.sequenceId.set(id);
+      if (id) {
+        this._loadSequence(id);
+        this._loadEnrollments(id, this.stateFilter());
+      }
+    });
   }
 
   setStateFilter(s: StateFilter): void {
@@ -145,14 +138,11 @@ export class SequenceDetailComponent implements OnInit {
   }
 
   cancel(row: Enrollment): void {
-    if (!confirm('Cancel this enrollment? This can\'t be undone.')) return;
+    if (!confirm("Cancel this enrollment? This can't be undone.")) return;
     this._actOnEnrollment(row, 'cancel');
   }
 
-  private _actOnEnrollment(
-    row: Enrollment,
-    action: 'pause' | 'resume' | 'cancel',
-  ): void {
+  private _actOnEnrollment(row: Enrollment, action: 'pause' | 'resume' | 'cancel'): void {
     if (this.actingOn() !== null) return;
     this.actingOn.set(row.id);
     this.inlineError.set(null);
@@ -178,14 +168,9 @@ export class SequenceDetailComponent implements OnInit {
 
   /** Cumulative delay across steps [0..i]. step_order is dense from
    *  the backend so we walk the array directly. */
-  private _cumulative(
-    steps: EmailSequence['steps'],
-    upToIndex: number,
-  ): number {
+  private _cumulative(steps: EmailSequence['steps'], upToIndex: number): number {
     let total = 0;
-    const sorted = steps
-      .slice()
-      .sort((a, b) => a.step_order - b.step_order);
+    const sorted = steps.slice().sort((a, b) => a.step_order - b.step_order);
     for (let i = 0; i <= upToIndex; i++) {
       total += sorted[i]?.delay_days ?? 0;
     }

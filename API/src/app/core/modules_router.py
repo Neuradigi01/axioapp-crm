@@ -10,6 +10,7 @@ The list endpoint relies on `permissions.list_permissions_for_role`
 to compute which `MODULE.permissions` keys the user holds, then asks
 the registry to filter on that set.
 """
+
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -32,7 +33,6 @@ from src.app.core.permissions.service import (
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(tags=["Modules"])
 
 
@@ -48,7 +48,7 @@ class ModuleOut(BaseModel):
     parent: str | None
 
     @classmethod
-    def from_descriptor(cls, m: ModuleDescriptor) -> "ModuleOut":
+    def from_descriptor(cls, m: ModuleDescriptor) -> ModuleOut:
         return cls(**asdict(m))
 
 
@@ -62,9 +62,7 @@ async def list_modules(
     db: AsyncSession = Depends(get_db),
 ) -> list[ModuleOut]:
     granted = {p.key for p in await list_permissions_for_role(db, user.role_id)}
-    return [
-        ModuleOut.from_descriptor(m) for m in registry.list_for_user(granted)
-    ]
+    return [ModuleOut.from_descriptor(m) for m in registry.list_for_user(granted)]
 
 
 @router.post("/dev/refresh-modules", response_model=RefreshModulesResponse)

@@ -15,10 +15,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  WorkflowFolder,
-  WorkflowsApiService,
-} from '../workflows-api.service';
+import { WorkflowFolder, WorkflowsApiService } from '../workflows-api.service';
 
 /**
  * Modal for creating a workflow folder. Mounted by the folders
@@ -27,7 +24,6 @@ import {
  * (master sidebar UI can't visually distinguish deeper trees) — the
  * picker only offers depth-0 folders as parents.
  */
-
 
 @Component({
   selector: 'app-workflow-folder-create-modal',
@@ -87,9 +83,7 @@ export class FolderCreateModalComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.saveError.set(
-            extractApiError(err) ?? 'Could not create folder.',
-          );
+          this.saveError.set(extractApiError(err) ?? 'Could not create folder.');
         },
       });
   }

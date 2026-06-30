@@ -5,6 +5,7 @@ org B's RequestContext) and verifies it's invisible to org A's HTTP
 reader. Covers both layers of isolation: the ORM `do_orm_execute`
 filter on `TenantScoped` and the Postgres RLS policy on `activities`.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -31,9 +32,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -88,10 +87,10 @@ async def test_other_org_activities_invisible(layered_client, seeded_admin):
             from sqlalchemy import select
 
             count = (
-                await session.execute(
-                    select(Activity).where(Activity.entity_id == shared_entity)
-                )
-            ).scalars().all()
+                (await session.execute(select(Activity).where(Activity.entity_id == shared_entity)))
+                .scalars()
+                .all()
+            )
             assert len(count) == 1
         finally:
             reset_context(verify_token)
@@ -114,9 +113,7 @@ async def test_other_org_activities_invisible(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_org_a_sees_own_activity_alongside_invisible_org_b_row(
-    layered_client, seeded_admin
-):
+async def test_org_a_sees_own_activity_alongside_invisible_org_b_row(layered_client, seeded_admin):
     """Sibling test: org A's own row is visible while org B's stays hidden."""
     from tests.conftest import TestSession
 

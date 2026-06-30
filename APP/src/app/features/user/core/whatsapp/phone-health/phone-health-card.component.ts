@@ -1,13 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -63,8 +56,7 @@ const QUALITY_TOOLTIP: Record<WhatsAppQualityRating, string> = {
   YELLOW:
     'Quality has dropped recently. Address the recovery items below to avoid a tier downgrade.',
   RED: 'Quality is critically low. Meta may restrict or suspend the number if not addressed.',
-  UNKNOWN:
-    'Health data is not yet available. The hourly refresh will populate it within an hour.',
+  UNKNOWN: 'Health data is not yet available. The hourly refresh will populate it within an hour.',
 };
 
 const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
@@ -86,7 +78,6 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
   },
 };
 
-
 @Component({
   selector: 'app-phone-health-card',
   standalone: true,
@@ -101,12 +92,16 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
       }
 
       @if (loading() && !data()) {
-        <div class="rounded-md border border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500">
+        <div
+          class="rounded-md border border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500"
+        >
           Loading health…
         </div>
       } @else if (data(); as h) {
         <!-- Top row: badges + refresh -->
-        <div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-zinc-200 bg-white p-3">
+        <div
+          class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-zinc-200 bg-white p-3"
+        >
           <div class="flex flex-wrap items-center gap-2">
             <span
               [class]="
@@ -119,18 +114,24 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
               Quality: {{ QUALITY_BADGE[h.quality_rating].label }}
             </span>
             @if (h.tier_label) {
-              <span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200">
+              <span
+                class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+              >
                 Tier · {{ h.tier_label }}
               </span>
             }
             @if (h.verified_name) {
-              <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200">
+              <span
+                class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+              >
                 <lucide-icon name="check-circle-2" size="10" />
                 {{ h.verified_name }}
               </span>
             }
             @if (h.throughput) {
-              <span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-medium text-zinc-700 ring-1 ring-zinc-200">
+              <span
+                class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-medium text-zinc-700 ring-1 ring-zinc-200"
+              >
                 <lucide-icon name="zap" size="10" />
                 {{ h.throughput }} msg/s
               </span>
@@ -153,8 +154,7 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
             <div class="mb-1 flex items-center justify-between text-xs">
               <span class="font-medium text-zinc-700">24-hour usage</span>
               <span class="text-zinc-600">
-                {{ h.used_today | number }} / {{ h.daily_limit | number }}
-                ({{ h.usage_percent }}%)
+                {{ h.used_today | number }} / {{ h.daily_limit | number }} ({{ h.usage_percent }}%)
               </span>
             </div>
             <div class="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
@@ -223,8 +223,7 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
                 <li class="flex items-center gap-2 text-xs">
                   <span
                     [class]="
-                      'inline-flex h-2 w-2 shrink-0 rounded-full ' +
-                      eventDotClass(e.event_type)
+                      'inline-flex h-2 w-2 shrink-0 rounded-full ' + eventDotClass(e.event_type)
                     "
                   ></span>
                   <span class="font-medium text-zinc-700">
@@ -286,9 +285,7 @@ export class PhoneHealthCardComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load phone health.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load phone health.');
         },
       });
   }
@@ -305,9 +302,7 @@ export class PhoneHealthCardComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.refreshing.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not refresh phone health.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not refresh phone health.');
         },
       });
   }

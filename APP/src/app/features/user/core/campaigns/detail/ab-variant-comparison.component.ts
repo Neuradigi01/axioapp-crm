@@ -158,9 +158,8 @@ interface AbComparisonReport {
 
           @if (r.winning_variant && r.winner_decided_at) {
             <p class="mt-3 text-[11px] text-zinc-500">
-              Winner decided at {{ formatDate(r.winner_decided_at) }}.
-              Remaining unsent recipients (if any) receive the
-              winning template automatically.
+              Winner decided at {{ formatDate(r.winner_decided_at) }}. Remaining unsent recipients
+              (if any) receive the winning template automatically.
             </p>
           }
         </div>
@@ -189,9 +188,7 @@ export class AbVariantComparisonComponent {
     return Math.round((ratio ?? 0) * 100);
   }
 
-  protected humanMetric(
-    m: 'reply_rate' | 'read_rate' | 'click_rate' | null,
-  ): string {
+  protected humanMetric(m: 'reply_rate' | 'read_rate' | 'click_rate' | null): string {
     switch (m) {
       case 'reply_rate':
         return 'Reply rate';
@@ -212,9 +209,7 @@ export class AbVariantComparisonComponent {
     this.loading.set(true);
     this.error.set(null);
     this.http
-      .get<AbComparisonReport>(
-        `${environment.apiBaseUrl}/reports/campaigns/${id}/ab-comparison`,
-      )
+      .get<AbComparisonReport>(`${environment.apiBaseUrl}/reports/campaigns/${id}/ab-comparison`)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (r) => {
@@ -223,9 +218,7 @@ export class AbVariantComparisonComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not load A/B comparison.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load A/B comparison.');
         },
       });
   }

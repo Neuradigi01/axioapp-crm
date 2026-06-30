@@ -26,12 +26,12 @@ Four operations, all thin wrappers around `MetaGraphClient`:
 Both Facebook and Instagram Lead Ads ride the same `leadgen` webhook
 field, so there's no parallel Instagram code path.
 """
+
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,7 +50,7 @@ class MetaPage:
     page_id: str
     name: str
     access_token: str
-    category: Optional[str] = None
+    category: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,7 +182,7 @@ async def upsert_page_token(
     org_id: uuid.UUID,
     integration_id: uuid.UUID,
     page_id: str,
-    page_name: Optional[str],
+    page_name: str | None,
     page_token: str,
 ) -> MetaPageToken:
     """Cache the Page-scoped access_token in `meta_page_tokens` so the
@@ -199,7 +199,7 @@ async def upsert_page_token(
         )
     ).scalar_one_or_none()
     enc = encrypt(page_token)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if existing is None:
         row = MetaPageToken(
             org_id=org_id,
@@ -247,7 +247,7 @@ async def find_page_token(
     client: MetaGraphClient,
     *,
     page_id: str,
-) -> Optional[str]:
+) -> str | None:
     """Look up the access_token for a specific page id by paging
     through `/me/accounts`. Returns None if the user no longer
     manages that page (could happen if Pages were transferred out of

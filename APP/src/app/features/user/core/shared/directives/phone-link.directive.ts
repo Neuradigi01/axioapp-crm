@@ -1,12 +1,4 @@
-import {
-  Directive,
-  ElementRef,
-  Renderer2,
-  computed,
-  effect,
-  inject,
-  input,
-} from '@angular/core';
+import { Directive, ElementRef, Renderer2, computed, effect, inject, input } from '@angular/core';
 
 /**
  * Wraps a phone string into a working `tel:` link on the host element.

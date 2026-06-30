@@ -1,4 +1,5 @@
 """Pydantic v2 schemas for the tenants module."""
+
 from __future__ import annotations
 
 import uuid
@@ -22,7 +23,6 @@ class OwnershipTransferRequest(BaseModel):
 
 
 class OrganizationMemberOut(ORMModel):
-
     id: int
     organization_id: uuid.UUID
     user_member_id: int
@@ -66,7 +66,5 @@ class SendRulesUpdate(BaseModel):
     quiet_hours_start: time | None = None
     quiet_hours_end: time | None = None
     quiet_hours_timezone: str | None = Field(default=None, max_length=64)
-    marketing_frequency_cap_per_week: int | None = Field(
-        default=None, ge=0, le=100
-    )
+    marketing_frequency_cap_per_week: int | None = Field(default=None, ge=0, le=100)
     marketing_frequency_cap_enabled: bool | None = None

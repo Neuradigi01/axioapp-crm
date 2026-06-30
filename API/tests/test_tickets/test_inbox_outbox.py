@@ -1,22 +1,22 @@
 import pytest
 import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
-from httpx import AsyncClient, ASGITransport
 
+from src.constants.route_ids import RouteIds
+from src.core.security.jwt import create_access_token
+from src.core.security.password import hash_password
 from src.models import Base
 from src.models.admin import Admin
-from src.models.user import UserLogin, UserInfo
 from src.models.ticket import Ticket
-from src.core.security.password import hash_password
-from src.core.security.jwt import create_access_token
-from src.constants.route_ids import RouteIds
-from tests.conftest import test_engine, TestSession
+from src.models.user import UserInfo, UserLogin
+from tests.conftest import TestSession, test_engine
 
 
 @pytest_asyncio.fixture
 async def client():
-    from main import app
     import src.core.db as db_module
+    from main import app
 
     original_session = db_module.async_session
     db_module.async_session = TestSession
@@ -88,20 +88,24 @@ async def _seed_with_tickets(db):
 
 
 def _make_user_token():
-    return create_access_token({
-        "user_id": "test_user",
-        "role": "User",
-        "access_rights": f"{RouteIds.USER_SUPPORT_TICKETS},{RouteIds.USER_SUPPORT_VIEW_TICKET}",
-    })
+    return create_access_token(
+        {
+            "user_id": "test_user",
+            "role": "User",
+            "access_rights": f"{RouteIds.USER_SUPPORT_TICKETS},{RouteIds.USER_SUPPORT_VIEW_TICKET}",
+        }
+    )
 
 
 def _make_admin_token():
-    return create_access_token({
-        "user_id": "test_admin",
-        "role": "Admin",
-        "access_rights": f"{RouteIds.ADMIN_SUPPORT_TICKETS},{RouteIds.ADMIN_SUPPORT_VIEW_TICKET}",
-        "is_super_admin": True,
-    })
+    return create_access_token(
+        {
+            "user_id": "test_admin",
+            "role": "Admin",
+            "access_rights": f"{RouteIds.ADMIN_SUPPORT_TICKETS},{RouteIds.ADMIN_SUPPORT_VIEW_TICKET}",
+            "is_super_admin": True,
+        }
+    )
 
 
 @pytest.mark.asyncio

@@ -14,6 +14,7 @@ matching ``tbl_whatsapp_templates`` extension row via the new
 which talks to Meta and updates both the WA row's status AND the
 central row's ``external_status``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,14 +26,12 @@ from src.app.core.conversations.models import ConversationChannel
 from src.app.core.integrations.whatsapp import data_access as wa_da
 from src.app.core.templates.exceptions import (
     TemplateError,
-    TemplateNotFound,
 )
 from src.app.core.templates.models import (
     MessageTemplate,
     TemplateExternalStatus,
 )
 from src.app.core.templates.service import get_template
-
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +84,7 @@ async def submit_external(
     needed by the WA submission path; the router pulls them from the
     SOPS-managed config and passes them in.
     """
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
 
     if template.channel != ConversationChannel.whatsapp:
         raise ExternalSubmissionNotSupported(channel=template.channel.value)
@@ -95,9 +92,7 @@ async def submit_external(
     # Resolve the WA extension row via the Step-9 reciprocal link.
     wa_row = await wa_da.get_by_message_template_id(session, template.id)
     if wa_row is None:
-        raise MissingExtensionRow(
-            channel=template.channel.value, template_id=template.id
-        )
+        raise MissingExtensionRow(channel=template.channel.value, template_id=template.id)
 
     # Delegate to the existing WA submission service. It talks to
     # Meta, updates the WA row's submission_status, and the
@@ -138,9 +133,7 @@ async def get_external_status(
     status badge. For WA: pulls the rejection reason + last sync time
     from the extension row. For other channels: returns the central
     row's ``external_status`` only (no extra metadata)."""
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
     payload = {
         "status": template.external_status.value,
         "rejection_reason": None,

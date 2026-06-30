@@ -13,6 +13,7 @@ Or by registered template_id (the loader looks under
 The script is idempotent — re-running it produces zero-write seconds
 once the org is at the manifest's version.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,10 +23,9 @@ import sys
 import uuid
 from pathlib import Path
 
-
-from src.app.core.tenants import data_access
 from src.app.core.packs.installer import install
 from src.app.core.packs.loader import PackLoadError, load_pack
+from src.app.core.tenants import data_access
 from src.app.shared.context import RequestContext, set_context
 from src.app.shared.db import async_session
 
@@ -34,9 +34,7 @@ def _resolve_pack_file(template_id: str | None, pack_file: str | None) -> Path:
     if pack_file:
         return Path(pack_file)
     if not template_id:
-        raise SystemExit(
-            "Must pass either --pack-file or --pack <template_id>"
-        )
+        raise SystemExit("Must pass either --pack-file or --pack <template_id>")
     # Conventional location: src/app/packs/<template_id>/pack.yaml
     return Path("src/app/packs") / template_id / "pack.yaml"
 
@@ -78,9 +76,7 @@ def main() -> None:
         "--pack",
         help="template_id (resolves to src/app/packs/<id>/pack.yaml)",
     )
-    parser.add_argument(
-        "--pack-file", help="explicit path to a pack.yaml file"
-    )
+    parser.add_argument("--pack-file", help="explicit path to a pack.yaml file")
     args = parser.parse_args()
     exit_code = asyncio.run(_run(args))
     sys.exit(exit_code)

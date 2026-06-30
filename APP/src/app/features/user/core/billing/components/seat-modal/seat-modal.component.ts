@@ -76,7 +76,9 @@ import { SeatPreview } from '../../types/subscription.types';
               {{ planSummary() }}
             </p>
 
-            <div class="mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-200 p-1 dark:border-slate-700">
+            <div
+              class="mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-200 p-1 dark:border-slate-700"
+            >
               <button
                 type="button"
                 (click)="decrement()"
@@ -86,9 +88,7 @@ import { SeatPreview } from '../../types/subscription.types';
               >
                 −
               </button>
-              <span
-                class="min-w-[2ch] text-center font-medium text-zinc-900 dark:text-slate-100"
-              >
+              <span class="min-w-[2ch] text-center font-medium text-zinc-900 dark:text-slate-100">
                 {{ seats() }}
               </span>
               <button
@@ -332,9 +332,7 @@ export class SeatModalComponent {
               return;
             }
             this.isSubmitting.set(false);
-            this.submitError.set(
-              'Payment provider unavailable. Please try again later.',
-            );
+            this.submitError.set('Payment provider unavailable. Please try again later.');
             return;
           case 'scheduled':
             this.isSubmitting.set(false);
@@ -371,7 +369,6 @@ export class SeatModalComponent {
     });
   }
 }
-
 
 function extractErrorMessage(err: unknown): string {
   const e = err as {

@@ -22,10 +22,10 @@ the request context (so RLS authorises), but the raw `text()` API
 doesn't pick up the `do_orm_execute` listener, so explicit `org_id`
 WHERE clauses are mandatory.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,7 +46,7 @@ async def find_open_lead_for_contact(
     *,
     org_id: uuid.UUID,
     contact_id: uuid.UUID,
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     """Return the most recent OPEN lead's id for `contact_id` in
     `org_id`, or None if none exists.
 

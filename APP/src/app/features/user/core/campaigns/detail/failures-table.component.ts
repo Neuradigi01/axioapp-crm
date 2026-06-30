@@ -1,10 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 import { CampaignFailuresReport } from '../../reporting/whatsapp/whatsapp-reports.service';
 
@@ -25,7 +20,9 @@ import { CampaignFailuresReport } from '../../reporting/whatsapp/whatsapp-report
   template: `
     @if (report(); as r) {
       @if (r.total_failed === 0) {
-        <p class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+        <p
+          class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700"
+        >
           No failures — every campaign message reached Meta.
         </p>
       } @else {

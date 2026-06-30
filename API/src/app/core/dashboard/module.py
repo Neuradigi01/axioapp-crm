@@ -9,8 +9,8 @@ on its next shell init.
 modules with empty permission lists to every authenticated caller,
 which is what we want for the landing page.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="dashboard",

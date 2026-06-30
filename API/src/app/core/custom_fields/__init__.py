@@ -6,6 +6,7 @@ Per-org, per-entity field definitions stored in
 deletable, which keys are immutable. See `service.py` for the central
 enforcement.
 """
+
 from src.app.core.custom_fields.service import (
     create_managed_field,
     create_user_field,

@@ -26,6 +26,7 @@ Response shape for a blocked write (HTTP 402):
       "upgrade_url": "/user/subscription"
     }
 """
+
 from __future__ import annotations
 
 import re
@@ -38,13 +39,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from src.app.core.subscriptions.models import Subscription
+from src.app.shared.context import get_context
+
 # Look up `async_session` at call time via the module attribute so
 # the conftest patch (which rebinds `src.core.db.async_session = TestSession`)
 # propagates into the middleware during tests.
 from src.core import db as _core_db
-from src.app.core.subscriptions.models import Subscription
-from src.app.shared.context import get_context
-
 
 # Methods that never block. Reads are unconditionally allowed even on
 # `archived` / `cancelled` orgs — they need to be able to inspect
@@ -55,9 +56,7 @@ READ_METHODS: frozenset[str] = frozenset({"GET", "HEAD", "OPTIONS"})
 # write. Distinct from `ACTIVE_STATUSES` on the model: `trialing` and
 # `active` are NOT blocked; `past_due` and `read_only` are blocked but
 # `get_active_subscription` still returns their rows (recovery path).
-BLOCKED_STATUSES: frozenset[str] = frozenset(
-    {"read_only", "past_due", "archived", "cancelled"}
-)
+BLOCKED_STATUSES: frozenset[str] = frozenset({"read_only", "past_due", "archived", "cancelled"})
 
 # Paths exempted from the block. Each pattern is anchored end-to-end
 # so wildcards do not over-match. The list is intentionally small;
@@ -80,8 +79,7 @@ _ALLOWLIST_PATTERNS: tuple[re.Pattern[str], ...] = (
 _BLOCK_MESSAGES: dict[str, str] = {
     "read_only": "Your trial has ended. Upgrade to continue using FurnitureCRM.",
     "past_due": (
-        "Your subscription payment is past due. Update your payment method "
-        "to restore write access."
+        "Your subscription payment is past due. Update your payment method to restore write access."
     ),
     "archived": "Your account is archived. Contact support to restore.",
     "cancelled": "Your subscription is cancelled.",
@@ -97,7 +95,8 @@ def _allowlisted(path: str) -> bool:
 
 
 async def _latest_subscription_state(
-    session: AsyncSession, org_id: uuid.UUID,
+    session: AsyncSession,
+    org_id: uuid.UUID,
 ) -> tuple[str | None, datetime | None]:
     """Return `(status, since)` for the most-recent subscription row.
 
@@ -135,9 +134,7 @@ def _build_block_body(status: str, since: datetime | None) -> dict:
         "reason": status,
         "subscription_status": status,
         "since": since.isoformat() if since is not None else None,
-        "message": _BLOCK_MESSAGES.get(
-            status, "Write access is currently blocked."
-        ),
+        "message": _BLOCK_MESSAGES.get(status, "Write access is currently blocked."),
         "upgrade_url": _UPGRADE_URL,
     }
 
@@ -155,7 +152,9 @@ class SubscriptionStateMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(
-        self, request: Request, call_next,
+        self,
+        request: Request,
+        call_next,
     ) -> Response:
         if request.method in READ_METHODS:
             return await call_next(request)
@@ -175,7 +174,8 @@ class SubscriptionStateMiddleware(BaseHTTPMiddleware):
         # optimises correctness over latency.
         async with _core_db.async_session() as session:
             status_value, since = await _latest_subscription_state(
-                session, ctx.org_id,
+                session,
+                ctx.org_id,
             )
 
         if status_value is None or status_value not in BLOCKED_STATUSES:

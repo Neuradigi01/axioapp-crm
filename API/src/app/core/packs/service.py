@@ -15,6 +15,7 @@ A tile is marked `status="available"` if its `template_id` matches a real
 pack, else `status="coming_soon"`. The result is sorted ascending by
 `display_order`.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -69,9 +70,7 @@ def get_catalog() -> CatalogResponse:
             name=entry["name"],
             description=entry["description"],
             icon=entry["icon"],
-            status=(
-                "available" if entry["template_id"] in real_ids else "coming_soon"
-            ),
+            status=("available" if entry["template_id"] in real_ids else "coming_soon"),
             default_currency=entry["default_currency"],
             default_tax_rate=entry["default_tax_rate"],
             modules_preview=list(entry["modules_preview"]),

@@ -16,12 +16,12 @@ pytest-asyncio fixtures (asyncpg's "another operation in progress"
 error on the second test using the fixture). Manual smoke covers
 end-to-end DB writes — the unit tests cover the contract.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
 
 import pytest
 from cryptography.fernet import InvalidToken
@@ -36,7 +36,6 @@ from src.app.core.integrations.schemas import (
     IntegrationRead,
     IntegrationUpsert,
 )
-
 
 # --- 1. crypto round-trip ------------------------------------------------
 
@@ -133,6 +132,7 @@ class _CapturingSession:
 def _silence_audit(monkeypatch):
     """audit.log opens its own session; stub it to a no-op so the
     unit tests don't touch the real DB."""
+
     async def _noop(*_a, **_k):
         return None
 
@@ -149,13 +149,11 @@ class TestServiceUpsert:
             account_label="asha@example.com",
             access_token="plain-access-token",
             refresh_token="plain-refresh-token",
-            token_expires_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+            token_expires_at=datetime(2026, 6, 1, tzinfo=UTC),
             scopes=["https://www.googleapis.com/auth/adwords", "openid"],
         )
 
-        row = await service.upsert(
-            session, org_id=_ORG_ID, payload=payload, actor_id=_ACTOR_ID
-        )
+        row = await service.upsert(session, org_id=_ORG_ID, payload=payload, actor_id=_ACTOR_ID)
 
         assert len(session.added) == 1
         assert row.org_id == _ORG_ID
@@ -189,11 +187,11 @@ class TestServiceUpsert:
             account_label="old@example.com",
             access_token_enc=crypto.encrypt("old-access"),
             refresh_token_enc=crypto.encrypt("old-refresh"),
-            token_expires_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            token_expires_at=datetime(2025, 1, 1, tzinfo=UTC),
             scopes=["old-scope"],
             status=IntegrationStatus.expired,
             last_error="token expired",
-            connected_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            connected_at=datetime(2024, 1, 1, tzinfo=UTC),
             connected_by=uuid.uuid4(),
         )
         session = _CapturingSession(existing=existing)
@@ -206,9 +204,7 @@ class TestServiceUpsert:
             scopes=["new-scope"],
         )
 
-        row = await service.upsert(
-            session, org_id=_ORG_ID, payload=payload, actor_id=_ACTOR_ID
-        )
+        row = await service.upsert(session, org_id=_ORG_ID, payload=payload, actor_id=_ACTOR_ID)
 
         # No new row added — the existing one was mutated.
         assert session.added == []
@@ -234,9 +230,7 @@ class TestServiceUpsert:
             access_token="just-access",
             refresh_token=None,
         )
-        row = await service.upsert(
-            session, org_id=_ORG_ID, payload=payload, actor_id=_ACTOR_ID
-        )
+        row = await service.upsert(session, org_id=_ORG_ID, payload=payload, actor_id=_ACTOR_ID)
         assert row.refresh_token_enc is None
         access, refresh = service.decrypt_tokens(row)
         assert access == "just-access"
@@ -252,10 +246,10 @@ class TestServiceDisconnect:
             provider=IntegrationProvider.google_ads,
             access_token_enc=crypto.encrypt("a"),
             refresh_token_enc=crypto.encrypt("r"),
-            token_expires_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+            token_expires_at=datetime(2026, 6, 1, tzinfo=UTC),
             scopes=["s"],
             status=IntegrationStatus.connected,
-            connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session = _CapturingSession(existing=existing)
 
@@ -335,15 +329,15 @@ class TestIntegrationReadProjection:
             account_label="asha@example.com",
             access_token_enc="ENCRYPTED-LEAK-CANARY",
             refresh_token_enc="ENCRYPTED-LEAK-CANARY",
-            token_expires_at=datetime.now(timezone.utc),
+            token_expires_at=datetime.now(UTC),
             scopes=["s"],
             status="connected",
             last_error=None,
-            connected_at=datetime.now(timezone.utc),
+            connected_at=datetime.now(UTC),
             connected_by=uuid.uuid4(),
             disconnected_at=None,
             disconnected_by=None,
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
         )
 
         dumped = IntegrationRead.model_validate(row).model_dump(mode="json")

@@ -14,6 +14,7 @@ Permission model:
 Both keys exist on the `contacts` module from Phase 1, so this
 surface adds no new permission registry entries.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -44,7 +45,6 @@ from src.app.core.contacts.groups.service import (
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/contact-groups", tags=["Contact Groups"])
 
 
@@ -64,9 +64,7 @@ async def list_groups_endpoint(
         item = GroupRead.model_validate(row)
         item.member_count = count
         items.append(item)
-    return GroupListResponse(
-        items=items, total=total, page=page, size=size
-    )
+    return GroupListResponse(items=items, total=total, page=page, size=size)
 
 
 @router.post(
@@ -88,9 +86,7 @@ async def create_group_endpoint(
         payload=payload,
     )
     out = GroupRead.model_validate(row)
-    out.member_count = (
-        len(payload.contact_ids or []) if not payload.is_dynamic else None
-    )
+    out.member_count = len(payload.contact_ids or []) if not payload.is_dynamic else None
     return out
 
 
@@ -127,9 +123,7 @@ async def update_group_endpoint(
     return out
 
 
-@router.delete(
-    "/{group_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_group_endpoint(
     group_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -142,9 +136,7 @@ async def delete_group_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post(
-    "/preview-size", response_model=PreviewSizeOut
-)
+@router.post("/preview-size", response_model=PreviewSizeOut)
 async def preview_size_endpoint(
     payload: PreviewSizeIn,
     db: AsyncSession = Depends(get_db),

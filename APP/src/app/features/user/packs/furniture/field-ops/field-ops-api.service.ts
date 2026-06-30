@@ -99,10 +99,7 @@ export class FieldOpsApiService extends BaseCrudApiService<
     return this.http.get<FieldVisitListResponse>(this.base, { params });
   }
 
-  complete(
-    id: string,
-    payload: FieldVisitCompletePayload,
-  ): Observable<FieldVisit> {
+  complete(id: string, payload: FieldVisitCompletePayload): Observable<FieldVisit> {
     return this.http.post<FieldVisit>(`${this.base}/${id}/complete`, payload);
   }
 
@@ -110,11 +107,7 @@ export class FieldOpsApiService extends BaseCrudApiService<
     return this.http.get<FieldVisitPhoto[]>(`${this.base}/${id}/photos`);
   }
 
-  uploadPhoto(
-    id: string,
-    file: File,
-    caption: string | null,
-  ): Observable<FieldVisitPhoto> {
+  uploadPhoto(id: string, file: File, caption: string | null): Observable<FieldVisitPhoto> {
     const form = new FormData();
     form.append('file', file, file.name);
     if (caption) form.append('caption', caption);

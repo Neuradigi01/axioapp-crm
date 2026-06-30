@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.user import UserLogin
-from src.data_access import user_da, admin_da
+
 from config import EMAIL_ENABLED, SMS_ENABLED
+from src.data_access import admin_da, user_da
+from src.models.user import UserLogin
 
 
 async def resolve_user(db: AsyncSession, identifier: str) -> UserLogin | None:

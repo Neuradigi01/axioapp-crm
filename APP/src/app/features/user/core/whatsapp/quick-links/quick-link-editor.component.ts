@@ -15,11 +15,7 @@ import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  QuickLink,
-  QuickLinkUpsert,
-  QuickLinksService,
-} from './quick-links.service';
+import { QuickLink, QuickLinkUpsert, QuickLinksService } from './quick-links.service';
 
 /**
  * Editor for a single quick-link (Step 26).
@@ -81,9 +77,7 @@ import {
       </label>
 
       <label class="block text-xs">
-        <span class="mb-1 block font-medium text-zinc-700">
-          Destination phone (E.164 digits)
-        </span>
+        <span class="mb-1 block font-medium text-zinc-700"> Destination phone (E.164 digits) </span>
         <input
           type="tel"
           maxlength="32"
@@ -98,9 +92,7 @@ import {
       </label>
 
       <label class="block text-xs">
-        <span class="mb-1 block font-medium text-zinc-700">
-          Prefilled message (optional)
-        </span>
+        <span class="mb-1 block font-medium text-zinc-700"> Prefilled message (optional) </span>
         <textarea
           rows="3"
           maxlength="2000"
@@ -110,7 +102,7 @@ import {
           (ngModelChange)="patch({ prefilled_message: $event })"
         ></textarea>
         <span class="mt-1 block text-[11px]" [class.text-amber-700]="warnLength()">
-          {{ (form().prefilled_message?.length ?? 0) }} / 200 ideal
+          {{ form().prefilled_message?.length ?? 0 }} / 200 ideal
           @if (warnLength()) {
             — WhatsApp may truncate the preview on scan.
           }

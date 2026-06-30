@@ -41,11 +41,12 @@ A/B sibling split:
   the two siblings. v1 (Step 5) returns the workflow unchanged;
   Step 18 wires the actual split.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.app.core.events import bus as events_bus
@@ -56,7 +57,6 @@ from src.app.core.workflows.models import (
     Workflow,
     WorkflowReEnrollmentRule,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,6 @@ async def _on_event(envelope: dict[str, Any]) -> None:
     NOT re-raised — the bus already swallows handler exceptions to
     isolate one bad subscriber from the rest, but we log per-handler
     so the operator can investigate via the run-history UI."""
-    from src.app.core.workflows import engine
     from src.app.shared.context import (
         RequestContext,
         reset_context,
@@ -91,8 +90,7 @@ async def _on_event(envelope: dict[str, Any]) -> None:
         # Defensive — the bus envelope guarantees these, but we
         # don't crash on a malformed publish.
         logger.warning(
-            "workflows._on_event missing_envelope_fields event_type=%r "
-            "org_id=%r",
+            "workflows._on_event missing_envelope_fields event_type=%r org_id=%r",
             event_type,
             org_id,
         )
@@ -102,9 +100,7 @@ async def _on_event(envelope: dict[str, Any]) -> None:
         try:
             org_id = uuid.UUID(str(org_id))
         except (ValueError, TypeError):
-            logger.warning(
-                "workflows._on_event malformed_org_id org_id=%r", org_id
-            )
+            logger.warning("workflows._on_event malformed_org_id org_id=%r", org_id)
             return
 
     contact_id_raw = envelope.get("contact_id")
@@ -145,11 +141,7 @@ async def _on_event(envelope: dict[str, Any]) -> None:
         # and pass the rest as the run's trigger_payload. We keep
         # ``contact_id`` + ``event_id`` in the payload too so the
         # action handlers can reference them via variable resolution.
-        trigger_payload = {
-            k: v
-            for k, v in envelope.items()
-            if k not in ("event_type", "org_id")
-        }
+        trigger_payload = {k: v for k, v in envelope.items() if k not in ("event_type", "org_id")}
 
         for workflow in workflows:
             try:
@@ -182,8 +174,7 @@ async def _on_event(envelope: dict[str, Any]) -> None:
                 )
             except Exception:
                 logger.exception(
-                    "workflows._on_event start_run_failed org=%s workflow=%s "
-                    "event=%s",
+                    "workflows._on_event start_run_failed org=%s workflow=%s event=%s",
                     org_id,
                     workflow.id,
                     event_type,
@@ -217,8 +208,7 @@ async def _maybe_start_run(
         )
         if existing is not None:
             logger.info(
-                "workflows._maybe_start_run dedupe_replay workflow=%s "
-                "event_id=%s",
+                "workflows._maybe_start_run dedupe_replay workflow=%s event_id=%s",
                 workflow.id,
                 trigger_event_id,
             )
@@ -237,14 +227,13 @@ async def _maybe_start_run(
             )
             if existing is not None:
                 logger.info(
-                    "workflows._maybe_start_run dedupe_once workflow=%s "
-                    "contact=%s",
+                    "workflows._maybe_start_run dedupe_once workflow=%s contact=%s",
                     workflow.id,
                     contact_id,
                 )
                 return
         elif rule == WorkflowReEnrollmentRule.daily:
-            today_utc_midnight = datetime.now(timezone.utc).replace(
+            today_utc_midnight = datetime.now(UTC).replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
             existing = await _da.find_existing_run(
@@ -255,8 +244,7 @@ async def _maybe_start_run(
             )
             if existing is not None:
                 logger.info(
-                    "workflows._maybe_start_run dedupe_daily workflow=%s "
-                    "contact=%s",
+                    "workflows._maybe_start_run dedupe_daily workflow=%s contact=%s",
                     workflow.id,
                     contact_id,
                 )
@@ -272,9 +260,7 @@ async def _maybe_start_run(
     )
 
 
-def _trigger_conditions_match(
-    workflow: Workflow, payload: dict[str, Any]
-) -> bool:
+def _trigger_conditions_match(workflow: Workflow, payload: dict[str, Any]) -> bool:
     """Step 6 — evaluate the trigger node's ``config.conditions``
     against the published envelope. Empty / missing conditions
     evaluate to True (the "always match" default for fresh
@@ -284,11 +270,7 @@ def _trigger_conditions_match(
     graph = workflow.graph or {}
     nodes = graph.get("nodes") or []
     trigger_node = next(
-        (
-            n
-            for n in nodes
-            if str(n.get("type", "")).startswith("trigger")
-        ),
+        (n for n in nodes if str(n.get("type", "")).startswith("trigger")),
         None,
     )
     if trigger_node is None:
@@ -347,10 +329,11 @@ async def _resume_matching_waits(
     beat sweep's timeout path. The sweep handles that wait
     exclusively.
     """
-    from src.app.core.workflows import engine as workflows_engine
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    now = datetime.now(timezone.utc)
+    from src.app.core.workflows import engine as workflows_engine
+
+    now = datetime.now(UTC)
     matches = await _da.find_waits_for_event(
         session,
         org_id=org_id,
@@ -372,9 +355,7 @@ async def _resume_matching_waits(
             )
             continue
         try:
-            await workflows_engine.resume_run(
-                wait.run_id, output_edge_label="event_received"
-            )
+            await workflows_engine.resume_run(wait.run_id, output_edge_label="event_received")
         except Exception:
             logger.exception(
                 "workflows._resume_matching_waits resume_failed wait=%s run=%s",

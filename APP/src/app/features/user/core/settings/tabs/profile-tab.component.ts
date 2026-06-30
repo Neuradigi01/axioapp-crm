@@ -1,16 +1,6 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { FurnitureAuthService, MeResponse } from '../../auth/auth.service';
@@ -56,10 +46,7 @@ export class ProfileTabComponent {
 
   protected readonly passwordForm = this.fb.nonNullable.group({
     current_password: ['', [Validators.required]],
-    new_password: [
-      '',
-      [Validators.required, Validators.minLength(8), Validators.maxLength(255)],
-    ],
+    new_password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(255)]],
     confirm_password: ['', [Validators.required]],
     sign_out_others: [false],
   });
@@ -115,9 +102,7 @@ export class ProfileTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.profileSaving.set(false);
-          this.profileError.set(
-            extractApiError(err) ?? 'Could not save profile.',
-          );
+          this.profileError.set(extractApiError(err) ?? 'Could not save profile.');
         },
       });
   }
@@ -158,9 +143,7 @@ export class ProfileTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.passwordSaving.set(false);
-          this.passwordError.set(
-            extractApiError(err) ?? 'Could not change password.',
-          );
+          this.passwordError.set(extractApiError(err) ?? 'Could not change password.');
         },
       });
   }

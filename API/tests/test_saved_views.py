@@ -14,6 +14,7 @@ The fixture helpers (`_grant`, `_login`, `_make_second_user`) come
 from existing test modules so the seeding semantics stay in lockstep
 with the leads suite.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,8 +27,8 @@ from src.app.core.permissions.models import Role
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import OrganizationMember, User
 from src.app.shared.security.password import hash_password
-from src.models.user import UserInfo as LegacyUserInfo, UserLogin
-
+from src.models.user import UserInfo as LegacyUserInfo
+from src.models.user import UserLogin
 from tests.test_leads_crud import _grant, _login
 
 
@@ -93,9 +94,7 @@ async def _make_second_user_in_org(
         )
         await session.commit()
 
-        result = await session.execute(
-            select(User).where(User.id == user_login.id)
-        )
+        result = await session.execute(select(User).where(User.id == user_login.id))
         user = result.scalar_one()
 
     return {"user": user, "role": role, "password": password}
@@ -107,11 +106,7 @@ async def _make_org(name: str = "Other") -> uuid.UUID:
 
     org_id = uuid.uuid4()
     async with TestSession() as session:
-        session.add(
-            Organization(
-                id=org_id, name=name, slug=f"{name.lower()}-{org_id.hex[:6]}"
-            )
-        )
+        session.add(Organization(id=org_id, name=name, slug=f"{name.lower()}-{org_id.hex[:6]}"))
         await session.commit()
     return org_id
 
@@ -159,9 +154,7 @@ async def test_create_and_list_view(layered_client, seeded_admin):
     assert body["shared"] is False
     assert body["config"]["sort"] == "lead_score"
 
-    listed = await layered_client.get(
-        "/api/v1/saved-views?entity=leads", headers=headers
-    )
+    listed = await layered_client.get("/api/v1/saved-views?entity=leads", headers=headers)
     assert listed.status_code == 200
     items = listed.json()
     assert any(v["id"] == body["id"] for v in items)
@@ -190,14 +183,10 @@ async def test_duplicate_name_is_conflict(layered_client, seeded_admin):
         "name": "Dupes",
         "config": _SAMPLE_CONFIG,
     }
-    first = await layered_client.post(
-        "/api/v1/saved-views", json=payload, headers=headers
-    )
+    first = await layered_client.post("/api/v1/saved-views", json=payload, headers=headers)
     assert first.status_code == 201
 
-    second = await layered_client.post(
-        "/api/v1/saved-views", json=payload, headers=headers
-    )
+    second = await layered_client.post("/api/v1/saved-views", json=payload, headers=headers)
     assert second.status_code == 409, second.text
 
 
@@ -210,9 +199,7 @@ async def test_non_owner_cannot_update(layered_client, seeded_admin):
     owner = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "saved_views.use")
 
-    other = await _make_second_user_in_org(
-        org.id, email="rep@demo.local", password="Rep@1234"
-    )
+    other = await _make_second_user_in_org(org.id, email="rep@demo.local", password="Rep@1234")
     await _grant(other["role"].id, "saved_views.use")
 
     owner_token = await _login(
@@ -255,16 +242,12 @@ async def test_non_owner_cannot_update(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_shared_view_visible_to_another_user_same_org(
-    layered_client, seeded_admin
-):
+async def test_shared_view_visible_to_another_user_same_org(layered_client, seeded_admin):
     org = seeded_admin["org"]
     owner = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "saved_views.use")
 
-    other = await _make_second_user_in_org(
-        org.id, email="rep@demo.local", password="Rep@1234"
-    )
+    other = await _make_second_user_in_org(org.id, email="rep@demo.local", password="Rep@1234")
     await _grant(other["role"].id, "saved_views.use")
 
     owner_token = await _login(
@@ -303,14 +286,11 @@ async def test_shared_view_visible_to_another_user_same_org(
 
 
 @pytest.mark.asyncio
-async def test_shared_view_invisible_cross_tenant(
-    layered_client, seeded_admin
-):
+async def test_shared_view_invisible_cross_tenant(layered_client, seeded_admin):
     """Org B's shared view does NOT appear in org A's list."""
-    from tests.conftest import TestSession
-
     from src.app.core.saved_views.models import SavedView
     from src.app.shared.context import RequestContext, reset_context, set_context
+    from tests.conftest import TestSession
 
     org_a = seeded_admin["org"]
     user_a = seeded_admin["user"]
@@ -360,9 +340,7 @@ async def test_delete_only_by_owner(layered_client, seeded_admin):
     owner = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "saved_views.use")
 
-    other = await _make_second_user_in_org(
-        org.id, email="rep@demo.local", password="Rep@1234"
-    )
+    other = await _make_second_user_in_org(org.id, email="rep@demo.local", password="Rep@1234")
     await _grant(other["role"].id, "saved_views.use")
 
     owner_token = await _login(

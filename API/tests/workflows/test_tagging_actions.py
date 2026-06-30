@@ -1,4 +1,5 @@
 """Pin tests for the Step-10 tagging action handlers."""
+
 from __future__ import annotations
 
 import uuid
@@ -7,19 +8,21 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead, LeadStatus
 from src.app.core.workflows.actions import (
     _clear_registry_for_tests,
     _register_builtins,
+)
+from src.app.core.workflows.actions import (
     resolve as resolve_action,
 )
 from src.app.core.workflows.actions import tagging as tagging_module
 from src.app.core.workflows.exceptions import ActionNotImplemented
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -41,10 +44,7 @@ class _FakeStepRun:
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -126,9 +126,7 @@ async def test_add_tag_happy(test_db, org_id):
         reset_context(token)
     assert result.skip_reason is None
     assert result.output["added"] is True
-    contact = (
-        await test_db.execute(select(Contact).where(Contact.id == contact_id))
-    ).scalar_one()
+    contact = (await test_db.execute(select(Contact).where(Contact.id == contact_id))).scalar_one()
     assert "vip" in contact.tags
 
 
@@ -194,9 +192,7 @@ async def test_remove_tag_present(test_db, org_id):
     finally:
         reset_context(token)
     assert result.output["removed"] is True
-    contact = (
-        await test_db.execute(select(Contact).where(Contact.id == contact_id))
-    ).scalar_one()
+    contact = (await test_db.execute(select(Contact).where(Contact.id == contact_id))).scalar_one()
     assert "vip" not in contact.tags
     assert "newsletter" in contact.tags
 
@@ -280,9 +276,7 @@ async def test_set_lead_score_decrement_clamps_at_zero(test_db, org_id):
     assert result.output["new_score"] == 0
 
 
-async def test_set_lead_score_crossing_threshold_publishes_event(
-    test_db, org_id
-):
+async def test_set_lead_score_crossing_threshold_publishes_event(test_db, org_id):
     contact_id = await _make_contact(test_db, org_id=org_id)
     lead = await _make_lead(test_db, org_id=org_id, contact_id=contact_id, score=70)
     handler = resolve_action("tagging.set_lead_score")

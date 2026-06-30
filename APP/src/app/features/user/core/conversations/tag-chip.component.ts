@@ -1,17 +1,7 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  EventEmitter,
-  Input,
-  Output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
-import {
-  ConversationTagRef,
-  TAG_COLOR_CLASSES,
-  TagColor,
-} from './conversations-api.service';
+import { ConversationTagRef, TAG_COLOR_CLASSES, TagColor } from './conversations-api.service';
 
 /**
  * Tag chip (whatsapp-platform-upgrade Step 14).
@@ -56,9 +46,6 @@ export class TagChipComponent {
   @Output() readonly remove = new EventEmitter<string>();
 
   protected colorClasses(): string {
-    return (
-      TAG_COLOR_CLASSES[this.tag.color as TagColor] ??
-      TAG_COLOR_CLASSES.zinc
-    );
+    return TAG_COLOR_CLASSES[this.tag.color as TagColor] ?? TAG_COLOR_CLASSES.zinc;
   }
 }

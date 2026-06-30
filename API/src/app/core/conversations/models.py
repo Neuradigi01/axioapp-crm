@@ -16,6 +16,7 @@ The engine is intentionally agnostic of *which* channel — adapters
 (WhatsApp etc.) live under `adapters/` and the registry resolves them
 at runtime. Migration 0018 enforces RLS + the hot-path indexes.
 """
+
 from __future__ import annotations
 
 import enum
@@ -105,18 +106,14 @@ class Conversation(Base, TenantScoped):
         primary_key=True,
         server_default=sql_text("gen_random_uuid()"),
     )
-    channel: Mapped[ConversationChannel] = mapped_column(
-        conversation_channel_enum, nullable=False
-    )
+    channel: Mapped[ConversationChannel] = mapped_column(conversation_channel_enum, nullable=False)
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     # whatsapp-platform-upgrade Step 27a — the Meta phone_number_id
     # the inbound message arrived on (multi-number per org). NULL on
     # conversations created before 0115 or via the manual outbound
     # path. The chat-thread composer reads this to default Send-From
     # back to the same number the customer reached us on.
-    received_via_phone_id: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
+    received_via_phone_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     contact_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
@@ -134,9 +131,7 @@ class Conversation(Base, TenantScoped):
     ai_handling: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sql_text("false")
     )
-    last_message_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # whatsapp-platform-upgrade Step 15 — timestamp of the most recent
     # *customer-driven* message in this conversation. Used to compute
     # the WhatsApp 24-hour session window. NULL when the customer has
@@ -146,9 +141,7 @@ class Conversation(Base, TenantScoped):
     last_customer_message_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    unread_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=sql_text("0")
-    )
+    unread_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=sql_text("0"))
     # whatsapp-platform-upgrade Step 24 — click-to-WhatsApp ad
     # attribution. Single-touch: set on the first inbound that
     # carries a Meta `referral` block; never overwritten on later
@@ -168,17 +161,11 @@ class Conversation(Base, TenantScoped):
         ),
         nullable=True,
     )
-    acquisition_campaign_id: Mapped[str | None] = mapped_column(
-        String(128), nullable=True
-    )
-    acquisition_ad_id: Mapped[str | None] = mapped_column(
-        String(128), nullable=True
-    )
-    acquisition_landing_url: Mapped[str | None] = mapped_column(
-        String(2048), nullable=True
-    )
-    acquisition_referral_payload: Mapped[dict[str, Any] | None] = (
-        mapped_column(JSONB, nullable=True)
+    acquisition_campaign_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    acquisition_ad_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    acquisition_landing_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    acquisition_referral_payload: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -207,9 +194,7 @@ class Message(Base, TenantScoped):
         ForeignKey("tbl_conversations.id", ondelete="CASCADE"),
         nullable=False,
     )
-    direction: Mapped[MessageDirection] = mapped_column(
-        message_direction_enum, nullable=False
-    )
+    direction: Mapped[MessageDirection] = mapped_column(message_direction_enum, nullable=False)
     sender_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         nullable=True,
@@ -220,9 +205,7 @@ class Message(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("'[]'::jsonb"),
     )
-    channel_message_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
+    channel_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     payload: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
@@ -233,9 +216,7 @@ class Message(Base, TenantScoped):
     # template rows. The thread bubble renders this so button labels
     # stay visible even months after send; replay audits also read
     # from here.
-    interactive_payload: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True
-    )
+    interactive_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     # whatsapp-platform-upgrade Step 7: reply-to / reactions.
     # `reply_to_message_id` is a self-FK to the message being quoted —
     # `ON DELETE SET NULL` so a deleted original leaves the reply intact
@@ -267,15 +248,9 @@ class Message(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("'{}'::uuid[]"),
     )
-    sent_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    delivered_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    read_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -316,9 +291,7 @@ class ConversationTag(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("'zinc'"),
     )
-    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -332,11 +305,7 @@ class ConversationTagAssignment(Base, TenantScoped):
     rows automatically."""
 
     __tablename__ = "tbl_conversation_tag_assignments"
-    __table_args__ = (
-        UniqueConstraint(
-            "conversation_id", "tag_id", name="uq_conv_tag_assignment"
-        ),
-    )
+    __table_args__ = (UniqueConstraint("conversation_id", "tag_id", name="uq_conv_tag_assignment"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -353,9 +322,7 @@ class ConversationTagAssignment(Base, TenantScoped):
         ForeignKey("tbl_conversation_tags.id", ondelete="CASCADE"),
         nullable=False,
     )
-    tagged_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    tagged_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     tagged_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

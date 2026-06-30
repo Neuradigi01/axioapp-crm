@@ -14,10 +14,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { InrPipe } from '../../shared/pipes/inr.pipe';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  StaffApiService,
-  StaffWithPerformance,
-} from '../staff-api.service';
+import { StaffApiService, StaffWithPerformance } from '../staff-api.service';
 
 /**
  * Targets & Commission tab â€” table of staff with an inline editor.
@@ -62,10 +59,9 @@ export class StaffTargetsTabComponent {
       nonNullable: true,
       validators: [Validators.required],
     }),
-    employment_status: this.fb.control<'active' | 'leave' | 'terminated'>(
-      'active',
-      { nonNullable: true },
-    ),
+    employment_status: this.fb.control<'active' | 'leave' | 'terminated'>('active', {
+      nonNullable: true,
+    }),
   });
 
   protected startEdit(row: StaffWithPerformance): void {
@@ -108,11 +104,8 @@ export class StaffTargetsTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.submitError.set(
-            extractApiError(err) ?? 'Could not save profile.',
-          );
+          this.submitError.set(extractApiError(err) ?? 'Could not save profile.');
         },
       });
   }
-
 }

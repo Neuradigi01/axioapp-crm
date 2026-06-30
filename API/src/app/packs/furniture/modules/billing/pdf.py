@@ -8,6 +8,7 @@ the totals, payment-method footer.
 The renderer is wired into the core `pdf_registry` from this pack's
 `__init__.py` at import time. Core never imports this file.
 """
+
 from __future__ import annotations
 
 import io
@@ -26,7 +27,6 @@ from reportlab.platypus import (
 )
 
 from src.app.core.billing.models import Invoice, InvoiceLine
-
 
 _FONT = "Helvetica"
 _FONT_BOLD = "Helvetica-Bold"
@@ -78,19 +78,35 @@ async def render_invoice_pdf(
     )
     styles = getSampleStyleSheet()
     h1 = ParagraphStyle(
-        "h1", parent=styles["Heading1"], fontName=_FONT_BOLD, fontSize=18,
-        leading=22, spaceAfter=4,
+        "h1",
+        parent=styles["Heading1"],
+        fontName=_FONT_BOLD,
+        fontSize=18,
+        leading=22,
+        spaceAfter=4,
     )
     h_sub = ParagraphStyle(
-        "sub", parent=styles["Normal"], fontName=_FONT, fontSize=9,
-        textColor=colors.HexColor("#52525b"), leading=12,
+        "sub",
+        parent=styles["Normal"],
+        fontName=_FONT,
+        fontSize=9,
+        textColor=colors.HexColor("#52525b"),
+        leading=12,
     )
     label = ParagraphStyle(
-        "label", parent=styles["Normal"], fontName=_FONT_BOLD, fontSize=8,
-        textColor=colors.HexColor("#71717a"), leading=10, spaceBefore=4,
+        "label",
+        parent=styles["Normal"],
+        fontName=_FONT_BOLD,
+        fontSize=8,
+        textColor=colors.HexColor("#71717a"),
+        leading=10,
+        spaceBefore=4,
     )
     body = ParagraphStyle(
-        "body", parent=styles["Normal"], fontName=_FONT, fontSize=10,
+        "body",
+        parent=styles["Normal"],
+        fontName=_FONT,
+        fontSize=10,
         leading=14,
     )
 
@@ -106,9 +122,7 @@ async def render_invoice_pdf(
         )
     )
     issued_str = (
-        invoice.issued_at.strftime("%d %b %Y, %H:%M")
-        if invoice.issued_at
-        else "Not yet issued"
+        invoice.issued_at.strftime("%d %b %Y, %H:%M") if invoice.issued_at else "Not yet issued"
     )
     elements.append(Paragraph(f"Issued: {issued_str}", h_sub))
     if org_meta.get("gst_number"):
@@ -163,7 +177,10 @@ async def render_invoice_pdf(
     totals_data = [
         ["Subtotal", _fmt_inr(invoice.subtotal)],
         [f"Tax ({invoice.tax_rate_snapshot or 0}%)", _fmt_inr(invoice.tax_amount)],
-        ["Discount", "-" + _fmt_inr(invoice.discount_amount) if invoice.discount_amount else _fmt_inr(0)],
+        [
+            "Discount",
+            "-" + _fmt_inr(invoice.discount_amount) if invoice.discount_amount else _fmt_inr(0),
+        ],
         ["Total", _fmt_inr(invoice.total)],
     ]
     totals = Table(totals_data, colWidths=[40 * mm, 40 * mm], hAlign="RIGHT")
@@ -185,11 +202,7 @@ async def render_invoice_pdf(
 
     # Payment + notes
     if invoice.payment_method:
-        elements.append(
-            Paragraph(
-                f"Payment method: {invoice.payment_method.value.upper()}", label
-            )
-        )
+        elements.append(Paragraph(f"Payment method: {invoice.payment_method.value.upper()}", label))
     if invoice.notes:
         elements.append(Paragraph("Notes", label))
         elements.append(Paragraph(invoice.notes.replace("\n", "<br/>"), body))
@@ -198,8 +211,7 @@ async def render_invoice_pdf(
     elements.append(Spacer(1, 12 * mm))
     elements.append(
         Paragraph(
-            "Thank you for your purchase. All sales are subject to "
-            "our standard return policy.",
+            "Thank you for your purchase. All sales are subject to our standard return policy.",
             h_sub,
         )
     )

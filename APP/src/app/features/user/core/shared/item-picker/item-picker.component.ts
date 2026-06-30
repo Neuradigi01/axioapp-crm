@@ -8,18 +8,12 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import {
-  ControlValueAccessor,
-  NG_VALUE_ACCESSOR,
-} from '@angular/forms';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
-import {
-  CatalogApiService,
-  CatalogItem,
-} from '../../catalog/catalog-api.service';
+import { CatalogApiService, CatalogItem } from '../../catalog/catalog-api.service';
 import { InrPipe } from '../pipes/inr.pipe';
 
 /**

@@ -62,9 +62,7 @@ export class TemplatePickerComponent {
   protected readonly filtered = computed<TemplateRead[]>(() => {
     const q = this.searchQuery().trim().toLowerCase();
     if (!q) return this.items();
-    return this.items().filter((t) =>
-      t.name.toLowerCase().includes(q),
-    );
+    return this.items().filter((t) => t.name.toLowerCase().includes(q));
   });
 
   constructor() {

@@ -1,0 +1,13 @@
+# Code owners for Core CRM.
+#
+# Until a second reviewer exists, Code Owner review is NOT required by branch
+# protection (see BRANCH_PROTECTION.md) — this file just records ownership.
+# Replace @Neuradigi02 with the real GitHub username(s)/team(s) when staffing up.
+
+*               @Neuradigi02
+
+# Quality tooling — keep an eye on changes that relax the gates.
+/.github/                       @Neuradigi02
+/.githooks/                     @Neuradigi02
+/API/pyproject.toml             @Neuradigi02
+/APP/eslint.config.js           @Neuradigi02

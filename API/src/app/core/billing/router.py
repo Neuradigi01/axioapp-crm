@@ -12,10 +12,10 @@ Permissions:
   - `billing.write`  → create / update / delete / lines / issue / payments
   - `billing.refund` → void
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,11 +46,12 @@ from src.app.core.billing.service import (
     record_payment,
     remove_line,
     update_invoice,
+)
+from src.app.core.billing.service import (
     void as void_invoice,
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/invoices", tags=["Billing"])
 
@@ -60,8 +61,8 @@ router = APIRouter(prefix="/invoices", tags=["Billing"])
 
 @router.get("", response_model=InvoiceListResponse)
 async def list_invoices_endpoint(
-    status_: Optional[InvoiceStatus] = Query(default=None, alias="status"),
-    contact_id: Optional[uuid.UUID] = Query(default=None),
+    status_: InvoiceStatus | None = Query(default=None, alias="status"),
+    contact_id: uuid.UUID | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -188,9 +189,7 @@ async def void_invoice_endpoint(
 # --- payments ------------------------------------------------------------
 
 
-@router.get(
-    "/{invoice_id}/payments", response_model=list[PaymentOut]
-)
+@router.get("/{invoice_id}/payments", response_model=list[PaymentOut])
 async def list_payments_endpoint(
     invoice_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -212,9 +211,7 @@ async def record_payment_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("billing.write")),
 ) -> PaymentOut:
-    pay = await record_payment(
-        db, invoice_id=invoice_id, user_id=user.legacy_uuid, payload=payload
-    )
+    pay = await record_payment(db, invoice_id=invoice_id, user_id=user.legacy_uuid, payload=payload)
     return PaymentOut.model_validate(pay)
 
 

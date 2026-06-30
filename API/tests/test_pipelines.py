@@ -4,6 +4,7 @@ Pipelines are normally created by the pack installer (Phase 4). For
 test isolation we insert a small `leads` pipeline directly through the
 TestSession bound to the tenant context.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -28,9 +29,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -110,9 +109,7 @@ async def test_list_pipelines_is_initially_empty(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_get_pipeline_by_key_returns_ordered_stages(
-    layered_client, seeded_admin
-):
+async def test_get_pipeline_by_key_returns_ordered_stages(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "pipelines.read")
@@ -160,9 +157,7 @@ async def test_patch_stage_label_color(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_patch_display_order_swaps_with_holder(
-    layered_client, seeded_admin
-):
+async def test_patch_display_order_swaps_with_holder(layered_client, seeded_admin):
     """Moving stage[0] to slot 2 swaps stage[2] back to slot 0."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -185,17 +180,13 @@ async def test_patch_display_order_swaps_with_holder(
     assert resp.status_code == 200, resp.text
     assert resp.json()["display_order"] == 2
 
-    listing = await layered_client.get(
-        "/api/v1/pipelines/leads", headers=headers
-    )
+    listing = await layered_client.get("/api/v1/pipelines/leads", headers=headers)
     by_key = {s["key"]: s["display_order"] for s in listing.json()["stages"]}
     assert by_key == {"won": 0, "qualified": 1, "new": 2}
 
 
 @pytest.mark.asyncio
-async def test_patch_rejects_key_and_is_won_changes(
-    layered_client, seeded_admin
-):
+async def test_patch_rejects_key_and_is_won_changes(layered_client, seeded_admin):
     """Schema has extra='forbid' so unknown / immutable keys fail with 422."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -225,8 +216,8 @@ async def test_patch_rejects_key_and_is_won_changes(
 @pytest.mark.asyncio
 async def test_other_org_pipeline_invisible(layered_client, seeded_admin):
     """RLS: an admin in org A cannot see org B's leads pipeline."""
-    from tests.conftest import TestSession
     from src.app.core.tenants.models import Organization
+    from tests.conftest import TestSession
 
     org_a = seeded_admin["org"]
     user_a = seeded_admin["user"]

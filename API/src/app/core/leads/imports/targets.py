@@ -21,10 +21,11 @@ the same surface would force one to grow the other unnecessarily.
 Custom fields come from `custom_field_definitions` and surface as
 `custom_data.<field_key>` targets, scoped to the active org.
 """
+
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,13 +51,9 @@ _STANDARD_TARGETS: Sequence[_StandardTarget] = (
     _StandardTarget("contact.email", "Email", "email", required=False),
     _StandardTarget("contact.source", "Source", "text", required=False),
     _StandardTarget("contact.notes", "Notes", "textarea", required=False),
-    _StandardTarget(
-        "lead.pipeline_stage", "Pipeline stage", "select", required=False
-    ),
+    _StandardTarget("lead.pipeline_stage", "Pipeline stage", "select", required=False),
     _StandardTarget("lead.budget", "Budget", "currency", required=False),
-    _StandardTarget(
-        "lead.expected_close_date", "Expected close date", "date", required=False
-    ),
+    _StandardTarget("lead.expected_close_date", "Expected close date", "date", required=False),
 )
 
 
@@ -78,12 +75,16 @@ async def list_targets(session: AsyncSession) -> list[MappingTarget]:
     ]
 
     rows = (
-        await session.execute(
-            select(CustomFieldDefinition).where(
-                CustomFieldDefinition.entity_type.in_(("contact", "lead"))
+        (
+            await session.execute(
+                select(CustomFieldDefinition).where(
+                    CustomFieldDefinition.entity_type.in_(("contact", "lead"))
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for row in rows:
         out.append(
             MappingTarget(

@@ -19,6 +19,7 @@ Cases:
   8. ZIP bundle includes `contact.json` + `consent-events.json` +
      `leads.json` + `conversations.json`.
 """
+
 from __future__ import annotations
 
 import io
@@ -26,7 +27,7 @@ import json
 import uuid
 import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -55,9 +56,7 @@ class _Msg:
     sent_at: datetime | None = None
     delivered_at: datetime | None = None
     read_at: datetime | None = None
-    created_at: datetime = field(
-        default_factory=lambda: datetime(2026, 6, 24, tzinfo=timezone.utc)
-    )
+    created_at: datetime = field(default_factory=lambda: datetime(2026, 6, 24, tzinfo=UTC))
 
 
 class _Channel(Enum):
@@ -77,9 +76,7 @@ class _Conv:
     status: Any = _Status.open
     ai_handling: bool = False
     last_message_at: datetime | None = None
-    created_at: datetime = field(
-        default_factory=lambda: datetime(2026, 6, 24, tzinfo=timezone.utc)
-    )
+    created_at: datetime = field(default_factory=lambda: datetime(2026, 6, 24, tzinfo=UTC))
     contact_id: uuid.UUID | None = None
 
 
@@ -118,8 +115,7 @@ class TestCsvShape:
         out = build_csv_bytes(conv, _make_messages()).decode("utf-8-sig")
         first = out.splitlines()[0]
         assert first == (
-            "message_id,direction,author,text,attachments_count,"
-            "sent_at,delivered_at,read_at,is_ai"
+            "message_id,direction,author,text,attachments_count,sent_at,delivered_at,read_at,is_ai"
         )
 
     def test_excludes_internal_notes(self):
@@ -132,9 +128,7 @@ class TestCsvShape:
         rows = [r for r in out.splitlines() if "AI auto-reply" in r]
         assert len(rows) == 1
         assert rows[0].endswith(",yes")
-        staff_rows = [
-            r for r in out.splitlines() if "Staff follow-up" in r
-        ]
+        staff_rows = [r for r in out.splitlines() if "Staff follow-up" in r]
         assert staff_rows[0].endswith(",no")
 
     def test_utf8_bom_prefix(self):
@@ -182,9 +176,7 @@ class TestZipManifest:
                     "leads": 2,
                     "conversations": 1,
                 },
-                "transcripts": [
-                    {"conversation_id": "abc", "formats": ["csv"]}
-                ],
+                "transcripts": [{"conversation_id": "abc", "formats": ["csv"]}],
                 "schema_version": 1,
                 "notes": "stub",
             },

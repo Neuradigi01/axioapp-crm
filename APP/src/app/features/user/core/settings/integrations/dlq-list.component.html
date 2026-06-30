@@ -4,15 +4,8 @@
 >
   <header class="mb-3 flex flex-wrap items-center justify-between gap-2">
     <div class="flex items-center gap-2">
-      <lucide-icon
-        name="inbox"
-        size="16"
-        class="text-zinc-500"
-        aria-hidden="true"
-      ></lucide-icon>
-      <h3 class="text-sm font-semibold text-zinc-900">
-        Dead-letter queue
-      </h3>
+      <lucide-icon name="inbox" size="16" class="text-zinc-500" aria-hidden="true"></lucide-icon>
+      <h3 class="text-sm font-semibold text-zinc-900">Dead-letter queue</h3>
       @if (loading()) {
         <lucide-icon
           name="loader-2"
@@ -41,9 +34,7 @@
   }
 
   @if (!loading() && rows().length === 0) {
-    <p class="py-6 text-center text-sm text-zinc-500">
-      No DLQ rows for this filter. All clear.
-    </p>
+    <p class="py-6 text-center text-sm text-zinc-500">No DLQ rows for this filter. All clear.</p>
   } @else {
     <div class="overflow-x-auto">
       <table class="min-w-full text-sm">
@@ -64,9 +55,7 @@
                 {{ formatRelative(row.created_at) }}
               </td>
               <td class="px-2 py-2 align-top">
-                <span
-                  class="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-700"
-                >
+                <span class="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-700">
                   {{ row.provider === 'google_ads' ? 'Google' : 'Meta' }}
                 </span>
               </td>
@@ -87,11 +76,7 @@
                     <span
                       class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
                     >
-                      <lucide-icon
-                        name="check"
-                        size="12"
-                        aria-hidden="true"
-                      ></lucide-icon>
+                      <lucide-icon name="check" size="12" aria-hidden="true"></lucide-icon>
                       Replayed
                     </span>
                   }
@@ -118,11 +103,7 @@
                             aria-hidden="true"
                           ></lucide-icon>
                         } @else {
-                          <lucide-icon
-                            name="refresh-cw"
-                            size="12"
-                            aria-hidden="true"
-                          ></lucide-icon>
+                          <lucide-icon name="refresh-cw" size="12" aria-hidden="true"></lucide-icon>
                         }
                         Replay
                       </button>
@@ -132,11 +113,7 @@
                         [disabled]="actionInFlight() === row.id"
                         (click)="discard(row)"
                       >
-                        <lucide-icon
-                          name="trash-2"
-                          size="12"
-                          aria-hidden="true"
-                        ></lucide-icon>
+                        <lucide-icon name="trash-2" size="12" aria-hidden="true"></lucide-icon>
                         Discard
                       </button>
                     </div>
@@ -160,11 +137,7 @@
             (click)="prevPage()"
             aria-label="Previous page"
           >
-            <lucide-icon
-              name="chevron-left"
-              size="12"
-              aria-hidden="true"
-            ></lucide-icon>
+            <lucide-icon name="chevron-left" size="12" aria-hidden="true"></lucide-icon>
           </button>
           <button
             type="button"
@@ -173,11 +146,7 @@
             (click)="nextPage()"
             aria-label="Next page"
           >
-            <lucide-icon
-              name="chevron-right"
-              size="12"
-              aria-hidden="true"
-            ></lucide-icon>
+            <lucide-icon name="chevron-right" size="12" aria-hidden="true"></lucide-icon>
           </button>
         </div>
       </div>

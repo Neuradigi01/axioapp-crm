@@ -1,4 +1,13 @@
-import { Component, ChangeDetectionStrategy, signal, computed, inject, OnInit, OnDestroy, viewChild } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  signal,
+  computed,
+  inject,
+  OnInit,
+  OnDestroy,
+  viewChild,
+} from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
@@ -14,10 +23,16 @@ import { AppConfigApiService } from '@app/services/app-config-api.service';
 import { LocationApiService } from '@app/services/location-api.service';
 import { createCountdownTimer } from '@core/services/countdown.service';
 import { getRoute } from '@core/services/routes-helper.service';
-import { SNACKBAR_DURATION, SNACKBAR_DURATION_LONG, SNACKBAR_ACTION, RESEND_COOLDOWN_SECONDS } from '@core/constants/app.constants';
 import {
-  MSG_ERROR_GENERIC, MSG_REGISTRATION_SUCCESS, MSG_REGISTRATION_FAILED,
-  MSG_CONTACT_OTP_SENT, MSG_CONTACT_OTP_SEND_FAILED,
+  SNACKBAR_DURATION,
+  SNACKBAR_DURATION_LONG,
+  SNACKBAR_ACTION,
+  RESEND_COOLDOWN_SECONDS,
+} from '@core/constants/app.constants';
+import {
+  MSG_REGISTRATION_FAILED,
+  MSG_CONTACT_OTP_SENT,
+  MSG_CONTACT_OTP_SEND_FAILED,
 } from '@core/constants/messages.constants';
 import { ICountry, IState } from '@app/schemas/common';
 
@@ -128,10 +143,14 @@ export class RegisterComponent implements OnInit, OnDestroy {
         this.emailTimer.start(RESEND_COOLDOWN_SECONDS);
         this.snackBar.open(MSG_CONTACT_OTP_SENT, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
       } else {
-        this.snackBar.open(res.message || MSG_CONTACT_OTP_SEND_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(res.message || MSG_CONTACT_OTP_SEND_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
-      this.snackBar.open(MSG_CONTACT_OTP_SEND_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+      this.snackBar.open(MSG_CONTACT_OTP_SEND_FAILED, SNACKBAR_ACTION, {
+        duration: SNACKBAR_DURATION,
+      });
     } finally {
       this.isSendingEmailOtp.set(false);
     }
@@ -153,10 +172,14 @@ export class RegisterComponent implements OnInit, OnDestroy {
         this.smsTimer.start(RESEND_COOLDOWN_SECONDS);
         this.snackBar.open(MSG_CONTACT_OTP_SENT, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
       } else {
-        this.snackBar.open(res.message || MSG_CONTACT_OTP_SEND_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(res.message || MSG_CONTACT_OTP_SEND_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
-      this.snackBar.open(MSG_CONTACT_OTP_SEND_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+      this.snackBar.open(MSG_CONTACT_OTP_SEND_FAILED, SNACKBAR_ACTION, {
+        duration: SNACKBAR_DURATION,
+      });
     } finally {
       this.isSendingSmsOtp.set(false);
     }
@@ -206,7 +229,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
     }
 
     this.isLoading.set(true);
-    const { confirm_password, email_otp_code, mobile_otp_code, ...payload } = this.registerForm.getRawValue();
+    const { confirm_password, email_otp_code, mobile_otp_code, ...payload } =
+      this.registerForm.getRawValue();
 
     if (this.needsEmailOtp() && this.emailOtpToken()) {
       payload.email_otp_token = this.emailOtpToken();

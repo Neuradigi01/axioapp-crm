@@ -45,9 +45,7 @@ export class DevPipelinePageComponent {
     // For the demo we just mutate local state and surface the event.
     this.lastEvent.set(event);
     this.items.update((rows) =>
-      rows.map((r) =>
-        r.id === event.itemId ? { ...r, pipeline_stage: event.toStage } : r,
-      ),
+      rows.map((r) => (r.id === event.itemId ? { ...r, pipeline_stage: event.toStage } : r)),
     );
   }
 

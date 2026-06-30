@@ -12,29 +12,28 @@ Coverage:
 The email backend is monkeypatched to a capture spy so tests assert
 on `Email` payloads without touching SMTP.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.app.core.permissions.models import (
     Permission,
     Role,
     RolePermission,
 )
-from src.app.core.subscriptions import notifications as notif_module
 from src.app.core.subscriptions.email_templates import RENDERERS, render
 from src.app.core.subscriptions.notifications import send_billing_email
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import OrganizationMember
 from src.app.shared.email import Email
 from src.app.shared.security.password import hash_password
-from src.models.user import UserInfo as LegacyUserInfo, UserLogin
-
+from src.models.user import UserInfo as LegacyUserInfo
+from src.models.user import UserLogin
 
 # ---------------------------------------------------------------------------
 # Spy backend + monkeypatch helper
@@ -114,15 +113,11 @@ async def _seed_org_with_owner(
                     .on_conflict_do_nothing(index_elements=["key"])
                     .returning(Permission.id)
                 )
-                perm_id = (
-                    await session.execute(stmt)
-                ).scalar_one_or_none()
+                perm_id = (await session.execute(stmt)).scalar_one_or_none()
                 if perm_id is None:
                     perm_id = (
                         await session.execute(
-                            select(Permission.id).where(
-                                Permission.key == "billing.manage"
-                            )
+                            select(Permission.id).where(Permission.key == "billing.manage")
                         )
                     ).scalar_one()
             session.add(
@@ -214,10 +209,12 @@ def test_payment_succeeded_includes_invoice_pdf():
 
 @pytest.mark.asyncio
 async def test_send_billing_email_dispatches_to_owner_email(
-    layered_client, capture_backend,
+    layered_client,
+    capture_backend,
 ):
     org_id, owner_email = await _seed_org_with_owner(
-        owner_role_name="owner", owner_first_name="Ajay",
+        owner_role_name="owner",
+        owner_first_name="Ajay",
     )
 
     await send_billing_email(
@@ -235,12 +232,14 @@ async def test_send_billing_email_dispatches_to_owner_email(
 
 @pytest.mark.asyncio
 async def test_send_billing_email_falls_back_to_billing_manage(
-    layered_client, capture_backend,
+    layered_client,
+    capture_backend,
 ):
     """If no role named 'owner' exists, the resolver finds the member
     whose role has `billing.manage`."""
     org_id, owner_email = await _seed_org_with_owner(
-        owner_role_name="admin", grant_billing_manage=True,
+        owner_role_name="admin",
+        grant_billing_manage=True,
     )
 
     await send_billing_email(
@@ -255,7 +254,8 @@ async def test_send_billing_email_falls_back_to_billing_manage(
 
 @pytest.mark.asyncio
 async def test_send_billing_email_logs_and_skips_when_no_member(
-    layered_client, capture_backend,
+    layered_client,
+    capture_backend,
 ):
     from tests.conftest import TestSession
 
@@ -279,7 +279,8 @@ async def test_send_billing_email_logs_and_skips_when_no_member(
 
 @pytest.mark.asyncio
 async def test_send_billing_email_swallows_backend_errors(
-    layered_client, monkeypatch,
+    layered_client,
+    monkeypatch,
 ):
     """A misconfigured SMTP backend must not propagate — the parent
     flow (webhook handler, lifecycle task) keeps running."""

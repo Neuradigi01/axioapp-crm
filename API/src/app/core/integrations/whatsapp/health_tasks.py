@@ -14,6 +14,7 @@ side — well inside Meta's per-token rate limits.
 Mirrors the celery-absent shim shape of
 ``src.app.core.campaigns.tasks`` so dev shells without Celery
 installed don't break import."""
+
 from __future__ import annotations
 
 import asyncio
@@ -77,18 +78,22 @@ async def _refresh_phone_health_all_orgs_async() -> dict[str, Any]:
         # active WhatsApp integration's org_id, then re-enter per-org
         # with the right context for RLS-scoped DB writes.
         rows = (
-            await session.execute(
-                sql_text(
-                    """
+            (
+                await session.execute(
+                    sql_text(
+                        """
                     SELECT i.org_id
                     FROM tbl_integrations i
                     WHERE i.provider = 'whatsapp'
                       AND i.status = 'connected'
                       AND i.access_token_enc IS NOT NULL
                     """
+                    )
                 )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         for row in rows:
             org_id = row["org_id"]
@@ -97,18 +102,14 @@ async def _refresh_phone_health_all_orgs_async() -> dict[str, Any]:
                 await refresh_from_meta(session)
                 refreshed += 1
             except Exception:
-                logger.exception(
-                    "phone_health refresh failed for org %s", org_id
-                )
+                logger.exception("phone_health refresh failed for org %s", org_id)
                 failed += 1
                 # Roll back so the next iteration's session is clean.
                 await session.rollback()
             finally:
                 reset_context(token)
 
-    logger.info(
-        "phone_health refresh: %d refreshed, %d failed", refreshed, failed
-    )
+    logger.info("phone_health refresh: %d refreshed, %d failed", refreshed, failed)
     return {"refreshed": refreshed, "failed": failed}
 
 

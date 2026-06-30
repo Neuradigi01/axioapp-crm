@@ -1,10 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 import {
   CampaignFunnelReport,
@@ -32,9 +27,7 @@ import {
             <span class="col-span-3 truncate font-medium text-zinc-700">
               {{ stage.label }}
             </span>
-            <div
-              class="col-span-7 h-5 overflow-hidden rounded bg-zinc-100"
-            >
+            <div class="col-span-7 h-5 overflow-hidden rounded bg-zinc-100">
               <div
                 class="flex h-full items-center px-2 text-[10px] font-semibold text-white"
                 [class]="barColor(stage.key)"
@@ -61,9 +54,7 @@ import {
 
       <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
         <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-          <p class="text-[10px] uppercase text-zinc-500">
-            Median time to delivery
-          </p>
+          <p class="text-[10px] uppercase text-zinc-500">Median time to delivery</p>
           <p class="text-sm font-semibold text-zinc-900">
             {{ formatDuration(r.delivery_median_seconds) }}
           </p>

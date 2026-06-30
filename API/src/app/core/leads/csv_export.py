@@ -15,13 +15,14 @@ Server-side hard cap ``EXPORT_CSV_MAX_ROWS`` (50000) — beyond that we
 422 with a "narrow the filter" message. Matches the contacts export
 precedent so the FE error-handling stays uniform.
 """
+
 from __future__ import annotations
 
 import csv
 import io
 import uuid
-from datetime import date, datetime, timezone
-from typing import AsyncIterator, Iterable, Sequence
+from collections.abc import AsyncIterator, Iterable, Sequence
+from datetime import UTC, date, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -31,7 +32,6 @@ from sqlalchemy.sql.elements import ColumnElement
 from src.app.core.contacts.models import Contact
 from src.app.core.custom_fields.models import CustomFieldDefinition
 from src.app.core.leads.models import Lead
-
 
 EXPORT_CSV_MAX_ROWS = 50_000
 _BATCH_SIZE = 1_000
@@ -140,9 +140,7 @@ async def export_rows(
             break
 
 
-def _row_values(
-    lead: Lead, contact: Contact, custom_columns: Iterable[str]
-) -> list[str]:
+def _row_values(lead: Lead, contact: Contact, custom_columns: Iterable[str]) -> list[str]:
     row: list[str] = [
         str(lead.id),
         contact.full_name or "",
@@ -189,13 +187,13 @@ def _iso(value: datetime | date | None) -> str:
         return ""
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc).isoformat()
+            value = value.replace(tzinfo=UTC)
+        return value.astimezone(UTC).isoformat()
     return value.isoformat()
 
 
 def export_filename(org_slug: str) -> str:
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = datetime.now(UTC).date().isoformat()
     return f"leads-{org_slug}-{today}.csv"
 
 

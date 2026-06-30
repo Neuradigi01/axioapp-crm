@@ -1,24 +1,25 @@
 import io
 import os
+
 import pytest
 import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
-from httpx import AsyncClient, ASGITransport
 
+from src.constants.route_ids import RouteIds
+from src.core.security.jwt import create_access_token
+from src.core.security.password import hash_password
 from src.models import Base
 from src.models.admin import Admin
-from src.models.user import UserLogin, UserInfo
 from src.models.ticket import Ticket, TicketAttachment
-from src.core.security.password import hash_password
-from src.core.security.jwt import create_access_token
-from src.constants.route_ids import RouteIds
-from tests.conftest import test_engine, TestSession
+from src.models.user import UserInfo, UserLogin
+from tests.conftest import TestSession, test_engine
 
 
 @pytest_asyncio.fixture
 async def client():
-    from main import app
     import src.core.db as db_module
+    from main import app
 
     original_session = db_module.async_session
     db_module.async_session = TestSession
@@ -90,33 +91,37 @@ async def _seed(db):
 
 
 def _make_user_token(user_id="test_user"):
-    return create_access_token({
-        "user_id": user_id,
-        "role": "User",
-        "access_rights": f"{RouteIds.USER_SUPPORT_COMPOSE},{RouteIds.USER_SUPPORT_TICKETS},{RouteIds.USER_SUPPORT_VIEW_TICKET}",
-    })
+    return create_access_token(
+        {
+            "user_id": user_id,
+            "role": "User",
+            "access_rights": f"{RouteIds.USER_SUPPORT_COMPOSE},{RouteIds.USER_SUPPORT_TICKETS},{RouteIds.USER_SUPPORT_VIEW_TICKET}",
+        }
+    )
 
 
 def _make_admin_token():
-    return create_access_token({
-        "user_id": "test_admin",
-        "role": "Admin",
-        "access_rights": f"{RouteIds.ADMIN_SUPPORT_COMPOSE},{RouteIds.ADMIN_SUPPORT_TICKETS},{RouteIds.ADMIN_SUPPORT_VIEW_TICKET}",
-        "is_super_admin": True,
-    })
+    return create_access_token(
+        {
+            "user_id": "test_admin",
+            "role": "Admin",
+            "access_rights": f"{RouteIds.ADMIN_SUPPORT_COMPOSE},{RouteIds.ADMIN_SUPPORT_TICKETS},{RouteIds.ADMIN_SUPPORT_VIEW_TICKET}",
+            "is_super_admin": True,
+        }
+    )
 
 
 # JPEG magic bytes (minimal valid JPEG header)
-JPEG_HEADER = b'\xff\xd8\xff\xe0' + b'\x00' * 100
+JPEG_HEADER = b"\xff\xd8\xff\xe0" + b"\x00" * 100
 
 # PDF magic bytes
-PDF_HEADER = b'%PDF-1.4 ' + b'\x00' * 100
+PDF_HEADER = b"%PDF-1.4 " + b"\x00" * 100
 
 # ZIP magic bytes (used by .xlsx, .docx, etc.)
-ZIP_HEADER = b'PK\x03\x04' + b'\x00' * 100
+ZIP_HEADER = b"PK\x03\x04" + b"\x00" * 100
 
 # EXE magic bytes (MZ header)
-EXE_HEADER = b'MZ' + b'\x00' * 100
+EXE_HEADER = b"MZ" + b"\x00" * 100
 
 
 @pytest.mark.asyncio
@@ -166,7 +171,16 @@ async def test_upload_valid_excel(client):
     resp = await client.post(
         "/api/attachments/upload",
         headers={"Authorization": f"Bearer {token}"},
-        files=[("files", ("data.xlsx", io.BytesIO(ZIP_HEADER), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))],
+        files=[
+            (
+                "files",
+                (
+                    "data.xlsx",
+                    io.BytesIO(ZIP_HEADER),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                ),
+            )
+        ],
     )
     data = resp.json()
     assert data["success"] is True
@@ -198,7 +212,11 @@ async def test_upload_blocked_script(client):
 
     token = _make_user_token()
 
-    for ext, content_type in [(".js", "application/javascript"), (".bat", "application/x-bat"), (".ps1", "application/octet-stream")]:
+    for ext, content_type in [
+        (".js", "application/javascript"),
+        (".bat", "application/x-bat"),
+        (".ps1", "application/octet-stream"),
+    ]:
         resp = await client.post(
             "/api/attachments/upload",
             headers={"Authorization": f"Bearer {token}"},
@@ -237,7 +255,7 @@ async def test_upload_too_large(client):
     token = _make_user_token()
 
     # Create a file > 10MB
-    large_content = JPEG_HEADER + b'\x00' * (11 * 1024 * 1024)
+    large_content = JPEG_HEADER + b"\x00" * (11 * 1024 * 1024)
 
     resp = await client.post(
         "/api/attachments/upload",
@@ -257,10 +275,7 @@ async def test_upload_too_many_files(client):
     token = _make_user_token()
 
     # 6 files — exceeds MAX_ATTACHMENTS (5)
-    files = [
-        ("files", (f"photo{i}.jpg", io.BytesIO(JPEG_HEADER), "image/jpeg"))
-        for i in range(6)
-    ]
+    files = [("files", (f"photo{i}.jpg", io.BytesIO(JPEG_HEADER), "image/jpeg")) for i in range(6)]
 
     resp = await client.post(
         "/api/attachments/upload",
@@ -295,6 +310,7 @@ async def test_download_as_participant(client):
 
         # Save a real file to disk for download
         from config import STATIC_DIR
+
         upload_dir = os.path.join(STATIC_DIR, "uploads", "tickets", "test")
         os.makedirs(upload_dir, exist_ok=True)
         stored_name = "test_download.jpg"

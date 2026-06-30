@@ -20,15 +20,14 @@ authorisation to RLS for read.
 
 Audit: `embed.config.updated` on every successful PUT.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.shared.audit import log_entity_change
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
     FieldType,
@@ -41,8 +40,8 @@ from src.app.core.embed.schemas import (
     WidgetConfigField,
     WidgetConfigUpdate,
 )
+from src.app.shared.audit import log_entity_change
 from src.app.shared.db import async_session
-
 
 # Contact custom-field types the widget can render. Limiting to a
 # safe subset of the full `FieldType` enum so unsupported types
@@ -138,7 +137,7 @@ async def update(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
     payload: WidgetConfigUpdate,
 ) -> WidgetConfig:
     """Patch-style update. Re-validates the merged document so we
@@ -195,9 +194,7 @@ async def _validate_custom_field_refs(
     }
 
     missing = [
-        f"{entity}.{key}"
-        for entity, key in sorted(needed)
-        if (entity, key) not in found_by_pair
+        f"{entity}.{key}" for entity, key in sorted(needed) if (entity, key) not in found_by_pair
     ]
     if missing:
         raise HTTPException(
@@ -212,8 +209,7 @@ async def _validate_custom_field_refs(
     unsupported = [
         f"{entity}.{key} ({found_by_pair[(entity, key)].field_type.value})"
         for entity, key in sorted(needed)
-        if found_by_pair[(entity, key)].field_type.value
-        not in _WIDGET_SUPPORTED_CUSTOM_TYPES
+        if found_by_pair[(entity, key)].field_type.value not in _WIDGET_SUPPORTED_CUSTOM_TYPES
     ]
     if unsupported:
         raise HTTPException(
@@ -231,12 +227,10 @@ async def list_available_widget_custom_fields(
 ) -> list[AvailableCustomField]:
     """Read-only listing of custom fields (contact OR lead) the Settings
     picker can offer for widget opt-in."""
-    rows = await _da.list_custom_fields_for_widget_entities(
-        session, entity_types=_WIDGET_ENTITIES
-    )
+    rows = await _da.list_custom_fields_for_widget_entities(session, entity_types=_WIDGET_ENTITIES)
     out: list[AvailableCustomField] = []
     for row in rows:
-        opts: Optional[list[str]] = None
+        opts: list[str] | None = None
         if isinstance(row.options, dict):
             raw = row.options.get("choices") or row.options.get("options")
             if isinstance(raw, list):
@@ -251,9 +245,7 @@ async def list_available_widget_custom_fields(
                 field_type=row.field_type.value,
                 is_required=row.is_required,
                 options=opts,
-                widget_supported=(
-                    row.field_type.value in _WIDGET_SUPPORTED_CUSTOM_TYPES
-                ),
+                widget_supported=(row.field_type.value in _WIDGET_SUPPORTED_CUSTOM_TYPES),
             )
         )
     return out
@@ -264,7 +256,7 @@ async def list_available_widget_custom_fields(
 list_available_contact_custom_fields = list_available_widget_custom_fields
 
 
-async def public_get(org_id: uuid.UUID) -> Optional[WidgetConfig]:
+async def public_get(org_id: uuid.UUID) -> WidgetConfig | None:
     """Public-endpoint read. Opens its own session WITHOUT setting
     tenant context — the explicit query keyed by ``org_id`` (resolved
     from the embed key) is the authorisation gate."""

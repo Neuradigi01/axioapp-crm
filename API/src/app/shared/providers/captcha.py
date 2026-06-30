@@ -12,9 +12,7 @@ from captcha.image import ImageCaptcha
 from config import RECAPTCHA_SECRET_KEY
 from src.utilities.fernet_util import fernet
 
-ALLOWED_CHARS = "".join(
-    c for c in string.ascii_uppercase + string.digits if c not in "0OIl1"
-)
+ALLOWED_CHARS = "".join(c for c in string.ascii_uppercase + string.digits if c not in "0OIl1")
 CAPTCHA_LENGTH = 5
 CAPTCHA_EXPIRY_SECONDS = 60
 RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"

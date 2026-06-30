@@ -1,5 +1,8 @@
 @if (current(); as item) {
-  <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" (click)="close.emit()">
+  <div
+    class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+    (click)="close.emit()"
+  >
     <div
       class="w-full max-w-lg rounded-lg bg-white shadow-xl ring-1 ring-zinc-200"
       (click)="$event.stopPropagation()"
@@ -10,11 +13,15 @@
           <h2 class="mt-0.5 text-base font-semibold text-zinc-900">{{ item.name }}</h2>
         </div>
         @if (item.is_active) {
-          <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">
+          <span
+            class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+          >
             active
           </span>
         } @else {
-          <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 ring-1 ring-zinc-200">
+          <span
+            class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 ring-1 ring-zinc-200"
+          >
             inactive
           </span>
         }
@@ -29,7 +36,9 @@
               class="h-48 w-48 rounded-md object-cover ring-1 ring-zinc-200"
             />
           } @else {
-            <div class="flex h-48 w-48 items-center justify-center rounded-md bg-zinc-100 text-xs text-zinc-400 ring-1 ring-dashed ring-zinc-300">
+            <div
+              class="flex h-48 w-48 items-center justify-center rounded-md bg-zinc-100 text-xs text-zinc-400 ring-1 ring-dashed ring-zinc-300"
+            >
               No image
             </div>
           }
@@ -69,12 +78,14 @@
         }
 
         <p class="text-[11px] text-zinc-400">
-          Created {{ item.created_at | date: 'mediumDate' }}
-          · Updated {{ item.updated_at | date: 'mediumDate' }}
+          Created {{ item.created_at | date: 'mediumDate' }} · Updated
+          {{ item.updated_at | date: 'mediumDate' }}
         </p>
       </div>
 
-      <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg">
+      <footer
+        class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg"
+      >
         <button
           type="button"
           (click)="close.emit()"

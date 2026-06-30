@@ -1,9 +1,11 @@
-from datetime import datetime, timedelta, timezone
-from jose import JWTError, jwt
+from datetime import UTC, datetime, timedelta
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
 from sqlalchemy import select
-from config import JWT_SECRET_KEY, JWT_ALGORITHM
+
+from config import JWT_ALGORITHM, JWT_SECRET_KEY
 from src.core.db import async_session
 from src.models.login_history import LoginHistory
 
@@ -15,7 +17,7 @@ ACCESS_TOKEN_EXPIRE_HOURS = 24
 
 def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    expire = datetime.now(UTC) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -35,8 +37,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             )
             is_active = result.scalar_one_or_none()
             if not is_active:
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session has been invalidated")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, detail="Session has been invalidated"
+                )
 
         return payload
     except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
+        ) from None

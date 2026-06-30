@@ -25,7 +25,6 @@ import {
 import { IssueKeyModalComponent } from './issue-key-modal.component';
 import { SubmissionLogComponent } from './submission-log.component';
 
-
 /** Map a contact-custom-field type to the widget field_type the
  *  renderer knows about. Backend `_WIDGET_SUPPORTED_CUSTOM_TYPES`
  *  already filters out anything not in this set. */
@@ -45,7 +44,6 @@ function customTypeToWidgetType(t: string): WidgetConfigField['field_type'] {
       return 'text';
   }
 }
-
 
 /**
  * Settings → Embed Widget tab. Three panels stacked vertically:
@@ -102,9 +100,7 @@ export class EmbedIntegrationsTabComponent {
   // Contact custom fields the Owner can opt IN to the widget. Lazily
   // loaded the first time the picker is opened (most Settings visits
   // won't touch custom fields, so we avoid the extra request).
-  protected readonly availableCustomFields = signal<
-    AvailableCustomField[] | null
-  >(null);
+  protected readonly availableCustomFields = signal<AvailableCustomField[] | null>(null);
   protected readonly pickerOpen = signal(false);
   protected readonly pickerLoading = signal(false);
   protected readonly pickerError = signal<string | null>(null);
@@ -118,9 +114,7 @@ export class EmbedIntegrationsTabComponent {
     const cfg = this.config();
     if (!cfg) return all;
     const exposed = new Set(
-      cfg.fields
-        .filter((f) => f.field_source === 'custom')
-        .map((f) => `${f.entity}.${f.key}`),
+      cfg.fields.filter((f) => f.field_source === 'custom').map((f) => `${f.entity}.${f.key}`),
     );
     return all.filter((f) => !exposed.has(`${f.entity}.${f.field_key}`));
   });
@@ -164,9 +158,7 @@ export class EmbedIntegrationsTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load widget config.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load widget config.');
         },
       });
   }
@@ -188,8 +180,7 @@ export class EmbedIntegrationsTabComponent {
   protected revoke(key: EmbedKey): void {
     if (key.revoked_at) return;
     const label = key.name ? `"${key.name}"` : `prefix ${key.prefix}`;
-    if (!confirm(`Revoke key ${label}? Any sites using it will stop working.`))
-      return;
+    if (!confirm(`Revoke key ${label}? Any sites using it will stop working.`)) return;
     this.revokingId.set(key.id);
     this.api
       .revokeKey(key.id)
@@ -198,11 +189,7 @@ export class EmbedIntegrationsTabComponent {
         next: () => {
           this.revokingId.set(null);
           this.keys.update((rows) =>
-            rows.map((r) =>
-              r.id === key.id
-                ? { ...r, revoked_at: new Date().toISOString() }
-                : r,
-            ),
+            rows.map((r) => (r.id === key.id ? { ...r, revoked_at: new Date().toISOString() } : r)),
           );
         },
         error: () => this.revokingId.set(null),
@@ -236,10 +223,7 @@ export class EmbedIntegrationsTabComponent {
   // --- Panel 2 handlers ------------------------------------------------
 
   /** Mutate the field at `index` immutably + mark dirty. */
-  private updateField(
-    index: number,
-    patch: Partial<WidgetConfigField>,
-  ): void {
+  private updateField(index: number, patch: Partial<WidgetConfigField>): void {
     const cur = this.config();
     if (!cur) return;
     const next = {
@@ -303,9 +287,7 @@ export class EmbedIntegrationsTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.pickerLoading.set(false);
-          this.pickerError.set(
-            extractApiError(err) ?? 'Could not load custom fields.',
-          );
+          this.pickerError.set(extractApiError(err) ?? 'Could not load custom fields.');
         },
       });
   }
@@ -478,9 +460,7 @@ export class EmbedIntegrationsTabComponent {
 
   protected onMinFillTimeInput(event: Event): void {
     const raw = Number((event.target as HTMLInputElement).value);
-    const clamped = Number.isFinite(raw)
-      ? Math.min(60_000, Math.max(0, Math.round(raw)))
-      : 2000;
+    const clamped = Number.isFinite(raw) ? Math.min(60_000, Math.max(0, Math.round(raw))) : 2000;
     this.updateSpam({ min_fill_time_ms: clamped });
   }
 
@@ -509,9 +489,7 @@ export class EmbedIntegrationsTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.saveError.set(
-            extractApiError(err) ?? 'Could not save widget config.',
-          );
+          this.saveError.set(extractApiError(err) ?? 'Could not save widget config.');
         },
       });
   }

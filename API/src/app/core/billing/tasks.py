@@ -18,20 +18,19 @@ Mirrors the celery-absent shim shape of ``core.automation.tasks`` /
 ``core.appointments.tasks`` so dev shells without Celery installed
 don't break import.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
-import uuid
+from datetime import UTC
 from typing import Any
-
 
 try:
     from celery import shared_task as _shared_task
 
     HAS_CELERY = True
 except ImportError:  # pragma: no cover — celery absent in dev shells
-
     HAS_CELERY = False
 
     def _shared_task(*decorator_args: Any, **decorator_kwargs: Any):
@@ -85,9 +84,7 @@ async def _scan_for_overdue_async() -> dict[str, Any]:
     published = 0
 
     async with async_session() as session:
-        overdue = await _da.find_overdue(
-            session, days_overdue=_OVERDUE_DAYS
-        )
+        overdue = await _da.find_overdue(session, days_overdue=_OVERDUE_DAYS)
         for inv in overdue:
             ok = await _publish_overdue(session, inv=inv)
             if ok:
@@ -108,7 +105,7 @@ async def _publish_overdue(session, *, inv) -> bool:
     publish completed (subscriber outcomes are absorbed by the bus +
     logged)."""
     try:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from sqlalchemy import select as _select
 
@@ -124,40 +121,30 @@ async def _publish_overdue(session, *, inv) -> bool:
         contact = None
         if inv.contact_id is not None:
             contact = (
-                await session.execute(
-                    _select(Contact).where(Contact.id == inv.contact_id)
-                )
+                await session.execute(_select(Contact).where(Contact.id == inv.contact_id))
             ).scalar_one_or_none()
         org = (
-            await session.execute(
-                _select(Organization).where(Organization.id == inv.org_id)
-            )
+            await session.execute(_select(Organization).where(Organization.id == inv.org_id))
         ).scalar_one_or_none()
 
         days_overdue = None
         if inv.issued_at is not None:
-            delta = datetime.now(timezone.utc) - inv.issued_at
+            delta = datetime.now(UTC) - inv.issued_at
             days_overdue = delta.days
 
         payload: dict[str, Any] = {
             "invoice_id": str(inv.id),
-            "contact_id": (
-                str(inv.contact_id) if inv.contact_id else None
-            ),
+            "contact_id": (str(inv.contact_id) if inv.contact_id else None),
             "total_amount": str(inv.total),
             "currency": inv.currency,
-            "issued_at": (
-                inv.issued_at.isoformat() if inv.issued_at else None
-            ),
+            "issued_at": (inv.issued_at.isoformat() if inv.issued_at else None),
             "days_overdue": days_overdue,
             "invoice": {
                 "id": str(inv.id),
                 "number": inv.number,
                 "total_amount": str(inv.total),
                 "currency": inv.currency,
-                "issued_at": (
-                    inv.issued_at.isoformat() if inv.issued_at else None
-                ),
+                "issued_at": (inv.issued_at.isoformat() if inv.issued_at else None),
             },
         }
         if contact is not None:

@@ -1,4 +1,11 @@
-import { Component, ChangeDetectionStrategy, inject, signal, viewChild, computed } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  signal,
+  viewChild,
+  computed,
+} from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -77,19 +84,31 @@ export class ComposeComponent {
     const formVal = this.composeForm.value;
 
     try {
-      let attachments: { stored_name: string; file_name: string; file_size: number; mime_type: string }[] = [];
+      let attachments: {
+        stored_name: string;
+        file_name: string;
+        file_size: number;
+        mime_type: string;
+      }[] = [];
 
       if (this.attachedFiles.length > 0) {
         const uploadRes = await this.ticketApi.uploadAttachments(this.attachedFiles);
         if (!uploadRes.success) {
-          this.snackBar.open(uploadRes.message || MSG_TICKET_UPLOAD_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+          this.snackBar.open(uploadRes.message || MSG_TICKET_UPLOAD_FAILED, SNACKBAR_ACTION, {
+            duration: SNACKBAR_DURATION,
+          });
           this.isSaving.set(false);
           return;
         }
         attachments = uploadRes.data;
       }
 
-      const payload: { subject: string; message: string; attachments: typeof attachments; to_user_id?: string } = {
+      const payload: {
+        subject: string;
+        message: string;
+        attachments: typeof attachments;
+        to_user_id?: string;
+      } = {
         subject: formVal.subject,
         message: formVal.message,
         attachments,
@@ -106,7 +125,9 @@ export class ComposeComponent {
         const routeKey = this.isAdmin() ? 'admin_support_tickets' : 'user_support_tickets';
         this.router.navigate([getRoute(routeKey).url]);
       } else {
-        this.snackBar.open(res.message || MSG_TICKET_COMPOSE_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(res.message || MSG_TICKET_COMPOSE_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });

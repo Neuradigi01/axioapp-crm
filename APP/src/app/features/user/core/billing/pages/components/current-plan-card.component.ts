@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { UpgradeModalService } from '../../services/upgrade-modal.service';
@@ -66,7 +60,9 @@ const STATUS_TONES: Record<string, StatusTone> = {
       <div class="flex flex-wrap items-start justify-between gap-4 p-6">
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+            <p
+              class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+            >
               Current plan
             </p>
             <span
@@ -109,7 +105,9 @@ const STATUS_TONES: Record<string, StatusTone> = {
       >
         @for (row of detailRows(); track row.label) {
           <div class="bg-zinc-50 px-6 py-4 dark:bg-slate-800/60">
-            <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+            <dt
+              class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+            >
               {{ row.label }}
             </dt>
             <dd class="mt-1 text-sm font-medium tabular-nums text-zinc-900 dark:text-slate-100">
@@ -201,13 +199,11 @@ export class CurrentPlanCardComponent {
   }
 }
 
-
 /** ISO-8601 string → `YYYY-MM-DD`. The page is admin-facing — short
  *  date is more readable than long-form locale. */
 function formatDate(iso: string): string {
   return iso.slice(0, 10);
 }
-
 
 function capitalize(value: string): string {
   return value.length === 0 ? value : value[0].toUpperCase() + value.slice(1);

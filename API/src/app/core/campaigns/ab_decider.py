@@ -34,15 +34,17 @@ Edge cases
   * Winner already decided → no-op + log. Lets the task be
     re-queued safely after a Celery worker restart.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Literal, Optional
+from datetime import UTC, datetime
+from typing import Literal
 
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -70,7 +72,7 @@ class VariantMetrics:
 
 @dataclass(frozen=True, slots=True)
 class WinnerDecision:
-    winning_variant: Optional[Variant]
+    winning_variant: Variant | None
     metric: WinnerMetric
     a: VariantMetrics
     b: VariantMetrics
@@ -101,9 +103,7 @@ async def _per_variant_metrics(
             WHERE campaign_id = :cid AND variant = :v
             """
         )
-        row = (
-            await session.execute(stmt, {"cid": campaign_id, "v": variant})
-        ).first()
+        row = (await session.execute(stmt, {"cid": campaign_id, "v": variant})).first()
         samples = int((row.samples if row else 0) or 0)
         numerator = int((row.numerator if row else 0) or 0)
     elif metric == "click_rate":
@@ -132,9 +132,7 @@ async def _per_variant_metrics(
              AND (m.payload ? 'button_reply' OR m.payload ? 'list_reply')
             """
         )
-        row = (
-            await session.execute(stmt, {"cid": campaign_id, "v": variant})
-        ).first()
+        row = (await session.execute(stmt, {"cid": campaign_id, "v": variant})).first()
         samples = int((row.samples if row else 0) or 0)
         numerator = int((row.numerator if row else 0) or 0)
         if samples > 0 and numerator == 0:
@@ -174,9 +172,7 @@ async def _per_variant_metrics(
              AND m.created_at < d.sent_at + INTERVAL '7 days'
             """
         )
-        row = (
-            await session.execute(stmt, {"cid": campaign_id, "v": variant})
-        ).first()
+        row = (await session.execute(stmt, {"cid": campaign_id, "v": variant})).first()
         samples = int((row.samples if row else 0) or 0)
         numerator = int((row.numerator if row else 0) or 0)
 
@@ -189,9 +185,7 @@ async def _per_variant_metrics(
     )
 
 
-def _pick_winner(
-    a: VariantMetrics, b: VariantMetrics
-) -> tuple[Optional[Variant], str]:
+def _pick_winner(a: VariantMetrics, b: VariantMetrics) -> tuple[Variant | None, str]:
     """Return ``(winner, reason)`` or ``(None, reason)`` when no
     winner can be picked. Tie-break: A wins on equal rates."""
     if a.samples == 0 and b.samples == 0:
@@ -207,9 +201,7 @@ def _pick_winner(
     return "A", "tie-break: A wins on equal rate"
 
 
-async def decide_winner(
-    session: AsyncSession, *, campaign_id: uuid.UUID
-) -> Optional[WinnerDecision]:
+async def decide_winner(session: AsyncSession, *, campaign_id: uuid.UUID) -> WinnerDecision | None:
     """Run the winner decision for ``campaign_id``.
 
     Returns the :class:`WinnerDecision` (winner + per-variant
@@ -218,9 +210,7 @@ async def decide_winner(
     exist. Persists ``winning_variant`` + ``winner_decided_at`` and
     emits a ``campaigns.ab_winner_decided`` audit event."""
     campaign = (
-        await session.execute(
-            select(Campaign).where(Campaign.id == campaign_id)
-        )
+        await session.execute(select(Campaign).where(Campaign.id == campaign_id))
     ).scalar_one_or_none()
     if campaign is None:
         return None
@@ -262,7 +252,7 @@ async def decide_winner(
 
     if winner is not None:
         campaign.winning_variant = winner
-        campaign.winner_decided_at = datetime.now(timezone.utc)
+        campaign.winner_decided_at = datetime.now(UTC)
         await session.commit()
         await session.refresh(campaign)
         await audit.log(

@@ -27,24 +27,11 @@ import { TagManagerComponent } from './tag-manager.component';
 import { AttributionChipComponent } from './header/attribution-chip.component';
 import { ConversationBlockNumberActionComponent } from './header/block-number-action.component';
 import { ConversationExportButtonComponent } from './header/export-button.component';
-import {
-  LocationAttachment,
-  LocationBubbleComponent,
-} from './thread/location-bubble.component';
-import {
-  StickerAttachment,
-  StickerBubbleComponent,
-} from './thread/sticker-bubble.component';
-import {
-  VCardAttachment,
-  VCardBubbleComponent,
-} from './thread/vcard-bubble.component';
+import { LocationAttachment, LocationBubbleComponent } from './thread/location-bubble.component';
+import { StickerAttachment, StickerBubbleComponent } from './thread/sticker-bubble.component';
+import { VCardAttachment, VCardBubbleComponent } from './thread/vcard-bubble.component';
 import { StaffListItem } from '../staff/staff-api.service';
-import {
-  OwnerColor,
-  ownerColor,
-  staffInitials,
-} from '../shared/owner-color.util';
+import { OwnerColor, ownerColor, staffInitials } from '../shared/owner-color.util';
 import { FurnitureAuthService } from '../auth/auth.service';
 
 /**
@@ -131,9 +118,7 @@ export class ChatThreadComponent implements AfterViewChecked {
 
   /** Permission gate for the reassign click target — same key the
    * backend enforces on `PATCH /api/v1/conversations/{id}`. */
-  protected readonly canReassign = computed(() =>
-    this.auth.hasPermission('conversations.write'),
-  );
+  protected readonly canReassign = computed(() => this.auth.hasPermission('conversations.write'));
 
   @ViewChild('scrollHost') protected scrollHost?: ElementRef<HTMLDivElement>;
 
@@ -175,9 +160,7 @@ export class ChatThreadComponent implements AfterViewChecked {
    * before rendering. Other channels (SMS/email) currently have no
    * delivery tracking; for them only `sent` shows after dispatch.
    */
-  protected tickState(
-    m: ConversationMessage,
-  ): 'read' | 'delivered' | 'sent' | 'pending' {
+  protected tickState(m: ConversationMessage): 'read' | 'delivered' | 'sent' | 'pending' {
     if (m.read_at) return 'read';
     if (m.delivered_at) return 'delivered';
     if (m.sent_at) return 'sent';
@@ -211,64 +194,46 @@ export class ChatThreadComponent implements AfterViewChecked {
 
   // --- Interactive (whatsapp-platform-upgrade Step 6) --------------
 
-  protected interactiveKind(
-    m: ConversationMessage,
-  ): 'reply_buttons' | 'cta_url' | 'list' | null {
+  protected interactiveKind(m: ConversationMessage): 'reply_buttons' | 'cta_url' | 'list' | null {
     const p = m.interactive_payload;
     if (!p || typeof p !== 'object') return null;
     const k = (p as { kind?: string }).kind;
-    return k === 'reply_buttons' || k === 'cta_url' || k === 'list'
-      ? k
-      : null;
+    return k === 'reply_buttons' || k === 'cta_url' || k === 'list' ? k : null;
   }
 
-  protected interactiveButtons(
-    m: ConversationMessage,
-  ): Array<{ id: string; title: string }> {
-    const p = m.interactive_payload as
-      | { buttons?: Array<{ id?: string; title?: string }> }
-      | null;
+  protected interactiveButtons(m: ConversationMessage): Array<{ id: string; title: string }> {
+    const p = m.interactive_payload as { buttons?: Array<{ id?: string; title?: string }> } | null;
     if (!p?.buttons) return [];
     return p.buttons
       .filter((b) => typeof b.id === 'string' && typeof b.title === 'string')
       .map((b) => ({ id: b.id as string, title: b.title as string }));
   }
 
-  protected interactiveCta(
-    m: ConversationMessage,
-  ): { button_text: string; url: string } | null {
-    const p = m.interactive_payload as
-      | { button_text?: string; url?: string }
-      | null;
+  protected interactiveCta(m: ConversationMessage): { button_text: string; url: string } | null {
+    const p = m.interactive_payload as { button_text?: string; url?: string } | null;
     if (!p?.button_text || !p?.url) return null;
     return { button_text: p.button_text, url: p.url };
   }
 
-  protected interactiveListSections(
-    m: ConversationMessage,
-  ): Array<{
+  protected interactiveListSections(m: ConversationMessage): Array<{
     title: string;
     rows: Array<{ id: string; title: string; description?: string }>;
   }> {
-    const p = m.interactive_payload as
-      | {
-          sections?: Array<{
-            title?: string;
-            rows?: Array<{
-              id?: string;
-              title?: string;
-              description?: string;
-            }>;
-          }>;
-        }
-      | null;
+    const p = m.interactive_payload as {
+      sections?: Array<{
+        title?: string;
+        rows?: Array<{
+          id?: string;
+          title?: string;
+          description?: string;
+        }>;
+      }>;
+    } | null;
     if (!p?.sections) return [];
     return p.sections.map((s) => ({
       title: s.title ?? '',
       rows: (s.rows ?? [])
-        .filter(
-          (r) => typeof r.id === 'string' && typeof r.title === 'string',
-        )
+        .filter((r) => typeof r.id === 'string' && typeof r.title === 'string')
         .map((r) => ({
           id: r.id as string,
           title: r.title as string,
@@ -307,21 +272,14 @@ export class ChatThreadComponent implements AfterViewChecked {
   protected mediaAttachmentCount(m: ConversationMessage): number {
     return (m.attachments ?? []).filter((att) => {
       const t = (att as { type?: string }).type;
-      return (
-        t === 'image' ||
-        t === 'video' ||
-        t === 'audio' ||
-        t === 'document'
-      );
+      return t === 'image' || t === 'video' || t === 'audio' || t === 'document';
     }).length;
   }
 
   /** Step 28 — pluck the first `location` attachment, or null.
    *  The bubble renders only when present so location-less
    *  messages don't paint an empty card. */
-  protected locationAttachment(
-    m: ConversationMessage,
-  ): LocationAttachment | null {
+  protected locationAttachment(m: ConversationMessage): LocationAttachment | null {
     const found = (m.attachments ?? []).find(
       (att) => (att as { type?: string }).type === 'location',
     );
@@ -329,9 +287,7 @@ export class ChatThreadComponent implements AfterViewChecked {
   }
 
   /** Step 28 — first `contacts` (vCard) attachment, or null. */
-  protected vcardAttachment(
-    m: ConversationMessage,
-  ): VCardAttachment | null {
+  protected vcardAttachment(m: ConversationMessage): VCardAttachment | null {
     const found = (m.attachments ?? []).find(
       (att) => (att as { type?: string }).type === 'contacts',
     );
@@ -339,9 +295,7 @@ export class ChatThreadComponent implements AfterViewChecked {
   }
 
   /** Step 28 — first `sticker` attachment, or null. */
-  protected stickerAttachment(
-    m: ConversationMessage,
-  ): StickerAttachment | null {
+  protected stickerAttachment(m: ConversationMessage): StickerAttachment | null {
     const found = (m.attachments ?? []).find(
       (att) => (att as { type?: string }).type === 'sticker',
     );
@@ -353,13 +307,9 @@ export class ChatThreadComponent implements AfterViewChecked {
   /** Look up the message being quoted in the in-memory thread cache.
    *  Cross-pagination quotes fall back to null — the bubble renders
    *  "Original message" without the body preview. */
-  protected quotedMessage(
-    m: ConversationMessage,
-  ): ConversationMessage | null {
+  protected quotedMessage(m: ConversationMessage): ConversationMessage | null {
     if (!m.reply_to_message_id || !this.detail) return null;
-    return (
-      this.detail.messages.find((x) => x.id === m.reply_to_message_id) ?? null
-    );
+    return this.detail.messages.find((x) => x.id === m.reply_to_message_id) ?? null;
   }
 
   /** Short preview for a quoted block — uses the original's text when
@@ -370,9 +320,7 @@ export class ChatThreadComponent implements AfterViewChecked {
     if (target.text) return target.text;
     const att = (target.attachments ?? []).find((a) => {
       const t = (a as { type?: string }).type;
-      return (
-        t === 'image' || t === 'video' || t === 'audio' || t === 'document'
-      );
+      return t === 'image' || t === 'video' || t === 'audio' || t === 'document';
     });
     const type = (att as { type?: string } | undefined)?.type;
     switch (type) {
@@ -392,9 +340,7 @@ export class ChatThreadComponent implements AfterViewChecked {
   /** Aggregate the reactions list into `{emoji → count}` for the badge
    *  row. Order preserved by first-seen so the row stays stable across
    *  re-renders. */
-  protected groupedReactions(
-    m: ConversationMessage,
-  ): Array<{ emoji: string; count: number }> {
+  protected groupedReactions(m: ConversationMessage): Array<{ emoji: string; count: number }> {
     const counts = new Map<string, number>();
     for (const r of m.reactions ?? []) {
       counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
@@ -408,16 +354,12 @@ export class ChatThreadComponent implements AfterViewChecked {
   protected myReaction(m: ConversationMessage): string | null {
     const me = this.auth.currentUserId();
     if (!me) return null;
-    const mine = (m.reactions ?? []).find(
-      (r: MessageReaction) => r.actor === me,
-    );
+    const mine = (m.reactions ?? []).find((r: MessageReaction) => r.actor === me);
     return mine?.emoji ?? null;
   }
 
   protected openPicker(messageId: string): void {
-    this.pickerOpenFor.update((cur) =>
-      cur === messageId ? null : messageId,
-    );
+    this.pickerOpenFor.update((cur) => (cur === messageId ? null : messageId));
   }
 
   protected closePicker(): void {

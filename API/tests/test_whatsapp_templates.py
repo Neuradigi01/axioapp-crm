@@ -16,10 +16,11 @@ What we prove:
   5. Variable counting — body with `{{1}}`/`{{2}}` regex extraction.
   6. List filter — `status='APPROVED'` only returns approved rows.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -36,7 +37,6 @@ from src.app.core.integrations.whatsapp.models import (
     WhatsAppAccountConfig,
     WhatsAppTemplate,
 )
-
 
 _ORG_ID = uuid.uuid4()
 
@@ -128,7 +128,7 @@ def _connected_pair() -> tuple[Integration, WhatsAppAccountConfig]:
         scopes=None,
         status=IntegrationStatus.connected,
         last_error=None,
-        connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        connected_at=datetime(2026, 1, 1, tzinfo=UTC),
     )
     config = WhatsAppAccountConfig(
         id=uuid.uuid4(),
@@ -231,9 +231,7 @@ class TestSync:
 
         assert counts == {"added": 3, "updated": 0, "removed": 0, "total": 3}
 
-        templates = [
-            r for r in session.added if isinstance(r, WhatsAppTemplate)
-        ]
+        templates = [r for r in session.added if isinstance(r, WhatsAppTemplate)]
         assert len(templates) == 3
         by_name = {t.name: t for t in templates}
 
@@ -275,7 +273,7 @@ class TestSync:
             body="OLD body without variables",
             variable_count=0,
             meta_template_id="111",
-            last_synced_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            last_synced_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session.rows[WhatsAppTemplate] = [existing]
 
@@ -289,14 +287,10 @@ class TestSync:
         )
 
         assert counts == {"added": 0, "updated": 1, "removed": 0, "total": 1}
-        assert (
-            "Hi {{1}}" in existing.body
-        ), "body should be updated to Meta's version"
+        assert "Hi {{1}}" in existing.body, "body should be updated to Meta's version"
         assert existing.variable_count == 2
         # No new rows added — existing row mutated in place.
-        new_templates = [
-            r for r in session.added if isinstance(r, WhatsAppTemplate)
-        ]
+        new_templates = [r for r in session.added if isinstance(r, WhatsAppTemplate)]
         assert new_templates == []
 
     @pytest.mark.asyncio
@@ -317,7 +311,7 @@ class TestSync:
             body="Hi {{1}}, enjoy 30% off on all {{2}} this Diwali!",
             variable_count=2,
             meta_template_id="111",
-            last_synced_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            last_synced_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         deleted = WhatsAppTemplate(
             id=uuid.uuid4(),
@@ -330,7 +324,7 @@ class TestSync:
             body="Whatever",
             variable_count=0,
             meta_template_id="999",
-            last_synced_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            last_synced_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session.rows[WhatsAppTemplate] = [survives, deleted]
 
@@ -359,14 +353,10 @@ class TestSync:
 
 class TestVariableCounting:
     def test_count_distinct_placeholders(self):
-        assert wa_templates._count_variables(
-            "Hi {{1}}, your order {{2}} is ready"
-        ) == 2
+        assert wa_templates._count_variables("Hi {{1}}, your order {{2}} is ready") == 2
 
     def test_count_collapses_duplicates(self):
-        assert wa_templates._count_variables(
-            "{{1}} repeated {{1}} again — still one variable"
-        ) == 1
+        assert wa_templates._count_variables("{{1}} repeated {{1}} again — still one variable") == 1
 
     def test_count_zero_for_static_body(self):
         assert wa_templates._count_variables("No placeholders here") == 0
@@ -391,7 +381,7 @@ class TestListFilter:
                 status="APPROVED",
                 body="hi",
                 variable_count=0,
-                last_synced_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                last_synced_at=datetime(2026, 1, 1, tzinfo=UTC),
             ),
         ]
         session.rows[WhatsAppTemplate] = rows

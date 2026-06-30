@@ -1,4 +1,5 @@
 """Tests for `POST /api/v1/auth/refresh`."""
+
 from __future__ import annotations
 
 import pytest

@@ -5,8 +5,8 @@ and Leads (250) since walk-ins are the typical *entry point* of the
 showroom journey. Registers `walkins.read` / `walkins.write` so RBAC
 seeds know about them at startup.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="walk_ins",

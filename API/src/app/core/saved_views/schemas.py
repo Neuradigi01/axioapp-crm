@@ -6,15 +6,15 @@ module is generic infrastructure that the leads page (and future list
 pages) layers on top of. Semantic validation of ``config.filter``
 lives in the consuming page, not here.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
+from src.app.shared.schemas import TimestampedOrgScopedOut
 
 
 class SavedViewConfig(BaseModel):
@@ -30,14 +30,14 @@ class SavedViewConfig(BaseModel):
 
     # Filter DSL fragment. Free-form here; the leads page validates
     # shape via `core/leads/filter_dsl.parse()` before applying.
-    filter: Optional[dict[str, Any]] = None
-    sort: Optional[str] = Field(default=None, max_length=64)
-    order: Optional[Literal["asc", "desc"]] = None
-    scope: Optional[Literal["mine", "team", "all"]] = None
+    filter: dict[str, Any] | None = None
+    sort: str | None = Field(default=None, max_length=64)
+    order: Literal["asc", "desc"] | None = None
+    scope: Literal["mine", "team", "all"] | None = None
     # List of column descriptors as the FE persists them (key / label /
     # visible). Order matters: array order = column display order.
-    columns: Optional[list[dict[str, Any]]] = None
-    view: Optional[Literal["list", "pipeline"]] = None
+    columns: list[dict[str, Any]] | None = None
+    view: Literal["list", "pipeline"] | None = None
 
 
 class SavedViewCreate(BaseModel):
@@ -54,9 +54,9 @@ class SavedViewUpdate(BaseModel):
     """Partial update. Each field is optional; entity is immutable
     (rename across entities makes no sense — make a new view)."""
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=80)
-    config: Optional[SavedViewConfig] = None
-    shared: Optional[bool] = None
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    config: SavedViewConfig | None = None
+    shared: bool | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 

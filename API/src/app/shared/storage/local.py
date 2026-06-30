@@ -5,6 +5,7 @@ CWD) and served read-only by the `/files` static mount declared in
 `main.py`. The `./storage` root is the same one the import readers join
 their relative paths onto, so writes here are visible to those readers.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,9 +22,7 @@ class LocalStorage(StorageBackend):
     def __init__(self, root: str = "./storage") -> None:
         self._root = Path(root).resolve()
 
-    def put(
-        self, path: str, data: bytes, content_type: str | None = None
-    ) -> StoredFileRef:
+    def put(self, path: str, data: bytes, content_type: str | None = None) -> StoredFileRef:
         key = path.lstrip("/")
         target = self._root / key
         target.parent.mkdir(parents=True, exist_ok=True)

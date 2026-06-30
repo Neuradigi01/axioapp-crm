@@ -4,6 +4,7 @@ Finalizes the pending-pack org created by `POST /auth/register`:
 renames it, sets the chosen `template_id`, runs the matching pack
 installer, and rotates the JWT.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -33,9 +34,7 @@ async def _register_pending(client, email: str, first: str = "Acme") -> str:
 async def test_onboarding_complete_furniture_happy_path(layered_client):
     from tests.conftest import TestSession
 
-    token = await _register_pending(
-        layered_client, "furniture@onboarding-test.local"
-    )
+    token = await _register_pending(layered_client, "furniture@onboarding-test.local")
 
     resp = await layered_client.post(
         "/api/v1/auth/onboarding/complete",
@@ -59,9 +58,7 @@ async def test_onboarding_complete_furniture_happy_path(layered_client):
     async with TestSession() as session:
         org = (
             await session.execute(
-                select(Organization).where(
-                    Organization.id == body["organization_id"]
-                )
+                select(Organization).where(Organization.id == body["organization_id"])
             )
         ).scalar_one()
         assert org.name == "Acme Furniture"
@@ -72,10 +69,10 @@ async def test_onboarding_complete_furniture_happy_path(layered_client):
         # Furniture pack ships a `leads` pipeline AND a `custom_orders`
         # pipeline. Spot-check one to prove the installer ran.
         pipelines = (
-            await session.execute(
-                select(Pipeline).where(Pipeline.org_id == org.id)
-            )
-        ).scalars().all()
+            (await session.execute(select(Pipeline).where(Pipeline.org_id == org.id)))
+            .scalars()
+            .all()
+        )
         keys = {p.key for p in pipelines}
         assert "leads" in keys or "custom_orders" in keys
 
@@ -84,9 +81,7 @@ async def test_onboarding_complete_furniture_happy_path(layered_client):
 async def test_onboarding_complete_base_happy_path(layered_client):
     from tests.conftest import TestSession
 
-    token = await _register_pending(
-        layered_client, "base@onboarding-test.local", first="Base"
-    )
+    token = await _register_pending(layered_client, "base@onboarding-test.local", first="Base")
 
     resp = await layered_client.post(
         "/api/v1/auth/onboarding/complete",
@@ -102,9 +97,7 @@ async def test_onboarding_complete_base_happy_path(layered_client):
     async with TestSession() as session:
         org = (
             await session.execute(
-                select(Organization).where(
-                    Organization.id == body["organization_id"]
-                )
+                select(Organization).where(Organization.id == body["organization_id"])
             )
         ).scalar_one()
         assert org.template_id == "base"
@@ -112,11 +105,7 @@ async def test_onboarding_complete_base_happy_path(layered_client):
         # Owner role still present after pack install (role_templates
         # installed during register; pack installer is additive).
         owner = (
-            await session.execute(
-                select(Role).where(
-                    Role.org_id == org.id, Role.name == "Owner"
-                )
-            )
+            await session.execute(select(Role).where(Role.org_id == org.id, Role.name == "Owner"))
         ).scalar_one_or_none()
         assert owner is not None
 
@@ -174,9 +163,7 @@ async def test_onboarding_complete_rejects_empty_org_name(layered_client):
 
 @pytest.mark.asyncio
 async def test_onboarding_complete_409_after_already_onboarded(layered_client):
-    token = await _register_pending(
-        layered_client, "twice@onboarding-test.local", first="Twice"
-    )
+    token = await _register_pending(layered_client, "twice@onboarding-test.local", first="Twice")
 
     first = await layered_client.post(
         "/api/v1/auth/onboarding/complete",

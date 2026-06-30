@@ -14,11 +14,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  AutomationsApiService,
-  RunRead,
-} from '../automations-api.service';
-
+import { AutomationsApiService, RunRead } from '../automations-api.service';
 
 /**
  * Retry confirmation modal. Opens when the operator clicks "Retry"
@@ -59,9 +55,7 @@ export class RetryModalComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.submitError.set(
-            extractApiError(err) ?? 'Retry failed. Try again.',
-          );
+          this.submitError.set(extractApiError(err) ?? 'Retry failed. Try again.');
         },
       });
   }

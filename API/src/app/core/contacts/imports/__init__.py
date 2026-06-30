@@ -6,6 +6,7 @@ A future step can route through Celery if the cap rises.
 
 Public re-exports keep the import surface small; the router is the
 only caller outside this package."""
+
 from src.app.core.contacts.imports.service import (
     MAX_FILE_SIZE_BYTES,
     MAX_ROW_COUNT,

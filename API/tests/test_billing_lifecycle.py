@@ -9,6 +9,7 @@ Covers:
   - void from `issued` → status='void' + reason captured
   - perm gate: a user with only `billing.read` cannot create
 """
+
 from __future__ import annotations
 
 import uuid
@@ -33,9 +34,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -52,8 +51,8 @@ async def _login(client, *, org_slug: str, email: str, password: str) -> str:
 async def _seed_org_settings(
     org_id: uuid.UUID, *, gst_number: str = "29ABCDE1234F1Z5", tax_rate: str = "18.00"
 ) -> None:
-    from tests.conftest import TestSession
     from src.app.shared.context import RequestContext, reset_context, set_context
+    from tests.conftest import TestSession
 
     token = set_context(RequestContext(org_id=org_id))
     try:
@@ -105,9 +104,7 @@ async def test_draft_issue_pay_lifecycle(layered_client, seeded_admin):
     assert Decimal(line.json()["line_total"]) == Decimal("29500.00")
 
     # 3. Issue → number assigned, tax snapshot, status flips
-    issued = await layered_client.post(
-        f"/api/v1/invoices/{inv_id}/issue", headers=headers
-    )
+    issued = await layered_client.post(f"/api/v1/invoices/{inv_id}/issue", headers=headers)
     assert issued.status_code == 200, issued.text
     assert issued.json()["status"] == "issued"
     assert issued.json()["number"] == 1
@@ -123,9 +120,7 @@ async def test_draft_issue_pay_lifecycle(layered_client, seeded_admin):
         headers=headers,
     )
     assert pay1.status_code == 201
-    after_partial = await layered_client.get(
-        f"/api/v1/invoices/{inv_id}", headers=headers
-    )
+    after_partial = await layered_client.get(f"/api/v1/invoices/{inv_id}", headers=headers)
     assert after_partial.json()["status"] == "issued"
     assert after_partial.json()["paid_at"] is None
 
@@ -136,9 +131,7 @@ async def test_draft_issue_pay_lifecycle(layered_client, seeded_admin):
         headers=headers,
     )
     assert pay2.status_code == 201
-    final = await layered_client.get(
-        f"/api/v1/invoices/{inv_id}", headers=headers
-    )
+    final = await layered_client.get(f"/api/v1/invoices/{inv_id}", headers=headers)
     assert final.json()["status"] == "paid"
     assert final.json()["paid_at"] is not None
     assert final.json()["payment_method"] == "upi"
@@ -158,14 +151,10 @@ async def test_issue_with_no_lines_rejected(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    draft = await layered_client.post(
-        "/api/v1/invoices", json={}, headers=headers
-    )
+    draft = await layered_client.post("/api/v1/invoices", json={}, headers=headers)
     inv_id = draft.json()["id"]
 
-    resp = await layered_client.post(
-        f"/api/v1/invoices/{inv_id}/issue", headers=headers
-    )
+    resp = await layered_client.post(f"/api/v1/invoices/{inv_id}/issue", headers=headers)
     assert resp.status_code == 400
     assert "no lines" in resp.text
 
@@ -187,18 +176,14 @@ async def test_per_org_invoice_numbering(layered_client, seeded_admin):
 
     numbers: list[int] = []
     for _ in range(3):
-        draft = await layered_client.post(
-            "/api/v1/invoices", json={}, headers=headers
-        )
+        draft = await layered_client.post("/api/v1/invoices", json={}, headers=headers)
         inv_id = draft.json()["id"]
         await layered_client.post(
             f"/api/v1/invoices/{inv_id}/lines",
             json={"description": "Item", "qty": 1, "unit_price": "100.00"},
             headers=headers,
         )
-        issued = await layered_client.post(
-            f"/api/v1/invoices/{inv_id}/issue", headers=headers
-        )
+        issued = await layered_client.post(f"/api/v1/invoices/{inv_id}/issue", headers=headers)
         numbers.append(issued.json()["number"])
 
     assert numbers == [1, 2, 3]
@@ -223,22 +208,16 @@ async def test_void_from_issued(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    draft = await layered_client.post(
-        "/api/v1/invoices", json={}, headers=headers
-    )
+    draft = await layered_client.post("/api/v1/invoices", json={}, headers=headers)
     inv_id = draft.json()["id"]
     await layered_client.post(
         f"/api/v1/invoices/{inv_id}/lines",
         json={"description": "Item", "qty": 1, "unit_price": "500.00"},
         headers=headers,
     )
-    await layered_client.post(
-        f"/api/v1/invoices/{inv_id}/issue", headers=headers
-    )
+    await layered_client.post(f"/api/v1/invoices/{inv_id}/issue", headers=headers)
 
-    voided = await layered_client.post(
-        f"/api/v1/invoices/{inv_id}/void", headers=headers
-    )
+    voided = await layered_client.post(f"/api/v1/invoices/{inv_id}/void", headers=headers)
     assert voided.status_code == 200
     assert voided.json()["status"] == "void"
 
@@ -257,7 +236,5 @@ async def test_write_requires_billing_write(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    resp = await layered_client.post(
-        "/api/v1/invoices", json={}, headers=headers
-    )
+    resp = await layered_client.post("/api/v1/invoices", json={}, headers=headers)
     assert resp.status_code == 403

@@ -1,10 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.services.common_service import get_member_with_contact_info, verify_2fa_code
-from src.core.security.action_token import create_action_token
+
 from src.constants import messages
+from src.core.security.action_token import create_action_token
+from src.services.common_service import get_member_with_contact_info, verify_2fa_code
 
 
-async def verify_action(db: AsyncSession, user_id: str, user_type: str, code: str, method: str) -> dict:
+async def verify_action(
+    db: AsyncSession, user_id: str, user_type: str, code: str, method: str
+) -> dict:
     record, _, _ = await get_member_with_contact_info(db, user_id, user_type)
     if not record:
         return {"success": False, "message": messages.RECORD_NOT_FOUND}

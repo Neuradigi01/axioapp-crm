@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  Input,
-  computed,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, signal } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import {
@@ -65,9 +59,7 @@ import {
               {{ resolved(body) }}
             </p>
           } @else {
-            <p class="text-xs italic text-zinc-400">
-              Body text will appear here…
-            </p>
+            <p class="text-xs italic text-zinc-400">Body text will appear here…</p>
           }
 
           @if (footerText) {
@@ -92,20 +84,11 @@ import {
               disabled
             >
               @if (b.type === 'URL') {
-                <lucide-icon
-                  name="arrow-right"
-                  class="mr-1 inline h-3.5 w-3.5"
-                />
+                <lucide-icon name="arrow-right" class="mr-1 inline h-3.5 w-3.5" />
               } @else if (b.type === 'PHONE_NUMBER') {
-                <lucide-icon
-                  name="phone"
-                  class="mr-1 inline h-3.5 w-3.5"
-                />
+                <lucide-icon name="phone" class="mr-1 inline h-3.5 w-3.5" />
               } @else {
-                <lucide-icon
-                  name="corner-up-left"
-                  class="mr-1 inline h-3.5 w-3.5"
-                />
+                <lucide-icon name="corner-up-left" class="mr-1 inline h-3.5 w-3.5" />
               }
               {{ b.text }}
             </button>

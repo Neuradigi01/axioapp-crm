@@ -9,18 +9,17 @@ plaintext tokens by calling `decrypt_tokens()` on a freshly-loaded
 `Integration` row. Tokens are never held longer than the API call that
 needs them — no module-level caching, no logging.
 """
+
 from __future__ import annotations
 
 import secrets
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.shared.audit import log_entity_change
 from src.app.core.integrations import data_access as _da
 from src.app.core.integrations.crypto import (
     decrypt_optional,
@@ -39,6 +38,7 @@ from src.app.core.integrations.schemas import (
     IntegrationSubscriptionUpdate,
     IntegrationUpsert,
 )
+from src.app.shared.audit import log_entity_change
 
 
 def _new_webhook_secret() -> str:
@@ -51,7 +51,7 @@ async def get(
     session: AsyncSession,
     *,
     provider: IntegrationProvider,
-) -> Optional[Integration]:
+) -> Integration | None:
     """Return the single (org, provider) row for the active tenant, or
     None if the org has never connected this provider."""
     return await _da.get_integration_for_provider(session, provider)
@@ -67,7 +67,7 @@ async def upsert(
     *,
     org_id: uuid.UUID,
     payload: IntegrationUpsert,
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
 ) -> Integration:
     """Insert-or-update the (org, provider) row. Encrypts the plaintext
     tokens before write."""
@@ -78,7 +78,7 @@ async def upsert(
 
     access_enc = encrypt(payload.access_token)
     refresh_enc = encrypt_optional(payload.refresh_token)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if existing is None:
         row = Integration(
@@ -105,9 +105,7 @@ async def upsert(
         existing.access_token_enc = access_enc
         existing.refresh_token_enc = refresh_enc
         existing.token_expires_at = payload.token_expires_at
-        existing.scopes = (
-            list(payload.scopes) if payload.scopes else None
-        )
+        existing.scopes = list(payload.scopes) if payload.scopes else None
         existing.status = IntegrationStatus.connected
         existing.last_error = None
         existing.connected_at = now
@@ -139,8 +137,8 @@ async def disconnect(
     session: AsyncSession,
     *,
     provider: IntegrationProvider,
-    actor_id: Optional[uuid.UUID],
-) -> Optional[Integration]:
+    actor_id: uuid.UUID | None,
+) -> Integration | None:
     """Clear the row's tokens + flip status to `disconnected`. Returns
     the updated row, or None if no row exists for this (org, provider)."""
     row = await get(session, provider=provider)
@@ -154,7 +152,7 @@ async def disconnect(
     row.token_expires_at = None
     row.scopes = None
     row.status = IntegrationStatus.disconnected
-    row.disconnected_at = datetime.now(timezone.utc)
+    row.disconnected_at = datetime.now(UTC)
     row.disconnected_by = actor_id
     # Null the webhook secret so the public webhook URL stops
     # authenticating immediately.
@@ -171,7 +169,7 @@ async def disconnect(
     return row
 
 
-def decrypt_tokens(integration: Integration) -> tuple[str, Optional[str]]:
+def decrypt_tokens(integration: Integration) -> tuple[str, str | None]:
     """Return `(access_token, refresh_token)` in plaintext."""
     if integration.access_token_enc is None:
         raise RuntimeError(
@@ -193,7 +191,7 @@ async def get_by_webhook_secret(
     session: AsyncSession,
     *,
     webhook_secret: str,
-) -> Optional[Integration]:
+) -> Integration | None:
     """Resolve an integration row by its webhook URL discriminator.
     Used by the public webhook endpoint to authenticate the inbound
     delivery — no JWT, no tenant header; the secret IS the auth."""
@@ -206,7 +204,7 @@ async def rotate_webhook_secret(
     session: AsyncSession,
     *,
     provider: IntegrationProvider,
-) -> Optional[Integration]:
+) -> Integration | None:
     """Issue a fresh webhook secret for the (active-tenant, provider)
     integration."""
     row = await get(session, provider=provider)
@@ -230,13 +228,11 @@ async def rotate_webhook_secret(
 async def list_subscriptions(
     session: AsyncSession,
     *,
-    integration_id: Optional[uuid.UUID] = None,
+    integration_id: uuid.UUID | None = None,
 ) -> list[IntegrationSubscription]:
     """All subscriptions in the active tenant, optionally filtered to
     one integration."""
-    return await _da.list_subscriptions_query(
-        session, integration_id=integration_id
-    )
+    return await _da.list_subscriptions_query(session, integration_id=integration_id)
 
 
 async def create_subscription(
@@ -246,9 +242,7 @@ async def create_subscription(
     payload: IntegrationSubscriptionCreate,
 ) -> IntegrationSubscription:
     """Insert a new (integration, external_form_id) subscription."""
-    parent = await _da.get_integration_by_id(
-        session, payload.integration_id
-    )
+    parent = await _da.get_integration_by_id(session, payload.integration_id)
     if parent is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -273,7 +267,7 @@ async def create_subscription(
                 f"Subscription already exists for form "
                 f"{payload.external_form_id} on this integration."
             ),
-        )
+        ) from None
     await session.refresh(row)
     await log_entity_change(
         action="integration.subscription.created",
@@ -338,7 +332,7 @@ async def find_subscription(
     *,
     integration_id: uuid.UUID,
     external_form_id: str,
-) -> Optional[IntegrationSubscription]:
+) -> IntegrationSubscription | None:
     """Locate the subscription row for an inbound webhook payload."""
     return await _da.find_subscription_for_form(
         session,
@@ -355,7 +349,7 @@ async def list_dlq(
     *,
     page: int = 1,
     size: int = 50,
-    provider: Optional[IntegrationProvider] = None,
+    provider: IntegrationProvider | None = None,
     include_replayed: bool = True,
 ) -> tuple[list[IntegrationDLQ], int]:
     """Paginated DLQ list for the active tenant."""
@@ -372,7 +366,7 @@ async def discard_dlq(
     session: AsyncSession,
     *,
     dlq_id: uuid.UUID,
-) -> Optional[IntegrationDLQ]:
+) -> IntegrationDLQ | None:
     """Soft-discard a DLQ row — sets `replayed_at = now()` with
     `replayed_by = NULL`."""
     row = await get_dlq(session, dlq_id=dlq_id)
@@ -380,7 +374,7 @@ async def discard_dlq(
         return None
     if row.replayed_at is not None:
         return row
-    row.replayed_at = datetime.now(timezone.utc)
+    row.replayed_at = datetime.now(UTC)
     row.replayed_by = None
     await session.commit()
     await session.refresh(row)
@@ -418,9 +412,7 @@ async def update_subscription_mapping(
     return row
 
 
-async def get_dlq(
-    session: AsyncSession, *, dlq_id: uuid.UUID
-) -> Optional[IntegrationDLQ]:
+async def get_dlq(session: AsyncSession, *, dlq_id: uuid.UUID) -> IntegrationDLQ | None:
     """Fetch a single DLQ row by id (RLS-scoped)."""
     return await _da.get_dlq_by_id(session, dlq_id)
 

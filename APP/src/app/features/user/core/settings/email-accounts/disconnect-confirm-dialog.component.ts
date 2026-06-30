@@ -12,16 +12,10 @@
  * component is presentational. Emits `confirmed` on the primary CTA
  * and `cancelled` on the secondary / backdrop click.
  */
-import {
-  ChangeDetectionStrategy,
-  Component,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { EmailAccount } from '../../services/email-accounts-api.service';
-
 
 @Component({
   selector: 'app-disconnect-confirm-dialog',

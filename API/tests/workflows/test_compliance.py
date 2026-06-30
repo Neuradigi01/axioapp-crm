@@ -5,17 +5,17 @@ seeded org / contact / settings rows. The send.* action handlers
 delegate to this helper; testing it in isolation pins the gate
 semantics + keeps the Send-handler test surface narrow.
 """
+
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, time, timedelta, timezone
+from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
 from sqlalchemy import text as sql_text
 
-from src.app.core.workflows import compliance
 from src.app.core.workflows.compliance import (
     Allow,
     Defer,
@@ -23,7 +23,6 @@ from src.app.core.workflows.compliance import (
     check_send,
     ensure_unsubscribe_link,
 )
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -39,10 +38,7 @@ class _FakeRun:
 async def org_with_settings(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -50,10 +46,7 @@ async def org_with_settings(test_db):
         },
     )
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_org_settings (id, org_id) "
-            "VALUES (:id, :org_id)"
-        ),
+        sql_text("INSERT INTO tbl_org_settings (id, org_id) VALUES (:id, :org_id)"),
         {"id": str(uuid.uuid4()), "org_id": str(org_id)},
     )
     await test_db.commit()
@@ -89,9 +82,7 @@ async def _set_compliance(test_db, *, org_id, **overrides):
     nine Step-12 fields as keyword args."""
     pairs = ", ".join(f"{k} = :{k}" for k in overrides.keys())
     await test_db.execute(
-        sql_text(
-            f"UPDATE tbl_org_settings SET {pairs} WHERE org_id = :org_id"
-        ),
+        sql_text(f"UPDATE tbl_org_settings SET {pairs} WHERE org_id = :org_id"),
         {**overrides, "org_id": str(org_id)},
     )
     await test_db.commit()
@@ -109,7 +100,7 @@ async def test_opt_out_email_blocks_marketing(test_db, org_with_settings):
     # Test inside quiet hours by using a non-quiet timezone window;
     # we run at 12:00 UTC + Asia/Kolkata is 17:30 IST (outside default
     # 21:00–09:00). Default settings are loaded from the seeded row.
-    now = datetime(2026, 6, 29, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 6, 29, 12, 0, tzinfo=UTC)
     decision = await check_send(
         test_db,
         run=run,
@@ -126,11 +117,9 @@ async def test_opt_out_email_blocks_marketing(test_db, org_with_settings):
 async def test_opt_out_whatsapp_blocks_wa_only(test_db, org_with_settings):
     """Channel-specific opt-out: WA-stop contact still receives email."""
     org_id = org_with_settings
-    contact_id = await _make_contact(
-        test_db, org_id=org_id, wa_status="opted_out"
-    )
+    contact_id = await _make_contact(test_db, org_id=org_id, wa_status="opted_out")
     run = _FakeRun(org_id=org_id, contact_id=contact_id)
-    now = datetime(2026, 6, 29, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 6, 29, 12, 0, tzinfo=UTC)
 
     wa_decision = await check_send(
         test_db,
@@ -168,7 +157,7 @@ async def test_quiet_hours_defers_marketing(test_db, org_with_settings):
     contact_id = await _make_contact(test_db, org_id=org_id)
     run = _FakeRun(org_id=org_id, contact_id=contact_id)
     # 22:00 IST on 2026-06-29 = 16:30 UTC on the same date.
-    now = datetime(2026, 6, 29, 16, 30, tzinfo=timezone.utc)
+    now = datetime(2026, 6, 29, 16, 30, tzinfo=UTC)
 
     decision = await check_send(
         test_db,
@@ -182,16 +171,14 @@ async def test_quiet_hours_defers_marketing(test_db, org_with_settings):
     assert isinstance(decision, Defer)
     assert decision.reason == "deferred_quiet_hours"
     # Expected: 09:00 IST tomorrow = 03:30 UTC on 2026-06-30.
-    assert decision.until.astimezone(timezone.utc) == datetime(
-        2026, 6, 30, 3, 30, tzinfo=timezone.utc
-    )
+    assert decision.until.astimezone(UTC) == datetime(2026, 6, 30, 3, 30, tzinfo=UTC)
 
 
 async def test_quiet_hours_transactional_bypasses(test_db, org_with_settings):
     org_id = org_with_settings
     contact_id = await _make_contact(test_db, org_id=org_id)
     run = _FakeRun(org_id=org_id, contact_id=contact_id)
-    now = datetime(2026, 6, 29, 16, 30, tzinfo=timezone.utc)
+    now = datetime(2026, 6, 29, 16, 30, tzinfo=UTC)
 
     decision = await check_send(
         test_db,
@@ -210,7 +197,7 @@ async def test_quiet_hours_outside_window_allows(test_db, org_with_settings):
     org_id = org_with_settings
     contact_id = await _make_contact(test_db, org_id=org_id)
     run = _FakeRun(org_id=org_id, contact_id=contact_id)
-    now = datetime(2026, 6, 29, 7, 30, tzinfo=timezone.utc)
+    now = datetime(2026, 6, 29, 7, 30, tzinfo=UTC)
 
     decision = await check_send(
         test_db,
@@ -224,16 +211,14 @@ async def test_quiet_hours_outside_window_allows(test_db, org_with_settings):
     assert isinstance(decision, Allow)
 
 
-async def test_quiet_hours_past_midnight_defers_to_today(
-    test_db, org_with_settings
-):
+async def test_quiet_hours_past_midnight_defers_to_today(test_db, org_with_settings):
     """03:00 IST = 21:30 UTC PREVIOUS day. We're past midnight in
     IST → end (09:00 IST) is TODAY, not tomorrow."""
     org_id = org_with_settings
     contact_id = await _make_contact(test_db, org_id=org_id)
     run = _FakeRun(org_id=org_id, contact_id=contact_id)
     # 03:00 IST on 2026-06-30 = 21:30 UTC on 2026-06-29.
-    now = datetime(2026, 6, 29, 21, 30, tzinfo=timezone.utc)
+    now = datetime(2026, 6, 29, 21, 30, tzinfo=UTC)
 
     decision = await check_send(
         test_db,
@@ -246,9 +231,7 @@ async def test_quiet_hours_past_midnight_defers_to_today(
     )
     assert isinstance(decision, Defer)
     # Expected: 09:00 IST on 2026-06-30 = 03:30 UTC on 2026-06-30.
-    assert decision.until.astimezone(timezone.utc) == datetime(
-        2026, 6, 30, 3, 30, tzinfo=timezone.utc
-    )
+    assert decision.until.astimezone(UTC) == datetime(2026, 6, 30, 3, 30, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +251,7 @@ async def test_frequency_cap_zero_disables_check(test_db, org_with_settings):
         frequency_cap_marketing_per_day=0,
     )
     # Use a non-quiet time so the cap path is the only gate.
-    now = datetime(2026, 6, 29, 7, 30, tzinfo=timezone.utc)
+    now = datetime(2026, 6, 29, 7, 30, tzinfo=UTC)
     decision = await check_send(
         test_db,
         run=run,
@@ -286,13 +269,11 @@ async def test_frequency_cap_zero_disables_check(test_db, org_with_settings):
 # ---------------------------------------------------------------------------
 
 
-async def test_allow_path_for_clean_contact_outside_quiet_hours(
-    test_db, org_with_settings
-):
+async def test_allow_path_for_clean_contact_outside_quiet_hours(test_db, org_with_settings):
     org_id = org_with_settings
     contact_id = await _make_contact(test_db, org_id=org_id)
     run = _FakeRun(org_id=org_id, contact_id=contact_id)
-    now = datetime(2026, 6, 29, 7, 30, tzinfo=timezone.utc)
+    now = datetime(2026, 6, 29, 7, 30, tzinfo=UTC)
     decision = await check_send(
         test_db,
         run=run,
@@ -310,18 +291,14 @@ async def test_allow_path_for_clean_contact_outside_quiet_hours(
 # ---------------------------------------------------------------------------
 
 
-async def test_transactional_with_bypass_disabled_still_gated(
-    test_db, org_with_settings
-):
+async def test_transactional_with_bypass_disabled_still_gated(test_db, org_with_settings):
     """Setting transactional_bypass_quiet_hours=False forces
     transactional sends through the quiet-hours gate too."""
     org_id = org_with_settings
     contact_id = await _make_contact(test_db, org_id=org_id)
     run = _FakeRun(org_id=org_id, contact_id=contact_id)
-    await _set_compliance(
-        test_db, org_id=org_id, transactional_bypass_quiet_hours=False
-    )
-    now = datetime(2026, 6, 29, 16, 30, tzinfo=timezone.utc)  # 22:00 IST
+    await _set_compliance(test_db, org_id=org_id, transactional_bypass_quiet_hours=False)
+    now = datetime(2026, 6, 29, 16, 30, tzinfo=UTC)  # 22:00 IST
 
     decision = await check_send(
         test_db,
@@ -340,9 +317,7 @@ async def test_transactional_with_bypass_disabled_still_gated(
 # ---------------------------------------------------------------------------
 
 
-async def test_ensure_unsubscribe_injects_footer_when_missing(
-    test_db, org_with_settings
-):
+async def test_ensure_unsubscribe_injects_footer_when_missing(test_db, org_with_settings):
     body = "Hi Asha — check out our offer."
     new_body, injected = await ensure_unsubscribe_link(
         test_db,
@@ -368,9 +343,7 @@ async def test_ensure_unsubscribe_skips_when_present(test_db, org_with_settings)
     assert new_body == body
 
 
-async def test_ensure_unsubscribe_skips_for_non_email_channels(
-    test_db, org_with_settings
-):
+async def test_ensure_unsubscribe_skips_for_non_email_channels(test_db, org_with_settings):
     body = "Hi Asha"
     new_body, injected = await ensure_unsubscribe_link(
         test_db,
@@ -383,9 +356,7 @@ async def test_ensure_unsubscribe_skips_for_non_email_channels(
     assert new_body == body
 
 
-async def test_ensure_unsubscribe_skips_for_transactional_email(
-    test_db, org_with_settings
-):
+async def test_ensure_unsubscribe_skips_for_transactional_email(test_db, org_with_settings):
     body = "Your invoice receipt"
     new_body, injected = await ensure_unsubscribe_link(
         test_db,

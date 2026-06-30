@@ -8,6 +8,7 @@ Five endpoints:
   GET    /api/v1/invitations/lookup      unauthenticated — accept-page preview
   POST   /api/v1/invitations/accept      unauthenticated — redeem + auto-login
 """
+
 from __future__ import annotations
 
 import uuid
@@ -35,7 +36,6 @@ from src.app.core.invitations.service import (
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/invitations", tags=["Invitations"])
 
@@ -76,9 +76,7 @@ async def list_endpoint(
     return [InvitationOut.model_validate(r) for r in rows]
 
 
-@router.delete(
-    "/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_endpoint(
     invitation_id: uuid.UUID,
     request: Request,
@@ -118,7 +116,5 @@ async def accept_endpoint(
 ) -> LoginResponse:
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent")
-    result = await accept_invitation(
-        session, payload=payload, ip=ip, ua=ua
-    )
+    result = await accept_invitation(session, payload=payload, ip=ip, ua=ua)
     return LoginResponse.model_validate(result)

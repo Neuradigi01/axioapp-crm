@@ -12,10 +12,11 @@ Notes on what is NOT covered here:
   - Downgrade: tested via the run.cmd smoke loop in the step
     report (`downgrade -1` then `upgrade head`), not as a pytest case.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -47,7 +48,7 @@ def _make_sub(
     billing_cycle: str = "monthly",
     seats_purchased: int = 3,
 ) -> Subscription:
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     return Subscription(
         org_id=org_id,
         plan_code=plan_code,
@@ -73,6 +74,7 @@ async def org(test_db):
 # ---------------------------------------------------------------------------
 # Table shape — columns, defaults, FK
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_insert_and_read(test_db, org):
@@ -102,8 +104,8 @@ async def test_org_id_fk_required(test_db):
         status="trialing",
         billing_cycle="monthly",
         seats_purchased=3,
-        current_period_start=datetime.now(tz=timezone.utc),
-        current_period_end=datetime.now(tz=timezone.utc) + timedelta(days=14),
+        current_period_start=datetime.now(tz=UTC),
+        current_period_end=datetime.now(tz=UTC) + timedelta(days=14),
     )
     test_db.add(sub)
     with pytest.raises(IntegrityError):
@@ -114,6 +116,7 @@ async def test_org_id_fk_required(test_db):
 # ---------------------------------------------------------------------------
 # CHECK constraints
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_status_check_rejects_gibberish(test_db, org):
@@ -167,6 +170,7 @@ async def test_all_canonical_statuses_accepted(test_db, org):
 # Partial unique index — one active subscription per org
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_second_active_subscription_rejected(test_db, org):
     """Two `trialing` rows for the same org violate the partial unique
@@ -194,9 +198,7 @@ async def test_multiple_archived_subscriptions_allowed(test_db, org):
     test_db.add(sub_b)
     await test_db.commit()  # should succeed
 
-    result = await test_db.execute(
-        select(Subscription).where(Subscription.org_id == org.id)
-    )
+    result = await test_db.execute(select(Subscription).where(Subscription.org_id == org.id))
     rows = list(result.scalars())
     assert len(rows) == 2
 
@@ -220,6 +222,7 @@ async def test_active_plus_archived_coexist(test_db, org):
 # ---------------------------------------------------------------------------
 # `get_active_subscription` service helper
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_get_active_returns_trialing_row(test_db, org):
@@ -257,7 +260,7 @@ async def test_get_active_returns_read_only_row(test_db, org):
     """`read_only` is part of the active set — `get_active_subscription`
     must return it so the billing page can render the upgrade prompt."""
     sub = _make_sub(org.id, status="read_only")
-    sub.read_only_at = datetime.now(tz=timezone.utc)
+    sub.read_only_at = datetime.now(tz=UTC)
     test_db.add(sub)
     await test_db.commit()
 
@@ -269,6 +272,7 @@ async def test_get_active_returns_read_only_row(test_db, org):
 # ---------------------------------------------------------------------------
 # Constants alignment — guards against drift between models / migration
 # ---------------------------------------------------------------------------
+
 
 def test_active_statuses_subset_of_all_statuses():
     for s in ACTIVE_STATUSES:

@@ -4,17 +4,16 @@ Each resolver is tested both for the "payload carries the
 denormalised dict" happy path (no DB hit) and the "payload only
 carries the id" fallback path (resolver issues the DB lookup).
 """
+
 from __future__ import annotations
 
 import uuid
+from unittest.mock import AsyncMock
 
 import pytest
-import pytest_asyncio
 from sqlalchemy import text as sql_text
-from unittest.mock import AsyncMock, patch
 
 from src.app.core.automation import recipients
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -66,10 +65,7 @@ async def test_contact_email_fallback_to_db_lookup(test_db):
     # Insert a contact + org and resolve via contact_id only.
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -145,6 +141,7 @@ async def test_unknown_resolver_raises():
 async def test_register_resolver_is_idempotent():
     """Re-registering the same (name, fn) pair must not crash —
     side-effect imports may re-run."""
+
     async def fake(_session, _payload, _config):
         return "x@y.com"
 

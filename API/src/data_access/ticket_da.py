@@ -1,7 +1,8 @@
-from sqlalchemy import select, update, func, or_
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from src.models.ticket import Ticket, TicketReply, TicketAttachment
+
+from src.models.ticket import Ticket, TicketReply
 
 
 async def get_open_ticket_count(db: AsyncSession, member_id: int, user_type: str) -> int:
@@ -60,13 +61,10 @@ async def get_tickets(
     if user_type == "Admin":
         base = select(Ticket)
     else:
-        base = (
-            select(Ticket)
-            .where(
-                or_(
-                    Ticket.from_member_id == member_id,
-                    Ticket.to_member_id == member_id,
-                )
+        base = select(Ticket).where(
+            or_(
+                Ticket.from_member_id == member_id,
+                Ticket.to_member_id == member_id,
             )
         )
 
@@ -92,8 +90,7 @@ async def get_tickets(
     total = (await db.execute(count_stmt)).scalar()
 
     items_stmt = (
-        base
-        .options(
+        base.options(
             selectinload(Ticket.replies).selectinload(TicketReply.attachments),
             selectinload(Ticket.attachments),
         )
@@ -121,17 +118,17 @@ async def mark_replies_as_read(db: AsyncSession, ticket_id: int, reader_type: st
 
 
 async def mark_ticket_read_by_recipient(db: AsyncSession, ticket_id: int):
-    stmt = (
-        update(Ticket)
-        .where(Ticket.id == ticket_id)
-        .values(is_read_by_recipient=True)
-    )
+    stmt = update(Ticket).where(Ticket.id == ticket_id).values(is_read_by_recipient=True)
     await db.execute(stmt)
 
 
 async def update_ticket_status(
-    db: AsyncSession, ticket_id: int, status: str,
-    closed_by_id: int | None = None, closed_by_type: str | None = None, closed_at=None,
+    db: AsyncSession,
+    ticket_id: int,
+    status: str,
+    closed_by_id: int | None = None,
+    closed_by_type: str | None = None,
+    closed_at=None,
 ):
     values = {"status": status}
     if closed_by_id is not None:

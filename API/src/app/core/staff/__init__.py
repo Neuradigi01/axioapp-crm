@@ -4,6 +4,7 @@ Re-exports service entry points (no FastAPI / Pydantic) so other
 modules can `from src.app.core.staff import compute_performance`
 without dragging in HTTP-layer deps.
 """
+
 from src.app.core.staff.service import (
     clock_in,
     clock_out,

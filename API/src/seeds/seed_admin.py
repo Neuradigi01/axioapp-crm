@@ -1,7 +1,8 @@
-from sqlalchemy import select, func
+from sqlalchemy import func, select
+
 from src.core.db import async_session
-from src.models.admin import Admin
 from src.core.security.password import hash_password
+from src.models.admin import Admin
 
 
 async def _seed_admin(
@@ -13,9 +14,11 @@ async def _seed_admin(
     is_developer: bool,
 ):
     async with async_session() as db:
-        existing = (await db.execute(
-            select(Admin).where(func.lower(Admin.admin_user_id) == admin_user_id.lower())
-        )).scalar_one_or_none()
+        existing = (
+            await db.execute(
+                select(Admin).where(func.lower(Admin.admin_user_id) == admin_user_id.lower())
+            )
+        ).scalar_one_or_none()
         if existing:
             print(f"Admin '{admin_user_id}' already exists, skipping.")
             return

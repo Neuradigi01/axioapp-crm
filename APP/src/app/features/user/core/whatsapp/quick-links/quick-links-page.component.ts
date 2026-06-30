@@ -1,23 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { QrDownloadComponent } from './qr-download.component';
 import { QuickLinkEditorComponent } from './quick-link-editor.component';
-import {
-  QuickLink,
-  QuickLinkPage,
-  QuickLinksService,
-} from './quick-links.service';
+import { QuickLink, QuickLinkPage, QuickLinksService } from './quick-links.service';
 
 type Mode = 'list' | 'edit';
 
@@ -34,22 +24,15 @@ type Mode = 'list' | 'edit';
   selector: 'app-whatsapp-quick-links-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    CommonModule,
-    LucideAngularModule,
-    QrDownloadComponent,
-    QuickLinkEditorComponent,
-  ],
+  imports: [CommonModule, LucideAngularModule, QrDownloadComponent, QuickLinkEditorComponent],
   template: `
     <div class="space-y-4 p-4">
       <header class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 class="text-xl font-semibold text-zinc-900">
-            Quick contact links
-          </h1>
+          <h1 class="text-xl font-semibold text-zinc-900">Quick contact links</h1>
           <p class="text-xs text-zinc-500">
-            Print on billboards, receipts, packaging. Each scan attributes
-            the resulting conversation to the link.
+            Print on billboards, receipts, packaging. Each scan attributes the resulting
+            conversation to the link.
           </p>
         </div>
         @if (mode() === 'list') {
@@ -212,8 +195,7 @@ export class WhatsAppQuickLinksPageComponent {
           this.toast.set(`Deleted "${row.label}".`);
           this.load();
         },
-        error: (err: HttpErrorResponse) =>
-          this.error.set(extractApiError(err) ?? 'Delete failed.'),
+        error: (err: HttpErrorResponse) => this.error.set(extractApiError(err) ?? 'Delete failed.'),
       });
   }
 

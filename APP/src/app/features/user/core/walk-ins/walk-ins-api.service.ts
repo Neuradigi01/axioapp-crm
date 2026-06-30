@@ -7,12 +7,7 @@ import { Contact } from '../contacts/contacts-api.service';
 import { FieldDef } from '../shared/dynamic-form/types';
 import { buildHttpParams } from '../shared/services/query-builder';
 
-export type WalkInStatus =
-  | 'browsing'
-  | 'interested'
-  | 'follow_up'
-  | 'converted'
-  | 'left';
+export type WalkInStatus = 'browsing' | 'interested' | 'follow_up' | 'converted' | 'left';
 
 export interface WalkIn {
   id: string;
@@ -113,17 +108,11 @@ export class WalkInsApiService {
   }
 
   quickRegister(payload: QuickRegisterPayload): Observable<QuickRegisterResponse> {
-    return this.http.post<QuickRegisterResponse>(
-      `${this.base}/quick-register`,
-      payload,
-    );
+    return this.http.post<QuickRegisterResponse>(`${this.base}/quick-register`, payload);
   }
 
   /** Single-row reassign. `userId === null` clears the owner. */
-  reassign(
-    id: string,
-    body: { userId: string | null; note?: string | null },
-  ): Observable<WalkIn> {
+  reassign(id: string, body: { userId: string | null; note?: string | null }): Observable<WalkIn> {
     return this.http.post<WalkIn>(`${this.base}/${id}/reassign`, {
       assigned_to_id: body.userId,
       note: body.note ?? null,
@@ -141,9 +130,7 @@ export class WalkInsApiService {
     });
   }
 
-  bulkCheckout(
-    ids: string[],
-  ): Observable<{ checked_out: number; already_checked_out: number }> {
+  bulkCheckout(ids: string[]): Observable<{ checked_out: number; already_checked_out: number }> {
     return this.http.post<{
       checked_out: number;
       already_checked_out: number;

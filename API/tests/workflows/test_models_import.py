@@ -12,6 +12,7 @@ Covers:
   * ``WorkflowGraph`` rejects nodes without an ``id`` / ``type``.
   * ``WorkflowGraph`` rejects edges referencing missing node ids.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -60,9 +61,7 @@ def test_all_five_tables_registered_with_base_metadata():
         "tbl_workflow_step_runs",
     }
     registered = set(Base.metadata.tables.keys())
-    assert expected.issubset(registered), (
-        f"missing tables: {expected - registered}"
-    )
+    assert expected.issubset(registered), f"missing tables: {expected - registered}"
 
 
 def test_workflow_status_enum_values():

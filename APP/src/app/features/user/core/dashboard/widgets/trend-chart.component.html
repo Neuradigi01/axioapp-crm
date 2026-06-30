@@ -1,7 +1,5 @@
 <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
-  <div
-    class="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3"
-  >
+  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3">
     <h2 class="text-sm font-semibold text-zinc-900">Trend</h2>
     <div class="flex flex-wrap items-center gap-1">
       @for (m of METRICS; track m.key) {
@@ -10,9 +8,7 @@
           (click)="setMetric(m.key)"
           [class]="
             'rounded-md px-2 py-1 text-xs font-medium transition-colors ' +
-            (metric() === m.key
-              ? 'bg-zinc-900 text-white'
-              : 'text-zinc-600 hover:bg-zinc-100')
+            (metric() === m.key ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100')
           "
           [attr.aria-pressed]="metric() === m.key"
         >
@@ -24,10 +20,7 @@
 
   <div class="p-4">
     @if (error(); as err) {
-      <div
-        class="flex h-64 items-center justify-center text-sm text-rose-700"
-        role="alert"
-      >
+      <div class="flex h-64 items-center justify-center text-sm text-rose-700" role="alert">
         {{ err }}
       </div>
     } @else if (loading()) {

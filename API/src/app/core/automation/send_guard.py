@@ -35,13 +35,13 @@ with one of three terminal states:
     No send. Audit event ``automations.send_blocked_<reason>``
     emitted.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, time, timedelta
 
 try:
     # Python 3.9+ ships zoneinfo; the project is on 3.13.
@@ -63,8 +63,8 @@ class SendDecision:
     """Composite send-guard verdict for a single automation run."""
 
     allow: bool
-    defer_until: Optional[datetime] = None
-    skip_reason: Optional[str] = None
+    defer_until: datetime | None = None
+    skip_reason: str | None = None
 
 
 # A sentinel "no-op" decision the dispatcher uses when the run is
@@ -115,7 +115,7 @@ async def check_frequency_cap(
     session,
     *,
     org,
-    contact_id: Optional[uuid.UUID],
+    contact_id: uuid.UUID | None,
     now_utc: datetime,
 ) -> SendDecision:
     """Return ``allow=False`` when the contact has already received
@@ -138,9 +138,7 @@ async def check_frequency_cap(
     # Cap = 0 means "no marketing sends ever"; short-circuit so we
     # don't even fire the COUNT query.
     if cap <= 0:
-        return SendDecision(
-            allow=False, skip_reason="frequency_cap_exceeded"
-        )
+        return SendDecision(allow=False, skip_reason="frequency_cap_exceeded")
 
     from src.app.core.automation import data_access as _da
 
@@ -152,9 +150,7 @@ async def check_frequency_cap(
         since=since,
     )
     if sent_count >= cap:
-        return SendDecision(
-            allow=False, skip_reason="frequency_cap_exceeded"
-        )
+        return SendDecision(allow=False, skip_reason="frequency_cap_exceeded")
     return _ALLOW
 
 
@@ -224,7 +220,7 @@ def _next_quiet_hours_end(
         # window; never schedules into the past.
         if today_end <= now_local:
             today_end = today_end + timedelta(days=1)
-    return today_end.astimezone(timezone.utc)
+    return today_end.astimezone(UTC)
 
 
 def check_quiet_hours(
@@ -259,9 +255,7 @@ def check_quiet_hours(
         return _ALLOW
 
     now_local = now_utc.astimezone(tz).time()
-    if not _within_quiet_hours(
-        now_local=now_local, start=quiet_start, end=quiet_end
-    ):
+    if not _within_quiet_hours(now_local=now_local, start=quiet_start, end=quiet_end):
         return _ALLOW
 
     defer_until = _next_quiet_hours_end(
@@ -281,7 +275,7 @@ async def check_suppression(
     *,
     org_id: uuid.UUID,
     channel: str,
-    recipient: Optional[str],
+    recipient: str | None,
 ) -> SendDecision:
     """Return ``allow=False`` when ``recipient`` is on the org's
     suppression list for ``channel`` — populated by the Step-14
@@ -331,9 +325,9 @@ async def evaluate(
     org,
     template,
     contact,
-    contact_id: Optional[uuid.UUID],
+    contact_id: uuid.UUID | None,
     channel: str,
-    now_utc: Optional[datetime] = None,
+    now_utc: datetime | None = None,
 ) -> SendDecision:
     """Composite verdict: returns the first non-allow decision found,
     or ``SendDecision(allow=True)`` if all three checks pass.
@@ -352,7 +346,7 @@ async def evaluate(
     from src.app.core.templates.models import TemplateCategory
 
     if now_utc is None:
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
 
     # 1) Hard suppression check — runs for every category. A
     # hard-bounced address can't receive ANYTHING, including
@@ -381,9 +375,7 @@ async def evaluate(
     if not dpdp.allow:
         return dpdp
 
-    freq = await check_frequency_cap(
-        session, org=org, contact_id=contact_id, now_utc=now_utc
-    )
+    freq = await check_frequency_cap(session, org=org, contact_id=contact_id, now_utc=now_utc)
     if not freq.allow:
         return freq
 

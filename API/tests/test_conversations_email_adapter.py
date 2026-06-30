@@ -20,14 +20,12 @@ Convention: no DB. Stub `async_session()` so the receive path's
 "open session" call yields a `_CapturingSession`. Stub
 `email_service.get_account` + `activities_log` + `notify` + audit.
 """
+
 from __future__ import annotations
 
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
-from typing import Any, Optional
-from unittest.mock import AsyncMock
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -50,7 +48,6 @@ from src.app.core.email.models import (
     EmailAccountSyncState,
 )
 
-
 # --- shared fixtures ---------------------------------------------------
 
 
@@ -69,15 +66,15 @@ def _make_account(**overrides) -> EmailAccount:
         display_name="Asha Patel",
         access_token_enc="enc",
         refresh_token_enc="enc",
-        token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        token_expires_at=datetime.now(UTC) + timedelta(hours=1),
         scopes_granted=[],
         sync_cursor="history-1",
         sync_state=EmailAccountSyncState.live,
         last_sync_at=None,
         last_sync_error=None,
         daily_sent_count=0,
-        daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-        connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+        connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         disconnected_at=None,
         disconnected_by=None,
     )
@@ -90,19 +87,13 @@ def _make_account(**overrides) -> EmailAccount:
 
 class TestExtractMessageId:
     def test_lowercase_key(self):
-        assert extract_message_id(
-            {"message-id": "<abc@x.com>"}
-        ) == "abc@x.com"
+        assert extract_message_id({"message-id": "<abc@x.com>"}) == "abc@x.com"
 
     def test_camelcase_key(self):
-        assert extract_message_id(
-            {"Message-ID": "<abc@x.com>"}
-        ) == "abc@x.com"
+        assert extract_message_id({"Message-ID": "<abc@x.com>"}) == "abc@x.com"
 
     def test_unbracketed(self):
-        assert extract_message_id(
-            {"message-id": "abc@x.com"}
-        ) == "abc@x.com"
+        assert extract_message_id({"message-id": "abc@x.com"}) == "abc@x.com"
 
     def test_missing(self):
         assert extract_message_id({}) == ""
@@ -113,15 +104,11 @@ class TestExtractMessageId:
 
 class TestExtractThreadKeys:
     def test_in_reply_to(self):
-        keys = extract_thread_keys(
-            {"in-reply-to": "<parent@x.com>"}
-        )
+        keys = extract_thread_keys({"in-reply-to": "<parent@x.com>"})
         assert keys == {"parent@x.com"}
 
     def test_references_chain(self):
-        keys = extract_thread_keys(
-            {"references": "<a@x> <b@x>\n <c@y>"}
-        )
+        keys = extract_thread_keys({"references": "<a@x> <b@x>\n <c@y>"})
         assert keys == {"a@x", "b@x", "c@y"}
 
     def test_combined(self):
@@ -139,22 +126,13 @@ class TestExtractThreadKeys:
 
 class TestNormalizeSubject:
     def test_strips_re(self):
-        assert (
-            normalize_subject("Re: Quote for sofa")
-            == "quote for sofa"
-        )
+        assert normalize_subject("Re: Quote for sofa") == "quote for sofa"
 
     def test_strips_repeated_re(self):
-        assert (
-            normalize_subject("Re: Re: Re: Quote for sofa")
-            == "quote for sofa"
-        )
+        assert normalize_subject("Re: Re: Re: Quote for sofa") == "quote for sofa"
 
     def test_strips_outlook_numbered_re(self):
-        assert (
-            normalize_subject("Re[2]: Quote for sofa")
-            == "quote for sofa"
-        )
+        assert normalize_subject("Re[2]: Quote for sofa") == "quote for sofa"
 
     def test_strips_fwd(self):
         assert normalize_subject("Fwd: Quote") == "quote"
@@ -320,8 +298,7 @@ class _AllRows:
 
 
 class _FakeContact:
-    def __init__(self, *, id=None, email="mehta@designs.com",
-                 full_name="Mr Mehta"):
+    def __init__(self, *, id=None, email="mehta@designs.com", full_name="Mr Mehta"):
         self.id = id or uuid.uuid4()
         self.email = email
         self.full_name = full_name
@@ -344,6 +321,7 @@ class _FakeConversation:
 def patch_external_io(monkeypatch):
     """Stub activities.log, notify, audit.log so tests don't open
     their own sessions."""
+
     async def _noop(*_a, **_k):
         return None
 
@@ -368,8 +346,7 @@ class TestSendEmail:
             return None
 
         monkeypatch.setattr(
-            "src.app.core.conversations.adapters.email."
-            "email_service.get_account",
+            "src.app.core.conversations.adapters.email.email_service.get_account",
             fake_get_account,
         )
         from fastapi import HTTPException
@@ -396,8 +373,7 @@ class TestSendEmail:
             return account
 
         monkeypatch.setattr(
-            "src.app.core.conversations.adapters.email."
-            "email_service.get_account",
+            "src.app.core.conversations.adapters.email.email_service.get_account",
             fake_get_account,
         )
         from fastapi import HTTPException
@@ -426,8 +402,7 @@ class TestSendEmail:
             return account
 
         monkeypatch.setattr(
-            "src.app.core.conversations.adapters.email."
-            "email_service.get_account",
+            "src.app.core.conversations.adapters.email.email_service.get_account",
             fake_get_account,
         )
         from fastapi import HTTPException
@@ -454,8 +429,7 @@ class TestSendEmail:
             return account
 
         monkeypatch.setattr(
-            "src.app.core.conversations.adapters.email."
-            "email_service.get_account",
+            "src.app.core.conversations.adapters.email.email_service.get_account",
             fake_get_account,
         )
         from fastapi import HTTPException
@@ -483,16 +457,14 @@ class TestSendEmail:
             return account
 
         monkeypatch.setattr(
-            "src.app.core.conversations.adapters.email."
-            "email_service.get_account",
+            "src.app.core.conversations.adapters.email.email_service.get_account",
             fake_get_account,
         )
 
         # Mock the Gmail send. send() returns a SendResult dataclass.
         from src.app.core.email.gmail.send import SendResult as GmailSR
 
-        async def fake_gmail_send(_account, _session, *, raw_mime,
-                                   thread_id=None):
+        async def fake_gmail_send(_account, _session, *, raw_mime, thread_id=None):
             return GmailSR(
                 gmail_message_id="gm-msg-xyz",
                 gmail_thread_id="gm-thr-abc",
@@ -502,9 +474,7 @@ class TestSendEmail:
 
         from src.app.core.email.gmail import send as gmail_send_mod
 
-        monkeypatch.setattr(
-            gmail_send_mod, "send", fake_gmail_send
-        )
+        monkeypatch.setattr(gmail_send_mod, "send", fake_gmail_send)
 
         session = _CapturingSession()
         # 1. Contact lookup
@@ -538,8 +508,7 @@ class TestSendEmail:
             return account
 
         monkeypatch.setattr(
-            "src.app.core.conversations.adapters.email."
-            "email_service.get_account",
+            "src.app.core.conversations.adapters.email.email_service.get_account",
             fake_get_account,
         )
         from src.app.core.email.gmail import send as gmail_send_mod
@@ -589,9 +558,7 @@ def patch_async_session(monkeypatch):
     async def fake_async_session():
         yield session
 
-    monkeypatch.setattr(
-        "src.app.shared.db.async_session", fake_async_session
-    )
+    monkeypatch.setattr("src.app.shared.db.async_session", fake_async_session)
     return session
 
 
@@ -622,9 +589,7 @@ class TestReceiveEmail:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_fresh_conversation_when_no_thread_keys(
-        self, patch_async_session
-    ):
+    async def test_fresh_conversation_when_no_thread_keys(self, patch_async_session):
         contact_id = uuid.uuid4()
         # Dedupe: no existing RFC-id row.
         patch_async_session.queue(_ScalarOneOrNone(None))

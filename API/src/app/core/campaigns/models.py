@@ -19,6 +19,7 @@ by `status` and returns counts that the UI charts.
 
 Tenant-scoped, RLS on. Migration 0021 adds hot-path indexes.
 """
+
 from __future__ import annotations
 
 import enum
@@ -27,8 +28,8 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
-    Boolean,
     CHAR,
+    Boolean,
     DateTime,
     ForeignKey,
     Index,
@@ -89,9 +90,7 @@ class Campaign(Base, TenantScoped):
         server_default=sql_text("gen_random_uuid()"),
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    channel: Mapped[ConversationChannel] = mapped_column(
-        conversation_channel_enum, nullable=False
-    )
+    channel: Mapped[ConversationChannel] = mapped_column(conversation_channel_enum, nullable=False)
     audience_filter: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=sql_text("'{}'::jsonb")
     )
@@ -123,16 +122,12 @@ class Campaign(Base, TenantScoped):
         JSONB,
         nullable=True,
     )
-    schedule_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    schedule_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # whatsapp-platform-upgrade Step 27a — multi-number per org.
     # When set, the dispatcher resolves this specific WhatsApp
     # config instead of the org's default phone. NULL preserves
     # the original behaviour for every existing campaign row.
-    send_from_phone_id: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
+    send_from_phone_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # whatsapp-platform-upgrade Step 29 — A/B testing.
     # ``is_ab_test`` is the master gate; when False every other
     # A/B column is ignored. When True the dispatcher assigns each
@@ -177,9 +172,7 @@ class Campaign(Base, TenantScoped):
     winner_decided_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    winning_variant: Mapped[str | None] = mapped_column(
-        CHAR(1), nullable=True
-    )
+    winning_variant: Mapped[str | None] = mapped_column(CHAR(1), nullable=True)
     status: Mapped[CampaignStatus] = mapped_column(
         campaign_status_enum,
         nullable=False,
@@ -227,36 +220,26 @@ class CampaignMessage(Base, TenantScoped):
         ForeignKey("tbl_contacts.id", ondelete="CASCADE"),
         nullable=False,
     )
-    channel_message_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
+    channel_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[CampaignMessageStatus] = mapped_column(
         campaign_message_status_enum,
         nullable=False,
         server_default=sql_text("'queued'"),
     )
     error: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    sent_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Meta status webhook timestamps (Step 3.5.12). NULL until the
     # corresponding `statuses[]` event arrives from Meta. The
     # Step 3.5.13 UI uses these to render the WhatsApp tick state
     # (✓ sent / ✓✓ delivered / ✓✓ blue read) per message.
-    delivered_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    read_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # whatsapp-platform-upgrade Step 29 — A/B test variant marker.
     # ``'A'`` / ``'B'`` for recipients dispatched during the A/B
     # hold-out window; ``NULL`` for non-A/B campaigns + recipients
     # sent after the winner was decided (those receive the winning
     # template directly without a variant tag).
-    variant: Mapped[str | None] = mapped_column(
-        CHAR(1), nullable=True
-    )
+    variant: Mapped[str | None] = mapped_column(CHAR(1), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

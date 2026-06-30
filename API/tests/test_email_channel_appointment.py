@@ -12,32 +12,32 @@ update-appointments-page).
 We patch `src.app.shared.email.get_email_backend` to a recording or
 raising fake so SMTP credentials aren't required in CI.
 """
+
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.appointments.models import Appointment, AppointmentStatus
 from src.app.core.audit.models import AuditLog
 from src.app.core.contacts.models import Contact
+from src.app.core.notifications import service as notif_service
 from src.app.core.notifications.models import (
     Notification,
     NotificationChannel,
     NotificationPreference,
 )
-from src.app.core.notifications import service as notif_service
 from src.app.core.permissions.models import RolePermission
 from src.app.core.permissions.service import register_permission
 from src.app.core.users.models import OrganizationMember, UserInfo
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.security.password import hash_password as _hp
 from src.models.user import UserLogin
-
 
 # --- fake email backend ----------------------------------------------------
 
@@ -103,9 +103,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -161,15 +159,11 @@ async def _seed_second_user(
         await session.flush()
 
         await session.execute(
-            sql_text(
-                "UPDATE tbl_user_login SET legacy_uuid = :u WHERE id = :i"
-            ),
+            sql_text("UPDATE tbl_user_login SET legacy_uuid = :u WHERE id = :i"),
             {"u": str(user_uuid), "i": login.id},
         )
         await session.execute(
-            sql_text(
-                "INSERT INTO users (id) VALUES (:u) ON CONFLICT DO NOTHING"
-            ),
+            sql_text("INSERT INTO users (id) VALUES (:u) ON CONFLICT DO NOTHING"),
             {"u": str(user_uuid)},
         )
         session.add(
@@ -212,8 +206,7 @@ async def _seed_appointment(
                 org_id=org_id,
                 contact_id=contact_id,
                 title="Showroom visit",
-                scheduled_at=scheduled_at
-                or datetime.now(timezone.utc) + timedelta(days=1, hours=2),
+                scheduled_at=scheduled_at or datetime.now(UTC) + timedelta(days=1, hours=2),
                 duration_min=60,
                 assigned_to_id=assigned_to_id,
                 status=status,
@@ -226,9 +219,7 @@ async def _seed_appointment(
         reset_context(token)
 
 
-async def _opt_in_email(
-    org_id: uuid.UUID, *, user_id: uuid.UUID, type_: str
-) -> None:
+async def _opt_in_email(org_id: uuid.UUID, *, user_id: uuid.UUID, type_: str) -> None:
     """Insert an explicit `enabled=True` row for `(user, type, email)`."""
     from tests.conftest import TestSession
 
@@ -245,9 +236,7 @@ async def _opt_in_email(
         await session.commit()
 
 
-async def _notifications_for(
-    user_id: uuid.UUID, *, type_: str | None = None
-) -> list[Notification]:
+async def _notifications_for(user_id: uuid.UUID, *, type_: str | None = None) -> list[Notification]:
     from tests.conftest import TestSession
 
     async with TestSession() as session:
@@ -263,19 +252,16 @@ async def _audit_actions(*, action: str) -> list[AuditLog]:
 
     async with TestSession() as session:
         rows = (
-            await session.execute(
-                select(AuditLog).where(AuditLog.action == action)
-            )
-        ).scalars().all()
+            (await session.execute(select(AuditLog).where(AuditLog.action == action)))
+            .scalars()
+            .all()
+        )
         return list(rows)
 
 
 def _ts(hour: int, days_offset: int = 1) -> str:
-    base = (
-        datetime.now(timezone.utc).replace(
-            hour=hour, minute=0, second=0, microsecond=0
-        )
-        + timedelta(days=days_offset)
+    base = datetime.now(UTC).replace(hour=hour, minute=0, second=0, microsecond=0) + timedelta(
+        days=days_offset
     )
     return base.isoformat()
 
@@ -284,23 +270,17 @@ def _ts(hour: int, days_offset: int = 1) -> str:
 
 
 @pytest.mark.asyncio
-async def test_email_pref_on_dispatches_email(
-    layered_client, seeded_admin, monkeypatch
-):
+async def test_email_pref_on_dispatches_email(layered_client, seeded_admin, monkeypatch):
     """Email pref ON for `appointment.assigned` -> SMTP send() called once
     with subject carrying the appointment title."""
     org = seeded_admin["org"]
     actor = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id, name="Asha Reddy")
     priya_uuid, priya_email = await _seed_second_user(
         org.id, role_id=seeded_admin["role"].id, first_name="Priya"
     )
-    await _opt_in_email(
-        org.id, user_id=priya_uuid, type_="appointment.assigned"
-    )
+    await _opt_in_email(org.id, user_id=priya_uuid, type_="appointment.assigned")
 
     backend = _RecordingBackend()
     _install_backend(monkeypatch, backend)
@@ -334,15 +314,11 @@ async def test_email_pref_on_dispatches_email(
 
 
 @pytest.mark.asyncio
-async def test_email_pref_off_skips_email(
-    layered_client, seeded_admin, monkeypatch
-):
+async def test_email_pref_off_skips_email(layered_client, seeded_admin, monkeypatch):
     """No explicit email pref row -> default OFF -> no SMTP send()."""
     org = seeded_admin["org"]
     actor = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id)
     priya_uuid, _ = await _seed_second_user(
         org.id, role_id=seeded_admin["role"].id, first_name="PriyaOff"
@@ -373,9 +349,7 @@ async def test_email_pref_off_skips_email(
 
     assert backend.sent == []
     # In-app row still written.
-    notifs = await _notifications_for(
-        priya_uuid, type_="appointment.assigned"
-    )
+    notifs = await _notifications_for(priya_uuid, type_="appointment.assigned")
     assert len(notifs) == 1
 
 
@@ -388,16 +362,12 @@ async def test_smtp_failure_does_not_rollback_notification(
     returns 201."""
     org = seeded_admin["org"]
     actor = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id, name="SmtpDown")
     priya_uuid, _ = await _seed_second_user(
         org.id, role_id=seeded_admin["role"].id, first_name="PriyaFail"
     )
-    await _opt_in_email(
-        org.id, user_id=priya_uuid, type_="appointment.assigned"
-    )
+    await _opt_in_email(org.id, user_id=priya_uuid, type_="appointment.assigned")
 
     _install_backend(monkeypatch, _RaisingBackend())
 
@@ -421,9 +391,7 @@ async def test_smtp_failure_does_not_rollback_notification(
     )
     assert resp.status_code == 201, resp.text
 
-    notifs = await _notifications_for(
-        priya_uuid, type_="appointment.assigned"
-    )
+    notifs = await _notifications_for(priya_uuid, type_="appointment.assigned")
     assert len(notifs) == 1
     failed = await _audit_actions(action="notification.email.failed")
     assert len(failed) == 1
@@ -437,19 +405,13 @@ async def test_rescheduled_email_carries_new_scheduled_at(
     """Reschedule -> email body contains the new ISO scheduled_at."""
     org = seeded_admin["org"]
     actor = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id)
     priya_uuid, _ = await _seed_second_user(
         org.id, role_id=seeded_admin["role"].id, first_name="PriyaR"
     )
-    await _opt_in_email(
-        org.id, user_id=priya_uuid, type_="appointment.rescheduled"
-    )
-    appt_id = await _seed_appointment(
-        org.id, contact_id=contact_id, assigned_to_id=priya_uuid
-    )
+    await _opt_in_email(org.id, user_id=priya_uuid, type_="appointment.rescheduled")
+    appt_id = await _seed_appointment(org.id, contact_id=contact_id, assigned_to_id=priya_uuid)
 
     backend = _RecordingBackend()
     _install_backend(monkeypatch, backend)
@@ -461,9 +423,7 @@ async def test_rescheduled_email_carries_new_scheduled_at(
         password=seeded_admin["password"],
     )
 
-    new_at = (
-        datetime.now(timezone.utc) + timedelta(days=3, hours=5)
-    ).isoformat()
+    new_at = (datetime.now(UTC) + timedelta(days=3, hours=5)).isoformat()
     resp = await layered_client.post(
         f"/api/v1/appointments/{appt_id}/reschedule",
         json={"scheduled_at": new_at, "reason": "vendor delay"},
@@ -479,24 +439,18 @@ async def test_rescheduled_email_carries_new_scheduled_at(
 
 
 @pytest.mark.asyncio
-async def test_cancelled_email_carries_contact_and_time(
-    layered_client, seeded_admin, monkeypatch
-):
+async def test_cancelled_email_carries_contact_and_time(layered_client, seeded_admin, monkeypatch):
     """Cancel -> email body contains the contact name + original
     scheduled_at."""
     org = seeded_admin["org"]
     actor = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "appointments.read", "appointments.write"
-    )
+    await _grant(seeded_admin["role"].id, "appointments.read", "appointments.write")
     contact_id = await _seed_contact(org.id, name="Mr Cancel")
     priya_uuid, _ = await _seed_second_user(
         org.id, role_id=seeded_admin["role"].id, first_name="PriyaC"
     )
-    await _opt_in_email(
-        org.id, user_id=priya_uuid, type_="appointment.cancelled"
-    )
-    scheduled = datetime.now(timezone.utc) + timedelta(days=1, hours=4)
+    await _opt_in_email(org.id, user_id=priya_uuid, type_="appointment.cancelled")
+    scheduled = datetime.now(UTC) + timedelta(days=1, hours=4)
     appt_id = await _seed_appointment(
         org.id,
         contact_id=contact_id,

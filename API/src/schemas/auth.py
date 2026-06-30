@@ -15,14 +15,14 @@ class LoginRequest(BaseModel):
     identifier: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
     two_factor_code: str | None = None
-    two_factor_method: str | None = Field(None, pattern=r'^(authenticator|email|sms)$')
+    two_factor_method: str | None = Field(None, pattern=r"^(authenticator|email|sms)$")
     device_info: DeviceInfo | None = None
     captcha_token: str | None = None
     captcha_answer: str | None = None
 
 
 class SendContactOtpRequest(BaseModel):
-    type: str = Field(..., pattern=r'^(email|sms)$')
+    type: str = Field(..., pattern=r"^(email|sms)$")
     value: str = Field(..., min_length=1)
 
 
@@ -59,8 +59,8 @@ class ResetPasswordRequest(BaseModel):
 class TwoFactorRequest(BaseModel):
     identifier: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
-    user_type: str = Field(..., pattern=r'^(User|Admin)$')
-    method: str = Field(..., pattern=r'^(authenticator|email|sms)$')
+    user_type: str = Field(..., pattern=r"^(User|Admin)$")
+    method: str = Field(..., pattern=r"^(authenticator|email|sms)$")
 
 
 class LoginResponse(BaseModel):

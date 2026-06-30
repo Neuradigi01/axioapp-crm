@@ -25,10 +25,7 @@ import {
 
 import { environment } from '../../../../../../environments/environment';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  dashboardRange,
-  type DashboardRange,
-} from '../shared/dashboard-range.signal';
+import { dashboardRange, type DashboardRange } from '../shared/dashboard-range.signal';
 
 type TrendMetric = 'leads_created' | 'pipeline_value' | 'calls' | 'appointments';
 
@@ -71,9 +68,7 @@ export class TrendChartComponent {
   protected readonly metric = signal<TrendMetric>('leads_created');
   protected readonly loading = signal<boolean>(true);
   protected readonly error = signal<string | null>(null);
-  protected readonly series = signal<ApexAxisChartSeries>([
-    { name: 'Leads created', data: [] },
-  ]);
+  protected readonly series = signal<ApexAxisChartSeries>([{ name: 'Leads created', data: [] }]);
 
   protected readonly chart = computed<ApexChart>(() => ({
     type: 'area',
@@ -171,8 +166,7 @@ export class TrendChartComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
-          const label =
-            this.METRICS.find((x) => x.key === metric)?.label ?? metric;
+          const label = this.METRICS.find((x) => x.key === metric)?.label ?? metric;
           this.series.set([
             {
               name: label,

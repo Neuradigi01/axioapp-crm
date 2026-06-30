@@ -87,6 +87,11 @@ if /i "%1"=="help" ( call :print_help & exit /b 0
     echo Regenerating uv.lock with upgrades...
     docker run --rm -v "%cd%":/app -w /app %UV_IMAGE% uv lock --upgrade
     exit /b !errorlevel!
+) else if /i "%1"=="lint" ( call :do_lint & exit /b !errorlevel!
+) else if /i "%1"=="lint-fix" ( call :do_lint_fix & exit /b !errorlevel!
+) else if /i "%1"=="hooks-on" ( git config core.hooksPath .githooks & echo Git hooks enabled ^(core.hooksPath -^> .githooks^). & exit /b 0
+) else if /i "%1"=="hooks-off" ( git config --unset core.hooksPath 2>nul & echo Git hooks disabled ^(using default .git\hooks^). & exit /b 0
+) else if /i "%1"=="hooks-status" ( call :hooks_status & exit /b 0
 ) else if /i "%1"=="secrets-install" (
     set "missing="
     where sops >nul 2>nul
@@ -172,6 +177,13 @@ echo %C_SECTION%Dependencies%C_RESET%
 echo   %C_CMD%lock%C_RESET%               Regenerate uv.lock from pyproject.toml
 echo   %C_CMD%lock-upgrade%C_RESET%       Regenerate uv.lock with upgrades
 echo.
+echo %C_SECTION%Code quality%C_RESET%
+echo   %C_CMD%lint%C_RESET%               Check format + lint ^(ruff in container; prettier/eslint in APP^)
+echo   %C_CMD%lint-fix%C_RESET%           Auto-format + autofix ^(ruff --fix; prettier --write; eslint --fix^)
+echo   %C_CMD%hooks-on%C_RESET%           Enable the committed pre-commit hook ^(core.hooksPath^)
+echo   %C_CMD%hooks-off%C_RESET%          Disable the committed pre-commit hook
+echo   %C_CMD%hooks-status%C_RESET%       Show the current git hooks path
+echo.
 echo %C_SECTION%Secrets ^(SOPS + age^)%C_RESET%
 echo   %C_CMD%secrets-install%C_RESET%    Install sops + age via winget ^(open a new terminal after^)
 echo   %C_CMD%secrets-keygen%C_RESET%     Generate this machine's age key; print the public key
@@ -190,6 +202,7 @@ exit /b 0
 :do_up
 call :require_secrets
 if errorlevel 1 exit /b 1
+call :ensure_hooks
 echo Starting the full API stack...
 sops exec-env %SECRETS_FILE% "docker compose %ENV_FILE_FLAGS% %COMPOSE_FILES% --profile celery up --build -d"
 exit /b !errorlevel!
@@ -197,6 +210,7 @@ exit /b !errorlevel!
 :do_up_api
 call :require_secrets
 if errorlevel 1 exit /b 1
+call :ensure_hooks
 echo Starting the API stack (api + redis only)...
 sops exec-env %SECRETS_FILE% "docker compose %ENV_FILE_FLAGS% %COMPOSE_FILES% up --build -d"
 exit /b !errorlevel!
@@ -207,3 +221,75 @@ if errorlevel 1 exit /b 1
 echo Stopping and removing the full API stack...
 sops exec-env %SECRETS_FILE% "docker compose %ENV_FILE_FLAGS% %COMPOSE_FILES% --profile celery down -v"
 exit /b !errorlevel!
+
+:ensure_hooks
+set "HP="
+for /f "delims=" %%h in ('git config core.hooksPath 2^>nul') do set "HP=%%h"
+if not "!HP!"==".githooks" (
+    git config core.hooksPath .githooks
+    echo Git hooks enabled ^(core.hooksPath -^> .githooks^).
+)
+exit /b 0
+
+:hooks_status
+set "HP="
+for /f "delims=" %%h in ('git config core.hooksPath 2^>nul') do set "HP=%%h"
+if defined HP ( echo core.hooksPath = !HP! ) else ( echo core.hooksPath = ^(default .git\hooks^) )
+exit /b 0
+
+:do_lint
+set "RC=0"
+set "CID="
+for /f "delims=" %%i in ('docker compose %COMPOSE_FILES% ps -q api 2^>nul') do set "CID=%%i"
+if not defined CID (
+    echo Skipping Python lint: dev 'api' container not running ^(run.cmd up^).
+) else (
+    docker exec !CID! sh -c "command -v ruff >/dev/null 2>&1"
+    if errorlevel 1 (
+        echo Skipping Python lint: ruff not in image ^(rebuild: run.cmd up^).
+    ) else (
+        echo == ruff format --check ^(container^) ==
+        docker exec !CID! ruff format --check src tests || set "RC=1"
+        echo == ruff check ^(container^) ==
+        docker exec !CID! ruff check src tests || set "RC=1"
+    )
+)
+if exist "..\APP\node_modules" (
+    pushd ..\APP
+    echo == prettier --check ^(APP^) ==
+    call npx --no-install prettier --check "src/**/*.{ts,html,scss,css,json}" || set "RC=1"
+    echo == eslint ^(APP^) ==
+    call npx --no-install eslint . || set "RC=1"
+    popd
+) else (
+    echo Skipping frontend lint: APP\node_modules missing ^(npm ci^).
+)
+exit /b !RC!
+
+:do_lint_fix
+set "CID="
+for /f "delims=" %%i in ('docker compose %COMPOSE_FILES% ps -q api 2^>nul') do set "CID=%%i"
+if not defined CID (
+    echo Skipping Python autofix: dev 'api' container not running ^(run.cmd up^).
+) else (
+    docker exec !CID! sh -c "command -v ruff >/dev/null 2>&1"
+    if errorlevel 1 (
+        echo Skipping Python autofix: ruff not in image ^(rebuild: run.cmd up^).
+    ) else (
+        echo == ruff format ^(container^) ==
+        docker exec !CID! ruff format src tests
+        echo == ruff check --fix ^(container^) ==
+        docker exec !CID! ruff check --fix src tests
+    )
+)
+if exist "..\APP\node_modules" (
+    pushd ..\APP
+    echo == prettier --write ^(APP^) ==
+    call npx --no-install prettier --write "src/**/*.{ts,html,scss,css,json}"
+    echo == eslint --fix ^(APP^) ==
+    call npx --no-install eslint . --fix
+    popd
+) else (
+    echo Skipping frontend autofix: APP\node_modules missing ^(npm ci^).
+)
+exit /b 0

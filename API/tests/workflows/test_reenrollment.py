@@ -13,19 +13,23 @@ Plus:
   * Canceled prior runs never block re-enrollment (operator can
     re-enrol after cancellation).
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.events.event_catalog import LEAD_CREATED
 from src.app.core.workflows import (
     data_access as workflows_da,
+)
+from src.app.core.workflows import (
     trigger_handlers,
 )
 from src.app.core.workflows.models import (
@@ -36,7 +40,6 @@ from src.app.core.workflows.models import (
     WorkflowStatus,
 )
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -44,10 +47,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -92,10 +92,7 @@ async def _seed_workflow(
 async def _make_contact(test_db, *, org_id) -> uuid.UUID:
     contact_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_contacts (id, org_id, full_name) "
-            "VALUES (:id, :org_id, :name)"
-        ),
+        sql_text("INSERT INTO tbl_contacts (id, org_id, full_name) VALUES (:id, :org_id, :name)"),
         {"id": str(contact_id), "org_id": str(org_id), "name": "Asha"},
     )
     await test_db.commit()
@@ -108,9 +105,7 @@ async def _make_contact(test_db, *, org_id) -> uuid.UUID:
 
 
 async def test_re_enrollment_once_refuses_second_event(test_db, org_id):
-    wf = await _seed_workflow(
-        test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.once
-    )
+    wf = await _seed_workflow(test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.once)
     contact_id = await _make_contact(test_db, org_id=org_id)
 
     from src.app.core.workflows import engine as workflows_engine
@@ -127,10 +122,10 @@ async def test_re_enrollment_once_refuses_second_event(test_db, org_id):
             )
 
     rows = (
-        await test_db.execute(
-            select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
     # First enrolment was preserved — second was refused.
     assert rows[0].trigger_event_id == "first"
@@ -142,9 +137,7 @@ async def test_re_enrollment_once_refuses_second_event(test_db, org_id):
 
 
 async def test_re_enrollment_daily_refuses_same_day_repeat(test_db, org_id):
-    wf = await _seed_workflow(
-        test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.daily
-    )
+    wf = await _seed_workflow(test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.daily)
     contact_id = await _make_contact(test_db, org_id=org_id)
 
     from src.app.core.workflows import engine as workflows_engine
@@ -168,10 +161,10 @@ async def test_re_enrollment_daily_refuses_same_day_repeat(test_db, org_id):
         )
 
     rows = (
-        await test_db.execute(
-            select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
 
 
@@ -179,13 +172,11 @@ async def test_re_enrollment_daily_allows_after_midnight(test_db, org_id):
     """A run from yesterday doesn't block today's enrolment under
     the daily rule. We simulate yesterday's run via a direct row
     insert + back-dated started_at."""
-    wf = await _seed_workflow(
-        test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.daily
-    )
+    wf = await _seed_workflow(test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.daily)
     contact_id = await _make_contact(test_db, org_id=org_id)
 
     # Yesterday's enrolment.
-    yesterday = datetime.now(timezone.utc) - timedelta(days=2)
+    yesterday = datetime.now(UTC) - timedelta(days=2)
     test_db.add(
         WorkflowRun(
             org_id=org_id,
@@ -214,10 +205,10 @@ async def test_re_enrollment_daily_allows_after_midnight(test_db, org_id):
         )
 
     rows = (
-        await test_db.execute(
-            select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 2  # yesterday + today
 
 
@@ -227,9 +218,7 @@ async def test_re_enrollment_daily_allows_after_midnight(test_db, org_id):
 
 
 async def test_re_enrollment_never_allows_back_to_back(test_db, org_id):
-    wf = await _seed_workflow(
-        test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.never
-    )
+    wf = await _seed_workflow(test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.never)
     contact_id = await _make_contact(test_db, org_id=org_id)
 
     from src.app.core.workflows import engine as workflows_engine
@@ -246,10 +235,10 @@ async def test_re_enrollment_never_allows_back_to_back(test_db, org_id):
             )
 
     rows = (
-        await test_db.execute(
-            select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 3
 
 
@@ -261,9 +250,7 @@ async def test_re_enrollment_never_allows_back_to_back(test_db, org_id):
 async def test_canceled_prior_run_does_not_block_once(test_db, org_id):
     """The spec calls this out: canceled runs never block — operators
     cancel + re-enrol."""
-    wf = await _seed_workflow(
-        test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.once
-    )
+    wf = await _seed_workflow(test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.once)
     contact_id = await _make_contact(test_db, org_id=org_id)
 
     test_db.add(
@@ -293,10 +280,10 @@ async def test_canceled_prior_run_does_not_block_once(test_db, org_id):
         )
 
     rows = (
-        await test_db.execute(
-            select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)))
+        .scalars()
+        .all()
+    )
     statuses = {r.status for r in rows}
     # The canceled row is preserved + a fresh row landed.
     assert WorkflowRunStatus.canceled in statuses
@@ -309,9 +296,7 @@ async def test_canceled_prior_run_does_not_block_once(test_db, org_id):
 
 
 async def test_find_existing_run_by_trigger_event_id_match(test_db, org_id):
-    wf = await _seed_workflow(
-        test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.never
-    )
+    wf = await _seed_workflow(test_db, org_id=org_id, re_enroll=WorkflowReEnrollmentRule.never)
     contact_id = await _make_contact(test_db, org_id=org_id)
 
     test_db.add(

@@ -43,13 +43,13 @@ RLS scoping
 query additionally passes ``org_id`` as a belt-and-braces filter so
 a missing RLS policy can't leak across tenants.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -97,10 +97,10 @@ class CampaignFunnelReport:
     campaign_id: uuid.UUID
     name: str
     status: str
-    started_at: Optional[datetime]
+    started_at: datetime | None
     stages: list[FunnelStage]
-    delivery_median_seconds: Optional[float]
-    delivery_p95_seconds: Optional[float]
+    delivery_median_seconds: float | None
+    delivery_p95_seconds: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,8 +141,8 @@ class CostReport:
 class QualityEvent:
     occurred_at: datetime
     event_type: str
-    old_value: Optional[str]
-    new_value: Optional[str]
+    old_value: str | None
+    new_value: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,7 +176,7 @@ class AIMetricsReport:
 # ---------------------------------------------------------------------------
 
 
-def _classify_failure(error: Optional[str]) -> str:
+def _classify_failure(error: str | None) -> str:
     """Map Meta's ``error`` title onto the Step-21 taxonomy.
 
     Meta's error titles are stable strings — we match on lowercased
@@ -188,18 +188,11 @@ def _classify_failure(error: Optional[str]) -> str:
     e = str(error).lower()
     if "rate" in e and ("limit" in e or "throttl" in e):
         return "rate_limited"
-    if (
-        "not on whatsapp" in e
-        or "invalid" in e
-        or "non-existing" in e
-        or "wa id" in e
-    ):
+    if "not on whatsapp" in e or "invalid" in e or "non-existing" in e or "wa id" in e:
         return "invalid_number"
     if "opted out" in e or "user has not opted in" in e or "consent" in e:
         return "opted_out"
-    if "template" in e and (
-        "paused" in e or "disabled" in e or "rejected" in e or "deleted" in e
-    ):
+    if "template" in e and ("paused" in e or "disabled" in e or "rejected" in e or "deleted" in e):
         return "template_paused"
     if (
         "quality" in e
@@ -244,7 +237,7 @@ async def compute_campaign_funnel(
     *,
     org_id: uuid.UUID,
     campaign_id: uuid.UUID,
-) -> Optional[CampaignFunnelReport]:
+) -> CampaignFunnelReport | None:
     """Per-campaign funnel + time-to-delivery percentiles.
 
     Funnel stages (in order):
@@ -365,9 +358,7 @@ async def compute_campaign_funnel(
             {"cid": campaign_id, "org_id": org_id},
         )
     ).all()
-    seconds_samples = [
-        float(r.seconds) for r in deltas_rows if r.seconds is not None
-    ]
+    seconds_samples = [float(r.seconds) for r in deltas_rows if r.seconds is not None]
 
     targeted = int(counts.targeted or 0)
     sent = int(counts.sent or 0)
@@ -375,9 +366,7 @@ async def compute_campaign_funnel(
     read_n = int(counts.read or 0)
     failed = int(counts.failed or 0)
     replied = int((replied_row.replied if replied_row else 0) or 0)
-    converted = int(
-        (converted_row.converted if converted_row else 0) or 0
-    )
+    converted = int((converted_row.converted if converted_row else 0) or 0)
 
     stages = [
         FunnelStage(key=k, label=_funnel_label(k), count=v)
@@ -394,7 +383,7 @@ async def compute_campaign_funnel(
 
     started_at = head.started_at
     if started_at is not None and started_at.tzinfo is None:
-        started_at = started_at.replace(tzinfo=timezone.utc)
+        started_at = started_at.replace(tzinfo=UTC)
 
     return CampaignFunnelReport(
         campaign_id=campaign_id,
@@ -452,9 +441,7 @@ async def compute_campaign_failures(
         campaign_id=campaign_id,
         total_failed=sum(buckets.values()),
         buckets=[
-            FailureBucket(
-                reason=k, label=_FAILURE_LABELS.get(k, k), count=v
-            )
+            FailureBucket(reason=k, label=_FAILURE_LABELS.get(k, k), count=v)
             for k, v in buckets.items()
         ],
         sample_errors=sample_errors,
@@ -546,9 +533,7 @@ async def compute_cost(
             {"org_id": org_id, "start": start, "end": end},
         )
     ).first()
-    counts["service"] = counts.get("service", 0) + int(
-        (service_row.n if service_row else 0) or 0
-    )
+    counts["service"] = counts.get("service", 0) + int((service_row.n if service_row else 0) or 0)
 
     estimate = cost_estimator.estimate(region=region, counts=counts)
     return CostReport(
@@ -637,7 +622,7 @@ async def compute_quality_timeline(
     for r in event_rows:
         ts = r.occurred_at
         if ts is not None and ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
+            ts = ts.replace(tzinfo=UTC)
         events.append(
             QualityEvent(
                 occurred_at=ts,
@@ -651,14 +636,10 @@ async def compute_quality_timeline(
     for r in volume_rows:
         ts = r.bucket_start
         if ts is not None and ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
-        volume.append(
-            QualityVolumePoint(bucket_start=ts, sent=int(r.n or 0))
-        )
+            ts = ts.replace(tzinfo=UTC)
+        volume.append(QualityVolumePoint(bucket_start=ts, sent=int(r.n or 0)))
 
-    return QualityTimelineReport(
-        range=range_key, events=events, volume=volume
-    )
+    return QualityTimelineReport(range=range_key, events=events, volume=volume)
 
 
 # ---------------------------------------------------------------------------
@@ -784,9 +765,7 @@ async def compute_ai_metrics(
     ).first()
 
     ai_replies = int((reply_counts.ai_replies if reply_counts else 0) or 0)
-    human_replies = int(
-        (reply_counts.human_replies if reply_counts else 0) or 0
-    )
+    human_replies = int((reply_counts.human_replies if reply_counts else 0) or 0)
     handled = int((handled_row.n if handled_row else 0) or 0)
     ai_only = int((ai_only_row.n if ai_only_row else 0) or 0)
 
@@ -826,8 +805,8 @@ class AbVariantBreakdown:
     division. Empty samples → 0 across the board."""
 
     variant: str
-    template_id: Optional[str]
-    template_name: Optional[str]
+    template_id: str | None
+    template_name: str | None
     sent: int
     delivered: int
     read: int
@@ -841,11 +820,11 @@ class AbVariantBreakdown:
 class AbComparisonReport:
     campaign_id: uuid.UUID
     is_ab_test: bool
-    winner_metric: Optional[str]
-    winning_variant: Optional[str]
-    winner_decided_at: Optional[datetime]
-    a: Optional[AbVariantBreakdown]
-    b: Optional[AbVariantBreakdown]
+    winner_metric: str | None
+    winning_variant: str | None
+    winner_decided_at: datetime | None
+    a: AbVariantBreakdown | None
+    b: AbVariantBreakdown | None
 
 
 async def compute_ab_comparison(
@@ -853,7 +832,7 @@ async def compute_ab_comparison(
     *,
     org_id: uuid.UUID,
     campaign_id: uuid.UUID,
-) -> Optional[AbComparisonReport]:
+) -> AbComparisonReport | None:
     """Per-variant side-by-side metrics for the campaign-detail
     Analytics tab (Step 29).
 
@@ -940,10 +919,7 @@ async def compute_ab_comparison(
             # template_id column) now points at the central library.
             tpl_row = (
                 await session.execute(
-                    text(
-                        "SELECT name FROM tbl_message_templates "
-                        "WHERE id = :tid"
-                    ),
+                    text("SELECT name FROM tbl_message_templates WHERE id = :tid"),
                     {"tid": tpl_id},
                 )
             ).first()
@@ -970,7 +946,7 @@ async def compute_ab_comparison(
     b = await _variant("B", head.variant_b_template_id)
     decided_at = head.winner_decided_at
     if decided_at is not None and decided_at.tzinfo is None:
-        decided_at = decided_at.replace(tzinfo=timezone.utc)
+        decided_at = decided_at.replace(tzinfo=UTC)
     return AbComparisonReport(
         campaign_id=campaign_id,
         is_ab_test=True,

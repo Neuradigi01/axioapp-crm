@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
@@ -91,9 +85,7 @@ export class SuppressionListComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.rows.update((current) =>
-            current.filter((r) => r.id !== row.id),
-          );
+          this.rows.update((current) => current.filter((r) => r.id !== row.id));
           this.removingId.set(null);
         },
         error: (err: HttpErrorResponse) => {

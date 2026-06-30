@@ -5,7 +5,6 @@ import {
   Component,
   DestroyRef,
   Input,
-  computed,
   effect,
   inject,
   signal,
@@ -42,7 +41,6 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
   { key: '90d', label: 'Last 90 days' },
 ];
 
-
 @Component({
   selector: 'app-template-performance',
   standalone: true,
@@ -68,9 +66,7 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
               (click)="setRange(r.key)"
               [class]="
                 'rounded-md px-2.5 py-1 text-xs font-medium transition ' +
-                (range() === r.key
-                  ? 'bg-zinc-900 text-white'
-                  : 'text-zinc-600 hover:bg-zinc-100')
+                (range() === r.key ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100')
               "
             >
               {{ r.label }}
@@ -86,19 +82,16 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
       }
 
       @if (loading()) {
-        <div class="rounded-md border border-zinc-200 bg-white px-6 py-12 text-center text-sm text-zinc-500">
+        <div
+          class="rounded-md border border-zinc-200 bg-white px-6 py-12 text-center text-sm text-zinc-500"
+        >
           Loading metrics…
         </div>
       } @else if (data(); as d) {
         @if (d.sent === 0 && d.failed === 0) {
           <div class="rounded-md border border-zinc-200 bg-white px-6 py-12 text-center">
-            <lucide-icon
-              name="trending-up"
-              class="mx-auto mb-2 h-8 w-8 text-zinc-300"
-            />
-            <p class="text-sm font-medium text-zinc-700">
-              No data yet.
-            </p>
+            <lucide-icon name="trending-up" class="mx-auto mb-2 h-8 w-8 text-zinc-300" />
+            <p class="text-sm font-medium text-zinc-700">No data yet.</p>
             <p class="mt-1 text-xs text-zinc-500">
               Send this template in a campaign to see metrics here.
             </p>
@@ -107,9 +100,7 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
           <!-- Stat-card grid -->
           <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
             <div class="rounded-md border border-zinc-200 bg-white p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                Sent
-              </p>
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Sent</p>
               <p class="mt-1 text-2xl font-semibold text-zinc-900">
                 {{ d.sent }}
               </p>
@@ -121,23 +112,17 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
               <p class="mt-1 text-2xl font-semibold text-zinc-900">
                 {{ d.delivered }}
               </p>
-              <p class="text-[10px] text-zinc-500">
-                {{ d.delivery_rate }}%
-              </p>
+              <p class="text-[10px] text-zinc-500">{{ d.delivery_rate }}%</p>
             </div>
             <div class="rounded-md border border-zinc-200 bg-white p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                Read
-              </p>
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Read</p>
               <p class="mt-1 text-2xl font-semibold text-zinc-900">
                 {{ d.read }}
               </p>
               <p class="text-[10px] text-zinc-500">{{ d.read_rate }}%</p>
             </div>
             <div class="rounded-md border border-zinc-200 bg-white p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                Replied
-              </p>
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Replied</p>
               <p class="mt-1 text-2xl font-semibold text-zinc-900">
                 {{ d.replied }}
               </p>
@@ -152,9 +137,7 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
               </p>
             </div>
             <div class="rounded-md border border-zinc-200 bg-white p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                Failed
-              </p>
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Failed</p>
               <p class="mt-1 text-2xl font-semibold text-rose-700">
                 {{ d.failed }}
               </p>
@@ -172,20 +155,9 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
                   Not enough data for a trend chart yet.
                 </p>
               } @else {
-                <svg
-                  viewBox="0 0 600 160"
-                  class="h-32 w-full"
-                  preserveAspectRatio="none"
-                >
+                <svg viewBox="0 0 600 160" class="h-32 w-full" preserveAspectRatio="none">
                   <!-- Axis baseline -->
-                  <line
-                    x1="0"
-                    y1="150"
-                    x2="600"
-                    y2="150"
-                    stroke="#e4e4e7"
-                    stroke-width="1"
-                  />
+                  <line x1="0" y1="150" x2="600" y2="150" stroke="#e4e4e7" stroke-width="1" />
                   <!-- Sent (zinc-900) -->
                   <polyline
                     [attr.points]="chartLine('sent')"
@@ -241,9 +213,7 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
                 Failure breakdown
               </p>
               @if (d.failures.length === 0) {
-                <p class="py-4 text-center text-xs text-zinc-500">
-                  No failures in this range. 🎉
-                </p>
+                <p class="py-4 text-center text-xs text-zinc-500">No failures in this range. 🎉</p>
               } @else {
                 <ul class="divide-y divide-zinc-100">
                   @for (f of d.failures; track f.bucket) {
@@ -261,11 +231,11 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
 
           @if (d.used_in_campaigns > 0) {
             <p class="text-xs text-zinc-500">
-              Used in <a
-                routerLink="/user/campaigns"
-                class="font-semibold text-zinc-900 underline"
-              >{{ d.used_in_campaigns }}
-              {{ d.used_in_campaigns === 1 ? 'campaign' : 'campaigns' }}</a>.
+              Used in
+              <a routerLink="/user/campaigns" class="font-semibold text-zinc-900 underline"
+                >{{ d.used_in_campaigns }}
+                {{ d.used_in_campaigns === 1 ? 'campaign' : 'campaigns' }}</a
+              >.
             </p>
           }
         }
@@ -299,15 +269,10 @@ export class TemplatePerformanceComponent {
     this.range.set(r);
   }
 
-  protected chartLine(
-    key: 'sent' | 'delivered' | 'read' | 'failed',
-  ): string {
+  protected chartLine(key: 'sent' | 'delivered' | 'read' | 'failed'): string {
     const d = this.data();
     if (!d || d.daily.length === 0) return '';
-    const max = d.daily.reduce(
-      (m, b) => Math.max(m, b.sent, b.delivered, b.read, b.failed),
-      0,
-    );
+    const max = d.daily.reduce((m, b) => Math.max(m, b.sent, b.delivered, b.read, b.failed), 0);
     if (max === 0) return '';
     const width = 600;
     const height = 150;
@@ -336,9 +301,7 @@ export class TemplatePerformanceComponent {
         error: (err: HttpErrorResponse) => {
           this.data.set(null);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load template metrics.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load template metrics.');
         },
       });
   }

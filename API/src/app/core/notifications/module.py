@@ -6,8 +6,8 @@ top-level entry. No permission keys are registered because every
 authenticated user is allowed to read and manage their own
 notifications; per-resource scoping happens inside the service.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="notifications",

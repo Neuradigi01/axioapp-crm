@@ -34,6 +34,7 @@ adapter. If no opt-out template is configured the flip still
 persists — DPDP compliance trumps the courtesy notice. The
 template send failure is logged but does not raise.
 """
+
 from __future__ import annotations
 
 import logging
@@ -41,8 +42,8 @@ import os
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -89,10 +90,10 @@ class ConsentError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class TransitionResult:
     contact_id: uuid.UUID
-    old_status: Optional[str]
+    old_status: str | None
     new_status: str
     persisted: bool  # False on idempotent no-op
-    event_id: Optional[uuid.UUID]
+    event_id: uuid.UUID | None
 
 
 def _normalised_keywords() -> list[str]:
@@ -114,7 +115,7 @@ def _normalised_keywords() -> list[str]:
     return out
 
 
-def detect_stop_keyword(text: Optional[str]) -> bool:
+def detect_stop_keyword(text: str | None) -> bool:
     """True if the inbound text matches any STOP keyword.
 
     Match rules:
@@ -147,19 +148,17 @@ def detect_stop_keyword(text: Optional[str]) -> bool:
 def _validate_status(status: str) -> str:
     if status not in WHATSAPP_OPT_IN_STATUSES:
         raise ConsentError(
-            f"unknown opt-in status {status!r}; must be one of "
-            f"{sorted(WHATSAPP_OPT_IN_STATUSES)}"
+            f"unknown opt-in status {status!r}; must be one of {sorted(WHATSAPP_OPT_IN_STATUSES)}"
         )
     return status
 
 
-def _validate_source(source: Optional[str]) -> Optional[str]:
+def _validate_source(source: str | None) -> str | None:
     if source is None:
         return None
     if source not in WHATSAPP_OPT_IN_SOURCES:
         raise ConsentError(
-            f"unknown opt-in source {source!r}; must be one of "
-            f"{sorted(WHATSAPP_OPT_IN_SOURCES)}"
+            f"unknown opt-in source {source!r}; must be one of {sorted(WHATSAPP_OPT_IN_SOURCES)}"
         )
     return source
 
@@ -169,11 +168,11 @@ async def record_transition(
     *,
     contact: Contact,
     new_status: str,
-    source: Optional[str],
-    actor_user_id: Optional[uuid.UUID] = None,
-    reason: Optional[str] = None,
-    request_evidence: Optional[dict[str, Any]] = None,
-    ip_address: Optional[str] = None,
+    source: str | None,
+    actor_user_id: uuid.UUID | None = None,
+    reason: str | None = None,
+    request_evidence: dict[str, Any] | None = None,
+    ip_address: str | None = None,
     commit: bool = True,
 ) -> TransitionResult:
     """Persist a status transition on ``contact`` + append a
@@ -204,7 +203,7 @@ async def record_transition(
             event_id=None,
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     contact.whatsapp_opt_in_status = new_status
     contact.whatsapp_opt_in_source = source
     if new_status == "opted_out":
@@ -245,9 +244,7 @@ async def record_transition(
         after={
             "whatsapp_opt_in_status": new_status,
             "whatsapp_opt_in_source": source,
-            "actor_user_id": (
-                str(actor_user_id) if actor_user_id else None
-            ),
+            "actor_user_id": (str(actor_user_id) if actor_user_id else None),
             "reason": reason,
         },
     )
@@ -281,8 +278,8 @@ async def list_consent_events(
 async def auto_flip_on_inbound(
     session: AsyncSession,
     *,
-    contact: Optional[Contact],
-    inbound_text: Optional[str],
+    contact: Contact | None,
+    inbound_text: str | None,
     is_first_inbound: bool,
 ) -> TransitionResult | None:
     """Apply the two automatic rules from the Step 22 spec:
@@ -309,10 +306,7 @@ async def auto_flip_on_inbound(
             commit=False,
         )
 
-    if (
-        is_first_inbound
-        and contact.whatsapp_opt_in_status == "never_contacted"
-    ):
+    if is_first_inbound and contact.whatsapp_opt_in_status == "never_contacted":
         return await record_transition(
             session,
             contact=contact,
@@ -387,7 +381,7 @@ async def send_opt_out_confirmation(
             language=template.language,
             variables=[],
         )
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sent_at = ref.sent_at or now
         msg = Message(
             org_id=conversation.org_id,

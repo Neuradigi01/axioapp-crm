@@ -11,6 +11,7 @@ authenticated user since every form modal calls it on open.
   DELETE /standard-fields/{entity}/{field_key}  → reset to registry defaults      [manage]
   GET    /standard-fields/{entity}/render       → merged defaults + overrides     [any user]
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response, status
@@ -35,7 +36,6 @@ from src.app.core.standard_fields.service import (
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/standard-fields", tags=["Standard Fields"])
 

@@ -1,4 +1,5 @@
 """Pydantic v2 schemas for roles and permissions."""
+
 from __future__ import annotations
 
 import uuid
@@ -10,7 +11,6 @@ from src.app.shared.schemas import ORMModel
 
 
 class PermissionOut(ORMModel):
-
     id: uuid.UUID
     key: str
     description: str | None
@@ -18,7 +18,6 @@ class PermissionOut(ORMModel):
 
 
 class RoleOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     name: str

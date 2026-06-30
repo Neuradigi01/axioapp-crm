@@ -11,10 +11,10 @@ through the leads module descriptor's `MODULE.permissions` list, so
 the lifespan's `discover_modules()` sweep populates the row in the
 `permissions` table at startup.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import (
     APIRouter,
@@ -59,7 +59,6 @@ from src.app.core.leads.imports.targets import list_targets
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/leads/import", tags=["Leads", "Bulk Import"])
 
 
@@ -71,7 +70,7 @@ router = APIRouter(prefix="/leads/import", tags=["Leads", "Bulk Import"])
 async def upload_lead_import_endpoint(
     file: UploadFile = File(...),
     source_platform: SourcePlatform = Form(...),
-    name: Optional[str] = Form(default=None, max_length=255),
+    name: str | None = Form(default=None, max_length=255),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("leads.import")),
 ) -> LeadImportRead:
@@ -98,8 +97,8 @@ async def upload_lead_import_endpoint(
 
 @router.get("", response_model=LeadImportListResponse)
 async def list_lead_imports_endpoint(
-    status_filter: Optional[LeadImportStatus] = None,
-    source_platform: Optional[SourcePlatform] = None,
+    status_filter: LeadImportStatus | None = None,
+    source_platform: SourcePlatform | None = None,
     page: int = 1,
     size: int = 50,
     db: AsyncSession = Depends(get_db),
@@ -146,9 +145,7 @@ async def list_import_presets_endpoint(
     most-recent-first order. The mapping UI picks the org's newest
     preset as the auto-default, falling back to the system row.
     """
-    rows = await list_presets(
-        db, org_id=user.org_id, source_platform=source_platform
-    )
+    rows = await list_presets(db, org_id=user.org_id, source_platform=source_platform)
     return [PresetRead.model_validate(r) for r in rows]
 
 
@@ -204,9 +201,7 @@ async def get_lead_import_endpoint(
     if row is None:
         # Either nonexistent or a foreign-org id (RLS-hidden). Surface
         # as 404 so we don't leak existence across tenants.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
     return LeadImportRead.model_validate(row)
 
 
@@ -236,9 +231,7 @@ async def cancel_lead_import_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("leads.import")),
 ) -> LeadImportRead:
-    row = await cancel_import(
-        db, import_id=import_id, actor_id=user.legacy_uuid
-    )
+    row = await cancel_import(db, import_id=import_id, actor_id=user.legacy_uuid)
     return LeadImportRead.model_validate(row)
 
 
@@ -257,9 +250,7 @@ async def preview_lead_import_endpoint(
     """
     row = await get_import(db, import_id)
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
     payload = read_preview(row, limit)
     return PreviewResponse(columns=payload.columns, rows=payload.rows)
 
@@ -279,9 +270,7 @@ async def download_import_source_endpoint(
     """
     row = await get_import(db, import_id)
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
     data = read_source_file(row)
     safe_filename = (row.original_filename or "import.csv").replace('"', "")
     return Response(
@@ -306,9 +295,7 @@ async def download_import_errors_endpoint(
     """
     row = await get_import(db, import_id)
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="import not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
     data = read_error_csv(row)
     filename = f"import-{import_id}-errors.csv"
     return Response(

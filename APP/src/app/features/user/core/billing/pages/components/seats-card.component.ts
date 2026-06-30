@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { SeatModalService } from '../../services/seat-modal.service';
@@ -34,12 +28,12 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
             <lucide-icon name="users" size="18" aria-hidden="true"></lucide-icon>
           </div>
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+            <p
+              class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+            >
               Seats
             </p>
-            <h2 class="text-base font-semibold text-zinc-900 dark:text-slate-100">
-              Team seats
-            </h2>
+            <h2 class="text-base font-semibold text-zinc-900 dark:text-slate-100">Team seats</h2>
           </div>
         </div>
 
@@ -74,9 +68,7 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
             {{ subscription().seats.in_use }} / {{ subscription().seats.purchased }}
           </p>
         </div>
-        <div
-          class="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-slate-700"
-        >
+        <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-slate-700">
           <div
             class="h-full rounded-full transition-all"
             [class.bg-emerald-500]="seatTone() === 'green'"
@@ -92,7 +84,9 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
 
       <dl class="mt-6 grid flex-1 gap-4 sm:grid-cols-3">
         <div>
-          <dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+          <dt
+            class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+          >
             Included
           </dt>
           <dd class="mt-0.5 text-sm font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
@@ -100,7 +94,9 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
           </dd>
         </div>
         <div>
-          <dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+          <dt
+            class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+          >
             Active
           </dt>
           <dd class="mt-0.5 text-sm font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
@@ -108,7 +104,9 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
           </dd>
         </div>
         <div>
-          <dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+          <dt
+            class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+          >
             Extra seat
           </dt>
           <dd class="mt-0.5 text-sm font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
@@ -133,11 +131,7 @@ export class SeatsCardComponent {
    *  seats to the in-use floor can be a cost-recovery move. */
   protected readonly manageDisabled = computed(() => {
     const status = this.subscription().status;
-    return (
-      status === 'trialing' ||
-      status === 'cancelled' ||
-      status === 'archived'
-    );
+    return status === 'trialing' || status === 'cancelled' || status === 'archived';
   });
 
   protected readonly manageTooltip = computed(() => {

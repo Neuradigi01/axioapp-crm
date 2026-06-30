@@ -4,7 +4,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  computed,
   effect,
   inject,
   input,
@@ -14,11 +13,7 @@ import { Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  OutcomesReport,
-  ReportRange,
-  WhatsAppReportsService,
-} from './whatsapp-reports.service';
+import { OutcomesReport, ReportRange, WhatsAppReportsService } from './whatsapp-reports.service';
 
 /**
  * Outcomes widget (Step 20).
@@ -37,12 +32,8 @@ import {
     <div class="rounded-md border border-zinc-200 bg-white p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Outcomes
-          </p>
-          <p class="text-[11px] text-zinc-500">
-            Conversation status mix + top tag breakdown.
-          </p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Outcomes</p>
+          <p class="text-[11px] text-zinc-500">Conversation status mix + top tag breakdown.</p>
         </div>
         @if (loading()) {
           <span class="text-[11px] text-zinc-500">Loading…</span>
@@ -181,9 +172,7 @@ export class OutcomesWidgetComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not load outcomes.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load outcomes.');
         },
       });
   }

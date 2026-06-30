@@ -18,19 +18,19 @@ Like the integrations tests these skip DB round-trip — the prod-style
 `async_session()` engine isn't safe to drive from pytest-asyncio
 fixtures. Manual smoke covers end-to-end DB writes.
 """
+
 from __future__ import annotations
 
 import base64
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock
 
 import httpx
 import pytest
 
-from src.app.core.email import oauth as email_oauth
 from src.app.core.email.gmail import push as gmail_push
 from src.app.core.email.gmail import send as gmail_send
 from src.app.core.email.gmail import sync as gmail_sync
@@ -43,7 +43,6 @@ from src.app.core.email.models import (
 )
 from src.app.core.email.oauth import TokenSet
 from src.app.core.integrations import crypto
-
 
 _ORG_ID = uuid.uuid4()
 _USER_ID = uuid.uuid4()
@@ -62,15 +61,15 @@ def _make_account(
         display_name="Asha",
         access_token_enc=crypto.encrypt("current-access"),
         refresh_token_enc=crypto.encrypt("current-refresh"),
-        token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        token_expires_at=datetime.now(UTC) + timedelta(hours=1),
         scopes_granted=list(GMAIL_SCOPES),
         sync_cursor=None,
         sync_state=EmailAccountSyncState.live,
         last_sync_at=None,
         last_sync_error=None,
         daily_sent_count=0,
-        daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-        connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+        connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         disconnected_at=None,
         disconnected_by=None,
     )
@@ -82,9 +81,7 @@ class _FakeResp:
     def __init__(self, status_code: int, body: Any) -> None:
         self.status_code = status_code
         self._body = body
-        self.text = (
-            body if isinstance(body, str) else json.dumps(body)
-        )
+        self.text = body if isinstance(body, str) else json.dumps(body)
 
     def json(self) -> Any:
         if isinstance(self._body, str):
@@ -93,9 +90,7 @@ class _FakeResp:
 
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
-            raise httpx.HTTPStatusError(
-                "fake", request=None, response=None
-            )
+            raise httpx.HTTPStatusError("fake", request=None, response=None)
 
 
 class _StubHttp:
@@ -121,9 +116,7 @@ class _StubHttp:
             }
         )
         if not self.queue:
-            raise AssertionError(
-                f"unexpected POST {url}: no queued response"
-            )
+            raise AssertionError(f"unexpected POST {url}: no queued response")
         return self.queue.pop(0)
 
     async def get(self, url, *, params=None, headers=None):
@@ -136,9 +129,7 @@ class _StubHttp:
             }
         )
         if not self.queue:
-            raise AssertionError(
-                f"unexpected GET {url}: no queued response"
-            )
+            raise AssertionError(f"unexpected GET {url}: no queued response")
         return self.queue.pop(0)
 
     async def request(self, method, url, *, headers=None, params=None, json=None):
@@ -152,9 +143,7 @@ class _StubHttp:
             }
         )
         if not self.queue:
-            raise AssertionError(
-                f"unexpected {method} {url}: no queued response"
-            )
+            raise AssertionError(f"unexpected {method} {url}: no queued response")
         return self.queue.pop(0)
 
 
@@ -162,9 +151,7 @@ class _StubHttp:
 
 
 class TestGmailProvider:
-    def test_authorize_url_carries_scopes_state_redirect(
-        self, monkeypatch
-    ):
+    def test_authorize_url_carries_scopes_state_redirect(self, monkeypatch):
         monkeypatch.setattr(
             "src.app.core.email.gmail.oauth.GOOGLE_OAUTH_CLIENT_ID",
             "test-client-id",
@@ -184,9 +171,7 @@ class TestGmailProvider:
         assert "callback" in url
 
     def test_authorize_url_503_when_client_missing(self, monkeypatch):
-        monkeypatch.setattr(
-            "src.app.core.email.gmail.oauth.GOOGLE_OAUTH_CLIENT_ID", ""
-        )
+        monkeypatch.setattr("src.app.core.email.gmail.oauth.GOOGLE_OAUTH_CLIENT_ID", "")
         from fastapi import HTTPException
 
         provider = GmailProvider()
@@ -241,9 +226,7 @@ class TestGmailProvider:
             "y",
         )
         http = _StubHttp()
-        http.queue_response(
-            _FakeResp(400, {"error": "invalid_grant"})
-        )
+        http.queue_response(_FakeResp(400, {"error": "invalid_grant"}))
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc:
@@ -274,9 +257,7 @@ class TestGmailProvider:
                 },
             )
         )
-        tokens = await GmailProvider().refresh(
-            refresh_token="rt", http_client=http
-        )
+        tokens = await GmailProvider().refresh(refresh_token="rt", http_client=http)
         assert tokens.access_token == "refreshed-access"
         assert tokens.refresh_token is None
 
@@ -286,9 +267,7 @@ class TestGmailProvider:
 
 class TestGmailClient:
     @pytest.mark.asyncio
-    async def test_request_carries_bearer_after_refresh(
-        self, monkeypatch
-    ):
+    async def test_request_carries_bearer_after_refresh(self, monkeypatch):
         # Mock refresh_if_expired to return a stable TokenSet so we
         # don't drag the entire OAuth registry into a client test.
         async def fake_refresh(session, *, account):
@@ -305,12 +284,8 @@ class TestGmailClient:
         )
         account = _make_account()
         http = _StubHttp()
-        http.queue_response(
-            _FakeResp(200, {"messages": [{"id": "abc"}]})
-        )
-        client = GmailClient(
-            account=account, session=AsyncMock(), http_client=http
-        )
+        http.queue_response(_FakeResp(200, {"messages": [{"id": "abc"}]}))
+        client = GmailClient(account=account, session=AsyncMock(), http_client=http)
         body = await client.list_messages(q="newer_than:1d")
         assert body == {"messages": [{"id": "abc"}]}
         call = http.calls[0]
@@ -321,8 +296,10 @@ class TestGmailClient:
     async def test_4xx_raises_gmail_http_error(self, monkeypatch):
         async def fake_refresh(session, *, account):
             return TokenSet(
-                access_token="a", refresh_token=None,
-                expires_in_seconds=None, scopes_granted=[],
+                access_token="a",
+                refresh_token=None,
+                expires_in_seconds=None,
+                scopes_granted=[],
             )
 
         monkeypatch.setattr(
@@ -331,12 +308,8 @@ class TestGmailClient:
         )
         account = _make_account()
         http = _StubHttp()
-        http.queue_response(
-            _FakeResp(404, {"error": {"message": "not found"}})
-        )
-        client = GmailClient(
-            account=account, session=AsyncMock(), http_client=http
-        )
+        http.queue_response(_FakeResp(404, {"error": {"message": "not found"}}))
+        client = GmailClient(account=account, session=AsyncMock(), http_client=http)
         with pytest.raises(GmailHTTPError) as exc:
             await client.get_message("zzz", format="metadata")
         assert exc.value.status_code == 404
@@ -368,7 +341,7 @@ class _FakeGmailClient:
         *,
         list_pages: list[dict],
         message_details: dict[str, dict],
-        history_pages: Optional[list[dict]] = None,
+        history_pages: list[dict] | None = None,
     ) -> None:
         self._list_pages = list(list_pages)
         self._messages = message_details
@@ -419,11 +392,7 @@ def _msg(id: str, *, headers: dict, history_id: str = "100", thread_id: str | No
         "id": id,
         "threadId": thread_id or id,
         "historyId": history_id,
-        "payload": {
-            "headers": [
-                {"name": k, "value": v} for k, v in headers.items()
-            ]
-        },
+        "payload": {"headers": [{"name": k, "value": v} for k, v in headers.items()]},
     }
 
 
@@ -431,9 +400,7 @@ class TestSyncBackfill:
     @pytest.mark.asyncio
     async def test_matched_messages_collected(self):
         contact_id = uuid.uuid4()
-        session = _FakeSession(
-            contacts_by_email={"mehta@designs.com": contact_id}
-        )
+        session = _FakeSession(contacts_by_email={"mehta@designs.com": contact_id})
         client = _FakeGmailClient(
             list_pages=[
                 {"messages": [{"id": "m1"}, {"id": "m2"}]},
@@ -460,9 +427,7 @@ class TestSyncBackfill:
             },
         )
         account = _make_account()
-        result = await gmail_sync.backfill(
-            account, session, client=client, days=30
-        )
+        result = await gmail_sync.backfill(account, session, client=client, days=30)
         assert result.scanned_count == 2
         assert len(result.matched) == 1
         assert result.matched[0].gmail_message_id == "m1"
@@ -474,9 +439,7 @@ class TestSyncBackfill:
     @pytest.mark.asyncio
     async def test_pagination_walks_until_exhausted(self):
         contact_id = uuid.uuid4()
-        session = _FakeSession(
-            contacts_by_email={"a@x.com": contact_id}
-        )
+        session = _FakeSession(contacts_by_email={"a@x.com": contact_id})
         client = _FakeGmailClient(
             list_pages=[
                 {
@@ -494,9 +457,7 @@ class TestSyncBackfill:
             },
         )
         account = _make_account()
-        result = await gmail_sync.backfill(
-            account, session, client=client, days=30
-        )
+        result = await gmail_sync.backfill(account, session, client=client, days=30)
         assert client.list_calls == 2
         assert result.scanned_count == 2
         assert len(result.matched) == 2
@@ -504,9 +465,7 @@ class TestSyncBackfill:
     @pytest.mark.asyncio
     async def test_404_on_get_skips_message(self):
         contact_id = uuid.uuid4()
-        session = _FakeSession(
-            contacts_by_email={"a@x.com": contact_id}
-        )
+        session = _FakeSession(contacts_by_email={"a@x.com": contact_id})
         client = _FakeGmailClient(
             list_pages=[
                 {
@@ -522,9 +481,7 @@ class TestSyncBackfill:
             },
         )
         account = _make_account()
-        result = await gmail_sync.backfill(
-            account, session, client=client, days=30
-        )
+        result = await gmail_sync.backfill(account, session, client=client, days=30)
         assert result.scanned_count == 2
         assert len(result.matched) == 1
         assert result.matched[0].gmail_message_id == "m1"
@@ -534,9 +491,7 @@ class TestSyncIncremental:
     @pytest.mark.asyncio
     async def test_history_walk_matches_added(self):
         contact_id = uuid.uuid4()
-        session = _FakeSession(
-            contacts_by_email={"mehta@designs.com": contact_id}
-        )
+        session = _FakeSession(contacts_by_email={"mehta@designs.com": contact_id})
         client = _FakeGmailClient(
             list_pages=[],
             message_details={
@@ -568,9 +523,7 @@ class TestSyncIncremental:
             ],
         )
         account = _make_account(sync_cursor="500")
-        result = await gmail_sync.sync_incremental(
-            account, session, client=client
-        )
+        result = await gmail_sync.sync_incremental(account, session, client=client)
         assert result.scanned_count == 1
         assert len(result.matched) == 1
         assert result.new_cursor == "600"
@@ -580,13 +533,9 @@ class TestSyncIncremental:
     async def test_no_cursor_raises(self):
         session = _FakeSession(contacts_by_email={})
         account = _make_account(sync_cursor=None)
-        client = _FakeGmailClient(
-            list_pages=[], message_details={}, history_pages=[]
-        )
+        client = _FakeGmailClient(list_pages=[], message_details={}, history_pages=[])
         with pytest.raises(RuntimeError, match="no sync_cursor"):
-            await gmail_sync.sync_incremental(
-                account, session, client=client
-            )
+            await gmail_sync.sync_incremental(account, session, client=client)
 
 
 # --- 4. send.send --------------------------------------------------------
@@ -601,9 +550,7 @@ class _SendStubClient:
         self.calls: list[dict] = []
 
     async def send_message(self, *, raw_b64url, thread_id=None):
-        self.calls.append(
-            {"raw_b64url": raw_b64url, "thread_id": thread_id}
-        )
+        self.calls.append({"raw_b64url": raw_b64url, "thread_id": thread_id})
         if self._raise is not None:
             raise self._raise
         return self._response or {"id": "sent-msg-id", "threadId": "t"}
@@ -627,9 +574,7 @@ class TestSend:
     async def test_send_increments_counter_and_returns_ids(self):
         account = _make_account(daily_sent_count=10)
         session = _CapturingSession()
-        client = _SendStubClient(
-            response={"id": "msg-xyz", "threadId": "thr-abc"}
-        )
+        client = _SendStubClient(response={"id": "msg-xyz", "threadId": "thr-abc"})
         result = await gmail_send.send(
             account,
             session,
@@ -669,9 +614,7 @@ class TestSend:
     async def test_gmail_failure_rolls_back_counter(self):
         account = _make_account(daily_sent_count=10)
         session = _CapturingSession()
-        client = _SendStubClient(
-            raise_with=GmailHTTPError(503, {"err": "down"})
-        )
+        client = _SendStubClient(raise_with=GmailHTTPError(503, {"err": "down"}))
         with pytest.raises(GmailHTTPError):
             await gmail_send.send(
                 account,
@@ -690,9 +633,7 @@ class TestSend:
     async def test_near_soft_cap_flag(self):
         account = _make_account(daily_sent_count=189)  # 0.9 * 200 = 180
         session = _CapturingSession()
-        client = _SendStubClient(
-            response={"id": "x", "threadId": "y"}
-        )
+        client = _SendStubClient(response={"id": "x", "threadId": "y"})
         result = await gmail_send.send(
             account,
             session,
@@ -712,9 +653,9 @@ class TestPushDecode:
         payload = {"emailAddress": "asha@example.com", "historyId": 12345}
         envelope = {
             "message": {
-                "data": base64.urlsafe_b64encode(
-                    json.dumps(payload).encode("utf-8")
-                ).decode("ascii"),
+                "data": base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode(
+                    "ascii"
+                ),
                 "messageId": "pubsub-msg-1",
                 "publishTime": "2026-06-11T10:00:00Z",
             },
@@ -762,27 +703,21 @@ class TestPushDecode:
 
 class TestAddressExtraction:
     def test_bracketed_form(self):
-        assert gmail_sync._extract_addresses(
-            'Asha Patel <asha@example.com>'
-        ) == ["asha@example.com"]
-
-    def test_bare_form(self):
-        assert gmail_sync._extract_addresses("bob@y.com") == [
-            "bob@y.com"
+        assert gmail_sync._extract_addresses("Asha Patel <asha@example.com>") == [
+            "asha@example.com"
         ]
 
+    def test_bare_form(self):
+        assert gmail_sync._extract_addresses("bob@y.com") == ["bob@y.com"]
+
     def test_multiple_comma_separated(self):
-        addrs = gmail_sync._extract_addresses(
-            'A <a@x.com>, b@y.com, "C, Jr" <c@z.com>'
-        )
+        addrs = gmail_sync._extract_addresses('A <a@x.com>, b@y.com, "C, Jr" <c@z.com>')
         assert "a@x.com" in addrs
         assert "b@y.com" in addrs
         assert "c@z.com" in addrs
 
     def test_lowercases(self):
-        assert gmail_sync._extract_addresses(
-            "ASHA@Example.COM"
-        ) == ["asha@example.com"]
+        assert gmail_sync._extract_addresses("ASHA@Example.COM") == ["asha@example.com"]
 
     def test_empty(self):
         assert gmail_sync._extract_addresses("") == []

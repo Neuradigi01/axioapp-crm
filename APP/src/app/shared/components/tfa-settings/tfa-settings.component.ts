@@ -1,4 +1,11 @@
-import { Component, ChangeDetectionStrategy, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  signal,
+  OnInit,
+  OnDestroy,
+} from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -8,8 +15,26 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FormCardComponent } from '@shared/components/form-card/form-card.component';
 import { TwoFactorApiService } from '@app/services/two-factor-api.service';
-import { TFA_METHOD_LABELS, TFA_METHOD_ICONS, SNACKBAR_DURATION, SNACKBAR_ACTION } from '@core/constants/app.constants';
-import { MSG_ERROR_GENERIC, MSG_2FA_STATUS_FAILED, MSG_2FA_ENABLED, MSG_2FA_DISABLED, MSG_2FA_METHOD_CHANGED, MSG_2FA_SETUP_FAILED, MSG_2FA_OTP_SENT, MSG_2FA_OTP_RESENT, MSG_2FA_OTP_SEND_FAILED, MSG_2FA_VERIFY_FAILED, MSG_2FA_DISABLE_FAILED, MSG_2FA_METHOD_CHANGE_FAILED } from '@core/constants/messages.constants';
+import {
+  TFA_METHOD_LABELS,
+  TFA_METHOD_ICONS,
+  SNACKBAR_DURATION,
+  SNACKBAR_ACTION,
+} from '@core/constants/app.constants';
+import {
+  MSG_ERROR_GENERIC,
+  MSG_2FA_STATUS_FAILED,
+  MSG_2FA_ENABLED,
+  MSG_2FA_DISABLED,
+  MSG_2FA_METHOD_CHANGED,
+  MSG_2FA_SETUP_FAILED,
+  MSG_2FA_OTP_SENT,
+  MSG_2FA_OTP_RESENT,
+  MSG_2FA_OTP_SEND_FAILED,
+  MSG_2FA_VERIFY_FAILED,
+  MSG_2FA_DISABLE_FAILED,
+  MSG_2FA_METHOD_CHANGE_FAILED,
+} from '@core/constants/messages.constants';
 import { createCountdownTimer } from '@core/services/countdown.service';
 import { TfaView } from '@app/schemas/user';
 
@@ -100,7 +125,9 @@ export class TfaSettingsComponent implements OnInit, OnDestroy {
           this.secretKey.set(response.data.secret);
           this.currentView.set('setup-authenticator');
         } else {
-          this.snackBar.open(response.message || MSG_2FA_SETUP_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+          this.snackBar.open(response.message || MSG_2FA_SETUP_FAILED, SNACKBAR_ACTION, {
+            duration: SNACKBAR_DURATION,
+          });
         }
       } else {
         const response = await this.tfaApi.sendSetupOtp(method);
@@ -109,7 +136,9 @@ export class TfaSettingsComponent implements OnInit, OnDestroy {
           this.startResendTimer();
           this.snackBar.open(MSG_2FA_OTP_SENT, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
         } else {
-          this.snackBar.open(response.message || MSG_2FA_OTP_SEND_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+          this.snackBar.open(response.message || MSG_2FA_OTP_SEND_FAILED, SNACKBAR_ACTION, {
+            duration: SNACKBAR_DURATION,
+          });
         }
       }
     } catch {
@@ -138,7 +167,9 @@ export class TfaSettingsComponent implements OnInit, OnDestroy {
         this.clearTimers();
         await this.loadStatus();
       } else {
-        this.snackBar.open(response.message || MSG_2FA_VERIFY_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(response.message || MSG_2FA_VERIFY_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
@@ -157,7 +188,9 @@ export class TfaSettingsComponent implements OnInit, OnDestroy {
         this.snackBar.open(MSG_2FA_OTP_RESENT, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
         this.startResendTimer();
       } else {
-        this.snackBar.open(response.message || MSG_2FA_OTP_SEND_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(response.message || MSG_2FA_OTP_SEND_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
@@ -184,7 +217,9 @@ export class TfaSettingsComponent implements OnInit, OnDestroy {
         this.snackBar.open(MSG_2FA_DISABLED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
         await this.loadStatus();
       } else {
-        this.snackBar.open(response.message || MSG_2FA_DISABLE_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(response.message || MSG_2FA_DISABLE_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
@@ -201,10 +236,14 @@ export class TfaSettingsComponent implements OnInit, OnDestroy {
     try {
       const response = await this.tfaApi.changeMethod(this.selectedMethod());
       if (response.success) {
-        this.snackBar.open(MSG_2FA_METHOD_CHANGED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(MSG_2FA_METHOD_CHANGED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
         await this.loadStatus();
       } else {
-        this.snackBar.open(response.message || MSG_2FA_METHOD_CHANGE_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(response.message || MSG_2FA_METHOD_CHANGE_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });

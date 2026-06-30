@@ -36,9 +36,7 @@ async def _load_field_defs(
     session: AsyncSession, entity_type: str
 ) -> dict[str, CustomFieldDefinition]:
     result = await session.execute(
-        select(CustomFieldDefinition).where(
-            CustomFieldDefinition.entity_type == entity_type
-        )
+        select(CustomFieldDefinition).where(CustomFieldDefinition.entity_type == entity_type)
     )
     return {row.field_key: row for row in result.scalars()}
 

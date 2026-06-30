@@ -14,6 +14,7 @@ Tenant-scoped, RLS on. Migration 0020 adds hot-path indexes:
 `(org_id, rating)` for distribution group-bys and `(org_id, source)`
 for per-source filtering.
 """
+
 from __future__ import annotations
 
 import enum
@@ -65,9 +66,7 @@ class Review(Base, TenantScoped):
     source: Mapped[str] = mapped_column(String(32), nullable=False)
     # Channel-side review id (Google review id, FB post id, etc.).
     # Optional — internal reviews entered by an agent don't have one.
-    source_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
+    source_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     contact_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
@@ -76,9 +75,7 @@ class Review(Base, TenantScoped):
     rating: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     reply_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    replied_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     replied_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         nullable=True,

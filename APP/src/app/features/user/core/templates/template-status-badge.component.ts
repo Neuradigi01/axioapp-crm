@@ -1,9 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
-import type {
-  TemplateExternalStatus,
-  TemplateInternalStatus,
-} from './templates-api.service';
+import type { TemplateExternalStatus, TemplateInternalStatus } from './templates-api.service';
 
 /**
  * Status badge — renders either an internal workflow status
@@ -61,7 +58,6 @@ const EXTERNAL: Record<TemplateExternalStatus, BadgeDescriptor | null> = {
     classes: 'bg-orange-50 text-orange-700 ring-orange-200',
   },
 };
-
 
 @Component({
   selector: 'app-template-status-badge',

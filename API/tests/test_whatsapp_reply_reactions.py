@@ -19,16 +19,17 @@ The service-layer behaviour (FK resolution, `_merge_reaction`,
 conversations-CRUD integration tests once the migration lands; the
 adapter is the boundary worth testing in isolation.
 """
+
 from __future__ import annotations
 
 import uuid
+from datetime import UTC
 from typing import Any
 
 import httpx
 import pytest
 
 from src.app.core.conversations.adapters.whatsapp import WhatsAppAdapter
-
 
 _PHONE_ID = "12345"
 _TOKEN = "EAA_test_token"
@@ -66,9 +67,7 @@ def _stub_factory(*, body: dict | None = None):
             calls.append({"url": url, "json": json})
             return httpx.Response(
                 200,
-                json=body
-                if body is not None
-                else {"messages": [{"id": "wamid.reply"}]},
+                json=body if body is not None else {"messages": [{"id": "wamid.reply"}]},
             )
 
     factory = lambda: _Client()  # noqa: E731
@@ -130,11 +129,7 @@ class TestOutboundReplyAndReaction:
 
 
 def _inbound_envelope(message: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "entry": [
-            {"changes": [{"value": {"messages": [message]}}]}
-        ]
-    }
+    return {"entry": [{"changes": [{"value": {"messages": [message]}}]}]}
 
 
 class TestInboundReplyAndReactionParse:
@@ -207,21 +202,23 @@ class TestInboundReplyAndReactionParse:
 
 class TestMergeReaction:
     def test_merge_appends_new_actor(self):
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         from src.app.core.conversations.service import _merge_reaction
 
         rows = _merge_reaction(
             [],
             actor="user-1",
             emoji="👍",
-            ts=datetime(2026, 6, 22, tzinfo=timezone.utc),
+            ts=datetime(2026, 6, 22, tzinfo=UTC),
         )
         assert len(rows) == 1
         assert rows[0]["actor"] == "user-1"
         assert rows[0]["emoji"] == "👍"
 
     def test_merge_replaces_same_actor(self):
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         from src.app.core.conversations.service import _merge_reaction
 
         existing = [{"actor": "user-1", "emoji": "👍", "ts": "old"}]
@@ -229,13 +226,14 @@ class TestMergeReaction:
             existing,
             actor="user-1",
             emoji="❤️",
-            ts=datetime(2026, 6, 22, tzinfo=timezone.utc),
+            ts=datetime(2026, 6, 22, tzinfo=UTC),
         )
         assert len(rows) == 1
         assert rows[0]["emoji"] == "❤️"
 
     def test_merge_removes_on_empty_emoji(self):
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         from src.app.core.conversations.service import _merge_reaction
 
         existing = [
@@ -246,7 +244,7 @@ class TestMergeReaction:
             existing,
             actor="user-1",
             emoji=None,
-            ts=datetime(2026, 6, 22, tzinfo=timezone.utc),
+            ts=datetime(2026, 6, 22, tzinfo=UTC),
         )
         actors = [r["actor"] for r in rows]
         assert actors == ["user-2"]

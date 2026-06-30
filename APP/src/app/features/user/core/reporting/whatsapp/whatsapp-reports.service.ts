@@ -192,13 +192,8 @@ export class WhatsAppReportsService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/reports/whatsapp`;
 
-  getVolume(
-    range: ReportRange,
-    granularity: ReportGranularity,
-  ): Observable<VolumeReport> {
-    const params = new HttpParams()
-      .set('range', range)
-      .set('granularity', granularity);
+  getVolume(range: ReportRange, granularity: ReportGranularity): Observable<VolumeReport> {
+    const params = new HttpParams().set('range', range).set('granularity', granularity);
     return this.http.get<VolumeReport>(`${this.base}/volume`, { params });
   }
 
@@ -219,10 +214,7 @@ export class WhatsAppReportsService {
 
   getAgentLeaderboard(range: ReportRange): Observable<LeaderboardReport> {
     const params = new HttpParams().set('range', range);
-    return this.http.get<LeaderboardReport>(
-      `${this.base}/agent-leaderboard`,
-      { params },
-    );
+    return this.http.get<LeaderboardReport>(`${this.base}/agent-leaderboard`, { params });
   }
 
   /** Step 21 — per-campaign funnel + time-to-delivery percentiles. */
@@ -233,9 +225,7 @@ export class WhatsAppReportsService {
   }
 
   /** Step 21 — per-campaign failure-reason breakdown. */
-  getCampaignFailures(
-    campaignId: string,
-  ): Observable<CampaignFailuresReport> {
+  getCampaignFailures(campaignId: string): Observable<CampaignFailuresReport> {
     return this.http.get<CampaignFailuresReport>(
       `${environment.apiBaseUrl}/reports/campaigns/${campaignId}/failures`,
     );
@@ -250,10 +240,7 @@ export class WhatsAppReportsService {
   /** Step 21 — phone-quality events + daily send volume. */
   getQualityTimeline(range: ReportRange): Observable<QualityTimelineReport> {
     const params = new HttpParams().set('range', range);
-    return this.http.get<QualityTimelineReport>(
-      `${this.base}/quality-timeline`,
-      { params },
-    );
+    return this.http.get<QualityTimelineReport>(`${this.base}/quality-timeline`, { params });
   }
 
   /** Step 21 — AI response + escalation + completion-proxy metrics. */
@@ -267,10 +254,7 @@ export class WhatsAppReportsService {
   /** Step 24 — per-campaign click-to-WhatsApp conversion + revenue. */
   getAdAttribution(range: ReportRange): Observable<AdAttributionReport> {
     const params = new HttpParams().set('range', range);
-    return this.http.get<AdAttributionReport>(
-      `${this.base}/ad-attribution`,
-      { params },
-    );
+    return this.http.get<AdAttributionReport>(`${this.base}/ad-attribution`, { params });
   }
 }
 

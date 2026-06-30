@@ -5,8 +5,8 @@ exposed in the UI via the furniture-pack's "Billing & POS" module
 (menu_position 50). Core still registers the descriptor so the three
 core billing permissions land in the `permissions` table at startup.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="billing",

@@ -1,4 +1,5 @@
 """Tests for `src.app.shared.context` and `TenantContextMiddleware`."""
+
 from __future__ import annotations
 
 import uuid

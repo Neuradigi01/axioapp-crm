@@ -14,6 +14,7 @@ calls/hour worker-side — well inside Meta's per-token rate limit.
 Mirrors the celery-absent shim shape of
 :mod:`core.integrations.whatsapp.health_tasks` so dev shells without
 Celery installed don't break import."""
+
 from __future__ import annotations
 
 import asyncio
@@ -91,9 +92,10 @@ async def _sync_external_status_all_async() -> dict[str, Any]:
         # template won't show up, neither will orgs whose templates
         # are all approved/archived.
         rows = (
-            await session.execute(
-                sql_text(
-                    """
+            (
+                await session.execute(
+                    sql_text(
+                        """
                     SELECT DISTINCT i.org_id
                     FROM tbl_integrations i
                     JOIN tbl_message_templates t
@@ -103,16 +105,17 @@ async def _sync_external_status_all_async() -> dict[str, Any]:
                       AND i.status = 'connected'
                       AND i.access_token_enc IS NOT NULL
                     """
+                    )
                 )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         for row in rows:
             org_id = row["org_id"]
             orgs_visited += 1
-            token = set_context(
-                RequestContext(org_id=org_id, user_id=None)
-            )
+            token = set_context(RequestContext(org_id=org_id, user_id=None))
             try:
                 result = await sync_all_pending(
                     session,
@@ -124,9 +127,7 @@ async def _sync_external_status_all_async() -> dict[str, Any]:
                 total_updated += result["updated"]
                 total_failed += result["failed"]
             except Exception:
-                logger.exception(
-                    "templates.sync sweep failed for org %s", org_id
-                )
+                logger.exception("templates.sync sweep failed for org %s", org_id)
                 total_failed += 1
                 await session.rollback()
             finally:

@@ -24,7 +24,9 @@ export const authGuard: CanActivateFn = (route, state) => {
 
   if (userDetails && !routesHelper.hasRightsToAccessUrl(state.url, userDetails.accessRights)) {
     const dashboardUrl =
-      userDetails.role === ROLE_ADMIN ? getRoute('admin_dashboard').url : getRoute('user_dashboard').url;
+      userDetails.role === ROLE_ADMIN
+        ? getRoute('admin_dashboard').url
+        : getRoute('user_dashboard').url;
     router.navigate([dashboardUrl]);
     return false;
   }

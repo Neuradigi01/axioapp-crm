@@ -94,11 +94,7 @@ export class DynamicFormComponent {
     this.form.set(fg);
 
     fg.valueChanges
-      .pipe(
-        debounceTime(50),
-        takeUntil(this.rebuild$),
-        takeUntilDestroyed(this.destroyRef),
-      )
+      .pipe(debounceTime(50), takeUntil(this.rebuild$), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
         this.valueChange.emit(fg.getRawValue() as FormValue);
         this.validityChange.emit(fg.valid);

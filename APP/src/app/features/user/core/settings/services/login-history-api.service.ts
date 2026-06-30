@@ -35,9 +35,6 @@ export class LoginHistoryApiService {
   }
 
   revoke(sessionId: string): Observable<{ success: boolean }> {
-    return this.http.post<{ success: boolean }>(
-      `${this.base}/${sessionId}/revoke`,
-      {},
-    );
+    return this.http.post<{ success: boolean }>(`${this.base}/${sessionId}/revoke`, {});
   }
 }

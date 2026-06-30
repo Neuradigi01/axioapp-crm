@@ -1,15 +1,15 @@
 """Pydantic v2 schemas for the call-center module."""
+
 from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.calls.models import CallDirection
 from src.app.shared.schemas import ORMModel, PaginatedResponse
-
 
 # --- Outcomes (config) ----------------------------------------------------
 
@@ -22,13 +22,12 @@ class CallOutcomeCreate(BaseModel):
 
 
 class CallOutcomeUpdate(BaseModel):
-    label: Optional[str] = Field(default=None, min_length=1, max_length=128)
-    color: Optional[str] = Field(default=None, max_length=32)
-    display_order: Optional[int] = Field(default=None, ge=0)
+    label: str | None = Field(default=None, min_length=1, max_length=128)
+    color: str | None = Field(default=None, max_length=32)
+    display_order: int | None = Field(default=None, ge=0)
 
 
 class CallOutcomeOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     key: str
@@ -42,39 +41,38 @@ class CallOutcomeOut(ORMModel):
 
 
 class CallCreate(BaseModel):
-    contact_id: Optional[uuid.UUID] = None
+    contact_id: uuid.UUID | None = None
     direction: CallDirection
     started_at: datetime
     duration_sec: int = Field(default=0, ge=0)
-    outcome_id: Optional[uuid.UUID] = None
-    notes: Optional[str] = None
-    recording_url: Optional[str] = Field(default=None, max_length=512)
-    assigned_to_id: Optional[uuid.UUID] = None
+    outcome_id: uuid.UUID | None = None
+    notes: str | None = None
+    recording_url: str | None = Field(default=None, max_length=512)
+    assigned_to_id: uuid.UUID | None = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class CallUpdate(BaseModel):
-    contact_id: Optional[uuid.UUID] = None
-    duration_sec: Optional[int] = Field(default=None, ge=0)
-    outcome_id: Optional[uuid.UUID] = None
-    notes: Optional[str] = None
-    recording_url: Optional[str] = Field(default=None, max_length=512)
-    assigned_to_id: Optional[uuid.UUID] = None
-    custom_data: Optional[dict[str, Any]] = None
+    contact_id: uuid.UUID | None = None
+    duration_sec: int | None = Field(default=None, ge=0)
+    outcome_id: uuid.UUID | None = None
+    notes: str | None = None
+    recording_url: str | None = Field(default=None, max_length=512)
+    assigned_to_id: uuid.UUID | None = None
+    custom_data: dict[str, Any] | None = None
 
 
 class CallOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
-    contact_id: Optional[uuid.UUID]
+    contact_id: uuid.UUID | None
     direction: CallDirection
     started_at: datetime
     duration_sec: int
-    outcome_id: Optional[uuid.UUID]
-    notes: Optional[str]
-    recording_url: Optional[str]
-    assigned_to_id: Optional[uuid.UUID]
+    outcome_id: uuid.UUID | None
+    notes: str | None
+    recording_url: str | None
+    assigned_to_id: uuid.UUID | None
     custom_data: dict[str, Any]
     created_at: datetime
 
@@ -89,16 +87,15 @@ class CallTranscriptUpsert(BaseModel):
     """Idempotent set — replaces the single transcript row for a call."""
 
     text: str = Field(min_length=1)
-    language: Optional[str] = Field(default=None, max_length=16)
+    language: str | None = Field(default=None, max_length=16)
 
 
 class CallTranscriptOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     call_id: uuid.UUID
     text: str
-    language: Optional[str]
+    language: str | None
     created_at: datetime
 
 
@@ -106,10 +103,10 @@ class CallTranscriptOut(ORMModel):
 
 
 class OutcomeDistributionRow(BaseModel):
-    outcome_id: Optional[uuid.UUID]
-    outcome_key: Optional[str]
-    outcome_label: Optional[str]
-    outcome_color: Optional[str]
+    outcome_id: uuid.UUID | None
+    outcome_key: str | None
+    outcome_label: str | None
+    outcome_color: str | None
     count: int
 
 

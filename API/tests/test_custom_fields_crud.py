@@ -4,6 +4,7 @@ Grants `custom_fields.read` + `custom_fields.write` to the seeded admin,
 logs in, and exercises create / list / patch / delete on user-source
 fields. Source-rule edge cases live in `test_custom_fields_source_rules.py`.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -44,9 +45,7 @@ async def _login(client, *, org_slug: str, email: str, password: str) -> str:
 async def test_create_list_update_delete_user_field(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant_custom_fields(
-        seeded_admin["role"].id, "custom_fields.read", "custom_fields.write"
-    )
+    await _grant_custom_fields(seeded_admin["role"].id, "custom_fields.read", "custom_fields.write")
     token = await _login(
         layered_client,
         org_slug=org.slug,
@@ -74,9 +73,7 @@ async def test_create_list_update_delete_user_field(layered_client, seeded_admin
     field_id = body["id"]
 
     # List
-    listed = await layered_client.get(
-        "/api/v1/custom-fields?entity_type=contact", headers=headers
-    )
+    listed = await layered_client.get("/api/v1/custom-fields?entity_type=contact", headers=headers)
     assert listed.status_code == 200
     keys = [item["field_key"] for item in listed.json()]
     assert "dob" in keys
@@ -92,9 +89,7 @@ async def test_create_list_update_delete_user_field(layered_client, seeded_admin
     assert patch.json()["display_order"] == 5
 
     # Delete
-    delete = await layered_client.delete(
-        f"/api/v1/custom-fields/{field_id}", headers=headers
-    )
+    delete = await layered_client.delete(f"/api/v1/custom-fields/{field_id}", headers=headers)
     assert delete.status_code == 204
 
     # Confirm gone
@@ -109,9 +104,7 @@ async def test_duplicate_field_key_returns_409(layered_client, seeded_admin):
     """The unique (org_id, entity_type, field_key) index surfaces as 409."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant_custom_fields(
-        seeded_admin["role"].id, "custom_fields.read", "custom_fields.write"
-    )
+    await _grant_custom_fields(seeded_admin["role"].id, "custom_fields.read", "custom_fields.write")
     token = await _login(
         layered_client,
         org_slug=org.slug,
@@ -126,14 +119,10 @@ async def test_duplicate_field_key_returns_409(layered_client, seeded_admin):
         "field_label": "Nickname",
         "field_type": "text",
     }
-    first = await layered_client.post(
-        "/api/v1/custom-fields", json=payload, headers=headers
-    )
+    first = await layered_client.post("/api/v1/custom-fields", json=payload, headers=headers)
     assert first.status_code == 201
 
-    second = await layered_client.post(
-        "/api/v1/custom-fields", json=payload, headers=headers
-    )
+    second = await layered_client.post("/api/v1/custom-fields", json=payload, headers=headers)
     assert second.status_code == 409, second.text
 
 
@@ -142,9 +131,7 @@ async def test_create_rejects_bad_field_key(layered_client, seeded_admin):
     """Field-key regex rejects uppercase / hyphen / leading digit."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant_custom_fields(
-        seeded_admin["role"].id, "custom_fields.write"
-    )
+    await _grant_custom_fields(seeded_admin["role"].id, "custom_fields.write")
     token = await _login(
         layered_client,
         org_slug=org.slug,
@@ -172,9 +159,7 @@ async def test_select_field_requires_choices(layered_client, seeded_admin):
     """`select`/`multiselect` must declare options.choices."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant_custom_fields(
-        seeded_admin["role"].id, "custom_fields.write"
-    )
+    await _grant_custom_fields(seeded_admin["role"].id, "custom_fields.write")
     token = await _login(
         layered_client,
         org_slug=org.slug,

@@ -7,17 +7,17 @@ matrix (email + WhatsApp implemented, SMS / FB / IG / push raise
 Adapter calls are stubbed at the module boundary so we don't need
 a Meta token or a live SMTP server.
 """
+
 from __future__ import annotations
 
 import uuid
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.conversations.adapters import ChannelMessageRef
 from src.app.core.conversations.models import ConversationChannel
@@ -34,7 +34,6 @@ from src.app.core.templates.models import (
 from src.app.core.templates.schemas import TemplateCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -43,10 +42,7 @@ async def org_id(test_db):
     """Seed one org row so template inserts don't violate the FK."""
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {"id": str(org_id), "name": "Demo", "slug": f"demo-{org_id.hex[:6]}"},
     )
     await test_db.commit()
@@ -98,38 +94,28 @@ async def _make_template(test_db, *, org_id, channel):
 
 
 def test_email_recipient_shape():
-    out = templates_test_send._validate_recipient(
-        ConversationChannel.email, "  asha@example.com "
-    )
+    out = templates_test_send._validate_recipient(ConversationChannel.email, "  asha@example.com ")
     assert out == "asha@example.com"
 
 
 def test_email_recipient_rejected():
     with pytest.raises(InvalidRecipient):
-        templates_test_send._validate_recipient(
-            ConversationChannel.email, "not-an-email"
-        )
+        templates_test_send._validate_recipient(ConversationChannel.email, "not-an-email")
 
 
 def test_phone_recipient_strips_plus_and_spaces():
-    out = templates_test_send._validate_recipient(
-        ConversationChannel.whatsapp, "+91 98765 43210"
-    )
+    out = templates_test_send._validate_recipient(ConversationChannel.whatsapp, "+91 98765 43210")
     assert out == "919876543210"
 
 
 def test_phone_too_short_rejected():
     with pytest.raises(InvalidRecipient):
-        templates_test_send._validate_recipient(
-            ConversationChannel.whatsapp, "1234"
-        )
+        templates_test_send._validate_recipient(ConversationChannel.whatsapp, "1234")
 
 
 def test_empty_recipient_rejected():
     with pytest.raises(InvalidRecipient):
-        templates_test_send._validate_recipient(
-            ConversationChannel.email, "   "
-        )
+        templates_test_send._validate_recipient(ConversationChannel.email, "   ")
 
 
 # --- dispatch matrix --------------------------------------------------
@@ -172,9 +158,7 @@ async def test_dispatch_email_writes_audit_row(test_db, org_id):
 
 
 async def test_dispatch_whatsapp_calls_adapter(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.whatsapp
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.whatsapp)
 
     fake_ref = ChannelMessageRef(channel_message_id="wamid.TEST123")
     with patch.object(
@@ -197,9 +181,7 @@ async def test_dispatch_whatsapp_calls_adapter(test_db, org_id):
 
 
 async def test_dispatch_sms_returns_not_supported(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.sms
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.sms)
     with pytest.raises(TestSendNotSupported) as info:
         await templates_test_send.dispatch_test_send(
             test_db,
@@ -212,9 +194,7 @@ async def test_dispatch_sms_returns_not_supported(test_db, org_id):
 
 
 async def test_dispatch_facebook_returns_not_supported(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.facebook
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.facebook)
     with pytest.raises(TestSendNotSupported):
         await templates_test_send.dispatch_test_send(
             test_db,
@@ -244,9 +224,7 @@ async def test_test_send_works_on_draft_template(test_db, org_id):
     # internal_status defaults to 'draft' — confirm.
     assert template.internal_status.value == "draft"
 
-    with patch.object(
-        templates_test_send, "_dispatch_email", new=AsyncMock(return_value=None)
-    ):
+    with patch.object(templates_test_send, "_dispatch_email", new=AsyncMock(return_value=None)):
         out = await templates_test_send.dispatch_test_send(
             test_db,
             org_id=org_id,

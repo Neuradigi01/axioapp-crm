@@ -11,13 +11,7 @@ import { buildHttpParams } from '../shared/services/query-builder';
  * a new value here without the backend enum picking it up will not
  * make the new value safe to send.
  */
-export type ActivityType =
-  | 'note'
-  | 'call'
-  | 'email'
-  | 'whatsapp'
-  | 'status_change'
-  | 'task';
+export type ActivityType = 'note' | 'call' | 'email' | 'whatsapp' | 'status_change' | 'task';
 
 export interface Activity {
   id: string;
@@ -62,11 +56,7 @@ export class ActivitiesApiService {
    * inside the backend (call ended, status changed, …) and rejected by
    * the API when posted from the browser.
    */
-  createNote(
-    entityType: string,
-    entityId: string,
-    text: string,
-  ): Observable<Activity> {
+  createNote(entityType: string, entityId: string, text: string): Observable<Activity> {
     return this.http.post<Activity>(this.base, {
       entity_type: entityType,
       entity_id: entityId,

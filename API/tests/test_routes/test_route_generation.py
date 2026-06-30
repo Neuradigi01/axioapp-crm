@@ -1,13 +1,14 @@
 import os
+from unittest.mock import AsyncMock, patch
+
 import pytest
 import pytest_asyncio
-from unittest.mock import patch, AsyncMock
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 from src.models import Base
 from src.models.routes import Route
 from src.providers.route_provider import generate_routes_json
-from tests.conftest import test_engine, TestSession
+from tests.conftest import TestSession, test_engine
 
 
 @pytest_asyncio.fixture
@@ -22,8 +23,8 @@ async def setup_tables():
 
 @pytest_asyncio.fixture
 async def client():
-    from main import app
     import src.core.db as db_module
+    from main import app
 
     original_session = db_module.async_session
     db_module.async_session = TestSession
@@ -42,15 +43,39 @@ async def client():
 
 async def _seed_routes(db):
     routes = [
-        Route(parent_id=0, control_id="admin_dashboard", user_type="Admin",
-              name="Dashboard", path="dashboard", url="/admin/dashboard",
-              is_nav_menu_item=True, order_no=1, is_compulsory=True),
-        Route(parent_id=0, control_id="user_dashboard", user_type="User",
-              name="Dashboard", path="dashboard", url="/user/dashboard",
-              is_nav_menu_item=True, order_no=2, is_compulsory=True),
-        Route(parent_id=0, control_id="logout", user_type="Any",
-              name="Logout", path="logout", url="/logout",
-              is_nav_menu_item=False, order_no=99, is_compulsory=True),
+        Route(
+            parent_id=0,
+            control_id="admin_dashboard",
+            user_type="Admin",
+            name="Dashboard",
+            path="dashboard",
+            url="/admin/dashboard",
+            is_nav_menu_item=True,
+            order_no=1,
+            is_compulsory=True,
+        ),
+        Route(
+            parent_id=0,
+            control_id="user_dashboard",
+            user_type="User",
+            name="Dashboard",
+            path="dashboard",
+            url="/user/dashboard",
+            is_nav_menu_item=True,
+            order_no=2,
+            is_compulsory=True,
+        ),
+        Route(
+            parent_id=0,
+            control_id="logout",
+            user_type="Any",
+            name="Logout",
+            path="logout",
+            url="/logout",
+            is_nav_menu_item=False,
+            order_no=99,
+            is_compulsory=True,
+        ),
     ]
     db.add_all(routes)
     await db.flush()
@@ -78,10 +103,11 @@ async def test_routes_json_generated_on_startup(setup_tables):
 @patch("src.services.dev.route_service.async_session", TestSession)
 async def test_routes_json_contains_all_routes(setup_tables):
     import orjson
+
     from config import ROUTES_API
 
     async with TestSession() as db:
-        routes = await _seed_routes(db)
+        await _seed_routes(db)
         await db.commit()
 
     await generate_routes_json()
@@ -102,6 +128,7 @@ async def test_routes_json_contains_all_routes(setup_tables):
 @patch("src.services.dev.route_service.async_session", TestSession)
 async def test_routes_json_keyed_by_control_id(setup_tables):
     import orjson
+
     from config import ROUTES_API
 
     async with TestSession() as db:
@@ -124,6 +151,7 @@ async def test_routes_json_keyed_by_control_id(setup_tables):
 @patch("src.services.dev.route_service.generate_routes_json", new_callable=AsyncMock)
 async def test_public_config_endpoint(mock_routes, client):
     import orjson
+
     from config import ROUTES_API
 
     # Create a routes.json file for the config endpoint to read

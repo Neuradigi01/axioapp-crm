@@ -35,12 +35,13 @@ Retry policy: same as the Google task — autoretry on
 `(ConnectionError, TimeoutError)` only; structural errors DLQ
 immediately. Exponential backoff capped at 1 hour, 5 retries.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from sqlalchemy import text
@@ -72,13 +73,12 @@ except ImportError:  # pragma: no cover - celery absent in dev
 
             return _Stub()
 
-        if (
-            decorator_args
-            and callable(decorator_args[0])
-            and not decorator_kwargs
-        ):
+        if decorator_args and callable(decorator_args[0]) and not decorator_kwargs:
             return _wrap(decorator_args[0])
         return _wrap
+
+
+from datetime import UTC
 
 from config import META_GRAPH_API_VERSION
 from src.app.core import audit
@@ -94,7 +94,6 @@ from src.app.core.leads.models import LeadSource
 from src.app.core.leads.schemas import LeadCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
-
 
 logger = logging.getLogger(__name__)
 
@@ -115,9 +114,7 @@ _HTTP_TIMEOUT = 15.0
     retry_backoff_max=3600,
     retry_jitter=True,
 )
-def process_meta_lead(
-    self, payload: dict[str, Any]
-) -> dict[str, Any]:
+def process_meta_lead(self, payload: dict[str, Any]) -> dict[str, Any]:
     """Sync entrypoint — bridges into async via `asyncio.run`.
 
     `payload` is the slice the webhook receiver extracted from the
@@ -129,7 +126,7 @@ def process_meta_lead(
         return asyncio.run(process_meta_lead_async(payload=payload))
     except (ConnectionError, TimeoutError) as exc:
         if HAS_CELERY:
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
         raise
 
 
@@ -139,7 +136,7 @@ def process_meta_lead(
 async def process_meta_lead_async(
     *,
     payload: dict[str, Any],
-    http_client: Optional[httpx.AsyncClient] = None,
+    http_client: httpx.AsyncClient | None = None,
 ) -> dict[str, Any]:
     """Resolve page → integration → subscription, fetch leadgen
     details, create the lead.
@@ -197,9 +194,7 @@ async def process_meta_lead_async(
 
     org_id, integration_id, page_token = mapping
 
-    ctx_token = set_context(
-        RequestContext(org_id=org_id, user_id=None)
-    )
+    ctx_token = set_context(RequestContext(org_id=org_id, user_id=None))
     try:
         async with async_session() as session:
             if not form_id:
@@ -225,9 +220,7 @@ async def process_meta_lead_async(
                     org_id=org_id,
                     integration_id=integration_id,
                     payload=payload,
-                    error_message=(
-                        f"no enabled subscription for form {form_id}"
-                    ),
+                    error_message=(f"no enabled subscription for form {form_id}"),
                 )
                 return {"status": "dlq", "reason": "no_subscription"}
 
@@ -257,16 +250,12 @@ async def process_meta_lead_async(
                     org_id=org_id,
                     integration_id=integration_id,
                     payload=payload,
-                    error_message=(
-                        f"failed to fetch leadgen {leadgen_id} from Meta"
-                    ),
+                    error_message=(f"failed to fetch leadgen {leadgen_id} from Meta"),
                 )
                 return {"status": "dlq", "reason": "fetch_failed"}
 
             # 3. Translate Meta's field_data via the subscription mapping.
-            mapped = _apply_mapping(
-                subscription.field_mapping or {}, details
-            )
+            mapped = _apply_mapping(subscription.field_mapping or {}, details)
             full_name = (mapped.get("contact.full_name") or "").strip()
             phone = mapped.get("contact.phone")
             email = mapped.get("contact.email")
@@ -335,17 +324,17 @@ async def process_meta_lead_async(
 # --- payload extractors --------------------------------------------------
 
 
-def _extract_page_id(payload: dict[str, Any]) -> Optional[str]:
+def _extract_page_id(payload: dict[str, Any]) -> str | None:
     v = payload.get("page_id")
     return str(v) if v is not None else None
 
 
-def _extract_leadgen_id(payload: dict[str, Any]) -> Optional[str]:
+def _extract_leadgen_id(payload: dict[str, Any]) -> str | None:
     v = payload.get("leadgen_id")
     return str(v) if v is not None else None
 
 
-def _extract_form_id(payload: dict[str, Any]) -> Optional[str]:
+def _extract_form_id(payload: dict[str, Any]) -> str | None:
     v = payload.get("form_id")
     return str(v) if v is not None else None
 
@@ -358,9 +347,7 @@ def _fallback_org() -> uuid.UUID:
     return uuid.UUID("00000000-0000-0000-0000-000000000000")
 
 
-def _apply_mapping(
-    field_mapping: dict[str, str], details: dict[str, Any]
-) -> dict[str, Any]:
+def _apply_mapping(field_mapping: dict[str, str], details: dict[str, Any]) -> dict[str, Any]:
     """Translate Meta's `field_data: [{name, values:[v]}, ...]` shape
     through the subscription's `{form_field_name: crm_key}` mapping.
 
@@ -387,9 +374,7 @@ def _apply_mapping(
         # not real user input. Those strings never pass downstream Pydantic
         # validation (e.g. phone-format), so skip them and let the lead fall
         # back to the existing email/phone/"Meta Ads lead" defaults.
-        if isinstance(value, str) and value.startswith(
-            "<test lead: dummy data"
-        ):
+        if isinstance(value, str) and value.startswith("<test lead: dummy data"):
             continue
         result[crm_key] = value
     return result
@@ -404,9 +389,7 @@ def _extract_custom(mapped: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _build_attribution(
-    payload: dict[str, Any], leadgen_id: str
-) -> dict[str, Any]:
+def _build_attribution(payload: dict[str, Any], leadgen_id: str) -> dict[str, Any]:
     """Spec'd attribution shape:
     `{external_form_id, external_lead_id, page_id, ad_id, campaign_id}`.
     Step-6 reporting + the lead-detail UI both read these keys."""
@@ -426,7 +409,7 @@ def _build_attribution(
 
 async def _load_page_token_unscoped(
     session, page_id: str
-) -> Optional[tuple[uuid.UUID, uuid.UUID, str]]:
+) -> tuple[uuid.UUID, uuid.UUID, str] | None:
     """Resolve `page_id → (org_id, integration_id, page_token)` by
     raw SQL (bypasses the tenant filter — the receiver has no tenant
     context yet). The webhook HMAC has already authenticated the
@@ -445,9 +428,7 @@ async def _load_page_token_unscoped(
         LIMIT 1
         """
     )
-    row = (
-        await session.execute(sql, {"page_id": page_id})
-    ).mappings().first()
+    row = (await session.execute(sql, {"page_id": page_id})).mappings().first()
     if row is None:
         return None
     return (
@@ -459,7 +440,7 @@ async def _load_page_token_unscoped(
 
 async def _find_lead_by_external_id(
     session, *, org_id: uuid.UUID, external_lead_id: str
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     """Idempotency lookup — does this org already have a lead whose
     `attribution->>'external_lead_id'` matches? Uses the partial
     UNIQUE index from 0049."""
@@ -472,9 +453,7 @@ async def _find_lead_by_external_id(
         """
     )
     return (
-        await session.execute(
-            sql, {"org_id": str(org_id), "ext_id": external_lead_id}
-        )
+        await session.execute(sql, {"org_id": str(org_id), "ext_id": external_lead_id})
     ).scalar()
 
 
@@ -482,8 +461,8 @@ async def _fetch_leadgen_details(
     *,
     leadgen_id: str,
     page_token: str,
-    http_client: Optional[httpx.AsyncClient],
-) -> Optional[dict[str, Any]]:
+    http_client: httpx.AsyncClient | None,
+) -> dict[str, Any] | None:
     """GET `/{leadgen_id}?fields=id,created_time,field_data,ad_id,
     campaign_id`. Returns the response body on success, None on any
     error — caller routes to DLQ on None.
@@ -491,9 +470,7 @@ async def _fetch_leadgen_details(
     We don't raise on transient errors — Celery's retry only fires
     for `(ConnectionError, TimeoutError)`. A 4xx/5xx response here
     means the lead is unfetchable; DLQ is the right home."""
-    url = (
-        f"{_GRAPH_BASE}/{META_GRAPH_API_VERSION}/{leadgen_id}"
-    )
+    url = f"{_GRAPH_BASE}/{META_GRAPH_API_VERSION}/{leadgen_id}"
     params = {
         "fields": "id,created_time,field_data,ad_id,campaign_id",
         "access_token": page_token,
@@ -505,9 +482,7 @@ async def _fetch_leadgen_details(
             async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
                 response = await client.get(url, params=params)
     except (httpx.HTTPError, httpx.TimeoutException) as exc:
-        logger.warning(
-            "process_meta_lead: leadgen fetch failed (%s)", exc
-        )
+        logger.warning("process_meta_lead: leadgen fetch failed (%s)", exc)
         # Re-raise as ConnectionError so the Celery autoretry kicks in.
         raise ConnectionError(str(exc)) from exc
 
@@ -536,21 +511,17 @@ async def _fetch_leadgen_details(
     retry_backoff_max=600,
     retry_jitter=True,
 )
-def delete_meta_user_data(
-    self, request_id: str
-) -> dict[str, Any]:
+def delete_meta_user_data(self, request_id: str) -> dict[str, Any]:
     """Sync Celery entrypoint — bridges into async via ``asyncio.run``.
 
     ``request_id`` is the ``tbl_meta_data_deletion_requests.id`` row the
     callback just inserted. Worker re-reads the row to discover which
     orgs to scrub; it does NOT trust task-arg state beyond the id."""
     try:
-        return asyncio.run(
-            delete_meta_user_data_async(request_id=request_id)
-        )
+        return asyncio.run(delete_meta_user_data_async(request_id=request_id))
     except (ConnectionError, TimeoutError) as exc:
         if HAS_CELERY:
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
         raise
 
 
@@ -583,7 +554,8 @@ async def delete_meta_user_data_async(
     Status transitions: pending → in_progress → completed/failed. Audit
     log fires once per affected org (``compliance.meta_data_deletion.
     executed``) plus one terminal event."""
-    from sqlalchemy import select, text as sql_text
+    from sqlalchemy import select
+
     from src.app.core.integrations.meta.models import (
         MetaDataDeletionRequest,
         MetaDataDeletionStatus,
@@ -591,14 +563,10 @@ async def delete_meta_user_data_async(
 
     request_uuid = uuid.UUID(request_id)
     async with async_session() as session:
-        stmt = select(MetaDataDeletionRequest).where(
-            MetaDataDeletionRequest.id == request_uuid
-        )
+        stmt = select(MetaDataDeletionRequest).where(MetaDataDeletionRequest.id == request_uuid)
         row = (await session.execute(stmt)).scalar_one_or_none()
         if row is None:
-            logger.warning(
-                "delete_meta_user_data: request_id=%s not found", request_id
-            )
+            logger.warning("delete_meta_user_data: request_id=%s not found", request_id)
             return {"status": "missing", "request_id": request_id}
 
         if row.status != MetaDataDeletionStatus.pending:
@@ -616,7 +584,7 @@ async def delete_meta_user_data_async(
         meta_user_id = row.meta_user_id
         confirmation_code = row.confirmation_code
 
-    failure_reason: Optional[str] = None
+    failure_reason: str | None = None
     try:
         for org_id in affected_org_ids:
             await _scrub_whatsapp_for_org(org_id=org_id)
@@ -638,9 +606,7 @@ async def delete_meta_user_data_async(
             except Exception:
                 # audit.log is best-effort by design; never abort the
                 # scrub because the audit insert failed.
-                logger.exception(
-                    "audit.log failed during meta deletion scrub"
-                )
+                logger.exception("audit.log failed during meta deletion scrub")
         await _null_meta_user_id(meta_user_id=meta_user_id)
     except Exception as exc:
         failure_reason = f"{type(exc).__name__}: {exc}"[:1024]
@@ -771,9 +737,8 @@ def _short_hash(value: str) -> str:
 
 def _utc_now():
     from datetime import datetime as _dt
-    from datetime import timezone as _tz
 
-    return _dt.now(_tz.utc)
+    return _dt.now(UTC)
 
 
 __all__ = [

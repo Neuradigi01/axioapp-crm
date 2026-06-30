@@ -44,7 +44,6 @@ import {
   MetaPage,
 } from './integrations-api.service';
 
-
 @Component({
   selector: 'app-meta-card',
   standalone: true,
@@ -74,16 +73,12 @@ export class MetaCardComponent {
   /** In-flight Page-level subscribe/unsubscribe button. */
   protected readonly pageActionInFlight = signal<string | null>(null);
 
-  protected readonly isConnected = computed(
-    () => this.integration()?.status === 'connected',
-  );
+  protected readonly isConnected = computed(() => this.integration()?.status === 'connected');
   protected readonly needsReconnect = computed(() => {
     const s = this.integration()?.status;
     return s === 'expired' || s === 'error';
   });
-  protected readonly webhookUrl = computed(
-    () => this.integration()?.webhook_url ?? null,
-  );
+  protected readonly webhookUrl = computed(() => this.integration()?.webhook_url ?? null);
 
   /** Days until token expiry — `null` when no expiry / not connected.
    *  Drives the yellow "expiring soon" banner (≤ 7 days). */
@@ -109,14 +104,10 @@ export class MetaCardComponent {
     const id = this.integration()?.id;
     const out: Record<string, boolean> = {};
     if (!id) return out;
-    const subs = this.subscriptions().filter(
-      (s) => s.integration_id === id,
-    );
+    const subs = this.subscriptions().filter((s) => s.integration_id === id);
     for (const page of this.pages()) {
       const forms = this.formsByPage()[page.page_id] ?? [];
-      out[page.page_id] = forms.some((f) =>
-        subs.some((s) => s.external_form_id === f.form_id),
-      );
+      out[page.page_id] = forms.some((f) => subs.some((s) => s.external_form_id === f.form_id));
     }
     return out;
   });
@@ -243,9 +234,7 @@ export class MetaCardComponent {
   unsubscribePage(page: MetaPage): void {
     if (this.pageActionInFlight()) return;
     if (
-      !confirm(
-        `Stop receiving leads from "${page.name}"? This also drops the cached Page token.`,
-      )
+      !confirm(`Stop receiving leads from "${page.name}"? This also drops the cached Page token.`)
     ) {
       return;
     }

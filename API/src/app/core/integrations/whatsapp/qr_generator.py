@@ -16,6 +16,7 @@ operators rarely paste that much. The UI warns when
 practical limit beyond which preview previews get clipped on
 WhatsApp's own QR-scan UI.
 """
+
 from __future__ import annotations
 
 import io
@@ -51,9 +52,7 @@ def render_png(payload: str, *, size_px: int = 512) -> bytes:
     try:
         import qrcode  # type: ignore[import-untyped]
     except ImportError as exc:  # pragma: no cover — handled by callers
-        raise RuntimeError(
-            "qrcode is required for PNG export but is not installed"
-        ) from exc
+        raise RuntimeError("qrcode is required for PNG export but is not installed") from exc
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -76,9 +75,7 @@ def render_svg(payload: str, *, size_px: int = 512) -> bytes:
         import qrcode  # type: ignore[import-untyped]
         from qrcode.image.svg import SvgImage  # type: ignore[import-untyped]
     except ImportError as exc:  # pragma: no cover — handled by callers
-        raise RuntimeError(
-            "qrcode is required for SVG export but is not installed"
-        ) from exc
+        raise RuntimeError("qrcode is required for SVG export but is not installed") from exc
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_M,

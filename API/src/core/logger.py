@@ -1,6 +1,7 @@
 import logging
 import os
 from logging.handlers import TimedRotatingFileHandler
+
 from config import IS_DEVELOPMENT
 
 LOG_DIR = "logs"

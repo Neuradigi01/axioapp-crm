@@ -16,20 +16,19 @@ Tenant isolation is *not* enforced here — it is enforced by:
 That means callers can use this repository with a plain model class and
 the right rows surface based on the active `RequestContext`.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.shared.db import Base
 
-T = TypeVar("T", bound=Base)
 
-
-class Repository(Generic[T]):
+class Repository[T: Base]:
     """Generic CRUD for a single mapped class."""
 
     def __init__(self, session: AsyncSession, model: type[T]) -> None:
@@ -37,15 +36,11 @@ class Repository(Generic[T]):
         self.model = model
 
     async def get(self, id: uuid.UUID) -> T | None:
-        result = await self.session.execute(
-            select(self.model).where(self.model.id == id)
-        )
+        result = await self.session.execute(select(self.model).where(self.model.id == id))
         return result.scalar_one_or_none()
 
     async def list(self, *, limit: int = 50, offset: int = 0) -> list[T]:
-        result = await self.session.execute(
-            select(self.model).limit(limit).offset(offset)
-        )
+        result = await self.session.execute(select(self.model).limit(limit).offset(offset))
         return list(result.scalars().all())
 
     async def create(self, **kwargs: Any) -> T:

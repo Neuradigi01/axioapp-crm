@@ -1,7 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ITokenPayload, IUserDetails } from '@app/schemas/common';
-import { STORAGE_KEY_TOKEN, STORAGE_KEY_ADMIN_IMPERSONATION, ROLE_USER, ROLE_ADMIN } from '@core/constants/app.constants';
+import {
+  STORAGE_KEY_TOKEN,
+  STORAGE_KEY_ADMIN_IMPERSONATION,
+  ROLE_USER,
+  ROLE_ADMIN,
+} from '@core/constants/app.constants';
 import { getRoute } from '@core/services/routes-helper.service';
 import { AuthApiService } from '@app/services/auth-api.service';
 import { PushNotificationService } from '@core/services/push-notification.service';
@@ -49,7 +54,10 @@ export class AuthService {
     if (!payload) return null;
 
     const accessRights = payload.access_rights
-      ? payload.access_rights.split(',').map(Number).filter((n) => !isNaN(n))
+      ? payload.access_rights
+          .split(',')
+          .map(Number)
+          .filter((n) => !isNaN(n))
       : [];
 
     return {

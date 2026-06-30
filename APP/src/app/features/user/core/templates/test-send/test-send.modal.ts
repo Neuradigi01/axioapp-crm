@@ -15,16 +15,10 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  TemplateRead,
-  TemplateTestSendRead,
-  TemplatesApiService,
-} from '../templates-api.service';
-
+import { TemplateRead, TemplateTestSendRead, TemplatesApiService } from '../templates-api.service';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PHONE_RE = /^\d{8,15}$/;
-
 
 /**
  * Test-send modal — wraps the Step-5 endpoint.
@@ -91,19 +85,14 @@ export class TestSendModalComponent {
     const v = this.recipient().trim();
     if (!v) return false;
     if (this.template().channel === 'email') return EMAIL_RE.test(v);
-    if (
-      this.template().channel === 'whatsapp' ||
-      this.template().channel === 'sms'
-    ) {
-      const cleaned = v.replace(/[\s+\-]/g, '');
+    if (this.template().channel === 'whatsapp' || this.template().channel === 'sms') {
+      const cleaned = v.replace(/[\s+-]/g, '');
       return PHONE_RE.test(cleaned);
     }
     return v.length > 0;
   });
 
-  protected readonly canSubmit = computed(
-    () => !this.submitting() && this.recipientValid(),
-  );
+  protected readonly canSubmit = computed(() => !this.submitting() && this.recipientValid());
 
   protected onRecipientInput(value: string): void {
     this.recipient.set(value);

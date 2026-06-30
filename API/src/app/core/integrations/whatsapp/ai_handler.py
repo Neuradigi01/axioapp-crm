@@ -28,12 +28,12 @@ Handover side-effects:
 All exceptions are caught; the inbound webhook handler is unaffected
 by AI failures.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,9 +61,7 @@ logger = logging.getLogger(__name__)
 _RECENT_TURNS = 20
 
 
-def _matches_handover_keyword(
-    text: Optional[str], keywords: list[str]
-) -> bool:
+def _matches_handover_keyword(text: str | None, keywords: list[str]) -> bool:
     """Case-insensitive substring scan over the operator's handover
     phrase list. Used as the first escalation gate before we even
     call the LLM — saves a roundtrip when the customer explicitly
@@ -79,7 +77,7 @@ async def _send_ai_reply(
     *,
     conversation: Conversation,
     response: AIResponse,
-) -> Optional[Message]:
+) -> Message | None:
     adapter = await resolve_whatsapp_adapter(session)
     ref = await adapter.send(
         org_id=conversation.org_id,
@@ -87,7 +85,7 @@ async def _send_ai_reply(
         text=response.text,
         attachments=[],
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     sent_at = ref.sent_at or now
     msg = Message(
         org_id=conversation.org_id,
@@ -163,8 +161,8 @@ async def dispatch_ai_response(
     session: AsyncSession,
     *,
     conversation: Conversation,
-    inbound_text: Optional[str],
-) -> Optional[uuid.UUID]:
+    inbound_text: str | None,
+) -> uuid.UUID | None:
     """Run the AI dispatch pipeline for a single inbound message.
 
     Returns the AI message id (when a reply was sent) or None
@@ -184,23 +182,23 @@ async def dispatch_ai_response(
     _, config = bundle
 
     # Stage 1 — explicit handover phrase short-circuits the LLM call.
-    if _matches_handover_keyword(
-        inbound_text, list(config.ai_handover_keywords or [])
-    ):
-        await _handover_to_human(
-            session, conversation=conversation, reason="keyword"
-        )
+    if _matches_handover_keyword(inbound_text, list(config.ai_handover_keywords or [])):
+        await _handover_to_human(session, conversation=conversation, reason="keyword")
         return None
 
     # Stage 2 — pull recent turns + invoke the LLM.
     msgs = (
-        await session.execute(
-            select(Message)
-            .where(Message.conversation_id == conversation.id)
-            .order_by(Message.created_at.asc())
-            .limit(_RECENT_TURNS * 2)
+        (
+            await session.execute(
+                select(Message)
+                .where(Message.conversation_id == conversation.id)
+                .order_by(Message.created_at.asc())
+                .limit(_RECENT_TURNS * 2)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     history = history_from_messages(msgs, max_turns=_RECENT_TURNS)
 
     try:
@@ -219,10 +217,7 @@ async def dispatch_ai_response(
         return None
 
     threshold = float(config.ai_confidence_threshold or 0.6)
-    if (
-        response.handover_requested
-        or response.confidence < threshold
-    ):
+    if response.handover_requested or response.confidence < threshold:
         await _handover_to_human(
             session,
             conversation=conversation,
@@ -236,9 +231,7 @@ async def dispatch_ai_response(
 
     # Stage 3 — send the reply.
     try:
-        msg = await _send_ai_reply(
-            session, conversation=conversation, response=response
-        )
+        msg = await _send_ai_reply(session, conversation=conversation, response=response)
     except WhatsAppNotConnected:
         logger.info("ai_handler: WA not connected, skipping reply")
         return None

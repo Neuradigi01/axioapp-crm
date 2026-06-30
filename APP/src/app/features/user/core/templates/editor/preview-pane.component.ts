@@ -75,7 +75,6 @@ const SAMPLE_CONTEXT: Record<string, Record<string, string>> = {
 
 const VAR_RE = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}/g;
 
-
 @Component({
   selector: 'app-preview-pane',
   standalone: true,
@@ -100,9 +99,7 @@ const VAR_RE = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}/g;
                   {{ resolvedBody() }}
                 </p>
               } @else {
-                <p class="text-xs italic text-zinc-400">
-                  Body text will appear here…
-                </p>
+                <p class="text-xs italic text-zinc-400">Body text will appear here…</p>
               }
             </div>
           </div>
@@ -110,9 +107,7 @@ const VAR_RE = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}/g;
       }
       @case ('email') {
         <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-          <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-            Preview
-          </p>
+          <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Preview</p>
           @if (resolvedSubject(); as s) {
             <div class="mb-2 border-b border-zinc-100 pb-2">
               <p class="text-[10px] uppercase tracking-wide text-zinc-400">Subject</p>
@@ -120,19 +115,17 @@ const VAR_RE = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}/g;
             </div>
           }
           @if (resolvedBody()) {
-            <pre class="whitespace-pre-wrap break-words font-sans text-sm text-zinc-800">{{ resolvedBody() }}</pre>
+            <pre class="whitespace-pre-wrap break-words font-sans text-sm text-zinc-800">{{
+              resolvedBody()
+            }}</pre>
           } @else {
-            <p class="text-xs italic text-zinc-400">
-              Body will appear here as you type…
-            </p>
+            <p class="text-xs italic text-zinc-400">Body will appear here as you type…</p>
           }
         </div>
       }
       @default {
         <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-          <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-            Preview
-          </p>
+          <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Preview</p>
           @if (resolvedBody()) {
             <p class="whitespace-pre-wrap break-words text-sm text-zinc-800">
               {{ resolvedBody() }}

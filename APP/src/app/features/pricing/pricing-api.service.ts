@@ -18,8 +18,6 @@ export class PricingApiService {
   private readonly http = inject(HttpClient);
 
   getPlans(): Observable<PlansResponse> {
-    return this.http.get<PlansResponse>(
-      `${environment.apiBaseUrl}/plans`,
-    );
+    return this.http.get<PlansResponse>(`${environment.apiBaseUrl}/plans`);
   }
 }

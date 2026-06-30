@@ -12,6 +12,7 @@ Cases:
   6. `_extract_meta_error` parses Meta's error envelope.
   7. Picture MIME validation in upload service.
 """
+
 from __future__ import annotations
 
 import httpx

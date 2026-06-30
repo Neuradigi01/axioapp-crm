@@ -15,9 +15,7 @@
   <div class="max-h-48 overflow-y-auto">
     @for (group of filtered(); track group.label) {
       <div class="px-2 pt-2 pb-1">
-        <h4
-          class="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1"
-        >
+        <h4 class="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">
           {{ group.label }}
         </h4>
         <div class="space-y-0.5">
@@ -35,9 +33,7 @@
       </div>
     }
     @if (filtered().length === 0) {
-      <p class="text-[11px] italic text-zinc-500 px-2 py-2">
-        No variables match.
-      </p>
+      <p class="text-[11px] italic text-zinc-500 px-2 py-2">No variables match.</p>
     }
   </div>
 </div>

@@ -1,22 +1,22 @@
 import pytest
 import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
-from httpx import AsyncClient, ASGITransport
 
+from src.constants.route_ids import RouteIds
+from src.core.security.jwt import create_access_token
+from src.core.security.password import hash_password
 from src.models import Base
 from src.models.admin import Admin
-from src.models.user import UserLogin, UserInfo
-from src.models.ticket import Ticket, TicketReply, TicketAttachment
-from src.core.security.password import hash_password
-from src.core.security.jwt import create_access_token
-from src.constants.route_ids import RouteIds
-from tests.conftest import test_engine, TestSession
+from src.models.ticket import Ticket, TicketAttachment, TicketReply
+from src.models.user import UserInfo, UserLogin
+from tests.conftest import TestSession, test_engine
 
 
 @pytest_asyncio.fixture
 async def client():
-    from main import app
     import src.core.db as db_module
+    from main import app
 
     original_session = db_module.async_session
     db_module.async_session = TestSession
@@ -101,20 +101,24 @@ async def _seed(db, *, ticket_status="Open"):
 
 
 def _make_user_token(user_id="test_user"):
-    return create_access_token({
-        "user_id": user_id,
-        "role": "User",
-        "access_rights": f"{RouteIds.USER_SUPPORT_VIEW_TICKET},{RouteIds.USER_SUPPORT_COMPOSE},{RouteIds.USER_SUPPORT_TICKETS}",
-    })
+    return create_access_token(
+        {
+            "user_id": user_id,
+            "role": "User",
+            "access_rights": f"{RouteIds.USER_SUPPORT_VIEW_TICKET},{RouteIds.USER_SUPPORT_COMPOSE},{RouteIds.USER_SUPPORT_TICKETS}",
+        }
+    )
 
 
 def _make_admin_token():
-    return create_access_token({
-        "user_id": "test_admin",
-        "role": "Admin",
-        "access_rights": f"{RouteIds.ADMIN_SUPPORT_VIEW_TICKET},{RouteIds.ADMIN_SUPPORT_COMPOSE},{RouteIds.ADMIN_SUPPORT_TICKETS}",
-        "is_super_admin": True,
-    })
+    return create_access_token(
+        {
+            "user_id": "test_admin",
+            "role": "Admin",
+            "access_rights": f"{RouteIds.ADMIN_SUPPORT_VIEW_TICKET},{RouteIds.ADMIN_SUPPORT_COMPOSE},{RouteIds.ADMIN_SUPPORT_TICKETS}",
+            "is_super_admin": True,
+        }
+    )
 
 
 @pytest.mark.asyncio
@@ -205,7 +209,9 @@ async def test_view_marks_unread_as_read(client):
     # Verify the reply is now marked as read
     async with TestSession() as db:
         from sqlalchemy import select
+
         from src.models.ticket import TicketReply as TR
+
         stmt = select(TR).where(TR.id == reply_id)
         result = await db.execute(stmt)
         updated_reply = result.scalar_one()

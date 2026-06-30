@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { CatalogTile } from './onboarding.types';
@@ -43,7 +37,9 @@ import { CatalogTile } from './onboarding.types';
         </span>
       }
 
-      <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 mb-3">
+      <div
+        class="flex items-center justify-center w-12 h-12 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 mb-3"
+      >
         <lucide-icon [name]="tile().icon" class="w-6 h-6"></lucide-icon>
       </div>
 

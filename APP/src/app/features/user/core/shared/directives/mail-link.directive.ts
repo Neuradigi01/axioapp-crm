@@ -1,12 +1,4 @@
-import {
-  Directive,
-  ElementRef,
-  Renderer2,
-  computed,
-  effect,
-  inject,
-  input,
-} from '@angular/core';
+import { Directive, ElementRef, Renderer2, computed, effect, inject, input } from '@angular/core';
 
 /**
  * Wraps an email address into a `mailto:` link on the host element.

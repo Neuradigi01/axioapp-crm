@@ -14,10 +14,11 @@ Complements ``test_engine.py`` which covers the engine's branching
     cleanly tested in-process — documented + verified at DB layer
     by the migration's partial index.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -33,7 +34,6 @@ from src.app.core.workflows.models import (
     WorkflowStepRunStatus,
 )
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -41,10 +41,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -131,7 +128,7 @@ async def test_next_step_index_monotonic_per_run(test_db, org_id):
 
 async def test_list_runs_due_picks_pending_in_past_only(test_db, org_id):
     wf = await _seed_workflow(test_db, org_id=org_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     due = await _seed_run(
         test_db,
@@ -190,9 +187,7 @@ async def test_list_runs_filters_by_workflow_and_status(test_db, org_id):
     )
 
     # Workflow A only.
-    rows_a, total_a = await workflows_da.list_runs(
-        test_db, org_id=org_id, workflow_id=wf_a.id
-    )
+    rows_a, total_a = await workflows_da.list_runs(test_db, org_id=org_id, workflow_id=wf_a.id)
     assert total_a == 2
     assert {r.id for r in rows_a} == {run_a1.id, run_a2.id}
 
@@ -207,9 +202,7 @@ async def test_list_runs_filters_by_workflow_and_status(test_db, org_id):
     assert rows_err[0].id == run_a2.id
 
     # Workflow B only — should not include any of A's rows.
-    rows_b, total_b = await workflows_da.list_runs(
-        test_db, org_id=org_id, workflow_id=wf_b.id
-    )
+    rows_b, total_b = await workflows_da.list_runs(test_db, org_id=org_id, workflow_id=wf_b.id)
     assert total_b == 1
     assert rows_b[0].id == run_b1.id
 
@@ -237,9 +230,7 @@ async def test_list_step_runs_ordered_by_step_index_asc(test_db, org_id):
         )
     await test_db.commit()
 
-    rows = await workflows_da.list_step_runs(
-        test_db, org_id=org_id, run_id=run.id
-    )
+    rows = await workflows_da.list_step_runs(test_db, org_id=org_id, run_id=run.id)
     assert [r.step_index for r in rows] == [0, 1, 2]
 
 

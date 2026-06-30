@@ -13,11 +13,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  Call,
-  CallOutcome,
-  CallsApiService,
-} from './calls-api.service';
+import { Call, CallOutcome, CallsApiService } from './calls-api.service';
 
 /**
  * Modal to log a phone call. Reused by:
@@ -113,5 +109,4 @@ export class LogCallModalComponent {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
-
 }

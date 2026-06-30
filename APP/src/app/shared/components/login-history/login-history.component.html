@@ -1,4 +1,9 @@
 <app-login-history-table
   [showUserColumns]="isAdmin"
   [pageTitle]="'Login History'"
-  [pageSubtitle]="isAdmin ? 'View login activity and manage sessions across all users' : 'View your recent login activity and manage active sessions'" />
+  [pageSubtitle]="
+    isAdmin
+      ? 'View login activity and manage sessions across all users'
+      : 'View your recent login activity and manage active sessions'
+  "
+/>

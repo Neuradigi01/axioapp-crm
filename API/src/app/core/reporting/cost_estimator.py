@@ -28,13 +28,13 @@ These are public Meta pricing — see
 https://developers.facebook.com/docs/whatsapp/pricing — and may
 drift; the override env var lets ops correct them without a deploy.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +206,7 @@ def estimate(
     )
 
 
-def normalise_category(raw: Optional[str]) -> str:
+def normalise_category(raw: str | None) -> str:
     """Map a Meta template ``category`` field onto our lower-case
     set. Unknown → "utility" (the median-cost catch-all). Used by
     the campaign-analytics service when classifying outbound rows."""

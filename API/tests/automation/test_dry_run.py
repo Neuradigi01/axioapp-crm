@@ -6,13 +6,15 @@ channel adapter. Powers the editor's "Save & Test" modal so the
 operator can verify trigger conditions + template rendering before
 the trigger fires for real.
 """
+
 from __future__ import annotations
 
 import uuid
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.automation import service as automation_service
 from src.app.core.automation.models import AutomationRun
@@ -23,7 +25,6 @@ from src.app.core.templates.models import TemplateCategory
 from src.app.core.templates.schemas import TemplateCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -31,10 +32,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {"id": str(org_id), "name": "Demo", "slug": f"demo-{org_id.hex[:6]}"},
     )
     await test_db.commit()
@@ -168,8 +166,8 @@ async def test_dry_run_does_not_create_run_row(test_db, org_id):
         reset_context(token)
 
     runs = (
-        await test_db.execute(
-            select(AutomationRun).where(AutomationRun.trigger_id == trigger_id)
-        )
-    ).scalars().all()
+        (await test_db.execute(select(AutomationRun).where(AutomationRun.trigger_id == trigger_id)))
+        .scalars()
+        .all()
+    )
     assert len(runs) == 0

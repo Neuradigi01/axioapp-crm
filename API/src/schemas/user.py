@@ -8,5 +8,3 @@ class UpdateProfileRequest(BaseModel):
     mobile_no: str | None = None
     country_id: int | None = None
     state_id: int | None = None
-
-

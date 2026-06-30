@@ -1,7 +1,9 @@
 <div class="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-8">
   <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-md sm:p-8">
     @if (loadError(); as err) {
-      <div class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+      <div
+        class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+      >
         {{ err }}
       </div>
     }
@@ -11,14 +13,17 @@
       <header class="mb-6 text-center">
         <h1 class="text-xl font-semibold text-zinc-900">Sign in to Staff Portal</h1>
         <p class="mt-1 text-sm text-zinc-500">
-          Pick your name to continue (org: <span class="font-medium">{{ orgSlug }}</span>)
+          Pick your name to continue (org: <span class="font-medium">{{ orgSlug }}</span
+          >)
         </p>
       </header>
 
       @if (loadingUsers()) {
         <div class="py-8 text-center text-sm text-zinc-500">Loading staff…</div>
       } @else if (users().length === 0) {
-        <div class="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500">
+        <div
+          class="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500"
+        >
           No active staff in this org yet. Ask an admin to set up your profile.
         </div>
       } @else {
@@ -77,7 +82,9 @@
       </div>
 
       @if (submitError(); as err) {
-        <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-center text-sm text-rose-700">
+        <div
+          class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-center text-sm text-rose-700"
+        >
           {{ err }}
         </div>
       }

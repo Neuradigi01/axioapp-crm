@@ -14,12 +14,12 @@ post-0037 convention.
 Tenant-scoped: standard `TenantScoped` mixin + RLS policy from the
 migration. The ORM tenant filter auto-applies to every query.
 """
+
 from __future__ import annotations
 
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
@@ -80,23 +80,15 @@ class Integration(Base, TenantScoped):
         ),
         nullable=False,
     )
-    account_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    account_label: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
+    account_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    account_label: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Fernet ciphertexts. NULL when status='disconnected'.
-    access_token_enc: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
-    refresh_token_enc: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
-    token_expires_at: Mapped[Optional[datetime]] = mapped_column(
+    access_token_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    refresh_token_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    scopes: Mapped[Optional[list[str]]] = mapped_column(
-        ARRAY(Text), nullable=True
-    )
+    scopes: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     status: Mapped[IntegrationStatus] = mapped_column(
         Enum(
             IntegrationStatus,
@@ -107,19 +99,11 @@ class Integration(Base, TenantScoped):
         nullable=False,
         server_default=text("'disconnected'"),
     )
-    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    connected_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    connected_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
-    disconnected_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    disconnected_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    connected_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    disconnected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    disconnected_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -132,9 +116,7 @@ class Integration(Base, TenantScoped):
     # token in the path; disconnect nulls the secret so stale URLs
     # immediately stop authenticating. Migration 0049 adds the
     # partial-UNIQUE index for the path-lookup query.
-    webhook_secret: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
+    webhook_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Meta-side user identifier captured during WhatsApp Embedded
     # Signup (whatsapp-platform-upgrade Step 2) via a `GET /debug_token`
     # call after the code exchange. Used as the join key by Meta's
@@ -144,9 +126,7 @@ class Integration(Base, TenantScoped):
     # legacy manually-connected rows (no Meta identity ever captured)
     # and for non-WhatsApp providers (Google Ads / Meta Ads have their
     # own per-provider identity columns).
-    meta_user_id: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
+    meta_user_id: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     @property
     def is_connected(self) -> bool:
@@ -182,15 +162,11 @@ class IntegrationSubscription(Base, TenantScoped):
         index=True,
     )
     external_form_id: Mapped[str] = mapped_column(Text, nullable=False)
-    external_form_label: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
+    external_form_label: Mapped[str | None] = mapped_column(Text, nullable=True)
     field_mapping: Mapped[dict] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
-    enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -224,7 +200,7 @@ class IntegrationDLQ(Base, TenantScoped):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    integration_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    integration_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_integrations.id", ondelete="SET NULL"),
         nullable=True,
@@ -248,12 +224,8 @@ class IntegrationDLQ(Base, TenantScoped):
         nullable=False,
         server_default=text("now()"),
     )
-    replayed_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    replayed_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    replayed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    replayed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
 
 __all__ = [

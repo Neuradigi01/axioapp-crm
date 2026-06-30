@@ -19,18 +19,19 @@ Five concerns:
 
 Audit events fire on every mutation so HR has an unambiguous record.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date as Date, datetime, timezone
+from datetime import UTC, datetime
+from datetime import date as Date
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.users import service as users_service
 from src.app.core.activities.models import Activity
 from src.app.core.leads.models import LeadStatus
 from src.app.core.staff import data_access as _da
@@ -45,6 +46,7 @@ from src.app.core.staff.schemas import (
     StaffListItem,
     StaffProfileUpsert,
 )
+from src.app.core.users import service as users_service
 from src.app.core.users.models import User
 
 
@@ -64,17 +66,13 @@ def _attendance_snapshot(a: Attendance) -> dict[str, Any]:
         "id": str(a.id),
         "user_id": str(a.user_id),
         "clock_in_at": a.clock_in_at.isoformat(),
-        "clock_out_at": (
-            a.clock_out_at.isoformat() if a.clock_out_at is not None else None
-        ),
+        "clock_out_at": (a.clock_out_at.isoformat() if a.clock_out_at is not None else None),
         "date": a.date.isoformat(),
         "notes": a.notes,
     }
 
 
-async def _ensure_user_in_scope(
-    session: AsyncSession, user_id: uuid.UUID
-) -> User:
+async def _ensure_user_in_scope(session: AsyncSession, user_id: uuid.UUID) -> User:
     user = await users_service.get_user_by_uuid(session, user_id)
     if user is None:
         raise HTTPException(
@@ -101,16 +99,10 @@ async def list_staff(session: AsyncSession) -> list[StaffListItem]:
                 phone=user.phone,
                 role_id=user.role_id,
                 is_active=user.is_active,
-                commission_rate=(
-                    profile.commission_rate if profile is not None else None
-                ),
-                monthly_target=(
-                    profile.monthly_target if profile is not None else None
-                ),
+                commission_rate=(profile.commission_rate if profile is not None else None),
+                monthly_target=(profile.monthly_target if profile is not None else None),
                 rating=profile.rating if profile is not None else None,
-                employment_status=(
-                    profile.employment_status if profile is not None else None
-                ),
+                employment_status=(profile.employment_status if profile is not None else None),
                 joined_at=profile.joined_at if profile is not None else None,
             )
         )
@@ -120,9 +112,7 @@ async def list_staff(session: AsyncSession) -> list[StaffListItem]:
 # --- profile upsert ---
 
 
-async def get_profile(
-    session: AsyncSession, user_id: uuid.UUID
-) -> Optional[StaffProfile]:
+async def get_profile(session: AsyncSession, user_id: uuid.UUID) -> StaffProfile | None:
     return await _da.get_staff_profile_by_user_id(session, user_id)
 
 
@@ -174,9 +164,7 @@ async def upsert_profile(
 # --- performance ---
 
 
-async def compute_performance(
-    session: AsyncSession, user_id: uuid.UUID
-) -> dict[str, Any]:
+async def compute_performance(session: AsyncSession, user_id: uuid.UUID) -> dict[str, Any]:
     await _ensure_user_in_scope(session, user_id)
 
     leads_won = await _da.count_leads_for_user_by_status(
@@ -189,13 +177,11 @@ async def compute_performance(
     profile = await get_profile(session, user_id)
     monthly_target = profile.monthly_target if profile is not None else Decimal("0")
     rating = profile.rating if profile is not None else Decimal("0")
-    commission_rate = (
-        profile.commission_rate if profile is not None else Decimal("0")
-    )
+    commission_rate = profile.commission_rate if profile is not None else Decimal("0")
 
     # `sales` is a Phase 5 invoices number — placeholder zero today.
     sales = Decimal("0")
-    target_progress_pct: Optional[float] = None
+    target_progress_pct: float | None = None
     if monthly_target > 0:
         target_progress_pct = float(sales / monthly_target * 100)
 
@@ -218,8 +204,8 @@ async def list_attendance(
     session: AsyncSession,
     *,
     user_id: uuid.UUID,
-    from_dt: Optional[Date] = None,
-    to_dt: Optional[Date] = None,
+    from_dt: Date | None = None,
+    to_dt: Date | None = None,
 ) -> list[Attendance]:
     return await _da.list_attendance_for_user(
         session, user_id=user_id, from_dt=from_dt, to_dt=to_dt
@@ -229,9 +215,7 @@ async def list_attendance(
 async def list_activities_for(
     session: AsyncSession, user_id: uuid.UUID, limit: int = 100
 ) -> list[Activity]:
-    return await _da.list_activities_for_user(
-        session, user_id=user_id, limit=limit
-    )
+    return await _da.list_activities_for_user(session, user_id=user_id, limit=limit)
 
 
 async def clock_in(
@@ -243,15 +227,13 @@ async def clock_in(
 ) -> Attendance:
     await _ensure_user_in_scope(session, user_id)
 
-    if (
-        await _da.find_open_attendance_session(session, user_id)
-    ) is not None:
+    if (await _da.find_open_attendance_session(session, user_id)) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="user already has an open attendance session — clock out first",
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     attendance = Attendance(
         org_id=org_id,
         user_id=user_id,
@@ -288,12 +270,10 @@ async def clock_out(
         )
 
     before = _attendance_snapshot(open_session)
-    open_session.clock_out_at = datetime.now(timezone.utc)
+    open_session.clock_out_at = datetime.now(UTC)
     if payload.notes is not None:
         existing = open_session.notes
-        open_session.notes = (
-            f"{existing}\n{payload.notes}" if existing else payload.notes
-        )
+        open_session.notes = f"{existing}\n{payload.notes}" if existing else payload.notes
     await session.commit()
     await session.refresh(open_session)
 

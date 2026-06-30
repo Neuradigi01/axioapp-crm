@@ -23,11 +23,13 @@ The ``_SORT_COLUMNS`` whitelist lives here because the service-level
 ``Literal`` already prevents arbitrary attribute access; the column
 mapping is just plumbing.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
-from typing import Any, Literal, Optional, Sequence
+from collections.abc import Sequence
+from datetime import datetime
+from typing import Any, Literal
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +37,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.appointments.models import Appointment, AppointmentStatus
 from src.app.core.contacts.models import Contact
 from src.app.core.users.models import OrganizationMember, User
-
 
 _SORT_COLUMNS = {
     "scheduled_at": Appointment.scheduled_at,
@@ -46,12 +47,10 @@ _SORT_COLUMNS = {
 
 async def get_appointment_by_id(
     session: AsyncSession, appointment_id: uuid.UUID
-) -> Optional[Appointment]:
+) -> Appointment | None:
     """Single-row read by PK. ``None`` on miss (or cross-tenant — the
     ORM filter applies)."""
-    result = await session.execute(
-        select(Appointment).where(Appointment.id == appointment_id)
-    )
+    result = await session.execute(select(Appointment).where(Appointment.id == appointment_id))
     return result.scalar_one_or_none()
 
 
@@ -61,35 +60,25 @@ def insert_appointment(session: AsyncSession, appointment: Appointment) -> None:
     session.add(appointment)
 
 
-async def delete_appointment(
-    session: AsyncSession, appointment: Appointment
-) -> None:
+async def delete_appointment(session: AsyncSession, appointment: Appointment) -> None:
     """Mark an Appointment row for DELETE. Caller commits."""
     await session.delete(appointment)
 
 
-async def get_contact_name(
-    session: AsyncSession, contact_id: uuid.UUID
-) -> str | None:
+async def get_contact_name(session: AsyncSession, contact_id: uuid.UUID) -> str | None:
     """Narrow-column projection of ``tbl_contacts.full_name`` for the
     notification body. ``None`` when the contact was deleted between
     the appointment write and the post-commit notification."""
     return (
-        await session.execute(
-            select(Contact.full_name).where(Contact.id == contact_id)
-        )
+        await session.execute(select(Contact.full_name).where(Contact.id == contact_id))
     ).scalar_one_or_none()
 
 
-async def contact_exists(
-    session: AsyncSession, contact_id: uuid.UUID
-) -> bool:
+async def contact_exists(session: AsyncSession, contact_id: uuid.UUID) -> bool:
     """Existence check used by the appointment-create validator. The
     full hydrate isn't needed — the caller just decides 422 vs proceed."""
     row = (
-        await session.execute(
-            select(Contact.id).where(Contact.id == contact_id)
-        )
+        await session.execute(select(Contact.id).where(Contact.id == contact_id))
     ).scalar_one_or_none()
     return row is not None
 
@@ -100,7 +89,7 @@ async def find_overlapping_appointments(
     assigned_to_id: uuid.UUID,
     scheduled_at_lt: datetime,
     non_blocking_statuses: Sequence[AppointmentStatus],
-    exclude_id: Optional[uuid.UUID] = None,
+    exclude_id: uuid.UUID | None = None,
 ) -> list[Appointment]:
     """SELECT candidates whose ``scheduled_at`` falls before the
     proposed new end-time, for the same assignee, excluding statuses
@@ -124,13 +113,11 @@ async def find_overlapping_appointments(
 async def list_appointments_query(
     session: AsyncSession,
     *,
-    from_dt: Optional[datetime] = None,
-    to_dt: Optional[datetime] = None,
-    assigned_to: Optional[uuid.UUID] = None,
-    status_filter: Optional[AppointmentStatus] = None,
-    sort: Literal[
-        "scheduled_at", "created_at", "last_activity_at"
-    ] = "scheduled_at",
+    from_dt: datetime | None = None,
+    to_dt: datetime | None = None,
+    assigned_to: uuid.UUID | None = None,
+    status_filter: AppointmentStatus | None = None,
+    sort: Literal["scheduled_at", "created_at", "last_activity_at"] = "scheduled_at",
     order: Literal["asc", "desc"] = "asc",
 ) -> list[Appointment]:
     """Calendar / list read. Not paginated by design — the FE either
@@ -158,11 +145,7 @@ async def list_appointments_query(
 
     sort_col = _SORT_COLUMNS[sort]
     if sort == "last_activity_at":
-        primary = (
-            sort_col.asc().nulls_last()
-            if order == "asc"
-            else sort_col.desc().nulls_last()
-        )
+        primary = sort_col.asc().nulls_last() if order == "asc" else sort_col.desc().nulls_last()
     else:
         primary = sort_col.asc() if order == "asc" else sort_col.desc()
     stmt = stmt.order_by(primary, Appointment.id.asc())

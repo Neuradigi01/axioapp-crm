@@ -1,16 +1,8 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CanvasNode } from '../canvas-state.service';
-
 
 /**
  * Handles every `routing.*` node — the dispatcher passes the node and
@@ -18,7 +10,6 @@ import { CanvasNode } from '../canvas-state.service';
  * least_loaded / territory / skill / specific_user). Operator picks
  * the pool spec + target attachment + fallback resolver.
  */
-
 
 @Component({
   selector: 'app-routing-editor',
@@ -37,9 +28,7 @@ export class RoutingEditorComponent {
   readonly poolType = computed<string>(
     () => (this.node().config?.['pool_type'] as string) ?? 'role',
   );
-  readonly poolValue = computed<string>(
-    () => (this.node().config?.['pool_value'] as string) ?? '',
-  );
+  readonly poolValue = computed<string>(() => (this.node().config?.['pool_value'] as string) ?? '');
   readonly target = computed<string>(
     () => (this.node().config?.['target'] as string) ?? 'lead.assigned_to',
   );
@@ -61,11 +50,23 @@ export class RoutingEditorComponent {
     });
   }
 
-  isSpecificUser(): boolean { return this.mode() === 'specific_user'; }
+  isSpecificUser(): boolean {
+    return this.mode() === 'specific_user';
+  }
 
-  onPoolTypeChange(v: string): void { this.configChange.emit({ pool_type: v }); }
-  onPoolValueChange(v: string): void { this.configChange.emit({ pool_value: v }); }
-  onTargetChange(v: string): void { this.configChange.emit({ target: v }); }
-  onFallbackChange(v: string): void { this.configChange.emit({ fallback: v }); }
-  onSpecificUserChange(v: string): void { this.configChange.emit({ specific_user_id: v }); }
+  onPoolTypeChange(v: string): void {
+    this.configChange.emit({ pool_type: v });
+  }
+  onPoolValueChange(v: string): void {
+    this.configChange.emit({ pool_value: v });
+  }
+  onTargetChange(v: string): void {
+    this.configChange.emit({ target: v });
+  }
+  onFallbackChange(v: string): void {
+    this.configChange.emit({ fallback: v });
+  }
+  onSpecificUserChange(v: string): void {
+    this.configChange.emit({ specific_user_id: v });
+  }
 }

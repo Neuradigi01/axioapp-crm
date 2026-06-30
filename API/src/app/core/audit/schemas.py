@@ -1,4 +1,5 @@
 """Pydantic v2 schemas for the audit router."""
+
 from __future__ import annotations
 
 import uuid

@@ -3,7 +3,11 @@
     <div class="dashboard-tiles__tile">
       <div class="dashboard-tiles__accent" [style.background]="tile.color"></div>
       <div class="dashboard-tiles__body">
-        <div class="dashboard-tiles__icon-wrapper" [style.background-color]="tile.color + '18'" [style.color]="tile.color">
+        <div
+          class="dashboard-tiles__icon-wrapper"
+          [style.background-color]="tile.color + '18'"
+          [style.color]="tile.color"
+        >
           <mat-icon>{{ tile.icon }}</mat-icon>
         </div>
         <div class="dashboard-tiles__info">

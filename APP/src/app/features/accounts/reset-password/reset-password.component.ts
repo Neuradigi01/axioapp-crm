@@ -9,7 +9,11 @@ import { matchFieldValidator } from '@shared/validators/custom-validators';
 import { AuthApiService } from '@app/services/auth-api.service';
 import { getRoute } from '@core/services/routes-helper.service';
 import { SNACKBAR_DURATION, SNACKBAR_ACTION } from '@core/constants/app.constants';
-import { MSG_ERROR_GENERIC, MSG_PASSWORD_RESET_SUCCESS, MSG_PASSWORD_RESET_FAILED } from '@core/constants/messages.constants';
+import {
+  MSG_ERROR_GENERIC,
+  MSG_PASSWORD_RESET_SUCCESS,
+  MSG_PASSWORD_RESET_FAILED,
+} from '@core/constants/messages.constants';
 
 @Component({
   selector: 'app-reset-password',
@@ -61,7 +65,9 @@ export class ResetPasswordComponent implements OnInit {
       });
 
       if (response.success) {
-        this.snackBar.open(response.message || MSG_PASSWORD_RESET_SUCCESS, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(response.message || MSG_PASSWORD_RESET_SUCCESS, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
         this.router.navigate([this.loginUrl]);
       } else {
         const msg = response.message || MSG_PASSWORD_RESET_FAILED;

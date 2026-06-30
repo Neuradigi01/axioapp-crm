@@ -1,10 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 interface FlowScreen {
   id: string;
@@ -53,9 +48,7 @@ interface FlowField {
       </p>
       @for (screen of screens(); track screen.id; let i = $index) {
         <div class="mb-3 rounded border border-zinc-200 bg-zinc-50 p-3">
-          <p class="mb-2 text-xs font-semibold text-zinc-800">
-            {{ i + 1 }}. {{ screen.title }}
-          </p>
+          <p class="mb-2 text-xs font-semibold text-zinc-800">{{ i + 1 }}. {{ screen.title }}</p>
           <ul class="space-y-1.5 text-xs">
             @for (field of screenFields(screen); track field.name || field.type) {
               <li class="flex items-start gap-2">
@@ -84,16 +77,12 @@ interface FlowField {
                 </span>
               </li>
             } @empty {
-              <li class="text-[11px] text-zinc-500">
-                (no input fields on this screen)
-              </li>
+              <li class="text-[11px] text-zinc-500">(no input fields on this screen)</li>
             }
           </ul>
         </div>
       } @empty {
-        <p class="text-[11px] text-zinc-500">
-          Empty flow — add a screen to get started.
-        </p>
+        <p class="text-[11px] text-zinc-500">Empty flow — add a screen to get started.</p>
       }
     </div>
   `,
@@ -113,19 +102,13 @@ export class FlowPreviewComponent {
     return out;
   }
 
-  private walkChildren(
-    nodes: Array<Record<string, unknown>>,
-    out: FlowField[],
-  ): void {
+  private walkChildren(nodes: Array<Record<string, unknown>>, out: FlowField[]): void {
     for (const node of nodes) {
       const type = String(node['type'] ?? '');
       if (type === 'Form' || type === 'SingleColumnLayout') {
         const inner = node['children'];
         if (Array.isArray(inner)) {
-          this.walkChildren(
-            inner as Array<Record<string, unknown>>,
-            out,
-          );
+          this.walkChildren(inner as Array<Record<string, unknown>>, out);
         }
         continue;
       }
@@ -143,11 +126,8 @@ export class FlowPreviewComponent {
         type,
         name: node['name'] ? String(node['name']) : undefined,
         label: node['label'] ? String(node['label']) : undefined,
-        required:
-          node['required'] === true || node['required'] === 'true',
-        helperText: node['helper-text']
-          ? String(node['helper-text'])
-          : undefined,
+        required: node['required'] === true || node['required'] === 'true',
+        helperText: node['helper-text'] ? String(node['helper-text']) : undefined,
         options,
       });
     }

@@ -4,6 +4,7 @@ Pure tests — no DB usage. The registry is file-IO + Pydantic only.
 HTTP tests reuse the existing AsyncClient + ASGITransport pattern from
 the other layered-router tests.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,7 +20,6 @@ from src.app.core.subscriptions.plans import (
     UNLIMITED_SENTINEL,
     Cap,
 )
-
 
 # ---------------------------------------------------------------------------
 # Registry — pure unit tests against the real plans.yaml
@@ -205,18 +205,14 @@ def test_duplicate_plan_codes_rejected(tmp_path):
 
 
 def test_cap_below_minus_one_rejected(tmp_path):
-    body = VALID_YAML_TEMPLATE.replace(
-        "contacts: 5000", "contacts: -5"
-    )
+    body = VALID_YAML_TEMPLATE.replace("contacts: 5000", "contacts: -5")
     path = _write_yaml(tmp_path, body)
     with pytest.raises(ValidationError):
         plans.reload(path)
 
 
 def test_negative_price_rejected(tmp_path):
-    body = VALID_YAML_TEMPLATE.replace(
-        "monthly_bundle_usd: 60", "monthly_bundle_usd: -10"
-    )
+    body = VALID_YAML_TEMPLATE.replace("monthly_bundle_usd: 60", "monthly_bundle_usd: -10")
     path = _write_yaml(tmp_path, body)
     with pytest.raises(ValidationError):
         plans.reload(path)
@@ -225,6 +221,7 @@ def test_negative_price_rejected(tmp_path):
 # ---------------------------------------------------------------------------
 # CLI — exits 0 on the real YAML, 1 on a broken fixture
 # ---------------------------------------------------------------------------
+
 
 def test_cli_validates_real_yaml(capsys):
     rc = plans_cli.main(["validate"])
@@ -249,6 +246,7 @@ def test_cli_missing_argument_returns_2(capsys):
 # ---------------------------------------------------------------------------
 # HTTP — the two public endpoints
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture
 async def client():
