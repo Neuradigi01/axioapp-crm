@@ -58,6 +58,34 @@
       Discard
     </button>
 
+    <!-- Step 17 — version drawer + export + import -->
+    <button
+      type="button"
+      class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      [disabled]="!state.workflowId()"
+      (click)="toggleVersionDrawer()"
+      title="Version history"
+    >
+      <lucide-icon name="History" class="w-4 h-4"></lucide-icon>
+    </button>
+    <button
+      type="button"
+      class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      [disabled]="!state.workflowId()"
+      (click)="exportWorkflow()"
+      title="Export JSON"
+    >
+      <lucide-icon name="Download" class="w-4 h-4"></lucide-icon>
+    </button>
+    <button
+      type="button"
+      class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      (click)="openImportModal()"
+      title="Import JSON"
+    >
+      <lucide-icon name="Upload" class="w-4 h-4"></lucide-icon>
+    </button>
+
     <button
       type="button"
       class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
@@ -93,11 +121,28 @@
       type="button"
       class="px-3 py-1.5 text-xs rounded bg-zinc-900 text-white hover:bg-zinc-800"
       (click)="save()"
-      [disabled]="!state.dirty() || saving()"
+      [disabled]="!state.dirty() || saving() || viewingVersion() !== null"
+      [title]="viewingVersion() !== null ? 'Exit version preview to save' : 'Save draft'"
     >
       Save draft
     </button>
   </header>
+
+  @if (viewingVersion() !== null) {
+    <div
+      class="px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-900 text-xs flex items-center gap-2"
+    >
+      <lucide-icon name="History" class="w-3.5 h-3.5"></lucide-icon>
+      Previewing version <strong>v{{ viewingVersion() }}</strong> — read-only.
+      <button
+        type="button"
+        class="ml-2 px-2 py-0.5 rounded bg-white border border-amber-300 text-amber-900 hover:bg-amber-100"
+        (click)="backToCurrentFromVersion()"
+      >
+        Back to current
+      </button>
+    </div>
+  }
 
   @if (error()) {
     <div class="px-4 py-2 bg-rose-50 border-b border-rose-200 text-rose-800 text-xs">
@@ -255,11 +300,20 @@
       }
     </main>
 
-    <!-- Right drawer — typed node editor (Step 15) or test-fire trace -->
+    <!-- Right drawer — version history (Step 17) / typed node editor (Step 15) / test-fire trace -->
     <aside
       class="w-[440px] shrink-0 bg-white border-l border-zinc-200 flex flex-col"
     >
-      @if (selectedNode(); as node) {
+      @if (showVersionDrawer() && state.workflowId(); as wfId) {
+        <app-version-history-drawer
+          [workflowId]="wfId"
+          [viewingVersion]="viewingVersion()"
+          (close)="closeVersionDrawer()"
+          (viewVersion)="viewHistoricalVersion($event)"
+          (backToCurrent)="backToCurrentFromVersion()"
+          (restoreVersion)="rollbackToVersion($event)"
+        />
+      } @else if (selectedNode(); as node) {
         <app-node-editor
           [node]="node"
           (close)="state.selectNode(null)"
@@ -322,4 +376,20 @@
       }
     </aside>
   </div>
+
+  <!-- Step 17 — save-change-note modal -->
+  <app-save-change-note-modal
+    [open]="showChangeNoteModal()"
+    [busy]="saving()"
+    (cancel)="cancelChangeNote()"
+    (confirm)="confirmChangeNote($event)"
+  />
+
+  <!-- Step 17 — import JSON modal -->
+  @if (showImportModal()) {
+    <app-import-modal
+      (cancel)="cancelImport()"
+      (confirm)="confirmImport($event)"
+    />
+  }
 </div>

@@ -49,13 +49,19 @@ from src.app.core.workflows.permissions import (
     PERM_WRITE,
 )
 from src.app.core.workflows.schemas import (
+    RollbackRequest,
     WorkflowCreate,
+    WorkflowExport,
     WorkflowFolderCreate,
     WorkflowFolderRead,
+    WorkflowImportRequest,
     WorkflowRead,
     WorkflowRunRead,
     WorkflowStepRunRead,
     WorkflowUpdate,
+    WorkflowVersionDetailRead,
+    WorkflowVersionListResponse,
+    WorkflowVersionSummaryRead,
 )
 from src.app.core.workflows import data_access as _workflows_da
 from src.app.shared.context import get_context
@@ -789,6 +795,193 @@ async def clone_workflow_from_gallery_endpoint(
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     return WorkflowRead.model_validate(clone)
+
+
+# --- Step 17: version history + rollback + import / export -----------
+
+
+@router.get(
+    "/{workflow_id}/versions",
+    response_model=WorkflowVersionListResponse,
+)
+async def list_workflow_versions_endpoint(
+    workflow_id: uuid.UUID,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    _user: User = Depends(require_permissions(PERM_READ)),
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowVersionListResponse:
+    """Paginated version history (newest first) for one workflow.
+
+    Each entry carries only the summary metadata
+    (``version`` / ``change_note`` / ``created_by_user_id`` /
+    ``created_at``); the full graph for "View" is fetched via
+    :func:`get_workflow_version_endpoint`.
+    """
+    ctx = get_context()
+    org_id = ctx.org_id if ctx is not None else None
+    if org_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="no org context",
+        )
+    try:
+        rows, total = await workflows_service.list_workflow_versions(
+            db,
+            org_id=org_id,
+            workflow_id=workflow_id,
+            limit=limit,
+            offset=offset,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowVersionListResponse(
+        items=[WorkflowVersionSummaryRead.model_validate(r) for r in rows],
+        total=total,
+    )
+
+
+@router.get(
+    "/{workflow_id}/versions/{version}",
+    response_model=WorkflowVersionDetailRead,
+)
+async def get_workflow_version_endpoint(
+    workflow_id: uuid.UUID,
+    version: int,
+    _user: User = Depends(require_permissions(PERM_READ)),
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowVersionDetailRead:
+    """Full graph + metadata for one historical version. Drives the
+    canvas page's read-only "View" overlay."""
+    ctx = get_context()
+    org_id = ctx.org_id if ctx is not None else None
+    if org_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="no org context",
+        )
+    try:
+        row = await workflows_service.get_workflow_version(
+            db,
+            org_id=org_id,
+            workflow_id=workflow_id,
+            version=version,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowVersionDetailRead.model_validate(row)
+
+
+@router.post(
+    "/{workflow_id}/rollback",
+    response_model=WorkflowRead,
+)
+async def rollback_workflow_endpoint(
+    workflow_id: uuid.UUID,
+    payload: RollbackRequest,
+    user: User = Depends(require_permissions(PERM_WRITE)),
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowRead:
+    """Copy the target version's graph into the live workflow as a
+    NEW version (preserves the audit chain). Refused on active
+    marketing workflows — same lock as ``PATCH /workflows/{id}``."""
+    ctx = get_context()
+    org_id = ctx.org_id if ctx is not None else None
+    if org_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="no org context",
+        )
+    try:
+        workflow = await workflows_service.rollback_workflow(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            workflow_id=workflow_id,
+            target_version=payload.target_version,
+            change_note=payload.change_note,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowRead.model_validate(workflow)
+
+
+@router.get(
+    "/{workflow_id}/export",
+    response_model=WorkflowExport,
+)
+async def export_workflow_endpoint(
+    workflow_id: uuid.UUID,
+    _user: User = Depends(require_permissions(PERM_READ)),
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowExport:
+    """Portable JSON export for the canvas page's "Export JSON"
+    button. The operator's browser downloads the response as
+    ``<workflow-name>.workflow.json``."""
+    ctx = get_context()
+    org_id = ctx.org_id if ctx is not None else None
+    if org_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="no org context",
+        )
+    try:
+        body = await workflows_service.export_workflow(
+            db, org_id=org_id, workflow_id=workflow_id
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowExport.model_validate(body)
+
+
+@router.post(
+    "/import",
+    response_model=WorkflowRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def import_workflow_endpoint(
+    payload: WorkflowImportRequest,
+    user: User = Depends(require_permissions(PERM_WRITE)),
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowRead:
+    """Create a draft workflow from a previously-exported JSON body.
+    Unknown ``template_id`` references on send + record.create_*
+    nodes are remapped to ``null`` + stamped ``__valid=false`` so
+    the Step-15 editor surfaces them. Name collisions auto-suffix
+    `(2)` / `(3)` / …"""
+    ctx = get_context()
+    org_id = ctx.org_id if ctx is not None else None
+    if org_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="no org context",
+        )
+    # Translate the import payload's `WorkflowExport` body into a
+    # `WorkflowCreate` shape the service layer consumes.
+    body = payload.json_body
+    create_payload = WorkflowCreate(
+        name=body.name,
+        description=body.description,
+        category=body.category,
+        folder_id=payload.target_folder_id,
+        is_marketing=body.is_marketing,
+        re_enrollment_rule=body.re_enrollment_rule,
+        graph=body.graph,
+        goal_node_id=body.goal_node_id,
+        cost_per_run_cents=body.cost_per_run_cents,
+    )
+    try:
+        workflow = await workflows_service.import_workflow(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            payload=create_payload,
+            target_folder_id=payload.target_folder_id,
+            override_name=payload.name,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowRead.model_validate(workflow)
 
 
 __all__ = ["router"]

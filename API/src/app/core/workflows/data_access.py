@@ -197,10 +197,13 @@ async def list_versions(
     *,
     org_id: uuid.UUID,
     workflow_id: uuid.UUID,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[WorkflowVersion]:
     """Append-only version history, newest first. Step 17's UI
-    surfaces this for diff/revert."""
-    result = await session.execute(
+    surfaces this for diff/revert. Optional ``limit`` / ``offset``
+    pagination is honoured when supplied — defaults to "all rows"."""
+    stmt = (
         select(WorkflowVersion)
         .where(
             WorkflowVersion.org_id == org_id,
@@ -208,7 +211,51 @@ async def list_versions(
         )
         .order_by(WorkflowVersion.version.desc())
     )
+    if limit is not None:
+        stmt = stmt.offset(offset).limit(limit)
+    result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def count_versions(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+) -> int:
+    """Total version rows for one workflow — feeds the drawer's
+    paginator `total`."""
+    result = await session.execute(
+        select(func.count())
+        .select_from(WorkflowVersion)
+        .where(
+            WorkflowVersion.org_id == org_id,
+            WorkflowVersion.workflow_id == workflow_id,
+        )
+    )
+    return int(result.scalar_one() or 0)
+
+
+async def get_version(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+    version: int,
+) -> WorkflowVersion | None:
+    """Resolve one specific historical version. ``None`` when missing.
+
+    Used by the rollback service to fetch the graph to restore, and
+    by the read endpoint that powers the version-history drawer's
+    preview overlay."""
+    result = await session.execute(
+        select(WorkflowVersion).where(
+            WorkflowVersion.org_id == org_id,
+            WorkflowVersion.workflow_id == workflow_id,
+            WorkflowVersion.version == version,
+        )
+    )
+    return result.scalar_one_or_none()
 
 
 # --- stage-only writes (caller commits) --------------------------------
@@ -667,6 +714,7 @@ __all__ = [
     "add_version",
     "add_workflow",
     "count_recent_marketing_sends",
+    "count_versions",
     "count_workflows_in_folder",
     "delete_event_wait",
     "delete_folder",
@@ -676,6 +724,7 @@ __all__ = [
     "get_run",
     "get_run_for_processing",
     "get_run_unscoped",
+    "get_version",
     "get_workflow",
     "get_workflow_by_name",
     "insert_event_wait",

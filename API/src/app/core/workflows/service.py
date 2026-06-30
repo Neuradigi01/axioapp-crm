@@ -490,16 +490,281 @@ async def update_enabled_event_types_from_graph(
     return list(workflow.enabled_event_types)
 
 
+# --- Step 17: version history + rollback + import / export ----------
+
+
+async def list_workflow_versions(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+    limit: int | None = None,
+    offset: int = 0,
+) -> tuple[list[WorkflowVersion], int]:
+    """Paginated version history for one workflow. Returns ``(rows,
+    total)`` so the drawer can render newest-first + show a
+    `<count of total>` counter. Raises :class:`WorkflowNotFound` if
+    the workflow doesn't belong to the org."""
+    await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
+    rows = await _da.list_versions(
+        session,
+        org_id=org_id,
+        workflow_id=workflow_id,
+        limit=limit,
+        offset=offset,
+    )
+    total = await _da.count_versions(
+        session, org_id=org_id, workflow_id=workflow_id
+    )
+    return rows, total
+
+
+async def get_workflow_version(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+    version: int,
+) -> WorkflowVersion:
+    """Resolve a specific historical version. Raises
+    :class:`WorkflowNotFound` for both unknown workflow + unknown
+    version (we don't want to leak which one is missing — same
+    contract as the templates module)."""
+    await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
+    row = await _da.get_version(
+        session,
+        org_id=org_id,
+        workflow_id=workflow_id,
+        version=version,
+    )
+    if row is None:
+        raise WorkflowNotFound(
+            f"workflow {workflow_id} has no version {version}"
+        )
+    return row
+
+
+async def rollback_workflow(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    workflow_id: uuid.UUID,
+    target_version: int,
+    change_note: str | None = None,
+) -> Workflow:
+    """Copy the target version's graph back onto the live workflow.
+
+    Bumps ``current_version`` and lands a NEW row in
+    ``tbl_workflow_versions`` (preserving the audit chain — rolling
+    back to v3 from v7 lands v8 with v3's graph). Active marketing
+    workflows are locked out — same rule as
+    :func:`update_workflow` (operator pauses, rolls back, reactivates).
+
+    Re-validates the rolled-back graph against the current DB —
+    template / sub-workflow references that were valid at the time
+    of the version snapshot may have been archived since.
+    """
+    workflow = await get_workflow(
+        session, org_id=org_id, workflow_id=workflow_id
+    )
+    if _is_marketing_locked(workflow):
+        raise WorkflowLocked(
+            "cannot roll back an active marketing workflow; pause it first"
+        )
+
+    target = await _da.get_version(
+        session,
+        org_id=org_id,
+        workflow_id=workflow_id,
+        version=target_version,
+    )
+    if target is None:
+        raise WorkflowNotFound(
+            f"workflow {workflow_id} has no version {target_version}"
+        )
+
+    graph_dict = dict(target.graph or {})
+    graph_obj = WorkflowGraph.model_validate(graph_dict)
+    await validate_graph_with_db(
+        session,
+        org_id=org_id,
+        graph=graph_obj,
+        goal_node_id=workflow.goal_node_id,
+    )
+
+    workflow.graph = graph_obj.model_dump()
+    workflow.enabled_event_types = _extract_event_types(graph_obj)
+    workflow.current_version = workflow.current_version + 1
+    workflow.updated_by_user_id = user_id
+
+    note = change_note or f"Rolled back to v{target_version}"
+    new_version = WorkflowVersion(
+        org_id=org_id,
+        workflow_id=workflow.id,
+        version=workflow.current_version,
+        graph=workflow.graph,
+        change_note=note,
+        created_by_user_id=user_id,
+    )
+    _da.add_version(session, new_version)
+
+    await session.commit()
+    await session.refresh(workflow)
+    return workflow
+
+
+async def export_workflow(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+) -> dict:
+    """Pure dict serializer for the JSON-export endpoint. Shape
+    matches :class:`schemas.WorkflowExport`. Internal UUIDs
+    (template_id references, etc.) are kept verbatim; the importer
+    remaps unknown references to ``null``."""
+    workflow = await get_workflow(
+        session, org_id=org_id, workflow_id=workflow_id
+    )
+    return {
+        "name": workflow.name,
+        "description": workflow.description,
+        "category": workflow.category,
+        "graph": dict(workflow.graph or {}),
+        "re_enrollment_rule": (
+            workflow.re_enrollment_rule.value
+            if hasattr(workflow.re_enrollment_rule, "value")
+            else str(workflow.re_enrollment_rule)
+        ),
+        "is_marketing": bool(workflow.is_marketing),
+        "goal_node_id": workflow.goal_node_id,
+        "cost_per_run_cents": int(workflow.cost_per_run_cents or 0),
+        "schema_version": 1,
+    }
+
+
+async def import_workflow(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    payload: WorkflowCreate,
+    target_folder_id: uuid.UUID | None = None,
+    override_name: str | None = None,
+) -> Workflow:
+    """Persist an imported workflow as a draft.
+
+    Caller (router) has already validated the JSON shape via
+    :class:`schemas.WorkflowImportRequest`. This function:
+
+      * applies the optional ``override_name`` (falls back to the
+        payload's name);
+      * auto-uniqifies the name if it clashes with an existing
+        workflow in the org (``(2)``, ``(3)``, … suffix);
+      * remaps unknown ``template_id`` references on send +
+        record.create_* nodes to ``null`` + stamps
+        ``__valid=false`` so the Step-15 editor surfaces them;
+      * delegates persistence to :func:`create_workflow` so the
+        graph validator + initial version row land as on a normal
+        create.
+    """
+    # Auto-uniqify the name.
+    desired = (override_name or payload.name).strip()
+    existing_names = {
+        name for name in await _da.list_workflow_names(session, org_id=org_id)
+    }
+    final_name = _next_unique_name(desired, existing_names)
+
+    # Remap unknown template_ids → null. Pulls the existing template
+    # ids in the org once so we can fast-check membership.
+    from src.app.core.templates import data_access as templates_da
+
+    graph_dict = dict(payload.graph.model_dump())
+    nodes = list(graph_dict.get("nodes") or [])
+    referenced_ids: set[uuid.UUID] = set()
+    for node in nodes:
+        cfg = (node.get("config") or {}) if isinstance(node, dict) else {}
+        tid = cfg.get("template_id")
+        if isinstance(tid, str):
+            try:
+                referenced_ids.add(uuid.UUID(tid))
+            except ValueError:
+                pass
+
+    valid_ids: set[uuid.UUID] = set()
+    for tid in referenced_ids:
+        row = await templates_da.get_template(
+            session, org_id=org_id, template_id=tid
+        )
+        if row is not None:
+            valid_ids.add(tid)
+
+    new_nodes: list[dict] = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            new_nodes.append(node)
+            continue
+        node_type = str(node.get("type") or "")
+        cfg = dict(node.get("config") or {})
+        if node_type.startswith("send.") or node_type.startswith("record.create_"):
+            tid_raw = cfg.get("template_id")
+            keep = False
+            if isinstance(tid_raw, str):
+                try:
+                    keep = uuid.UUID(tid_raw) in valid_ids
+                except ValueError:
+                    keep = False
+            if not keep:
+                cfg.pop("template_id", None)
+                cfg["__valid"] = False
+        new_nodes.append({**node, "config": cfg})
+
+    graph_dict["nodes"] = new_nodes
+
+    create_payload = WorkflowCreate(
+        name=final_name,
+        description=payload.description,
+        category=payload.category,
+        folder_id=target_folder_id,
+        is_marketing=payload.is_marketing,
+        re_enrollment_rule=payload.re_enrollment_rule,
+        graph=WorkflowGraph.model_validate(graph_dict),
+        goal_node_id=payload.goal_node_id,
+        cost_per_run_cents=payload.cost_per_run_cents,
+    )
+    return await create_workflow(
+        session, org_id=org_id, user_id=user_id, payload=create_payload
+    )
+
+
+def _next_unique_name(base: str, existing: set[str]) -> str:
+    """Bump ``base`` to ``base (2)``, ``base (3)``, … until unused."""
+    if base not in existing:
+        return base
+    n = 2
+    while True:
+        candidate = f"{base} ({n})"
+        if candidate not in existing:
+            return candidate
+        n += 1
+
+
 __all__ = [
     "archive_workflow",
     "change_status",
     "create_folder",
     "create_workflow",
     "delete_folder",
+    "export_workflow",
     "get_workflow",
+    "get_workflow_version",
+    "import_workflow",
     "list_folders",
+    "list_workflow_versions",
     "list_workflows",
     "patch_folder",
+    "rollback_workflow",
     "update_enabled_event_types_from_graph",
     "update_workflow",
 ]

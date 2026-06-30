@@ -108,7 +108,7 @@ The `actions/` sub-package is the only one allowed beyond the single-file conven
 | 14 | [Workflow canvas UI (node palette + drag-drop)](step-14-workflow-canvas-ui.md) | **COMPLETED** | ~2 days |
 | 15 | [Node editor drawers (per-node config)](step-15-node-editor-drawers.md) | **COMPLETED** | ~1.5 days |
 | 16 | [Templates gallery + clone-from-default](step-16-templates-gallery.md) | **COMPLETED** | ~0.5 days |
-| 17 | [Version history + rollback + import/export JSON](step-17-version-history.md) | **Pending** | ~1 day |
+| 17 | [Version history + rollback + import/export JSON](step-17-version-history.md) | **COMPLETED** | ~1 day |
 | 18 | [A/B test entire workflows + winner selection](step-18-ab-testing.md) | **Pending** | ~1 day |
 | 19 | [Analytics + "why didn't this fire?" diagnostics](step-19-analytics-and-diagnostics.md) | **Pending** | ~1.5 days |
 | 20 | [Default workflow seeder + email_sequences absorption](step-20-seeded-workflows-and-sequences-absorption.md) | **Pending** | ~1.5 days |
