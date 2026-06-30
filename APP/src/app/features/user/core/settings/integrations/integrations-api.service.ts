@@ -27,18 +27,11 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { buildHttpParams } from '../../shared/services/query-builder';
 
-
 // --- Shared shapes (mirror backend `core/integrations/schemas.py`) ----
-
 
 export type IntegrationProvider = 'google_ads' | 'meta_ads' | 'whatsapp';
 
-export type IntegrationStatus =
-  | 'connected'
-  | 'disconnected'
-  | 'expired'
-  | 'error';
-
+export type IntegrationStatus = 'connected' | 'disconnected' | 'expired' | 'error';
 
 export interface Integration {
   id: string;
@@ -66,7 +59,6 @@ export interface Integration {
   webhook_url: string | null;
 }
 
-
 export interface IntegrationSubscription {
   id: string;
   org_id: string;
@@ -79,7 +71,6 @@ export interface IntegrationSubscription {
   updated_at: string;
 }
 
-
 export interface SubscriptionCreatePayload {
   integration_id: string;
   external_form_id: string;
@@ -88,19 +79,16 @@ export interface SubscriptionCreatePayload {
   enabled?: boolean;
 }
 
-
 export interface SubscriptionUpdatePayload {
   external_form_label?: string | null;
   field_mapping?: Record<string, string>;
   enabled?: boolean;
 }
 
-
 export interface GoogleAdsAccount {
   customer_id: string;
   resource_name: string;
 }
-
 
 export interface GoogleLeadForm {
   form_id: string;
@@ -108,20 +96,17 @@ export interface GoogleLeadForm {
   resource_name: string;
 }
 
-
 export interface MetaPage {
   page_id: string;
   name: string;
   category: string | null;
 }
 
-
 export interface MetaLeadForm {
   form_id: string;
   name: string;
   status: string;
 }
-
 
 export interface IntegrationDLQRow {
   id: string;
@@ -136,14 +121,12 @@ export interface IntegrationDLQRow {
   replayed_by: string | null;
 }
 
-
 export interface IntegrationDLQListResponse {
   items: IntegrationDLQRow[];
   total: number;
   page: number;
   size: number;
 }
-
 
 /** Response shape from `GET /authorize` (Google + Meta) — JSON
  *  instead of 302 so the SPA's XHR can read the consent URL and
@@ -152,9 +135,7 @@ export interface AuthorizeUrlResponse {
   url: string;
 }
 
-
 // --- Step 8: dashboard + mapping editor shapes ------------------------
-
 
 /** One row in `GET /api/v1/leads/import/targets` — reused as the CRM
  *  target dropdown options in the field-mapping editor (Step 8) and
@@ -168,7 +149,6 @@ export interface MappingTarget {
   custom: boolean;
 }
 
-
 export interface ProviderDeliveryStatus {
   provider: IntegrationProvider;
   status: IntegrationStatus;
@@ -177,7 +157,6 @@ export interface ProviderDeliveryStatus {
   deliveries_24h_failed: number;
 }
 
-
 export interface IntegrationStatusResponse {
   providers: ProviderDeliveryStatus[];
   /** Count of DLQ rows NOT yet replayed or discarded. Drives the
@@ -185,9 +164,7 @@ export interface IntegrationStatusResponse {
   dlq_open_total: number;
 }
 
-
 // --- WhatsApp Business Account (Step 3.5.1+) -------------------------
-
 
 /** Projection returned by every WA endpoint that reports lifecycle
  *  state. Mirrors backend `WhatsAppStatusOut`. The Settings card uses
@@ -205,7 +182,6 @@ export interface WhatsAppStatus {
   connected_at: string | null;
 }
 
-
 /** HTTP body for `POST /api/v1/integrations/whatsapp/connect`.
  *  All 5 base fields are required; `api_version` defaults to `v18.0`
  *  on the backend if omitted. Mirrors backend `WhatsAppConnectIn`. */
@@ -220,7 +196,6 @@ export interface WhatsAppConnectPayload {
   rate_limit_per_sec?: number;
 }
 
-
 /** Response shape from `GET /api/v1/integrations/whatsapp/embedded-signup/config`.
  *  Public-safe bootstrap values for Meta's FB JS SDK — none are secrets,
  *  they appear in browser network logs by design.
@@ -231,7 +206,6 @@ export interface EmbeddedSignupConfig {
   graph_api_version: string;
 }
 
-
 /** Body for `POST /api/v1/integrations/whatsapp/embedded-signup/exchange`.
  *  The frontend popup harvests these three values from Meta's
  *  postMessage + `FB.login` callback and ships them to the backend
@@ -241,7 +215,6 @@ export interface EmbeddedSignupExchangePayload {
   phone_number_id: string;
   waba_id: string;
 }
-
 
 /** Response shape from `POST /embedded-signup/exchange`.
  *  Mirrors backend `EmbeddedSignupExchangeOut`. Settings UI uses this
@@ -261,7 +234,6 @@ export interface EmbeddedSignupExchangeResult {
   quality_rating: string | null;
 }
 
-
 export interface WhatsAppTemplate {
   id: string;
   name: string;
@@ -277,14 +249,12 @@ export interface WhatsAppTemplate {
   last_synced_at: string;
 }
 
-
 export interface WhatsAppTemplateSyncResult {
   added: number;
   updated: number;
   removed: number;
   total: number;
 }
-
 
 /** Response shape from `GET /api/v1/integrations/whatsapp/capacity` —
  *  drives the campaign create modal's quota banner (Step 3.5.16).
@@ -303,7 +273,6 @@ export interface WhatsAppCapacity {
   is_unlimited: boolean;
 }
 
-
 export interface DlqListFilters {
   page?: number;
   size?: number;
@@ -312,7 +281,6 @@ export interface DlqListFilters {
    *  addressed failures (drives the dashboard's open-failures view). */
   include_replayed?: boolean;
 }
-
 
 @Injectable({ providedIn: 'root' })
 export class IntegrationsApiService {
@@ -341,10 +309,7 @@ export class IntegrationsApiService {
   /** Mint a fresh webhook secret (Google only — Meta has no per-
    *  tenant secret). Old URL stops authenticating immediately. */
   rotateWebhookSecret(provider: IntegrationProvider): Observable<Integration> {
-    return this.http.post<Integration>(
-      `${this.base}/${provider}/webhook/rotate`,
-      {},
-    );
+    return this.http.post<Integration>(`${this.base}/${provider}/webhook/rotate`, {});
   }
 
   // --- Google Ads OAuth + discovery (Step 2) ----------------------
@@ -352,9 +317,7 @@ export class IntegrationsApiService {
   /** Returns `{url}` — the Google consent URL the SPA should
    *  navigate the browser to via `window.location.assign(...)`. */
   startGoogleAuthorize(): Observable<AuthorizeUrlResponse> {
-    return this.http.get<AuthorizeUrlResponse>(
-      `${this.base}/google/authorize`,
-    );
+    return this.http.get<AuthorizeUrlResponse>(`${this.base}/google/authorize`);
   }
 
   /** List Google Ads customers the connected OAuth user can see.
@@ -367,17 +330,13 @@ export class IntegrationsApiService {
   /** Lead Forms on a Google Ads customer. `customer_id` may include
    *  hyphens (e.g. "123-456-7890"); the backend strips them. */
   listGoogleForms(customerId: string): Observable<GoogleLeadForm[]> {
-    return this.http.get<GoogleLeadForm[]>(
-      `${this.base}/google/accounts/${customerId}/forms`,
-    );
+    return this.http.get<GoogleLeadForm[]>(`${this.base}/google/accounts/${customerId}/forms`);
   }
 
   // --- Meta OAuth + discovery (Step 4) ----------------------------
 
   startMetaAuthorize(): Observable<AuthorizeUrlResponse> {
-    return this.http.get<AuthorizeUrlResponse>(
-      `${this.base}/meta/authorize`,
-    );
+    return this.http.get<AuthorizeUrlResponse>(`${this.base}/meta/authorize`);
   }
 
   /** List Facebook Pages the OAuth user manages. Page tokens are
@@ -388,9 +347,7 @@ export class IntegrationsApiService {
   }
 
   listMetaForms(pageId: string): Observable<MetaLeadForm[]> {
-    return this.http.get<MetaLeadForm[]>(
-      `${this.base}/meta/pages/${pageId}/forms`,
-    );
+    return this.http.get<MetaLeadForm[]>(`${this.base}/meta/pages/${pageId}/forms`);
   }
 
   /** Subscribe to the `leadgen` field on this Page. Backend
@@ -415,22 +372,12 @@ export class IntegrationsApiService {
   /** Form subscriptions in the active org, optionally filtered to
    *  one integration. The Settings cards filter client-side. */
   listSubscriptions(integrationId?: string): Observable<IntegrationSubscription[]> {
-    const params = integrationId
-      ? buildHttpParams({ integration_id: integrationId })
-      : undefined;
-    return this.http.get<IntegrationSubscription[]>(
-      `${this.base}/subscriptions`,
-      { params },
-    );
+    const params = integrationId ? buildHttpParams({ integration_id: integrationId }) : undefined;
+    return this.http.get<IntegrationSubscription[]>(`${this.base}/subscriptions`, { params });
   }
 
-  createSubscription(
-    payload: SubscriptionCreatePayload,
-  ): Observable<IntegrationSubscription> {
-    return this.http.post<IntegrationSubscription>(
-      `${this.base}/subscriptions`,
-      payload,
-    );
+  createSubscription(payload: SubscriptionCreatePayload): Observable<IntegrationSubscription> {
+    return this.http.post<IntegrationSubscription>(`${this.base}/subscriptions`, payload);
   }
 
   updateSubscription(
@@ -444,9 +391,7 @@ export class IntegrationsApiService {
   }
 
   deleteSubscription(subscriptionId: string): Observable<void> {
-    return this.http.delete<void>(
-      `${this.base}/subscriptions/${subscriptionId}`,
-    );
+    return this.http.delete<void>(`${this.base}/subscriptions/${subscriptionId}`);
   }
 
   // --- DLQ (Step 3 list + Step 8 filters/discard/replay) ---------
@@ -459,8 +404,7 @@ export class IntegrationsApiService {
       page: filters.page ?? 1,
       size: filters.size ?? 50,
       provider: filters.provider,
-      include_replayed:
-        filters.include_replayed === false ? false : undefined,
+      include_replayed: filters.include_replayed === false ? false : undefined,
     });
     return this.http.get<IntegrationDLQListResponse>(`${this.base}/dlq`, {
       params,
@@ -470,20 +414,14 @@ export class IntegrationsApiService {
   /** Re-enqueue a DLQ payload through the matching provider's
    *  Celery task. Row survives with `replayed_at` stamped. */
   replayDlq(dlqId: string): Observable<IntegrationDLQRow> {
-    return this.http.post<IntegrationDLQRow>(
-      `${this.base}/dlq/${dlqId}/replay`,
-      {},
-    );
+    return this.http.post<IntegrationDLQRow>(`${this.base}/dlq/${dlqId}/replay`, {});
   }
 
   /** Soft-discard a DLQ row — stamps `replayed_at` with
    *  `replayed_by=NULL` so the status panel + open-failures view
    *  exclude it. Row survives for forensic trail. */
   discardDlq(dlqId: string): Observable<IntegrationDLQRow> {
-    return this.http.post<IntegrationDLQRow>(
-      `${this.base}/dlq/${dlqId}/discard`,
-      {},
-    );
+    return this.http.post<IntegrationDLQRow>(`${this.base}/dlq/${dlqId}/discard`, {});
   }
 
   // --- Step 8: Status dashboard + mapping editor -------------------
@@ -529,29 +467,20 @@ export class IntegrationsApiService {
    *  HTTP 400 if Meta refuses the token (response detail is Meta's
    *  error message verbatim, suitable for showing to the operator). */
   connectWhatsApp(payload: WhatsAppConnectPayload): Observable<WhatsAppStatus> {
-    return this.http.post<WhatsAppStatus>(
-      `${this.base}/whatsapp/connect`,
-      payload,
-    );
+    return this.http.post<WhatsAppStatus>(`${this.base}/whatsapp/connect`, payload);
   }
 
   /** Re-ping Meta with stored credentials. Flips status to `error`
    *  with `last_error` populated on rejection; returns 400 in that
    *  case. Also 400 when the org has never connected. */
   testWhatsApp(): Observable<WhatsAppStatus> {
-    return this.http.post<WhatsAppStatus>(
-      `${this.base}/whatsapp/test`,
-      {},
-    );
+    return this.http.post<WhatsAppStatus>(`${this.base}/whatsapp/test`, {});
   }
 
   /** Null the stored token + flip status to `disconnected`. Sidecar
    *  config (phone_id, waba_id) survives so reconnect can prefill. */
   disconnectWhatsApp(): Observable<void> {
-    return this.http.post<void>(
-      `${this.base}/whatsapp/disconnect`,
-      {},
-    );
+    return this.http.post<void>(`${this.base}/whatsapp/disconnect`, {});
   }
 
   // --- WhatsApp Embedded Signup (whatsapp-platform-upgrade Step 2/3) ---
@@ -559,9 +488,7 @@ export class IntegrationsApiService {
   /** Public-safe bootstrap values for Meta's FB JS SDK. Called once
    *  on Connect-button click to feed `FB.init` + `FB.login`. */
   getWhatsAppEmbeddedSignupConfig(): Observable<EmbeddedSignupConfig> {
-    return this.http.get<EmbeddedSignupConfig>(
-      `${this.base}/whatsapp/embedded-signup/config`,
-    );
+    return this.http.get<EmbeddedSignupConfig>(`${this.base}/whatsapp/embedded-signup/config`);
   }
 
   /** Trade the popup's `(code, phone_number_id, waba_id)` for a
@@ -585,10 +512,7 @@ export class IntegrationsApiService {
    *  counts the Settings UI shows in a toast: "3 added, 1 updated".
    *  409 if WA is not connected. */
   syncWhatsAppTemplates(): Observable<WhatsAppTemplateSyncResult> {
-    return this.http.post<WhatsAppTemplateSyncResult>(
-      `${this.base}/whatsapp/templates/sync`,
-      {},
-    );
+    return this.http.post<WhatsAppTemplateSyncResult>(`${this.base}/whatsapp/templates/sync`, {});
   }
 
   /** List cached templates for the active org. The campaign create-
@@ -602,10 +526,7 @@ export class IntegrationsApiService {
       status: filters?.status,
       category: filters?.category,
     });
-    return this.http.get<WhatsAppTemplate[]>(
-      `${this.base}/whatsapp/templates`,
-      { params },
-    );
+    return this.http.get<WhatsAppTemplate[]>(`${this.base}/whatsapp/templates`, { params });
   }
 
   // --- WhatsApp send capacity (Step 3.5.16) -----------------------
@@ -615,9 +536,7 @@ export class IntegrationsApiService {
    *  before sending. 409 when WhatsApp is not connected — the modal
    *  treats that as "hide the banner". */
   getWhatsAppCapacity(): Observable<WhatsAppCapacity> {
-    return this.http.get<WhatsAppCapacity>(
-      `${this.base}/whatsapp/capacity`,
-    );
+    return this.http.get<WhatsAppCapacity>(`${this.base}/whatsapp/capacity`);
   }
 
   // --- WhatsApp phone health (whatsapp-platform-upgrade Step 12) --
@@ -627,21 +546,15 @@ export class IntegrationsApiService {
    *  widget. The hourly Celery task keeps the data fresh; this
    *  endpoint reads the cached row. */
   getWhatsAppPhoneHealth(): Observable<WhatsAppPhoneHealth> {
-    return this.http.get<WhatsAppPhoneHealth>(
-      `${this.base}/whatsapp/phone-health`,
-    );
+    return this.http.get<WhatsAppPhoneHealth>(`${this.base}/whatsapp/phone-health`);
   }
 
   /** Force-pull fresh health values from Meta — the operator's
    *  "I just acted on a recovery suggestion, refresh now" affordance. */
   refreshWhatsAppPhoneHealth(): Observable<WhatsAppPhoneHealth> {
-    return this.http.post<WhatsAppPhoneHealth>(
-      `${this.base}/whatsapp/phone-health/refresh`,
-      {},
-    );
+    return this.http.post<WhatsAppPhoneHealth>(`${this.base}/whatsapp/phone-health/refresh`, {});
   }
 }
-
 
 export type WhatsAppQualityRating = 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN';
 

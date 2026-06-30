@@ -20,16 +20,16 @@ Cases:
   9. `move-stage` to a Lost stage with valid `lost_reason` → 200;
      `lost_reason` + `status` persisted.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from src.app.core.activities.models import ActivityType
 from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead, LeadSource, LeadStatus
 from src.app.core.permissions.models import RolePermission
@@ -49,9 +49,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -147,9 +145,7 @@ async def _seed_lead(
 
 
 @pytest.mark.asyncio
-async def test_activity_insert_bumps_lead_last_activity_at(
-    layered_client, seeded_admin
-):
+async def test_activity_insert_bumps_lead_last_activity_at(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -188,25 +184,21 @@ async def test_activity_insert_bumps_lead_last_activity_at(
     ctx = set_context(RequestContext(org_id=org.id))
     try:
         async with TestSession() as session:
-            row = (
-                await session.execute(select(Lead).where(Lead.id == lead_id))
-            ).scalar_one()
+            row = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one()
             assert row.last_activity_at is not None
     finally:
         reset_context(ctx)
 
 
 @pytest.mark.asyncio
-async def test_list_sort_by_last_activity_desc_nulls_last(
-    layered_client, seeded_admin
-):
+async def test_list_sort_by_last_activity_desc_nulls_last(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "leads.read", "leads.write")
     await _seed_leads_pipeline(org.id)
     contact_id = await _seed_contact(org.id)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     older = await _seed_lead(
         org.id,
         contact_id=contact_id,
@@ -236,9 +228,7 @@ async def test_list_sort_by_last_activity_desc_nulls_last(
 
 
 @pytest.mark.asyncio
-async def test_list_last_activity_lt_includes_nulls(
-    layered_client, seeded_admin
-):
+async def test_list_last_activity_lt_includes_nulls(layered_client, seeded_admin):
     """`?last_activity_lt=<ts>` returns rows older than ts OR with NULL —
     never-touched leads surface in the no-activity chip."""
     org = seeded_admin["org"]
@@ -247,7 +237,7 @@ async def test_list_last_activity_lt_includes_nulls(
     await _seed_leads_pipeline(org.id)
     contact_id = await _seed_contact(org.id)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cutoff = now - timedelta(days=7)
     stale = await _seed_lead(
         org.id,
@@ -293,9 +283,7 @@ async def test_list_rejects_unknown_sort_key(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    bad = await layered_client.get(
-        "/api/v1/leads?sort=evil", headers=headers
-    )
+    bad = await layered_client.get("/api/v1/leads?sort=evil", headers=headers)
     assert bad.status_code == 422
 
 
@@ -325,9 +313,7 @@ async def test_patch_rejects_unknown_lost_reason(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_patch_lost_reason_other_requires_text(
-    layered_client, seeded_admin
-):
+async def test_patch_lost_reason_other_requires_text(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "leads.read", "leads.write")
@@ -352,9 +338,7 @@ async def test_patch_lost_reason_other_requires_text(
 
 
 @pytest.mark.asyncio
-async def test_patch_valid_lost_reason_persists(
-    layered_client, seeded_admin
-):
+async def test_patch_valid_lost_reason_persists(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "leads.read", "leads.write")
@@ -380,9 +364,7 @@ async def test_patch_valid_lost_reason_persists(
 
 
 @pytest.mark.asyncio
-async def test_move_stage_to_lost_requires_reason(
-    layered_client, seeded_admin
-):
+async def test_move_stage_to_lost_requires_reason(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "leads.read", "leads.write")
@@ -407,9 +389,7 @@ async def test_move_stage_to_lost_requires_reason(
 
 
 @pytest.mark.asyncio
-async def test_move_stage_to_lost_with_reason_persists(
-    layered_client, seeded_admin
-):
+async def test_move_stage_to_lost_with_reason_persists(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "leads.read", "leads.write")

@@ -1,4 +1,5 @@
 """Tests for the layered bcrypt password helper."""
+
 from __future__ import annotations
 
 from src.app.shared.security.password import hash_password, verify_password

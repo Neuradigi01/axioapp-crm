@@ -28,11 +28,11 @@ Threading rules the adapter applies (in order):
 
 Everything in this module is pure (no I/O). Tests drive it directly.
 """
+
 from __future__ import annotations
 
 import re
-from typing import Iterable
-
+from collections.abc import Iterable
 
 _MESSAGE_ID_KEYS = {"message-id", "message_id"}
 _IN_REPLY_TO_KEYS = {"in-reply-to", "in_reply_to"}

@@ -1,11 +1,4 @@
-import {
-  DestroyRef,
-  Directive,
-  Injector,
-  effect,
-  inject,
-  input,
-} from '@angular/core';
+import { DestroyRef, Directive, Injector, effect, inject, input } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -80,18 +73,16 @@ export class UrlFilterStateDirective {
   private start(): void {
     // 1) Hydrate from URL on first run + on every URL change (e.g.
     //    the user clicks "back").
-    this.route.queryParamMap
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((params) => {
-        const cfg = this.appUrlFilterState();
-        for (const entry of Object.values(cfg)) {
-          const incoming = params.get(entry.queryKey) ?? entry.defaultValue ?? '';
-          if (incoming !== entry.read()) {
-            entry.write(incoming);
-          }
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const cfg = this.appUrlFilterState();
+      for (const entry of Object.values(cfg)) {
+        const incoming = params.get(entry.queryKey) ?? entry.defaultValue ?? '';
+        if (incoming !== entry.read()) {
+          entry.write(incoming);
         }
-        this.hydrated = true;
-      });
+      }
+      this.hydrated = true;
+    });
 
     // 2) Push state changes back to the URL. One effect per entry —
     //    Angular tracks the signals each `read()` touches, so each
@@ -103,9 +94,8 @@ export class UrlFilterStateDirective {
           const value = entry.read();
           if (!this.hydrated) return;
           const current = this.route.snapshot.queryParamMap.get(entry.queryKey);
-          const isDefault = entry.defaultValue !== undefined
-            ? value === entry.defaultValue
-            : value === '';
+          const isDefault =
+            entry.defaultValue !== undefined ? value === entry.defaultValue : value === '';
           const desired = isDefault ? null : value;
           if (current === desired) return;
           this.router.navigate([], {

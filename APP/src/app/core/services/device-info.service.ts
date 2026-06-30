@@ -3,7 +3,6 @@ import { IDeviceInfo } from '@app/schemas/auth';
 
 @Injectable({ providedIn: 'root' })
 export class DeviceInfoService {
-
   collect(): IDeviceInfo {
     const ua = navigator.userAgent;
     return {

@@ -6,6 +6,7 @@ request flow can never be broken by an audit failure. The list
 endpoint (`GET /api/v1/audit-logs`) is gated by the `audit.read`
 permission.
 """
+
 from src.app.core.audit.service import log
 
 __all__ = ["log"]

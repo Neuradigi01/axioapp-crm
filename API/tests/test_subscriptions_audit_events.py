@@ -10,10 +10,11 @@ features landed; Step 19's contribution is `subscription.created` in
 the signup hook, plus the safety net these tests provide that none of
 the existing emits regressed silently.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -28,7 +29,6 @@ from src.app.core.subscriptions.webhooks.handlers.checkout_completed import (
     on_checkout_completed,
 )
 from src.app.core.tenants.models import Organization
-
 
 # ---------------------------------------------------------------------------
 # Helpers — mirror the RBAC test file so tests are self-contained.
@@ -61,9 +61,7 @@ async def _grant_permissions(role_id: uuid.UUID, keys: list[str]) -> None:
     async with TestSession() as session:
         for key in keys:
             perm_id = (
-                await session.execute(
-                    select(Permission.id).where(Permission.key == key)
-                )
+                await session.execute(select(Permission.id).where(Permission.key == key))
             ).scalar_one_or_none()
             if perm_id is None:
                 stmt = (
@@ -75,9 +73,7 @@ async def _grant_permissions(role_id: uuid.UUID, keys: list[str]) -> None:
                 row = (await session.execute(stmt)).scalar_one_or_none()
                 if row is None:
                     perm_id = (
-                        await session.execute(
-                            select(Permission.id).where(Permission.key == key)
-                        )
+                        await session.execute(select(Permission.id).where(Permission.key == key))
                     ).scalar_one()
                 else:
                     perm_id = row
@@ -92,11 +88,12 @@ async def _grant_permissions(role_id: uuid.UUID, keys: list[str]) -> None:
 
 
 async def _seed_active_basic(
-    org_id: uuid.UUID, stripe_subscription_id: str | None = None,
+    org_id: uuid.UUID,
+    stripe_subscription_id: str | None = None,
 ) -> uuid.UUID:
     from tests.conftest import TestSession
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     async with TestSession() as session:
         sub = Subscription(
             org_id=org_id,
@@ -119,13 +116,17 @@ async def _read_audit_rows(action: str, org_id: uuid.UUID) -> list[AuditLog]:
 
     async with TestSession() as session:
         rows = (
-            await session.execute(
-                select(AuditLog).where(
-                    AuditLog.action == action,
-                    AuditLog.org_id == org_id,
+            (
+                await session.execute(
+                    select(AuditLog).where(
+                        AuditLog.action == action,
+                        AuditLog.org_id == org_id,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     return list(rows)
 
 
@@ -174,7 +175,8 @@ async def test_signup_hook_emits_subscription_created(test_db):
 
 @pytest.mark.asyncio
 async def test_plan_change_emits_change_scheduled_audit(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
     role = seeded_admin["role"]
@@ -187,9 +189,7 @@ async def test_plan_change_emits_change_scheduled_audit(
 
     async with TestSession() as session:
         existing = (
-            await session.execute(
-                select(Subscription).where(Subscription.org_id == org.id)
-            )
+            await session.execute(select(Subscription).where(Subscription.org_id == org.id))
         ).scalar_one()
         existing.plan_code = "standard"
         await session.commit()
@@ -214,7 +214,8 @@ async def test_plan_change_emits_change_scheduled_audit(
 
 @pytest.mark.asyncio
 async def test_cancel_emits_subscription_cancelled_audit(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
     role = seeded_admin["role"]
@@ -247,7 +248,7 @@ async def test_checkout_completed_handler_emits_upgraded_audit(test_db):
     test_db.add(org)
     await test_db.commit()
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = Subscription(
         org_id=org.id,
         plan_code="trial",
@@ -302,7 +303,7 @@ async def test_trial_expiry_emits_trial_expired_audit(test_db):
     test_db.add(org)
     await test_db.flush()
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     test_db.add(
         Subscription(
             org_id=org.id,

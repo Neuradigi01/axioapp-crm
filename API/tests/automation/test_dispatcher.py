@@ -9,30 +9,29 @@ scheduling call is observable without spinning up a worker.
 Adapter calls are mocked at the conversations-registry boundary so
 the test doesn't need a Meta token or a live SMTP backend.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
 from sqlalchemy import text as sql_text
 
-from src.app.core.automation import dispatcher, tasks as automation_tasks
+from src.app.core.automation import dispatcher
 from src.app.core.automation import service as automation_service
+from src.app.core.automation import tasks as automation_tasks
 from src.app.core.automation.models import (
-    AutomationRun,
     AutomationRunStatus,
 )
 from src.app.core.automation.schemas import TriggerCreate
-from src.app.core.conversations.adapters import ChannelMessageRef
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.templates import service as templates_service
 from src.app.core.templates.models import TemplateCategory
 from src.app.core.templates.schemas import TemplateCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -44,10 +43,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {"id": str(org_id), "name": "Demo", "slug": f"demo-{org_id.hex[:6]}"},
     )
     await test_db.commit()
@@ -83,9 +79,7 @@ async def _make_trigger(test_db, *, org_id, template, **overrides):
             event_type=overrides.pop("event_type", "user.signed_up"),
             channel=overrides.pop("channel", ConversationChannel.email),
             template_id=template.id,
-            recipient_resolver=overrides.pop(
-                "recipient_resolver", "contact.email"
-            ),
+            recipient_resolver=overrides.pop("recipient_resolver", "contact.email"),
             **overrides,
         ),
     )
@@ -120,9 +114,7 @@ async def test_dispatch_writes_one_run_per_matched_trigger(test_db, org_id):
 
 async def test_dispatch_skips_disabled_triggers(test_db, org_id):
     template = await _make_email_template(test_db, org_id=org_id)
-    await _make_trigger(
-        test_db, org_id=org_id, template=template, enabled=False
-    )
+    await _make_trigger(test_db, org_id=org_id, template=template, enabled=False)
 
     with patch.object(automation_tasks.deliver_run, "apply_async") as schedule:
         runs = await dispatcher.dispatch_event(
@@ -185,9 +177,7 @@ async def test_dispatch_idempotent_on_duplicate_event_id(test_db, org_id):
 
 async def test_dispatch_honors_delay_seconds(test_db, org_id):
     template = await _make_email_template(test_db, org_id=org_id)
-    await _make_trigger(
-        test_db, org_id=org_id, template=template, delay_seconds=600
-    )
+    await _make_trigger(test_db, org_id=org_id, template=template, delay_seconds=600)
 
     with patch.object(automation_tasks.deliver_run, "apply_async") as schedule:
         runs = await dispatcher.dispatch_event(
@@ -251,9 +241,7 @@ async def test_deliver_run_permanent_error_flips_to_failed(test_db, org_id):
     run_id = runs[0].id
 
     fake_backend = MagicMock()
-    fake_backend.send = AsyncMock(
-        side_effect=Exception("SmtpNotConfigured: missing creds")
-    )
+    fake_backend.send = AsyncMock(side_effect=Exception("SmtpNotConfigured: missing creds"))
 
     class _Fake(Exception):
         pass
@@ -292,7 +280,7 @@ async def test_deliver_run_short_circuits_on_already_processed(test_db, org_id):
     run = runs[0]
     # Flip the row to 'sent' manually so the task sees a terminal state.
     run.status = AutomationRunStatus.sent
-    run.completed_at = datetime.now(timezone.utc)
+    run.completed_at = datetime.now(UTC)
     await test_db.commit()
 
     result = await automation_tasks._deliver_run_async(str(run.id))
@@ -307,11 +295,11 @@ async def test_wildcard_subscriber_registered_on_package_import():
     """Importing `core.automation` registers the dispatcher's
     wildcard handler. Idempotent — re-running the registration
     doesn't double-fire."""
-    from src.app.core.events import bus
     from src.app.core.automation.dispatcher import (
         _bus_subscriber,
         register_bus_subscriber,
     )
+    from src.app.core.events import bus
 
     assert _bus_subscriber in bus._wildcard_subscribers
     # Idempotent.

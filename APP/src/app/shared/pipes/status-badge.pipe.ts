@@ -14,16 +14,14 @@ export class StatusBadgePipe implements PipeTransform {
       return '';
     }
 
-    const label = typeof value === 'boolean'
-      ? (value ? 'Active' : 'Inactive')
-      : value;
+    const label = typeof value === 'boolean' ? (value ? 'Active' : 'Inactive') : value;
 
     const key = label.toLowerCase();
     const config = BADGE_MAP[key];
 
     if (!config) {
       return this.sanitizer.bypassSecurityTrustHtml(
-        `<span class="status-badge">${this.escapeHtml(label)}</span>`
+        `<span class="status-badge">${this.escapeHtml(label)}</span>`,
       );
     }
 
@@ -37,10 +35,12 @@ export class StatusBadgePipe implements PipeTransform {
       line-height: 1.4;
       color: ${config.color};
       background-color: ${config.bgVar};
-    `.replace(/\s+/g, ' ').trim();
+    `
+      .replace(/\s+/g, ' ')
+      .trim();
 
     return this.sanitizer.bypassSecurityTrustHtml(
-      `<span class="status-badge" style="${style}">${this.escapeHtml(label)}</span>`
+      `<span class="status-badge" style="${style}">${this.escapeHtml(label)}</span>`,
     );
   }
 

@@ -27,21 +27,19 @@ Mirrors the celery-absent shim shape of
 don't break import; ``apply_async`` becomes a no-op so the beat
 schedule entry still resolves under ``CELERY_ENABLED=False``.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
-
 
 try:
     from celery import shared_task as _shared_task
 
     HAS_CELERY = True
 except ImportError:  # pragma: no cover — celery absent in dev shells
-
     HAS_CELERY = False
 
     def _shared_task(*decorator_args: Any, **decorator_kwargs: Any):
@@ -97,7 +95,7 @@ async def _scan_for_reminders_async() -> dict[str, Any]:
     from src.app.core.appointments import data_access as _da
     from src.app.shared.db import async_session
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # 24h bracket centred on ``now + 24h``.
     win24_start = now + _REMINDER_24H_OFFSET - _HALF_WINDOW
@@ -180,14 +178,10 @@ async def _publish_reminder(
         )
 
         contact = (
-            await session.execute(
-                _select(Contact).where(Contact.id == appt.contact_id)
-            )
+            await session.execute(_select(Contact).where(Contact.id == appt.contact_id))
         ).scalar_one_or_none()
         org = (
-            await session.execute(
-                _select(Organization).where(Organization.id == appt.org_id)
-            )
+            await session.execute(_select(Organization).where(Organization.id == appt.org_id))
         ).scalar_one_or_none()
 
         payload: dict[str, Any] = {
@@ -236,8 +230,7 @@ async def _publish_reminder(
         return True
     except Exception:
         logger.exception(
-            "appointments.scan_for_reminders publish_failed "
-            "appt=%s event=%s",
+            "appointments.scan_for_reminders publish_failed appt=%s event=%s",
             getattr(appt, "id", None),
             event_type,
         )

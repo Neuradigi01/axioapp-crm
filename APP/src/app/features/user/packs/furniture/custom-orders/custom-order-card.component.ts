@@ -1,9 +1,4 @@
-﻿import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from '@angular/core';
+﻿import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { CustomOrder } from './custom-orders-api.service';
@@ -98,5 +93,4 @@ export class CustomOrderCardComponent {
   private titleCase(s: string): string {
     return s.replace(/\b\w/g, (c) => c.toUpperCase());
   }
-
 }

@@ -1,22 +1,10 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CanvasNode } from '../canvas-state.service';
 import { ConditionsBuilderComponent } from '../conditions-builder.component';
-import {
-  ConditionNode,
-  EVENT_TYPES,
-  variableGroupsForEvent,
-} from './editor-contract';
-
+import { ConditionNode, EVENT_TYPES, variableGroupsForEvent } from './editor-contract';
 
 type ReEnrollmentRule = 'once' | 'daily' | 'never';
 
@@ -42,7 +30,6 @@ const RE_ENROLLMENT_OPTIONS: Array<{
   },
 ];
 
-
 /**
  * Trigger node editor. Operator picks:
  *   - `event_type` from the catalogue (Step-5 backend's `EVENT_DESCRIPTIONS`).
@@ -55,7 +42,6 @@ const RE_ENROLLMENT_OPTIONS: Array<{
  * Valid when `event_type` is set. Conditions are optional but
  * recommended (without them, every event of the chosen type fires).
  */
-
 
 @Component({
   selector: 'app-trigger-editor',
@@ -72,9 +58,7 @@ export class TriggerEditorComponent {
   readonly eventTypes = EVENT_TYPES;
   readonly reEnrollmentOptions = RE_ENROLLMENT_OPTIONS;
 
-  readonly eventType = computed<string>(
-    () => (this.node().config?.['event_type'] as string) ?? '',
-  );
+  readonly eventType = computed<string>(() => (this.node().config?.['event_type'] as string) ?? '');
 
   readonly reEnrollmentRule = computed<ReEnrollmentRule>(
     () => (this.node().config?.['re_enrollment_rule'] as ReEnrollmentRule) ?? 'once',
@@ -84,9 +68,7 @@ export class TriggerEditorComponent {
     () => (this.node().config?.['conditions'] as ConditionNode | null) ?? null,
   );
 
-  readonly variableGroups = computed(() =>
-    variableGroupsForEvent(this.eventType()),
-  );
+  readonly variableGroups = computed(() => variableGroupsForEvent(this.eventType()));
 
   constructor() {
     effect(() => {

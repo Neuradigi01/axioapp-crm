@@ -5,6 +5,7 @@ This module owns the staff-side JWT pool (`scope="staff"`,
 ModuleDescriptor — because tablet UX is a separate route tree
 (`/staff-portal/...`) reached without the admin app.
 """
+
 from src.app.core.staff_portal.service import (
     list_pickable_users,
     login,

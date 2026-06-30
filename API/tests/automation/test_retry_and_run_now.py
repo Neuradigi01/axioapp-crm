@@ -8,21 +8,25 @@ run-now). All Celery scheduling is mocked at the
 ``deliver_run.apply_async`` boundary so no real workers are
 required.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from datetime import UTC, datetime
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import text as sql_text
 
 from src.app.core.automation import (
     data_access,
     dispatcher,
-    seeds,
+)
+from src.app.core.automation import (
     service as automation_service,
+)
+from src.app.core.automation import (
     tasks as automation_tasks,
 )
 from src.app.core.automation.models import (
@@ -36,7 +40,6 @@ from src.app.core.templates.models import TemplateCategory
 from src.app.core.templates.schemas import TemplateCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -44,10 +47,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {"id": str(org_id), "name": "Demo", "slug": f"demo-{org_id.hex[:6]}"},
     )
     await test_db.commit()
@@ -101,8 +101,8 @@ async def test_retry_failed_run_resets_status_and_schedules(test_db, org_id):
         event_payload={"contact": {"email": "asha@x.com"}},
         status=AutomationRunStatus.failed,
         error="SMTP timeout",
-        scheduled_at=datetime.now(timezone.utc),
-        completed_at=datetime.now(timezone.utc),
+        scheduled_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
     )
     test_db.add(run)
     await test_db.commit()
@@ -116,7 +116,7 @@ async def test_retry_failed_run_resets_status_and_schedules(test_db, org_id):
         run.dispatched_at = None
         run.completed_at = None
         run.channel_message_id = None
-        run.scheduled_at = datetime.now(timezone.utc)
+        run.scheduled_at = datetime.now(UTC)
         await test_db.commit()
         automation_tasks.deliver_run.apply_async(args=(str(run.id),), countdown=0)
 
@@ -138,8 +138,8 @@ async def test_retry_succeeded_run_blocks_in_router_logic(test_db, org_id):
         event_id="event-sent",
         event_payload={},
         status=AutomationRunStatus.sent,
-        scheduled_at=datetime.now(timezone.utc),
-        completed_at=datetime.now(timezone.utc),
+        scheduled_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
     )
     test_db.add(run)
     await test_db.commit()
@@ -153,9 +153,7 @@ async def test_retry_succeeded_run_blocks_in_router_logic(test_db, org_id):
 # --- run-now ------------------------------------------------------
 
 
-async def test_run_now_creates_fresh_run_row_with_manual_event_id(
-    test_db, org_id
-):
+async def test_run_now_creates_fresh_run_row_with_manual_event_id(test_db, org_id):
     trigger = await _make_trigger(test_db, org_id=org_id)
     manual_event_id = f"manual:{trigger.id}:{uuid.uuid4()}"
 
@@ -217,18 +215,14 @@ async def test_list_runs_filters_by_contact_id(test_db, org_id):
             event_payload={},
             contact_id=cid,
             status=AutomationRunStatus.sent,
-            scheduled_at=datetime.now(timezone.utc),
-            completed_at=datetime.now(timezone.utc),
+            scheduled_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
         )
         test_db.add(run)
     await test_db.commit()
 
-    rows_a, total_a = await data_access.list_runs(
-        test_db, org_id=org_id, contact_id=contact_a
-    )
-    rows_b, total_b = await data_access.list_runs(
-        test_db, org_id=org_id, contact_id=contact_b
-    )
+    rows_a, total_a = await data_access.list_runs(test_db, org_id=org_id, contact_id=contact_a)
+    rows_b, total_b = await data_access.list_runs(test_db, org_id=org_id, contact_id=contact_b)
     assert total_a == 2
     assert total_b == 1
     assert {r.contact_id for r in rows_a} == {contact_a}
@@ -254,7 +248,7 @@ async def test_list_runs_filters_by_contact_and_status(test_db, org_id):
             event_payload={},
             contact_id=contact_id,
             status=st,
-            scheduled_at=datetime.now(timezone.utc),
+            scheduled_at=datetime.now(UTC),
         )
         test_db.add(run)
     await test_db.commit()

@@ -13,11 +13,11 @@ Frontend mount: ``/user/automations`` (Step 7 list page).
 (250) and before Settings (600+). Logical grouping — operators
 build templates, then attach them to triggers via the editor.
 """
+
 from __future__ import annotations
 
 from src.app.core.automation.permissions import ALL_KEYS
 from src.app.core.module_registry import ModuleDescriptor
-
 
 MODULE = ModuleDescriptor(
     id="automations",

@@ -13,6 +13,7 @@ create_customer / create_checkout_session, webhook signature handling,
 update_subscription and cancel_subscription kwarg shape, and seed
 script idempotency + persistence.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -28,7 +29,6 @@ from src.app.core.subscriptions.providers.stripe_provider import (
     StripePriceMapMissing,
     StripeProvider,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -85,13 +85,16 @@ def provider(mock_stripe, fake_price_map) -> StripeProvider:
 
 @pytest.mark.asyncio
 async def test_create_customer_passes_email_name_metadata(
-    provider, mock_stripe,
+    provider,
+    mock_stripe,
 ):
     mock_stripe.Customer.create.return_value = {"id": "cus_123"}
     org_id = uuid.uuid4()
 
     customer_id = await provider.create_customer(
-        org_id, "alice@example.com", "Alice",
+        org_id,
+        "alice@example.com",
+        "Alice",
     )
 
     assert customer_id == "cus_123"
@@ -109,7 +112,8 @@ async def test_create_customer_passes_email_name_metadata(
 
 @pytest.mark.asyncio
 async def test_create_checkout_session_uses_mapped_price_and_quantity(
-    provider, mock_stripe,
+    provider,
+    mock_stripe,
 ):
     mock_stripe.checkout.Session.create.return_value = {
         "url": "https://checkout.stripe.com/c/pay/cs_test_123",
@@ -143,13 +147,16 @@ async def test_create_checkout_session_uses_mapped_price_and_quantity(
 
 @pytest.mark.asyncio
 async def test_create_checkout_session_carries_reconciliation_metadata(
-    provider, mock_stripe,
+    provider,
+    mock_stripe,
 ):
     """Step 13's webhook decoder reads these four metadata keys to
     locate the org and apply the right plan / cycle / seats. Missing
     keys would silently drop subscriptions."""
     mock_stripe.checkout.Session.create.return_value = {
-        "url": "u", "id": "cs", "customer": "cus",
+        "url": "u",
+        "id": "cs",
+        "customer": "cus",
     }
     org_id = uuid.uuid4()
 
@@ -183,7 +190,8 @@ async def test_create_checkout_session_unmapped_plan_raises(
             plan_code="ghost",
             billing_cycle="monthly",
             seats=5,
-            success_url="u", cancel_url="u",
+            success_url="u",
+            cancel_url="u",
         )
 
 
@@ -194,15 +202,19 @@ async def test_create_checkout_session_unmapped_plan_raises(
 
 @pytest.mark.asyncio
 async def test_verify_webhook_returns_parsed_event_on_valid_signature(
-    provider, mock_stripe,
+    provider,
+    mock_stripe,
 ):
     mock_stripe.Webhook.construct_event.return_value = {
-        "id": "evt_1", "type": "checkout.session.completed",
+        "id": "evt_1",
+        "type": "checkout.session.completed",
     }
     event = await provider.verify_webhook(b"{}", "t=1,v1=abc")
     assert event["type"] == "checkout.session.completed"
     mock_stripe.Webhook.construct_event.assert_called_once_with(
-        b"{}", "t=1,v1=abc", "whsec_xxx",
+        b"{}",
+        "t=1,v1=abc",
+        "whsec_xxx",
     )
 
 
@@ -220,14 +232,18 @@ async def test_verify_webhook_raises_on_bad_signature(provider, mock_stripe):
 
 @pytest.mark.asyncio
 async def test_update_subscription_modifies_first_item_quantity(
-    provider, mock_stripe,
+    provider,
+    mock_stripe,
 ):
     mock_stripe.Subscription.retrieve.return_value = {
         "items": {"data": [{"id": "si_abc"}]},
     }
 
     await provider.update_subscription(
-        "sub_123", plan_code="basic", billing_cycle="monthly", seats=7,
+        "sub_123",
+        plan_code="basic",
+        billing_cycle="monthly",
+        seats=7,
     )
 
     mock_stripe.Subscription.retrieve.assert_called_once_with("sub_123")
@@ -245,11 +261,13 @@ async def test_update_subscription_modifies_first_item_quantity(
 
 @pytest.mark.asyncio
 async def test_cancel_subscription_sets_cancel_at_period_end(
-    provider, mock_stripe,
+    provider,
+    mock_stripe,
 ):
     await provider.cancel_subscription("sub_999")
     mock_stripe.Subscription.modify.assert_called_once_with(
-        "sub_999", cancel_at_period_end=True,
+        "sub_999",
+        cancel_at_period_end=True,
     )
 
 
@@ -318,8 +336,7 @@ def _build_seed_stripe_mock() -> MagicMock:
     def price_create(**kwargs):
         new = {
             "id": (
-                f"price_{kwargs['metadata']['plan_code']}_"
-                f"{kwargs['metadata']['billing_cycle']}"
+                f"price_{kwargs['metadata']['plan_code']}_{kwargs['metadata']['billing_cycle']}"
             ),
             "product": kwargs["product"],
             "metadata": dict(kwargs["metadata"]),
@@ -341,14 +358,10 @@ def test_seed_script_is_idempotent(tmp_path):
     out = tmp_path / "out.yaml"
 
     first_map = seed_stripe_catalog.run(stripe_sdk=sdk, output_path=out)
-    create_calls_after_first = (
-        sdk.Product.create.call_count + sdk.Price.create.call_count
-    )
+    create_calls_after_first = sdk.Product.create.call_count + sdk.Price.create.call_count
 
     second_map = seed_stripe_catalog.run(stripe_sdk=sdk, output_path=out)
-    create_calls_after_second = (
-        sdk.Product.create.call_count + sdk.Price.create.call_count
-    )
+    create_calls_after_second = sdk.Product.create.call_count + sdk.Price.create.call_count
 
     assert first_map == second_map
     # No new creates on the second run — every object was found via

@@ -18,6 +18,7 @@ Contract — never raises. Every call site is downstream of a
 user-visible action; a misconfigured SMTP credential must not turn a
 successful checkout into a 500.
 """
+
 from __future__ import annotations
 
 import logging
@@ -30,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.subscriptions.email_templates import render as render_template
 from src.app.core.users.models import OrganizationMember, UserInfo
 from src.app.shared.email import Email, get_email_backend
+
 # `async_session` is looked up at call time via this module reference so
 # the conftest patch (`src.core.db.async_session = TestSession`) takes
 # effect during tests. Importing it as a name would freeze the binding
@@ -69,7 +71,8 @@ async def send_billing_email(
             if recipient is None:
                 log.warning(
                     "billing_email.no_owner org_id=%s template=%s",
-                    org_id, template_key,
+                    org_id,
+                    template_key,
                 )
                 return
 
@@ -95,19 +98,23 @@ async def send_billing_email(
             await get_email_backend().send(email)
             log.info(
                 "billing_email.sent org_id=%s template=%s to=%s",
-                org_id, template_key, email_address,
+                org_id,
+                template_key,
+                email_address,
             )
     except Exception:  # noqa: BLE001
         # Per the documented contract — never let an email failure
         # propagate to a user-visible 5xx.
         log.exception(
             "billing_email.failed org_id=%s template=%s",
-            org_id, template_key,
+            org_id,
+            template_key,
         )
 
 
 async def _resolve_owner_email(
-    session: AsyncSession, org_id: uuid.UUID,
+    session: AsyncSession,
+    org_id: uuid.UUID,
 ) -> tuple[str, str | None, str | None] | None:
     """Find the org's Owner email + first_name + org_name.
 

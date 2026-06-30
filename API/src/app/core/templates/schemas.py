@@ -6,11 +6,12 @@ Step 1 lands shapes only — no service / router consumes them yet
 ``subject`` + ``preview_text`` must be ``None`` for non-email
 channels, and the email channel must carry a non-empty subject.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -22,7 +23,6 @@ from src.app.core.templates.models import (
     TemplateReviewAction,
 )
 from src.app.shared.schemas.base import ORMModel
-
 
 # ---- Request shapes ---------------------------------------------------
 
@@ -43,11 +43,11 @@ class TemplateCreate(BaseModel):
     category: TemplateCategory = TemplateCategory.marketing
     language: str = Field(default="en", min_length=2, max_length=16)
     body_text: str = Field(min_length=1, max_length=65535)
-    subject: Optional[str] = Field(default=None, max_length=998)
-    preview_text: Optional[str] = Field(default=None, max_length=190)
+    subject: str | None = Field(default=None, max_length=998)
+    preview_text: str | None = Field(default=None, max_length=190)
 
     @model_validator(mode="after")
-    def _email_subject_required(self) -> "TemplateCreate":
+    def _email_subject_required(self) -> TemplateCreate:
         if self.channel == ConversationChannel.email:
             if not self.subject or not self.subject.strip():
                 raise ValueError("subject is required for email templates")
@@ -75,13 +75,13 @@ class TemplateUpdate(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
-    category: Optional[TemplateCategory] = None
-    language: Optional[str] = Field(default=None, min_length=2, max_length=16)
-    body_text: Optional[str] = Field(default=None, min_length=1, max_length=65535)
-    subject: Optional[str] = Field(default=None, max_length=998)
-    preview_text: Optional[str] = Field(default=None, max_length=190)
-    change_note: Optional[str] = Field(default=None, max_length=2000)
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    category: TemplateCategory | None = None
+    language: str | None = Field(default=None, min_length=2, max_length=16)
+    body_text: str | None = Field(default=None, min_length=1, max_length=65535)
+    subject: str | None = Field(default=None, max_length=998)
+    preview_text: str | None = Field(default=None, max_length=190)
+    change_note: str | None = Field(default=None, max_length=2000)
 
 
 # ---- Read / response shapes ------------------------------------------
@@ -95,15 +95,15 @@ class TemplateRead(ORMModel):
     category: TemplateCategory
     language: str
     body_text: str
-    subject: Optional[str]
-    preview_text: Optional[str]
+    subject: str | None
+    preview_text: str | None
     variables: list[Any]
     internal_status: TemplateInternalStatus
     external_status: TemplateExternalStatus
-    external_provider_id: Optional[str]
+    external_provider_id: str | None
     current_version: int
-    created_by_user_id: Optional[uuid.UUID]
-    updated_by_user_id: Optional[uuid.UUID]
+    created_by_user_id: uuid.UUID | None
+    updated_by_user_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 
@@ -113,20 +113,20 @@ class TemplateVersionRead(ORMModel):
     template_id: uuid.UUID
     version: int
     body_text: str
-    subject: Optional[str]
+    subject: str | None
     variables: list[Any]
-    changed_by_user_id: Optional[uuid.UUID]
+    changed_by_user_id: uuid.UUID | None
     changed_at: datetime
-    change_note: Optional[str]
+    change_note: str | None
 
 
 class TemplateReviewRead(ORMModel):
     id: uuid.UUID
     template_id: uuid.UUID
     version: int
-    reviewer_user_id: Optional[uuid.UUID]
+    reviewer_user_id: uuid.UUID | None
     action: TemplateReviewAction
-    note: Optional[str]
+    note: str | None
     created_at: datetime
 
 
@@ -136,8 +136,8 @@ class TemplateTestSendRead(ORMModel):
     version: int
     channel: ConversationChannel
     sent_to: str
-    sent_by_user_id: Optional[uuid.UUID]
-    channel_message_id: Optional[str]
+    sent_by_user_id: uuid.UUID | None
+    channel_message_id: str | None
     sent_at: datetime
 
 
@@ -152,7 +152,7 @@ class WorkflowActionPayload(BaseModel):
 
     model_config = {"str_strip_whitespace": True, "extra": "forbid"}
 
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class TestSendPayload(BaseModel):
@@ -168,4 +168,4 @@ class TestSendPayload(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     recipient: str = Field(min_length=1, max_length=255)
-    sample_context: Optional[dict[str, Any]] = None
+    sample_context: dict[str, Any] | None = None

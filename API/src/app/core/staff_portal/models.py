@@ -8,6 +8,7 @@ session pools never share state.
 Tenant-scoped (every session belongs to an org), RLS-enforced via the
 0017 migration.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -40,8 +41,6 @@ class StaffSession(Base, TenantScoped):
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
     )
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     ua: Mapped[str | None] = mapped_column(String(512), nullable=True)

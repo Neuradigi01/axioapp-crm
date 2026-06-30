@@ -10,18 +10,19 @@ Three responsibilities:
    missing, creates a minimal contact row. Then creates the walk-in.
 3. **`checkout`** — stamps `time_out=now()`.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Literal, Optional
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import activities, audit
-from src.app.core.contacts import service as contacts_service
 from src.app.core.activities.models import ActivityType
+from src.app.core.contacts import service as contacts_service
 from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import LeadSource
 from src.app.core.walk_ins import data_access as _da
@@ -35,7 +36,6 @@ from src.app.core.walk_ins.status_workflow import ALLOWED_TRANSITIONS
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.queries import ensure_found
-
 
 _WALK_IN_ENTITY = "walk_in"
 
@@ -61,9 +61,7 @@ def _snapshot(w: WalkIn) -> dict[str, Any]:
 # --- helpers ---
 
 
-async def _ensure_contact_in_scope(
-    session: AsyncSession, contact_id: uuid.UUID
-) -> None:
+async def _ensure_contact_in_scope(session: AsyncSession, contact_id: uuid.UUID) -> None:
     if not await _da.contact_exists_in_org(session, contact_id):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -71,9 +69,7 @@ async def _ensure_contact_in_scope(
         )
 
 
-async def _find_contact_by_phone(
-    session: AsyncSession, phone: str
-) -> Optional[Contact]:
+async def _find_contact_by_phone(session: AsyncSession, phone: str) -> Contact | None:
     # Exact phone match — reception desk's natural dedup key. The
     # ORM's tenant filter already scopes to the active org.
     normalized = phone.strip()
@@ -85,9 +81,7 @@ async def _find_contact_by_phone(
 # --- CRUD ---
 
 
-async def get_walk_in(
-    session: AsyncSession, walk_in_id: uuid.UUID
-) -> Optional[WalkIn]:
+async def get_walk_in(session: AsyncSession, walk_in_id: uuid.UUID) -> WalkIn | None:
     return await _da.get_walk_in_by_id(session, walk_in_id)
 
 
@@ -144,21 +138,14 @@ async def update_walk_in(
     # current status alongside other field changes still succeeds.
     if "status" in changes and changes["status"] is not None:
         new_status = changes["status"]
-        new_value = (
-            new_status.value
-            if isinstance(new_status, WalkInStatus)
-            else str(new_status)
-        )
+        new_value = new_status.value if isinstance(new_status, WalkInStatus) else str(new_status)
         current = walk_in.status.value
         if new_value != current:
             allowed = ALLOWED_TRANSITIONS.get(current, frozenset())
             if new_value not in allowed:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=(
-                        f"invalid walk-in status transition "
-                        f"{current!r} → {new_value!r}"
-                    ),
+                    detail=(f"invalid walk-in status transition {current!r} → {new_value!r}"),
                 )
 
     if "custom_data" in changes:
@@ -201,11 +188,11 @@ async def delete_walk_in(session: AsyncSession, *, walk_in_id: uuid.UUID) -> Non
 async def list_walk_ins(
     session: AsyncSession,
     *,
-    status_filter: Optional[WalkInStatus] = None,
-    assigned_to: Optional[uuid.UUID] = None,
+    status_filter: WalkInStatus | None = None,
+    assigned_to: uuid.UUID | None = None,
     open_only: bool = False,
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     sort: Literal["time_in", "created_at", "last_activity_at"] = "time_in",
     order: Literal["asc", "desc"] = "desc",
     page: int = 1,
@@ -230,11 +217,11 @@ async def list_walk_ins_visible_to(
     session: AsyncSession,
     *,
     caller,
-    status_filter: Optional[WalkInStatus] = None,
-    assigned_to: Optional[uuid.UUID] = None,
+    status_filter: WalkInStatus | None = None,
+    assigned_to: uuid.UUID | None = None,
     open_only: bool = False,
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     sort: Literal["time_in", "created_at", "last_activity_at"] = "time_in",
     order: Literal["asc", "desc"] = "desc",
     page: int = 1,
@@ -326,14 +313,12 @@ async def quick_register(
     return walk_in, contact, was_created
 
 
-async def checkout(
-    session: AsyncSession, *, walk_in_id: uuid.UUID
-) -> WalkIn:
+async def checkout(session: AsyncSession, *, walk_in_id: uuid.UUID) -> WalkIn:
     """Stamp `time_out=now()` on a walk-in. Idempotent."""
     walk_in = ensure_found(await get_walk_in(session, walk_in_id), entity="walk-in")
     if walk_in.time_out is None:
         before = _snapshot(walk_in)
-        walk_in.time_out = datetime.now(timezone.utc)
+        walk_in.time_out = datetime.now(UTC)
         await session.commit()
         await session.refresh(walk_in)
         await audit.log(
@@ -353,9 +338,7 @@ async def _assert_user_in_org(
     session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
 ) -> None:
     """422 if the target user has no active membership in this org."""
-    if not await _da.user_has_active_membership(
-        session, org_id=org_id, user_uuid=user_uuid
-    ):
+    if not await _da.user_has_active_membership(session, org_id=org_id, user_uuid=user_uuid):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="target user is not a member of this organisation",
@@ -383,9 +366,7 @@ async def reassign_walk_in(
 ) -> WalkIn:
     walk_in = ensure_found(await get_walk_in(session, walk_in_id), entity="walk-in")
     if assigned_to_id is not None:
-        await _assert_user_in_org(
-            session, org_id=org_id, user_uuid=assigned_to_id
-        )
+        await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
     before_id = walk_in.assigned_to_id
     if before_id == assigned_to_id:
@@ -399,9 +380,7 @@ async def reassign_walk_in(
         entity_type="walk_in",
         entity_id=walk_in.id,
         type=ActivityType.reassign,
-        payload=_reassign_payload(
-            from_id=before_id, to_id=assigned_to_id, note=note
-        ),
+        payload=_reassign_payload(from_id=before_id, to_id=assigned_to_id, note=note),
         user_id=actor_user_id,
     )
     await session.commit()
@@ -427,9 +406,7 @@ async def bulk_reassign_walk_ins(
     actor_user_id: uuid.UUID | None,
 ) -> int:
     if assigned_to_id is not None:
-        await _assert_user_in_org(
-            session, org_id=org_id, user_uuid=assigned_to_id
-        )
+        await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
     reassigned = 0
     for wid in ids:
@@ -446,9 +423,7 @@ async def bulk_reassign_walk_ins(
             entity_type="walk_in",
             entity_id=walk_in.id,
             type=ActivityType.reassign,
-            payload=_reassign_payload(
-                from_id=before_id, to_id=assigned_to_id, note=note
-            ),
+            payload=_reassign_payload(from_id=before_id, to_id=assigned_to_id, note=note),
             user_id=actor_user_id,
         )
         reassigned += 1
@@ -466,7 +441,7 @@ async def bulk_checkout_walk_ins(
     """Bulk equivalent of single-row `checkout`."""
     checked_out = 0
     already_out = 0
-    now_ts = datetime.now(timezone.utc)
+    now_ts = datetime.now(UTC)
     for wid in ids:
         walk_in = await get_walk_in(session, wid)
         if walk_in is None:

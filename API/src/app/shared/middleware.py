@@ -14,6 +14,7 @@ The middleware never raises — invalid tokens / malformed UUIDs leave
 the context empty, and the route's auth dependency
 (`get_current_user`) returns 401.
 """
+
 from __future__ import annotations
 
 import uuid

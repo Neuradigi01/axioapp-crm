@@ -18,6 +18,7 @@ Tenant-scoped, RLS-on. Migration 0019 adds the indexes for hot reads
 (by org+started_at desc for the list, by contact_id for "calls for
 this contact", by outcome_id for analytics group-bys).
 """
+
 from __future__ import annotations
 
 import enum
@@ -56,9 +57,7 @@ call_direction_enum = ENUM(
 
 class CallOutcome(Base, TenantScoped):
     __tablename__ = "tbl_call_outcomes"
-    __table_args__ = (
-        UniqueConstraint("org_id", "key", name="uq_call_outcomes_org_key"),
-    )
+    __table_args__ = (UniqueConstraint("org_id", "key", name="uq_call_outcomes_org_key"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -98,24 +97,16 @@ class Call(Base, TenantScoped):
         ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
         nullable=True,
     )
-    direction: Mapped[CallDirection] = mapped_column(
-        call_direction_enum, nullable=False
-    )
-    started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    duration_sec: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=sql_text("0")
-    )
+    direction: Mapped[CallDirection] = mapped_column(call_direction_enum, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    duration_sec: Mapped[int] = mapped_column(Integer, nullable=False, server_default=sql_text("0"))
     outcome_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_call_outcomes.id", ondelete="SET NULL"),
         nullable=True,
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    recording_url: Mapped[str | None] = mapped_column(
-        String(512), nullable=True
-    )
+    recording_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     assigned_to_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         nullable=True,
@@ -134,9 +125,7 @@ class Call(Base, TenantScoped):
 
 class CallTranscript(Base, TenantScoped):
     __tablename__ = "tbl_call_transcripts"
-    __table_args__ = (
-        Index("ix_call_transcripts_call_id", "call_id"),
-    )
+    __table_args__ = (Index("ix_call_transcripts_call_id", "call_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -149,9 +138,7 @@ class CallTranscript(Base, TenantScoped):
         nullable=False,
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    language: Mapped[str | None] = mapped_column(
-        String(16), nullable=True
-    )
+    language: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

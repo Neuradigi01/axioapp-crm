@@ -29,10 +29,10 @@ Cases:
  15. ``record_transition`` is idempotent on identical status.
  16. ``record_transition`` rejects unknown status / source values.
 """
+
 from __future__ import annotations
 
 import asyncio
-import os
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -141,9 +141,7 @@ class TestSendGuardClassifier:
 
     def test_never_contacted_allows_with_flag(self):
         c = _StubContact(whatsapp_opt_in_status="never_contacted")
-        assert (
-            evaluate_contact(c, allow_implicit=True).verdict == "allow"
-        )
+        assert evaluate_contact(c, allow_implicit=True).verdict == "allow"
 
     def test_implicit_warns_by_default(self):
         c = _StubContact(whatsapp_opt_in_status="implicit")
@@ -151,9 +149,7 @@ class TestSendGuardClassifier:
 
     def test_implicit_allow_with_flag(self):
         c = _StubContact(whatsapp_opt_in_status="implicit")
-        assert (
-            evaluate_contact(c, allow_implicit=True).verdict == "allow"
-        )
+        assert evaluate_contact(c, allow_implicit=True).verdict == "allow"
 
     def test_opted_in_allows(self):
         c = _StubContact(whatsapp_opt_in_status="opted_in")
@@ -175,9 +171,7 @@ class TestRecordTransitionIdempotency:
     def test_same_status_noop(self):
         c = _StubContact(whatsapp_opt_in_status="opted_in")
         session = _FakeSession()
-        with patch(
-            "src.app.core.contacts.consent_service.audit.log"
-        ) as mock_audit:
+        with patch("src.app.core.contacts.consent_service.audit.log") as mock_audit:
             result: TransitionResult = _run(
                 record_transition(
                     session,
@@ -195,9 +189,7 @@ class TestRecordTransitionIdempotency:
     def test_real_transition_persists(self):
         c = _StubContact(whatsapp_opt_in_status="implicit")
         session = _FakeSession()
-        with patch(
-            "src.app.core.contacts.consent_service.audit.log"
-        ) as mock_audit:
+        with patch("src.app.core.contacts.consent_service.audit.log") as mock_audit:
             result = _run(
                 record_transition(
                     session,

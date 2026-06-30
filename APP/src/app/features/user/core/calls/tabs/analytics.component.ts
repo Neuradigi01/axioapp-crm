@@ -24,10 +24,7 @@ import {
 import { BaseChartDirective } from 'ng2-charts';
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  CallAnalytics,
-  CallsApiService,
-} from '../calls-api.service';
+import { CallAnalytics, CallsApiService } from '../calls-api.service';
 
 // Register only the chart pieces we actually use. Tree-shaking-friendly.
 Chart.register(
@@ -65,14 +62,10 @@ export class CallAnalyticsTabComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
 
-  protected readonly fromControl = new FormControl(
-    this._isoDate(this._daysAgo(14)),
-    { nonNullable: true },
-  );
-  protected readonly toControl = new FormControl(
-    this._isoDate(new Date()),
-    { nonNullable: true },
-  );
+  protected readonly fromControl = new FormControl(this._isoDate(this._daysAgo(14)), {
+    nonNullable: true,
+  });
+  protected readonly toControl = new FormControl(this._isoDate(new Date()), { nonNullable: true });
 
   // --- chart configs ----------------------------------------------------
 
@@ -84,9 +77,7 @@ export class CallAnalyticsTabComponent {
       datasets: [
         {
           data: d.outcomes.map((r) => r.count),
-          backgroundColor: d.outcomes.map(
-            (r) => r.outcome_color ?? '#9ca3af',
-          ),
+          backgroundColor: d.outcomes.map((r) => r.outcome_color ?? '#9ca3af'),
         },
       ],
     };
@@ -111,15 +102,11 @@ export class CallAnalyticsTabComponent {
     const d = this.data();
     if (!d) return { labels: [], datasets: [] };
     return {
-      labels: d.direction.map((r) =>
-        r.direction === 'out' ? 'Outgoing' : 'Incoming',
-      ),
+      labels: d.direction.map((r) => (r.direction === 'out' ? 'Outgoing' : 'Incoming')),
       datasets: [
         {
           data: d.direction.map((r) => r.count),
-          backgroundColor: d.direction.map((r) =>
-            r.direction === 'out' ? '#10b981' : '#0ea5e9',
-          ),
+          backgroundColor: d.direction.map((r) => (r.direction === 'out' ? '#10b981' : '#0ea5e9')),
         },
       ],
     };
@@ -158,9 +145,7 @@ export class CallAnalyticsTabComponent {
         error: (err: HttpErrorResponse) => {
           this.data.set(null);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load analytics.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load analytics.');
         },
       });
   }
@@ -181,5 +166,4 @@ export class CallAnalyticsTabComponent {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
-
 }

@@ -85,9 +85,7 @@ export class TasksPanelComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load tasks.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load tasks.');
           this.loading.set(false);
         },
       });
@@ -118,15 +116,11 @@ export class TasksPanelComponent {
           this.form.reset({ title: '', due_at: '', priority: 'med' });
           // Re-fetch instead of locally inserting so server-side
           // due_at ordering stays consistent without us re-sorting.
-          this.items.update((rows) =>
-            [task, ...rows].sort(this.compareTasks),
-          );
+          this.items.update((rows) => [task, ...rows].sort(this.compareTasks));
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.addError.set(
-            extractApiError(err) ?? 'Could not create task.',
-          );
+          this.addError.set(extractApiError(err) ?? 'Could not create task.');
         },
       });
   }
@@ -143,15 +137,11 @@ export class TasksPanelComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
         },
         error: (err: HttpErrorResponse) => {
           this.items.set(before);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not update task.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not update task.');
         },
       });
   }
@@ -201,5 +191,4 @@ export class TasksPanelComponent {
     if (!a.due_at && b.due_at) return 1;
     return a.created_at < b.created_at ? 1 : -1;
   }
-
 }

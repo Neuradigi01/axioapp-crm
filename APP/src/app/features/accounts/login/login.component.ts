@@ -1,4 +1,11 @@
-import { Component, ChangeDetectionStrategy, effect, signal, inject, viewChild } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  effect,
+  signal,
+  inject,
+  viewChild,
+} from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -133,14 +140,17 @@ export class LoginComponent {
         }
       }
 
-      const loginFn = this.isAdmin ? this.authApi.adminLogin.bind(this.authApi) : this.authApi.login.bind(this.authApi);
+      const loginFn = this.isAdmin
+        ? this.authApi.adminLogin.bind(this.authApi)
+        : this.authApi.login.bind(this.authApi);
       const response = await loginFn(payload);
 
       if (response.success && response.data?.token) {
         this.auth.setToken(response.data.token, this.loginForm.value.rememberMe);
-        const target = response.data.role === ROLE_ADMIN
-          ? getRoute('admin_dashboard').url
-          : getRoute('user').url;
+        const target =
+          response.data.role === ROLE_ADMIN
+            ? getRoute('admin_dashboard').url
+            : getRoute('user').url;
         this.router.navigate([target]);
         return;
       }
@@ -170,7 +180,9 @@ export class LoginComponent {
         }
       }
 
-      this.snackBar.open(response.message || MSG_LOGIN_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+      this.snackBar.open(response.message || MSG_LOGIN_FAILED, SNACKBAR_ACTION, {
+        duration: SNACKBAR_DURATION,
+      });
       this.captchaRef()?.refresh();
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });

@@ -21,15 +21,17 @@ All Celery dispatches are mocked at the
 :func:`core.workflows.engine._schedule_process_step` boundary so
 no real workers are required.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.workflows import engine as workflows_engine
 from src.app.core.workflows.actions import (
@@ -37,6 +39,7 @@ from src.app.core.workflows.actions import (
     _register_builtins,
     register_action,
 )
+from src.app.core.workflows.engine import ActionResult
 from src.app.core.workflows.models import (
     Workflow,
     WorkflowRun,
@@ -46,9 +49,7 @@ from src.app.core.workflows.models import (
     WorkflowStepRun,
     WorkflowStepRunStatus,
 )
-from src.app.core.workflows.engine import ActionResult
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -62,10 +63,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -327,7 +325,7 @@ async def test_wait_node_parks_run_without_recursing(test_db, org_id):
     assert run.current_node_id == "w1"
     assert run.next_step_at is not None
     # Should be ~1 hour ahead.
-    delta = run.next_step_at - datetime.now(timezone.utc)
+    delta = run.next_step_at - datetime.now(UTC)
     assert timedelta(minutes=58) < delta < timedelta(minutes=62)
 
 
@@ -345,8 +343,8 @@ async def test_resume_after_wait_dispatches_due_runs(test_db, org_id):
         nodes=[{"id": "t1", "type": "trigger.lead_created", "config": {}}],
         edges=[],
     )
-    past = datetime.now(timezone.utc) - timedelta(minutes=5)
-    future = datetime.now(timezone.utc) + timedelta(hours=1)
+    past = datetime.now(UTC) - timedelta(minutes=5)
+    future = datetime.now(UTC) + timedelta(hours=1)
 
     due = WorkflowRun(
         org_id=org_id,
@@ -425,12 +423,16 @@ async def test_handler_exception_terminates_run_as_errored(test_db, org_id):
     assert "boom" in (run.error or "")
 
     step_runs = (
-        await test_db.execute(
-            select(WorkflowStepRun)
-            .where(WorkflowStepRun.run_id == run.id)
-            .order_by(WorkflowStepRun.step_index.asc())
+        (
+            await test_db.execute(
+                select(WorkflowStepRun)
+                .where(WorkflowStepRun.run_id == run.id)
+                .order_by(WorkflowStepRun.step_index.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     errored = [s for s in step_runs if s.status == WorkflowStepRunStatus.errored]
     assert len(errored) == 1
     assert "boom" in (errored[0].error or "")

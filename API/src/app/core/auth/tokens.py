@@ -16,11 +16,12 @@ signature, expired, or missing required claim. The middleware catches
 this and leaves the request context empty (the auth dependency then
 returns 401).
 """
+
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
 
@@ -57,7 +58,7 @@ def encode_token(
     scope: str = "admin",
 ) -> tuple[str, datetime]:
     """Return (jwt, expires_at)."""
-    issued_at = now or datetime.now(timezone.utc)
+    issued_at = now or datetime.now(UTC)
     expires_at = issued_at + ttl
     payload = {
         "sub": str(user_id),
@@ -83,8 +84,8 @@ def decode_token(raw: str) -> TokenClaims:
             user_id=uuid.UUID(payload["sub"]),
             org_id=uuid.UUID(payload["org_id"]),
             token_id=uuid.UUID(payload["token_id"]),
-            issued_at=datetime.fromtimestamp(payload["iat"], tz=timezone.utc),
-            expires_at=datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
+            issued_at=datetime.fromtimestamp(payload["iat"], tz=UTC),
+            expires_at=datetime.fromtimestamp(payload["exp"], tz=UTC),
             scope=payload.get("scope", "admin"),
         )
     except (KeyError, ValueError, TypeError) as exc:

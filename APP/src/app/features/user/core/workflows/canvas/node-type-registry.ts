@@ -57,7 +57,6 @@ export interface WorkflowNodeType {
   outputs: NodeOutputPort[];
 }
 
-
 // --- Triggers ----------------------------------------------------------
 //
 // One node type — `trigger`. Operator picks the specific event_type via
@@ -75,7 +74,6 @@ const TRIGGER_NODE: WorkflowNodeType = {
   inputPorts: 0,
   outputs: [{ label: null, display: 'out' }],
 };
-
 
 // --- Send actions (7) ---------------------------------------------------
 
@@ -151,7 +149,6 @@ const SEND_NODES: WorkflowNodeType[] = [
     outputs: [{ label: null, display: 'out' }],
   },
 ];
-
 
 // --- Record actions (8) -------------------------------------------------
 
@@ -238,7 +235,6 @@ const RECORD_NODES: WorkflowNodeType[] = [
   },
 ];
 
-
 // --- Routing actions (5) ------------------------------------------------
 
 const ROUTING_NODES: WorkflowNodeType[] = [
@@ -293,7 +289,6 @@ const ROUTING_NODES: WorkflowNodeType[] = [
     outputs: [{ label: null, display: 'out' }],
   },
 ];
-
 
 // --- Tagging + lifecycle (13) -------------------------------------------
 
@@ -430,7 +425,6 @@ const TAG_LIFECYCLE_NODES: WorkflowNodeType[] = [
   },
 ];
 
-
 // --- Flow control (8) ---------------------------------------------------
 
 const FLOW_CONTROL_NODES: WorkflowNodeType[] = [
@@ -528,7 +522,6 @@ const FLOW_CONTROL_NODES: WorkflowNodeType[] = [
   },
 ];
 
-
 // --- Internal-note flow control variant ---------------------------------
 //
 // Step 11 ships `flow_control.log_internal_note` as a 14th tag-lifecycle
@@ -546,7 +539,6 @@ const INTERNAL_NOTE_NODE: WorkflowNodeType = {
   outputs: [{ label: null, display: 'out' }],
 };
 
-
 // --- Public registry ----------------------------------------------------
 
 export const NODE_TYPES: readonly WorkflowNodeType[] = [
@@ -559,8 +551,9 @@ export const NODE_TYPES: readonly WorkflowNodeType[] = [
   ...FLOW_CONTROL_NODES,
 ];
 
-export const NODE_TYPES_BY_KEY: ReadonlyMap<string, WorkflowNodeType> =
-  new Map(NODE_TYPES.map((n) => [n.type, n]));
+export const NODE_TYPES_BY_KEY: ReadonlyMap<string, WorkflowNodeType> = new Map(
+  NODE_TYPES.map((n) => [n.type, n]),
+);
 
 export function getNodeType(type: string): WorkflowNodeType | undefined {
   return NODE_TYPES_BY_KEY.get(type);

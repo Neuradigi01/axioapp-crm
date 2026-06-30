@@ -1,10 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 import { WhatsAppOptInStatus } from '../contacts-api.service';
 
@@ -34,9 +29,7 @@ import { WhatsAppOptInStatus } from '../contacts-api.service';
   `,
 })
 export class OptInChipComponent {
-  readonly status = input<WhatsAppOptInStatus | null | undefined>(
-    'never_contacted',
-  );
+  readonly status = input<WhatsAppOptInStatus | null | undefined>('never_contacted');
 
   protected readonly label = computed(() => {
     switch (this.status()) {

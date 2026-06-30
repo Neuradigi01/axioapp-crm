@@ -107,27 +107,15 @@ export class DashboardPageComponent {
   // by `scope` (server-decided from the caller's permission set) so
   // there's no role-name branching anywhere on the frontend.
   private readonly HERO_KEYS: Record<'org' | 'personal', string[]> = {
-    org: [
-      'leads.pipeline_value',
-      'leads.new_today',
-      'appointments.today',
-      'conversion.rate',
-    ],
-    personal: [
-      'leads.my_count',
-      'tasks.my_open',
-      'appointments.my_today',
-      'conversion.my_rate',
-    ],
+    org: ['leads.pipeline_value', 'leads.new_today', 'appointments.today', 'conversion.rate'],
+    personal: ['leads.my_count', 'tasks.my_open', 'appointments.my_today', 'conversion.my_rate'],
   };
 
   protected readonly heroCards = computed<DashboardCard[]>(() => {
     const s = this.summary();
     if (!s) return [];
     const keys = this.HERO_KEYS[s.scope] ?? [];
-    return keys
-      .map((k) => s.cards.find((c) => c.key === k))
-      .filter((c): c is DashboardCard => !!c);
+    return keys.map((k) => s.cards.find((c) => c.key === k)).filter((c): c is DashboardCard => !!c);
   });
 
   protected readonly secondaryCards = computed<DashboardCard[]>(() => {
@@ -163,9 +151,7 @@ export class DashboardPageComponent {
           this.refreshing.set(false);
         },
         error: (err: HttpErrorResponse) => {
-          this.error.set(
-            extractApiError(err) ?? "Couldn't load your dashboard.",
-          );
+          this.error.set(extractApiError(err) ?? "Couldn't load your dashboard.");
           this.loading.set(false);
           this.refreshing.set(false);
         },

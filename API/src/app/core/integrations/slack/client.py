@@ -17,11 +17,10 @@ so a slow Slack endpoint won't block a request thread; the
 timeout exists just to bound the worker hold-time when Slack is
 flat-out down.
 """
+
 from __future__ import annotations
 
 import logging
-from typing import Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +55,7 @@ async def post_message(
     today but the upstream proxy / future native support keeps the
     contract stable.
     """
-    if not isinstance(webhook_url, str) or not webhook_url.startswith(
-        "https://"
-    ):
+    if not isinstance(webhook_url, str) or not webhook_url.startswith("https://"):
         raise SlackError("webhook_url must be an https:// URL")
     if not isinstance(text, str) or not text.strip():
         raise SlackError("text must be a non-empty string")
@@ -90,8 +87,7 @@ async def post_message(
 
     if response.status_code >= 300:
         raise SlackError(
-            f"slack webhook returned {response.status_code}: "
-            f"{response.text[:500]}",
+            f"slack webhook returned {response.status_code}: {response.text[:500]}",
             status_code=response.status_code,
         )
 
@@ -99,9 +95,7 @@ async def post_message(
     if body and body != "ok":
         # Slack returns "ok" on success; any other 2xx body is unexpected
         # but harmless — log + return.
-        logger.info(
-            "slack.post_message unexpected_success_body body=%r", body
-        )
+        logger.info("slack.post_message unexpected_success_body body=%r", body)
 
 
 __all__ = ["SlackError", "post_message"]

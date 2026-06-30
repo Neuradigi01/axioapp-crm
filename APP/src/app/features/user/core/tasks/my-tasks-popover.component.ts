@@ -102,9 +102,7 @@ export class MyTasksPopoverComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load your tasks.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load your tasks.');
           this.loading.set(false);
         },
       });
@@ -119,9 +117,7 @@ export class MyTasksPopoverComponent {
       .subscribe({
         error: (err: HttpErrorResponse) => {
           this.items.set(before);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not update task.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not update task.');
         },
       });
   }
@@ -137,5 +133,4 @@ export class MyTasksPopoverComponent {
       minute: '2-digit',
     });
   }
-
 }

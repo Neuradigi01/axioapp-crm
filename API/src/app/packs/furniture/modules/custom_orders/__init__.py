@@ -13,9 +13,12 @@ with the `core.standard_fields` registry so the Settings page's
 "Standard Fields" tab can offer per-org label/required/visibility
 overrides on the basics step of the create wizard.
 """
+
 from src.app.core.pipelines.service import register_pipeline_table
 from src.app.core.standard_fields import (
     StandardFieldDef,
+)
+from src.app.core.standard_fields import (
     register as register_standard_field,
 )
 from src.app.packs.furniture.modules.custom_orders.service import (
@@ -32,19 +35,14 @@ from src.app.packs.furniture.modules.custom_orders.service import (
     update_order,
 )
 
-
 register_pipeline_table("fp_custom_orders")
 
 
 # Standard-field overrides for the custom-order create/edit wizard's
 # basics step. Title is backend-required (NOT NULL). Currency knobs
 # carry full numeric override support.
-_TEXT_PROPS = frozenset(
-    {"label", "placeholder", "help", "required", "hidden", "display_order"}
-)
-_LOCKED_REQUIRED_PROPS = frozenset(
-    {"label", "placeholder", "help", "display_order"}
-)
+_TEXT_PROPS = frozenset({"label", "placeholder", "help", "required", "hidden", "display_order"})
+_LOCKED_REQUIRED_PROPS = frozenset({"label", "placeholder", "help", "display_order"})
 _CURRENCY_PROPS = frozenset(
     {
         "label",

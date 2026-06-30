@@ -14,11 +14,12 @@ Every mutation fires `audit.log`; creates also log an `Activity` with
 `type='call'` on the linked contact (if any) so the contact timeline
 shows it.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import date as Date
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -43,7 +44,6 @@ from src.app.core.calls.schemas import (
 )
 from src.app.shared.audit import log_entity_change
 from src.app.shared.db.queries import ensure_found
-
 
 # --- Outcomes -------------------------------------------------------------
 
@@ -115,9 +115,7 @@ async def update_outcome(
     return outcome
 
 
-async def delete_outcome(
-    session: AsyncSession, *, outcome_id: uuid.UUID
-) -> None:
+async def delete_outcome(session: AsyncSession, *, outcome_id: uuid.UUID) -> None:
     outcome = await _get_outcome(session, outcome_id)
     before = _outcome_snapshot(outcome)
     await _da.delete_outcome_row(session, outcome)
@@ -130,12 +128,8 @@ async def delete_outcome(
     )
 
 
-async def _get_outcome(
-    session: AsyncSession, outcome_id: uuid.UUID
-) -> CallOutcome:
-    return ensure_found(
-        await _da.get_outcome_by_id(session, outcome_id), entity="call outcome"
-    )
+async def _get_outcome(session: AsyncSession, outcome_id: uuid.UUID) -> CallOutcome:
+    return ensure_found(await _da.get_outcome_by_id(session, outcome_id), entity="call outcome")
 
 
 # --- Calls CRUD ------------------------------------------------------------
@@ -144,9 +138,9 @@ async def _get_outcome(
 async def list_calls(
     session: AsyncSession,
     *,
-    contact_id: Optional[uuid.UUID] = None,
-    direction: Optional[CallDirection] = None,
-    assigned_to_id: Optional[uuid.UUID] = None,
+    contact_id: uuid.UUID | None = None,
+    direction: CallDirection | None = None,
+    assigned_to_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Call], int]:
@@ -161,9 +155,7 @@ async def list_calls(
 
 
 async def get_call(session: AsyncSession, call_id: uuid.UUID) -> Call:
-    return ensure_found(
-        await _da.get_call_by_id(session, call_id), entity="call"
-    )
+    return ensure_found(await _da.get_call_by_id(session, call_id), entity="call")
 
 
 async def create_call(
@@ -270,9 +262,7 @@ async def delete_call(session: AsyncSession, *, call_id: uuid.UUID) -> None:
 # --- Transcript -----------------------------------------------------------
 
 
-async def get_transcript(
-    session: AsyncSession, *, call_id: uuid.UUID
-) -> Optional[CallTranscript]:
+async def get_transcript(session: AsyncSession, *, call_id: uuid.UUID) -> CallTranscript | None:
     return await _da.get_transcript_for_call(session, call_id=call_id)
 
 
@@ -288,9 +278,7 @@ async def upsert_transcript(
 
     existing = await get_transcript(session, call_id=call_id)
     before = (
-        {"text": existing.text, "language": existing.language}
-        if existing is not None
-        else None
+        {"text": existing.text, "language": existing.language} if existing is not None else None
     )
     if existing is None:
         transcript = CallTranscript(
@@ -340,23 +328,17 @@ async def analytics(
             "outcome_color": r.color,
             "count": int(r.count),
         }
-        for r in await _da.outcomes_distribution_query(
-            session, from_dt=from_dt, to_dt=to_dt
-        )
+        for r in await _da.outcomes_distribution_query(session, from_dt=from_dt, to_dt=to_dt)
     ]
 
     daily_rows = [
         {"day": r.day, "count": int(r.count)}
-        for r in await _da.daily_volume_query(
-            session, from_dt=from_dt, to_dt=to_dt
-        )
+        for r in await _da.daily_volume_query(session, from_dt=from_dt, to_dt=to_dt)
     ]
 
     direction_rows = [
         {"direction": r.direction, "count": int(r.count)}
-        for r in await _da.direction_split_query(
-            session, from_dt=from_dt, to_dt=to_dt
-        )
+        for r in await _da.direction_split_query(session, from_dt=from_dt, to_dt=to_dt)
     ]
 
     return {

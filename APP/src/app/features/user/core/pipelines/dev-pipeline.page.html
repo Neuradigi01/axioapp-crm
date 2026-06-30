@@ -3,9 +3,9 @@
     <div>
       <h1 class="text-lg font-semibold text-zinc-900">Pipeline engine — dev preview</h1>
       <p class="mt-0.5 text-xs text-zinc-500">
-        Talks to <code class="font-mono">/api/v1/pipelines/leads</code> for stage
-        config; items are an in-memory mock. Drag a card or pick a new stage
-        from the list dropdown to see the <code class="font-mono">itemMoved</code> event.
+        Talks to <code class="font-mono">/api/v1/pipelines/leads</code> for stage config; items are
+        an in-memory mock. Drag a card or pick a new stage from the list dropdown to see the
+        <code class="font-mono">itemMoved</code> event.
       </p>
     </div>
     <div class="inline-flex overflow-hidden rounded-md ring-1 ring-zinc-300">
@@ -35,32 +35,20 @@
   </header>
 
   @if (view() === 'board') {
-    <app-pipeline-board
-      pipelineKey="leads"
-      [items]="items()"
-      (itemMoved)="onItemMoved($event)"
-    >
+    <app-pipeline-board pipelineKey="leads" [items]="items()" (itemMoved)="onItemMoved($event)">
       <ng-template let-item>
         <div class="space-y-0.5">
           <p class="text-sm font-medium text-zinc-900">{{ item.full_name }}</p>
-          <p class="text-xs text-zinc-500">
-            {{ formatInr(item.budget_inr) }} · {{ item.id }}
-          </p>
+          <p class="text-xs text-zinc-500">{{ formatInr(item.budget_inr) }} · {{ item.id }}</p>
         </div>
       </ng-template>
     </app-pipeline-board>
   } @else {
-    <app-pipeline-list
-      pipelineKey="leads"
-      [items]="items()"
-      (itemMoved)="onItemMoved($event)"
-    >
+    <app-pipeline-list pipelineKey="leads" [items]="items()" (itemMoved)="onItemMoved($event)">
       <ng-template let-item>
         <div>
           <p class="font-medium">{{ item.full_name }}</p>
-          <p class="text-xs text-zinc-500">
-            {{ formatInr(item.budget_inr) }} · {{ item.id }}
-          </p>
+          <p class="text-xs text-zinc-500">{{ formatInr(item.budget_inr) }} · {{ item.id }}</p>
         </div>
       </ng-template>
     </app-pipeline-list>
@@ -70,6 +58,8 @@
     <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-400">
       Last <code class="font-mono">itemMoved</code> event
     </h2>
-    <pre class="mt-2 overflow-x-auto rounded-md bg-zinc-950 p-3 text-xs"><code>{{ lastEvent() ? (lastEvent() | json) : '— no events yet —' }}</code></pre>
+    <pre
+      class="mt-2 overflow-x-auto rounded-md bg-zinc-950 p-3 text-xs"
+    ><code>{{ lastEvent() ? (lastEvent() | json) : '— no events yet —' }}</code></pre>
   </section>
 </div>

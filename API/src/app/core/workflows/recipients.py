@@ -32,15 +32,16 @@ The registry is the same shape as
 string, raise :class:`UnknownResolver` when the key is unknown so a
 typo in the workflow node config doesn't silently send nowhere.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any, Awaitable, Callable, Optional
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ class UnknownResolver(Exception):
 
 
 #: Resolver signature — coroutine returning the address string or None.
-Resolver = Callable[..., Awaitable[Optional[str]]]
+Resolver = Callable[..., Awaitable[str | None]]
 
 
 _resolvers: dict[str, Resolver] = {}
@@ -92,7 +93,7 @@ async def resolve(
     run,
     node: dict[str, Any],
     context: dict[str, Any],
-) -> Optional[str]:
+) -> str | None:
     """Look up + invoke a resolver. Raises :class:`UnknownResolver`
     for unregistered names — the Send handler catches + maps to a
     skipped step."""
@@ -111,7 +112,7 @@ async def _contact_email(
     run,
     node: dict[str, Any],
     context: dict[str, Any],
-) -> Optional[str]:
+) -> str | None:
     """Read ``contact.email`` from the hydrated context dict first
     (set by the engine in ``_build_handler_context``); fall back
     to a direct lookup by ``run.contact_id`` so deleted-contact
@@ -132,7 +133,7 @@ async def _contact_phone(
     run,
     node: dict[str, Any],
     context: dict[str, Any],
-) -> Optional[str]:
+) -> str | None:
     contact = context.get("contact")
     if isinstance(contact, dict):
         phone = contact.get("phone")
@@ -149,7 +150,7 @@ async def _user_email(
     run,
     node: dict[str, Any],
     context: dict[str, Any],
-) -> Optional[str]:
+) -> str | None:
     """Look up the email of a user. The node config can supply an
     explicit ``user_id`` (for "notify deal owner" patterns);
     otherwise we fall back to the workflow's creator."""
@@ -180,7 +181,7 @@ async def _lead_owner(
     run,
     node: dict[str, Any],
     context: dict[str, Any],
-) -> Optional[str]:
+) -> str | None:
     """Resolve the lead's assigned user, then that user's email or
     phone per ``config.method`` (defaults to ``email``)."""
     cfg = (node.get("config") or {}).get("recipient") or {}
@@ -200,9 +201,7 @@ async def _lead_owner(
     if user_uuid is None:
         # Fall back to a DB lookup off lead_id when the snapshot
         # didn't include the assignee.
-        lead_id_raw = trigger_payload.get("lead_id") or trigger_payload.get(
-            "lead", {}
-        ).get("id")
+        lead_id_raw = trigger_payload.get("lead_id") or trigger_payload.get("lead", {}).get("id")
         lead_uuid = _coerce_uuid(lead_id_raw)
         if lead_uuid is not None:
             user_uuid = await _lookup_lead_owner(session, lead_uuid)
@@ -220,7 +219,7 @@ async def _custom(
     run,
     node: dict[str, Any],
     context: dict[str, Any],
-) -> Optional[str]:
+) -> str | None:
     """Walk a dot-path against the trigger payload. Depth-capped so
     a pathological ``"a.b.c.d.e.f.g..."`` config can't bog the
     worker down."""
@@ -257,38 +256,30 @@ async def _lookup_contact_field(
     session: AsyncSession,
     contact_id: uuid.UUID,
     field: str,
-) -> Optional[str]:
+) -> str | None:
     from src.app.core.contacts.models import Contact
 
     column = getattr(Contact, field, None)
     if column is None:
         return None
-    result = await session.execute(
-        select(column).where(Contact.id == contact_id)
-    )
+    result = await session.execute(select(column).where(Contact.id == contact_id))
     value = result.scalar_one_or_none()
     if isinstance(value, str) and value.strip():
         return _trim(value)
     return None
 
 
-async def _lookup_user_email(
-    session: AsyncSession, user_uuid: uuid.UUID
-) -> Optional[str]:
+async def _lookup_user_email(session: AsyncSession, user_uuid: uuid.UUID) -> str | None:
     from src.app.core.users.models import User
 
-    result = await session.execute(
-        select(User.email).where(User.legacy_uuid == user_uuid)
-    )
+    result = await session.execute(select(User.email).where(User.legacy_uuid == user_uuid))
     value = result.scalar_one_or_none()
     if isinstance(value, str) and value.strip():
         return _trim(value)
     return None
 
 
-async def _lookup_user_phone(
-    session: AsyncSession, user_uuid: uuid.UUID
-) -> Optional[str]:
+async def _lookup_user_phone(session: AsyncSession, user_uuid: uuid.UUID) -> str | None:
     """Best-effort phone lookup. The User model in this codebase
     doesn't carry a phone today — returns None until that's added.
     Kept here so the resolver shape stays stable when phone-on-user
@@ -296,14 +287,10 @@ async def _lookup_user_phone(
     return None
 
 
-async def _lookup_lead_owner(
-    session: AsyncSession, lead_id: uuid.UUID
-) -> Optional[uuid.UUID]:
+async def _lookup_lead_owner(session: AsyncSession, lead_id: uuid.UUID) -> uuid.UUID | None:
     from src.app.core.leads.models import Lead
 
-    result = await session.execute(
-        select(Lead.assigned_to_id).where(Lead.id == lead_id)
-    )
+    result = await session.execute(select(Lead.assigned_to_id).where(Lead.id == lead_id))
     value = result.scalar_one_or_none()
     return value if isinstance(value, uuid.UUID) else None
 

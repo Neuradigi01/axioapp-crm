@@ -4,14 +4,16 @@
   </div>
 
   <div class="flex flex-col items-center text-center">
-    <span class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-zinc-500">
+    <span
+      class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-zinc-500"
+    >
       <lucide-icon name="mail" class="h-6 w-6" />
     </span>
     <p class="text-sm font-medium text-zinc-800">A verification email has been sent</p>
     @if (email) {
       <p class="mt-1 text-sm text-zinc-500">
-        We've sent a verification link to <span class="font-medium text-zinc-700">{{ email }}</span>.
-        Please check your inbox and click the link to verify your email address.
+        We've sent a verification link to <span class="font-medium text-zinc-700">{{ email }}</span
+        >. Please check your inbox and click the link to verify your email address.
       </p>
     } @else {
       <p class="mt-1 text-sm text-zinc-500">

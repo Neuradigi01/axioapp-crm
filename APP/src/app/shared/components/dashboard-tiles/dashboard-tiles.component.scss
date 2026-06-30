@@ -11,7 +11,9 @@
     border-radius: var(--radius-md);
     box-shadow: var(--tile-shadow);
     overflow: hidden;
-    transition: box-shadow var(--transition-normal), transform var(--transition-normal);
+    transition:
+      box-shadow var(--transition-normal),
+      transform var(--transition-normal);
 
     &:hover {
       box-shadow: var(--tile-hover-shadow);

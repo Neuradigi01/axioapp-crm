@@ -16,6 +16,7 @@ Covers:
 
 Pure-Python doubles — no Meta, no DB, no FastAPI TestClient.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -35,7 +36,6 @@ from src.app.core.conversations.media_upload import (
     upload_to_meta,
     validate_attachment,
 )
-
 
 _PHONE_ID = "12345"
 _TOKEN = "EAA_test_token"
@@ -69,14 +69,10 @@ def _stub_factory(*, status_code: int = 200, body: dict | None = None):
             return None
 
         async def post(self, url, json=None, headers=None, files=None):
-            calls.append(
-                {"url": url, "json": json, "headers": headers, "files": files}
-            )
+            calls.append({"url": url, "json": json, "headers": headers, "files": files})
             return httpx.Response(
                 status_code,
-                json=body
-                if body is not None
-                else {"messages": [{"id": "wamid.media123"}]},
+                json=body if body is not None else {"messages": [{"id": "wamid.media123"}]},
             )
 
     factory = lambda: _Client()  # noqa: E731
@@ -128,9 +124,7 @@ class TestValidateAttachment:
 class TestUploadToMeta:
     @pytest.mark.asyncio
     async def test_happy_path_returns_media_id(self):
-        factory = _stub_factory(
-            status_code=200, body={"id": "1234567890"}
-        )
+        factory = _stub_factory(status_code=200, body={"id": "1234567890"})
         result = await upload_to_meta(
             phone_id=_PHONE_ID,
             token=_TOKEN,
@@ -301,9 +295,7 @@ class TestAdapterMediaSend:
             org_id=_ORG_ID,
             external_id=_TO,
             text="hi",
-            attachments=[
-                {"type": "image", "id": "inbound_id", "sha256": "abc"}
-            ],
+            attachments=[{"type": "image", "id": "inbound_id", "sha256": "abc"}],
         )
         envelope = factory.calls[0]["json"]  # type: ignore[attr-defined]
         assert envelope["type"] == "text"

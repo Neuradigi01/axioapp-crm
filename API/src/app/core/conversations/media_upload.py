@@ -18,10 +18,10 @@ Why a separate module instead of folding into the adapter:
 Reference: https://developers.facebook.com/docs/whatsapp/cloud-api/
 reference/media
 """
+
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import httpx
 
@@ -94,9 +94,7 @@ class MediaUploadError(Exception):
         self.user_message = user_message
 
 
-def validate_attachment(
-    *, type_: str, mime_type: str, size_bytes: int
-) -> None:
+def validate_attachment(*, type_: str, mime_type: str, size_bytes: int) -> None:
     """Pre-flight check at the router boundary. Raises ``MediaUploadError``
     with the appropriate HTTP status so the caller can pass it through.
 
@@ -107,25 +105,20 @@ def validate_attachment(
         raise MediaUploadError(
             http_status=422,
             user_message=(
-                f"Unsupported media type {type_!r}. Allowed: "
-                f"{', '.join(sorted(_MIME_BY_TYPE))}."
+                f"Unsupported media type {type_!r}. Allowed: {', '.join(sorted(_MIME_BY_TYPE))}."
             ),
         )
     if mime_type not in _MIME_BY_TYPE[type_]:
         raise MediaUploadError(
             http_status=415,
-            user_message=(
-                f"MIME type {mime_type!r} is not allowed for "
-                f"{type_!r} messages."
-            ),
+            user_message=(f"MIME type {mime_type!r} is not allowed for {type_!r} messages."),
         )
     cap = _MAX_SIZE_BYTES[type_]
     if size_bytes > cap:
         raise MediaUploadError(
             http_status=413,
             user_message=(
-                f"File is too large ({size_bytes} bytes) — Meta caps "
-                f"{type_} at {cap} bytes."
+                f"File is too large ({size_bytes} bytes) — Meta caps {type_} at {cap} bytes."
             ),
         )
 
@@ -164,9 +157,7 @@ async def upload_to_meta(
         "messaging_product": (None, "whatsapp"),
         "type": (None, mime_type),
     }
-    factory = http_client_factory or (
-        lambda: httpx.AsyncClient(timeout=60.0)
-    )
+    factory = http_client_factory or (lambda: httpx.AsyncClient(timeout=60.0))
     async with factory() as client:
         response = await client.post(url, headers=headers, files=files)
     if response.status_code >= 400:
@@ -179,33 +170,25 @@ async def upload_to_meta(
         if response.status_code == 413:
             raise MediaUploadError(
                 http_status=413,
-                user_message=(
-                    "Meta rejected the file as too large — try a smaller "
-                    "version."
-                ),
+                user_message=("Meta rejected the file as too large — try a smaller version."),
             )
         if response.status_code in (400, 415):
             raise MediaUploadError(
                 http_status=415,
                 user_message=(
-                    "Meta refused the file type — make sure the MIME "
-                    "matches the chosen media kind."
+                    "Meta refused the file type — make sure the MIME matches the chosen media kind."
                 ),
             )
         raise MediaUploadError(
             http_status=502,
-            user_message=(
-                f"Meta media upload failed: HTTP {response.status_code}."
-            ),
+            user_message=(f"Meta media upload failed: HTTP {response.status_code}."),
         )
     body = response.json()
     media_id = body.get("id") if isinstance(body, dict) else None
     if not isinstance(media_id, str) or not media_id:
         raise MediaUploadError(
             http_status=502,
-            user_message=(
-                "Meta returned no media_id — please retry."
-            ),
+            user_message=("Meta returned no media_id — please retry."),
         )
     return media_id
 

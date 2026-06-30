@@ -50,7 +50,9 @@ export class AdminApiService {
   // ── Sub-Admin Management ─────────────────────────────────────────
 
   getSubAdminList(payload: ISubAdminListRequest): Promise<IPaginatedApiResponse<ISubAdmin>> {
-    return this.http.Post('/admin/sub-admins/list', payload) as Promise<IPaginatedApiResponse<ISubAdmin>>;
+    return this.http.Post('/admin/sub-admins/list', payload) as Promise<
+      IPaginatedApiResponse<ISubAdmin>
+    >;
   }
 
   createSubAdmin(payload: ICreateSubAdminRequest): Promise<IApiResponse> {

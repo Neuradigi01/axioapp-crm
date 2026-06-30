@@ -11,10 +11,11 @@ Plus a handful of edge cases:
   - cancelled / no-show appointments don't block their slot
   - PATCH of the appointment's own time is allowed (exclude self)
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -38,9 +39,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -68,9 +67,7 @@ async def _seed_contact(org_id: uuid.UUID) -> uuid.UUID:
         reset_context(token)
 
 
-async def _seed_extra_user(
-    org_id: uuid.UUID, role_id: uuid.UUID
-) -> uuid.UUID:
+async def _seed_extra_user(org_id: uuid.UUID, role_id: uuid.UUID) -> uuid.UUID:
     from tests.conftest import TestSession
 
     user_id = uuid.uuid4()
@@ -92,9 +89,9 @@ async def _seed_extra_user(
 
 def _at(hour: int, minute: int = 0) -> str:
     """Deterministic timestamp slot tomorrow."""
-    base = datetime.now(timezone.utc).replace(
-        hour=hour, minute=minute, second=0, microsecond=0
-    ) + timedelta(days=3)
+    base = datetime.now(UTC).replace(hour=hour, minute=minute, second=0, microsecond=0) + timedelta(
+        days=3
+    )
     return base.isoformat()
 
 
@@ -298,9 +295,7 @@ async def test_patch_own_time_is_allowed(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_cancelled_appointment_does_not_block(
-    layered_client, seeded_admin
-):
+async def test_cancelled_appointment_does_not_block(layered_client, seeded_admin):
     """Once A is cancelled, B can take its slot."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]

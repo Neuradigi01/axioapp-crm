@@ -5,6 +5,7 @@ These now drive the layered app via real JWT auth (via
 insufficient since Step 1.6 — `get_current_user` requires a non-null
 `token_id`, which only `/auth/login` produces.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -23,9 +24,7 @@ async def test_users_me_with_valid_token(layered_client, seeded_admin):
     assert resp.status_code == 200, resp.text
     token = resp.json()["access_token"]
 
-    me = await layered_client.get(
-        "/api/v1/users/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    me = await layered_client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 200, me.text
     body = me.json()
     assert body["id"] == str(user.id)
@@ -66,9 +65,7 @@ async def test_users_list_scoped_to_active_org(layered_client, seeded_admin):
     from src.app.shared.security.password import hash_password
     from tests.conftest import TestSession
 
-    other_org = Organization(
-        id=_uuid.uuid4(), name="Other", slug=f"other-{_uuid.uuid4().hex[:6]}"
-    )
+    other_org = Organization(id=_uuid.uuid4(), name="Other", slug=f"other-{_uuid.uuid4().hex[:6]}")
     other_role = Role(id=_uuid.uuid4(), org_id=other_org.id, name="admin", is_system=True)
     other_user = User(
         id=_uuid.uuid4(),

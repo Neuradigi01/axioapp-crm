@@ -34,6 +34,7 @@ WhatsApp trigger pointing at an email template would dispatch
 through the wrong adapter — :class:`MissingTemplateForChannel` is
 the 422 the operator sees in the trigger editor.
 """
+
 from __future__ import annotations
 
 import logging
@@ -53,7 +54,6 @@ from src.app.core.automation.models import AutomationTrigger
 from src.app.core.automation.schemas import TriggerCreate, TriggerUpdate
 from src.app.core.conversations.models import ConversationChannel
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -68,9 +68,7 @@ async def get_trigger(
 ) -> AutomationTrigger:
     """Resolve a trigger by id; raise :class:`TriggerNotFound` on miss
     so the router can return 404 with a structured payload."""
-    row = await data_access.get_trigger(
-        session, org_id=org_id, trigger_id=trigger_id
-    )
+    row = await data_access.get_trigger(session, org_id=org_id, trigger_id=trigger_id)
     if row is None:
         raise TriggerNotFound(trigger_id)
     return row
@@ -127,9 +125,7 @@ async def create_trigger(
         trigger_channel=payload.channel,
     )
 
-    existing = await data_access.get_trigger_by_name(
-        session, org_id=org_id, name=payload.name
-    )
+    existing = await data_access.get_trigger_by_name(session, org_id=org_id, name=payload.name)
     if existing is not None:
         raise DuplicateTriggerName(payload.name)
 
@@ -181,9 +177,7 @@ async def update_trigger(
     applied; ``enabled`` toggle still works but the dedicated
     helpers (:func:`enable_trigger` / :func:`disable_trigger`) are
     preferred for the Settings list-page toggle path."""
-    trigger = await get_trigger(
-        session, org_id=org_id, trigger_id=trigger_id
-    )
+    trigger = await get_trigger(session, org_id=org_id, trigger_id=trigger_id)
 
     next_channel = payload.channel if payload.channel is not None else trigger.channel
     next_template_id = (
@@ -202,9 +196,7 @@ async def update_trigger(
         )
 
     if payload.name is not None and payload.name.strip().lower() != trigger.name.lower():
-        clashing = await data_access.get_trigger_by_name(
-            session, org_id=org_id, name=payload.name
-        )
+        clashing = await data_access.get_trigger_by_name(session, org_id=org_id, name=payload.name)
         if clashing is not None and clashing.id != trigger.id:
             raise DuplicateTriggerName(payload.name)
         trigger.name = payload.name.strip()
@@ -236,9 +228,7 @@ async def update_trigger(
         raise DuplicateTriggerName(payload.name or trigger.name) from exc
 
     await session.refresh(trigger)
-    logger.info(
-        "automation.update_trigger org=%s trigger=%s", org_id, trigger.id
-    )
+    logger.info("automation.update_trigger org=%s trigger=%s", org_id, trigger.id)
     return trigger
 
 
@@ -286,14 +276,10 @@ async def delete_trigger(
     """Hard delete. ON DELETE CASCADE on ``tbl_automation_runs``
     drops historical runs — operators usually prefer
     :func:`disable_trigger` to preserve audit history."""
-    trigger = await get_trigger(
-        session, org_id=org_id, trigger_id=trigger_id
-    )
+    trigger = await get_trigger(session, org_id=org_id, trigger_id=trigger_id)
     await session.delete(trigger)
     await session.commit()
-    logger.info(
-        "automation.delete_trigger org=%s trigger=%s", org_id, trigger_id
-    )
+    logger.info("automation.delete_trigger org=%s trigger=%s", org_id, trigger_id)
 
 
 # --- matcher --------------------------------------------------------
@@ -336,9 +322,7 @@ async def _enforce_template_channel(
     so the operator sees one clear error."""
     from src.app.core.templates import data_access as templates_da
 
-    template = await templates_da.get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await templates_da.get_template(session, org_id=org_id, template_id=template_id)
     if template is None:
         raise MissingTemplateForChannel(
             trigger_channel=trigger_channel.value,
@@ -359,9 +343,7 @@ async def _set_enabled(
     trigger_id: uuid.UUID,
     enabled: bool,
 ) -> AutomationTrigger:
-    trigger = await get_trigger(
-        session, org_id=org_id, trigger_id=trigger_id
-    )
+    trigger = await get_trigger(session, org_id=org_id, trigger_id=trigger_id)
     if trigger.enabled == enabled:
         return trigger
     trigger.enabled = enabled

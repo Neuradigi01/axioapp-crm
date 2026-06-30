@@ -14,6 +14,7 @@ What we prove:
   5. `_normalise_phone` strips non-digits + leading zeros.
   6. `_apply_mapping` drops `skip` columns and missing-mapping columns.
 """
+
 from __future__ import annotations
 
 import io
@@ -22,16 +23,13 @@ import pytest
 
 from src.app.core.contacts.imports import parser, service
 
-
 # --- CSV parsing ---------------------------------------------------------
 
 
 class TestCsvParse:
     def test_basic_csv_yields_data_rows(self):
         data = b"name,phone,email\nAsha,9999,asha@x.com\nBob,8888,bob@x.com\n"
-        headers, sample, total = parser.parse_headers_and_sample(
-            data, "test.csv"
-        )
+        headers, sample, total = parser.parse_headers_and_sample(data, "test.csv")
         assert headers == ["name", "phone", "email"]
         assert total == 2
         assert sample == [
@@ -41,20 +39,14 @@ class TestCsvParse:
 
     def test_utf8_bom_decoded(self):
         """Excel exports with UTF-8 BOM should decode cleanly."""
-        data = (
-            "﻿full_name,phone\nAsha Walker,9876543210\n"
-        ).encode("utf-8")
-        headers, sample, total = parser.parse_headers_and_sample(
-            data, "test.csv"
-        )
+        data = ("﻿full_name,phone\nAsha Walker,9876543210\n").encode()
+        headers, sample, total = parser.parse_headers_and_sample(data, "test.csv")
         assert headers == ["full_name", "phone"]
         assert sample[0]["full_name"] == "Asha Walker"
 
     def test_quoted_fields_with_commas(self):
         data = b'name,address\n"Walker, Asha","Bangalore, IN"\n'
-        headers, sample, total = parser.parse_headers_and_sample(
-            data, "test.csv"
-        )
+        headers, sample, total = parser.parse_headers_and_sample(data, "test.csv")
         assert sample[0]["name"] == "Walker, Asha"
         assert sample[0]["address"] == "Bangalore, IN"
 
@@ -81,12 +73,8 @@ class TestXlsxParse:
         return buf.getvalue()
 
     def test_basic_xlsx(self):
-        data = self._make_xlsx(
-            [["name", "phone"], ["Asha", "9876543210"]]
-        )
-        headers, sample, total = parser.parse_headers_and_sample(
-            data, "test.xlsx"
-        )
+        data = self._make_xlsx([["name", "phone"], ["Asha", "9876543210"]])
+        headers, sample, total = parser.parse_headers_and_sample(data, "test.xlsx")
         assert headers == ["name", "phone"]
         assert total == 1
         assert sample[0]["name"] == "Asha"
@@ -94,9 +82,7 @@ class TestXlsxParse:
     def test_numeric_cells_coerced_to_string(self):
         """A phone column with numeric cells (Excel default) should
         come out as a string in the data dict."""
-        data = self._make_xlsx(
-            [["name", "phone"], ["Asha", 9876543210]]
-        )
+        data = self._make_xlsx([["name", "phone"], ["Asha", 9876543210]])
         _, sample, _ = parser.parse_headers_and_sample(data, "test.xlsx")
         assert sample[0]["phone"] == "9876543210"
 

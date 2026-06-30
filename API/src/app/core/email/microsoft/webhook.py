@@ -28,13 +28,13 @@ shared signing key (`JWT_SECRET_KEY`). Per-subscription deterministic,
 verifiable without an extra DB column, and rotates automatically if
 the signing key rotates.
 """
+
 from __future__ import annotations
 
 import hashlib
 import hmac
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import text
@@ -46,7 +46,6 @@ from config import (
 )
 from src.app.core.email.microsoft.client import GraphClient, GraphHTTPError
 from src.app.core.email.models import EmailAccount
-
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +70,7 @@ def client_state_for(account_id) -> str:
     key = (JWT_SECRET_KEY or "").encode("utf-8")
     if not key:
         raise RuntimeError(
-            "JWT_SECRET_KEY is not configured; cannot derive "
-            "Graph subscription clientState."
+            "JWT_SECRET_KEY is not configured; cannot derive Graph subscription clientState."
         )
     mac = hmac.new(key, str(account_id).encode("utf-8"), hashlib.sha256)
     return mac.hexdigest()[:32]
@@ -82,8 +80,8 @@ async def subscribe_if_configured(
     account: EmailAccount,
     session: AsyncSession,
     *,
-    client: Optional[GraphClient] = None,
-) -> Optional[dict]:
+    client: GraphClient | None = None,
+) -> dict | None:
     """Register a Graph change-notification subscription for the
     account's mailbox if a webhook URL is configured. Returns the
     subscription payload Graph echoed back (the `id` we'll later
@@ -95,10 +93,9 @@ async def subscribe_if_configured(
     if not webhook_configured():
         return None
     gc = client or GraphClient(account=account, session=session)
-    expiration = (
-        datetime.now(timezone.utc)
-        + timedelta(hours=_INITIAL_EXPIRATION_HOURS)
-    ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    expiration = (datetime.now(UTC) + timedelta(hours=_INITIAL_EXPIRATION_HOURS)).strftime(
+        "%Y-%m-%dT%H:%M:%S.000Z"
+    )
     payload = {
         "changeType": "created,updated,deleted",
         "notificationUrl": MICROSOFT_GRAPH_WEBHOOK_URL,
@@ -123,8 +120,8 @@ async def unsubscribe_quiet(
     account: EmailAccount,
     session: AsyncSession,
     *,
-    subscription_id: Optional[str],
-    client: Optional[GraphClient] = None,
+    subscription_id: str | None,
+    client: GraphClient | None = None,
 ) -> None:
     """Tear down an existing subscription. Idempotent: missing
     `subscription_id`, missing webhook URL, or a 404 from Graph
@@ -137,8 +134,7 @@ async def unsubscribe_quiet(
         await gc.delete_subscription(subscription_id)
     except (GraphHTTPError, HTTPException) as exc:
         logger.warning(
-            "Graph subscriptions.delete failed for account=%s "
-            "subscription=%s err=%s (ignored)",
+            "Graph subscriptions.delete failed for account=%s subscription=%s err=%s (ignored)",
             account.id,
             subscription_id,
             exc,
@@ -150,26 +146,22 @@ async def renew_subscription(
     session: AsyncSession,
     *,
     subscription_id: str,
-    client: Optional[GraphClient] = None,
-) -> Optional[str]:
+    client: GraphClient | None = None,
+) -> str | None:
     """Extend `expirationDateTime` by 65 hours. Returns the new
     expiration ISO string Graph echoed back, or None on failure
     (caller marks the subscription dead, schedules a re-subscribe
     on next sync)."""
     gc = client or GraphClient(account=account, session=session)
-    new_iso = (
-        datetime.now(timezone.utc)
-        + timedelta(hours=_RENEWAL_EXPIRATION_HOURS)
-    ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    new_iso = (datetime.now(UTC) + timedelta(hours=_RENEWAL_EXPIRATION_HOURS)).strftime(
+        "%Y-%m-%dT%H:%M:%S.000Z"
+    )
     try:
-        body = await gc.renew_subscription(
-            subscription_id, new_expiration_iso=new_iso
-        )
+        body = await gc.renew_subscription(subscription_id, new_expiration_iso=new_iso)
         return str(body.get("expirationDateTime") or new_iso)
     except GraphHTTPError as exc:
         logger.warning(
-            "Graph subscriptions.renew failed for account=%s "
-            "subscription=%s status=%s",
+            "Graph subscriptions.renew failed for account=%s subscription=%s status=%s",
             account.id,
             subscription_id,
             exc.status_code,
@@ -215,7 +207,7 @@ def assert_client_state(notification: dict, *, expected: str) -> None:
 
 async def find_account_by_subscription_id(
     session: AsyncSession, subscription_id: str
-) -> Optional[EmailAccount]:
+) -> EmailAccount | None:
     """Resolve an inbound notification's subscriptionId to the
     `email_accounts` row. We store Graph subscription ids in
     `email_accounts.sync_cursor` — same column reused for Gmail's
@@ -247,9 +239,7 @@ async def find_account_by_subscription_id(
         LIMIT 1
         """
     )
-    row = (
-        await session.execute(sql, {"sub_id": subscription_id})
-    ).mappings().first()
+    row = (await session.execute(sql, {"sub_id": subscription_id})).mappings().first()
     if row is None:
         return None
     from src.app.core.email.models import (

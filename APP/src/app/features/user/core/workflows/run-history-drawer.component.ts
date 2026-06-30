@@ -15,11 +15,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  WorkflowRunRead,
-  WorkflowStepRunRead,
-  WorkflowsApiService,
-} from './workflows-api.service';
+import { WorkflowRunRead, WorkflowStepRunRead, WorkflowsApiService } from './workflows-api.service';
 
 /**
  * Right-anchored side drawer that lists the most recent runs of a
@@ -33,7 +29,6 @@ import {
  */
 
 const PAGE_SIZE = 50;
-
 
 @Component({
   selector: 'app-workflow-run-history-drawer',
@@ -144,9 +139,7 @@ export class RunHistoryDrawerComponent {
         error: (err: HttpErrorResponse) => {
           this.runs.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load run history.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load run history.');
         },
       });
   }
@@ -165,9 +158,7 @@ export class RunHistoryDrawerComponent {
         error: (err: HttpErrorResponse) => {
           this.steps.set([]);
           this.stepsLoading.set(false);
-          this.stepsError.set(
-            extractApiError(err) ?? 'Could not load steps for this run.',
-          );
+          this.stepsError.set(extractApiError(err) ?? 'Could not load steps for this run.');
         },
       });
   }

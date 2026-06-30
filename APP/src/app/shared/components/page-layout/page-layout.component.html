@@ -37,7 +37,11 @@
         <span class="page-layout__record-count">{{ dataCount() }} record(s)</span>
       </div>
       <div class="page-layout__table-actions">
-        <button mat-icon-button (click)="toggleFilters()" [attr.aria-label]="showFilters() ? 'Hide filters' : 'Show filters'">
+        <button
+          mat-icon-button
+          (click)="toggleFilters()"
+          [attr.aria-label]="showFilters() ? 'Hide filters' : 'Show filters'"
+        >
           <mat-icon>{{ showFilters() ? 'filter_list_off' : 'filter_list' }}</mat-icon>
         </button>
         @if (showExport()) {
@@ -57,7 +61,12 @@
         }
         <tbody>
           @for (item of data(); track $index) {
-            <ng-container *ngTemplateOutlet="tableBodyTemplate()!; context: { $implicit: item, srNo: getSrNo($index) }" />
+            <ng-container
+              *ngTemplateOutlet="
+                tableBodyTemplate()!;
+                context: { $implicit: item, srNo: getSrNo($index) }
+              "
+            />
           } @empty {
             <tr>
               <td colspan="999" class="page-layout__empty">No records found</td>

@@ -16,6 +16,7 @@ Tenant isolation is *not* enforced here — it is enforced by:
 That means callers can use this repository with a plain model class and
 the right rows surface based on the active `RequestContext`.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -37,15 +38,11 @@ class Repository(Generic[T]):
         self.model = model
 
     async def get(self, id: uuid.UUID) -> T | None:
-        result = await self.session.execute(
-            select(self.model).where(self.model.id == id)
-        )
+        result = await self.session.execute(select(self.model).where(self.model.id == id))
         return result.scalar_one_or_none()
 
     async def list(self, *, limit: int = 50, offset: int = 0) -> list[T]:
-        result = await self.session.execute(
-            select(self.model).limit(limit).offset(offset)
-        )
+        result = await self.session.execute(select(self.model).limit(limit).offset(offset))
         return list(result.scalars().all())
 
     async def create(self, **kwargs: Any) -> T:

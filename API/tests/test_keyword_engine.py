@@ -17,6 +17,7 @@ Cases:
   9. Schema rejects > 200-char regex keyword.
  10. Schema rejects > 10 actions per rule.
 """
+
 from __future__ import annotations
 
 import time

@@ -21,10 +21,11 @@ direct `TestSession` insert for the Subscription row so each test
 controls plan / status / dates without round-tripping through the
 signup hook.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -33,8 +34,8 @@ from src.app.core.subscriptions.usage_service import RESOURCE_PERIOD_KIND
 from src.app.core.tenants.models import Organization
 from src.app.core.users.models import OrganizationMember
 from src.app.shared.security.password import hash_password
-from src.models.user import UserInfo as LegacyUserInfo, UserLogin
-
+from src.models.user import UserInfo as LegacyUserInfo
+from src.models.user import UserLogin
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -68,7 +69,7 @@ async def _insert_subscription(
     """Insert a Subscription row directly. Returns its id."""
     from tests.conftest import TestSession
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     cps = current_period_start or trial_started_at or now
     cpe = current_period_end or trial_ends_at or (now + timedelta(days=30))
 
@@ -93,9 +94,7 @@ async def _insert_subscription(
         return sub.id
 
 
-async def _add_extra_members(
-    org_id: uuid.UUID, role_id: uuid.UUID, count: int
-) -> None:
+async def _add_extra_members(org_id: uuid.UUID, role_id: uuid.UUID, count: int) -> None:
     """Add `count` extra active members to the org.
 
     The members get unique login handles + emails; they need rows in
@@ -136,7 +135,7 @@ async def _add_extra_members(
 
 
 def _trial_window(days: int = 14) -> tuple[datetime, datetime]:
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     return now, now + timedelta(days=days)
 
 
@@ -209,7 +208,7 @@ async def test_basic_org_returns_non_trial_response(layered_client, seeded_admin
     org = seeded_admin["org"]
     user = seeded_admin["user"]
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="basic",
@@ -276,13 +275,13 @@ async def test_seats_in_use_reflects_active_members(layered_client, seeded_admin
 
 @pytest.mark.asyncio
 async def test_usage_reflects_counters(layered_client, seeded_admin):
-    from tests.conftest import TestSession
     from src.app.core.subscriptions import usage_service
+    from tests.conftest import TestSession
 
     org = seeded_admin["org"]
     user = seeded_admin["user"]
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="basic",
@@ -356,16 +355,12 @@ async def test_cross_org_isolation(layered_client, seeded_admin):
     org_b_id = uuid.uuid4()
     async with TestSession() as session:
         session.add(
-            Organization(
-                id=org_b_id, name="Other Co", slug=f"other-{uuid.uuid4().hex[:6]}"
-            )
+            Organization(id=org_b_id, name="Other Co", slug=f"other-{uuid.uuid4().hex[:6]}")
         )
         await session.commit()
 
     sub_a_id = await _insert_subscription(org_a.id, plan_code="basic", status="active")
-    sub_b_id = await _insert_subscription(
-        org_b_id, plan_code="standard", status="active"
-    )
+    sub_b_id = await _insert_subscription(org_b_id, plan_code="standard", status="active")
     assert sub_a_id != sub_b_id
 
     token = await _login(
@@ -422,7 +417,7 @@ async def test_read_only_status_surfaces_flag(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="trial",
@@ -497,7 +492,7 @@ async def test_days_remaining_floors_at_zero(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="trial",

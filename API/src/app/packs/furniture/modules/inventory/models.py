@@ -21,6 +21,7 @@ This is the first Layer-2 (pack) module to touch the database.
 The `fp_` prefix lets a `DROP DATABASE` cleanly separate platform
 state from vertical-pack state in dev.
 """
+
 from __future__ import annotations
 
 import enum
@@ -48,10 +49,10 @@ from src.app.shared.orm import TenantScoped
 
 
 class MovementType(str, enum.Enum):
-    receipt = "receipt"      # +qty, e.g. PO arrival
-    dispatch = "dispatch"    # -qty, e.g. sale / delivery
-    adjust = "adjust"        # +/-qty, e.g. damage / cycle count correction
-    transfer = "transfer"    # -qty here (caller pairs with a receipt elsewhere)
+    receipt = "receipt"  # +qty, e.g. PO arrival
+    dispatch = "dispatch"  # -qty, e.g. sale / delivery
+    adjust = "adjust"  # +/-qty, e.g. damage / cycle count correction
+    transfer = "transfer"  # -qty here (caller pairs with a receipt elsewhere)
 
 
 class AlertSeverity(str, enum.Enum):
@@ -95,9 +96,7 @@ fp_alert_status_enum = ENUM(
 
 class Warehouse(Base, TenantScoped):
     __tablename__ = "tbl_fp_warehouses"
-    __table_args__ = (
-        UniqueConstraint("org_id", "name", name="uq_fp_warehouses_org_name"),
-    )
+    __table_args__ = (UniqueConstraint("org_id", "name", name="uq_fp_warehouses_org_name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -143,7 +142,9 @@ class InventoryItem(Base, TenantScoped):
             name="ck_fp_inventory_items_reorder_nonneg",
         ),
         UniqueConstraint(
-            "org_id", "warehouse_id", "sku",
+            "org_id",
+            "warehouse_id",
+            "sku",
             name="uq_fp_inventory_items_warehouse_sku",
         ),
         Index("ix_fp_inventory_items_warehouse", "warehouse_id"),
@@ -174,12 +175,8 @@ class InventoryItem(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("'{}'::jsonb"),
     )
-    qty_on_hand: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=sql_text("0")
-    )
-    qty_reserved: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=sql_text("0")
-    )
+    qty_on_hand: Mapped[int] = mapped_column(Integer, nullable=False, server_default=sql_text("0"))
+    qty_reserved: Mapped[int] = mapped_column(Integer, nullable=False, server_default=sql_text("0"))
     reorder_level: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=sql_text("0")
     )
@@ -231,19 +228,13 @@ class InventoryMovement(Base, TenantScoped):
         ForeignKey("tbl_fp_inventory_items.id", ondelete="CASCADE"),
         nullable=False,
     )
-    type: Mapped[MovementType] = mapped_column(
-        fp_movement_type_enum, nullable=False
-    )
+    type: Mapped[MovementType] = mapped_column(fp_movement_type_enum, nullable=False)
     # Signed delta applied to `qty_on_hand`. The service computes the
     # sign from `type` so callers always pass a positive `qty`
     # (except `adjust`, which can be negative).
     qty: Mapped[int] = mapped_column(Integer, nullable=False)
-    reference_type: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
-    reference_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    reference_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reference_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
@@ -276,9 +267,7 @@ class StockAlert(Base, TenantScoped):
         ForeignKey("tbl_fp_inventory_items.id", ondelete="CASCADE"),
         nullable=False,
     )
-    severity: Mapped[AlertSeverity] = mapped_column(
-        fp_alert_severity_enum, nullable=False
-    )
+    severity: Mapped[AlertSeverity] = mapped_column(fp_alert_severity_enum, nullable=False)
     priority: Mapped[AlertPriority] = mapped_column(
         fp_alert_priority_enum,
         nullable=False,
@@ -297,6 +286,4 @@ class StockAlert(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("now()"),
     )
-    closed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

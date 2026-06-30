@@ -32,12 +32,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  FormBuilder,
-  FormControl,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
@@ -52,7 +47,6 @@ import {
   EmailTemplatesApiService,
 } from '../../services/email-templates-api.service';
 
-
 /** A row in the builder's signal-driven step list. `template_id` is
  *  the saved template's id; `template_name` mirrors the saved name
  *  for display only (avoids re-fetching per row when editing). */
@@ -61,7 +55,6 @@ interface BuilderStep {
   template_name: string | null;
   delay_days: number;
 }
-
 
 @Component({
   selector: 'app-sequence-builder',
@@ -129,11 +122,7 @@ export class SequenceBuilderComponent implements OnInit {
     if (id !== null) this._loadSequence(id);
 
     this.templateSearchCtrl.valueChanges
-      .pipe(
-        debounceTime(250),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef),
-      )
+      .pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe((q) => this._searchTemplates(q.trim()));
   }
 
@@ -161,11 +150,7 @@ export class SequenceBuilderComponent implements OnInit {
 
   setDelay(index: number, value: number): void {
     const safe = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
-    this.steps.update((rows) =>
-      rows.map((r, i) =>
-        i === index ? { ...r, delay_days: safe } : r,
-      ),
-    );
+    this.steps.update((rows) => rows.map((r, i) => (i === index ? { ...r, delay_days: safe } : r)));
   }
 
   // --- Template picker --------------------------------------------
@@ -261,25 +246,18 @@ export class SequenceBuilderComponent implements OnInit {
 
     const id = this.sequenceId();
     const request$ =
-      id === null
-        ? this.api.createSequence(payload)
-        : this.api.updateSequence(id, payload);
+      id === null ? this.api.createSequence(payload) : this.api.updateSequence(id, payload);
 
-    request$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (saved) => {
-          this.submitting.set(false);
-          this.router.navigate([
-            '/user/settings/email-sequences',
-            saved.id,
-          ]);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.submitting.set(false);
-          this.submitError.set(extractApiError(err));
-        },
-      });
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (saved) => {
+        this.submitting.set(false);
+        this.router.navigate(['/user/settings/email-sequences', saved.id]);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.submitting.set(false);
+        this.submitError.set(extractApiError(err));
+      },
+    });
   }
 
   // --- Loaders ----------------------------------------------------
@@ -297,9 +275,7 @@ export class SequenceBuilderComponent implements OnInit {
           // Translate the saved step rows into BuilderSteps. We fetch
           // the matching template name in a single bulk call so the
           // builder doesn't render bare uuids.
-          const templateIds = Array.from(
-            new Set(row.steps.map((s) => s.template_id)),
-          );
+          const templateIds = Array.from(new Set(row.steps.map((s) => s.template_id)));
           this.steps.set(
             row.steps
               .slice()
@@ -330,11 +306,7 @@ export class SequenceBuilderComponent implements OnInit {
         .subscribe({
           next: (t) => {
             this.steps.update((rows) =>
-              rows.map((r) =>
-                r.template_id === id
-                  ? { ...r, template_name: t.name }
-                  : r,
-              ),
+              rows.map((r) => (r.template_id === id ? { ...r, template_name: t.name } : r)),
             );
           },
           error: () => {

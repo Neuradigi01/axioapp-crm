@@ -14,11 +14,11 @@ appointment, catalog_item). Packs register their own entities through
 the same `register(...)` function — Rule 1 holds (`core/` never imports
 `packs/`).
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
-
 
 FieldType = Literal[
     "text",
@@ -84,9 +84,7 @@ class StandardFieldDef:
         if not self.entity or not self.entity.replace("_", "").isalnum():
             raise ValueError(f"entity {self.entity!r} must be snake_case alphanumeric")
         if not self.field_key or not self.field_key.replace("_", "").isalnum():
-            raise ValueError(
-                f"field_key {self.field_key!r} must be snake_case alphanumeric"
-            )
+            raise ValueError(f"field_key {self.field_key!r} must be snake_case alphanumeric")
 
         unknown = self.overridable_props - _VALID_PROPS
         if unknown:
@@ -275,9 +273,7 @@ register(
         default_display_order=4,
         backend_required=False,
         backend_validators=(),
-        overridable_props=frozenset(
-            {"label", "placeholder", "help", "hidden", "display_order"}
-        ),
+        overridable_props=frozenset({"label", "placeholder", "help", "hidden", "display_order"}),
     )
 )
 
@@ -588,9 +584,7 @@ register(
         default_display_order=4,
         backend_required=False,
         backend_validators=("must be an active org member",),
-        overridable_props=frozenset(
-            {"label", "help", "required", "hidden", "display_order"}
-        ),
+        overridable_props=frozenset({"label", "help", "required", "hidden", "display_order"}),
     )
 )
 
@@ -796,8 +790,6 @@ register(
         default_display_order=4,
         backend_required=False,
         backend_validators=(),
-        overridable_props=frozenset(
-            {"label", "help", "hidden", "display_order"}
-        ),
+        overridable_props=frozenset({"label", "help", "hidden", "display_order"}),
     )
 )

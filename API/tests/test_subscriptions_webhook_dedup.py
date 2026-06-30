@@ -9,6 +9,7 @@ every test runs against an in-memory `AsyncMock` that returns
 pre-built event dicts. The webhook endpoint is unauthenticated, so
 no JWT setup is needed.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -22,7 +23,6 @@ from src.app.core.subscriptions.providers.stripe_provider import (
     InvalidWebhookSignature,
 )
 from src.app.core.subscriptions.webhooks import router as webhook_router_module
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -66,13 +66,12 @@ def override_provider(layered_client, mock_provider):
 
 @pytest.mark.asyncio
 async def test_bad_signature_returns_400_and_no_row(
-    layered_client, override_provider,
+    layered_client,
+    override_provider,
 ):
     from tests.conftest import TestSession
 
-    override_provider.verify_webhook.side_effect = InvalidWebhookSignature(
-        "bad sig"
-    )
+    override_provider.verify_webhook.side_effect = InvalidWebhookSignature("bad sig")
 
     resp = await layered_client.post(
         "/api/v1/webhooks/stripe",
@@ -84,9 +83,7 @@ async def test_bad_signature_returns_400_and_no_row(
 
     # No ledger row written on signature failure.
     async with TestSession() as session:
-        count = (
-            await session.execute(select(StripeWebhookEvent))
-        ).all()
+        count = (await session.execute(select(StripeWebhookEvent))).all()
     assert count == []
 
 
@@ -97,12 +94,14 @@ async def test_bad_signature_returns_400_and_no_row(
 
 @pytest.mark.asyncio
 async def test_first_event_is_persisted_and_marked_processed(
-    layered_client, override_provider,
+    layered_client,
+    override_provider,
 ):
     from tests.conftest import TestSession
 
     override_provider.verify_webhook.return_value = _make_event(
-        "evt_first", "checkout.session.completed",
+        "evt_first",
+        "checkout.session.completed",
     )
 
     resp = await layered_client.post(
@@ -118,9 +117,7 @@ async def test_first_event_is_persisted_and_marked_processed(
     async with TestSession() as session:
         row = (
             await session.execute(
-                select(StripeWebhookEvent).where(
-                    StripeWebhookEvent.stripe_event_id == "evt_first"
-                )
+                select(StripeWebhookEvent).where(StripeWebhookEvent.stripe_event_id == "evt_first")
             )
         ).scalar_one()
         assert row.event_type == "checkout.session.completed"
@@ -136,12 +133,14 @@ async def test_first_event_is_persisted_and_marked_processed(
 
 @pytest.mark.asyncio
 async def test_replay_is_idempotent_single_row(
-    layered_client, override_provider,
+    layered_client,
+    override_provider,
 ):
     from tests.conftest import TestSession
 
     override_provider.verify_webhook.return_value = _make_event(
-        "evt_replay", "invoice.paid",
+        "evt_replay",
+        "invoice.paid",
     )
 
     first = await layered_client.post(
@@ -162,12 +161,16 @@ async def test_replay_is_idempotent_single_row(
 
     async with TestSession() as session:
         rows = (
-            await session.execute(
-                select(StripeWebhookEvent).where(
-                    StripeWebhookEvent.stripe_event_id == "evt_replay"
+            (
+                await session.execute(
+                    select(StripeWebhookEvent).where(
+                        StripeWebhookEvent.stripe_event_id == "evt_replay"
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     assert len(rows) == 1
 
 
@@ -178,7 +181,9 @@ async def test_replay_is_idempotent_single_row(
 
 @pytest.mark.asyncio
 async def test_handler_exception_persists_error_and_returns_500(
-    layered_client, override_provider, monkeypatch,
+    layered_client,
+    override_provider,
+    monkeypatch,
 ):
     """If a registered handler raises, the row's `error` is filled,
     `processed_at` stays NULL so Stripe's retry re-runs it, and the
@@ -192,11 +197,14 @@ async def test_handler_exception_persists_error_and_returns_500(
     # module-level dispatch table so the test is hermetic — restore
     # is via monkeypatch.
     monkeypatch.setitem(
-        webhook_router_module._HANDLERS, "test.boom", boom,
+        webhook_router_module._HANDLERS,
+        "test.boom",
+        boom,
     )
 
     override_provider.verify_webhook.return_value = _make_event(
-        "evt_boom", "test.boom",
+        "evt_boom",
+        "test.boom",
     )
 
     resp = await layered_client.post(
@@ -209,9 +217,7 @@ async def test_handler_exception_persists_error_and_returns_500(
     async with TestSession() as session:
         row = (
             await session.execute(
-                select(StripeWebhookEvent).where(
-                    StripeWebhookEvent.stripe_event_id == "evt_boom"
-                )
+                select(StripeWebhookEvent).where(StripeWebhookEvent.stripe_event_id == "evt_boom")
             )
         ).scalar_one()
         assert row.processed_at is None
@@ -226,7 +232,8 @@ async def test_handler_exception_persists_error_and_returns_500(
 
 @pytest.mark.asyncio
 async def test_missing_event_id_returns_400(
-    layered_client, override_provider,
+    layered_client,
+    override_provider,
 ):
     from tests.conftest import TestSession
 
@@ -244,9 +251,7 @@ async def test_missing_event_id_returns_400(
     assert resp.json()["error"] == "missing_event_id"
 
     async with TestSession() as session:
-        count = (
-            await session.execute(select(StripeWebhookEvent))
-        ).all()
+        count = (await session.execute(select(StripeWebhookEvent))).all()
     assert count == []
 
 

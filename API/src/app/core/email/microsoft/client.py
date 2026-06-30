@@ -23,10 +23,11 @@ the daemon (Step 4) can defer.
 `http_client` is injectable for tests; production callers pass
 None and get a fresh httpx client per call.
 """
+
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from fastapi import HTTPException, status
@@ -34,7 +35,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.email import service as email_service
 from src.app.core.email.models import EmailAccount, EmailAccountSyncState
-
 
 _API_BASE = "https://graph.microsoft.com/v1.0"
 _HTTP_TIMEOUT = 30.0
@@ -62,15 +62,12 @@ class GraphClient:
         *,
         account: EmailAccount,
         session: AsyncSession,
-        http_client: Optional[httpx.AsyncClient] = None,
+        http_client: httpx.AsyncClient | None = None,
     ) -> None:
         if account.sync_state == EmailAccountSyncState.disconnected:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"email_account {account.id} is disconnected — "
-                    "reconnect required."
-                ),
+                detail=(f"email_account {account.id} is disconnected — reconnect required."),
             )
         self._account = account
         self._session = session
@@ -81,10 +78,10 @@ class GraphClient:
     async def list_messages(
         self,
         *,
-        filter_expr: Optional[str] = None,
-        select: Optional[str] = None,
+        filter_expr: str | None = None,
+        select: str | None = None,
         top: int = 50,
-        order_by: Optional[str] = None,
+        order_by: str | None = None,
     ) -> dict:
         """`GET /me/messages` with `$filter` / `$select` / `$top`.
         Used by backfill. Returns the decoded JSON `{value: [...],
@@ -102,7 +99,7 @@ class GraphClient:
     async def list_messages_delta(
         self,
         *,
-        select: Optional[str] = None,
+        select: str | None = None,
         top: int = 50,
     ) -> dict:
         """`GET /me/messages/delta` — initial delta call to seed the
@@ -124,9 +121,7 @@ class GraphClient:
         """`GET /me/messages/{id}/$value` — returns the raw MIME
         bytes (RFC 822). Used by Step 5's adapter when persisting
         a matched message."""
-        return await self._request_bytes(
-            "GET", f"/me/messages/{message_id}/$value"
-        )
+        return await self._request_bytes("GET", f"/me/messages/{message_id}/$value")
 
     async def send_raw(self, *, raw_b64: str) -> None:
         """`POST /me/sendMail` with `Content-Type: text/plain` and
@@ -149,13 +144,9 @@ class GraphClient:
         subscription. `payload` includes `changeType`,
         `notificationUrl`, `resource`, `expirationDateTime`,
         `clientState`. Returns Graph's subscription object."""
-        return await self._request(
-            "POST", "/subscriptions", json=payload
-        )
+        return await self._request("POST", "/subscriptions", json=payload)
 
-    async def renew_subscription(
-        self, subscription_id: str, *, new_expiration_iso: str
-    ) -> dict:
+    async def renew_subscription(self, subscription_id: str, *, new_expiration_iso: str) -> dict:
         """`PATCH /subscriptions/{id}` — extends `expirationDateTime`.
         Mail subscriptions max out at 3 days; renew every 2."""
         return await self._request(
@@ -179,9 +170,7 @@ class GraphClient:
 
     # --- Private -------------------------------------------------------
 
-    async def _get(
-        self, path: str, *, params: Optional[dict] = None
-    ) -> dict:
+    async def _get(self, path: str, *, params: dict | None = None) -> dict:
         return await self._request("GET", path, params=params)
 
     async def _request(
@@ -190,9 +179,9 @@ class GraphClient:
         path: str | None = None,
         *,
         absolute_url: str | None = None,
-        params: Optional[dict] = None,
-        json: Optional[dict] = None,
-        raw_body: Optional[bytes] = None,
+        params: dict | None = None,
+        json: dict | None = None,
+        raw_body: bytes | None = None,
         content_type: str = "application/json",
         expect_json: bool = True,
     ) -> dict:
@@ -214,9 +203,7 @@ class GraphClient:
             )
             if response.status_code == 429 and attempt < _MAX_429_RETRIES:
                 # Honour Retry-After when present; fall back to default.
-                retry_after = _parse_retry_after(
-                    response.headers.get("retry-after")
-                )
+                retry_after = _parse_retry_after(response.headers.get("retry-after"))
                 await asyncio.sleep(retry_after)
                 attempt += 1
                 continue
@@ -257,9 +244,9 @@ class GraphClient:
         url: str,
         *,
         headers: dict,
-        params: Optional[dict] = None,
-        json: Optional[dict] = None,
-        raw_body: Optional[bytes] = None,
+        params: dict | None = None,
+        json: dict | None = None,
+        raw_body: bytes | None = None,
     ) -> httpx.Response:
         try:
             if self._http is not None:
@@ -284,13 +271,11 @@ class GraphClient:
             raise GraphHTTPError(0, f"transport error: {exc}") from exc
 
     async def _access_token(self) -> str:
-        tokens = await email_service.refresh_if_expired(
-            self._session, account=self._account
-        )
+        tokens = await email_service.refresh_if_expired(self._session, account=self._account)
         return tokens.access_token
 
 
-def _parse_retry_after(header_value: Optional[str]) -> float:
+def _parse_retry_after(header_value: str | None) -> float:
     """Graph sends `Retry-After` as either a number of seconds or
     an HTTP date. We only honour the seconds form (the common one);
     HTTP date falls back to default."""

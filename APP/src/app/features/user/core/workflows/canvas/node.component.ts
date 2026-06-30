@@ -10,12 +10,8 @@ import {
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
-import {
-  CanvasNode,
-  CanvasStateService,
-} from './canvas-state.service';
+import { CanvasNode, CanvasStateService } from './canvas-state.service';
 import { getNodeType, WorkflowNodeType } from './node-type-registry';
-
 
 /**
  * Single canvas node — type-agnostic. Renders the rounded card with
@@ -39,7 +35,6 @@ import { getNodeType, WorkflowNodeType } from './node-type-registry';
 export const NODE_WIDTH = 220;
 export const NODE_HEIGHT = 110;
 export const NODE_HEADER = 30;
-
 
 @Component({
   selector: '[appWorkflowNode]',
@@ -84,21 +79,11 @@ export const NODE_HEADER = 30;
         ry="10"
         class="fill-white/60 stroke-transparent"
       />
-      <svg:rect
-        [attr.width]="WIDTH"
-        height="1"
-        [attr.y]="HEADER"
-        class="fill-zinc-200"
-      />
+      <svg:rect [attr.width]="WIDTH" height="1" [attr.y]="HEADER" class="fill-zinc-200" />
 
       <svg:foreignObject [attr.width]="WIDTH" [attr.height]="HEADER" x="0" y="0">
-        <div
-          class="flex items-center gap-2 px-3 h-full text-xs font-semibold text-zinc-700"
-        >
-          <lucide-icon
-            [name]="icon()"
-            class="w-3.5 h-3.5 text-zinc-600"
-          ></lucide-icon>
+        <div class="flex items-center gap-2 px-3 h-full text-xs font-semibold text-zinc-700">
+          <lucide-icon [name]="icon()" class="w-3.5 h-3.5 text-zinc-600"></lucide-icon>
           <span class="truncate flex-1">{{ displayName() }}</span>
           @if (validationFailed()) {
             <span
@@ -133,12 +118,7 @@ export const NODE_HEADER = 30;
       </svg:foreignObject>
 
       @if (menuOpen()) {
-        <svg:foreignObject
-          [attr.x]="WIDTH - 130"
-          [attr.y]="28"
-          width="130"
-          height="100"
-        >
+        <svg:foreignObject [attr.x]="WIDTH - 130" [attr.y]="28" width="130" height="100">
           <div
             class="bg-white border border-zinc-200 rounded-lg shadow-lg overflow-hidden text-xs"
             (mousedown)="$event.stopPropagation()"
@@ -181,13 +161,7 @@ export const NODE_HEADER = 30;
 
       @for (port of outputs(); track port.label || $index; let i = $index) {
         <svg:g
-          [attr.transform]="
-            'translate(' +
-            outputPortX(i, outputs().length) +
-            ',' +
-            HEIGHT +
-            ')'
-          "
+          [attr.transform]="'translate(' + outputPortX(i, outputs().length) + ',' + HEIGHT + ')'"
         >
           <svg:circle
             cx="0"
@@ -197,12 +171,7 @@ export const NODE_HEADER = 30;
             (mousedown)="onOutputDown($event, port.label)"
           />
           @if (port.display !== 'out') {
-            <svg:text
-              x="0"
-              y="20"
-              text-anchor="middle"
-              class="fill-zinc-500 text-[10px]"
-            >
+            <svg:text x="0" y="20" text-anchor="middle" class="fill-zinc-500 text-[10px]">
               {{ port.display }}
             </svg:text>
           }
@@ -231,9 +200,7 @@ export class WorkflowNodeComponent {
   private readonly state = inject(CanvasStateService);
   readonly menuOpen = signal(false);
 
-  readonly nodeType = computed<WorkflowNodeType | undefined>(() =>
-    getNodeType(this.node().type),
-  );
+  readonly nodeType = computed<WorkflowNodeType | undefined>(() => getNodeType(this.node().type));
 
   readonly outputs = computed(() => this.nodeType()?.outputs ?? []);
   readonly hasInputPort = computed(() => (this.nodeType()?.inputPorts ?? 1) > 0);
@@ -247,9 +214,7 @@ export class WorkflowNodeComponent {
     return this.nodeType()?.label ?? this.node().type;
   });
   readonly description = computed(() => this.nodeType()?.description ?? '');
-  readonly bodyClass = computed(
-    () => this.nodeType()?.colorClass ?? 'bg-zinc-50 border-zinc-300',
-  );
+  readonly bodyClass = computed(() => this.nodeType()?.colorClass ?? 'bg-zinc-50 border-zinc-300');
   readonly transform = computed(() => {
     const pos = this.node().position ?? { x: 0, y: 0 };
     return `translate(${pos.x}, ${pos.y})`;

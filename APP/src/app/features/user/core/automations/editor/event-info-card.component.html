@@ -16,7 +16,10 @@
       }
     </button>
     @if (expanded()) {
-      <pre class="mt-1 overflow-x-auto rounded bg-white px-2 py-1.5 font-mono text-[11px] leading-snug text-zinc-700 ring-1 ring-zinc-200">{{ samplePayloadJson() }}</pre>
+      <pre
+        class="mt-1 overflow-x-auto rounded bg-white px-2 py-1.5 font-mono text-[11px] leading-snug text-zinc-700 ring-1 ring-zinc-200"
+        >{{ samplePayloadJson() }}</pre
+      >
       <p class="mt-1 text-[10px] text-zinc-500">
         Reference any path above in conditions or templates — e.g.
         <code class="rounded bg-zinc-100 px-1 font-mono">contact.email</code>.

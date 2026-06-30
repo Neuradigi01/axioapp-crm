@@ -34,14 +34,18 @@
         <h2 class="text-sm font-semibold">Live value</h2>
         <span
           class="rounded-full px-2 py-0.5 text-xs font-medium ring-1"
-          [class]="valid()
-            ? 'bg-emerald-500/20 text-emerald-200 ring-emerald-500/40'
-            : 'bg-red-500/20 text-red-200 ring-red-500/40'"
+          [class]="
+            valid()
+              ? 'bg-emerald-500/20 text-emerald-200 ring-emerald-500/40'
+              : 'bg-red-500/20 text-red-200 ring-red-500/40'
+          "
         >
           {{ valid() ? 'valid' : 'invalid' }}
         </span>
       </div>
-      <pre class="overflow-x-auto rounded-md bg-zinc-950 p-4 text-xs leading-relaxed text-zinc-200"><code>{{ valuePreview }}</code></pre>
+      <pre
+        class="overflow-x-auto rounded-md bg-zinc-950 p-4 text-xs leading-relaxed text-zinc-200"
+      ><code>{{ valuePreview }}</code></pre>
     </section>
   </div>
 </div>

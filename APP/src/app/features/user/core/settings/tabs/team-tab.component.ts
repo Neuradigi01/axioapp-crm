@@ -9,11 +9,7 @@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
@@ -25,10 +21,7 @@ import {
   StaffDeactivateModalComponent,
 } from '../staff/staff-deactivate-modal.component';
 import { StaffWorkloadComponent } from '../staff/staff-workload.component';
-import {
-  InvitationRow,
-  InvitationsApiService,
-} from './invitations.service';
+import { InvitationRow, InvitationsApiService } from './invitations.service';
 
 interface UserRow {
   id: string;
@@ -67,12 +60,7 @@ interface RoleRow {
   selector: 'app-settings-team-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    DatePipe,
-    ReactiveFormsModule,
-    StaffDeactivateModalComponent,
-    StaffWorkloadComponent,
-  ],
+  imports: [DatePipe, ReactiveFormsModule, StaffDeactivateModalComponent, StaffWorkloadComponent],
   templateUrl: './team-tab.component.html',
 })
 export class TeamTabComponent {
@@ -152,9 +140,7 @@ export class TeamTabComponent {
   );
 
   /** Org name typed-confirmation gate. */
-  protected readonly currentOrgName = computed(
-    () => this.auth.currentOrg()?.name ?? '',
-  );
+  protected readonly currentOrgName = computed(() => this.auth.currentOrg()?.name ?? '');
 
   protected readonly canSubmitTransfer = computed(() => {
     if (this.transferSubmitting()) return false;
@@ -221,8 +207,7 @@ export class TeamTabComponent {
         next: () => {
           this.transferSubmitting.set(false);
           const targetEmail =
-            this.items().find((u) => u.id === raw.target_user_id)?.email ??
-            'the selected member';
+            this.items().find((u) => u.id === raw.target_user_id)?.email ?? 'the selected member';
           this.transferSuccess.set(
             `Ownership transferred to ${targetEmail}. Your role has changed.`,
           );
@@ -243,9 +228,7 @@ export class TeamTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.transferSubmitting.set(false);
-          this.transferError.set(
-            extractApiError(err) ?? 'Could not transfer ownership.',
-          );
+          this.transferError.set(extractApiError(err) ?? 'Could not transfer ownership.');
         },
       });
   }
@@ -277,7 +260,6 @@ export class TeamTabComponent {
   protected roleNameOf(user: UserRow): string {
     return this.roleNameById().get(user.role_id) ?? 'No role';
   }
-
 
   protected reloadInvitations(): void {
     this.invitationsError.set(null);
@@ -331,18 +313,14 @@ export class TeamTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.inviteSending.set(false);
-          this.inviteError.set(
-            extractApiError(err) ?? 'Could not send invitation.',
-          );
+          this.inviteError.set(extractApiError(err) ?? 'Could not send invitation.');
         },
       });
   }
 
   protected revokeInvite(invitation: InvitationRow): void {
     if (!this.canWrite() || this.revokingInviteId() !== null) return;
-    if (!window.confirm(
-      `Revoke invitation for ${invitation.email}?`,
-    )) {
+    if (!window.confirm(`Revoke invitation for ${invitation.email}?`)) {
       return;
     }
     this.revokingInviteId.set(invitation.id);
@@ -356,9 +334,7 @@ export class TeamTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.revokingInviteId.set(null);
-          this.invitationsError.set(
-            extractApiError(err) ?? 'Could not revoke invitation.',
-          );
+          this.invitationsError.set(extractApiError(err) ?? 'Could not revoke invitation.');
         },
       });
   }
@@ -406,9 +382,7 @@ export class TeamTabComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.items.update((rows) =>
-            rows.map((r) => (r.id === user.id ? updated : r)),
-          );
+          this.items.update((rows) => rows.map((r) => (r.id === user.id ? updated : r)));
           this.savingId.set(null);
           this.editingId.set(null);
         },
@@ -441,9 +415,7 @@ export class TeamTabComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.items.update((rows) =>
-            rows.map((r) => (r.id === user.id ? updated : r)),
-          );
+          this.items.update((rows) => rows.map((r) => (r.id === user.id ? updated : r)));
           this.savingId.set(null);
         },
         error: (err: HttpErrorResponse) => {
@@ -485,5 +457,4 @@ export class TeamTabComponent {
       is_active: u.is_active,
     })),
   );
-
 }

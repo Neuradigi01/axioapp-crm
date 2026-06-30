@@ -7,6 +7,7 @@ Register now creates the user + a placeholder organization with
 Distinct from the legacy `register_with_new_org` covered by other
 suites — this is the new self-signup stage 1.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -60,9 +61,7 @@ async def test_register_org_is_template_id_pending(layered_client):
 
     async with TestSession() as session:
         org = (
-            await session.execute(
-                select(Organization).where(Organization.id == org_id)
-            )
+            await session.execute(select(Organization).where(Organization.id == org_id))
         ).scalar_one()
         assert org.template_id == "pending"
         assert org.name == "Beta's Workspace"
@@ -88,9 +87,7 @@ async def test_register_creates_membership_and_user_info(layered_client):
     async with TestSession() as session:
         info = (
             await session.execute(
-                select(UserInfo).where(
-                    UserInfo.email == "founder3@onboarding-test.local"
-                )
+                select(UserInfo).where(UserInfo.email == "founder3@onboarding-test.local")
             )
         ).scalar_one()
         member = (
@@ -141,9 +138,7 @@ async def test_register_silently_ignores_legacy_org_name(layered_client):
     async with TestSession() as session:
         org = (
             await session.execute(
-                select(Organization).where(
-                    Organization.id == resp.json()["organization_id"]
-                )
+                select(Organization).where(Organization.id == resp.json()["organization_id"])
             )
         ).scalar_one()
         assert org.name == "Legacy's Workspace"
@@ -163,9 +158,7 @@ async def test_register_users_me_returns_needs_onboarding_true(layered_client):
     assert resp.status_code == 201, resp.text
     token = resp.json()["access_token"]
 
-    me = await layered_client.get(
-        "/api/v1/users/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    me = await layered_client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 200, me.text
     assert me.json()["needs_onboarding"] is True
     assert me.json()["org"]["template_id"] == "pending"

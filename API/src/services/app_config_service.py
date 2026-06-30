@@ -1,10 +1,17 @@
-from src.constants import messages
 from config import (
-    CAPTCHA_TYPE, EMAIL_ENABLED, SMS_ENABLED, CONTACT_VERIFICATION_MODE,
-    PUSH_NOTIFICATION_ENABLED, FIREBASE_API_KEY, FIREBASE_AUTH_DOMAIN,
-    FIREBASE_PROJECT_ID, FIREBASE_MESSAGING_SENDER_ID, FIREBASE_APP_ID,
+    CAPTCHA_TYPE,
+    CONTACT_VERIFICATION_MODE,
+    EMAIL_ENABLED,
+    FIREBASE_API_KEY,
+    FIREBASE_APP_ID,
+    FIREBASE_AUTH_DOMAIN,
+    FIREBASE_MESSAGING_SENDER_ID,
+    FIREBASE_PROJECT_ID,
     FIREBASE_VAPID_KEY,
+    PUSH_NOTIFICATION_ENABLED,
+    SMS_ENABLED,
 )
+from src.constants import messages
 
 
 def get_app_config() -> dict:
@@ -24,6 +31,8 @@ def get_app_config() -> dict:
                 "messaging_sender_id": FIREBASE_MESSAGING_SENDER_ID,
                 "app_id": FIREBASE_APP_ID,
                 "vapid_key": FIREBASE_VAPID_KEY,
-            } if PUSH_NOTIFICATION_ENABLED else None,
+            }
+            if PUSH_NOTIFICATION_ENABLED
+            else None,
         },
     }

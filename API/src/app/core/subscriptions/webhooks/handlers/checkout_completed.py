@@ -22,6 +22,7 @@ Raises if:
     the Step 2 backfill, but we'd rather 500 + retry than silently
     create a row from an arbitrary webhook.
 """
+
 from __future__ import annotations
 
 import logging
@@ -40,7 +41,8 @@ log = logging.getLogger(__name__)
 
 
 async def on_checkout_completed(
-    db: AsyncSession, event: dict[str, Any],
+    db: AsyncSession,
+    event: dict[str, Any],
 ) -> None:
     session_obj = event.get("data", {}).get("object", {}) or {}
     metadata = session_obj.get("metadata") or {}
@@ -60,8 +62,7 @@ async def on_checkout_completed(
         org_id = uuid.UUID(org_id_raw)
     except (ValueError, TypeError) as exc:
         raise ValueError(
-            f"checkout.session.completed metadata.org_id is not a UUID: "
-            f"{org_id_raw!r}"
+            f"checkout.session.completed metadata.org_id is not a UUID: {org_id_raw!r}"
         ) from exc
     seats = int(seats_raw)
     stripe_subscription_id = session_obj.get("subscription")
@@ -80,8 +81,7 @@ async def on_checkout_completed(
     ).scalar_one_or_none()
     if sub is None:
         raise ValueError(
-            f"No subscription row for org {org_id} — cannot apply "
-            "checkout.session.completed."
+            f"No subscription row for org {org_id} — cannot apply checkout.session.completed."
         )
 
     before = {
@@ -103,9 +103,7 @@ async def on_checkout_completed(
     if stripe_customer_id and not sub.stripe_customer_id:
         values["stripe_customer_id"] = stripe_customer_id
 
-    await db.execute(
-        update(Subscription).where(Subscription.id == sub.id).values(**values)
-    )
+    await db.execute(update(Subscription).where(Subscription.id == sub.id).values(**values))
     await db.commit()
 
     await audit.log(
@@ -124,9 +122,11 @@ async def on_checkout_completed(
         user_id=None,
     )
     log.info(
-        "Stripe Checkout completed → org %s flipped to active on plan %s/%s "
-        "(seats=%d)",
-        org_id, plan_code, billing_cycle, seats,
+        "Stripe Checkout completed → org %s flipped to active on plan %s/%s (seats=%d)",
+        org_id,
+        plan_code,
+        billing_cycle,
+        seats,
     )
 
     # Step 20 — welcome / upgrade email. `plan_changed` is the same

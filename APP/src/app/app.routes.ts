@@ -11,10 +11,7 @@ export const appRoutes: Routes = [
   },
   {
     path: getRoute('accounts').path,
-    loadChildren: () =>
-      import('./features/accounts/accounts.routes').then(
-        (m) => m.accountsRoutes
-      ),
+    loadChildren: () => import('./features/accounts/accounts.routes').then((m) => m.accountsRoutes),
   },
   {
     // Public marketing pricing page. Reachable without auth (peer of
@@ -23,10 +20,7 @@ export const appRoutes: Routes = [
     // "Start free trial" CTA forwards `plan` + `cycle` query params
     // into the signup flow.
     path: 'pricing',
-    loadComponent: () =>
-      import('./features/pricing/pricing.page').then(
-        (m) => m.PricingPage,
-      ),
+    loadComponent: () => import('./features/pricing/pricing.page').then((m) => m.PricingPage),
   },
   {
     // Meta-mandated public status page for Data Deletion Callback
@@ -36,9 +30,9 @@ export const appRoutes: Routes = [
     // periodically re-fetches it months after the original deletion.
     path: 'data-deletion-status',
     loadComponent: () =>
-      import(
-        './features/accounts/data-deletion-status.component'
-      ).then((m) => m.DataDeletionStatusComponent),
+      import('./features/accounts/data-deletion-status.component').then(
+        (m) => m.DataDeletionStatusComponent,
+      ),
   },
   {
     // Onboarding picker — landed on after self-signup, while the
@@ -54,23 +48,19 @@ export const appRoutes: Routes = [
   },
   {
     path: getRoute('user').path,
-    loadChildren: () =>
-      import('./features/user/user.routes').then((m) => m.userRoutes),
+    loadChildren: () => import('./features/user/user.routes').then((m) => m.userRoutes),
     canActivate: [furnitureAuthGuard],
   },
   {
     path: getRoute('admin').path,
-    loadChildren: () =>
-      import('./features/admin/admin.routes').then((m) => m.adminRoutes),
+    loadChildren: () => import('./features/admin/admin.routes').then((m) => m.adminRoutes),
     canActivate: [authGuard],
     data: { role: 'Admin' },
   },
   {
     path: 'staff-portal',
     loadChildren: () =>
-      import('./staff-portal/staff-portal.routes').then(
-        (m) => m.staffPortalRoutes,
-      ),
+      import('./staff-portal/staff-portal.routes').then((m) => m.staffPortalRoutes),
   },
   {
     path: '**',

@@ -22,9 +22,10 @@ Cases:
  10. ``_label_for_seconds`` returns "> 24 hr" for the catch-all.
  11. Distribution bucket list covers exactly the expected labels.
 """
+
 from __future__ import annotations
 
-from datetime import timedelta, timezone
+from datetime import UTC, timedelta
 
 import pytest
 
@@ -50,7 +51,7 @@ class TestResolveRange:
         assert abs(delta - timedelta(days=expected_days)) < timedelta(seconds=2)
         assert start.tzinfo is not None
         assert end.tzinfo is not None
-        assert start.utcoffset() == timezone.utc.utcoffset(None)
+        assert start.utcoffset() == UTC.utcoffset(None)
 
     def test_rejects_unknown(self):
         with pytest.raises(ValueError):
@@ -98,9 +99,7 @@ class TestPercentile:
 
     def test_unsorted_input_handled(self):
         # The helper sorts internally; result must be stable.
-        assert _percentile([50.0, 10.0, 30.0, 40.0, 20.0], 0.5) == pytest.approx(
-            30.0
-        )
+        assert _percentile([50.0, 10.0, 30.0, 40.0, 20.0], 0.5) == pytest.approx(30.0)
 
     def test_edges(self):
         samples = [10.0, 20.0, 30.0, 40.0, 50.0]

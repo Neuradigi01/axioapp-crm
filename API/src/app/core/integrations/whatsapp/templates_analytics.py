@@ -23,11 +23,12 @@ all reads to the active org via ``TenantScoped``.
 No SQL injection vectors: every input is a UUID or an int range
 clamped to the documented values.
 """
+
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from sqlalchemy import func, select
@@ -38,14 +39,12 @@ from src.app.core.campaigns.models import (
     CampaignMessage,
     CampaignMessageStatus,
 )
-from src.app.core.contacts.models import Contact
 from src.app.core.conversations.models import (
     Conversation,
     ConversationChannel,
     Message,
     MessageDirection,
 )
-
 
 RangeKey = Literal["7d", "30d", "90d"]
 
@@ -163,7 +162,7 @@ async def get_template_performance(
     The 0-bucket failure list signals "no failures yet" rather than
     "couldn't compute"."""
     days = _RANGE_TO_DAYS[range_key]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     range_start = now - timedelta(days=days)
 
     # All CampaignMessage rows that belong to a campaign using this
@@ -213,9 +212,7 @@ async def get_template_performance(
         if row.status == CampaignMessageStatus.failed:
             failed += 1
             bucket, label = _classify_failure(row.error)
-            slot = failures_counter.setdefault(
-                bucket, {"label": label, "count": 0}
-            )
+            slot = failures_counter.setdefault(bucket, {"label": label, "count": 0})
             slot["count"] += 1
 
         date_key = row.created_at.date().isoformat()
@@ -246,9 +243,7 @@ async def get_template_performance(
                     Message.id,
                     Message.attachments,
                 )
-                .join(
-                    Conversation, Conversation.id == Message.conversation_id
-                )
+                .join(Conversation, Conversation.id == Message.conversation_id)
                 .where(Conversation.channel == ConversationChannel.whatsapp)
                 .where(Conversation.contact_id.in_(contact_ids))
                 .where(Message.direction == MessageDirection.in_)
@@ -271,9 +266,7 @@ async def get_template_performance(
     # have I shipped this" number, not just the time-windowed slice).
     used_in_campaigns = (
         await session.execute(
-            select(func.count())
-            .select_from(Campaign)
-            .where(Campaign.template_id == template_id)
+            select(func.count()).select_from(Campaign).where(Campaign.template_id == template_id)
         )
     ).scalar_one() or 0
 

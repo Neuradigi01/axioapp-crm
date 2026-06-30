@@ -16,6 +16,7 @@ Consumers MUST NOT mutate the returned `Plan` objects. They are frozen
 Pydantic models; tests that need to override values should call
 `reload(path=...)` against a fixture YAML.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -24,32 +25,33 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
 # Every feature key permitted to appear under `features:` in any plan.
 # Adding a new key requires updating both this set and the YAML for every
 # plan that should grant it. Missing keys default to `False` at load
 # time; unknown keys cause a validation error at boot.
-KNOWN_FEATURE_KEYS: frozenset[str] = frozenset({
-    "contacts.read",
-    "contacts.write",
-    "leads.manual_entry",
-    "tasks.read",
-    "tasks.write",
-    "walkins.read",
-    "pipelines.read",
-    "automation.workflows",
-    "conversations.unified_inbox",
-    "integrations.whatsapp",
-    "integrations.email_imap_smtp",
-    "ads.google_webhook",
-    "ads.meta_webhook",
-    "calls.recording",
-    "campaigns.email",
-    "sso.saml",
-    "audit.full_log",
-    "multi_branch",
-    "white_label",
-})
+KNOWN_FEATURE_KEYS: frozenset[str] = frozenset(
+    {
+        "contacts.read",
+        "contacts.write",
+        "leads.manual_entry",
+        "tasks.read",
+        "tasks.write",
+        "walkins.read",
+        "pipelines.read",
+        "automation.workflows",
+        "conversations.unified_inbox",
+        "integrations.whatsapp",
+        "integrations.email_imap_smtp",
+        "ads.google_webhook",
+        "ads.meta_webhook",
+        "calls.recording",
+        "campaigns.email",
+        "sso.saml",
+        "audit.full_log",
+        "multi_branch",
+        "white_label",
+    }
+)
 
 # Caps with this value are interpreted as "no limit" by entitlement
 # checks. `Cap.is_unlimited(value)` is the canonical comparison.
@@ -115,10 +117,18 @@ class PlanCaps(BaseModel):
     sms_sends_per_month: int
 
     @field_validator(
-        "contacts", "leads_per_month", "storage_mb", "pipelines",
-        "custom_fields_per_entity", "form_widgets", "form_submissions_per_month",
-        "automation_runs_per_month", "api_calls_per_day", "branches",
-        "email_sends_per_month", "sms_sends_per_month",
+        "contacts",
+        "leads_per_month",
+        "storage_mb",
+        "pipelines",
+        "custom_fields_per_entity",
+        "form_widgets",
+        "form_submissions_per_month",
+        "automation_runs_per_month",
+        "api_calls_per_day",
+        "branches",
+        "email_sends_per_month",
+        "sms_sends_per_month",
     )
     @classmethod
     def _ge_minus_one(cls, v: int) -> int:
@@ -144,13 +154,9 @@ class PlanFeatures(BaseModel):
     walkins_read: bool = Field(False, alias="walkins.read")
     pipelines_read: bool = Field(False, alias="pipelines.read")
     automation_workflows: bool = Field(False, alias="automation.workflows")
-    conversations_unified_inbox: bool = Field(
-        False, alias="conversations.unified_inbox"
-    )
+    conversations_unified_inbox: bool = Field(False, alias="conversations.unified_inbox")
     integrations_whatsapp: bool = Field(False, alias="integrations.whatsapp")
-    integrations_email_imap_smtp: bool = Field(
-        False, alias="integrations.email_imap_smtp"
-    )
+    integrations_email_imap_smtp: bool = Field(False, alias="integrations.email_imap_smtp")
     ads_google_webhook: bool = Field(False, alias="ads.google_webhook")
     ads_meta_webhook: bool = Field(False, alias="ads.meta_webhook")
     calls_recording: bool = Field(False, alias="calls.recording")

@@ -58,9 +58,7 @@ export class BulkActionBarComponent {
    * from the current user's `currentPermissions` signal is filtered out. */
   protected readonly visibleActions = computed<BulkAction[]>(() => {
     const acts = this._actions();
-    return acts.filter(
-      (a) => !a.permissionKey || this.auth.hasPermission(a.permissionKey),
-    );
+    return acts.filter((a) => !a.permissionKey || this.auth.hasPermission(a.permissionKey));
   });
 
   protected readonly visible = computed(() => this._selectedCount() > 0);

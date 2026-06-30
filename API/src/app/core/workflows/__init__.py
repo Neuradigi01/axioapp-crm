@@ -32,6 +32,7 @@ carries ``org_id`` + RLS from day one (Rule 2). Cross-module reads
 go through the OWNING module's data_access (Rule from manager spec
 2026-06-25).
 """
+
 # tasks/workflows Step 5 — side-effect: register the universal
 # event-bus subscriber against every catalog event the moment the
 # workflows package is imported. The Step-4 engine then walks
@@ -46,28 +47,20 @@ register_subscribers()
 # action handlers so the engine resolves ``branch.if`` / ``branch.switch``
 # nodes without a special case. Import-only — the module's top-level
 # ``register()`` fires automatically.
-from src.app.core.workflows.actions import flow_control  # noqa: F401
-
 # tasks/workflows Step 7 — side-effect: register the seven Send
 # action handlers (email / WhatsApp / SMS / Facebook / Instagram /
 # push / Slack). Same import-only pattern as flow_control.
-from src.app.core.workflows.actions import send  # noqa: F401
-
 # tasks/workflows Step 8 — side-effect: register the nine Record
 # action handlers (update_contact_field / update_lead_field /
 # update_lead_stage / create_task / create_note / create_appointment /
 # create_quote / create_invoice / create_order). The quote + order
 # handlers are placeholders that raise ActionNotImplemented until
 # core/quotes + core/orders ship.
-from src.app.core.workflows.actions import records  # noqa: F401
-
 # tasks/workflows Step 9 — side-effect: register the five Routing
 # action handlers (round_robin / least_loaded / territory / skill /
 # specific_user). Round-robin pointer state lives on
 # ``tbl_org_settings.routing_state`` (column added by migration
 # 0138_org_settings_routing_state).
-from src.app.core.workflows.actions import routing  # noqa: F401
-
 # tasks/workflows Step 10 — side-effect: register the five tagging
 # handlers (add_tag / remove_tag / add_to_list / remove_from_list /
 # set_lead_score) and the eight lifecycle handlers (mark_converted /
@@ -76,5 +69,11 @@ from src.app.core.workflows.actions import routing  # noqa: F401
 # remove_from_sequence). add_to_list / remove_from_list /
 # block_contact / archive_contact are placeholders that raise
 # ActionNotImplemented until the underlying CRM modules ship.
-from src.app.core.workflows.actions import tagging  # noqa: F401
-from src.app.core.workflows.actions import lifecycle  # noqa: F401
+from src.app.core.workflows.actions import (
+    flow_control,  # noqa: F401
+    lifecycle,  # noqa: F401
+    records,  # noqa: F401
+    routing,  # noqa: F401
+    send,  # noqa: F401
+    tagging,  # noqa: F401
+)

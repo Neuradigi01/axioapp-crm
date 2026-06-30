@@ -7,10 +7,11 @@ the SubscriptionStateMiddleware (Step 10) blocks subsequent writes.
 
 Idempotent: a redelivery for an already-`cancelled` row is a no-op.
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import update
@@ -26,7 +27,8 @@ log = logging.getLogger(__name__)
 
 
 async def on_subscription_cancelled(
-    db: AsyncSession, event: dict[str, Any],
+    db: AsyncSession,
+    event: dict[str, Any],
 ) -> None:
     stripe_sub = event.get("data", {}).get("object", {}) or {}
     stripe_sub_id = stripe_sub.get("id")
@@ -45,7 +47,7 @@ async def on_subscription_cancelled(
         # have flipped the row already; Stripe's event follows.
         return
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     # Conditional UPDATE so a concurrent operator-side cancel cannot
     # overwrite a different status (e.g. `archived`).
     result = await db.execute(

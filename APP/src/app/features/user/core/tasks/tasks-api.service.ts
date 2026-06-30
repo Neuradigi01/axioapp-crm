@@ -13,12 +13,7 @@ import { buildHttpParams } from '../shared/services/query-builder';
 export type TaskStatus = 'open' | 'done' | 'cancelled';
 export type TaskPriority = 'low' | 'med' | 'high';
 export type TaskDueFilter = 'today' | 'overdue' | 'upcoming';
-export type TaskSortBy =
-  | 'due_at'
-  | 'priority'
-  | 'title'
-  | 'created_at'
-  | 'last_activity_at';
+export type TaskSortBy = 'due_at' | 'priority' | 'title' | 'created_at' | 'last_activity_at';
 export type TaskSortDir = 'asc' | 'desc';
 
 export interface TaskListFilters {
@@ -143,25 +138,19 @@ export class TasksApiService {
     ids: string[],
     body: { userId: string; note?: string | null },
   ): Observable<{ reassigned: number }> {
-    return this.http.post<{ reassigned: number }>(
-      `${this.base}/bulk-reassign`,
-      {
-        ids,
-        assigned_to_id: body.userId,
-        note: body.note ?? null,
-      },
-    );
+    return this.http.post<{ reassigned: number }>(`${this.base}/bulk-reassign`, {
+      ids,
+      assigned_to_id: body.userId,
+      note: body.note ?? null,
+    });
   }
 
   /** Bulk mark-done. Already-done rows are skipped (counted). Returns
    * `{done, skipped}` so the FE can surface partial success. */
-  bulkMarkDone(
-    ids: string[],
-  ): Observable<{ done: number; skipped: number }> {
-    return this.http.post<{ done: number; skipped: number }>(
-      `${this.base}/bulk-mark-done`,
-      { ids },
-    );
+  bulkMarkDone(ids: string[]): Observable<{ done: number; skipped: number }> {
+    return this.http.post<{ done: number; skipped: number }>(`${this.base}/bulk-mark-done`, {
+      ids,
+    });
   }
 
   bulkDelete(ids: string[]): Observable<{ deleted: number }> {

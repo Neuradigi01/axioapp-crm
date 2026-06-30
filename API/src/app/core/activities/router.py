@@ -8,6 +8,7 @@ Mounted at ``/api/v1/activities``.
 Reads are gated by `activities.read`; writes by `activities.write`.
 Tenant scoping is automatic via the ORM filter on `TenantScoped`.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -24,7 +25,6 @@ from src.app.core.activities.service import create_note, list_activities
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/activities", tags=["Activities"])
 
@@ -49,9 +49,7 @@ async def list_activities_endpoint(
     )
 
 
-@router.post(
-    "", response_model=ActivityOut, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=ActivityOut, status_code=status.HTTP_201_CREATED)
 async def create_activity_note(
     payload: ActivityCreate,
     db: AsyncSession = Depends(get_db),

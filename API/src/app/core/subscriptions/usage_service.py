@@ -19,16 +19,16 @@ Public surface:
 Period resolution is keyed by the canonical resource taxonomy in
 `RESOURCE_PERIOD_KIND` below. Unknown resources raise `KeyError`.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.subscriptions import data_access as _da
 from src.app.core.subscriptions.service import get_active_subscription
-
 
 # ---------------------------------------------------------------------------
 # Taxonomy
@@ -54,16 +54,17 @@ RESOURCE_PERIOD_KIND: dict[str, str] = {
 
 # Used as `period_end` for `lifetime` rows. Postgres `timestamptz`
 # accepts year 9999 — used as a recognisable "never expires" sentinel.
-_LIFETIME_SENTINEL_END = datetime(9999, 12, 31, tzinfo=timezone.utc)
+_LIFETIME_SENTINEL_END = datetime(9999, 12, 31, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------
 # Period resolution
 # ---------------------------------------------------------------------------
 
+
 def _utc_day_bounds(now: datetime | None = None) -> tuple[datetime, datetime]:
     """Midnight-to-midnight UTC window covering `now`."""
-    moment = now or datetime.now(tz=timezone.utc)
+    moment = now or datetime.now(tz=UTC)
     start = moment.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start + timedelta(days=1)
 
@@ -84,9 +85,7 @@ async def _resolve_current_period(
 
     sub = await get_active_subscription(session, org_id)
     if sub is None:
-        raise RuntimeError(
-            f"cannot resolve usage period for org {org_id}: no active subscription"
-        )
+        raise RuntimeError(f"cannot resolve usage period for org {org_id}: no active subscription")
 
     if kind == "lifetime":
         return kind, sub.created_at, _LIFETIME_SENTINEL_END
@@ -99,13 +98,10 @@ async def _resolve_current_period(
 # Reads
 # ---------------------------------------------------------------------------
 
-async def get(
-    session: AsyncSession, org_id: uuid.UUID, resource: str
-) -> int:
+
+async def get(session: AsyncSession, org_id: uuid.UUID, resource: str) -> int:
     """Read the current-period counter. Returns 0 if no row exists yet."""
-    _kind, period_start, _ = await _resolve_current_period(
-        session, org_id, resource
-    )
+    _kind, period_start, _ = await _resolve_current_period(session, org_id, resource)
     value = await _da.get_usage_counter_value(
         session,
         org_id=org_id,
@@ -148,9 +144,7 @@ async def increment(
 
     Does NOT commit — the caller's session manages the transaction.
     """
-    kind, period_start, period_end = await _resolve_current_period(
-        session, org_id, resource
-    )
+    kind, period_start, period_end = await _resolve_current_period(session, org_id, resource)
     return await _da.upsert_usage_counter_returning(
         session,
         org_id=org_id,
@@ -165,6 +159,7 @@ async def increment(
 # ---------------------------------------------------------------------------
 # Period rollover
 # ---------------------------------------------------------------------------
+
 
 async def reset_monthly_counters(
     session: AsyncSession,

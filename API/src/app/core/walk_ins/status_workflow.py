@@ -16,8 +16,8 @@ clean reporting per visit.
 Service-level enforcement in `update_walk_in` rejects any status
 change that doesn't appear in this map.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 ALLOWED_TRANSITIONS: dict[str, frozenset[str]] = {
     "browsing": frozenset({"interested", "left"}),

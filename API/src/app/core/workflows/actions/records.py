@@ -47,11 +47,12 @@ caught here — the engine's outer except-handler maps it to
 ``run.status='errored'`` so the operator sees it on the
 run-history view as a hard failure rather than a quiet skip.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException
@@ -59,7 +60,6 @@ from pydantic import ValidationError
 
 from src.app.core.workflows.actions import register_action
 from src.app.core.workflows.exceptions import ActionNotImplemented
-
 
 logger = logging.getLogger(__name__)
 
@@ -129,9 +129,7 @@ def _resolve_target_contact_id(
     return None
 
 
-def _resolve_target_lead_id(
-    *, node: dict[str, Any], context: dict[str, Any]
-) -> uuid.UUID | None:
+def _resolve_target_lead_id(*, node: dict[str, Any], context: dict[str, Any]) -> uuid.UUID | None:
     """The trigger payload's ``lead_id`` or ``lead.id`` is the
     default target. Operators can override via ``config.lead_id``
     (typically resolved via a prior step's output)."""
@@ -200,9 +198,7 @@ async def _update_contact_field(session, *, run, step_run, node, context):
     from src.app.core.contacts.schemas import ContactUpdate
 
     cfg = node.get("config") or {}
-    contact_id = _resolve_target_contact_id(
-        run=run, node=node, context=context
-    )
+    contact_id = _resolve_target_contact_id(run=run, node=node, context=context)
     if contact_id is None:
         return _result_skipped("target_not_found", reason="no_contact_id")
 
@@ -259,9 +255,7 @@ async def _update_lead_field(session, *, run, step_run, node, context):
         return _result_skipped("validation_failed", error=str(exc))
 
     try:
-        updated = await leads_service.update_lead(
-            session, lead_id=lead_id, payload=patch
-        )
+        updated = await leads_service.update_lead(session, lead_id=lead_id, payload=patch)
     except Exception as exc:
         reason, msg = _classify_exception(exc)
         return _result_skipped(reason, error=msg)
@@ -289,9 +283,7 @@ async def _update_lead_stage(session, *, run, step_run, node, context):
 
     new_stage = _render(cfg.get("pipeline_stage"), context)
     if not isinstance(new_stage, str) or not new_stage.strip():
-        return _result_skipped(
-            "validation_failed", reason="missing_pipeline_stage"
-        )
+        return _result_skipped("validation_failed", reason="missing_pipeline_stage")
 
     try:
         patch = LeadUpdate(pipeline_stage=new_stage.strip())
@@ -299,9 +291,7 @@ async def _update_lead_stage(session, *, run, step_run, node, context):
         return _result_skipped("validation_failed", error=str(exc))
 
     try:
-        updated = await leads_service.update_lead(
-            session, lead_id=lead_id, payload=patch
-        )
+        updated = await leads_service.update_lead(session, lead_id=lead_id, payload=patch)
     except Exception as exc:
         reason, msg = _classify_exception(exc)
         return _result_skipped(reason, error=msg)
@@ -330,7 +320,7 @@ async def _create_task(session, *, run, step_run, node, context):
     due_in_days = cfg.get("due_in_days")
     due_at: datetime | None = None
     if isinstance(due_in_days, (int, float)) and due_in_days > 0:
-        due_at = datetime.now(timezone.utc) + timedelta(days=int(due_in_days))
+        due_at = datetime.now(UTC) + timedelta(days=int(due_in_days))
 
     priority = cfg.get("priority", "med")
     related_to = cfg.get("related_to")
@@ -341,9 +331,7 @@ async def _create_task(session, *, run, step_run, node, context):
         if related_to == "contact":
             related_entity_id = getattr(run, "contact_id", None)
         elif related_to == "lead":
-            related_entity_id = _resolve_target_lead_id(
-                node=node, context=context
-            )
+            related_entity_id = _resolve_target_lead_id(node=node, context=context)
 
     assignee_id = _coerce_uuid(cfg.get("assignee_user_id"))
 
@@ -381,12 +369,8 @@ async def _create_task(session, *, run, step_run, node, context):
         {
             "task_id": str(task.id),
             "task_title": task.title,
-            "task_due_at": (
-                task.due_at.isoformat() if task.due_at else None
-            ),
-            "task_assignee_id": (
-                str(task.assigned_to_id) if task.assigned_to_id else None
-            ),
+            "task_due_at": (task.due_at.isoformat() if task.due_at else None),
+            "task_assignee_id": (str(task.assigned_to_id) if task.assigned_to_id else None),
         }
     )
 
@@ -399,9 +383,7 @@ async def _create_note(session, *, run, step_run, node, context):
     from src.app.core.activities.models import ActivityType
 
     cfg = node.get("config") or {}
-    contact_id = _resolve_target_contact_id(
-        run=run, node=node, context=context
-    )
+    contact_id = _resolve_target_contact_id(run=run, node=node, context=context)
     if contact_id is None:
         return _result_skipped("target_not_found", reason="no_contact_id")
 
@@ -421,9 +403,7 @@ async def _create_note(session, *, run, step_run, node, context):
         reason, msg = _classify_exception(exc)
         return _result_skipped(reason, error=msg)
 
-    return _result_sent(
-        {"contact_id": str(contact_id), "note_body": body.strip()}
-    )
+    return _result_sent({"contact_id": str(contact_id), "note_body": body.strip()})
 
 
 async def _create_appointment(session, *, run, step_run, node, context):
@@ -431,9 +411,7 @@ async def _create_appointment(session, *, run, step_run, node, context):
     from src.app.core.appointments.schemas import AppointmentCreate
 
     cfg = node.get("config") or {}
-    contact_id = _resolve_target_contact_id(
-        run=run, node=node, context=context
-    )
+    contact_id = _resolve_target_contact_id(run=run, node=node, context=context)
     if contact_id is None:
         return _result_skipped("target_not_found", reason="no_contact_id")
 
@@ -442,18 +420,14 @@ async def _create_appointment(session, *, run, step_run, node, context):
         return _result_skipped("validation_failed", reason="missing_title")
 
     delay_days = cfg.get("delay_days", 1)
-    scheduled_at = datetime.now(timezone.utc) + timedelta(
-        days=int(delay_days)
-        if isinstance(delay_days, (int, float))
-        else 1
+    scheduled_at = datetime.now(UTC) + timedelta(
+        days=int(delay_days) if isinstance(delay_days, (int, float)) else 1
     )
 
     duration_min = cfg.get("duration_min", 30)
     assigned_to_id = _coerce_uuid(cfg.get("assigned_to_id"))
     if assigned_to_id is None:
-        return _result_skipped(
-            "validation_failed", reason="missing_assigned_to_id"
-        )
+        return _result_skipped("validation_failed", reason="missing_assigned_to_id")
 
     location = _render(cfg.get("location"), context)
     purpose = _render(cfg.get("purpose"), context)
@@ -500,21 +474,15 @@ async def _create_invoice(session, *, run, step_run, node, context):
     from src.app.core.billing.schemas import InvoiceCreate, InvoiceLineCreate
 
     cfg = node.get("config") or {}
-    contact_id = _resolve_target_contact_id(
-        run=run, node=node, context=context
-    )
+    contact_id = _resolve_target_contact_id(run=run, node=node, context=context)
 
-    actor_user_id = (
-        getattr(run, "created_by_user_id", None) or uuid.uuid4()
-    )
+    actor_user_id = getattr(run, "created_by_user_id", None) or uuid.uuid4()
 
     try:
         invoice_payload = InvoiceCreate(
             contact_id=contact_id,
             notes=(
-                _render(cfg.get("notes"), context)
-                if isinstance(cfg.get("notes"), str)
-                else None
+                _render(cfg.get("notes"), context) if isinstance(cfg.get("notes"), str) else None
             ),
             currency=cfg.get("currency", "INR"),
         )
@@ -550,9 +518,7 @@ async def _create_invoice(session, *, run, step_run, node, context):
                 payload=line_payload,
             )
         except Exception as exc:
-            logger.warning(
-                "workflows.records.create_invoice add_line failed: %s", exc
-            )
+            logger.warning("workflows.records.create_invoice add_line failed: %s", exc)
             # Continue with remaining items + the draft invoice;
             # don't kill the whole step for one bad line.
 

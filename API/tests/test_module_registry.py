@@ -1,4 +1,5 @@
 """Unit tests for `ModuleRegistry` and `ModuleDescriptor` validation."""
+
 from __future__ import annotations
 
 import pytest
@@ -68,12 +69,8 @@ def test_list_sorts_by_menu_position_then_id():
 
 def test_list_for_user_filters_by_granted_permissions():
     r = ModuleRegistry()
-    r.register(
-        _make_descriptor(id="contacts", permissions=["contacts.read"])
-    )
-    r.register(
-        _make_descriptor(id="settings", permissions=["settings.read"])
-    )
+    r.register(_make_descriptor(id="contacts", permissions=["contacts.read"]))
+    r.register(_make_descriptor(id="settings", permissions=["settings.read"]))
     r.register(_make_descriptor(id="public", permissions=[]))
 
     visible = {m.id for m in r.list_for_user({"contacts.read"})}

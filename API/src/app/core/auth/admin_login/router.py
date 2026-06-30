@@ -10,6 +10,7 @@ this URL is mounted here while reusing the legacy
 `authenticate_admin` service — no logic duplication, just a URL alias
 that survives the Phase 6 cleanup of the legacy router tree.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
@@ -24,9 +25,7 @@ router = APIRouter(tags=["Auth — Admin"])
 
 
 @router.post("/admin-login")
-async def admin_login(
-    req: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)
-):
+async def admin_login(req: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     ctx = await extract_login_context(request, req.device_info)
     return await login_service.authenticate_admin(
         db=db,

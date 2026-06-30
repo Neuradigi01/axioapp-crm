@@ -1,4 +1,5 @@
 """Audit-log coverage for the login flow."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,9 +38,7 @@ async def test_successful_login_writes_audit_row(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_failed_login_writes_audit_row_with_null_user(
-    layered_client, seeded_admin
-):
+async def test_failed_login_writes_audit_row_with_null_user(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
 

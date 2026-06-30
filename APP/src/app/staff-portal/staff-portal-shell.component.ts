@@ -10,10 +10,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
-import {
-  StaffAttendance,
-  StaffPortalApiService,
-} from './staff-portal-api.service';
+import { StaffAttendance, StaffPortalApiService } from './staff-portal-api.service';
 import { StaffSessionService } from './staff-session.service';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -80,9 +77,7 @@ export class StaffPortalShellComponent {
           },
           error: (err: HttpErrorResponse) => {
             this.clockingOut.set(false);
-            this.clockError.set(
-              extractApiError(err) ?? 'Could not clock out.',
-            );
+            this.clockError.set(extractApiError(err) ?? 'Could not clock out.');
           },
         });
     } else {
@@ -97,9 +92,7 @@ export class StaffPortalShellComponent {
           },
           error: (err: HttpErrorResponse) => {
             this.clockingIn.set(false);
-            this.clockError.set(
-              extractApiError(err) ?? 'Could not clock in.',
-            );
+            this.clockError.set(extractApiError(err) ?? 'Could not clock in.');
           },
         });
     }
@@ -124,5 +117,4 @@ export class StaffPortalShellComponent {
         },
       });
   }
-
 }

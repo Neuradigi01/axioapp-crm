@@ -17,6 +17,7 @@ provider-specific and live on the google subrouter — those are the
 ONLY routes in this surface that don't gate on a CRM JWT (the OAuth
 state and the webhook secret are the trust roots respectively).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,9 +35,6 @@ from src.app.core.integrations.meta.router import router as meta_router
 from src.app.core.integrations.meta.webhook import (
     router as meta_webhook_router,
 )
-from src.app.core.integrations.whatsapp.router import (
-    router as whatsapp_router,
-)
 from src.app.core.integrations.models import IntegrationProvider
 from src.app.core.integrations.schemas import (
     IntegrationDLQListResponse,
@@ -53,7 +51,6 @@ from src.app.core.integrations.service import (
     create_subscription,
     delete_subscription,
     discard_dlq,
-    disconnect as disconnect_integration,
     list_all,
     list_dlq,
     list_subscriptions,
@@ -61,11 +58,16 @@ from src.app.core.integrations.service import (
     update_subscription,
     update_subscription_mapping,
 )
+from src.app.core.integrations.service import (
+    disconnect as disconnect_integration,
+)
 from src.app.core.integrations.status import build_status
+from src.app.core.integrations.whatsapp.router import (
+    router as whatsapp_router,
+)
 from src.app.core.leads.imports.targets import list_target_keys
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/integrations", tags=["Ad Integrations"])
 
@@ -96,9 +98,7 @@ router.include_router(whatsapp_router)
 @router.get("", response_model=list[IntegrationRead])
 async def list_integrations_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> list[IntegrationRead]:
     """Return every integration row for the active tenant. The response
     NEVER includes the encrypted-token columns — `IntegrationRead`
@@ -107,24 +107,18 @@ async def list_integrations_endpoint(
     return [IntegrationRead.model_validate(r) for r in rows]
 
 
-@router.delete(
-    "/{provider}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/{provider}", status_code=status.HTTP_204_NO_CONTENT)
 async def disconnect_integration_endpoint(
     provider: IntegrationProviderLiteral,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> Response:
     """Disconnect a provider — clears tokens + flips status to
     `disconnected`. Idempotent — re-disconnecting returns 204 without
     a second audit event. 404 if the org has never connected this
     provider."""
     provider_enum = IntegrationProvider(provider)
-    row = await disconnect_integration(
-        db, provider=provider_enum, actor_id=user.legacy_uuid
-    )
+    row = await disconnect_integration(db, provider=provider_enum, actor_id=user.legacy_uuid)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -143,9 +137,7 @@ async def disconnect_integration_endpoint(
 async def rotate_webhook_endpoint(
     provider: IntegrationProviderLiteral,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> IntegrationRead:
     """Mint a fresh webhook secret. Old URL stops authenticating
     immediately — Settings UI must show the new URL to the Owner and
@@ -171,9 +163,7 @@ async def rotate_webhook_endpoint(
 async def list_subscriptions_endpoint(
     integration_id: uuid.UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> list[IntegrationSubscriptionRead]:
     """List form subscriptions in this org, optionally filtered to one
     integration. The Settings UI loads this when rendering each
@@ -190,16 +180,12 @@ async def list_subscriptions_endpoint(
 async def create_subscription_endpoint(
     payload: IntegrationSubscriptionCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> IntegrationSubscriptionRead:
     """Subscribe to a Google/Meta form. Body specifies the integration
     + the platform's form_id + initial field mapping. 409 if the
     integration is already subscribed to that form."""
-    row = await create_subscription(
-        db, org_id=user.org_id, payload=payload
-    )
+    row = await create_subscription(db, org_id=user.org_id, payload=payload)
     return IntegrationSubscriptionRead.model_validate(row)
 
 
@@ -211,16 +197,12 @@ async def update_subscription_endpoint(
     subscription_id: uuid.UUID,
     payload: IntegrationSubscriptionUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> IntegrationSubscriptionRead:
     """Partial update — typically the field-mapping editor in Step 8
     or the enable/disable toggle on the Settings card. Returns the
     updated row."""
-    row = await update_subscription(
-        db, subscription_id=subscription_id, payload=payload
-    )
+    row = await update_subscription(db, subscription_id=subscription_id, payload=payload)
     return IntegrationSubscriptionRead.model_validate(row)
 
 
@@ -231,15 +213,11 @@ async def update_subscription_endpoint(
 async def delete_subscription_endpoint(
     subscription_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> Response:
     """Hard-delete a subscription. Future deliveries for the removed
     form will DLQ. 404 if no such row in this org."""
-    removed = await delete_subscription(
-        db, subscription_id=subscription_id
-    )
+    removed = await delete_subscription(db, subscription_id=subscription_id)
     if not removed:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -259,9 +237,7 @@ async def update_subscription_mapping_endpoint(
     subscription_id: uuid.UUID,
     payload: SubscriptionMappingUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> IntegrationSubscriptionRead:
     """Replace the subscription's `field_mapping`. Step-8 mapping
     editor calls this on Save. Targets are validated against the
@@ -274,9 +250,7 @@ async def update_subscription_mapping_endpoint(
     again). Sending the same mapping again is idempotent."""
     if payload.mapping:
         valid_keys = await list_target_keys(db)
-        invalid = sorted(
-            k for k in payload.mapping.values() if k not in valid_keys
-        )
+        invalid = sorted(k for k in payload.mapping.values() if k not in valid_keys)
         if invalid:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -307,9 +281,7 @@ async def list_dlq_endpoint(
     provider: IntegrationProviderLiteral | None = Query(default=None),
     include_replayed: bool = Query(default=True),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> IntegrationDLQListResponse:
     """Paginated DLQ for the active tenant.
 
@@ -317,9 +289,7 @@ async def list_dlq_endpoint(
     drops rows that have been replayed OR discarded — drives the
     Step-8 status panel's "open failures" view. Step 7's summary
     card uses the default (everything) since it just needs a total."""
-    provider_enum = (
-        IntegrationProvider(provider) if provider else None
-    )
+    provider_enum = IntegrationProvider(provider) if provider else None
     rows, total = await list_dlq(
         db,
         page=page,
@@ -342,9 +312,7 @@ async def list_dlq_endpoint(
 async def discard_dlq_endpoint(
     dlq_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> IntegrationDLQRead:
     """Soft-discard a DLQ row — stamps `replayed_at = now()` with
     `replayed_by = NULL`. The NULL `replayed_by` is the discriminator:
@@ -366,9 +334,7 @@ async def discard_dlq_endpoint(
 )
 async def integration_status_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    _user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> IntegrationStatusResponse:
     """Per-provider delivery snapshot for the Settings dashboard.
     Polled every ~30s by the SPA. Always returns ALL providers
@@ -387,9 +353,7 @@ async def integration_status_endpoint(
 async def replay_dlq_endpoint(
     dlq_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("settings.integrations.manage")
-    ),
+    user: User = Depends(require_permissions("settings.integrations.manage")),
 ) -> IntegrationDLQRead:
     """Re-enqueue a DLQ payload through the matching provider's
     Celery task. Marks the row as replayed (the row survives so an

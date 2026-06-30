@@ -32,6 +32,7 @@ raises typed Python exceptions that the router maps to HTTP codes.
 Future automation / workflow callers will use these same functions
 without touching FastAPI.
 """
+
 from __future__ import annotations
 
 import logging
@@ -57,7 +58,6 @@ from src.app.core.templates.models import (
     TemplateReviewAction,
 )
 from src.app.core.templates.service import get_template
-
 
 logger = logging.getLogger(__name__)
 
@@ -159,13 +159,9 @@ async def submit_for_review(
     note: str | None = None,
 ) -> MessageTemplate:
     """``draft → in_review``."""
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
     if template.internal_status != TemplateInternalStatus.draft:
-        raise InvalidWorkflowTransition(
-            current=template.internal_status.value, action="submit"
-        )
+        raise InvalidWorkflowTransition(current=template.internal_status.value, action="submit")
     return await _apply_transition(
         session,
         template=template,
@@ -186,17 +182,11 @@ async def approve(
 ) -> MessageTemplate:
     """``in_review → approved``. Reviewer ≠ author unless the org
     setting ``template_review_self_approve_allowed`` is ``True``."""
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
     if template.internal_status != TemplateInternalStatus.in_review:
-        raise InvalidWorkflowTransition(
-            current=template.internal_status.value, action="approve"
-        )
+        raise InvalidWorkflowTransition(current=template.internal_status.value, action="approve")
 
-    _, self_approve_allowed = await _get_org_review_settings(
-        session, org_id=org_id
-    )
+    _, self_approve_allowed = await _get_org_review_settings(session, org_id=org_id)
     if (
         not self_approve_allowed
         and reviewer_user_id is not None
@@ -225,13 +215,9 @@ async def reject(
     """``in_review → draft`` with a mandatory note explaining why."""
     if not note or not note.strip():
         raise TemplateError("a non-empty note is required to reject")
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
     if template.internal_status != TemplateInternalStatus.in_review:
-        raise InvalidWorkflowTransition(
-            current=template.internal_status.value, action="reject"
-        )
+        raise InvalidWorkflowTransition(current=template.internal_status.value, action="reject")
     return await _apply_transition(
         session,
         template=template,
@@ -254,12 +240,8 @@ async def request_changes(
     review-row carries ``request_changes`` so the UI can render
     "please revise" instead of "rejected". Mandatory note."""
     if not note or not note.strip():
-        raise TemplateError(
-            "a non-empty note is required to request changes"
-        )
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+        raise TemplateError("a non-empty note is required to request changes")
+    template = await get_template(session, org_id=org_id, template_id=template_id)
     if template.internal_status != TemplateInternalStatus.in_review:
         raise InvalidWorkflowTransition(
             current=template.internal_status.value, action="request_changes"
@@ -294,26 +276,19 @@ async def publish(
     ``approved`` (Meta / DLT already blessed it). Pending / rejected /
     paused all block publish.
     """
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
 
     if template.external_status not in (
         TemplateExternalStatus.n_a,
         TemplateExternalStatus.approved,
     ):
-        raise PublishBlockedByExternal(
-            external_status=template.external_status.value
-        )
+        raise PublishBlockedByExternal(external_status=template.external_status.value)
 
     mandatory, _ = await _get_org_review_settings(session, org_id=org_id)
 
     if template.internal_status == TemplateInternalStatus.approved:
         pass  # always allowed
-    elif (
-        template.internal_status == TemplateInternalStatus.draft
-        and not mandatory
-    ):
+    elif template.internal_status == TemplateInternalStatus.draft and not mandatory:
         pass  # shortcut allowed when review is optional
     else:
         raise InvalidWorkflowTransition(
@@ -348,9 +323,7 @@ async def archive(
 ) -> MessageTemplate:
     """Any state → ``archived``. Idempotent on already-archived rows
     (returns the row without writing a second review entry)."""
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
     if template.internal_status == TemplateInternalStatus.archived:
         return template
     return await _apply_transition(

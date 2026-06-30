@@ -55,7 +55,6 @@ import {
   WhatsAppStatus,
 } from './integrations-api.service';
 
-
 type CallbackStatus =
   | 'google_connected'
   | 'google_denied'
@@ -63,7 +62,6 @@ type CallbackStatus =
   | 'meta_connected'
   | 'meta_denied'
   | 'meta_error';
-
 
 @Component({
   selector: 'app-settings-integrations-page',
@@ -121,12 +119,10 @@ export class IntegrationsPageComponent {
   // --- derived ------------------------------------------------------
 
   protected readonly google = computed(
-    () =>
-      this.integrations().find((i) => i.provider === 'google_ads') ?? null,
+    () => this.integrations().find((i) => i.provider === 'google_ads') ?? null,
   );
   protected readonly meta = computed(
-    () =>
-      this.integrations().find((i) => i.provider === 'meta_ads') ?? null,
+    () => this.integrations().find((i) => i.provider === 'meta_ads') ?? null,
   );
 
   constructor() {
@@ -236,26 +232,21 @@ export class IntegrationsPageComponent {
         return {
           kind: 'success',
           title: 'Meta connected.',
-          detail:
-            'Subscribe to a Page below to start receiving its Lead Ads.',
+          detail: 'Subscribe to a Page below to start receiving its Lead Ads.',
         };
       case 'google_denied':
       case 'meta_denied':
         return {
           kind: 'warn',
           title: 'Connect cancelled.',
-          detail: reason
-            ? `Reason: ${reason}`
-            : 'Re-try the Connect button to authorise again.',
+          detail: reason ? `Reason: ${reason}` : 'Re-try the Connect button to authorise again.',
         };
       case 'google_error':
       case 'meta_error':
         return {
           kind: 'error',
           title: 'Connect failed.',
-          detail: reason
-            ? `Reason: ${reason}`
-            : 'Try again, or check the backend logs.',
+          detail: reason ? `Reason: ${reason}` : 'Try again, or check the backend logs.',
         };
     }
   }

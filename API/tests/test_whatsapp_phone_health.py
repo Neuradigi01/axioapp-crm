@@ -20,10 +20,9 @@ Cases:
   9. `_extract_phone_quality_event` returns None on non-quality
      payloads (e.g. a regular `messages` webhook).
 """
+
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from src.app.core.conversations.router import _extract_phone_quality_event
@@ -103,19 +102,12 @@ class TestDiffFields:
             new_tier=None,
             new_name_status=None,
             new_throughput=None,
-            new_restrictions=[
-                {"restriction_type": "BUSINESS_LIMIT_REACHED"}
-            ],
+            new_restrictions=[{"restriction_type": "BUSINESS_LIMIT_REACHED"}],
         )
-        assert any(
-            e[0] == WhatsAppPhoneHealthEventType.restriction_added
-            for e in events
-        )
+        assert any(e[0] == WhatsAppPhoneHealthEventType.restriction_added for e in events)
 
     def test_restriction_lifted_only_when_all_clear(self):
-        config = _config(
-            restrictions=[{"restriction_type": "BUSINESS_LIMIT_REACHED"}]
-        )
+        config = _config(restrictions=[{"restriction_type": "BUSINESS_LIMIT_REACHED"}])
         events = _diff_fields(
             config=config,
             new_quality=None,
@@ -124,10 +116,7 @@ class TestDiffFields:
             new_throughput=None,
             new_restrictions=[],  # all cleared
         )
-        assert any(
-            e[0] == WhatsAppPhoneHealthEventType.restriction_lifted
-            for e in events
-        )
+        assert any(e[0] == WhatsAppPhoneHealthEventType.restriction_lifted for e in events)
 
 
 class TestRecoveryKeys:

@@ -1,20 +1,20 @@
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
+from src.core.security.jwt import create_access_token
+from src.core.security.password import hash_password
 from src.models import Base
 from src.models.admin import Admin
-from src.models.user import UserLogin, UserInfo
 from src.models.routes import Route
-from src.core.security.password import hash_password, verify_password
-from src.core.security.jwt import create_access_token
-from tests.conftest import test_engine, TestSession
+from src.models.user import UserInfo, UserLogin
+from tests.conftest import TestSession, test_engine
 
 
 @pytest_asyncio.fixture
 async def client():
-    from main import app
     import src.core.db as db_module
+    from main import app
 
     original_session = db_module.async_session
     db_module.async_session = TestSession
@@ -44,12 +44,28 @@ async def _seed(db):
 
     # Create routes for user management (route IDs 31, 32)
     routes = [
-        Route(parent_id=0, control_id="admin_user_list", user_type="Admin",
-              name="User List", path="users", url="/admin/users",
-              is_nav_menu_item=True, order_no=1, is_compulsory=False),
-        Route(parent_id=0, control_id="admin_user_detail", user_type="Admin",
-              name="User Detail", path="users/:id", url="/admin/users/:id",
-              is_nav_menu_item=False, order_no=2, is_compulsory=False),
+        Route(
+            parent_id=0,
+            control_id="admin_user_list",
+            user_type="Admin",
+            name="User List",
+            path="users",
+            url="/admin/users",
+            is_nav_menu_item=True,
+            order_no=1,
+            is_compulsory=False,
+        ),
+        Route(
+            parent_id=0,
+            control_id="admin_user_detail",
+            user_type="Admin",
+            name="User Detail",
+            path="users/:id",
+            url="/admin/users/:id",
+            is_nav_menu_item=False,
+            order_no=2,
+            is_compulsory=False,
+        ),
     ]
     db.add_all(routes)
 
@@ -78,12 +94,14 @@ async def _seed(db):
 
 
 def _make_admin_token(route_ids):
-    return create_access_token({
-        "user_id": "test_admin",
-        "role": "Admin",
-        "access_rights": ",".join(str(r) for r in route_ids),
-        "is_super_admin": True,
-    })
+    return create_access_token(
+        {
+            "user_id": "test_admin",
+            "role": "Admin",
+            "access_rights": ",".join(str(r) for r in route_ids),
+            "is_super_admin": True,
+        }
+    )
 
 
 @pytest.mark.asyncio
@@ -208,9 +226,15 @@ async def test_admin_change_user_password(client):
 async def test_user_management_requires_admin_role(client):
     async with TestSession() as db:
         route = Route(
-            parent_id=0, control_id="user_dashboard", user_type="User",
-            name="Dashboard", path="dashboard", url="/user/dashboard",
-            is_nav_menu_item=True, order_no=1, is_compulsory=True,
+            parent_id=0,
+            control_id="user_dashboard",
+            user_type="User",
+            name="Dashboard",
+            path="dashboard",
+            url="/user/dashboard",
+            is_nav_menu_item=True,
+            order_no=1,
+            is_compulsory=True,
         )
         db.add(route)
         await db.flush()
@@ -218,11 +242,13 @@ async def test_user_management_requires_admin_role(client):
         route_id = route.id
 
     # User token - should not access admin endpoints
-    token = create_access_token({
-        "user_id": "test_user",
-        "role": "User",
-        "access_rights": str(route_id),
-    })
+    token = create_access_token(
+        {
+            "user_id": "test_user",
+            "role": "User",
+            "access_rights": str(route_id),
+        }
+    )
 
     resp = await client.post(
         "/api/admin/users/list",

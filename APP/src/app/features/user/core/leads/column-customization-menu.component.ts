@@ -1,9 +1,4 @@
-import {
-  CdkDrag,
-  CdkDragDrop,
-  CdkDropList,
-  moveItemInArray,
-} from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDragDrop, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -51,7 +46,9 @@ import { ColumnDef, ColumnPrefsService } from '../shared/column-prefs.service';
           role="menu"
           class="absolute right-0 z-40 mt-1 w-64 origin-top-right rounded-md border border-zinc-200 bg-white shadow-lg ring-1 ring-black/5"
         >
-          <div class="border-b border-zinc-100 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+          <div
+            class="border-b border-zinc-100 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500"
+          >
             Columns
           </div>
           <ul
@@ -150,9 +147,7 @@ export class ColumnCustomizationMenuComponent {
   }
 
   protected onToggle(key: string, visible: boolean): void {
-    const next = this.columns().map((c) =>
-      c.key === key ? { ...c, visible } : { ...c },
-    );
+    const next = this.columns().map((c) => (c.key === key ? { ...c, visible } : { ...c }));
     this.columnsChange.emit(next);
   }
 

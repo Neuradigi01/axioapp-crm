@@ -11,10 +11,11 @@ The Stripe provider is overridden via FastAPI's `dependency_overrides`
 so every test runs against an in-memory `MagicMock` that records calls
 without hitting the real Stripe API.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -23,7 +24,6 @@ from sqlalchemy import select
 from src.app.core.subscriptions.dependencies import get_payment_provider
 from src.app.core.subscriptions.models import Subscription
 from src.app.core.subscriptions.payment_provider import CheckoutSessionResult
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -63,7 +63,7 @@ async def _insert_subscription(
 ) -> uuid.UUID:
     from tests.conftest import TestSession
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     cps = current_period_start or trial_started_at or now
     cpe = current_period_end or trial_ends_at or (now + timedelta(days=30))
 
@@ -143,13 +143,18 @@ def override_provider(layered_client, mock_provider):
 
 @pytest.mark.asyncio
 async def test_direct_checkout_creates_session_and_persists_id(
-    layered_client, seeded_admin, override_provider,
+    layered_client,
+    seeded_admin,
+    override_provider,
 ):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
     sub_id = await _insert_subscription(
-        org.id, plan_code="basic", status="active", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        status="active",
+        seats_purchased=5,
     )
     token = await _login_seeded(layered_client, seeded_admin)
 
@@ -172,16 +177,16 @@ async def test_direct_checkout_creates_session_and_persists_id(
     # Verify pending_checkout_session_id was persisted.
     async with TestSession() as session:
         fresh = (
-            await session.execute(
-                select(Subscription).where(Subscription.id == sub_id)
-            )
+            await session.execute(select(Subscription).where(Subscription.id == sub_id))
         ).scalar_one()
         assert fresh.pending_checkout_session_id == "cs_mock_1"
 
 
 @pytest.mark.asyncio
 async def test_direct_checkout_creates_customer_on_first_call(
-    layered_client, seeded_admin, override_provider,
+    layered_client,
+    seeded_admin,
+    override_provider,
 ):
     """`stripe_customer_id` is null → provider.create_customer is
     invoked, and the row is updated with the returned id."""
@@ -189,7 +194,9 @@ async def test_direct_checkout_creates_customer_on_first_call(
 
     org = seeded_admin["org"]
     sub_id = await _insert_subscription(
-        org.id, plan_code="basic", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        seats_purchased=5,
         stripe_customer_id=None,
     )
     token = await _login_seeded(layered_client, seeded_admin)
@@ -210,22 +217,24 @@ async def test_direct_checkout_creates_customer_on_first_call(
 
     async with TestSession() as session:
         fresh = (
-            await session.execute(
-                select(Subscription).where(Subscription.id == sub_id)
-            )
+            await session.execute(select(Subscription).where(Subscription.id == sub_id))
         ).scalar_one()
         assert fresh.stripe_customer_id == "cus_mock_1"
 
 
 @pytest.mark.asyncio
 async def test_direct_checkout_reuses_existing_customer(
-    layered_client, seeded_admin, override_provider,
+    layered_client,
+    seeded_admin,
+    override_provider,
 ):
     """Second checkout reuses the persisted `stripe_customer_id`;
     no new Customer is created."""
     org = seeded_admin["org"]
     await _insert_subscription(
-        org.id, plan_code="basic", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        seats_purchased=5,
         stripe_customer_id="cus_existing_42",
     )
     token = await _login_seeded(layered_client, seeded_admin)
@@ -234,7 +243,9 @@ async def test_direct_checkout_reuses_existing_customer(
         "/api/v1/subscriptions/checkout",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "to_plan": "standard", "billing_cycle": "monthly", "seats": 5,
+            "to_plan": "standard",
+            "billing_cycle": "monthly",
+            "seats": 5,
             "success_url": "http://localhost:4200/done",
             "cancel_url": "http://localhost:4200/back",
         },
@@ -248,7 +259,9 @@ async def test_direct_checkout_reuses_existing_customer(
 
 @pytest.mark.asyncio
 async def test_direct_checkout_rejects_off_domain_success_url(
-    layered_client, seeded_admin, override_provider,
+    layered_client,
+    seeded_admin,
+    override_provider,
 ):
     org = seeded_admin["org"]
     await _insert_subscription(org.id, plan_code="basic", seats_purchased=5)
@@ -258,7 +271,9 @@ async def test_direct_checkout_rejects_off_domain_success_url(
         "/api/v1/subscriptions/checkout",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "to_plan": "standard", "billing_cycle": "monthly", "seats": 5,
+            "to_plan": "standard",
+            "billing_cycle": "monthly",
+            "seats": 5,
             "success_url": "https://evil.example.com/win",
             "cancel_url": "http://localhost:4200/back",
         },
@@ -270,7 +285,9 @@ async def test_direct_checkout_rejects_off_domain_success_url(
 
 @pytest.mark.asyncio
 async def test_direct_checkout_defaults_urls_when_omitted(
-    layered_client, seeded_admin, override_provider,
+    layered_client,
+    seeded_admin,
+    override_provider,
 ):
     """Omitted URLs fall back to `/user/settings/billing` on the
     request's origin. We just assert the provider was called with
@@ -283,7 +300,9 @@ async def test_direct_checkout_defaults_urls_when_omitted(
         "/api/v1/subscriptions/checkout",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "to_plan": "standard", "billing_cycle": "monthly", "seats": 5,
+            "to_plan": "standard",
+            "billing_cycle": "monthly",
+            "seats": 5,
         },
     )
     assert resp.status_code == 200, resp.text
@@ -299,15 +318,20 @@ async def test_direct_checkout_defaults_urls_when_omitted(
 
 @pytest.mark.asyncio
 async def test_plan_change_returns_real_url_when_provider_present(
-    layered_client, seeded_admin, override_provider,
+    layered_client,
+    seeded_admin,
+    override_provider,
 ):
     """Trial → Standard via `POST /subscriptions/change` returns a
     needs_payment response with the mocked checkout URL filled."""
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
-        org.id, plan_code="trial", status="trialing",
-        seats_purchased=3, trial_started_at=now,
+        org.id,
+        plan_code="trial",
+        status="trialing",
+        seats_purchased=3,
+        trial_started_at=now,
         trial_ends_at=now + timedelta(days=14),
     )
     token = await _login_seeded(layered_client, seeded_admin)
@@ -326,12 +350,16 @@ async def test_plan_change_returns_real_url_when_provider_present(
 
 @pytest.mark.asyncio
 async def test_downgrade_does_not_call_provider(
-    layered_client, seeded_admin, override_provider,
+    layered_client,
+    seeded_admin,
+    override_provider,
 ):
     """Standard → Basic is a scheduled downgrade; no checkout needed."""
     org = seeded_admin["org"]
     await _insert_subscription(
-        org.id, plan_code="standard", status="active",
+        org.id,
+        plan_code="standard",
+        status="active",
         seats_purchased=5,
     )
     token = await _login_seeded(layered_client, seeded_admin)
@@ -348,13 +376,18 @@ async def test_downgrade_does_not_call_provider(
 
 @pytest.mark.asyncio
 async def test_no_change_does_not_call_provider(
-    layered_client, seeded_admin, override_provider,
+    layered_client,
+    seeded_admin,
+    override_provider,
 ):
     """Same plan + cycle + seats → no_change short-circuits."""
     org = seeded_admin["org"]
     await _insert_subscription(
-        org.id, plan_code="basic", status="active",
-        billing_cycle="monthly", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        status="active",
+        billing_cycle="monthly",
+        seats_purchased=5,
     )
     token = await _login_seeded(layered_client, seeded_admin)
 
@@ -375,14 +408,19 @@ async def test_no_change_does_not_call_provider(
 
 @pytest.mark.asyncio
 async def test_seat_increase_returns_real_url_when_provider_present(
-    layered_client, seeded_admin, override_provider,
+    layered_client,
+    seeded_admin,
+    override_provider,
 ):
     """Paid sub + seat increase → needs_payment with Stripe URL filled."""
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
-        org.id, plan_code="basic", status="active",
-        billing_cycle="monthly", seats_purchased=5,
+        org.id,
+        plan_code="basic",
+        status="active",
+        billing_cycle="monthly",
+        seats_purchased=5,
         current_period_start=now,
         current_period_end=now + timedelta(days=30),
     )
@@ -407,7 +445,9 @@ async def test_seat_increase_returns_real_url_when_provider_present(
 
 @pytest.mark.asyncio
 async def test_validation_errors_propagate(
-    layered_client, seeded_admin, override_provider,
+    layered_client,
+    seeded_admin,
+    override_provider,
 ):
     """seats below bundle min → 400 even on the checkout endpoint."""
     org = seeded_admin["org"]
@@ -418,7 +458,9 @@ async def test_validation_errors_propagate(
         "/api/v1/subscriptions/checkout",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "to_plan": "basic", "billing_cycle": "monthly", "seats": 3,
+            "to_plan": "basic",
+            "billing_cycle": "monthly",
+            "seats": 3,
             "success_url": "http://localhost:4200/done",
             "cancel_url": "http://localhost:4200/back",
         },

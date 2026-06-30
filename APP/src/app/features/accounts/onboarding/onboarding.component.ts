@@ -114,9 +114,7 @@ export class OnboardingComponent implements OnInit {
       const res = await firstValueFrom(this.api.getCatalog());
       this.tiles.set(res.packs);
     } catch {
-      this.catalogError.set(
-        'Could not load CRM templates. Please refresh and try again.',
-      );
+      this.catalogError.set('Could not load CRM templates. Please refresh and try again.');
     } finally {
       this.isLoadingCatalog.set(false);
     }

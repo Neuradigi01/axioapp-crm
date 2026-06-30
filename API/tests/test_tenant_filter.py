@@ -15,6 +15,7 @@ table arrives in Step 1.5). The table joins the shared `Base.metadata`
 and is created/dropped by the existing `test_db` fixture along with
 all other tables.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -27,12 +28,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 # Importing db registers the `after_begin` listener that issues
 # `set_config('app.org_id', ..., true)` at transaction start.
 import src.app.shared.db  # noqa: F401
+
 # Importing orm registers the `do_orm_execute` listener.
 import src.app.shared.orm  # noqa: F401
+from src.app.core.tenants.models import Organization
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
-from src.app.core.tenants.models import Organization
 
 
 class _TenantThing(Base, TenantScoped):
@@ -72,13 +74,15 @@ async def test_after_begin_hook_is_noop_without_context(test_db):
 async def test_orm_filter_scopes_tenant_select(test_db):
     org_a = uuid.uuid4()
     org_b = uuid.uuid4()
-    test_db.add_all([
-        Organization(id=org_a, name="A", slug=f"a-{org_a.hex[:6]}"),
-        Organization(id=org_b, name="B", slug=f"b-{org_b.hex[:6]}"),
-        _TenantThing(id=uuid.uuid4(), org_id=org_a, name="a1"),
-        _TenantThing(id=uuid.uuid4(), org_id=org_a, name="a2"),
-        _TenantThing(id=uuid.uuid4(), org_id=org_b, name="b1"),
-    ])
+    test_db.add_all(
+        [
+            Organization(id=org_a, name="A", slug=f"a-{org_a.hex[:6]}"),
+            Organization(id=org_b, name="B", slug=f"b-{org_b.hex[:6]}"),
+            _TenantThing(id=uuid.uuid4(), org_id=org_a, name="a1"),
+            _TenantThing(id=uuid.uuid4(), org_id=org_a, name="a2"),
+            _TenantThing(id=uuid.uuid4(), org_id=org_b, name="b1"),
+        ]
+    )
     await test_db.commit()
 
     # Context A → only A's things.
@@ -106,10 +110,12 @@ async def test_orm_filter_returns_nothing_without_context(test_db):
     either tenant — verifies the listener is a strict no-op without context
     (the SQL-level RLS denies in production where the role doesn't bypass)."""
     org_a = uuid.uuid4()
-    test_db.add_all([
-        Organization(id=org_a, name="A", slug=f"a-{org_a.hex[:6]}"),
-        _TenantThing(id=uuid.uuid4(), org_id=org_a, name="a1"),
-    ])
+    test_db.add_all(
+        [
+            Organization(id=org_a, name="A", slug=f"a-{org_a.hex[:6]}"),
+            _TenantThing(id=uuid.uuid4(), org_id=org_a, name="a1"),
+        ]
+    )
     await test_db.commit()
 
     # No set_context → the ORM listener does not add a filter clause.

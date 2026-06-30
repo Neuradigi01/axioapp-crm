@@ -12,15 +12,14 @@ All write endpoints require `roles.write`. The two reads require
 `roles.read`. System roles (those seeded by `pack.yaml` /
 `seed_*.py`) are read-only — PATCH / DELETE returns 403.
 """
+
 from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from fastapi import HTTPException
 
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.permissions import role_templates
@@ -42,7 +41,6 @@ from src.app.core.permissions.service import (
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 roles_router = APIRouter(prefix="/roles", tags=["Roles"])
 permissions_router = APIRouter(prefix="/permissions", tags=["Permissions"])
@@ -82,9 +80,7 @@ async def update_role_endpoint(
     user: User = Depends(require_permissions("roles.write")),
     session: AsyncSession = Depends(get_db),
 ) -> RoleOut:
-    role = await update_role(
-        session, role_id=role_id, org_id=user.org_id, payload=payload
-    )
+    role = await update_role(session, role_id=role_id, org_id=user.org_id, payload=payload)
     return RoleOut.model_validate(role)
 
 
@@ -124,9 +120,7 @@ async def list_role_templates_endpoint(
     installed = await role_templates.installed_template_names(session, user.org_id)
     out: list[RoleTemplateOut] = []
     for t in role_templates.ROLE_TEMPLATES.values():
-        keys = (
-            list(t.permission_keys) if isinstance(t.permission_keys, list) else []
-        )
+        keys = list(t.permission_keys) if isinstance(t.permission_keys, list) else []
         out.append(
             RoleTemplateOut(
                 key=t.key,

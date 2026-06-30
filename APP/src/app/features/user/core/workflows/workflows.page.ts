@@ -76,7 +76,6 @@ const CHANNEL_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'push', label: 'Push' },
 ];
 
-
 @Component({
   selector: 'app-workflows-page',
   standalone: true,
@@ -133,9 +132,7 @@ export class WorkflowsPageComponent {
   // Per-row "more" menu.
   protected readonly openMenuId = signal<string | null>(null);
 
-  protected readonly canWrite = computed(() =>
-    this.auth.hasPermission('workflows.write'),
-  );
+  protected readonly canWrite = computed(() => this.auth.hasPermission('workflows.write'));
   protected readonly canActivate = computed(
     () => this.auth.hasPermission('workflows.activate') || this.canWrite(),
   );
@@ -143,13 +140,9 @@ export class WorkflowsPageComponent {
     () => this.auth.hasPermission('workflows.clone') || this.canWrite(),
   );
 
-  protected readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.total() / PAGE_SIZE)),
-  );
+  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / PAGE_SIZE)));
   protected readonly hasPrev = computed(() => this.pageIndex() > 0);
-  protected readonly hasNext = computed(
-    () => this.pageIndex() < this.totalPages() - 1,
-  );
+  protected readonly hasNext = computed(() => this.pageIndex() < this.totalPages() - 1);
 
   protected readonly hasFilters = computed(
     () =>
@@ -287,10 +280,7 @@ export class WorkflowsPageComponent {
   }
 
   protected get isAllSelected(): boolean {
-    return (
-      this.items().length > 0 &&
-      this.selectedIds().size === this.items().length
-    );
+    return this.items().length > 0 && this.selectedIds().size === this.items().length;
   }
 
   // --- bulk actions -------------------------------------------------
@@ -342,9 +332,7 @@ export class WorkflowsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.mutating.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Some workflows could not be updated.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Some workflows could not be updated.');
           // Refetch to reconcile.
           this.reload();
         },
@@ -366,10 +354,7 @@ export class WorkflowsPageComponent {
     event.stopPropagation();
     this.closeMenu();
     if (!this.canClone()) return;
-    const name = prompt(
-      'Name for the cloned workflow',
-      `${row.name} (copy)`,
-    );
+    const name = prompt('Name for the cloned workflow', `${row.name} (copy)`);
     if (!name) return;
     this.api
       .clone(row.id, name.trim())
@@ -395,14 +380,10 @@ export class WorkflowsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.items.update((rows) =>
-            rows.map((r) => (r.id === row.id ? updated : r)),
-          );
+          this.items.update((rows) => rows.map((r) => (r.id === row.id ? updated : r)));
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not archive workflow.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not archive workflow.');
         },
       });
   }
@@ -423,11 +404,7 @@ export class WorkflowsPageComponent {
   protected channelOf(row: WorkflowRead): string | null {
     for (const evt of row.enabled_event_types) {
       const prefix = evt.split('.')[0];
-      if (
-        ['email', 'whatsapp', 'sms', 'facebook', 'instagram', 'push'].includes(
-          prefix,
-        )
-      ) {
+      if (['email', 'whatsapp', 'sms', 'facebook', 'instagram', 'push'].includes(prefix)) {
         return prefix;
       }
     }
@@ -459,9 +436,7 @@ export class WorkflowsPageComponent {
           const channel = this.channelFilter();
           if (channel) {
             rows = rows.filter((r) =>
-              r.enabled_event_types.some((evt) =>
-                evt.toLowerCase().startsWith(`${channel}.`),
-              ),
+              r.enabled_event_types.some((evt) => evt.toLowerCase().startsWith(`${channel}.`)),
             );
           }
           this.items.set(rows);
@@ -472,9 +447,7 @@ export class WorkflowsPageComponent {
           this.items.set([]);
           this.total.set(0);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load workflows.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load workflows.');
         },
       });
   }

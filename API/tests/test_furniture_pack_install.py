@@ -12,6 +12,7 @@ Expected counts per the step file:
   - 7 lead sources
   - 6 call outcomes
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -41,15 +42,11 @@ def _pack_path() -> Path:
     for p in candidates:
         if p.exists():
             return p
-    raise FileNotFoundError(
-        f"furniture pack.yaml not found in any of: {candidates}"
-    )
+    raise FileNotFoundError(f"furniture pack.yaml not found in any of: {candidates}")
 
 
 @pytest.mark.asyncio
-async def test_furniture_pack_seeds_expected_counts(
-    test_db, seeded_admin
-):
+async def test_furniture_pack_seeds_expected_counts(test_db, seeded_admin):
     org = seeded_admin["org"]
     manifest = load_pack(_pack_path())
 
@@ -64,9 +61,7 @@ async def test_furniture_pack_seeds_expected_counts(
     # Pipelines: 2 total
     n_pipelines = (
         await test_db.execute(
-            select(func.count())
-            .select_from(Pipeline)
-            .where(Pipeline.org_id == org.id)
+            select(func.count()).select_from(Pipeline).where(Pipeline.org_id == org.id)
         )
     ).scalar_one()
     assert n_pipelines == 2
@@ -74,20 +69,28 @@ async def test_furniture_pack_seeds_expected_counts(
     # Leads pipeline — 6 stages (5 progression + 1 lost)
     leads = (
         await test_db.execute(
-            select(Pipeline)
-            .where(Pipeline.org_id == org.id, Pipeline.key == "leads")
+            select(Pipeline).where(Pipeline.org_id == org.id, Pipeline.key == "leads")
         )
     ).scalar_one()
     leads_stages = (
-        await test_db.execute(
-            select(PipelineStage)
-            .where(PipelineStage.pipeline_id == leads.id)
-            .order_by(PipelineStage.display_order)
+        (
+            await test_db.execute(
+                select(PipelineStage)
+                .where(PipelineStage.pipeline_id == leads.id)
+                .order_by(PipelineStage.display_order)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     leads_keys = [s.key for s in leads_stages]
     assert leads_keys == [
-        "new", "contacted", "showroom_visit", "quotation", "won", "lost",
+        "new",
+        "contacted",
+        "showroom_visit",
+        "quotation",
+        "won",
+        "lost",
     ]
     assert any(s.is_won for s in leads_stages)
     assert any(s.is_lost for s in leads_stages)
@@ -95,37 +98,34 @@ async def test_furniture_pack_seeds_expected_counts(
     # Custom orders pipeline — 7 stages
     co = (
         await test_db.execute(
-            select(Pipeline)
-            .where(Pipeline.org_id == org.id, Pipeline.key == "custom_orders")
+            select(Pipeline).where(Pipeline.org_id == org.id, Pipeline.key == "custom_orders")
         )
     ).scalar_one()
     co_stages = (
-        await test_db.execute(
-            select(PipelineStage)
-            .where(PipelineStage.pipeline_id == co.id)
-            .order_by(PipelineStage.display_order)
+        (
+            await test_db.execute(
+                select(PipelineStage)
+                .where(PipelineStage.pipeline_id == co.id)
+                .order_by(PipelineStage.display_order)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(co_stages) == 7
     assert [s.key for s in co_stages][0] == "measurement_scheduled"
     assert [s.key for s in co_stages][-1] == "cancelled"
 
     # Roles: 7
     n_roles = (
-        await test_db.execute(
-            select(func.count())
-            .select_from(Role)
-            .where(Role.org_id == org.id)
-        )
+        await test_db.execute(select(func.count()).select_from(Role).where(Role.org_id == org.id))
     ).scalar_one()
     assert n_roles == 7
 
     # Lead sources: 7
     n_sources = (
         await test_db.execute(
-            select(func.count())
-            .select_from(LeadSource)
-            .where(LeadSource.org_id == org.id)
+            select(func.count()).select_from(LeadSource).where(LeadSource.org_id == org.id)
         )
     ).scalar_one()
     assert n_sources == 7
@@ -133,9 +133,7 @@ async def test_furniture_pack_seeds_expected_counts(
     # Call outcomes: 6
     n_outcomes = (
         await test_db.execute(
-            select(func.count())
-            .select_from(CallOutcome)
-            .where(CallOutcome.org_id == org.id)
+            select(func.count()).select_from(CallOutcome).where(CallOutcome.org_id == org.id)
         )
     ).scalar_one()
     assert n_outcomes == 6
@@ -153,9 +151,7 @@ async def test_furniture_pack_seeds_expected_counts(
 
 
 @pytest.mark.asyncio
-async def test_furniture_pack_install_is_idempotent(
-    test_db, seeded_admin
-):
+async def test_furniture_pack_install_is_idempotent(test_db, seeded_admin):
     org = seeded_admin["org"]
     manifest = load_pack(_pack_path())
 

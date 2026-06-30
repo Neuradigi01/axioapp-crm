@@ -1,4 +1,5 @@
 """Data-access layer for the 2FA login challenge."""
+
 from __future__ import annotations
 
 from sqlalchemy import select

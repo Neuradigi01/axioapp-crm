@@ -73,14 +73,8 @@ export class PipelinesApiService {
     return this.http.get<Pipeline>(`${this.base}/${key}`);
   }
 
-  createStage(
-    pipelineKey: string,
-    payload: StageCreate,
-  ): Observable<PipelineStage> {
-    return this.http.post<PipelineStage>(
-      `${this.base}/${pipelineKey}/stages`,
-      payload,
-    );
+  createStage(pipelineKey: string, payload: StageCreate): Observable<PipelineStage> {
+    return this.http.post<PipelineStage>(`${this.base}/${pipelineKey}/stages`, payload);
   }
 
   updateStage(
@@ -88,10 +82,7 @@ export class PipelinesApiService {
     stageId: string,
     payload: StageUpdate,
   ): Observable<PipelineStage> {
-    return this.http.patch<PipelineStage>(
-      `${this.base}/${pipelineKey}/stages/${stageId}`,
-      payload,
-    );
+    return this.http.patch<PipelineStage>(`${this.base}/${pipelineKey}/stages/${stageId}`, payload);
   }
 
   /**
@@ -101,11 +92,7 @@ export class PipelinesApiService {
    * target was given. Callers should catch that 409 to surface the
    * relocation modal, then retry with `moveLeadsTo` filled in.
    */
-  deleteStage(
-    pipelineKey: string,
-    stageId: string,
-    moveLeadsTo?: string,
-  ): Observable<void> {
+  deleteStage(pipelineKey: string, stageId: string, moveLeadsTo?: string): Observable<void> {
     let url = `${this.base}/${pipelineKey}/stages/${stageId}`;
     if (moveLeadsTo) {
       url += `?move_leads_to=${encodeURIComponent(moveLeadsTo)}`;

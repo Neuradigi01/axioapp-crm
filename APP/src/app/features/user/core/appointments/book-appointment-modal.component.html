@@ -3,8 +3,7 @@
     <header class="border-b border-zinc-200 px-6 py-4">
       <h2 class="text-base font-semibold text-zinc-900">Book appointment</h2>
       <p class="mt-1 text-xs text-zinc-500">
-        Pick the contact, choose the team member it's for, then schedule a
-        time and place.
+        Pick the contact, choose the team member it's for, then schedule a time and place.
       </p>
     </header>
 
@@ -13,7 +12,9 @@
       <section>
         <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contact</h3>
         @if (selectedContact(); as c) {
-          <div class="mt-2 flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+          <div
+            class="mt-2 flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2"
+          >
             <div class="min-w-0">
               <p class="truncate text-sm font-medium text-zinc-900">{{ c.full_name }}</p>
               <p class="truncate text-xs text-zinc-500">
@@ -39,7 +40,9 @@
               class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
             @if (contactSearchOpen() && contactResults().length > 0) {
-              <ul class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-zinc-200">
+              <ul
+                class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-zinc-200"
+              >
                 @for (c of contactResults(); track c.id) {
                   <li>
                     <button
@@ -48,7 +51,9 @@
                       class="block w-full px-3 py-1.5 text-left text-sm hover:bg-zinc-50"
                     >
                       <span class="font-medium text-zinc-900">{{ c.full_name }}</span>
-                      <span class="ml-2 text-xs text-zinc-500">{{ c.phone ?? c.email ?? '—' }}</span>
+                      <span class="ml-2 text-xs text-zinc-500">{{
+                        c.phone ?? c.email ?? '—'
+                      }}</span>
                     </button>
                   </li>
                 }
@@ -70,7 +75,9 @@
                 id="ba_title"
                 type="text"
                 formControlName="title"
-                [attr.placeholder]="stdField('title')?.placeholder ?? 'e.g. Showroom visit · sofa selection'"
+                [attr.placeholder]="
+                  stdField('title')?.placeholder ?? 'e.g. Showroom visit · sofa selection'
+                "
                 class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
               @if (form.controls.title.touched && form.controls.title.invalid) {
@@ -86,13 +93,17 @@
             <div>
               <label class="block text-xs font-medium text-zinc-700" for="ba_purpose">
                 {{ stdField('purpose')?.label ?? 'Purpose' }}
-                @if (stdField('purpose')?.is_required) { <span class="text-red-600">*</span> }
+                @if (stdField('purpose')?.is_required) {
+                  <span class="text-red-600">*</span>
+                }
               </label>
               <input
                 id="ba_purpose"
                 type="text"
                 formControlName="purpose"
-                [attr.placeholder]="stdField('purpose')?.placeholder ?? 'showroom_visit, measurement, delivery, …'"
+                [attr.placeholder]="
+                  stdField('purpose')?.placeholder ?? 'showroom_visit, measurement, delivery, …'
+                "
                 class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
               @if (stdField('purpose')?.help_text; as help) {
@@ -105,7 +116,9 @@
             <div>
               <label class="block text-xs font-medium text-zinc-700" for="ba_location">
                 {{ stdField('location')?.label ?? 'Location' }}
-                @if (stdField('location')?.is_required) { <span class="text-red-600">*</span> }
+                @if (stdField('location')?.is_required) {
+                  <span class="text-red-600">*</span>
+                }
               </label>
               <input
                 id="ba_location"
@@ -142,7 +155,10 @@
               } @else {
                 @for (u of users(); track u.id) {
                   <option [value]="u.id">
-                    {{ u.full_name }}@if (u.id === me()?.id) { (you) }
+                    {{ u.full_name }}
+                    @if (u.id === me()?.id) {
+                      (you)
+                    }
                   </option>
                 }
               }
@@ -155,7 +171,8 @@
           @if (!isHidden('scheduled_at')) {
             <div>
               <label class="block text-xs font-medium text-zinc-700" for="ba_at">
-                {{ stdField('scheduled_at')?.label ?? 'Scheduled at' }} <span class="text-red-600">*</span>
+                {{ stdField('scheduled_at')?.label ?? 'Scheduled at' }}
+                <span class="text-red-600">*</span>
               </label>
               <input
                 id="ba_at"
@@ -175,7 +192,8 @@
           @if (!isHidden('duration_min')) {
             <div>
               <label class="block text-xs font-medium text-zinc-700" for="ba_dur">
-                {{ stdField('duration_min')?.label ?? 'Duration (min)' }} <span class="text-red-600">*</span>
+                {{ stdField('duration_min')?.label ?? 'Duration (min)' }}
+                <span class="text-red-600">*</span>
               </label>
               <input
                 id="ba_dur"
@@ -204,7 +222,6 @@
             </div>
           }
         </div>
-
       </section>
 
       <!-- Errors / conflicts -->
@@ -228,7 +245,9 @@
       }
     </form>
 
-    <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg">
+    <footer
+      class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg"
+    >
       <button
         type="button"
         (click)="cancel.emit()"

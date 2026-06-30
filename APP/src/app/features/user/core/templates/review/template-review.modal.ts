@@ -15,10 +15,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  TemplateRead,
-  TemplatesApiService,
-} from '../templates-api.service';
+import { TemplateRead, TemplatesApiService } from '../templates-api.service';
 
 /**
  * Review modal — wraps the Step-4 workflow endpoints.
@@ -35,7 +32,6 @@ import {
  * gated upstream so the modal can stay simple.
  */
 type ReviewAction = 'approve' | 'request_changes' | 'reject';
-
 
 @Component({
   selector: 'app-template-review-modal',

@@ -29,17 +29,11 @@ import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/
 import { extractApiError } from '@core/services/api-error.util';
 import { nullableTrim } from '@core/services/form.util';
 
-import {
-  ContactListItem,
-  ContactsApiService,
-} from '../../../core/contacts/contacts-api.service';
+import { ContactListItem, ContactsApiService } from '../../../core/contacts/contacts-api.service';
 import { StandardFieldsApiService } from '../../../core/standard-fields/standard-fields-api.service';
 import { StandardFieldsSignalsService } from '../../../core/standard-fields/standard-fields-signals.service';
 import type { StandardFieldRendered } from '../../../core/standard-fields/types';
-import {
-  CustomOrderCreate,
-  CustomOrdersApiService,
-} from './custom-orders-api.service';
+import { CustomOrderCreate, CustomOrdersApiService } from './custom-orders-api.service';
 
 /**
  * Multi-step "New Custom Order" wizard.
@@ -78,9 +72,7 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
   private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>(
-    {},
-  );
+  protected readonly stdFields = signal<Record<string, StandardFieldRendered>>({});
 
   protected stdField(key: string): StandardFieldRendered | undefined {
     return this.stdFields()[key];
@@ -114,13 +106,8 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
   /** Layer override-driven validators on top of the static shape validators.
    *  `title` is backend-locked-required. The rest accept `required`; currency
    *  fields additionally accept `min`/`max`. */
-  private applyStandardValidators(
-    map: Record<string, StandardFieldRendered>,
-  ): void {
-    this.basics.controls.title.setValidators([
-      Validators.required,
-      Validators.maxLength(255),
-    ]);
+  private applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
+    this.basics.controls.title.setValidators([Validators.required, Validators.maxLength(255)]);
     this.basics.controls.title.updateValueAndValidity({ emitEvent: false });
 
     const setReq = (
@@ -145,24 +132,18 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
     setReq('finish', map['finish']);
     setReq('expected_delivery_date', map['expected_delivery_date']);
 
-    const currencyValidators = (
-      row: StandardFieldRendered | undefined,
-    ): ValidatorFn[] => {
+    const currencyValidators = (row: StandardFieldRendered | undefined): ValidatorFn[] => {
       const v: ValidatorFn[] = [];
       if (row?.is_required) v.push(Validators.required);
       if (row?.min_value != null) v.push(Validators.min(row.min_value));
       if (row?.max_value != null) v.push(Validators.max(row.max_value));
       return v;
     };
-    this.basics.controls.total_amount.setValidators(
-      currencyValidators(map['total_amount']),
-    );
+    this.basics.controls.total_amount.setValidators(currencyValidators(map['total_amount']));
     this.basics.controls.total_amount.updateValueAndValidity({
       emitEvent: false,
     });
-    this.basics.controls.advance_paid.setValidators(
-      currencyValidators(map['advance_paid']),
-    );
+    this.basics.controls.advance_paid.setValidators(currencyValidators(map['advance_paid']));
     this.basics.controls.advance_paid.updateValueAndValidity({
       emitEvent: false,
     });
@@ -196,8 +177,9 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
   });
 
   // Step 2 â€” measurements (FormArray of FormGroups)
-  readonly measurements: FormArray<FormGroup<MeasurementRowGroup>> =
-    this.fb.array<FormGroup<MeasurementRowGroup>>([]);
+  readonly measurements: FormArray<FormGroup<MeasurementRowGroup>> = this.fb.array<
+    FormGroup<MeasurementRowGroup>
+  >([]);
 
   // Step 3 â€” photos (signal, not a form control â€” File objects are out-of-band)
   protected readonly photos = signal<PhotoStaged[]>([]);
@@ -227,7 +209,9 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
         switchMap((q) =>
           this.contactsApi
             .list({ q: q || undefined, size: 8 })
-            .pipe(catchError(() => of({ items: [] as ContactListItem[], total: 0, page: 1, size: 8 }))),
+            .pipe(
+              catchError(() => of({ items: [] as ContactListItem[], total: 0, page: 1, size: 8 })),
+            ),
         ),
         takeUntilDestroyed(this.destroyRef),
       )
@@ -350,8 +334,7 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
     const v = this.basics.getRawValue();
     const materials: Record<string, string> = {};
     if (v.material_primary.trim()) materials['primary'] = v.material_primary.trim();
-    if (v.material_secondary.trim())
-      materials['secondary'] = v.material_secondary.trim();
+    if (v.material_secondary.trim()) materials['secondary'] = v.material_secondary.trim();
 
     const payload: CustomOrderCreate = {
       contact_id: this.selectedContact()?.id ?? null,
@@ -374,9 +357,7 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
         },
         error: (err: HttpErrorResponse) => {
           this._submitting.set(false);
-          this.submitError.set(
-            extractApiError(err) ?? 'Could not create custom order.',
-          );
+          this.submitError.set(extractApiError(err) ?? 'Could not create custom order.');
         },
       });
   }
@@ -399,10 +380,7 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
       this.api.uploadPhoto(orderId, p.file, p.caption.trim() || null),
     );
 
-    const all: Observable<unknown>[] = [
-      ...measurementRequests,
-      ...photoRequests,
-    ];
+    const all: Observable<unknown>[] = [...measurementRequests, ...photoRequests];
     if (all.length === 0) {
       this._submitting.set(false);
       this.created.emit();
@@ -421,23 +399,18 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
     };
 
     for (const req of all) {
-      req
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: () => done(),
-          error: (err: HttpErrorResponse) => {
-            if (!firstError) {
-              firstError =
-                extractApiError(err)
-                ?? 'Order created, but some attachments failed to upload.';
-            }
-            done();
-          },
-        });
+      req.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: () => done(),
+        error: (err: HttpErrorResponse) => {
+          if (!firstError) {
+            firstError =
+              extractApiError(err) ?? 'Order created, but some attachments failed to upload.';
+          }
+          done();
+        },
+      });
     }
   }
-
-
 }
 
 interface MeasurementRowGroup {

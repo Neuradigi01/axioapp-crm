@@ -14,10 +14,9 @@
       <section>
         <h3 class="text-sm font-semibold text-zinc-900">Quiet hours</h3>
         <p class="mt-1 text-xs text-zinc-500">
-          Marketing automations don't send to customers in the window below.
-          Runs that land inside it are deferred to the end of the window —
-          they aren't dropped. Transactional templates (receipts, OTPs,
-          shipment notifications) always send, even during quiet hours.
+          Marketing automations don't send to customers in the window below. Runs that land inside
+          it are deferred to the end of the window — they aren't dropped. Transactional templates
+          (receipts, OTPs, shipment notifications) always send, even during quiet hours.
         </p>
 
         <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -56,10 +55,10 @@
       <section>
         <h3 class="text-sm font-semibold text-zinc-900">Frequency cap</h3>
         <p class="mt-1 text-xs text-zinc-500">
-          The maximum number of marketing messages a single contact will
-          receive in any rolling 7-day window. Going over this cap blocks
-          the send and records it as <code class="rounded bg-zinc-100 px-1 py-0.5 text-[11px]">skipped</code>
-          with reason <code class="rounded bg-zinc-100 px-1 py-0.5 text-[11px]">frequency_cap_exceeded</code>.
+          The maximum number of marketing messages a single contact will receive in any rolling
+          7-day window. Going over this cap blocks the send and records it as
+          <code class="rounded bg-zinc-100 px-1 py-0.5 text-[11px]">skipped</code> with reason
+          <code class="rounded bg-zinc-100 px-1 py-0.5 text-[11px]">frequency_cap_exceeded</code>.
           Transactional templates are not counted toward the cap.
         </p>
 
@@ -93,12 +92,12 @@
       <section>
         <h3 class="text-sm font-semibold text-zinc-900">DPDP marketing consent</h3>
         <p class="mt-1 text-xs text-zinc-500">
-          Per the DPDP Act, marketing messages can only go to contacts who
-          have opted in. The send-guard automatically skips any contact
-          whose consent state is <code class="rounded bg-zinc-100 px-1 py-0.5 text-[11px]">opted_out</code>
-          (WhatsApp) or whose <code class="rounded bg-zinc-100 px-1 py-0.5 text-[11px]">email_opt_out</code>
-          flag is true, regardless of the cap or quiet-hours settings above.
-          This policy is enforced — there's no toggle to disable it.
+          Per the DPDP Act, marketing messages can only go to contacts who have opted in. The
+          send-guard automatically skips any contact whose consent state is
+          <code class="rounded bg-zinc-100 px-1 py-0.5 text-[11px]">opted_out</code> (WhatsApp) or
+          whose <code class="rounded bg-zinc-100 px-1 py-0.5 text-[11px]">email_opt_out</code>
+          flag is true, regardless of the cap or quiet-hours settings above. This policy is enforced
+          — there's no toggle to disable it.
         </p>
       </section>
 
@@ -108,7 +107,9 @@
         </div>
       }
       @if (saveOk()) {
-        <div class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+        <div
+          class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700"
+        >
           Saved.
         </div>
       }

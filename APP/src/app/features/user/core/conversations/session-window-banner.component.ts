@@ -88,9 +88,7 @@ export class SessionWindowBannerComponent implements OnInit, OnDestroy {
   private intervalHandle: ReturnType<typeof setInterval> | null = null;
   private readonly visibilityHandler = () => this.tick.update((v) => v + 1);
 
-  protected readonly display = computed<
-    { inSession: boolean; remaining: string } | null
-  >(() => {
+  protected readonly display = computed<{ inSession: boolean; remaining: string } | null>(() => {
     // Consume the tick signal so this computed re-runs on each minute.
     this.tick();
     const s = this.state;
@@ -109,17 +107,13 @@ export class SessionWindowBannerComponent implements OnInit, OnDestroy {
     const totalMinutes = Math.floor(deltaMs / 60000);
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-    const remaining =
-      hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+    const remaining = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
     return { inSession: true, remaining };
   });
 
   ngOnInit(): void {
     // Refresh every 60s while mounted.
-    this.intervalHandle = setInterval(
-      () => this.tick.update((v) => v + 1),
-      60_000,
-    );
+    this.intervalHandle = setInterval(() => this.tick.update((v) => v + 1), 60_000);
     // Recompute on tab-visibility change so a backgrounded tab snaps
     // back to current state when re-focused.
     document.addEventListener('visibilitychange', this.visibilityHandler);

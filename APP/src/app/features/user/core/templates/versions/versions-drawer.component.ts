@@ -17,11 +17,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
 
 import { PreviewPaneComponent } from '../editor/preview-pane.component';
-import {
-  TemplateRead,
-  TemplateVersionRead,
-  TemplatesApiService,
-} from '../templates-api.service';
+import { TemplateRead, TemplateVersionRead, TemplatesApiService } from '../templates-api.service';
 
 /**
  * Versions drawer — right-side panel listing every saved version of
@@ -83,9 +79,7 @@ export class VersionsDrawerComponent {
         error: (err: HttpErrorResponse) => {
           this.versions.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load versions.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load versions.');
         },
       });
   }
@@ -119,9 +113,7 @@ export class VersionsDrawerComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.restoring.set(null);
-          this.restoreError.set(
-            extractApiError(err) ?? `Could not restore v${v.version}.`,
-          );
+          this.restoreError.set(extractApiError(err) ?? `Could not restore v${v.version}.`);
         },
       });
   }

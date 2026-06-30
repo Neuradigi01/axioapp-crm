@@ -10,10 +10,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 
-import {
-  StaffPickerUser,
-  StaffPortalApiService,
-} from '../staff-portal-api.service';
+import { StaffPickerUser, StaffPortalApiService } from '../staff-portal-api.service';
 import { StaffSessionService } from '../staff-session.service';
 import { initials } from '@core/services/text.util';
 import { extractApiError } from '@core/services/api-error.util';
@@ -47,8 +44,7 @@ export class StaffPortalLoginPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly orgSlug =
-    this.route.snapshot.queryParamMap.get('org') || DEFAULT_ORG_SLUG;
+  protected readonly orgSlug = this.route.snapshot.queryParamMap.get('org') || DEFAULT_ORG_SLUG;
 
   protected readonly users = signal<StaffPickerUser[]>([]);
   protected readonly loadingUsers = signal(false);
@@ -62,7 +58,18 @@ export class StaffPortalLoginPageComponent {
   protected readonly digits = computed(() => this.pin().padEnd(4, ' '));
 
   protected readonly keypad: ReadonlyArray<string> = [
-    '1', '2', '3', '4', '5', '6', '7', '8', '9', 'âŒ«', '0', 'OK',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    'âŒ«',
+    '0',
+    'OK',
   ];
 
   constructor() {
@@ -113,7 +120,6 @@ export class StaffPortalLoginPageComponent {
     return palette[h % palette.length];
   }
 
-
   private loadUsers(): void {
     this.loadingUsers.set(true);
     this.loadError.set(null);
@@ -128,9 +134,7 @@ export class StaffPortalLoginPageComponent {
         error: (err: HttpErrorResponse) => {
           this.users.set([]);
           this.loadingUsers.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load staff list.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load staff list.');
         },
       });
   }
@@ -154,9 +158,7 @@ export class StaffPortalLoginPageComponent {
           this.submitting.set(false);
           this.pin.set('');
           if (err.status === 429) {
-            this.submitError.set(
-              'Too many attempts. Try again in a minute.',
-            );
+            this.submitError.set('Too many attempts. Try again in a minute.');
           } else if (err.status === 401) {
             this.submitError.set('Wrong PIN. Try again.');
           } else {
@@ -165,5 +167,4 @@ export class StaffPortalLoginPageComponent {
         },
       });
   }
-
 }

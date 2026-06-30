@@ -19,6 +19,7 @@ resolves an adapter instance for a `(channel)` pair and the service
 calls into it. This keeps the engine channel-agnostic and lets
 Step 3.9 plug in WhatsApp without changing the engine.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -84,11 +85,9 @@ class ChannelAdapter(Protocol):
         external_id: str,
         text: str,
         attachments: list[dict[str, Any]],
-    ) -> ChannelMessageRef:
-        ...
+    ) -> ChannelMessageRef: ...
 
-    def parse_webhook(self, payload: dict[str, Any]) -> InboundMessage:
-        ...
+    def parse_webhook(self, payload: dict[str, Any]) -> InboundMessage: ...
 
 
 __all__ = [

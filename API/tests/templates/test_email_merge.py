@@ -6,6 +6,7 @@ Instead this file pins the status-mapping dict the migration uses,
 plus a behavioural check that the post-merge email-sequence DAL
 filters archived rows correctly.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -21,7 +22,6 @@ from src.app.core.templates.models import TemplateCategory, TemplateInternalStat
 from src.app.core.templates.schemas import TemplateCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -33,9 +33,7 @@ def test_email_merge_status_mapping_is_stable():
     import os
 
     here = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    path = os.path.join(
-        here, "alembic", "versions", "0121_email_template_merge.py"
-    )
+    path = os.path.join(here, "alembic", "versions", "0121_email_template_merge.py")
     spec = importlib.util.spec_from_file_location("merge_0121", path)
     assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
@@ -56,10 +54,7 @@ def test_email_merge_status_mapping_is_stable():
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {"id": str(org_id), "name": "Demo", "slug": f"demo-{org_id.hex[:6]}"},
     )
     await test_db.commit()

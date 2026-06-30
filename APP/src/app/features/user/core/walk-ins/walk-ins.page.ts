@@ -26,7 +26,10 @@ import {
 import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
 import { InrPipe } from '../shared/pipes/inr.pipe';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
-import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
+import {
+  ReassignConfirm,
+  ReassignModalComponent,
+} from '../shared/reassign-modal/reassign-modal.component';
 import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import {
@@ -45,7 +48,6 @@ import {
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
 import { Router } from '@angular/router';
-
 
 /** FE mirror of `core/walk_ins/status_workflow.ALLOWED_TRANSITIONS`. The
  * row-level action buttons read this to decide which buttons to show;
@@ -167,15 +169,11 @@ export class WalkInsPageComponent {
 
   /** Can the user run the Convert action? Same permission as creating
    * a lead, which is what the convert side-effect produces. */
-  readonly canConvert = computed(() =>
-    this.auth.hasPermission('leads.write'),
-  );
+  readonly canConvert = computed(() => this.auth.hasPermission('leads.write'));
 
   /** Can the user reassign a walk-in? Owner pencil + bulk reassign
    * both gate on this. Junior staff lack the key. */
-  readonly canReassign = computed(() =>
-    this.auth.hasPermission('walkins.reassign'),
-  );
+  readonly canReassign = computed(() => this.auth.hasPermission('walkins.reassign'));
 
   /** URL ↔ state map for filters + view state. */
   readonly urlState: UrlFilterStateConfig = {
@@ -220,11 +218,7 @@ export class WalkInsPageComponent {
     sort: {
       read: () => this.sortKey(),
       write: (v) => {
-        if (
-          v === 'time_in' ||
-          v === 'created_at' ||
-          v === 'last_activity_at'
-        ) {
+        if (v === 'time_in' || v === 'created_at' || v === 'last_activity_at') {
           this.sortKey.set(v);
         }
       },
@@ -243,20 +237,19 @@ export class WalkInsPageComponent {
 
   // --- KPI cards (computed from `all`) ---
 
-  readonly todayCount = computed(() =>
-    this.state.items().filter((w) => this.isToday(w.time_in)).length,
+  readonly todayCount = computed(
+    () => this.state.items().filter((w) => this.isToday(w.time_in)).length,
   );
-  readonly convertedTodayCount = computed(() =>
-    this.state.items().filter(
-      (w) => w.status === 'converted' && this.isToday(w.updated_at),
-    ).length,
+  readonly convertedTodayCount = computed(
+    () =>
+      this.state.items().filter((w) => w.status === 'converted' && this.isToday(w.updated_at))
+        .length,
   );
   /** Combined "warm leads" count â€” interested + follow_up across all loaded rows. */
   readonly interestedOrFollowUpCount = computed(
     () =>
-      this.state.items().filter(
-        (w) => w.status === 'interested' || w.status === 'follow_up',
-      ).length,
+      this.state.items().filter((w) => w.status === 'interested' || w.status === 'follow_up')
+        .length,
   );
   readonly conversionRate = computed(() => {
     const today = this.todayCount();
@@ -266,7 +259,8 @@ export class WalkInsPageComponent {
   });
   /** Average visit duration in minutes, across all checked-out walk-ins. */
   readonly avgVisitDuration = computed<number | null>(() => {
-    const completed = this.state.items()
+    const completed = this.state
+      .items()
       .map((w) => (w.duration_min !== null ? Number(w.duration_min) : null))
       .filter((n): n is number => n !== null && Number.isFinite(n));
     if (completed.length === 0) return null;
@@ -276,9 +270,20 @@ export class WalkInsPageComponent {
 
   constructor() {
     this.state.bulkActions.set([
-      { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'walkins.reassign' },
+      {
+        key: 'reassign',
+        label: 'Reassign to…',
+        icon: 'user-cog',
+        permissionKey: 'walkins.reassign',
+      },
       { key: 'checkout', label: 'Check out', icon: 'log-out', permissionKey: 'walkins.write' },
-      { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'walkins.write' },
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: 'trash-2',
+        danger: true,
+        permissionKey: 'walkins.write',
+      },
     ]);
     this.reload();
     effect(() => {
@@ -503,16 +508,12 @@ export class WalkInsPageComponent {
       .subscribe({
         next: (updated) => {
           this.singleReassignSubmitting.set(false);
-          this.state.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.closeSingleReassign();
         },
         error: (err: HttpErrorResponse) => {
           this.singleReassignSubmitting.set(false);
-          this.singleReassignError.set(
-            extractApiError(err) ?? 'Could not reassign walk-in.',
-          );
+          this.singleReassignError.set(extractApiError(err) ?? 'Could not reassign walk-in.');
         },
       });
   }
@@ -556,9 +557,7 @@ export class WalkInsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.convertSubmitting.set(false);
-          this.convertError.set(
-            extractApiError(err) ?? 'Could not convert walk-in.',
-          );
+          this.convertError.set(extractApiError(err) ?? 'Could not convert walk-in.');
         },
       });
   }
@@ -576,15 +575,11 @@ export class WalkInsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.state.items.update((rows) =>
-            rows.map((w) => (w.id === updated.id ? updated : w)),
-          );
+          this.state.items.update((rows) => rows.map((w) => (w.id === updated.id ? updated : w)));
         },
         error: (err: HttpErrorResponse) => {
           this.state.items.set(before);
-          this.state.loadError.set(
-            extractApiError(err) ?? 'Could not update walk-in status.',
-          );
+          this.state.loadError.set(extractApiError(err) ?? 'Could not update walk-in status.');
         },
       });
   }
@@ -608,24 +603,18 @@ export class WalkInsPageComponent {
     const optimisticNow = new Date().toISOString();
     const before = this.state.items();
     this.state.items.update((rows) =>
-      rows.map((w) =>
-        w.id === walkIn.id ? { ...w, time_out: optimisticNow } : w,
-      ),
+      rows.map((w) => (w.id === walkIn.id ? { ...w, time_out: optimisticNow } : w)),
     );
     this.api
       .checkout(walkIn.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.state.items.update((rows) =>
-            rows.map((w) => (w.id === updated.id ? updated : w)),
-          );
+          this.state.items.update((rows) => rows.map((w) => (w.id === updated.id ? updated : w)));
         },
         error: (err: HttpErrorResponse) => {
           this.state.items.set(before);
-          this.state.loadError.set(
-            extractApiError(err) ?? 'Could not check out walk-in.',
-          );
+          this.state.loadError.set(extractApiError(err) ?? 'Could not check out walk-in.');
         },
       });
   }
@@ -644,7 +633,6 @@ export class WalkInsPageComponent {
         return 'bg-red-100 text-red-700 ring-red-200';
     }
   }
-
 
   protected contactFor(id: string): ContactSummary | null {
     return this.contactsById()[id] ?? null;
@@ -709,19 +697,13 @@ export class WalkInsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.state.items.set([]);
           this.state.loading.set(false);
-          this.state.loadError.set(
-            extractApiError(err) ?? 'Could not load walk-ins.',
-          );
+          this.state.loadError.set(extractApiError(err) ?? 'Could not load walk-ins.');
         },
       });
   }
 
   private fetchContacts(ids: string[]): void {
-    forkJoin(
-      ids.map((id) =>
-        this.contactsApi.get(id).pipe(catchError(() => of(null))),
-      ),
-    )
+    forkJoin(ids.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((results) => {
         this.contactsById.update((cache) => {
@@ -738,10 +720,9 @@ export class WalkInsPageComponent {
     const d = new Date(iso);
     const now = new Date();
     return (
-      d.getFullYear() === now.getFullYear()
-      && d.getMonth() === now.getMonth()
-      && d.getDate() === now.getDate()
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
     );
   }
-
 }

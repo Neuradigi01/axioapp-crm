@@ -28,7 +28,6 @@ import {
 type Mode = 'list' | 'create' | 'edit';
 type Tab = 'keywords' | 'assignment' | 'ai';
 
-
 /**
  * WhatsApp Automation page (whatsapp-platform-upgrade Step 17).
  *
@@ -70,9 +69,7 @@ export class WhatsAppAutomationPageComponent {
   protected readonly activeTab = signal<Tab>('keywords');
 
   protected readonly assignmentRules = signal<AssignmentRule[]>([]);
-  protected readonly editingAssignmentRule = signal<AssignmentRule | null>(
-    null,
-  );
+  protected readonly editingAssignmentRule = signal<AssignmentRule | null>(null);
 
   protected setTab(tab: Tab): void {
     this.activeTab.set(tab);
@@ -107,9 +104,7 @@ export class WhatsAppAutomationPageComponent {
         error: (err: HttpErrorResponse) => {
           this.rules.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load automation rules.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load automation rules.');
         },
       });
     this.api
@@ -137,9 +132,7 @@ export class WhatsAppAutomationPageComponent {
 
   protected onAssignmentSaved(_rule: AssignmentRule): void {
     this.toast.set(
-      this.mode() === 'create'
-        ? 'Assignment rule created.'
-        : 'Assignment rule saved.',
+      this.mode() === 'create' ? 'Assignment rule created.' : 'Assignment rule saved.',
     );
     this.editingAssignmentRule.set(null);
     this.mode.set('list');
@@ -160,14 +153,10 @@ export class WhatsAppAutomationPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.assignmentRules.update((arr) =>
-            arr.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.assignmentRules.update((arr) => arr.map((r) => (r.id === updated.id ? updated : r)));
         },
         error: (err: HttpErrorResponse) => {
-          this.toast.set(
-            extractApiError(err) ?? 'Could not toggle the rule.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not toggle the rule.');
         },
       });
   }
@@ -180,15 +169,11 @@ export class WhatsAppAutomationPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.assignmentRules.update((arr) =>
-            arr.filter((r) => r.id !== rule.id),
-          );
+          this.assignmentRules.update((arr) => arr.filter((r) => r.id !== rule.id));
           this.toast.set('Assignment rule deleted.');
         },
         error: (err: HttpErrorResponse) => {
-          this.toast.set(
-            extractApiError(err) ?? 'Could not delete the rule.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not delete the rule.');
         },
       });
   }
@@ -216,9 +201,7 @@ export class WhatsAppAutomationPageComponent {
       .subscribe({
         next: (rows) => this.assignmentRules.set(rows),
         error: (err: HttpErrorResponse) => {
-          this.toast.set(
-            extractApiError(err) ?? 'Could not reorder rules.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not reorder rules.');
           this.reload();
         },
       });
@@ -245,9 +228,7 @@ export class WhatsAppAutomationPageComponent {
   }
 
   protected onSaved(rule: KeywordRule): void {
-    this.toast.set(
-      this.mode() === 'create' ? 'Rule created.' : 'Rule saved.',
-    );
+    this.toast.set(this.mode() === 'create' ? 'Rule created.' : 'Rule saved.');
     this.closeEditor();
     this.reload();
   }
@@ -272,14 +253,10 @@ export class WhatsAppAutomationPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.rules.update((arr) =>
-            arr.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.rules.update((arr) => arr.map((r) => (r.id === updated.id ? updated : r)));
         },
         error: (err: HttpErrorResponse) => {
-          this.toast.set(
-            extractApiError(err) ?? 'Could not toggle the rule.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not toggle the rule.');
         },
       });
   }
@@ -292,15 +269,11 @@ export class WhatsAppAutomationPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.rules.update((arr) =>
-            arr.filter((r) => r.id !== rule.id),
-          );
+          this.rules.update((arr) => arr.filter((r) => r.id !== rule.id));
           this.toast.set('Rule deleted.');
         },
         error: (err: HttpErrorResponse) => {
-          this.toast.set(
-            extractApiError(err) ?? 'Could not delete the rule.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not delete the rule.');
         },
       });
   }
@@ -331,9 +304,7 @@ export class WhatsAppAutomationPageComponent {
       .subscribe({
         next: (rows) => this.rules.set(rows),
         error: (err: HttpErrorResponse) => {
-          this.toast.set(
-            extractApiError(err) ?? 'Could not reorder rules.',
-          );
+          this.toast.set(extractApiError(err) ?? 'Could not reorder rules.');
           // Roll back by re-fetching.
           this.reload();
         },
@@ -358,9 +329,7 @@ export class WhatsAppAutomationPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.testRunning.set(false);
-          this.testError.set(
-            extractApiError(err) ?? 'Could not run the test.',
-          );
+          this.testError.set(extractApiError(err) ?? 'Could not run the test.');
         },
       });
   }

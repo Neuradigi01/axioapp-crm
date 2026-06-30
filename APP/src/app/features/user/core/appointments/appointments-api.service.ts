@@ -6,16 +6,9 @@ import { FieldDef } from '../shared/dynamic-form/types';
 import { BaseCrudApiService } from '../shared/services/base-crud-api.service';
 import { buildHttpParams } from '../shared/services/query-builder';
 
-export type AppointmentStatus =
-  | 'scheduled'
-  | 'completed'
-  | 'cancelled'
-  | 'no_show';
+export type AppointmentStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show';
 
-export type AppointmentSortKey =
-  | 'scheduled_at'
-  | 'created_at'
-  | 'last_activity_at';
+export type AppointmentSortKey = 'scheduled_at' | 'created_at' | 'last_activity_at';
 
 export type SortOrder = 'asc' | 'desc';
 
@@ -117,10 +110,7 @@ export class AppointmentsApiService extends BaseCrudApiService<
 
   /** Single-row reassign. Appointments require an owner, so `userId`
    * must be non-null — the backend rejects null. */
-  reassign(
-    id: string,
-    body: { userId: string; note?: string | null },
-  ): Observable<Appointment> {
+  reassign(id: string, body: { userId: string; note?: string | null }): Observable<Appointment> {
     return this.http.post<Appointment>(`${this.base}/${id}/reassign`, {
       assigned_to_id: body.userId,
       note: body.note ?? null,
@@ -145,9 +135,9 @@ export class AppointmentsApiService extends BaseCrudApiService<
     ids: string[],
     body: { reason?: string | null } = {},
   ): Observable<{ cancelled: number; skipped: number }> {
-    return this.http.post<{ cancelled: number; skipped: number }>(
-      `${this.base}/bulk-cancel`,
-      { ids, reason: body.reason ?? null },
-    );
+    return this.http.post<{ cancelled: number; skipped: number }>(`${this.base}/bulk-cancel`, {
+      ids,
+      reason: body.reason ?? null,
+    });
   }
 }

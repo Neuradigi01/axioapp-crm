@@ -9,15 +9,15 @@
   [class.bg-emerald-50]="isDragging() && canAttachMedia()"
 >
   <!-- Mode toggle (Reply / Note) — Step 13 -->
-  <div class="mb-2 inline-flex items-center gap-0.5 rounded-md border border-zinc-200 bg-white p-0.5 text-xs">
+  <div
+    class="mb-2 inline-flex items-center gap-0.5 rounded-md border border-zinc-200 bg-white p-0.5 text-xs"
+  >
     <button
       type="button"
       (click)="setMode('reply')"
       [class]="
         'rounded-md px-2.5 py-1 font-medium transition ' +
-        (mode() === 'reply'
-          ? 'bg-zinc-900 text-white'
-          : 'text-zinc-600 hover:bg-zinc-100')
+        (mode() === 'reply' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100')
       "
     >
       Reply
@@ -27,9 +27,7 @@
       (click)="setMode('note')"
       [class]="
         'rounded-md px-2.5 py-1 font-medium transition ' +
-        (mode() === 'note'
-          ? 'bg-amber-500 text-white'
-          : 'text-zinc-600 hover:bg-zinc-100')
+        (mode() === 'note' ? 'bg-amber-500 text-white' : 'text-zinc-600 hover:bg-zinc-100')
       "
     >
       <lucide-icon name="sticky-note" size="11" class="mr-1 inline" />
@@ -40,7 +38,9 @@
   @if (isNoteMode() && mentions().length > 0) {
     <div class="mb-2 flex flex-wrap gap-1">
       @for (m of mentions(); track m.userId) {
-        <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200">
+        <span
+          class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200"
+        >
           @{{ m.displayName }}
           <button
             type="button"
@@ -56,20 +56,44 @@
   }
 
   @if (templateError(); as err) {
-    <div class="mb-2 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800">
-      <lucide-icon name="alert-triangle" size="14" class="mt-0.5 shrink-0" aria-hidden="true"></lucide-icon>
+    <div
+      class="mb-2 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800"
+    >
+      <lucide-icon
+        name="alert-triangle"
+        size="14"
+        class="mt-0.5 shrink-0"
+        aria-hidden="true"
+      ></lucide-icon>
       <span class="flex-1">{{ err }}</span>
-      <button type="button" class="text-rose-700 hover:text-rose-900" aria-label="Dismiss" (click)="dismissTemplateError()">
+      <button
+        type="button"
+        class="text-rose-700 hover:text-rose-900"
+        aria-label="Dismiss"
+        (click)="dismissTemplateError()"
+      >
         <lucide-icon name="x" size="12" aria-hidden="true"></lucide-icon>
       </button>
     </div>
   }
 
   @if (mediaError(); as merr) {
-    <div class="mb-2 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800">
-      <lucide-icon name="alert-triangle" size="14" class="mt-0.5 shrink-0" aria-hidden="true"></lucide-icon>
+    <div
+      class="mb-2 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800"
+    >
+      <lucide-icon
+        name="alert-triangle"
+        size="14"
+        class="mt-0.5 shrink-0"
+        aria-hidden="true"
+      ></lucide-icon>
       <span class="flex-1">{{ merr }}</span>
-      <button type="button" class="text-rose-700 hover:text-rose-900" aria-label="Dismiss" (click)="dismissMediaError()">
+      <button
+        type="button"
+        class="text-rose-700 hover:text-rose-900"
+        aria-label="Dismiss"
+        (click)="dismissMediaError()"
+      >
         <lucide-icon name="x" size="12" aria-hidden="true"></lucide-icon>
       </button>
     </div>
@@ -86,9 +110,7 @@
         aria-hidden="true"
       ></lucide-icon>
       <div class="min-w-0 flex-1">
-        <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-          Replying to
-        </p>
+        <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Replying to</p>
         <p class="truncate text-xs">{{ quotedSnippet() }}</p>
       </div>
       <button
@@ -109,23 +131,41 @@
     >
       @switch (stagedType()) {
         @case ('image') {
-          <lucide-icon name="image" size="20" class="text-zinc-500" aria-hidden="true"></lucide-icon>
+          <lucide-icon
+            name="image"
+            size="20"
+            class="text-zinc-500"
+            aria-hidden="true"
+          ></lucide-icon>
         }
         @case ('video') {
-          <lucide-icon name="video" size="20" class="text-zinc-500" aria-hidden="true"></lucide-icon>
+          <lucide-icon
+            name="video"
+            size="20"
+            class="text-zinc-500"
+            aria-hidden="true"
+          ></lucide-icon>
         }
         @case ('audio') {
-          <lucide-icon name="music" size="20" class="text-zinc-500" aria-hidden="true"></lucide-icon>
+          <lucide-icon
+            name="music"
+            size="20"
+            class="text-zinc-500"
+            aria-hidden="true"
+          ></lucide-icon>
         }
         @default {
-          <lucide-icon name="file-text" size="20" class="text-zinc-500" aria-hidden="true"></lucide-icon>
+          <lucide-icon
+            name="file-text"
+            size="20"
+            class="text-zinc-500"
+            aria-hidden="true"
+          ></lucide-icon>
         }
       }
       <div class="flex-1 truncate">
         <div class="truncate text-xs font-medium text-zinc-800">{{ f.name }}</div>
-        <div class="text-[10px] text-zinc-500">
-          {{ stagedType() }} · {{ formatBytes(f.size) }}
-        </div>
+        <div class="text-[10px] text-zinc-500">{{ stagedType() }} · {{ formatBytes(f.size) }}</div>
       </div>
       <button
         type="button"
@@ -221,7 +261,9 @@
                 (click)="pickMention(s)"
                 class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-zinc-50"
               >
-                <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-semibold text-zinc-600">
+                <span
+                  class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-semibold text-zinc-600"
+                >
                   {{ s.full_name.substring(0, 1).toUpperCase() }}
                 </span>
                 <span>{{ s.full_name }}</span>
@@ -255,10 +297,7 @@
       <button
         type="button"
         (click)="submit()"
-        [disabled]="
-          (!isNoteMode() && outOfSession) ||
-          (!stagedFile() && !text().trim().length)
-        "
+        [disabled]="(!isNoteMode() && outOfSession) || (!stagedFile() && !text().trim().length)"
         class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
       >
         Send
@@ -268,7 +307,12 @@
   <p class="mt-2 text-[10px] text-zinc-400">
     @if (canAttachMedia()) {
       Enter to send · Shift+Enter for newline · drag a file or click
-      <lucide-icon name="paperclip" size="10" class="inline align-middle" aria-hidden="true"></lucide-icon>
+      <lucide-icon
+        name="paperclip"
+        size="10"
+        class="inline align-middle"
+        aria-hidden="true"
+      ></lucide-icon>
       to attach
     } @else {
       Enter to send · Shift+Enter for a new line

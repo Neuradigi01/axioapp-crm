@@ -5,6 +5,7 @@ admin shows up in `GET /staff` immediately even before HR fills a
 profile. `PUT /staff/{id}` then upserts the row, and a second PUT
 replaces values rather than erroring.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -28,9 +29,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -45,9 +44,7 @@ async def _login(client, *, org_slug: str, email: str, password: str) -> str:
 
 
 @pytest.mark.asyncio
-async def test_list_staff_includes_user_without_profile(
-    layered_client, seeded_admin
-):
+async def test_list_staff_includes_user_without_profile(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "staff.read")
@@ -121,9 +118,7 @@ async def test_put_profile_creates_then_replaces(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_put_profile_unknown_user_returns_404(
-    layered_client, seeded_admin
-):
+async def test_put_profile_unknown_user_returns_404(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "staff.write")
@@ -143,9 +138,7 @@ async def test_put_profile_unknown_user_returns_404(
 
 
 @pytest.mark.asyncio
-async def test_performance_returns_zero_when_no_leads_or_profile(
-    layered_client, seeded_admin
-):
+async def test_performance_returns_zero_when_no_leads_or_profile(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "staff.read")

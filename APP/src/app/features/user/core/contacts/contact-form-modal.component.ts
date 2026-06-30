@@ -99,9 +99,7 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
    * `Validators.required` on top per the org's override choice. `full_name`
    * stays required always (registry locks it).
    */
-  protected applyStandardValidators(
-    map: Record<string, StandardFieldRendered>,
-  ): void {
+  protected applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
     // full_name — always required + max 255 (backend enforces NOT NULL).
     this.standard.controls.full_name.setValidators([
       commonValidators.required,
@@ -117,10 +115,7 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
     this.standard.controls.phone.updateValueAndValidity({ emitEvent: false });
 
     this.standard.controls.email.setValidators(
-      withRequiredIf(
-        [commonValidators.email, commonValidators.maxLength(255)],
-        map['email'],
-      ),
+      withRequiredIf([commonValidators.email, commonValidators.maxLength(255)], map['email']),
     );
     this.standard.controls.email.updateValueAndValidity({ emitEvent: false });
 
@@ -130,9 +125,7 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
     this.standard.controls.source.updateValueAndValidity({ emitEvent: false });
 
     // tags has no static validators; only required if the override sets it.
-    this.standard.controls.tags_csv.setValidators(
-      withRequiredIf([], map['tags']),
-    );
+    this.standard.controls.tags_csv.setValidators(withRequiredIf([], map['tags']));
     this.standard.controls.tags_csv.updateValueAndValidity({
       emitEvent: false,
     });
@@ -158,18 +151,10 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
     // doesn't fire one HTTP call per keystroke; distinctUntilChanged
     // skips re-asking when the value matches the last submitted query.
     this.standard.controls.phone.valueChanges
-      .pipe(
-        debounceTime(400),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef),
-      )
+      .pipe(debounceTime(400), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.runDuplicateCheck());
     this.standard.controls.email.valueChanges
-      .pipe(
-        debounceTime(400),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef),
-      )
+      .pipe(debounceTime(400), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.runDuplicateCheck());
   }
 
@@ -246,7 +231,6 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
     this.customValue.set(contact.custom_data as FormValue);
   }
 
-
   private parseTags(csv: string | null | undefined): string[] {
     if (!csv) return [];
     const seen = new Set<string>();
@@ -256,5 +240,4 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
     }
     return [...seen];
   }
-
 }

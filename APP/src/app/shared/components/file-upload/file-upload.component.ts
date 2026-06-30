@@ -77,8 +77,10 @@ export class FileUploadComponent {
     if (mime.startsWith('image/')) return FILE_TYPE_ICONS['image'];
     if (mime === 'application/pdf') return FILE_TYPE_ICONS['pdf'];
     if (mime.includes('word') || mime.includes('document')) return FILE_TYPE_ICONS['doc'];
-    if (mime.includes('sheet') || mime.includes('excel') || mime.includes('csv')) return FILE_TYPE_ICONS['xls'];
-    if (mime.includes('zip') || mime.includes('rar') || mime.includes('compressed')) return FILE_TYPE_ICONS['zip'];
+    if (mime.includes('sheet') || mime.includes('excel') || mime.includes('csv'))
+      return FILE_TYPE_ICONS['xls'];
+    if (mime.includes('zip') || mime.includes('rar') || mime.includes('compressed'))
+      return FILE_TYPE_ICONS['zip'];
     if (mime.startsWith('text/')) return FILE_TYPE_ICONS['text'];
     return FILE_TYPE_ICONS['default'];
   }
@@ -95,14 +97,12 @@ export class FileUploadComponent {
     const remaining = this.maxFiles() - current.length;
 
     if (newFiles.length > remaining) {
-      validationErrors.push(
-        MSG_FILE_MAX_COUNT.replace('{count}', String(this.maxFiles()))
-      );
+      validationErrors.push(MSG_FILE_MAX_COUNT.replace('{count}', String(this.maxFiles())));
       newFiles = newFiles.slice(0, remaining);
     }
 
     const accepted: File[] = [];
-    const allowed = this.allowedExtensions().map(ext => ext.toLowerCase());
+    const allowed = this.allowedExtensions().map((ext) => ext.toLowerCase());
 
     for (const file of newFiles) {
       const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
@@ -112,7 +112,7 @@ export class FileUploadComponent {
       }
       if (file.size > this.maxSizeBytes()) {
         validationErrors.push(
-          `${MSG_FILE_TOO_LARGE.replace('{size}', this.formatFileSize(this.maxSizeBytes()))}: ${file.name}`
+          `${MSG_FILE_TOO_LARGE.replace('{size}', this.formatFileSize(this.maxSizeBytes()))}: ${file.name}`,
         );
         continue;
       }

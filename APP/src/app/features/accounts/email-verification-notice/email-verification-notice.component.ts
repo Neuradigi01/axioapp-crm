@@ -12,7 +12,8 @@ import { getRoute } from '@core/services/routes-helper.service';
 export class EmailVerificationNoticeComponent implements OnInit {
   private readonly router = inject(Router);
 
-  readonly email: string = (this.router.currentNavigation()?.extras.state?.['email'] as string) || '';
+  readonly email: string =
+    (this.router.currentNavigation()?.extras.state?.['email'] as string) || '';
   readonly loginUrl = getRoute('login').url;
 
   ngOnInit(): void {

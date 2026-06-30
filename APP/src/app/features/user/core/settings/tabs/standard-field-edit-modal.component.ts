@@ -8,12 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import {
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { extractApiError } from '@core/services/api-error.util';
@@ -96,10 +91,7 @@ export class StandardFieldEditModalComponent {
     min_value: new FormControl<number | null>(null),
     max_value: new FormControl<number | null>(null),
     step_value: new FormControl<number | null>(null),
-    display_order: new FormControl<number | null>(null, [
-      Validators.min(0),
-      Validators.max(999),
-    ]),
+    display_order: new FormControl<number | null>(null, [Validators.min(0), Validators.max(999)]),
   });
 
   /** Convenience for the template — case-by-case `@if` is faster to read
@@ -230,16 +222,26 @@ export class StandardFieldEditModalComponent {
       const prop = ((): OverridableProp | null => {
         // Map FormShape key → OverridableProp token.
         switch (ctrl) {
-          case 'label': return 'label';
-          case 'placeholder': return 'placeholder';
-          case 'help_text': return 'help';
-          case 'is_required': return 'required';
-          case 'is_hidden': return 'hidden';
-          case 'min_value': return 'min';
-          case 'max_value': return 'max';
-          case 'step_value': return 'step';
-          case 'display_order': return 'display_order';
-          default: return null;
+          case 'label':
+            return 'label';
+          case 'placeholder':
+            return 'placeholder';
+          case 'help_text':
+            return 'help';
+          case 'is_required':
+            return 'required';
+          case 'is_hidden':
+            return 'hidden';
+          case 'min_value':
+            return 'min';
+          case 'max_value':
+            return 'max';
+          case 'step_value':
+            return 'step';
+          case 'display_order':
+            return 'display_order';
+          default:
+            return null;
         }
       })();
       if (prop === null) return;

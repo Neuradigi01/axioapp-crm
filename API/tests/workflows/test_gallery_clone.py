@@ -19,6 +19,7 @@ patching the catalog's placeholder graphs through ``create_workflow``
 which exercises the full Step-2 validator. The catalog ships
 trigger → send → goal graphs that satisfy single-trigger + no-cycle.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -31,7 +32,6 @@ from src.app.core.workflows import templates_gallery
 from src.app.core.workflows.models import Workflow, WorkflowStatus
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -39,10 +39,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -63,9 +60,7 @@ def test_list_gallery_returns_exactly_15_entries():
     match — Step 20 will rely on exactly this set when seeding new
     orgs."""
     entries = templates_gallery.list_gallery()
-    assert len(entries) == 15, (
-        f"expected 15 catalogue entries, got {len(entries)}"
-    )
+    assert len(entries) == 15, f"expected 15 catalogue entries, got {len(entries)}"
     # Every entry has a stable id + non-empty graph_preview.
     ids = [e["id"] for e in entries]
     assert len(set(ids)) == 15, "catalogue ids must be unique"
@@ -80,9 +75,7 @@ def test_list_gallery_returns_exactly_15_entries():
 # ---------------------------------------------------------------------------
 
 
-async def test_clone_from_gallery_creates_draft_and_carries_graph(
-    test_db, org_id
-):
+async def test_clone_from_gallery_creates_draft_and_carries_graph(test_db, org_id):
     """The clone path creates a `status='draft'` row, copies the
     graph_preview node ids over verbatim (minus template_id
     stripping), and stamps the operator-supplied name."""
@@ -133,9 +126,7 @@ async def test_clone_strips_template_id_from_send_actions(test_db, org_id):
     finally:
         reset_context(token)
 
-    send_nodes = [
-        n for n in clone.graph["nodes"] if str(n.get("type", "")).startswith("send.")
-    ]
+    send_nodes = [n for n in clone.graph["nodes"] if str(n.get("type", "")).startswith("send.")]
     assert len(send_nodes) >= 1, "hot_nurture template has send nodes"
     for node in send_nodes:
         cfg = node.get("config") or {}
@@ -187,9 +178,7 @@ async def test_clone_auto_suffixes_on_duplicate_name(test_db, org_id):
 # ---------------------------------------------------------------------------
 
 
-async def test_clone_uses_gallery_entry_defaults_for_marketing_and_re_enrollment(
-    test_db, org_id
-):
+async def test_clone_uses_gallery_entry_defaults_for_marketing_and_re_enrollment(test_db, org_id):
     """Clone reads `is_marketing` + `re_enrollment_rule` from the
     catalogue entry — internal templates (Slack alerts, daily
     digests) ship with `is_marketing=False` and must keep that

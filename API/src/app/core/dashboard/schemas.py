@@ -1,4 +1,5 @@
 """Pydantic v2 response shapes for the dashboard endpoint."""
+
 from __future__ import annotations
 
 import uuid
@@ -8,7 +9,6 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 from src.app.shared.schemas import ORMModel
-
 
 Format = Literal["number", "currency", "percent", "text", "leaderboard"]
 Scope = Literal["org", "personal"]
@@ -35,6 +35,7 @@ class DashboardCard(BaseModel):
     `leaderboard` and `text` formats they stay `None` (no meaningful
     period comparison).
     """
+
     key: str
     label: str
     value: Any
@@ -47,6 +48,7 @@ class DashboardCard(BaseModel):
 
 class ActivityItem(BaseModel):
     """One row in the dashboard's recent-activity feed."""
+
     action: str
     entity_label: str
     actor_name: str
@@ -76,6 +78,7 @@ class DashboardSummary(BaseModel):
 
 class DashboardTrendPoint(BaseModel):
     """One day-bucket in a trend series. UTC date, never null value."""
+
     date: date
     value: float
 
@@ -87,6 +90,7 @@ class DashboardTrendResponse(BaseModel):
     missing buckets are zero-filled in the service so the frontend can
     render without gap-handling logic.
     """
+
     metric: TrendMetric
     range: TrendRange
     scope: Scope
@@ -95,6 +99,7 @@ class DashboardTrendResponse(BaseModel):
 
 class FunnelStageBucket(BaseModel):
     """One stage of the leads pipeline with its in-range lead count."""
+
     stage_id: uuid.UUID
     stage_name: str
     stage_order: int
@@ -112,6 +117,7 @@ class DashboardFunnelResponse(BaseModel):
     stages in the funnel chart itself; `total_leads_in_range` =
     sum(stages) + won_count + lost_count.
     """
+
     range: TrendRange
     scope: Scope
     total_leads_in_range: int

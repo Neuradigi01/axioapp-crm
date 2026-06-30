@@ -31,7 +31,6 @@ const STATUS_BADGES: Record<WorkflowStatus, BadgeDescriptor> = {
   },
 };
 
-
 @Component({
   selector: 'app-workflow-status-badge',
   standalone: true,

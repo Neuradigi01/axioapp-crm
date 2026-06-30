@@ -43,9 +43,7 @@ import {
   IntegrationsApiService,
 } from './integrations-api.service';
 
-
 const PAGE_SIZE = 20;
-
 
 @Component({
   selector: 'app-dlq-list',
@@ -76,9 +74,7 @@ export class DlqListComponent {
    *  buttons on that row while the request resolves. */
   protected readonly actionInFlight = signal<string | null>(null);
 
-  protected readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.total() / PAGE_SIZE)),
-  );
+  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / PAGE_SIZE)));
 
   constructor() {
     // Lazy load: only fetch when the panel is visible. Refetch on
@@ -175,9 +171,7 @@ export class DlqListComponent {
   }
 
   protected formatRelative(iso: string): string {
-    const seconds = Math.floor(
-      (Date.now() - new Date(iso).getTime()) / 1000,
-    );
+    const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
     if (seconds < 60) return `${seconds}s ago`;
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `${minutes}m ago`;
@@ -195,9 +189,7 @@ export class DlqListComponent {
     const filters = {
       page: this.page(),
       size: PAGE_SIZE,
-      ...(this.providerFilter()
-        ? { provider: this.providerFilter() as IntegrationProvider }
-        : {}),
+      ...(this.providerFilter() ? { provider: this.providerFilter() as IntegrationProvider } : {}),
     };
     this.api
       .listDlq(filters)

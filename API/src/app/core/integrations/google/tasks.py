@@ -32,12 +32,13 @@ synchronous `process_google_lead_async(...)` is callable directly —
 the webhook router falls through to that path so dev smoke tests
 exercise the full flow without a worker.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import text
 
@@ -75,13 +76,10 @@ except ImportError:  # pragma: no cover - celery absent in dev
 
             return _Stub()
 
-        if (
-            decorator_args
-            and callable(decorator_args[0])
-            and not decorator_kwargs
-        ):
+        if decorator_args and callable(decorator_args[0]) and not decorator_kwargs:
             return _wrap(decorator_args[0])
         return _wrap
+
 
 from src.app.core import audit
 from src.app.core.contacts.schemas import ContactCreate
@@ -98,7 +96,6 @@ from src.app.core.leads.models import LeadSource
 from src.app.core.leads.schemas import LeadCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
-
 
 logger = logging.getLogger(__name__)
 
@@ -127,15 +124,11 @@ _CONTACT_FIELDS = ("contact.full_name", "contact.phone", "contact.email")
     retry_backoff_max=3600,
     retry_jitter=True,
 )
-def process_google_lead(
-    self, integration_id: str, payload: dict[str, Any]
-) -> dict[str, Any]:
+def process_google_lead(self, integration_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Celery sync entrypoint. Bridges into async via `asyncio.run`."""
     try:
         return asyncio.run(
-            process_google_lead_async(
-                integration_id=uuid.UUID(integration_id), payload=payload
-            )
+            process_google_lead_async(integration_id=uuid.UUID(integration_id), payload=payload)
         )
     except (ConnectionError, TimeoutError) as exc:
         # Transient — let Celery's autoretry policy handle it.
@@ -165,13 +158,9 @@ async def process_google_lead_async(
     # already authenticated the URL so the integration_id we have here
     # is trusted.
     async with async_session() as session:
-        integration = await _load_integration_unscoped(
-            session, integration_id
-        )
+        integration = await _load_integration_unscoped(session, integration_id)
         if integration is None:
-            logger.warning(
-                "process_google_lead: integration %s not found", integration_id
-            )
+            logger.warning("process_google_lead: integration %s not found", integration_id)
             await record_dlq(
                 session,
                 org_id=_safe_org_from_payload(payload) or uuid.uuid4(),
@@ -188,18 +177,13 @@ async def process_google_lead_async(
                 org_id=org_id,
                 integration_id=integration.id,
                 payload=payload,
-                error_message=(
-                    f"integration status={integration.status.value} "
-                    "(not connected)"
-                ),
+                error_message=(f"integration status={integration.status.value} (not connected)"),
             )
             return {"status": "dlq", "reason": "disconnected"}
 
     # All subsequent reads/writes run under the org tenant context so
     # RLS + the ORM tenant filter authorise them.
-    ctx_token = set_context(
-        RequestContext(org_id=org_id, user_id=None)
-    )
+    ctx_token = set_context(RequestContext(org_id=org_id, user_id=None))
     try:
         async with async_session() as session:
             external_form_id = _extract_form_id(payload)
@@ -225,10 +209,7 @@ async def process_google_lead_async(
                     org_id=org_id,
                     integration_id=integration_id,
                     payload=payload,
-                    error_message=(
-                        "no enabled subscription for form "
-                        f"{external_form_id}"
-                    ),
+                    error_message=(f"no enabled subscription for form {external_form_id}"),
                 )
                 return {"status": "dlq", "reason": "no_subscription"}
 
@@ -250,9 +231,7 @@ async def process_google_lead_async(
                         "lead_id": str(existing_lead_id),
                     }
 
-            mapped = _apply_mapping(
-                subscription.field_mapping or {}, payload
-            )
+            mapped = _apply_mapping(subscription.field_mapping or {}, payload)
             full_name = (mapped.get("contact.full_name") or "").strip()
             phone = mapped.get("contact.phone")
             email = mapped.get("contact.email")
@@ -321,7 +300,7 @@ async def process_google_lead_async(
 # --- payload parsing ------------------------------------------------------
 
 
-def _extract_form_id(payload: dict[str, Any]) -> Optional[str]:
+def _extract_form_id(payload: dict[str, Any]) -> str | None:
     """Google sends `form_id` at top level (newer Ads payloads also
     use `lead_form_id`). Accept either; bail to None if absent."""
     for key in ("form_id", "lead_form_id"):
@@ -331,7 +310,7 @@ def _extract_form_id(payload: dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _extract_lead_id(payload: dict[str, Any]) -> Optional[str]:
+def _extract_lead_id(payload: dict[str, Any]) -> str | None:
     """Google calls this `lead_id`. The idempotency check (and the
     partial UNIQUE index in migration 0049) depends on this being
     stable for a given lead — Google's docs guarantee it is."""
@@ -339,7 +318,7 @@ def _extract_lead_id(payload: dict[str, Any]) -> Optional[str]:
     return str(v) if v is not None else None
 
 
-def _safe_org_from_payload(payload: dict[str, Any]) -> Optional[uuid.UUID]:
+def _safe_org_from_payload(payload: dict[str, Any]) -> uuid.UUID | None:
     """For DLQ-on-integration-missing: try to recover an org_id from
     the payload itself. Returns None if the payload doesn't carry one;
     caller falls back to a synthetic uuid (the DLQ row is still useful
@@ -353,9 +332,7 @@ def _safe_org_from_payload(payload: dict[str, Any]) -> Optional[uuid.UUID]:
         return None
 
 
-def _apply_mapping(
-    field_mapping: dict[str, str], payload: dict[str, Any]
-) -> dict[str, Any]:
+def _apply_mapping(field_mapping: dict[str, str], payload: dict[str, Any]) -> dict[str, Any]:
     """Translate Google's `user_column_data: [{column_id, column_name,
     string_value}, ...]` array through the subscription's field mapping.
 
@@ -389,9 +366,7 @@ def _apply_mapping(
     return result
 
 
-def _extract_custom(
-    mapped: dict[str, Any], *, prefix: str = "contact."
-) -> dict[str, Any]:
+def _extract_custom(mapped: dict[str, Any], *, prefix: str = "contact.") -> dict[str, Any]:
     """Pull the `custom_data.*` entries from a mapped row. For Step-3
     we route ALL `custom_data.*` keys to BOTH contact and lead — the
     custom-fields layer will accept-or-reject them per definition.
@@ -423,9 +398,7 @@ def _build_attribution(payload: dict[str, Any]) -> dict[str, Any]:
 # --- internals ------------------------------------------------------------
 
 
-async def _load_integration_unscoped(
-    session, integration_id: uuid.UUID
-) -> Optional[Integration]:
+async def _load_integration_unscoped(session, integration_id: uuid.UUID) -> Integration | None:
     """Fetch the integration by id WITHOUT tenant scoping. The
     webhook URL already proved tenant access (the secret IS the auth);
     we need the row's org_id to set the context for everything else."""
@@ -439,13 +412,13 @@ async def _load_integration_unscoped(
         FROM tbl_integrations WHERE id = :id LIMIT 1
         """
     )
-    row = (
-        await session.execute(sql, {"id": str(integration_id)})
-    ).mappings().first()
+    row = (await session.execute(sql, {"id": str(integration_id)})).mappings().first()
     if row is None:
         return None
     from src.app.core.integrations.models import (
         IntegrationProvider as _P,
+    )
+    from src.app.core.integrations.models import (
         IntegrationStatus as _S,
     )
 
@@ -472,7 +445,7 @@ async def _load_integration_unscoped(
 
 async def _find_lead_by_external_id(
     session, *, org_id: uuid.UUID, external_lead_id: str
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     """Idempotency lookup: does this org already have a lead whose
     `attribution->>'external_lead_id'` matches? Uses the partial
     UNIQUE index from 0049 for the lookup."""
@@ -485,9 +458,7 @@ async def _find_lead_by_external_id(
         """
     )
     return (
-        await session.execute(
-            sql, {"org_id": str(org_id), "ext_id": external_lead_id}
-        )
+        await session.execute(sql, {"org_id": str(org_id), "ext_id": external_lead_id})
     ).scalar()
 
 

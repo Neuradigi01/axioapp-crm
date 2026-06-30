@@ -20,19 +20,18 @@ We use SHA-256 instead of bcrypt because the raw token is already 256
 bits of entropy; bcrypt's per-row salt would make WHERE-clause lookup
 impossible without iterating every row.
 """
+
 from __future__ import annotations
 
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.tenants import service as tenants_service
-from src.app.core.users import service as users_service
 from src.app.core.auth.models import AuthSession
 from src.app.core.auth.tokens import ACCESS_TOKEN_TTL, encode_token
 from src.app.core.invitations import data_access as _da
@@ -41,10 +40,11 @@ from src.app.core.invitations.schemas import (
     InvitationAccept,
     InvitationCreate,
 )
+from src.app.core.tenants import service as tenants_service
+from src.app.core.users import service as users_service
 from src.app.core.users.models import OrganizationMember, UserInfo
 from src.app.shared.email import Email, get_email_backend
 from src.app.shared.security.password import hash_password
-
 
 INVITATION_TTL = timedelta(days=7)
 
@@ -65,22 +65,16 @@ async def create_invitation(
     ua: str | None = None,
 ) -> tuple[Invitation, str]:
     """Issue an invitation. Returns (row, raw_accept_link)."""
-    role = await users_service.get_role_in_org(
-        session, role_id=payload.role_id, org_id=org_id
-    )
+    role = await users_service.get_role_in_org(session, role_id=payload.role_id, org_id=org_id)
 
-    existing_member_id = await _da.find_user_member_id_by_email(
-        session, payload.email
-    )
+    existing_member_id = await _da.find_user_member_id_by_email(session, payload.email)
     if existing_member_id is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"email {payload.email} is already in use by another user"
-            ),
+            detail=(f"email {payload.email} is already in use by another user"),
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     pending = await _da.find_pending_invitation_for_email(
         session, org_id=org_id, email=payload.email, now=now
     )
@@ -103,9 +97,7 @@ async def create_invitation(
     await session.commit()
     await session.refresh(invitation)
 
-    accept_link = (
-        f"{frontend_url.rstrip('/')}/accounts/accept-invite?token={raw_token}"
-    )
+    accept_link = f"{frontend_url.rstrip('/')}/accounts/accept-invite?token={raw_token}"
 
     org = await tenants_service.get_organization_by_id(session, org_id)
     assert org is not None  # caller validated org_id upstream
@@ -143,13 +135,9 @@ async def create_invitation(
     return invitation, accept_link
 
 
-async def list_pending(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> list[Invitation]:
+async def list_pending(session: AsyncSession, *, org_id: uuid.UUID) -> list[Invitation]:
     """Pending (un-accepted, un-expired) invitations for `org_id`."""
-    return await _da.list_pending_invitations(
-        session, org_id=org_id, now=datetime.now(timezone.utc)
-    )
+    return await _da.list_pending_invitations(session, org_id=org_id, now=datetime.now(UTC))
 
 
 async def revoke_invitation(
@@ -162,9 +150,7 @@ async def revoke_invitation(
     ua: str | None = None,
 ) -> None:
     """Revoke = set expires_at to now. The row stays for audit."""
-    inv = await _da.get_invitation_in_org(
-        session, invitation_id=invitation_id, org_id=org_id
-    )
+    inv = await _da.get_invitation_in_org(session, invitation_id=invitation_id, org_id=org_id)
     if inv is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -176,7 +162,7 @@ async def revoke_invitation(
             detail="invitation already accepted",
         )
 
-    inv.expires_at = datetime.now(timezone.utc)
+    inv.expires_at = datetime.now(UTC)
     await session.commit()
 
     await audit.log(
@@ -192,19 +178,15 @@ async def revoke_invitation(
     )
 
 
-async def lookup_invitation(
-    session: AsyncSession, *, raw_token: str
-) -> dict:
+async def lookup_invitation(session: AsyncSession, *, raw_token: str) -> dict:
     """Unauthenticated. Validates the raw token; raises 404/410 otherwise."""
-    inv = await _da.get_invitation_by_token_hash(
-        session, _hash_token(raw_token)
-    )
+    inv = await _da.get_invitation_by_token_hash(session, _hash_token(raw_token))
     if inv is None or inv.accepted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="invitation not found or already accepted",
         )
-    if inv.expires_at <= datetime.now(timezone.utc):
+    if inv.expires_at <= datetime.now(UTC):
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail="invitation expired",
@@ -235,15 +217,13 @@ async def accept_invitation(
     Returns the `LoginResponse`-shaped dict so the caller can hand it
     straight back to the client.
     """
-    inv = await _da.get_invitation_by_token_hash(
-        session, _hash_token(payload.token)
-    )
+    inv = await _da.get_invitation_by_token_hash(session, _hash_token(payload.token))
     if inv is None or inv.accepted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="invitation not found or already accepted",
         )
-    if inv.expires_at <= datetime.now(timezone.utc):
+    if inv.expires_at <= datetime.now(UTC):
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail="invitation expired",
@@ -252,16 +232,11 @@ async def accept_invitation(
     # Email may have been claimed by a separate signup (e.g. an admin
     # ran POST /users for the same address) between issue and accept —
     # surface clearly rather than blowing up on a UNIQUE violation.
-    existing_user = await _da.find_user_member_id_by_email(
-        session, inv.email
-    )
+    existing_user = await _da.find_user_member_id_by_email(session, inv.email)
     if existing_user is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "email already belongs to a user — ask an admin to "
-                "reactivate them instead"
-            ),
+            detail=("email already belongs to a user — ask an admin to reactivate them instead"),
         )
 
     new_uuid = uuid.uuid4()
@@ -295,12 +270,12 @@ async def accept_invitation(
     )
     _da.insert_organization_member(session, membership)
 
-    inv.accepted_at = datetime.now(timezone.utc)
+    inv.accepted_at = datetime.now(UTC)
 
     # Auto-login: mint a JWT + persist the AuthSession so the
     # accept page can drop the recipient straight into /user/dashboard.
     token_id = uuid.uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at = now + ACCESS_TOKEN_TTL
     _da.insert_auth_session(
         session,

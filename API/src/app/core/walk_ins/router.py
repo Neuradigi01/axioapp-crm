@@ -10,11 +10,12 @@
 
 Reads need `walkins.read`; writes need `walkins.write`.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,20 +53,17 @@ from src.app.core.walk_ins.service import (
 )
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/walk-ins", tags=["Walk-ins"])
 
 
 @router.get("", response_model=list[WalkInOut])
 async def list_walk_ins_endpoint(
-    status_filter: Optional[WalkInStatus] = Query(default=None, alias="status"),
-    assigned_to: Optional[uuid.UUID] = Query(default=None),
+    status_filter: WalkInStatus | None = Query(default=None, alias="status"),
+    assigned_to: uuid.UUID | None = Query(default=None),
     open_only: bool = Query(default=False),
-    date_from: Optional[datetime] = Query(default=None),
-    date_to: Optional[datetime] = Query(default=None),
-    sort: Literal["time_in", "created_at", "last_activity_at"] = Query(
-        default="time_in"
-    ),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    sort: Literal["time_in", "created_at", "last_activity_at"] = Query(default="time_in"),
     order: Literal["asc", "desc"] = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
@@ -98,9 +96,7 @@ async def quick_register_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("walkins.write")),
 ) -> QuickRegisterResponse:
-    walk_in, contact, was_created = await quick_register(
-        db, org_id=user.org_id, payload=payload
-    )
+    walk_in, contact, was_created = await quick_register(db, org_id=user.org_id, payload=payload)
     return QuickRegisterResponse(
         walk_in=WalkInOut.model_validate(walk_in),
         contact=ContactOut.model_validate(contact),
@@ -126,19 +122,14 @@ async def get_walk_in_endpoint(
 ) -> WalkInOut:
     walk_in = await get_walk_in(db, walk_in_id)
     if walk_in is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found")
     # Row-level visibility: non-privileged callers can only fetch
     # walk-ins assigned to them. 404 (not 403) so we don't leak the
     # existence of walk-ins outside the caller's book.
-    if (
-        walk_in.assigned_to_id != caller.legacy_uuid
-        and not await role_has_permission(db, caller.role_id, "users.read")
+    if walk_in.assigned_to_id != caller.legacy_uuid and not await role_has_permission(
+        db, caller.role_id, "users.read"
     ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found")
     return WalkInOut.model_validate(walk_in)
 
 
@@ -217,12 +208,8 @@ async def bulk_checkout_walk_ins_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("walkins.write")),
 ) -> WalkInBulkCheckoutResult:
-    checked_out, already = await bulk_checkout_walk_ins(
-        db, ids=payload.ids, org_id=user.org_id
-    )
-    return WalkInBulkCheckoutResult(
-        checked_out=checked_out, already_checked_out=already
-    )
+    checked_out, already = await bulk_checkout_walk_ins(db, ids=payload.ids, org_id=user.org_id)
+    return WalkInBulkCheckoutResult(checked_out=checked_out, already_checked_out=already)
 
 
 @router.post("/{walk_in_id}/convert", response_model=WalkInConvertResponse)

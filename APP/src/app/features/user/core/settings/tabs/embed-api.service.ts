@@ -15,21 +15,9 @@ import { buildHttpParams } from '../../shared/services/query-builder';
  * only wraps the admin (JWT-gated) endpoints.
  */
 
-export type WidgetStandardFieldKey =
-  | 'full_name'
-  | 'phone'
-  | 'email'
-  | 'interest'
-  | 'notes';
+export type WidgetStandardFieldKey = 'full_name' | 'phone' | 'email' | 'interest' | 'notes';
 
-export type WidgetFieldType =
-  | 'text'
-  | 'email'
-  | 'tel'
-  | 'textarea'
-  | 'select'
-  | 'number'
-  | 'date';
+export type WidgetFieldType = 'text' | 'email' | 'tel' | 'textarea' | 'select' | 'number' | 'date';
 
 export type WidgetFieldSource = 'standard' | 'custom';
 export type WidgetFieldEntity = 'contact' | 'lead';
@@ -50,7 +38,6 @@ export interface WidgetConfigField {
    *  standard-source fields (which always land on the contact). */
   entity: WidgetFieldEntity;
 }
-
 
 /** One row in `GET /embed/available-custom-fields` — drives the
  *  Settings "Add custom field" picker. Unsupported types stay in the
@@ -135,7 +122,6 @@ export interface EmbedKeyIssueResponse {
   created_at: string;
 }
 
-
 @Injectable({ providedIn: 'root' })
 export class EmbedApiService {
   private readonly http = inject(HttpClient);
@@ -159,23 +145,17 @@ export class EmbedApiService {
     return this.http.get<WidgetConfigRead>(`${this.base}/config`);
   }
 
-  updateConfig(
-    payload: WidgetConfigUpdatePayload,
-  ): Observable<WidgetConfigRead> {
+  updateConfig(payload: WidgetConfigUpdatePayload): Observable<WidgetConfigRead> {
     return this.http.put<WidgetConfigRead>(`${this.base}/config`, payload);
   }
 
   listAvailableCustomFields(): Observable<AvailableCustomField[]> {
-    return this.http.get<AvailableCustomField[]>(
-      `${this.base}/available-custom-fields`,
-    );
+    return this.http.get<AvailableCustomField[]>(`${this.base}/available-custom-fields`);
   }
 
   // --- Submission log (Step 9) ---------------------------------------
 
-  listSubmissions(
-    filters: EmbedSubmissionListFilters,
-  ): Observable<EmbedSubmissionListResponse> {
+  listSubmissions(filters: EmbedSubmissionListFilters): Observable<EmbedSubmissionListResponse> {
     const params = buildHttpParams({
       page: filters.page ?? 1,
       page_size: filters.page_size ?? 25,
@@ -183,26 +163,17 @@ export class EmbedApiService {
       from: filters.from,
       to: filters.to,
     });
-    return this.http.get<EmbedSubmissionListResponse>(
-      `${this.base}/submissions`,
-      { params },
-    );
+    return this.http.get<EmbedSubmissionListResponse>(`${this.base}/submissions`, { params });
   }
 
-  getSubmissionSummary(
-    range: EmbedSubmissionRange,
-  ): Observable<EmbedSubmissionSummary> {
+  getSubmissionSummary(range: EmbedSubmissionRange): Observable<EmbedSubmissionSummary> {
     const params = buildHttpParams({
       from: range.from,
       to: range.to,
     });
-    return this.http.get<EmbedSubmissionSummary>(
-      `${this.base}/submissions/summary`,
-      { params },
-    );
+    return this.http.get<EmbedSubmissionSummary>(`${this.base}/submissions/summary`, { params });
   }
 }
-
 
 // --- Submission log shapes (Step 9) ------------------------------------
 

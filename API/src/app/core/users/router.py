@@ -11,6 +11,7 @@ filters and admin-only RBAC.
 
 Both routes return 401 if the request has no resolved user/org context.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -23,8 +24,8 @@ from src.app.core.permissions.service import (
     get_role_by_id,
     list_permissions_for_role,
 )
-from src.app.core.users.models import User
 from src.app.core.tenants import service as tenants_service
+from src.app.core.users.models import User
 from src.app.core.users.offboarding import transfer_records
 from src.app.core.users.schemas import (
     MeUpdate,
@@ -118,9 +119,7 @@ async def list_users_endpoint(
     _user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> list[UserOut]:
-    users = await list_users(
-        session, org_id=_user.org_id, limit=limit, offset=offset
-    )
+    users = await list_users(session, org_id=_user.org_id, limit=limit, offset=offset)
     return [UserOut.model_validate(u) for u in users]
 
 
@@ -145,9 +144,7 @@ async def update_user_endpoint(
     user: User = Depends(require_permissions("users.write")),
     session: AsyncSession = Depends(get_db),
 ) -> UserOut:
-    updated = await update_user(
-        session, user_id=user_id, org_id=user.org_id, payload=payload
-    )
+    updated = await update_user(session, user_id=user_id, org_id=user.org_id, payload=payload)
     return UserOut.model_validate(updated)
 
 
@@ -184,9 +181,7 @@ async def open_records_counts_endpoint(
     transferred. The five entities counted: contacts, leads,
     walk_ins, appointments, tasks. See `users.data_access` for the
     "open" predicates."""
-    counts = await compute_open_records_counts(
-        session, user_uuid=user_id, org_id=_user.org_id
-    )
+    counts = await compute_open_records_counts(session, user_uuid=user_id, org_id=_user.org_id)
     return OpenRecordsCounts(
         user_id=user_id,
         contacts=counts["contacts"],

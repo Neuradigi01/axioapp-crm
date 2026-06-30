@@ -93,9 +93,7 @@ export class NotificationsTabComponent {
       }
       row[r.channel] = r.enabled;
     }
-    return [...byType.values()].sort((a, b) =>
-      a.label.localeCompare(b.label),
-    );
+    return [...byType.values()].sort((a, b) => a.label.localeCompare(b.label));
   });
 
   constructor() {
@@ -135,5 +133,4 @@ export class NotificationsTabComponent {
           this.saveError.set(extractApiError(err) ?? 'Could not save.'),
       });
   }
-
 }

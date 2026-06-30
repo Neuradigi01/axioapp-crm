@@ -15,6 +15,7 @@ Coverage:
     pushes a JSON-encoded NotificationOut to the socket, manager
     de-registers on disconnect.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -84,9 +85,7 @@ def test_ws_rejects_bad_token():
 
     client = TestClient(app)
     with pytest.raises(WebSocketDisconnect):
-        with client.websocket_connect(
-            "/api/v1/notifications/stream?token=not-a-jwt"
-        ) as ws:
+        with client.websocket_connect("/api/v1/notifications/stream?token=not-a-jwt") as ws:
             ws.receive_text()
 
 
@@ -106,9 +105,7 @@ async def test_ws_accepts_good_token_and_broadcasts(ws_user):
 
     def consumer() -> None:
         try:
-            with client.websocket_connect(
-                f"/api/v1/notifications/stream?token={token}"
-            ) as ws:
+            with client.websocket_connect(f"/api/v1/notifications/stream?token={token}") as ws:
                 connected.set()
                 # Wait for at most one message.
                 received.append(ws.receive_text())

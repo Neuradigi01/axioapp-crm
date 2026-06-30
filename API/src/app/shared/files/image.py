@@ -8,10 +8,10 @@ filename and Content-Type are both attacker-controlled.
 Catalog covers (and any future image-upload point) route through
 here so size + format rules stay consistent.
 """
+
 from __future__ import annotations
 
 import magic
-
 
 # 5 MB cap — matches the contacts-import upload limit; predictable
 # memory profile for inline processing.
@@ -56,9 +56,7 @@ def validate_image_upload(data: bytes) -> tuple[str, str]:
     extension = ALLOWED_IMAGE_MIME.get(detected_mime)
     if extension is None:
         allowed = ", ".join(sorted(ALLOWED_IMAGE_MIME))
-        raise ImageValidationError(
-            f"Unsupported image type {detected_mime!r}. Allowed: {allowed}."
-        )
+        raise ImageValidationError(f"Unsupported image type {detected_mime!r}. Allowed: {allowed}.")
 
     return detected_mime, extension
 

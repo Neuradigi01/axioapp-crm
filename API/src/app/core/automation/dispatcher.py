@@ -31,11 +31,12 @@ queue-and-schedule path; Step 13 inserts the gate before the run
 row insert (gated sends still get an audit row with
 ``status='skipped'`` so the operator sees the decision).
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
@@ -48,7 +49,6 @@ from src.app.core.automation.models import (
     AutomationTrigger,
 )
 from src.app.core.automation.service import match_triggers
-
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +68,7 @@ async def dispatch_event(
 
     Idempotent on ``(trigger_id, event_id)`` — a replayed event
     never creates a second run row."""
-    matches = await match_triggers(
-        session, org_id=org_id, event_type=event_type, payload=payload
-    )
+    matches = await match_triggers(session, org_id=org_id, event_type=event_type, payload=payload)
     if not matches:
         return []
 
@@ -87,9 +85,7 @@ async def dispatch_event(
             )
             continue
 
-        recipient = await _resolve_recipient(
-            session, trigger=trigger, payload=payload
-        )
+        recipient = await _resolve_recipient(session, trigger=trigger, payload=payload)
         contact_id = _extract_contact_id(payload)
 
         run = AutomationRun(
@@ -98,14 +94,13 @@ async def dispatch_event(
             event_id=event_id,
             event_payload=payload,
             contact_id=contact_id,
-            scheduled_at=datetime.now(timezone.utc)
-            + timedelta(seconds=trigger.delay_seconds),
+            scheduled_at=datetime.now(UTC) + timedelta(seconds=trigger.delay_seconds),
         )
 
         if recipient is None:
             run.status = AutomationRunStatus.skipped
             run.error = "no_recipient"
-            run.completed_at = datetime.now(timezone.utc)
+            run.completed_at = datetime.now(UTC)
         else:
             run.status = AutomationRunStatus.queued
             # The resolved recipient lives on the event_payload so
@@ -205,15 +200,13 @@ def _schedule_delivery(run: AutomationRun) -> None:
     the tasks module ships a shim factory)."""
     from src.app.core.automation import tasks as automation_tasks
 
-    delay = (run.scheduled_at - datetime.now(timezone.utc)).total_seconds()
+    delay = (run.scheduled_at - datetime.now(UTC)).total_seconds()
     countdown = max(0, int(delay))
     automation_tasks.deliver_run.apply_async(
         args=(str(run.id),),
         countdown=countdown,
     )
-    logger.info(
-        "automation.dispatch scheduled run=%s countdown=%ss", run.id, countdown
-    )
+    logger.info("automation.dispatch scheduled run=%s countdown=%ss", run.id, countdown)
 
 
 # --- subscriber registration ----------------------------------------
@@ -238,11 +231,7 @@ async def _bus_subscriber(envelope: dict[str, Any]) -> None:
         else:
             return
 
-    payload = {
-        k: v
-        for k, v in envelope.items()
-        if k not in ("event_type", "org_id", "event_id")
-    }
+    payload = {k: v for k, v in envelope.items() if k not in ("event_type", "org_id", "event_id")}
 
     from src.app.shared.context import RequestContext, reset_context, set_context
     from src.app.shared.db import async_session

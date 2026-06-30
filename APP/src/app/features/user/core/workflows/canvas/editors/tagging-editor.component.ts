@@ -1,16 +1,8 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CanvasNode } from '../canvas-state.service';
-
 
 /**
  * Handles 5 nodes that share the same "pick a label, optionally a delta"
@@ -18,7 +10,6 @@ import { CanvasNode } from '../canvas-state.service';
  * `lifecycle.set_score`. The dispatcher passes the node, the editor
  * picks the right inputs from `node.type`.
  */
-
 
 @Component({
   selector: 'app-tagging-editor',
@@ -34,18 +25,10 @@ export class TaggingEditorComponent {
 
   readonly type = computed(() => this.node().type);
 
-  readonly tagName = computed<string>(
-    () => (this.node().config?.['tag'] as string) ?? '',
-  );
-  readonly listId = computed<string>(
-    () => (this.node().config?.['list_id'] as string) ?? '',
-  );
-  readonly scoreMode = computed<string>(
-    () => (this.node().config?.['mode'] as string) ?? 'set',
-  );
-  readonly scoreValue = computed<number>(
-    () => (this.node().config?.['value'] as number) ?? 0,
-  );
+  readonly tagName = computed<string>(() => (this.node().config?.['tag'] as string) ?? '');
+  readonly listId = computed<string>(() => (this.node().config?.['list_id'] as string) ?? '');
+  readonly scoreMode = computed<string>(() => (this.node().config?.['mode'] as string) ?? 'set');
+  readonly scoreValue = computed<number>(() => (this.node().config?.['value'] as number) ?? 0);
 
   constructor() {
     effect(() => {
@@ -62,13 +45,25 @@ export class TaggingEditorComponent {
     });
   }
 
-  isTag(): boolean { return this.type().startsWith('tag.'); }
-  isList(): boolean { return this.type().startsWith('list.'); }
-  isScore(): boolean { return this.type() === 'lifecycle.set_score'; }
+  isTag(): boolean {
+    return this.type().startsWith('tag.');
+  }
+  isList(): boolean {
+    return this.type().startsWith('list.');
+  }
+  isScore(): boolean {
+    return this.type() === 'lifecycle.set_score';
+  }
 
-  onTagChange(v: string): void { this.configChange.emit({ tag: v }); }
-  onListIdChange(v: string): void { this.configChange.emit({ list_id: v }); }
-  onScoreModeChange(v: string): void { this.configChange.emit({ mode: v }); }
+  onTagChange(v: string): void {
+    this.configChange.emit({ tag: v });
+  }
+  onListIdChange(v: string): void {
+    this.configChange.emit({ list_id: v });
+  }
+  onScoreModeChange(v: string): void {
+    this.configChange.emit({ mode: v });
+  }
   onScoreValueChange(v: number): void {
     this.configChange.emit({ value: Number.isFinite(v) ? v : 0 });
   }

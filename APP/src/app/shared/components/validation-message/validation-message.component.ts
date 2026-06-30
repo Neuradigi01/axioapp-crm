@@ -42,9 +42,7 @@ export class ValidationMessageComponent {
 
       const defaultMsg = DEFAULT_MESSAGES[key];
       if (defaultMsg) {
-        return typeof defaultMsg === 'function'
-          ? defaultMsg(ctrl.errors![key])
-          : defaultMsg;
+        return typeof defaultMsg === 'function' ? defaultMsg(ctrl.errors![key]) : defaultMsg;
       }
 
       return 'Invalid value';

@@ -5,8 +5,8 @@ management UI is reached from inside Settings (rule 5). The discovery
 sweep still registers the `settings.standard_fields.manage` permission
 key in the global registry on startup, so RBAC can grant it.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="standard_fields",

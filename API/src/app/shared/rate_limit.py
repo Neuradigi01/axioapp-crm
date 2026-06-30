@@ -10,6 +10,7 @@ A Redis-backed limiter is on the roadmap for horizontal scale-out;
 the `RateLimiter` interface below is intentionally small so a
 `RedisRateLimiter` can drop in later without callers changing.
 """
+
 from __future__ import annotations
 
 import time
@@ -55,9 +56,7 @@ class InMemoryRateLimiter:
             return RateLimitResult(allowed=False, remaining=0, retry_after=retry_after)
 
         bucket.append(ts)
-        return RateLimitResult(
-            allowed=True, remaining=self._max - len(bucket), retry_after=0.0
-        )
+        return RateLimitResult(allowed=True, remaining=self._max - len(bucket), retry_after=0.0)
 
     def reset(self, key: str | None = None) -> None:
         if key is None:

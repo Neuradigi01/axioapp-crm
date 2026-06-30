@@ -34,12 +34,12 @@ Window resolved via :func:`whatsapp_analytics._resolve_range`
 ``app.org_id`` setting plus an explicit ``org_id`` filter for
 belt-and-braces.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,10 +51,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class AdAttributionRow:
-    campaign_id: Optional[str]
-    campaign_name: Optional[str]
-    ad_id: Optional[str]
-    ad_name: Optional[str]
+    campaign_id: str | None
+    campaign_name: str | None
+    ad_id: str | None
+    ad_name: str | None
     conversations: int
     leads: int
     revenue: float
@@ -142,9 +142,8 @@ async def compute_ad_attribution(
         out.append(
             AdAttributionRow(
                 campaign_id=r.campaign_id,
-                campaign_name=r.campaign_name or (
-                    f"Unattributed ad ({r.ad_id})" if r.ad_id else "Unattributed ad"
-                ),
+                campaign_name=r.campaign_name
+                or (f"Unattributed ad ({r.ad_id})" if r.ad_id else "Unattributed ad"),
                 ad_id=r.ad_id,
                 ad_name=r.ad_name,
                 conversations=convs,

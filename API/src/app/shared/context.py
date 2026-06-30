@@ -8,6 +8,7 @@ it up without explicit threading through call signatures.
 Today the org_id is read from a dev placeholder header (`X-Org-Id`).
 Step 1.6 replaces this with JWT-claim extraction.
 """
+
 from __future__ import annotations
 
 import uuid

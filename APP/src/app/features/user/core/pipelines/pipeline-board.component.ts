@@ -87,9 +87,7 @@ export class PipelineBoardComponent {
 
   readonly itemMoved = output<ItemMovedEvent>();
 
-  readonly itemTemplate = contentChild<TemplateRef<{ $implicit: PipelineItem }>>(
-    TemplateRef,
-  );
+  readonly itemTemplate = contentChild<TemplateRef<{ $implicit: PipelineItem }>>(TemplateRef);
 
   protected readonly pipeline = signal<Pipeline | null>(null);
   protected readonly loading = signal(false);
@@ -120,9 +118,7 @@ export class PipelineBoardComponent {
   });
 
   /** Pre-built list of `cdkDropList` ids for `cdkDropListConnectedTo`. */
-  readonly dropListIds = computed(() =>
-    this.stages().map((s) => this.dropListIdFor(s.key)),
-  );
+  readonly dropListIds = computed(() => this.stages().map((s) => this.dropListIdFor(s.key)));
 
   constructor() {
     // Re-fetch pipeline whenever the key changes.
@@ -256,9 +252,7 @@ export class PipelineBoardComponent {
           this.fetchPipeline(this.pipelineKey());
         },
         error: (err: HttpErrorResponse) => {
-          this.deleteError.set(
-            extractApiError(err) ?? 'Could not delete stage.',
-          );
+          this.deleteError.set(extractApiError(err) ?? 'Could not delete stage.');
         },
       });
   }
@@ -281,9 +275,7 @@ export class PipelineBoardComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.pipeline.set(null);
-          this.loadError.set(
-            extractApiError(err) ?? `Could not load pipeline '${key}'.`,
-          );
+          this.loadError.set(extractApiError(err) ?? `Could not load pipeline '${key}'.`);
           this.loading.set(false);
         },
       });

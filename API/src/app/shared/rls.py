@@ -19,14 +19,13 @@ Notes:
   `apply_rls("organizations", column="id")` because the org row itself is
   identified by `id`, not by an `org_id` FK.
 """
+
 from __future__ import annotations
 
 from alembic import op
 
-
 _POLICY_SQL = (
-    "CREATE POLICY {policy} ON {table} "
-    "USING ({column} = current_setting('app.org_id', true)::uuid)"
+    "CREATE POLICY {policy} ON {table} USING ({column} = current_setting('app.org_id', true)::uuid)"
 )
 
 

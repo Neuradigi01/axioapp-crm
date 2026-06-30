@@ -19,20 +19,18 @@ Daily cap enforcement happens here, atomically against the
 The midnight UTC reset is handled by Step 4's daemon, not here —
 this code only checks the current counter and increments it.
 """
+
 from __future__ import annotations
 
 import base64
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.email.gmail.client import GmailClient, GmailHTTPError
 from src.app.core.email.models import EmailAccount
-
 
 # Soft cap = warn the rep; hard cap = block. Env-overridable so a
 # customer's whitelisted Workspace can lift the ceiling.
@@ -48,10 +46,7 @@ class DailyCapExceeded(HTTPException):
     def __init__(self, *, sent: int, cap: int) -> None:
         super().__init__(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=(
-                f"Daily send cap reached for this account "
-                f"({sent}/{cap}). Try again tomorrow."
-            ),
+            detail=(f"Daily send cap reached for this account ({sent}/{cap}). Try again tomorrow."),
         )
 
 
@@ -60,7 +55,7 @@ class SendResult:
     """Outcome of a successful Gmail send."""
 
     gmail_message_id: str
-    gmail_thread_id: Optional[str]
+    gmail_thread_id: str | None
     daily_sent_after: int
     near_soft_cap: bool
 
@@ -70,8 +65,8 @@ async def send(
     session: AsyncSession,
     *,
     raw_mime: bytes,
-    thread_id: Optional[str] = None,
-    client: Optional[GmailClient] = None,
+    thread_id: str | None = None,
+    client: GmailClient | None = None,
     soft_cap: int = DEFAULT_SOFT_CAP,
     hard_cap: int = DEFAULT_HARD_CAP,
 ) -> SendResult:
@@ -96,9 +91,7 @@ async def send(
 
     gc = client or GmailClient(account=account, session=session)
     try:
-        response = await gc.send_message(
-            raw_b64url=raw_b64url, thread_id=thread_id
-        )
+        response = await gc.send_message(raw_b64url=raw_b64url, thread_id=thread_id)
     except (GmailHTTPError, HTTPException):
         # Roll the counter back on any send failure — the user can
         # retry without burning a slot. We re-raise the exception
@@ -121,9 +114,7 @@ def _ensure_under_hard_cap(account: EmailAccount, hard_cap: int) -> None:
     the hard cap. The midnight reset is Step 4's daemon — this just
     reads the current value."""
     if (account.daily_sent_count or 0) >= hard_cap:
-        raise DailyCapExceeded(
-            sent=account.daily_sent_count, cap=hard_cap
-        )
+        raise DailyCapExceeded(sent=account.daily_sent_count, cap=hard_cap)
 
 
 __all__ = [

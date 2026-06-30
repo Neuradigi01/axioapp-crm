@@ -18,17 +18,17 @@ that does not exist until then. Including it here would require
 mocking out the permission system, which would be a brittle
 workaround.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
 
 from src.app.core.audit.models import AuditLog
 from src.app.core.subscriptions.models import Subscription
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -56,7 +56,7 @@ async def _login_seeded(client, seeded_admin) -> str:
 async def _insert_active_basic(org_id) -> uuid.UUID:
     from tests.conftest import TestSession
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     async with TestSession() as session:
         sub = Subscription(
             org_id=org_id,
@@ -103,9 +103,7 @@ async def test_active_subscription_is_cancelled(layered_client, seeded_admin):
     # Verify the row.
     async with TestSession() as session:
         fresh = (
-            await session.execute(
-                select(Subscription).where(Subscription.id == sub_id)
-            )
+            await session.execute(select(Subscription).where(Subscription.id == sub_id))
         ).scalar_one()
         assert fresh.status == "cancelled"
         assert fresh.cancelled_at is not None
@@ -136,13 +134,17 @@ async def test_cancel_is_idempotent(layered_client, seeded_admin):
 
     async with TestSession() as session:
         rows = (
-            await session.execute(
-                select(AuditLog).where(
-                    AuditLog.action == "subscription.cancelled",
-                    AuditLog.entity_id == sub_id,
+            (
+                await session.execute(
+                    select(AuditLog).where(
+                        AuditLog.action == "subscription.cancelled",
+                        AuditLog.entity_id == sub_id,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     # Exactly one row — the second cancel must short-circuit before
     # the audit call. (The audit log is best-effort, so a `>= 1`
     # assertion would mask a duplicate-audit bug. We want exactly one.)

@@ -9,7 +9,6 @@ Registration happens at import time. The import chain is anchored by
 `main.py` (which imports `leads.router`), so by the time the FastAPI
 app starts serving the registry is populated.
 """
-from src.app.core.pipelines import register_pipeline_table
 
 from src.app.core.leads.models import LeadStatus
 from src.app.core.leads.service import (
@@ -20,7 +19,7 @@ from src.app.core.leads.service import (
     move_stage_for_lead,
     update_lead,
 )
-
+from src.app.core.pipelines import register_pipeline_table
 
 register_pipeline_table("leads")
 

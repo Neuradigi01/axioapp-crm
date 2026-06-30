@@ -100,9 +100,7 @@ export class ColumnPrefsService {
       return parsed
         .filter(
           (e): e is { key: string; visible: boolean } =>
-            !!e &&
-            typeof e === 'object' &&
-            typeof (e as { key: unknown }).key === 'string',
+            !!e && typeof e === 'object' && typeof (e as { key: unknown }).key === 'string',
         )
         .map((e) => ({
           key: e.key,

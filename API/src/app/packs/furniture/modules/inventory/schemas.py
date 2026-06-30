@@ -1,45 +1,44 @@
 """Pydantic v2 schemas for the furniture-pack inventory module."""
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
 from src.app.packs.furniture.modules.inventory.models import (
     AlertPriority,
     AlertSeverity,
     AlertStatus,
     MovementType,
 )
-
+from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
 
 # --- Warehouses ----------------------------------------------------------
 
 
 class WarehouseCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128)
-    address: Optional[str] = None
-    contact_phone: Optional[str] = Field(default=None, max_length=32)
+    address: str | None = None
+    contact_phone: str | None = Field(default=None, max_length=32)
     is_default: bool = False
 
 
 class WarehouseUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=128)
-    address: Optional[str] = None
-    contact_phone: Optional[str] = Field(default=None, max_length=32)
-    is_default: Optional[bool] = None
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    address: str | None = None
+    contact_phone: str | None = Field(default=None, max_length=32)
+    is_default: bool | None = None
 
 
 class WarehouseOut(TimestampedOrgScopedOut):
-
     id: uuid.UUID
     name: str
-    address: Optional[str]
-    contact_phone: Optional[str]
+    address: str | None
+    contact_phone: str | None
     is_default: bool
 
 
@@ -47,12 +46,12 @@ class WarehouseOut(TimestampedOrgScopedOut):
 
 
 class InventoryItemCreate(BaseModel):
-    catalog_item_id: Optional[uuid.UUID] = None
+    catalog_item_id: uuid.UUID | None = None
     warehouse_id: uuid.UUID
     sku: str = Field(min_length=1, max_length=64)
-    material: Optional[str] = Field(default=None, max_length=64)
-    color: Optional[str] = Field(default=None, max_length=64)
-    finish: Optional[str] = Field(default=None, max_length=64)
+    material: str | None = Field(default=None, max_length=64)
+    color: str | None = Field(default=None, max_length=64)
+    finish: str | None = Field(default=None, max_length=64)
     dimensions: dict[str, Any] = Field(default_factory=dict)
     reorder_level: int = Field(default=0, ge=0)
     custom_data: dict[str, Any] = Field(default_factory=dict)
@@ -61,34 +60,33 @@ class InventoryItemCreate(BaseModel):
 
 
 class InventoryItemUpdate(BaseModel):
-    catalog_item_id: Optional[uuid.UUID] = None
-    warehouse_id: Optional[uuid.UUID] = None
-    material: Optional[str] = Field(default=None, max_length=64)
-    color: Optional[str] = Field(default=None, max_length=64)
-    finish: Optional[str] = Field(default=None, max_length=64)
-    dimensions: Optional[dict[str, Any]] = None
-    reorder_level: Optional[int] = Field(default=None, ge=0)
-    custom_data: Optional[dict[str, Any]] = None
-    is_best_seller: Optional[bool] = None
-    is_active: Optional[bool] = None
+    catalog_item_id: uuid.UUID | None = None
+    warehouse_id: uuid.UUID | None = None
+    material: str | None = Field(default=None, max_length=64)
+    color: str | None = Field(default=None, max_length=64)
+    finish: str | None = Field(default=None, max_length=64)
+    dimensions: dict[str, Any] | None = None
+    reorder_level: int | None = Field(default=None, ge=0)
+    custom_data: dict[str, Any] | None = None
+    is_best_seller: bool | None = None
+    is_active: bool | None = None
 
 
 class InventoryItemOut(TimestampedOrgScopedOut):
-
     id: uuid.UUID
-    catalog_item_id: Optional[uuid.UUID]
+    catalog_item_id: uuid.UUID | None
     warehouse_id: uuid.UUID
     sku: str
-    material: Optional[str]
-    color: Optional[str]
-    finish: Optional[str]
+    material: str | None
+    color: str | None
+    finish: str | None
     dimensions: dict[str, Any]
     qty_on_hand: int
     qty_reserved: int
     reorder_level: int
-    last_received_at: Optional[datetime]
+    last_received_at: datetime | None
     custom_data: dict[str, Any]
-    cover_url: Optional[str]
+    cover_url: str | None
     is_best_seller: bool
     is_active: bool
 
@@ -104,16 +102,16 @@ class InventoryItemFullCreate(BaseModel):
 
     # Catalog-side
     name: str = Field(min_length=1, max_length=255)
-    category: Optional[str] = Field(default=None, max_length=64)
+    category: str | None = Field(default=None, max_length=64)
     price: Decimal = Field(default=Decimal("0"), ge=0)
-    description: Optional[str] = None
+    description: str | None = None
 
     # Inventory-side
     warehouse_id: uuid.UUID
     sku: str = Field(min_length=1, max_length=64)
-    material: Optional[str] = Field(default=None, max_length=64)
-    color: Optional[str] = Field(default=None, max_length=64)
-    finish: Optional[str] = Field(default=None, max_length=64)
+    material: str | None = Field(default=None, max_length=64)
+    color: str | None = Field(default=None, max_length=64)
+    finish: str | None = Field(default=None, max_length=64)
     dimensions: dict[str, Any] = Field(default_factory=dict)
     reorder_level: int = Field(default=0, ge=0)
     is_best_seller: bool = False
@@ -137,26 +135,23 @@ class InventoryItemListResponse(BaseModel):
 class MovementCreate(BaseModel):
     type: MovementType
     qty: int = Field(
-        description=(
-            "Positive for receipt/dispatch/transfer; signed for adjust."
-        ),
+        description=("Positive for receipt/dispatch/transfer; signed for adjust."),
     )
-    reference_type: Optional[str] = Field(default=None, max_length=64)
-    reference_id: Optional[uuid.UUID] = None
-    notes: Optional[str] = None
+    reference_type: str | None = Field(default=None, max_length=64)
+    reference_id: uuid.UUID | None = None
+    notes: str | None = None
 
 
 class MovementOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     item_id: uuid.UUID
     type: MovementType
     qty: int
-    reference_type: Optional[str]
-    reference_id: Optional[uuid.UUID]
-    notes: Optional[str]
-    user_id: Optional[uuid.UUID]
+    reference_type: str | None
+    reference_id: uuid.UUID | None
+    notes: str | None
+    user_id: uuid.UUID | None
     created_at: datetime
 
 
@@ -164,7 +159,6 @@ class MovementOut(ORMModel):
 
 
 class StockAlertOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     item_id: uuid.UUID
@@ -173,7 +167,7 @@ class StockAlertOut(ORMModel):
     suggested_reorder_qty: int
     status: AlertStatus
     created_at: datetime
-    closed_at: Optional[datetime]
+    closed_at: datetime | None
 
 
 class StockAlertPatch(BaseModel):

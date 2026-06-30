@@ -1,10 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 
 import { AdRoiWidgetComponent } from './ad-roi-widget.component';
 import { AgentLeaderboardComponent } from './agent-leaderboard.component';
@@ -14,10 +9,7 @@ import { OutcomesWidgetComponent } from './outcomes-widget.component';
 import { QualityTimelineComponent } from './quality-timeline.component';
 import { ResponseTimeWidgetComponent } from './response-time-widget.component';
 import { VolumeWidgetComponent } from './volume-widget.component';
-import {
-  ReportGranularity,
-  ReportRange,
-} from './whatsapp-reports.service';
+import { ReportGranularity, ReportRange } from './whatsapp-reports.service';
 
 /**
  * WhatsApp Reports page (whatsapp-platform-upgrade Step 20).
@@ -58,9 +50,7 @@ import {
       <header class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 class="text-xl font-semibold text-zinc-900">WhatsApp reports</h1>
-          <p class="text-xs text-zinc-500">
-            Is WhatsApp working? Who's responding fastest?
-          </p>
+          <p class="text-xs text-zinc-500">Is WhatsApp working? Who's responding fastest?</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
@@ -75,9 +65,7 @@ import {
                 role="tab"
                 [class]="
                   'rounded px-2.5 py-1 ' +
-                  (range() === r.key
-                    ? 'bg-zinc-900 text-white'
-                    : 'text-zinc-700 hover:bg-zinc-100')
+                  (range() === r.key ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100')
                 "
                 (click)="setRange(r.key)"
               >
@@ -104,7 +92,11 @@ import {
                   (granularityDisabled(g.key) ? ' cursor-not-allowed opacity-40' : '')
                 "
                 (click)="setGranularity(g.key)"
-                [title]="granularityDisabled(g.key) ? 'Hour granularity is only available for 7d and 30d ranges' : ''"
+                [title]="
+                  granularityDisabled(g.key)
+                    ? 'Hour granularity is only available for 7d and 30d ranges'
+                    : ''
+                "
               >
                 {{ g.label }}
               </button>

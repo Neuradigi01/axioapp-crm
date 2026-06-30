@@ -130,7 +130,8 @@ export const MSG_NOTIFICATIONS_MARKED_READ = 'All notifications marked as read';
 
 // ── Push notification messages ───────────────────────────────────────
 
-export const MSG_PUSH_PERMISSION_DENIED = 'Push notifications are blocked. You can enable them in browser settings.';
+export const MSG_PUSH_PERMISSION_DENIED =
+  'Push notifications are blocked. You can enable them in browser settings.';
 
 // ── Access & System messages ──────────────────────────────────────────
 

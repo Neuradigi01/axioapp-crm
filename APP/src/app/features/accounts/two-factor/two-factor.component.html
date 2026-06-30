@@ -2,7 +2,8 @@
   <div class="mb-6 text-center">
     <h1 class="text-xl font-semibold text-zinc-900">Two-Factor Verification</h1>
     <p class="mt-1 text-sm text-zinc-500">
-      Enter the verification code from your <span class="font-medium text-zinc-700">{{ methodLabel }}</span>
+      Enter the verification code from your
+      <span class="font-medium text-zinc-700">{{ methodLabel }}</span>
     </p>
   </div>
 
@@ -88,10 +89,18 @@
               class="flex w-full items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <lucide-icon
-                [name]="m === 'authenticator' ? 'smartphone' : m === 'email' ? 'mail' : 'message-circle'"
+                [name]="
+                  m === 'authenticator' ? 'smartphone' : m === 'email' ? 'mail' : 'message-circle'
+                "
                 class="h-4 w-4"
               />
-              {{ m === 'authenticator' ? 'Authenticator App' : m === 'email' ? 'Email OTP' : 'SMS OTP' }}
+              {{
+                m === 'authenticator'
+                  ? 'Authenticator App'
+                  : m === 'email'
+                    ? 'Email OTP'
+                    : 'SMS OTP'
+              }}
             </button>
           }
         </div>
@@ -100,7 +109,10 @@
   }
 
   <div class="mt-6 text-center">
-    <a [routerLink]="loginUrl()" class="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-600 transition hover:text-zinc-900">
+    <a
+      [routerLink]="loginUrl()"
+      class="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-600 transition hover:text-zinc-900"
+    >
       <lucide-icon name="arrow-left" class="h-4 w-4" />
       Back to login
     </a>

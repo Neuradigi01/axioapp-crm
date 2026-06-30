@@ -35,9 +35,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 import { EmailAccountsApiService } from '../../services/email-accounts-api.service';
 
-
 const _CONSENT_STORAGE_KEY = 'email-accounts:consent-acknowledged';
-
 
 @Component({
   selector: 'app-connect-account-card',
@@ -54,13 +52,9 @@ export class ConnectAccountCardComponent {
 
   /** Provider currently mid-redirect. Both buttons disable while one
    *  is in flight so a double-click can't fire two consent windows. */
-  protected readonly redirecting = signal<'gmail' | 'microsoft' | null>(
-    null,
-  );
+  protected readonly redirecting = signal<'gmail' | 'microsoft' | null>(null);
 
-  protected readonly consentAcknowledged = signal<boolean>(
-    this._readConsent(),
-  );
+  protected readonly consentAcknowledged = signal<boolean>(this._readConsent());
 
   /** Consent banner is visible when the user hasn't dismissed it AND
    *  they don't already have a connected account (parent passes that
@@ -91,9 +85,7 @@ export class ConnectAccountCardComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.redirecting.set(null);
-          this.error.emit(
-            extractApiError(err) ?? 'Connection failed. Please try again.',
-          );
+          this.error.emit(extractApiError(err) ?? 'Connection failed. Please try again.');
         },
       });
   }
@@ -110,9 +102,7 @@ export class ConnectAccountCardComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.redirecting.set(null);
-          this.error.emit(
-            extractApiError(err) ?? 'Connection failed. Please try again.',
-          );
+          this.error.emit(extractApiError(err) ?? 'Connection failed. Please try again.');
         },
       });
   }

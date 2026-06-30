@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,7 +36,7 @@ async def request_reset(db: AsyncSession, identifier: str) -> None:
             member_id=member_id,
             user_type="User",
             token=token,
-            expires_at=datetime.now(timezone.utc) + RESET_TOKEN_TTL,
+            expires_at=datetime.now(UTC) + RESET_TOKEN_TTL,
         ),
     )
     await db.commit()
@@ -73,8 +73,6 @@ async def reset_password(db: AsyncSession, token: str, new_password: str) -> boo
     user.password = new_hash
     reset_token.is_used = True
 
-    await data_access.invalidate_outstanding_reset_tokens(
-        db, member_id=user.id
-    )
+    await data_access.invalidate_outstanding_reset_tokens(db, member_id=user.id)
     await db.commit()
     return True

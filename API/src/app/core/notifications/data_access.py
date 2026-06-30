@@ -20,11 +20,11 @@ Plus one cross-module helper:
     fan-out path. The projection (single string) is notifications-
     specific so it lives here rather than in users/data_access.py.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -37,7 +37,6 @@ from src.app.core.notifications.models import (
 )
 from src.app.core.users.models import User, UserInfo
 
-
 # --- Notifications ------------------------------------------------------
 
 
@@ -46,7 +45,7 @@ async def get_notification_for_user(
     *,
     notification_id: uuid.UUID,
     user_id: uuid.UUID,
-) -> Optional[Notification]:
+) -> Notification | None:
     """Single-row read scoped to one user — prevents leaking the
     existence of another user's notification on a guessed id."""
     result = await session.execute(
@@ -61,7 +60,7 @@ async def list_notifications_for_user(
     session: AsyncSession,
     *,
     user_id: uuid.UUID,
-    unread: Optional[bool] = None,
+    unread: bool | None = None,
     limit: int = 50,
 ) -> list[Notification]:
     """One user's notification feed, newest first. ``unread=True`` →
@@ -71,9 +70,7 @@ async def list_notifications_for_user(
         stmt = stmt.where(Notification.read_at.is_(None))
     elif unread is False:
         stmt = stmt.where(Notification.read_at.is_not(None))
-    stmt = stmt.order_by(
-        Notification.created_at.desc(), Notification.id.desc()
-    ).limit(limit)
+    stmt = stmt.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(limit)
     rows = (await session.execute(stmt)).scalars().all()
     return list(rows)
 
@@ -95,9 +92,7 @@ async def mark_all_unread_read(
     return int(result.rowcount or 0)
 
 
-def insert_notification(
-    session: AsyncSession, notification: Notification
-) -> None:
+def insert_notification(session: AsyncSession, notification: Notification) -> None:
     """Register an already-constructed Notification for INSERT."""
     session.add(notification)
 
@@ -111,7 +106,7 @@ async def get_preference_enabled(
     user_id: uuid.UUID,
     type_: str,
     channel: NotificationChannel,
-) -> Optional[bool]:
+) -> bool | None:
     """Return the explicit ``enabled`` value for a (user, type,
     channel) row, or ``None`` when no row exists. Caller picks the
     default — in-app defaults ON, email defaults OFF."""
@@ -133,9 +128,7 @@ async def list_preferences_for_user(
     result = await session.execute(
         select(NotificationPreference)
         .where(NotificationPreference.user_id == user_id)
-        .order_by(
-            NotificationPreference.type, NotificationPreference.channel
-        )
+        .order_by(NotificationPreference.type, NotificationPreference.channel)
     )
     return list(result.scalars().all())
 
@@ -192,7 +185,7 @@ async def upsert_preference(
 
 async def lookup_user_email_by_legacy_uuid(
     session: AsyncSession, *, legacy_uuid: uuid.UUID
-) -> Optional[str]:
+) -> str | None:
     """Resolve ``legacy_uuid → tbl_user_info.email`` via the layered
     User mapper's bigint PK. Returns ``None`` when the user / profile
     is missing or the email field is empty. Used by the email

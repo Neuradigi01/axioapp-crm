@@ -104,9 +104,7 @@ export class AttributionChipComponent {
 
   private load(id: string): void {
     this.http
-      .get<AttributionResponse>(
-        `${environment.apiBaseUrl}/conversations/${id}/attribution`,
-      )
+      .get<AttributionResponse>(`${environment.apiBaseUrl}/conversations/${id}/attribution`)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (a) => this.attribution.set(a),

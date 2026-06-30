@@ -24,8 +24,8 @@ own; deliberately not reused here so that surface stays orthogonal.
 The furniture pack's POS module (``fp_billing``) owns `/user/billing`
 and is unrelated to SaaS subscription management.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="subscriptions",

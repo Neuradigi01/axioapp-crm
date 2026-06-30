@@ -78,13 +78,9 @@ import {
   WhatsAppStatus,
   WhatsAppTemplate,
 } from './integrations-api.service';
-import {
-  EmbeddedSignupCancelled,
-  WhatsAppFbSdkService,
-} from './whatsapp-fb-sdk.service';
+import { EmbeddedSignupCancelled, WhatsAppFbSdkService } from './whatsapp-fb-sdk.service';
 import { PhoneHealthCardComponent } from '../../whatsapp/phone-health/phone-health-card.component';
 import { WhatsAppNumbersService } from '../../whatsapp/shared/whatsapp-numbers.service';
-
 
 interface WhatsAppConnectForm {
   phone_id: FormControl<string>;
@@ -95,7 +91,6 @@ interface WhatsAppConnectForm {
   api_version: FormControl<string>;
   rate_limit_per_sec: FormControl<number>;
 }
-
 
 @Component({
   selector: 'app-whatsapp-card',
@@ -127,8 +122,7 @@ export class WhatsAppCardComponent implements OnInit {
    *  `status` projection still drives the "Connected as …" header
    *  so single-number orgs see no visual change. */
   protected readonly numbers = this.numbersService.numbers;
-  protected readonly hasMultiple = (): boolean =>
-    (this.numbersService.numbers()?.length ?? 0) >= 2;
+  protected readonly hasMultiple = (): boolean => (this.numbersService.numbers()?.length ?? 0) >= 2;
 
   ngOnInit(): void {
     // Best-effort — failure is silent; the multi-number block just
@@ -208,19 +202,13 @@ export class WhatsAppCardComponent implements OnInit {
 
   // --- derived UI flags --------------------------------------------
 
-  protected readonly currentStatus = computed(
-    () => this.status()?.status ?? 'disconnected',
-  );
-  protected readonly isConnected = computed(
-    () => this.currentStatus() === 'connected',
-  );
+  protected readonly currentStatus = computed(() => this.status()?.status ?? 'disconnected');
+  protected readonly isConnected = computed(() => this.currentStatus() === 'connected');
   protected readonly isError = computed(() => {
     const s = this.currentStatus();
     return s === 'error' || s === 'expired';
   });
-  protected readonly isDisconnected = computed(
-    () => this.currentStatus() === 'disconnected',
-  );
+  protected readonly isDisconnected = computed(() => this.currentStatus() === 'disconnected');
 
   constructor() {
     // Prefill phone_id + waba_id from the sidecar whenever the parent
@@ -361,9 +349,7 @@ export class WhatsAppCardComponent implements OnInit {
       } else if (err instanceof HttpErrorResponse) {
         this.inlineError.set(extractApiError(err));
       } else {
-        this.inlineError.set(
-          err instanceof Error ? err.message : 'Unable to connect WhatsApp.',
-        );
+        this.inlineError.set(err instanceof Error ? err.message : 'Unable to connect WhatsApp.');
       }
     } finally {
       this.embeddedConnecting.set(false);

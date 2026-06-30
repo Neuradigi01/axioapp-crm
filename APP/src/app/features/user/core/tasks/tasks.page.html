@@ -1,5 +1,4 @@
 <div class="px-6 py-6" [appUrlFilterState]="urlState">
-
   <!-- Header -->
   <header class="mb-4 flex flex-wrap items-end justify-between gap-3">
     <div>
@@ -76,7 +75,7 @@
   <!-- Table -->
   @if (state.loading() && state.items().length === 0) {
     <div class="space-y-2">
-      @for (i of [1,2,3,4]; track i) {
+      @for (i of [1, 2, 3, 4]; track i) {
         <div class="h-12 animate-pulse rounded-lg border border-zinc-200 bg-zinc-50"></div>
       }
     </div>
@@ -140,10 +139,7 @@
         </thead>
         <tbody class="divide-y divide-zinc-100">
           @for (t of state.items(); track t.id) {
-            <tr
-              class="group hover:bg-zinc-50"
-              [class.bg-zinc-50]="isSelected(t.id)"
-            >
+            <tr class="group hover:bg-zinc-50" [class.bg-zinc-50]="isSelected(t.id)">
               <!-- Selection checkbox (Step 2). Separate from the
                    quick-complete checkbox below. -->
               <td class="px-3 py-2 align-middle" (click)="$event.stopPropagation()">
@@ -249,7 +245,13 @@
 <!-- Bulk mark-done confirm -->
 @if (state.bulkModal() === 'done') {
   <app-confirm-dialog
-    [title]="'Mark ' + state.selectedCount() + ' task' + (state.selectedCount() === 1 ? '' : 's') + ' as done?'"
+    [title]="
+      'Mark ' +
+      state.selectedCount() +
+      ' task' +
+      (state.selectedCount() === 1 ? '' : 's') +
+      ' as done?'
+    "
     [body]="'Already-done tasks are skipped.'"
     [confirmLabel]="'Mark done'"
     [submitting]="state.bulkSubmitting()"
@@ -261,7 +263,9 @@
 <!-- Bulk delete confirm -->
 @if (state.bulkModal() === 'delete') {
   <app-confirm-dialog
-    [title]="'Delete ' + state.selectedCount() + ' task' + (state.selectedCount() === 1 ? '' : 's') + '?'"
+    [title]="
+      'Delete ' + state.selectedCount() + ' task' + (state.selectedCount() === 1 ? '' : 's') + '?'
+    "
     [body]="'This cannot be undone.'"
     [confirmLabel]="'Delete'"
     [danger]="true"

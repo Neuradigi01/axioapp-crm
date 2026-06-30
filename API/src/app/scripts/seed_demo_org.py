@@ -3,6 +3,7 @@
 Usage (from inside the api/ directory or container):
     python -m src.app.scripts.seed_demo_org
 """
+
 import asyncio
 import uuid
 from decimal import Decimal

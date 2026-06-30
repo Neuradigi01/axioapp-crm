@@ -11,16 +11,15 @@ itself — every other code path that produces 402 in this codebase
 schema (also fine, but the body shape is identical so the test asserts
 on the wire content's `reason` field).
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
 
 from src.app.core.subscriptions.models import Subscription
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -62,7 +61,7 @@ async def _insert_subscription(
 ) -> uuid.UUID:
     from tests.conftest import TestSession
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     cps = current_period_start or trial_started_at or now
     cpe = current_period_end or trial_ends_at or (now + timedelta(days=30))
 
@@ -111,10 +110,11 @@ async def _probe_write(client, token: str | None):
 
 @pytest.mark.asyncio
 async def test_read_endpoint_passes_on_read_only_org(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="trial",
@@ -151,10 +151,13 @@ async def test_read_endpoint_passes_on_read_only_org(
     ],
 )
 async def test_write_endpoint_blocked_on_blocked_status(
-    layered_client, seeded_admin, status, plan_code,
+    layered_client,
+    seeded_admin,
+    status,
+    plan_code,
 ):
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     timestamps = {}
     if status == "read_only":
         timestamps["read_only_at"] = now - timedelta(hours=1)
@@ -163,7 +166,9 @@ async def test_write_endpoint_blocked_on_blocked_status(
     elif status == "cancelled":
         timestamps["cancelled_at"] = now - timedelta(days=1)
     await _insert_subscription(
-        org.id, plan_code=plan_code, status=status,
+        org.id,
+        plan_code=plan_code,
+        status=status,
         current_period_start=now - timedelta(days=30),
         current_period_end=now + timedelta(days=1),
         **timestamps,
@@ -185,10 +190,11 @@ async def test_write_endpoint_blocked_on_blocked_status(
 
 @pytest.mark.asyncio
 async def test_allowlist_subscriptions_change_reaches_handler(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="trial",
@@ -213,12 +219,15 @@ async def test_allowlist_subscriptions_change_reaches_handler(
 
 @pytest.mark.asyncio
 async def test_allowlist_logout_reaches_handler_on_read_only(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
-        org.id, plan_code="trial", status="read_only",
+        org.id,
+        plan_code="trial",
+        status="read_only",
         trial_started_at=now - timedelta(days=15),
         trial_ends_at=now - timedelta(days=1),
         read_only_at=now - timedelta(hours=1),
@@ -254,7 +263,7 @@ async def test_trialing_sub_passes_write_route(layered_client, seeded_admin):
     """`trialing` is NOT a blocked status — the trial customer must be
     able to write data they will keep when they upgrade."""
     org = seeded_admin["org"]
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await _insert_subscription(
         org.id,
         plan_code="trial",

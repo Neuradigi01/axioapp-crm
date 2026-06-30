@@ -15,6 +15,7 @@ Convention: pure-function tests where possible. The router's DB-
 side recording is left to integration tests (Step 8.5 once we wire
 the inbox UI); the helpers covered here are the unique logic.
 """
+
 from __future__ import annotations
 
 import os
@@ -25,20 +26,23 @@ import pytest
 
 # Tokens module reads TRACKING_HMAC_KEY at first use; set it here
 # before any encode/decode call.
-os.environ.setdefault(
-    "TRACKING_HMAC_KEY", "test-key-do-not-use-in-prod-32bytes"
-)
+os.environ.setdefault("TRACKING_HMAC_KEY", "test-key-do-not-use-in-prod-32bytes")
 
 
 # Import AFTER env is set (encode/decode lazy-load the key, so the
 # import order doesn't actually matter, but this is the safe shape).
 from src.app.core.email.tracking import (  # noqa: E402
     footer as footer_mod,
+)
+from src.app.core.email.tracking import (
     link_rewriter as links_mod,
+)
+from src.app.core.email.tracking import (
     pixel as pixel_mod,
+)
+from src.app.core.email.tracking import (
     tokens as tokens_mod,
 )
-
 
 _TRACKING_BASE = "https://t.example.com"
 
@@ -74,9 +78,7 @@ class TestTokens:
     def test_tampered_payload_rejected(self):
         token = tokens_mod.encode(message_id=uuid.uuid4(), kind="o")
         payload_b64, sig_b64 = token.rsplit(".", 1)
-        flipped = payload_b64[:-1] + (
-            "A" if payload_b64[-1] != "A" else "B"
-        )
+        flipped = payload_b64[:-1] + ("A" if payload_b64[-1] != "A" else "B")
         tampered = f"{flipped}.{sig_b64}"
         assert tokens_mod.decode(tampered) is None
 
@@ -90,7 +92,8 @@ class TestTokens:
     def test_unknown_kind_rejected_at_encode(self):
         with pytest.raises(ValueError):
             tokens_mod.encode(
-                message_id=uuid.uuid4(), kind="x"  # type: ignore[arg-type]
+                message_id=uuid.uuid4(),
+                kind="x",  # type: ignore[arg-type]
             )
 
 
@@ -100,9 +103,7 @@ class TestTokens:
 class TestPixel:
     def test_inserts_before_body_close(self):
         html = "<html><body><p>Hi</p></body></html>"
-        result = pixel_mod.inject(
-            html, token="tok123", base_url=_TRACKING_BASE
-        )
+        result = pixel_mod.inject(html, token="tok123", base_url=_TRACKING_BASE)
         # Pixel sits immediately before `</body>`.
         idx_pixel = result.index('src="https://t.example.com')
         idx_close = result.index("</body>")
@@ -111,26 +112,20 @@ class TestPixel:
 
     def test_appends_when_no_body_tag(self):
         html = "<p>Just a paragraph</p>"
-        result = pixel_mod.inject(
-            html, token="tok123", base_url=_TRACKING_BASE
-        )
+        result = pixel_mod.inject(html, token="tok123", base_url=_TRACKING_BASE)
         assert result.startswith("<p>Just a paragraph</p>")
         assert result.endswith("/>")
 
     def test_case_insensitive_body_close(self):
         html = "<html><BODY>X</BODY></html>"
-        result = pixel_mod.inject(
-            html, token="tok123", base_url=_TRACKING_BASE
-        )
+        result = pixel_mod.inject(html, token="tok123", base_url=_TRACKING_BASE)
         # Inserts before the close tag regardless of casing.
         idx_pixel = result.index('src="https://t.example.com')
         idx_close = result.upper().index("</BODY>")
         assert idx_pixel < idx_close
 
     def test_empty_body_wraps_pixel(self):
-        result = pixel_mod.inject(
-            "", token="tok123", base_url=_TRACKING_BASE
-        )
+        result = pixel_mod.inject("", token="tok123", base_url=_TRACKING_BASE)
         assert "<div>" in result
         assert 'src="https://t.example.com' in result
 
@@ -140,9 +135,7 @@ class TestPixel:
             token="abcDEF",
             base_url=_TRACKING_BASE,
         )
-        assert (
-            f'src="{_TRACKING_BASE}/api/v1/track/o/abcDEF"' in result
-        )
+        assert f'src="{_TRACKING_BASE}/api/v1/track/o/abcDEF"' in result
 
     def test_strips_trailing_slash_in_base(self):
         result = pixel_mod.inject(
@@ -160,103 +153,67 @@ class TestPixel:
 class TestLinkRewriter:
     def test_rewrites_https_link(self):
         html = '<a href="https://x.com">click</a>'
-        result = links_mod.rewrite(
-            html, token="tok", base_url=_TRACKING_BASE
-        )
-        assert "https://x.com" not in re.findall(
-            r'href="([^"]+)"', result
-        )[0]
-        assert (
-            f"{_TRACKING_BASE}/api/v1/track/c/tok?u=" in result
-        )
+        result = links_mod.rewrite(html, token="tok", base_url=_TRACKING_BASE)
+        assert "https://x.com" not in re.findall(r'href="([^"]+)"', result)[0]
+        assert f"{_TRACKING_BASE}/api/v1/track/c/tok?u=" in result
 
     def test_rewrites_http_link(self):
         html = '<a href="http://x.com/path?q=1">click</a>'
-        result = links_mod.rewrite(
-            html, token="tok", base_url=_TRACKING_BASE
-        )
+        result = links_mod.rewrite(html, token="tok", base_url=_TRACKING_BASE)
         assert f"{_TRACKING_BASE}/api/v1/track/c/tok?u=" in result
 
     def test_skips_mailto(self):
         html = '<a href="mailto:a@b.com">mail me</a>'
-        result = links_mod.rewrite(
-            html, token="tok", base_url=_TRACKING_BASE
-        )
+        result = links_mod.rewrite(html, token="tok", base_url=_TRACKING_BASE)
         # Unchanged.
         assert 'href="mailto:a@b.com"' in result
         assert "/api/v1/track/c/" not in result
 
     def test_skips_tel(self):
         html = '<a href="tel:+15555551212">call</a>'
-        result = links_mod.rewrite(
-            html, token="tok", base_url=_TRACKING_BASE
-        )
+        result = links_mod.rewrite(html, token="tok", base_url=_TRACKING_BASE)
         assert 'href="tel:+15555551212"' in result
 
     def test_skips_anchor(self):
         html = '<a href="#section">to section</a>'
-        result = links_mod.rewrite(
-            html, token="tok", base_url=_TRACKING_BASE
-        )
+        result = links_mod.rewrite(html, token="tok", base_url=_TRACKING_BASE)
         assert 'href="#section"' in result
 
     def test_skips_data_uri(self):
         html = '<a href="data:text/plain,abc">data</a>'
-        result = links_mod.rewrite(
-            html, token="tok", base_url=_TRACKING_BASE
-        )
+        result = links_mod.rewrite(html, token="tok", base_url=_TRACKING_BASE)
         assert 'href="data:text/plain,abc"' in result
 
     def test_skips_javascript(self):
         html = '<a href="javascript:alert(1)">x</a>'
-        result = links_mod.rewrite(
-            html, token="tok", base_url=_TRACKING_BASE
-        )
+        result = links_mod.rewrite(html, token="tok", base_url=_TRACKING_BASE)
         assert "javascript:alert(1)" in result
         assert "/api/v1/track/c/" not in result
 
     def test_idempotent_on_already_tracked(self):
         # Pre-rewritten URL — should NOT be wrapped a second time.
-        html = (
-            f'<a href="{_TRACKING_BASE}/api/v1/track/c/tok?u=foo">x</a>'
-        )
-        result = links_mod.rewrite(
-            html, token="tok", base_url=_TRACKING_BASE
-        )
+        html = f'<a href="{_TRACKING_BASE}/api/v1/track/c/tok?u=foo">x</a>'
+        result = links_mod.rewrite(html, token="tok", base_url=_TRACKING_BASE)
         assert result == html
 
     def test_preserves_other_attributes(self):
-        html = (
-            '<a href="https://x.com" class="cta" target="_blank">'
-            "click</a>"
-        )
-        result = links_mod.rewrite(
-            html, token="tok", base_url=_TRACKING_BASE
-        )
+        html = '<a href="https://x.com" class="cta" target="_blank">click</a>'
+        result = links_mod.rewrite(html, token="tok", base_url=_TRACKING_BASE)
         assert 'class="cta"' in result
         assert 'target="_blank"' in result
 
     def test_multiple_links_all_rewritten(self):
-        html = (
-            '<a href="https://a.com">A</a>'
-            '<a href="https://b.com">B</a>'
-        )
-        result = links_mod.rewrite(
-            html, token="tok", base_url=_TRACKING_BASE
-        )
+        html = '<a href="https://a.com">A</a><a href="https://b.com">B</a>'
+        result = links_mod.rewrite(html, token="tok", base_url=_TRACKING_BASE)
         # Two click URLs, no original https:// hosts.
-        click_matches = re.findall(
-            r"/api/v1/track/c/tok\?u=", result
-        )
+        click_matches = re.findall(r"/api/v1/track/c/tok\?u=", result)
         assert len(click_matches) == 2
         assert "https://a.com" not in result
         assert "https://b.com" not in result
 
     def test_single_quoted_href(self):
         html = "<a href='https://x.com'>click</a>"
-        result = links_mod.rewrite(
-            html, token="tok", base_url=_TRACKING_BASE
-        )
+        result = links_mod.rewrite(html, token="tok", base_url=_TRACKING_BASE)
         # Single-quoted href still rewritten, quote preserved.
         assert "/api/v1/track/c/tok?u=" in result
         assert "https://x.com" not in result
@@ -316,7 +273,7 @@ class TestFooter:
 
     def test_build_escapes_html_in_name(self):
         result = footer_mod.build(
-            org_name='<script>alert(1)</script>',
+            org_name="<script>alert(1)</script>",
             org_settings=None,
             unsubscribe_url="https://t.example.com/u/tok",
         )

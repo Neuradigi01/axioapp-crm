@@ -1,8 +1,9 @@
 """Stats coverage for /api/v1/reviews/stats."""
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -23,9 +24,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -43,29 +42,54 @@ async def _seed_reviews(org_id: uuid.UUID) -> None:
     """5★, 5★, 4★, 2★ (recent), 1★ (old) — 5 total."""
     from tests.conftest import TestSession
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     async with TestSession() as session:
-        session.add_all([
-            Review(org_id=org_id, source="google", rating=5,
-                   text="Loved it",   status=ReviewStatus.replied),
-            Review(org_id=org_id, source="google", rating=5,
-                   text="Excellent",  status=ReviewStatus.pending_reply),
-            Review(org_id=org_id, source="facebook", rating=4,
-                   text="Good",       status=ReviewStatus.pending_reply),
-            Review(org_id=org_id, source="google", rating=2,
-                   text="Slow delivery", status=ReviewStatus.pending_reply,
-                   created_at=now - timedelta(days=1)),
-            Review(org_id=org_id, source="google", rating=1,
-                   text="Old gripe", status=ReviewStatus.escalated,
-                   created_at=now - timedelta(days=30)),
-        ])
+        session.add_all(
+            [
+                Review(
+                    org_id=org_id,
+                    source="google",
+                    rating=5,
+                    text="Loved it",
+                    status=ReviewStatus.replied,
+                ),
+                Review(
+                    org_id=org_id,
+                    source="google",
+                    rating=5,
+                    text="Excellent",
+                    status=ReviewStatus.pending_reply,
+                ),
+                Review(
+                    org_id=org_id,
+                    source="facebook",
+                    rating=4,
+                    text="Good",
+                    status=ReviewStatus.pending_reply,
+                ),
+                Review(
+                    org_id=org_id,
+                    source="google",
+                    rating=2,
+                    text="Slow delivery",
+                    status=ReviewStatus.pending_reply,
+                    created_at=now - timedelta(days=1),
+                ),
+                Review(
+                    org_id=org_id,
+                    source="google",
+                    rating=1,
+                    text="Old gripe",
+                    status=ReviewStatus.escalated,
+                    created_at=now - timedelta(days=30),
+                ),
+            ]
+        )
         await session.commit()
 
 
 @pytest.mark.asyncio
-async def test_stats_returns_chart_ready_payload(
-    layered_client, seeded_admin
-):
+async def test_stats_returns_chart_ready_payload(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "reviews.read")

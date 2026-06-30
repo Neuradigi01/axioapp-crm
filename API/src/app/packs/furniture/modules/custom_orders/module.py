@@ -7,8 +7,8 @@ convention as the inventory module.
 the sidebar. The three permissions (`read`, `write`, `move`) line up
 with the per-endpoint gates in `router.py`.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="custom_orders",

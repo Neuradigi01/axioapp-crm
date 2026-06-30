@@ -1,9 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  CdkDragDrop,
-  DragDropModule,
-  moveItemInArray,
-} from '@angular/cdk/drag-drop';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -20,10 +16,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  WorkflowFolder,
-  WorkflowsApiService,
-} from '../workflows-api.service';
+import { WorkflowFolder, WorkflowsApiService } from '../workflows-api.service';
 
 /**
  * Folders sidebar. Drives the list page's folder filter. Top-level
@@ -34,7 +27,6 @@ import {
  * row to swap the label for an `<input>`, blur or Enter saves, Esc
  * cancels.
  */
-
 
 @Component({
   selector: 'app-workflow-folders-sidebar',
@@ -109,15 +101,11 @@ export class FoldersSidebarComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          const merged = this.folders().map((f) =>
-            f.id === folder.id ? updated : f,
-          );
+          const merged = this.folders().map((f) => (f.id === folder.id ? updated : f));
           this.foldersReordered.emit(merged);
         },
         error: (err: HttpErrorResponse) => {
-          this.mutationError.set(
-            extractApiError(err) ?? 'Could not rename folder.',
-          );
+          this.mutationError.set(extractApiError(err) ?? 'Could not rename folder.');
         },
       });
   }
@@ -142,9 +130,7 @@ export class FoldersSidebarComponent {
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           error: (err: HttpErrorResponse) => {
-            this.mutationError.set(
-              extractApiError(err) ?? 'Could not reorder folders.',
-            );
+            this.mutationError.set(extractApiError(err) ?? 'Could not reorder folders.');
           },
         });
     });
@@ -176,9 +162,7 @@ export class FoldersSidebarComponent {
           }
         },
         error: (err: HttpErrorResponse) => {
-          this.mutationError.set(
-            extractApiError(err) ?? 'Could not delete folder.',
-          );
+          this.mutationError.set(extractApiError(err) ?? 'Could not delete folder.');
         },
       });
   }

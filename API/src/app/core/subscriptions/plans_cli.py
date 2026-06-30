@@ -7,6 +7,7 @@ Exits 0 if the YAML loads and validates, prints `OK: N plans loaded.`
 Exits 1 with a descriptive error on validation failure — CI runs this
 to fail-fast before a malformed pricing change reaches deploy.
 """
+
 from __future__ import annotations
 
 import sys

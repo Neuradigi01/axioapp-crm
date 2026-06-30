@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.constants import messages
 from src.data_access import login_history_da
 from src.data_access.resolution_da import resolve_member_id
-from src.constants import messages
 
 
 async def get_login_history(
@@ -23,7 +24,11 @@ async def get_login_history(
     data = []
     for r in records:
         ip_details = r.ip_info or []
-        first_ip = ip_details[0] if isinstance(ip_details, list) and ip_details else (ip_details if isinstance(ip_details, dict) else {})
+        first_ip = (
+            ip_details[0]
+            if isinstance(ip_details, list) and ip_details
+            else (ip_details if isinstance(ip_details, dict) else {})
+        )
 
         login_status = _resolve_login_status(r, current_token_id)
 
@@ -34,28 +39,30 @@ async def get_login_history(
             parts = loc.split(",")
             latitude, longitude = parts[0], parts[1]
 
-        data.append({
-            "token_id": r.id,
-            "user_id": r.user_id,
-            "user_type": r.user_type,
-            "on_date": r.login_at.isoformat() if r.login_at else None,
-            "ip_address": r.ip_address,
-            "sender_ip": r.sender_ip,
-            "city": first_ip.get("city", ""),
-            "region": first_ip.get("region", ""),
-            "country": first_ip.get("country", ""),
-            "latitude": latitude,
-            "longitude": longitude,
-            "device": device.get("device", ""),
-            "device_type": device.get("device_type", ""),
-            "os": device.get("os", ""),
-            "os_version": device.get("os_version", ""),
-            "browser": device.get("browser", ""),
-            "browser_version": device.get("browser_version", ""),
-            "login_status": login_status,
-            "logout_timestamp": r.logout_timestamp.isoformat() if r.logout_timestamp else None,
-            "by_admin_token_id": r.by_admin_token_id,
-        })
+        data.append(
+            {
+                "token_id": r.id,
+                "user_id": r.user_id,
+                "user_type": r.user_type,
+                "on_date": r.login_at.isoformat() if r.login_at else None,
+                "ip_address": r.ip_address,
+                "sender_ip": r.sender_ip,
+                "city": first_ip.get("city", ""),
+                "region": first_ip.get("region", ""),
+                "country": first_ip.get("country", ""),
+                "latitude": latitude,
+                "longitude": longitude,
+                "device": device.get("device", ""),
+                "device_type": device.get("device_type", ""),
+                "os": device.get("os", ""),
+                "os_version": device.get("os_version", ""),
+                "browser": device.get("browser", ""),
+                "browser_version": device.get("browser_version", ""),
+                "login_status": login_status,
+                "logout_timestamp": r.logout_timestamp.isoformat() if r.logout_timestamp else None,
+                "by_admin_token_id": r.by_admin_token_id,
+            }
+        )
 
     return {"success": True, "data": data, "data_count": total}
 

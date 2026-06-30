@@ -14,6 +14,7 @@ is fixed (CLAUDE.md / rule 7), so handing the keys to anyone holding
 this org can fire this endpoint, enforced here by checking the
 caller's `Role.name == 'Owner' AND is_system=True` row.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -23,9 +24,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.permissions.models import Role
 from src.app.core.users import data_access
 from src.app.core.users import service as users_service
-from src.app.core.permissions.models import Role
 from src.app.core.users.models import OrganizationMember, User
 
 
@@ -36,9 +37,7 @@ class _Forbidden(HTTPException):
 
 class _Invalid(HTTPException):
     def __init__(self, detail: str) -> None:
-        super().__init__(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail
-        )
+        super().__init__(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
 
 
 async def transfer_ownership(
@@ -78,10 +77,7 @@ async def transfer_ownership(
         not_member_detail="Target is not an active member of this org.",
     )
     if target_membership.role_id == owner_role.id:
-        raise _Invalid(
-            "Target is already Owner — multiple Owner rows detected. "
-            "Contact support."
-        )
+        raise _Invalid("Target is already Owner — multiple Owner rows detected. Contact support.")
 
     # Resolve caller's own membership row (the one we'll demote). The
     # caller User is already loaded, so we go straight by bigint id.
@@ -109,15 +105,11 @@ async def transfer_ownership(
         # data_access in a later sweep with the other Role.id callers.
         demote_role = (
             await session.execute(
-                select(Role).where(
-                    Role.org_id == org_id, Role.id == demote_to_role_id
-                )
+                select(Role).where(Role.org_id == org_id, Role.id == demote_to_role_id)
             )
         ).scalar_one_or_none()
         if demote_role is None:
-            raise _Invalid(
-                f"demote_to_role_id {demote_to_role_id} is not a role in this org."
-            )
+            raise _Invalid(f"demote_to_role_id {demote_to_role_id} is not a role in this org.")
         if demote_role.id == owner_role.id:
             raise _Invalid("demote_to_role_id cannot be the Owner role.")
 

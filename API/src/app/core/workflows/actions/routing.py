@@ -40,11 +40,12 @@ or ``skill_map: {...}`` so the resolver can pick without needing
 a user-side metadata refactor. Future work: lift the maps into a
 per-user JSONB column once an operator asks for it.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -52,7 +53,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.workflows.actions import register_action
-
 
 logger = logging.getLogger(__name__)
 
@@ -138,20 +138,24 @@ async def _resolve_pool(
             return []
 
         rows = (
-            await session.execute(
-                select(User.legacy_uuid)
-                .join(
-                    OrganizationMember,
-                    OrganizationMember.user_member_id == User.id,
+            (
+                await session.execute(
+                    select(User.legacy_uuid)
+                    .join(
+                        OrganizationMember,
+                        OrganizationMember.user_member_id == User.id,
+                    )
+                    .where(
+                        OrganizationMember.organization_id == org_id,
+                        OrganizationMember.role_id == role_row,
+                        OrganizationMember.is_active.is_(True),
+                    )
+                    .order_by(User.legacy_uuid.asc())
                 )
-                .where(
-                    OrganizationMember.organization_id == org_id,
-                    OrganizationMember.role_id == role_row,
-                    OrganizationMember.is_active.is_(True),
-                )
-                .order_by(User.legacy_uuid.asc())
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return [row for row in rows if isinstance(row, uuid.UUID)]
 
     # Unknown kind — empty pool.
@@ -196,11 +200,7 @@ async def _bump_routing_pointer(
 
     sorted_candidates = sorted(candidates, key=lambda u: str(u))
 
-    stmt = (
-        select(OrgSettings)
-        .where(OrgSettings.org_id == org_id)
-        .with_for_update()
-    )
+    stmt = select(OrgSettings).where(OrgSettings.org_id == org_id).with_for_update()
     settings = (await session.execute(stmt)).scalar_one_or_none()
 
     if settings is None:
@@ -214,9 +214,7 @@ async def _bump_routing_pointer(
     routing_state = dict(settings.routing_state or {})
     pool_state = routing_state.get(pool_spec) or {}
     last_picked_raw = pool_state.get("last_picked_user_id")
-    last_picked = (
-        _coerce_uuid(last_picked_raw) if last_picked_raw else None
-    )
+    last_picked = _coerce_uuid(last_picked_raw) if last_picked_raw else None
 
     next_index = 0
     if last_picked is not None and last_picked in sorted_candidates:
@@ -227,7 +225,7 @@ async def _bump_routing_pointer(
 
     routing_state[pool_spec] = {
         "last_picked_user_id": str(picked),
-        "last_picked_at": datetime.now(timezone.utc).isoformat(),
+        "last_picked_at": datetime.now(UTC).isoformat(),
     }
     settings.routing_state = routing_state
     await session.commit()
@@ -319,9 +317,7 @@ async def _assign_to_user(
 ) -> tuple[str | None, str | None]:
     """Apply the assignment via leads.reassign_lead / contacts.reassign_contact.
     Returns ``(skip_reason, error_msg)`` — both None on success."""
-    actor_user_id = (
-        getattr(run, "created_by_user_id", None) or user_id
-    )
+    actor_user_id = getattr(run, "created_by_user_id", None) or user_id
     note = f"Auto-routed by workflow ({method})"
 
     try:
@@ -390,7 +386,7 @@ def _stash_lead_id(run, lead_id: uuid.UUID | None) -> None:
     """The reassign helper reads ``run._routing_lead_id`` to know
     which lead row to mutate. We attach it as a transient attribute
     so we don't have to thread it through every helper signature."""
-    setattr(run, "_routing_lead_id", lead_id)
+    run._routing_lead_id = lead_id
 
 
 def _normalise_target(target: Any) -> str:
@@ -417,9 +413,7 @@ async def _round_robin(session, *, run, step_run, node, context):
     if not isinstance(pool_spec, str) or not pool_spec:
         return _result_skipped("validation_failed", reason="missing_pool")
 
-    candidates = await _resolve_pool(
-        session, org_id=run.org_id, pool_spec=pool_spec
-    )
+    candidates = await _resolve_pool(session, org_id=run.org_id, pool_spec=pool_spec)
     if not candidates:
         return _result_skipped("no_candidates", pool=pool_spec, pool_size=0)
 
@@ -427,9 +421,7 @@ async def _round_robin(session, *, run, step_run, node, context):
         session, org_id=run.org_id, pool_spec=pool_spec, candidates=candidates
     )
     if target.startswith("lead."):
-        _stash_lead_id(
-            run, _resolve_target_lead_id(run=run, node=node, context=context)
-        )
+        _stash_lead_id(run, _resolve_target_lead_id(run=run, node=node, context=context))
     reason, msg = await _assign_to_user(
         session, run=run, target=target, user_id=picked, method="round_robin"
     )
@@ -454,22 +446,16 @@ async def _least_loaded(session, *, run, step_run, node, context):
     if not isinstance(pool_spec, str) or not pool_spec:
         return _result_skipped("validation_failed", reason="missing_pool")
 
-    candidates = await _resolve_pool(
-        session, org_id=run.org_id, pool_spec=pool_spec
-    )
+    candidates = await _resolve_pool(session, org_id=run.org_id, pool_spec=pool_spec)
     if not candidates:
         return _result_skipped("no_candidates", pool=pool_spec, pool_size=0)
 
-    picked = await _pick_least_loaded(
-        session, org_id=run.org_id, candidates=candidates
-    )
+    picked = await _pick_least_loaded(session, org_id=run.org_id, candidates=candidates)
     if picked is None:
         return _result_skipped("no_candidates", pool=pool_spec)
 
     if target.startswith("lead."):
-        _stash_lead_id(
-            run, _resolve_target_lead_id(run=run, node=node, context=context)
-        )
+        _stash_lead_id(run, _resolve_target_lead_id(run=run, node=node, context=context))
     reason, msg = await _assign_to_user(
         session, run=run, target=target, user_id=picked, method="least_loaded"
     )
@@ -523,9 +509,7 @@ async def _territory(session, *, run, step_run, node, context):
     for user_id_str, territories in territory_map.items():
         if not isinstance(territories, list):
             continue
-        if any(
-            isinstance(t, str) and t.lower() == value_lower for t in territories
-        ):
+        if any(isinstance(t, str) and t.lower() == value_lower for t in territories):
             user_uuid = _coerce_uuid(user_id_str)
             if user_uuid is not None:
                 matching.append(user_uuid)
@@ -537,16 +521,12 @@ async def _territory(session, *, run, step_run, node, context):
 
     # When multiple users match the territory, pick the least-loaded
     # among them so a busy rep doesn't grab every Mumbai lead.
-    picked = await _pick_least_loaded(
-        session, org_id=run.org_id, candidates=matching
-    )
+    picked = await _pick_least_loaded(session, org_id=run.org_id, candidates=matching)
     if picked is None:
         return _result_skipped("no_candidates", pool_size=len(matching))
 
     if target.startswith("lead."):
-        _stash_lead_id(
-            run, _resolve_target_lead_id(run=run, node=node, context=context)
-        )
+        _stash_lead_id(run, _resolve_target_lead_id(run=run, node=node, context=context))
     reason, msg = await _assign_to_user(
         session, run=run, target=target, user_id=picked, method="territory"
     )
@@ -606,16 +586,12 @@ async def _skill(session, *, run, step_run, node, context):
             session, run=run, step_run=step_run, node=node, context=context
         )
 
-    picked = await _pick_least_loaded(
-        session, org_id=run.org_id, candidates=matching
-    )
+    picked = await _pick_least_loaded(session, org_id=run.org_id, candidates=matching)
     if picked is None:
         return _result_skipped("no_candidates", pool_size=len(matching))
 
     if target.startswith("lead."):
-        _stash_lead_id(
-            run, _resolve_target_lead_id(run=run, node=node, context=context)
-        )
+        _stash_lead_id(run, _resolve_target_lead_id(run=run, node=node, context=context))
     reason, msg = await _assign_to_user(
         session, run=run, target=target, user_id=picked, method="skill"
     )
@@ -640,18 +616,14 @@ async def _specific_user(session, *, run, step_run, node, context):
         return _result_skipped("validation_failed", reason="missing_user_id")
 
     if target.startswith("lead."):
-        _stash_lead_id(
-            run, _resolve_target_lead_id(run=run, node=node, context=context)
-        )
+        _stash_lead_id(run, _resolve_target_lead_id(run=run, node=node, context=context))
     reason, msg = await _assign_to_user(
         session, run=run, target=target, user_id=user_id, method="specific_user"
     )
     if reason is not None:
         return _result_skipped(reason, error=msg)
 
-    return _result_assigned(
-        assigned_user_id=user_id, method="specific_user", pool_size=1
-    )
+    return _result_assigned(assigned_user_id=user_id, method="specific_user", pool_size=1)
 
 
 # --- Fallback driver ---------------------------------------------------
@@ -664,17 +636,11 @@ async def _fallback_route(session, *, run, step_run, node, context):
     cfg = node.get("config") or {}
     fallback = cfg.get("fallback", "round_robin")
     if fallback == "round_robin":
-        return await _round_robin(
-            session, run=run, step_run=step_run, node=node, context=context
-        )
+        return await _round_robin(session, run=run, step_run=step_run, node=node, context=context)
     if fallback == "least_loaded":
-        return await _least_loaded(
-            session, run=run, step_run=step_run, node=node, context=context
-        )
+        return await _least_loaded(session, run=run, step_run=step_run, node=node, context=context)
     if fallback == "specific_user":
-        return await _specific_user(
-            session, run=run, step_run=step_run, node=node, context=context
-        )
+        return await _specific_user(session, run=run, step_run=step_run, node=node, context=context)
     return _result_skipped("no_candidates", reason="no_fallback_match")
 
 

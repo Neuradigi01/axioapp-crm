@@ -1,10 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 
-import {
-  dashboardRange,
-  setDashboardRange,
-  type DashboardRange,
-} from './dashboard-range.signal';
+import { dashboardRange, setDashboardRange, type DashboardRange } from './dashboard-range.signal';
 
 /**
  * Segmented [7D | 30D | 90D | 365D] control that drives every dashboard

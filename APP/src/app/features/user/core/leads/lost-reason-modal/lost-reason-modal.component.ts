@@ -85,18 +85,14 @@ export class LostReasonModalComponent {
   });
 
   /** Pre-emptive guard for the "Other → must type" UX. */
-  protected readonly otherRequired = computed(
-    () => this.reasonControl.value === 'other',
-  );
+  protected readonly otherRequired = computed(() => this.reasonControl.value === 'other');
 
   protected onConfirm(): void {
     if (!this.canConfirm()) return;
     this.confirm.emit({
       lost_reason: this.reasonControl.value as LostReasonConfirm['lost_reason'],
       lost_reason_other:
-        this.reasonControl.value === 'other'
-          ? this.otherControl.value.trim()
-          : null,
+        this.reasonControl.value === 'other' ? this.otherControl.value.trim() : null,
     });
   }
 }

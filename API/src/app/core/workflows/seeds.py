@@ -11,6 +11,7 @@ module exists so the import paths Step 20 will reference are stable
 ahead of time. ``seed_default_workflows`` is a no-op for now — Step
 20 fills it in.
 """
+
 from __future__ import annotations
 
 import uuid

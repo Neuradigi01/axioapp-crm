@@ -22,12 +22,14 @@ The Meta HTTP call is injectable via `http_client_factory` so unit
 tests can plug in a stubbed `httpx.AsyncClient`. The factory matches
 the same convention the WhatsApp adapter uses (`whatsapp.py`).
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 from sqlalchemy import select
@@ -57,13 +59,11 @@ def _default_http_client_factory() -> httpx.AsyncClient:
 
 async def _get_integration_row(
     session: AsyncSession,
-) -> Optional[Integration]:
+) -> Integration | None:
     """Return the active tenant's WhatsApp `Integration` row, or None."""
     return (
         await session.execute(
-            select(Integration).where(
-                Integration.provider == IntegrationProvider.whatsapp
-            )
+            select(Integration).where(Integration.provider == IntegrationProvider.whatsapp)
         )
     ).scalar_one_or_none()
 
@@ -72,8 +72,8 @@ async def _get_config_row(
     session: AsyncSession,
     *,
     integration_id: uuid.UUID,
-    phone_id: Optional[str] = None,
-) -> Optional[WhatsAppAccountConfig]:
+    phone_id: str | None = None,
+) -> WhatsAppAccountConfig | None:
     """Return ONE WhatsApp sidecar row for the integration.
 
     When ``phone_id`` is supplied we filter on it directly (Step 27
@@ -93,8 +93,8 @@ async def _get_config_row(
 async def get_active_config(
     session: AsyncSession,
     *,
-    phone_id: Optional[str] = None,
-) -> Optional[tuple[Integration, WhatsAppAccountConfig]]:
+    phone_id: str | None = None,
+) -> tuple[Integration, WhatsAppAccountConfig] | None:
     """Resolve a connected WhatsApp config for the active tenant.
 
     Returns ``(integration, config)`` when:
@@ -113,9 +113,7 @@ async def get_active_config(
     integration = await _get_integration_row(session)
     if integration is None or integration.status != IntegrationStatus.connected:
         return None
-    config = await _get_config_row(
-        session, integration_id=integration.id, phone_id=phone_id
-    )
+    config = await _get_config_row(session, integration_id=integration.id, phone_id=phone_id)
     if config is None:
         return None
     return integration, config
@@ -136,14 +134,16 @@ async def list_active_configs(
     if integration is None or integration.status != IntegrationStatus.connected:
         return []
     rows = (
-        await session.execute(
-            select(WhatsAppAccountConfig)
-            .where(
-                WhatsAppAccountConfig.integration_id == integration.id
+        (
+            await session.execute(
+                select(WhatsAppAccountConfig)
+                .where(WhatsAppAccountConfig.integration_id == integration.id)
+                .order_by(WhatsAppAccountConfig.created_at.asc())
             )
-            .order_by(WhatsAppAccountConfig.created_at.asc())
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [(integration, row) for row in rows]
 
 
@@ -155,9 +155,7 @@ async def get_status(session: AsyncSession) -> dict[str, Any]:
     integration = await _get_integration_row(session)
     if integration is None:
         return {"status": "disconnected"}
-    config = await _get_config_row(
-        session, integration_id=integration.id
-    )
+    config = await _get_config_row(session, integration_id=integration.id)
     payload: dict[str, Any] = {
         "status": integration.status.value,
         "last_error": integration.last_error,
@@ -209,9 +207,7 @@ async def _validate_with_meta(
         raise MetaValidationError(message)
     body = response.json()
     if not isinstance(body, dict):
-        raise MetaValidationError(
-            f"unexpected meta response shape: {body!r}"
-        )
+        raise MetaValidationError(f"unexpected meta response shape: {body!r}")
     return body
 
 
@@ -236,7 +232,7 @@ async def connect_account(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
     payload: WhatsAppConnectIn,
     http_client_factory: HttpClientFactory = _default_http_client_factory,
 ) -> dict[str, Any]:
@@ -266,9 +262,7 @@ async def connect_account(
         # Re-raise so the router returns 400 with the same message.
         raise
 
-    display_phone_number = str(
-        meta_payload.get("display_phone_number") or payload.phone_id
-    )
+    display_phone_number = str(meta_payload.get("display_phone_number") or payload.phone_id)
     verified_name = meta_payload.get("verified_name")
     if verified_name is not None:
         verified_name = str(verified_name)
@@ -309,7 +303,7 @@ async def _upsert_integration_row(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
     access_token: str,
     phone_id: str,
     display_label: str,
@@ -319,7 +313,7 @@ async def _upsert_integration_row(
     `last_error`."""
     existing = await _get_integration_row(session)
     access_enc = encrypt(access_token)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if existing is None:
         row = Integration(
@@ -365,12 +359,10 @@ async def _upsert_config_row(
     integration_id: uuid.UUID,
     payload: WhatsAppConnectIn,
     display_phone_number: str,
-    verified_name: Optional[str],
+    verified_name: str | None,
 ) -> WhatsAppAccountConfig:
     """Insert-or-update the WA sidecar row. Encrypts the app secret."""
-    existing = await _get_config_row(
-        session, integration_id=integration_id
-    )
+    existing = await _get_config_row(session, integration_id=integration_id)
     app_secret_enc = encrypt(payload.app_secret)
     if existing is None:
         row = WhatsAppAccountConfig(
@@ -405,9 +397,9 @@ async def _persist_error(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
     phone_id: str,
-    display_label: Optional[str],
+    display_label: str | None,
     error_message: str,
 ) -> None:
     """Persist a parent-row failure marker (`status=error`,
@@ -416,7 +408,7 @@ async def _persist_error(
     doesn't bloat the row."""
     existing = await _get_integration_row(session)
     truncated = error_message[:1024]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if existing is None:
         row = Integration(
             org_id=org_id,
@@ -454,8 +446,8 @@ async def _persist_error(
 async def disconnect_account(
     session: AsyncSession,
     *,
-    actor_id: Optional[uuid.UUID],
-) -> Optional[Integration]:
+    actor_id: uuid.UUID | None,
+) -> Integration | None:
     """Null the bearer token + flip status to `disconnected`. Sidecar
     row stays so reconnect can pre-fill phone_id / waba_id.
 
@@ -468,7 +460,7 @@ async def disconnect_account(
     row.access_token_enc = None
     row.refresh_token_enc = None
     row.status = IntegrationStatus.disconnected
-    row.disconnected_at = datetime.now(timezone.utc)
+    row.disconnected_at = datetime.now(UTC)
     row.disconnected_by = actor_id
     await session.commit()
     await session.refresh(row)
@@ -496,18 +488,12 @@ async def test_connection(
         # "disconnected" by re-reading the integration row.
         integration = await _get_integration_row(session)
         if integration is None:
-            raise MetaValidationError(
-                "WhatsApp is not connected for this org."
-            )
+            raise MetaValidationError("WhatsApp is not connected for this org.")
         # Disconnected (token nulled) — surface the dedicated message.
-        raise MetaValidationError(
-            f"WhatsApp is {integration.status.value}; reconnect first."
-        )
+        raise MetaValidationError(f"WhatsApp is {integration.status.value}; reconnect first.")
     integration, config = bundle
     if integration.access_token_enc is None:
-        raise MetaValidationError(
-            "Stored credentials are missing; reconnect required."
-        )
+        raise MetaValidationError("Stored credentials are missing; reconnect required.")
     plaintext_token = decrypt(integration.access_token_enc)
     try:
         await _validate_with_meta(
@@ -537,7 +523,7 @@ async def test_connection(
 
 async def find_org_by_phone_id(
     session: AsyncSession, *, phone_id: str
-) -> Optional[tuple[Integration, WhatsAppAccountConfig]]:
+) -> tuple[Integration, WhatsAppAccountConfig] | None:
     """Look up the org that owns a given WhatsApp phone number id.
 
     Used by the inbound webhook receiver to learn which org's
@@ -573,9 +559,7 @@ async def find_org_by_phone_id(
         LIMIT 1
         """
     )
-    row = (
-        await session.execute(sql, {"phone_id": phone_id})
-    ).mappings().first()
+    row = (await session.execute(sql, {"phone_id": phone_id})).mappings().first()
     if row is None:
         return None
     integration = Integration(
@@ -616,7 +600,7 @@ async def find_org_by_phone_id(
 
 async def find_org_by_waba_id(
     session: AsyncSession, *, waba_id: str
-) -> Optional[tuple[Integration, WhatsAppAccountConfig]]:
+) -> tuple[Integration, WhatsAppAccountConfig] | None:
     """Look up the org owning a given WABA id
     (whatsapp-platform-upgrade Step 8).
 
@@ -638,9 +622,7 @@ async def find_org_by_waba_id(
         LIMIT 1
         """
     )
-    row = (
-        await session.execute(sql, {"waba_id": waba_id})
-    ).mappings().first()
+    row = (await session.execute(sql, {"waba_id": waba_id})).mappings().first()
     if row is None:
         return None
     return await find_org_by_phone_id(session, phone_id=row["phone_id"])
@@ -648,7 +630,7 @@ async def find_org_by_waba_id(
 
 async def find_org_by_verify_token(
     session: AsyncSession, *, verify_token: str
-) -> Optional[tuple[Integration, WhatsAppAccountConfig]]:
+) -> tuple[Integration, WhatsAppAccountConfig] | None:
     """Look up the org whose verify_token matches the one Meta sent on
     the GET-handshake. Same bypass-tenant-filter approach as
     `find_org_by_phone_id` — the handshake carries no other identifier.
@@ -670,9 +652,7 @@ async def find_org_by_verify_token(
         LIMIT 1
         """
     )
-    row = (
-        await session.execute(sql, {"vt": verify_token})
-    ).mappings().first()
+    row = (await session.execute(sql, {"vt": verify_token})).mappings().first()
     if row is None:
         return None
     return await find_org_by_phone_id(session, phone_id=row["phone_id"])

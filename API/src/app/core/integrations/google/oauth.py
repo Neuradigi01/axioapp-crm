@@ -28,6 +28,7 @@ return a refresh token on every grant (without `prompt=consent`,
 Google only returns refresh tokens on the FIRST grant for a given
 (client_id, user) pair — disastrous when the Owner reconnects).
 """
+
 from __future__ import annotations
 
 import base64
@@ -38,7 +39,7 @@ import secrets
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from datetime import UTC
 from urllib.parse import urlencode
 
 import httpx
@@ -55,7 +56,6 @@ from src.app.core.integrations.models import Integration
 from src.app.core.integrations.schemas import IntegrationUpsert
 from src.app.core.integrations.service import upsert
 
-
 _AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
@@ -69,7 +69,7 @@ _SCOPES = [
     "openid",
 ]
 
-_STATE_TTL_SECONDS = 600          # 10 minutes — Google flows complete in seconds
+_STATE_TTL_SECONDS = 600  # 10 minutes — Google flows complete in seconds
 _TOKEN_HTTP_TIMEOUT = 10.0
 
 
@@ -96,9 +96,7 @@ def _b64url_decode(data: str) -> bytes:
 def _sign_state(payload: dict) -> str:
     """Encode `{payload}` as `<b64-json>.<b64-hmac>`. Tamper-evident."""
     body = _b64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    sig = hmac.new(
-        _state_secret(), body.encode("ascii"), hashlib.sha256
-    ).digest()
+    sig = hmac.new(_state_secret(), body.encode("ascii"), hashlib.sha256).digest()
     return f"{body}.{_b64url_encode(sig)}"
 
 
@@ -111,9 +109,7 @@ def _verify_state(state: str) -> dict:
             detail="Invalid OAuth state.",
         )
     body, sig = state.split(".", 1)
-    expected = hmac.new(
-        _state_secret(), body.encode("ascii"), hashlib.sha256
-    ).digest()
+    expected = hmac.new(_state_secret(), body.encode("ascii"), hashlib.sha256).digest()
     try:
         provided = _b64url_decode(sig)
     except ValueError:
@@ -152,14 +148,14 @@ class GoogleTokens:
     we actually persist or use."""
 
     access_token: str
-    refresh_token: Optional[str]
+    refresh_token: str | None
     expires_at: int  # unix seconds
 
 
 def start_authorize(
     *,
     org_id: uuid.UUID,
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
 ) -> str:
     """Build the URL the browser should be redirected to for the
     Google OAuth consent screen.
@@ -203,7 +199,7 @@ def start_authorize(
 async def exchange_code_for_tokens(
     code: str,
     *,
-    http_client: Optional[httpx.AsyncClient] = None,
+    http_client: httpx.AsyncClient | None = None,
 ) -> GoogleTokens:
     """POST the authorization code to Google's token endpoint. Returns
     the decoded `GoogleTokens`. Raises HTTPException(502) if Google's
@@ -230,8 +226,8 @@ async def exchange_code_for_tokens(
 async def fetch_userinfo_email(
     access_token: str,
     *,
-    http_client: Optional[httpx.AsyncClient] = None,
-) -> Optional[str]:
+    http_client: httpx.AsyncClient | None = None,
+) -> str | None:
     """Best-effort: fetch the Google account's email for the
     integration row's `account_label`. Returns None on any failure —
     the connect doesn't fail just because the human-friendly label
@@ -239,13 +235,9 @@ async def fetch_userinfo_email(
     headers = {"Authorization": f"Bearer {access_token}"}
     try:
         if http_client is not None:
-            response = await http_client.get(
-                _USERINFO_URL, headers=headers
-            )
+            response = await http_client.get(_USERINFO_URL, headers=headers)
         else:
-            async with httpx.AsyncClient(
-                timeout=_TOKEN_HTTP_TIMEOUT
-            ) as client:
+            async with httpx.AsyncClient(timeout=_TOKEN_HTTP_TIMEOUT) as client:
                 response = await client.get(_USERINFO_URL, headers=headers)
     except (httpx.HTTPError, httpx.TimeoutException):
         return None
@@ -262,7 +254,7 @@ async def handle_callback(
     *,
     code: str,
     state: str,
-    http_client: Optional[httpx.AsyncClient] = None,
+    http_client: httpx.AsyncClient | None = None,
 ) -> Integration:
     """End-to-end callback handler:
 
@@ -276,16 +268,10 @@ async def handle_callback(
     error param so the Settings page can show a friendly message."""
     payload = _verify_state(state)
     org_id = uuid.UUID(payload["org_id"])
-    actor_id = (
-        uuid.UUID(payload["actor_id"])
-        if payload.get("actor_id")
-        else None
-    )
+    actor_id = uuid.UUID(payload["actor_id"]) if payload.get("actor_id") else None
 
     tokens = await exchange_code_for_tokens(code, http_client=http_client)
-    email = await fetch_userinfo_email(
-        tokens.access_token, http_client=http_client
-    )
+    email = await fetch_userinfo_email(tokens.access_token, http_client=http_client)
 
     integration = await upsert(
         session,
@@ -307,15 +293,11 @@ async def handle_callback(
 # --- Helpers --------------------------------------------------------------
 
 
-async def _post_token(
-    data: dict, http_client: Optional[httpx.AsyncClient]
-) -> httpx.Response:
+async def _post_token(data: dict, http_client: httpx.AsyncClient | None) -> httpx.Response:
     try:
         if http_client is not None:
             return await http_client.post(_TOKEN_URL, data=data)
-        async with httpx.AsyncClient(
-            timeout=_TOKEN_HTTP_TIMEOUT
-        ) as client:
+        async with httpx.AsyncClient(timeout=_TOKEN_HTTP_TIMEOUT) as client:
             return await client.post(_TOKEN_URL, data=data)
     except (httpx.HTTPError, httpx.TimeoutException) as exc:
         raise HTTPException(
@@ -333,8 +315,7 @@ def _parse_token_response(response: httpx.Response) -> dict:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Google rejected the OAuth exchange "
-                f"(status={response.status_code}): {detail_body}"
+                f"Google rejected the OAuth exchange (status={response.status_code}): {detail_body}"
             ),
         )
     body = _safe_json(response)
@@ -346,7 +327,7 @@ def _parse_token_response(response: httpx.Response) -> dict:
     return body
 
 
-def _safe_json(response: httpx.Response) -> Optional[dict]:
+def _safe_json(response: httpx.Response) -> dict | None:
     try:
         return response.json()
     except ValueError:
@@ -356,9 +337,9 @@ def _safe_json(response: httpx.Response) -> Optional[dict]:
 def _unix_to_aware(ts: int):
     """Unix seconds → tz-aware UTC datetime. Standalone so it's
     testable without the rest of the module being imported."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.fromtimestamp(ts, tz=timezone.utc)
+    return datetime.fromtimestamp(ts, tz=UTC)
 
 
 def verify_state(state: str) -> dict:

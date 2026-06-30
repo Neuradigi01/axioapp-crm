@@ -14,6 +14,7 @@ Verifies:
 No DB inserts here — RLS isolation is exercised in
 ``test_rls_isolation.py``.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,9 +27,7 @@ from src.app.core.automation.models import (
     AutomationTrigger,
 )
 from src.app.core.automation.schemas import (
-    RunRead,
     TriggerCreate,
-    TriggerRead,
     TriggerUpdate,
 )
 from src.app.core.conversations.models import ConversationChannel

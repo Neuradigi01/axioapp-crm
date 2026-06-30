@@ -16,11 +16,12 @@ Key invariants:
   * Cap on mentions is enforced by the Pydantic schema (max 5);
     this layer trusts the caller.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,18 +58,12 @@ async def _validate_mentions(
         session, org_id=org_id, user_uuids=mentioned_user_ids
     )
 
-    found = {
-        row[0]: f"{row[1] or ''} {row[2] or ''}".strip() or "User"
-        for row in rows
-    }
+    found = {row[0]: f"{row[1] or ''} {row[2] or ''}".strip() or "User" for row in rows}
     missing = [uid for uid in mentioned_user_ids if uid not in found]
     if missing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "One or more mentioned users are not active members "
-                "of this organization."
-            ),
+            detail=("One or more mentioned users are not active members of this organization."),
         )
     return [(uid, found[uid]) for uid in mentioned_user_ids]
 
@@ -99,7 +94,7 @@ async def post_note(
         mentioned_user_ids=mentioned_user_ids,
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     note = Message(
         org_id=conv.org_id,
         conversation_id=conv.id,

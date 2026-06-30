@@ -1,8 +1,9 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+
+from config import ROUTES_API
 from src.constants import messages
 from src.utilities.app_utils import load_json
-from config import ROUTES_API
 
 router = APIRouter()
 

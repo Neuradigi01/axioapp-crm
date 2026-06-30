@@ -8,12 +8,14 @@ endpoint doesn't leak existence.
 Run with:
   ``uv run pytest tests/test_walkins_row_level_scope.py -v``
 """
+
 from __future__ import annotations
 
 import uuid
 
 import pytest
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.app.core.contacts.models import Contact
@@ -23,7 +25,8 @@ from src.app.core.users.models import OrganizationMember, User
 from src.app.core.walk_ins.models import WalkIn, WalkInStatus
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.security.password import hash_password
-from src.models.user import UserInfo as LegacyUserInfo, UserLogin
+from src.models.user import UserInfo as LegacyUserInfo
+from src.models.user import UserLogin
 
 
 async def _grant(role_id: uuid.UUID, *keys: str) -> None:
@@ -37,9 +40,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -170,9 +171,7 @@ async def test_list_walkins_scope_split(layered_client, seeded_admin):
     admin_walkin = await _make_walkin(
         org.id, contact_id=contact_id, assigned_to_id=admin.legacy_uuid
     )
-    rep_walkin = await _make_walkin(
-        org.id, contact_id=contact_id, assigned_to_id=rep.legacy_uuid
-    )
+    rep_walkin = await _make_walkin(org.id, contact_id=contact_id, assigned_to_id=rep.legacy_uuid)
 
     # Admin → both walk-ins.
     admin_token = await _login(
@@ -215,9 +214,7 @@ async def test_list_walkins_scope_split(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_get_walkin_returns_404_when_out_of_scope(
-    layered_client, seeded_admin
-):
+async def test_get_walkin_returns_404_when_out_of_scope(layered_client, seeded_admin):
     """Employee fetching another user's walk-in by id → 404."""
     org = seeded_admin["org"]
     admin = seeded_admin["user"]
@@ -236,9 +233,7 @@ async def test_get_walkin_returns_404_when_out_of_scope(
     admin_walkin = await _make_walkin(
         org.id, contact_id=contact_id, assigned_to_id=admin.legacy_uuid
     )
-    rep_walkin = await _make_walkin(
-        org.id, contact_id=contact_id, assigned_to_id=rep.legacy_uuid
-    )
+    rep_walkin = await _make_walkin(org.id, contact_id=contact_id, assigned_to_id=rep.legacy_uuid)
 
     rep_token = await _login(
         layered_client,

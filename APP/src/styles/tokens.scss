@@ -13,7 +13,12 @@
   --brand-grad-1: #57bdff;
   --brand-grad-2: #4f77fb;
   --brand-grad-3: #6528cf;
-  --brand-gradient: linear-gradient(135deg, var(--brand-grad-1), var(--brand-grad-2), var(--brand-grad-3));
+  --brand-gradient: linear-gradient(
+    135deg,
+    var(--brand-grad-1),
+    var(--brand-grad-2),
+    var(--brand-grad-3)
+  );
 
   // ---------------------------------------------------------------------------
   // Primitive Colors — Dark Palette

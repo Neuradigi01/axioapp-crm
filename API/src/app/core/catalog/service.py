@@ -11,10 +11,11 @@ A duplicate `(org_id, sku)` violates the unique constraint at the DB
 level; we catch the IntegrityError and surface a 409 with a friendly
 message rather than letting the raw DB error escape.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -34,7 +35,6 @@ from src.app.shared.files import (
     validate_image_upload,
 )
 from src.app.shared.storage import get_storage
-
 
 _CATALOG_ENTITY = "catalog_item"
 
@@ -59,9 +59,7 @@ def _snapshot(item: CatalogItem) -> dict[str, Any]:
 # --- CRUD ---
 
 
-async def get_item(
-    session: AsyncSession, item_id: uuid.UUID
-) -> Optional[CatalogItem]:
+async def get_item(session: AsyncSession, item_id: uuid.UUID) -> CatalogItem | None:
     return await _da.get_catalog_item_by_id(session, item_id)
 
 
@@ -201,8 +199,8 @@ async def set_item_image(
 async def list_items(
     session: AsyncSession,
     *,
-    q: Optional[str] = None,
-    category: Optional[str] = None,
+    q: str | None = None,
+    category: str | None = None,
     active_only: bool = False,
     page: int = 1,
     size: int = 50,

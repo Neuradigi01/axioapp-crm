@@ -1,9 +1,10 @@
-import pytest
-from datetime import datetime, timedelta, timezone
-from jose import jwt
-from fastapi import HTTPException
+from datetime import UTC, datetime, timedelta
 
-from src.core.security.jwt import create_access_token, get_current_user, SECRET_KEY, ALGORITHM
+import pytest
+from fastapi import HTTPException
+from jose import jwt
+
+from src.core.security.jwt import ALGORITHM, SECRET_KEY, create_access_token, get_current_user
 
 
 def test_create_token_returns_string():
@@ -22,26 +23,34 @@ def test_decode_valid_token():
 
 
 def test_expired_token_raises():
-    payload = {"user_id": "test", "role": "User", "exp": datetime.now(timezone.utc) - timedelta(hours=1)}
+    payload = {
+        "user_id": "test",
+        "role": "User",
+        "exp": datetime.now(UTC) - timedelta(hours=1),
+    }
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-    from unittest.mock import AsyncMock, MagicMock
+    from unittest.mock import MagicMock
+
     credentials = MagicMock()
     credentials.credentials = token
 
     with pytest.raises(HTTPException) as exc_info:
         import asyncio
+
         asyncio.get_event_loop().run_until_complete(get_current_user(credentials))
     assert exc_info.value.status_code == 401
 
 
 def test_invalid_token_raises():
     from unittest.mock import MagicMock
+
     credentials = MagicMock()
     credentials.credentials = "garbage.token.string"
 
     with pytest.raises(HTTPException) as exc_info:
         import asyncio
+
         asyncio.get_event_loop().run_until_complete(get_current_user(credentials))
     assert exc_info.value.status_code == 401
 

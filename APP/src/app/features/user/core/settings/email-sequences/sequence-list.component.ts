@@ -36,24 +36,17 @@ import {
   EmailSequencesApiService,
 } from '../../services/email-sequences-api.service';
 
-
 interface SequenceStats {
   active: number;
   completed: number;
   paused_on_reply: number;
 }
 
-
 @Component({
   selector: 'app-email-sequences-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    DatePipe,
-    LucideAngularModule,
-    ReactiveFormsModule,
-    RouterLink,
-  ],
+  imports: [DatePipe, LucideAngularModule, ReactiveFormsModule, RouterLink],
   templateUrl: './sequence-list.component.html',
 })
 export class EmailSequencesListComponent implements OnInit {
@@ -74,26 +67,18 @@ export class EmailSequencesListComponent implements OnInit {
   protected readonly deleting = signal<string | null>(null);
   protected readonly confirmDelete = signal<EmailSequence | null>(null);
 
-  protected readonly canManage = computed(() =>
-    this.auth.hasPermission('email.sequences.manage'),
-  );
+  protected readonly canManage = computed(() => this.auth.hasPermission('email.sequences.manage'));
 
   protected readonly searchCtrl = new FormControl<string>('', {
     nonNullable: true,
   });
 
-  protected readonly emptyState = computed(
-    () => (this.sequences()?.length ?? 0) === 0,
-  );
+  protected readonly emptyState = computed(() => (this.sequences()?.length ?? 0) === 0);
 
   ngOnInit(): void {
     this._load('');
     this.searchCtrl.valueChanges
-      .pipe(
-        debounceTime(250),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef),
-      )
+      .pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe((value) => this._load(value.trim()));
   }
 
@@ -102,9 +87,7 @@ export class EmailSequencesListComponent implements OnInit {
   }
 
   openCreate(): void {
-    this.router.navigate([
-      '/user/settings/email-sequences/new',
-    ]);
+    this.router.navigate(['/user/settings/email-sequences/new']);
   }
 
   openDelete(s: EmailSequence): void {

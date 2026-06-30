@@ -36,11 +36,7 @@
     />
   </div>
   <label class="flex items-center gap-2 text-xs">
-    <input
-      type="checkbox"
-      [ngModel]="sendEmail()"
-      (ngModelChange)="onSendEmailChange($event)"
-    />
+    <input type="checkbox" [ngModel]="sendEmail()" (ngModelChange)="onSendEmailChange($event)" />
     Email the quote to the contact on creation
   </label>
 </div>

@@ -59,12 +59,15 @@
   <div class="flex flex-wrap items-center gap-2 text-xs">
     <!-- Status chips -->
     <div class="inline-flex overflow-hidden rounded-full ring-1 ring-zinc-200 bg-white">
-      @for (s of [
-        { v: '',       label: 'All' },
-        { v: 'active', label: 'Active' },
-        { v: 'won',    label: 'Won' },
-        { v: 'lost',   label: 'Lost' }
-      ]; track s.v) {
+      @for (
+        s of [
+          { v: '', label: 'All' },
+          { v: 'active', label: 'Active' },
+          { v: 'won', label: 'Won' },
+          { v: 'lost', label: 'Lost' },
+        ];
+        track s.v
+      ) {
         <button
           type="button"
           (click)="setStatus(s.v)"
@@ -82,11 +85,14 @@
     <!-- Scope toggle (hidden for junior staff) -->
     @if (canChangeScope()) {
       <div class="inline-flex overflow-hidden rounded-full ring-1 ring-zinc-200 bg-white">
-        @for (sc of [
-          { v: 'mine', label: 'Mine' },
-          { v: 'team', label: 'Team' },
-          { v: 'all',  label: 'All' }
-        ]; track sc.v) {
+        @for (
+          sc of [
+            { v: 'mine', label: 'Mine' },
+            { v: 'team', label: 'Team' },
+            { v: 'all', label: 'All' },
+          ];
+          track sc.v
+        ) {
           <button
             type="button"
             (click)="setScope(sc.v)"
@@ -147,10 +153,7 @@
           aria-haspopup="menu"
           [attr.aria-expanded]="viewsMenuOpen()"
         >
-          <lucide-icon
-            [name]="currentViewName() ? 'bookmark-check' : 'bookmark'"
-            class="h-4 w-4"
-          />
+          <lucide-icon [name]="currentViewName() ? 'bookmark-check' : 'bookmark'" class="h-4 w-4" />
           {{ currentViewName() ?? 'Default view' }}
           <lucide-icon name="chevron-down" class="h-3 w-3 text-zinc-400" />
         </button>
@@ -170,9 +173,7 @@
             class="absolute right-0 z-40 mt-1 w-72 rounded-md border border-zinc-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
           >
             @if (savedViews().length === 0) {
-              <p class="px-3 py-4 text-center text-xs text-zinc-500">
-                No saved views yet.
-              </p>
+              <p class="px-3 py-4 text-center text-xs text-zinc-500">No saved views yet.</p>
             } @else {
               <ul class="max-h-60 overflow-auto py-1 text-xs">
                 @for (view of savedViews(); track view.id) {
@@ -372,11 +373,7 @@
     >
       <ng-template let-item>
         @let contact = contactFor(item.contact_id);
-        <button
-          type="button"
-          (click)="openEdit(item)"
-          class="block w-full text-left"
-        >
+        <button type="button" (click)="openEdit(item)" class="block w-full text-left">
           <app-lead-card
             [lead]="item"
             [contactName]="contact?.full_name ?? null"
@@ -497,7 +494,9 @@
                   <td class="px-4 py-2.5 text-sm text-zinc-900 align-top whitespace-nowrap">
                     @switch (col.key) {
                       @case ('contact_name') {
-                        <span class="font-medium">{{ contact?.full_name ?? 'Unknown contact' }}</span>
+                        <span class="font-medium">{{
+                          contact?.full_name ?? 'Unknown contact'
+                        }}</span>
                       }
                       @case ('status') {
                         <span
@@ -515,7 +514,9 @@
                       }
                       @case ('source') {
                         @if (contact?.source; as src) {
-                          <span class="inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200">
+                          <span
+                            class="inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200"
+                          >
                             {{ src }}
                           </span>
                         } @else {
@@ -602,7 +603,9 @@
       </div>
 
       <!-- Pagination footer -->
-      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 bg-zinc-50 px-4 py-2.5 text-xs text-zinc-600">
+      <div
+        class="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 bg-zinc-50 px-4 py-2.5 text-xs text-zinc-600"
+      >
         <div>
           @if (totalCount() !== null && state.items().length > 0) {
             Showing {{ pageRangeStart() }}–{{ pageRangeEnd() }} of {{ totalCount() }}
@@ -687,7 +690,9 @@
 <!-- Bulk delete confirm. -->
 @if (state.bulkModal() === 'delete') {
   <app-confirm-dialog
-    [title]="'Delete ' + state.selectedCount() + ' lead' + (state.selectedCount() === 1 ? '' : 's') + '?'"
+    [title]="
+      'Delete ' + state.selectedCount() + ' lead' + (state.selectedCount() === 1 ? '' : 's') + '?'
+    "
     [body]="'This cannot be undone. Contacts and activities linked to these leads remain in their respective timelines.'"
     [confirmLabel]="'Delete'"
     [danger]="true"
@@ -745,9 +750,7 @@
     aria-labelledby="save-view-title"
   >
     <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl ring-1 ring-zinc-200">
-      <h2 id="save-view-title" class="text-base font-semibold text-zinc-900">
-        Save view
-      </h2>
+      <h2 id="save-view-title" class="text-base font-semibold text-zinc-900">Save view</h2>
       <p class="mt-1 text-xs text-zinc-500">
         Captures the current filter, sort, scope, columns, and view mode.
       </p>

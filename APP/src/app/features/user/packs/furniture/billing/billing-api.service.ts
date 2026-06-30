@@ -6,13 +6,7 @@ import { environment } from '../../../../../../environments/environment';
 import { buildHttpParams } from '../../../core/shared/services/query-builder';
 
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'void';
-export type PaymentMethod =
-  | 'cash'
-  | 'card'
-  | 'upi'
-  | 'emi'
-  | 'cheque'
-  | 'bank';
+export type PaymentMethod = 'cash' | 'card' | 'upi' | 'emi' | 'cheque' | 'bank';
 
 export interface Invoice {
   id: string;
@@ -156,9 +150,6 @@ export class BillingApiService {
   }
 
   checkout(payload: PosCheckoutPayload): Observable<PosCheckoutResponse> {
-    return this.http.post<PosCheckoutResponse>(
-      `${this.posBase}/checkout`,
-      payload,
-    );
+    return this.http.post<PosCheckoutResponse>(`${this.posBase}/checkout`, payload);
   }
 }

@@ -16,6 +16,7 @@ Covers the end-to-end "manager's promise":
 The Meta / SMTP boundary is mocked so the test doesn't need a
 real email backend.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -23,11 +24,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
-from src.app.core.automation import seeds, tasks as automation_tasks
+from src.app.core.automation import seeds
+from src.app.core.automation import tasks as automation_tasks
 from src.app.core.automation.models import (
-    AutomationRun,
     AutomationRunStatus,
     AutomationTrigger,
 )
@@ -35,9 +37,7 @@ from src.app.core.automation.service import (
     disable_trigger,
     match_triggers,
 )
-from src.app.core.events import bus
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -46,10 +46,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo Workspace",
@@ -73,21 +70,23 @@ async def _install_seeds(test_db, org_id):
 # --- seed installation --------------------------------------------
 
 
-async def test_install_default_org_seeds_creates_template_and_trigger(
-    test_db, org_id
-):
+async def test_install_default_org_seeds_creates_template_and_trigger(test_db, org_id):
     result = await _install_seeds(test_db, org_id)
     assert "template_id" in result
     assert "trigger_id" in result
 
     rows = (
-        await test_db.execute(
-            select(AutomationTrigger).where(
-                AutomationTrigger.org_id == org_id,
-                AutomationTrigger.name == "User Welcome",
+        (
+            await test_db.execute(
+                select(AutomationTrigger).where(
+                    AutomationTrigger.org_id == org_id,
+                    AutomationTrigger.name == "User Welcome",
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
     trigger = rows[0]
     assert trigger.event_type == "user.signed_up"
@@ -105,9 +104,7 @@ async def test_install_default_org_seeds_is_idempotent(test_db, org_id):
 # --- dispatcher matches the seeded trigger ------------------------
 
 
-async def test_match_triggers_returns_seeded_welcome_for_user_signed_up(
-    test_db, org_id
-):
+async def test_match_triggers_returns_seeded_welcome_for_user_signed_up(test_db, org_id):
     await _install_seeds(test_db, org_id)
     matches = await match_triggers(
         test_db,
@@ -150,7 +147,6 @@ async def test_publish_user_signed_up_enrols_queued_run(test_db, org_id):
     # package-level side-effect import runs at process start; we
     # ensure it's registered here too so the test is hermetic).
     from src.app.core.automation.dispatcher import (
-        _bus_subscriber,
         dispatch_event,
         register_bus_subscriber,
     )

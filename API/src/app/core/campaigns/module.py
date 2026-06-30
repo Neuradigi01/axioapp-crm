@@ -4,8 +4,8 @@ Sidebar entry at `menu_position=560` (after Reviews at 540).
 Permission keys `campaigns.read`, `campaigns.write`, `campaigns.send`
 register on startup.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="campaigns",

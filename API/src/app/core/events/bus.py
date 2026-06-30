@@ -67,13 +67,14 @@ Communications
 Time-based (emitted by the daily sweep)
     ``time.daily_tick`` — once a day at org-local midnight
 """
+
 from __future__ import annotations
 
 import inspect
 import logging
 import uuid
-from typing import Any, Awaitable, Callable, Union
-
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ logger = logging.getLogger(__name__)
 #: payload (already enriched with ``org_id``). Sync callables are
 #: also accepted to keep test fixtures simple; their return value
 #: is discarded.
-EventHandler = Callable[[dict[str, Any]], Union[None, Awaitable[None]]]
+EventHandler = Callable[[dict[str, Any]], None | Awaitable[None]]
 
 
 # Process-local registry. Keyed by exact event-type string match;

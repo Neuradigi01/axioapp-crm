@@ -10,6 +10,7 @@ Covers:
   * The role-template registry grants the right keys to
     Admin / Owner / Employee fanouts.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -29,7 +30,6 @@ from src.app.core.workflows.permissions import (
     EMPLOYEE_KEYS,
     OWNER_KEYS,
 )
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -67,9 +67,7 @@ def test_role_templates_grant_keys_correctly():
     # Owner is a superset of Admin in the role-templates module.
     assert set(ALL_KEYS).issubset(set(_CORE_OWNER_KEYS))
 
-    employee_workflow_keys = {
-        k for k in _CORE_EMPLOYEE_KEYS if k.startswith("workflows.")
-    }
+    employee_workflow_keys = {k for k in _CORE_EMPLOYEE_KEYS if k.startswith("workflows.")}
     assert employee_workflow_keys == set(EMPLOYEE_KEYS)
 
 
@@ -87,10 +85,8 @@ async def test_six_keys_registered_in_tbl_permissions(test_db):
     (``0137_bf_workflows_perm``) populates them explicitly so the
     fanout JOIN has something to find."""
     rows = (
-        await test_db.execute(
-            select(Permission.key).where(Permission.key.in_(ALL_KEYS))
-        )
-    ).scalars().all()
-    assert set(rows) == set(ALL_KEYS), (
-        f"missing keys: {set(ALL_KEYS) - set(rows)}"
+        (await test_db.execute(select(Permission.key).where(Permission.key.in_(ALL_KEYS))))
+        .scalars()
+        .all()
     )
+    assert set(rows) == set(ALL_KEYS), f"missing keys: {set(ALL_KEYS) - set(rows)}"

@@ -15,11 +15,7 @@ import { FormsModule } from '@angular/forms';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  PipelineStage,
-  PipelinesApiService,
-  StageUpdate,
-} from './pipelines-api.service';
+import { PipelineStage, PipelinesApiService, StageUpdate } from './pipelines-api.service';
 
 /**
  * Reusable popover for editing a single pipeline stage: name, colour,
@@ -101,9 +97,9 @@ export class StageEditorPopoverComponent {
   protected readonly dirty = computed(() => {
     const s = this.stage();
     return (
-      this.nameTrimmed() !== s.name
-      || (this.colorValue() ?? null) !== (s.color ?? null)
-      || this.displayOrderValue() !== s.display_order
+      this.nameTrimmed() !== s.name ||
+      (this.colorValue() ?? null) !== (s.color ?? null) ||
+      this.displayOrderValue() !== s.display_order
     );
   });
 
@@ -116,9 +112,7 @@ export class StageEditorPopoverComponent {
   );
 
   protected readonly canMoveRight = computed(
-    () =>
-      !this.isTerminal()
-      && this.displayOrderValue() < Math.max(0, this.siblingCount() - 1),
+    () => !this.isTerminal() && this.displayOrderValue() < Math.max(0, this.siblingCount() - 1),
   );
 
   constructor() {
@@ -211,9 +205,7 @@ export class StageEditorPopoverComponent {
             this.deleteBlocked.emit({ stageId, cardsInStage });
             return;
           }
-          this.deleteError.set(
-            extractApiError(err) ?? 'Could not delete stage.',
-          );
+          this.deleteError.set(extractApiError(err) ?? 'Could not delete stage.');
         },
       });
   }

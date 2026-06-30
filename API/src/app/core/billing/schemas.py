@@ -1,46 +1,45 @@
 """Pydantic v2 schemas for the core billing engine."""
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 from src.app.core.billing.models import InvoiceStatus, PaymentMethod
 from src.app.shared.schemas import ORMModel, PaginatedResponse, TimestampedOrgScopedOut
 
-
 # --- Invoices -------------------------------------------------------------
 
 
 class InvoiceCreate(BaseModel):
-    contact_id: Optional[uuid.UUID] = None
-    notes: Optional[str] = None
+    contact_id: uuid.UUID | None = None
+    notes: str | None = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class InvoiceUpdate(BaseModel):
-    contact_id: Optional[uuid.UUID] = None
-    discount_amount: Optional[Decimal] = Field(default=None, ge=0)
-    notes: Optional[str] = None
-    custom_data: Optional[dict[str, Any]] = None
+    contact_id: uuid.UUID | None = None
+    discount_amount: Decimal | None = Field(default=None, ge=0)
+    notes: str | None = None
+    custom_data: dict[str, Any] | None = None
 
 
 class InvoiceLineCreate(BaseModel):
-    catalog_item_id: Optional[uuid.UUID] = None
+    catalog_item_id: uuid.UUID | None = None
     description: str = Field(min_length=1, max_length=255)
     qty: int = Field(ge=1)
     unit_price: Decimal = Field(ge=0)
-    tax_pct: Optional[Decimal] = Field(default=None, ge=0, le=100)
+    tax_pct: Decimal | None = Field(default=None, ge=0, le=100)
 
 
 class InvoiceLineOut(ORMModel):
-
     id: uuid.UUID
     invoice_id: uuid.UUID
-    catalog_item_id: Optional[uuid.UUID]
+    catalog_item_id: uuid.UUID | None
     description: str
     qty: int
     unit_price: Decimal
@@ -51,22 +50,21 @@ class InvoiceLineOut(ORMModel):
 
 
 class InvoiceOut(TimestampedOrgScopedOut):
-
     id: uuid.UUID
-    number: Optional[int]
-    contact_id: Optional[uuid.UUID]
+    number: int | None
+    contact_id: uuid.UUID | None
     status: InvoiceStatus
     subtotal: Decimal
     tax_amount: Decimal
     discount_amount: Decimal
     total: Decimal
     currency: str
-    gst_number: Optional[str]
-    tax_rate_snapshot: Optional[Decimal]
-    issued_at: Optional[datetime]
-    paid_at: Optional[datetime]
-    payment_method: Optional[PaymentMethod]
-    notes: Optional[str]
+    gst_number: str | None
+    tax_rate_snapshot: Decimal | None
+    issued_at: datetime | None
+    paid_at: datetime | None
+    payment_method: PaymentMethod | None
+    notes: str | None
     custom_data: dict[str, Any]
 
 
@@ -83,23 +81,22 @@ InvoiceListResponse = PaginatedResponse[InvoiceOut]
 class IssuePayload(BaseModel):
     """Issuing snapshots `tax_rate` + `gst_number` from org settings."""
 
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class PaymentCreate(BaseModel):
     amount: Decimal = Field(gt=0)
     method: PaymentMethod
-    reference: Optional[str] = Field(default=None, max_length=128)
-    notes: Optional[str] = None
+    reference: str | None = Field(default=None, max_length=128)
+    notes: str | None = None
 
 
 class PaymentOut(ORMModel):
-
     id: uuid.UUID
     invoice_id: uuid.UUID
     amount: Decimal
     method: PaymentMethod
-    reference: Optional[str]
+    reference: str | None
     received_at: datetime
-    notes: Optional[str]
+    notes: str | None
     created_at: datetime

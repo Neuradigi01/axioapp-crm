@@ -35,6 +35,7 @@ Response is always 200 after auth — even if enqueue fails. Meta
 retries on any non-2xx and we'd rather have an alert fire on a
 broker outage than have Meta hammer us.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -48,7 +49,6 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from config import META_APP_SECRET, META_WEBHOOK_VERIFY_TOKEN
 from src.app.core import audit
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -59,12 +59,8 @@ router = APIRouter(prefix="/meta", tags=["Ad Integrations — Meta"])
 async def meta_verify_handshake(
     request: Request,
     hub_mode: str | None = Query(default=None, alias="hub.mode"),
-    hub_verify_token: str | None = Query(
-        default=None, alias="hub.verify_token"
-    ),
-    hub_challenge: str | None = Query(
-        default=None, alias="hub.challenge"
-    ),
+    hub_verify_token: str | None = Query(default=None, alias="hub.verify_token"),
+    hub_challenge: str | None = Query(default=None, alias="hub.challenge"),
 ) -> PlainTextResponse:
     """Meta's GET-time webhook verification handshake.
 
@@ -93,9 +89,7 @@ async def meta_verify_handshake(
         org_id=None,
         ip=client_ip,
     )
-    return PlainTextResponse(
-        content="forbidden", status_code=status.HTTP_403_FORBIDDEN
-    )
+    return PlainTextResponse(content="forbidden", status_code=status.HTTP_403_FORBIDDEN)
 
 
 @router.post("/webhook", include_in_schema=False)
@@ -158,10 +152,7 @@ def _verify_signature(body: bytes, header: str | None) -> bool:
     if not META_APP_SECRET:
         # Missing secret in env — refuse to authenticate anything.
         # Better than accidentally accepting unsigned payloads.
-        logger.error(
-            "meta webhook: META_APP_SECRET not configured — "
-            "rejecting all deliveries"
-        )
+        logger.error("meta webhook: META_APP_SECRET not configured — rejecting all deliveries")
         return False
     provided = header.split("=", 1)[1]
     digest = hmac.new(
@@ -224,8 +215,7 @@ def _enqueue_leadgen_changes(payload: Any) -> int:
                 "form_id": value.get("form_id"),
                 "page_id": value.get("page_id") or page_id,
                 "ad_id": value.get("ad_id"),
-                "campaign_id": value.get("adgroup_id")
-                or value.get("campaign_id"),
+                "campaign_id": value.get("adgroup_id") or value.get("campaign_id"),
                 "created_time": value.get("created_time"),
             }
             if HAS_CELERY:
@@ -233,8 +223,7 @@ def _enqueue_leadgen_changes(payload: Any) -> int:
                     process_meta_lead.delay(task_payload)
                 except Exception:
                     logger.exception(
-                        "meta webhook: failed to enqueue task for "
-                        "leadgen_id=%s",
+                        "meta webhook: failed to enqueue task for leadgen_id=%s",
                         task_payload.get("leadgen_id"),
                     )
                     continue
@@ -245,13 +234,10 @@ def _enqueue_leadgen_changes(payload: Any) -> int:
                 import asyncio
 
                 try:
-                    asyncio.create_task(
-                        process_meta_lead_async(payload=task_payload)
-                    )
+                    asyncio.create_task(process_meta_lead_async(payload=task_payload))
                 except Exception:
                     logger.exception(
-                        "meta webhook: inline async processing failed "
-                        "for leadgen_id=%s",
+                        "meta webhook: inline async processing failed for leadgen_id=%s",
                         task_payload.get("leadgen_id"),
                     )
                     continue

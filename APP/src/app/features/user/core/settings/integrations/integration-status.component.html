@@ -23,9 +23,7 @@
   </header>
 
   @if (error()) {
-    <p class="text-xs text-rose-700">
-      Could not load status: {{ error() }}
-    </p>
+    <p class="text-xs text-rose-700">Could not load status: {{ error() }}</p>
   } @else {
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       @for (p of providers(); track p.provider) {
@@ -52,12 +50,8 @@
             </span>
           </div>
           <div class="mt-1 flex items-center gap-3 text-xs">
-            <span class="text-emerald-700">
-              {{ p.deliveries_24h_accepted }} ok
-            </span>
-            <span class="text-rose-700">
-              {{ p.deliveries_24h_failed }} failed
-            </span>
+            <span class="text-emerald-700"> {{ p.deliveries_24h_accepted }} ok </span>
+            <span class="text-rose-700"> {{ p.deliveries_24h_failed }} failed </span>
             <span class="text-zinc-400">· last 24h</span>
           </div>
         </div>
@@ -71,19 +65,13 @@
         (click)="onOpenDlq()"
       >
         <span class="flex items-center gap-2">
-          <lucide-icon
-            name="alert-triangle"
-            size="14"
-            aria-hidden="true"
-          ></lucide-icon>
+          <lucide-icon name="alert-triangle" size="14" aria-hidden="true"></lucide-icon>
           <span>
             {{ dlqOpenTotal() }} delivery{{ dlqOpenTotal() === 1 ? '' : ' deliveries' }}
             need attention
           </span>
         </span>
-        <span class="text-xs text-amber-700 underline">
-          View DLQ
-        </span>
+        <span class="text-xs text-amber-700 underline"> View DLQ </span>
       </button>
     }
   }

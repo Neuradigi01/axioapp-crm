@@ -9,8 +9,8 @@ default; Admin role template inherits it; Employee templates do not.
 The name dropped the "Ad" qualifier — WhatsApp + email integrations
 also live under this surface, so the broader label fits.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="integrations",

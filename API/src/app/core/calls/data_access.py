@@ -13,11 +13,12 @@ Three concerns mirror the service layer:
     ``[from_dt, to_dt]`` window: outcomes distribution, daily volume,
     direction split. Service composes them into the response dict.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import date as Date
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import and_, cast, func, select
 from sqlalchemy.engine import Row
@@ -32,26 +33,19 @@ from src.app.core.calls.models import (
 )
 from src.app.shared.db.pagination import paginate
 
-
 # --- Outcomes -----------------------------------------------------------
 
 
 async def list_outcomes_query(session: AsyncSession) -> list[CallOutcome]:
     """All call outcomes for this org, ordered by display position then
     label."""
-    stmt = select(CallOutcome).order_by(
-        CallOutcome.display_order.asc(), CallOutcome.label.asc()
-    )
+    stmt = select(CallOutcome).order_by(CallOutcome.display_order.asc(), CallOutcome.label.asc())
     return list((await session.execute(stmt)).scalars().all())
 
 
-async def get_outcome_by_id(
-    session: AsyncSession, outcome_id: uuid.UUID
-) -> Optional[CallOutcome]:
+async def get_outcome_by_id(session: AsyncSession, outcome_id: uuid.UUID) -> CallOutcome | None:
     """Single-row read by PK. ``None`` on miss."""
-    result = await session.execute(
-        select(CallOutcome).where(CallOutcome.id == outcome_id)
-    )
+    result = await session.execute(select(CallOutcome).where(CallOutcome.id == outcome_id))
     return result.scalar_one_or_none()
 
 
@@ -61,9 +55,9 @@ async def get_outcome_by_id(
 async def list_calls_query(
     session: AsyncSession,
     *,
-    contact_id: Optional[uuid.UUID] = None,
-    direction: Optional[CallDirection] = None,
-    assigned_to_id: Optional[uuid.UUID] = None,
+    contact_id: uuid.UUID | None = None,
+    direction: CallDirection | None = None,
+    assigned_to_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Call], int]:
@@ -83,13 +77,9 @@ async def list_calls_query(
     return await paginate(session, base, page=page, size=size)
 
 
-async def get_call_by_id(
-    session: AsyncSession, call_id: uuid.UUID
-) -> Optional[Call]:
+async def get_call_by_id(session: AsyncSession, call_id: uuid.UUID) -> Call | None:
     """Single-row read by PK."""
-    result = await session.execute(
-        select(Call).where(Call.id == call_id)
-    )
+    result = await session.execute(select(Call).where(Call.id == call_id))
     return result.scalar_one_or_none()
 
 
@@ -98,13 +88,11 @@ async def get_call_by_id(
 
 async def get_transcript_for_call(
     session: AsyncSession, *, call_id: uuid.UUID
-) -> Optional[CallTranscript]:
+) -> CallTranscript | None:
     """One transcript per call. ``None`` if the call has never had
     a transcript captured."""
     return (
-        await session.execute(
-            select(CallTranscript).where(CallTranscript.call_id == call_id)
-        )
+        await session.execute(select(CallTranscript).where(CallTranscript.call_id == call_id))
     ).scalar_one_or_none()
 
 
@@ -135,17 +123,13 @@ async def outcomes_distribution_query(
         .select_from(Call)
         .join(CallOutcome, CallOutcome.id == Call.outcome_id, isouter=True)
         .where(window)
-        .group_by(
-            Call.outcome_id, CallOutcome.key, CallOutcome.label, CallOutcome.color
-        )
+        .group_by(Call.outcome_id, CallOutcome.key, CallOutcome.label, CallOutcome.color)
         .order_by(func.count(Call.id).desc())
     )
     return list((await session.execute(stmt)).all())
 
 
-async def daily_volume_query(
-    session: AsyncSession, *, from_dt: Date, to_dt: Date
-) -> list[Row]:
+async def daily_volume_query(session: AsyncSession, *, from_dt: Date, to_dt: Date) -> list[Row]:
     """GROUP BY ``started_at::date`` to produce a daily count series
     ordered ascending — direct chart input."""
     started_date, window = _date_window(from_dt, to_dt)
@@ -158,9 +142,7 @@ async def daily_volume_query(
     return list((await session.execute(stmt)).all())
 
 
-async def direction_split_query(
-    session: AsyncSession, *, from_dt: Date, to_dt: Date
-) -> list[Row]:
+async def direction_split_query(session: AsyncSession, *, from_dt: Date, to_dt: Date) -> list[Row]:
     """GROUP BY direction (inbound / outbound) for the same window."""
     _, window = _date_window(from_dt, to_dt)
     stmt = (
@@ -184,16 +166,12 @@ def insert_call(session: AsyncSession, call: Call) -> None:
     session.add(call)
 
 
-def insert_transcript(
-    session: AsyncSession, transcript: CallTranscript
-) -> None:
+def insert_transcript(session: AsyncSession, transcript: CallTranscript) -> None:
     """Register an already-constructed CallTranscript for INSERT."""
     session.add(transcript)
 
 
-async def delete_outcome_row(
-    session: AsyncSession, outcome: CallOutcome
-) -> None:
+async def delete_outcome_row(session: AsyncSession, outcome: CallOutcome) -> None:
     """Mark a CallOutcome row for DELETE."""
     await session.delete(outcome)
 

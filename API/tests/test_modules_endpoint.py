@@ -1,4 +1,5 @@
 """Integration tests for `GET /api/v1/modules`."""
+
 from __future__ import annotations
 
 import uuid
@@ -16,9 +17,7 @@ async def _grant(role_id: uuid.UUID, key: str) -> None:
     from tests.conftest import TestSession
 
     async with TestSession() as session:
-        perm = await register_permission(
-            session, key=key, module=key.split(".", 1)[0]
-        )
+        perm = await register_permission(session, key=key, module=key.split(".", 1)[0])
         await session.execute(
             pg_insert(RolePermission)
             .values(role_id=role_id, permission_id=perm.id)
@@ -56,18 +55,14 @@ async def test_user_with_permission_sees_settings(layered_client, seeded_admin):
         email=seeded_admin["user"].email,
         password=seeded_admin["password"],
     )
-    resp = await layered_client.get(
-        "/api/v1/modules", headers={"Authorization": f"Bearer {token}"}
-    )
+    resp = await layered_client.get("/api/v1/modules", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200, resp.text
     ids = {m["id"] for m in resp.json()}
     assert SETTINGS_MODULE.id in ids
 
 
 @pytest.mark.asyncio
-async def test_user_without_permission_does_not_see_settings(
-    layered_client, seeded_admin
-):
+async def test_user_without_permission_does_not_see_settings(layered_client, seeded_admin):
     # Intentionally do NOT grant settings.read / settings.write.
     token = await _login(
         layered_client,
@@ -75,9 +70,7 @@ async def test_user_without_permission_does_not_see_settings(
         email=seeded_admin["user"].email,
         password=seeded_admin["password"],
     )
-    resp = await layered_client.get(
-        "/api/v1/modules", headers={"Authorization": f"Bearer {token}"}
-    )
+    resp = await layered_client.get("/api/v1/modules", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200, resp.text
     ids = {m["id"] for m in resp.json()}
     assert SETTINGS_MODULE.id not in ids

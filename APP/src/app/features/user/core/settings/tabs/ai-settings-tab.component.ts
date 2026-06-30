@@ -1,19 +1,10 @@
-﻿import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+﻿import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  OrgSettings,
-  SettingsApiService,
-} from '../settings-api.service';
+import { OrgSettings, SettingsApiService } from '../settings-api.service';
 
 /**
  * AI Settings tab â€” `ai_enabled` master switch + personality +
@@ -112,5 +103,4 @@ export class AiSettingsTabComponent {
       reviews_auto_request_delay_hours: s.reviews_auto_request_delay_hours,
     });
   }
-
 }

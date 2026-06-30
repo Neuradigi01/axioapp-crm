@@ -15,12 +15,14 @@ accepts a list of ``template_id`` values (one per step). Each must:
 that satisfy the above. Sequence service compares the result against
 the input to raise a clear 400 listing the offending ids.
 """
+
 from __future__ import annotations
 
 import uuid
 from typing import Any
 
-from sqlalchemy import delete as sa_delete, func, select
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.conversations.models import ConversationChannel
@@ -65,12 +67,16 @@ async def list_steps_in_order(
 ) -> list[EmailSequenceStep]:
     """All steps for a sequence in `step_order` ascending."""
     rows = (
-        await session.execute(
-            select(EmailSequenceStep)
-            .where(EmailSequenceStep.sequence_id == sequence_id)
-            .order_by(EmailSequenceStep.step_order.asc())
+        (
+            await session.execute(
+                select(EmailSequenceStep)
+                .where(EmailSequenceStep.sequence_id == sequence_id)
+                .order_by(EmailSequenceStep.step_order.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -86,9 +92,7 @@ async def count_sequences_filtered(
         filters.append(EmailSequence.is_active.is_(is_active))
     if q:
         filters.append(EmailSequence.name.ilike(f"%{q}%"))
-    result = await session.execute(
-        select(func.count()).select_from(EmailSequence).where(*filters)
-    )
+    result = await session.execute(select(func.count()).select_from(EmailSequence).where(*filters))
     return int(result.scalar_one() or 0)
 
 
@@ -107,50 +111,42 @@ async def list_sequences_page(
     if q:
         filters.append(EmailSequence.name.ilike(f"%{q}%"))
     rows = (
-        await session.execute(
-            select(EmailSequence)
-            .where(*filters)
-            .order_by(EmailSequence.updated_at.desc())
-            .offset(offset)
-            .limit(limit)
+        (
+            await session.execute(
+                select(EmailSequence)
+                .where(*filters)
+                .order_by(EmailSequence.updated_at.desc())
+                .offset(offset)
+                .limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
-async def get_sequence_by_id(
-    session: AsyncSession, sequence_id: uuid.UUID
-) -> EmailSequence | None:
+async def get_sequence_by_id(session: AsyncSession, sequence_id: uuid.UUID) -> EmailSequence | None:
     """Raw sequence lookup — caller does the soft-delete + 404 check."""
-    result = await session.execute(
-        select(EmailSequence).where(EmailSequence.id == sequence_id)
-    )
+    result = await session.execute(select(EmailSequence).where(EmailSequence.id == sequence_id))
     return result.scalar_one_or_none()
 
 
-def add_sequence(
-    session: AsyncSession, sequence: EmailSequence
-) -> EmailSequence:
+def add_sequence(session: AsyncSession, sequence: EmailSequence) -> EmailSequence:
     """Stage a new sequence row in the unit-of-work."""
     session.add(sequence)
     return sequence
 
 
-def add_sequence_steps(
-    session: AsyncSession, steps: list[EmailSequenceStep]
-) -> None:
+def add_sequence_steps(session: AsyncSession, steps: list[EmailSequenceStep]) -> None:
     """Bulk-stage step rows in the unit-of-work."""
     session.add_all(steps)
 
 
-async def delete_steps_for_sequence(
-    session: AsyncSession, sequence_id: uuid.UUID
-) -> None:
+async def delete_steps_for_sequence(session: AsyncSession, sequence_id: uuid.UUID) -> None:
     """Drop every `EmailSequenceStep` row for one sequence."""
     await session.execute(
-        sa_delete(EmailSequenceStep).where(
-            EmailSequenceStep.sequence_id == sequence_id
-        )
+        sa_delete(EmailSequenceStep).where(EmailSequenceStep.sequence_id == sequence_id)
     )
 
 
@@ -161,9 +157,7 @@ _NON_TERMINAL_STATES = (
 )
 
 
-async def count_non_terminal_enrollments(
-    session: AsyncSession, sequence_id: uuid.UUID
-) -> int:
+async def count_non_terminal_enrollments(session: AsyncSession, sequence_id: uuid.UUID) -> int:
     """Number of enrollments in `active` / `paused_*` state."""
     result = await session.execute(
         select(func.count())
@@ -228,9 +222,7 @@ async def get_enrollment_by_id(
 ) -> EmailSequenceEnrollment | None:
     """Single enrollment lookup."""
     result = await session.execute(
-        select(EmailSequenceEnrollment).where(
-            EmailSequenceEnrollment.id == enrollment_id
-        )
+        select(EmailSequenceEnrollment).where(EmailSequenceEnrollment.id == enrollment_id)
     )
     return result.scalar_one_or_none()
 
@@ -251,9 +243,7 @@ async def count_enrollments_filtered(
     if state is not None:
         filters.append(EmailSequenceEnrollment.state == state)
     result = await session.execute(
-        select(func.count())
-        .select_from(EmailSequenceEnrollment)
-        .where(*filters)
+        select(func.count()).select_from(EmailSequenceEnrollment).where(*filters)
     )
     return int(result.scalar_one() or 0)
 
@@ -276,14 +266,18 @@ async def list_enrollments_page(
     if state is not None:
         filters.append(EmailSequenceEnrollment.state == state)
     rows = (
-        await session.execute(
-            select(EmailSequenceEnrollment)
-            .where(*filters)
-            .order_by(EmailSequenceEnrollment.enrolled_at.desc())
-            .offset(offset)
-            .limit(limit)
+        (
+            await session.execute(
+                select(EmailSequenceEnrollment)
+                .where(*filters)
+                .order_by(EmailSequenceEnrollment.enrolled_at.desc())
+                .offset(offset)
+                .limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 

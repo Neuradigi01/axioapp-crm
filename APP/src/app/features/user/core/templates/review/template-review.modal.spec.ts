@@ -4,11 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 
 import { TemplateReviewModalComponent } from './template-review.modal';
-import {
-  TemplateRead,
-  TemplatesApiService,
-} from '../templates-api.service';
-
+import { TemplateRead, TemplatesApiService } from '../templates-api.service';
 
 function makeTemplate(): TemplateRead {
   return {
@@ -107,9 +103,7 @@ describe('TemplateReviewModalComponent', () => {
 
   it('shows the error message when the API rejects', () => {
     const fixture = makeFixture();
-    apiSpy.approve.and.returnValue(
-      throwError(() => ({ error: { detail: 'workflow refused' } })),
-    );
+    apiSpy.approve.and.returnValue(throwError(() => ({ error: { detail: 'workflow refused' } })));
     const cmp = fixture.componentInstance as unknown as {
       setAction: (a: 'approve') => void;
       submit: () => void;

@@ -2,34 +2,42 @@
   <div class="w-full max-w-2xl rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
     @if (_field(); as f) {
       <header class="border-b border-zinc-200 px-6 py-4">
-        <h2 class="text-base font-semibold text-zinc-900">
-          Edit "{{ f.label }}"
-        </h2>
+        <h2 class="text-base font-semibold text-zinc-900">Edit "{{ f.label }}"</h2>
         <p class="mt-1 text-xs text-zinc-500">
           <code class="font-mono">{{ f.entity }}.{{ f.field_key }}</code>
           &middot; type: <span class="font-medium">{{ f.field_type }}</span>
         </p>
         @if (hidingLockedWarning()) {
-          <p class="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
-            ⚠ This field is enforced by the backend (NOT NULL). The system
-            won't let you hide it — that knob is locked.
+          <p
+            class="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200"
+          >
+            ⚠ This field is enforced by the backend (NOT NULL). The system won't let you hide it —
+            that knob is locked.
           </p>
         }
         @if (f.is_hidden && !f.backend_required) {
-          <p class="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
-            ⚠ Hidden today. Integrations that don't supply a value will see
-            the field default to null on create.
+          <p
+            class="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200"
+          >
+            ⚠ Hidden today. Integrations that don't supply a value will see the field default to
+            null on create.
           </p>
         }
       </header>
 
-      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="max-h-[70vh] overflow-y-auto px-6 py-5">
+      <form
+        [formGroup]="form"
+        (ngSubmit)="onSubmit()"
+        class="max-h-[70vh] overflow-y-auto px-6 py-5"
+      >
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <!-- Label -->
           <div class="sm:col-span-2">
             <label class="block text-xs font-medium text-zinc-700" for="sfe_label">
               Label
-              @if (!canEdit()?.label) { <span class="ml-1" title="Locked by registry">🔒</span> }
+              @if (!canEdit()?.label) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
             </label>
             <input
               id="sfe_label"
@@ -43,7 +51,9 @@
           <div>
             <label class="block text-xs font-medium text-zinc-700" for="sfe_placeholder">
               Placeholder
-              @if (!canEdit()?.placeholder) { <span class="ml-1" title="Locked by registry">🔒</span> }
+              @if (!canEdit()?.placeholder) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
             </label>
             <input
               id="sfe_placeholder"
@@ -57,7 +67,9 @@
           <div>
             <label class="block text-xs font-medium text-zinc-700" for="sfe_order">
               Display order
-              @if (!canEdit()?.display_order) { <span class="ml-1" title="Locked by registry">🔒</span> }
+              @if (!canEdit()?.display_order) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
             </label>
             <input
               id="sfe_order"
@@ -73,7 +85,9 @@
           <div class="sm:col-span-2">
             <label class="block text-xs font-medium text-zinc-700" for="sfe_help">
               Help text
-              @if (!canEdit()?.help_text) { <span class="ml-1" title="Locked by registry">🔒</span> }
+              @if (!canEdit()?.help_text) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
             </label>
             <textarea
               id="sfe_help"
@@ -93,7 +107,9 @@
             />
             <label for="sfe_required" class="text-sm text-zinc-700">
               Required
-              @if (!canEdit()?.is_required) { <span class="ml-1" title="Locked by registry">🔒</span> }
+              @if (!canEdit()?.is_required) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
             </label>
           </div>
 
@@ -106,7 +122,9 @@
             />
             <label for="sfe_hidden" class="text-sm text-zinc-700">
               Hidden
-              @if (!canEdit()?.is_hidden) { <span class="ml-1" title="Locked by registry">🔒</span> }
+              @if (!canEdit()?.is_hidden) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
             </label>
           </div>
 
@@ -171,7 +189,9 @@
         }
       </form>
 
-      <footer class="flex items-center justify-between gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg">
+      <footer
+        class="flex items-center justify-between gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg"
+      >
         <div>
           @if (canReset()) {
             <button

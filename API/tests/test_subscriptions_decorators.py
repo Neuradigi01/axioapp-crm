@@ -21,10 +21,11 @@ subscription-read API so we can confirm which plan the test user is on.
 Until then the decorator's correctness is established here, against
 deterministic synthetic bundles.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import FastAPI
@@ -36,16 +37,16 @@ from src.app.core.subscriptions.dependencies import get_entitlements
 from src.app.core.subscriptions.entitlements import Entitlements
 from src.app.core.subscriptions.models import Subscription
 
-
 # ---------------------------------------------------------------------------
 # Helpers — synthetic entitlements + test-app wiring
 # ---------------------------------------------------------------------------
+
 
 def _stub_entitlements(
     plan_code: str, *, status: str = "active", seats_purchased: int = 5
 ) -> Entitlements:
     """Build an unpersisted Subscription + matching Plan, wrap in Entitlements."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     sub = Subscription(
         org_id=uuid.uuid4(),
         plan_code=plan_code,
@@ -71,6 +72,7 @@ def _client_with_entitlements(app: FastAPI, ent: Entitlements) -> TestClient:
 # ---------------------------------------------------------------------------
 # requires_feature
 # ---------------------------------------------------------------------------
+
 
 def test_requires_feature_blocks_basic_for_locked_feature():
     app = FastAPI()
@@ -131,6 +133,7 @@ def test_requires_feature_blocks_trial_for_standard_feature():
 # ---------------------------------------------------------------------------
 # enforces_cap
 # ---------------------------------------------------------------------------
+
 
 def test_enforces_cap_blocks_at_limit():
     """Basic plan's contacts cap = 5000; a current count of 5000 means the
@@ -246,6 +249,7 @@ def test_enforces_cap_passes_org_id_to_provider():
 # Stacking
 # ---------------------------------------------------------------------------
 
+
 def test_stacked_decorators_both_pass_on_entitled_plan():
     """Standard grants automation + automation_runs cap is 5000; both gates clear."""
     app = FastAPI()
@@ -301,9 +305,11 @@ def test_stacked_decorators_cap_failure_blocks_when_feature_passes():
 # Signature / dispatch
 # ---------------------------------------------------------------------------
 
+
 def test_decorator_rejects_sync_handlers():
     """Wrapping a sync function is a programmer bug — fail loud at import."""
     with pytest.raises(TypeError, match="async"):
+
         @requires_feature("contacts.write")
         def sync_handler():  # pragma: no cover — TypeError before body runs
             return None

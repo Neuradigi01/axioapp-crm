@@ -17,16 +17,9 @@ import { buildHttpParams } from '../../shared/services/query-builder';
  * intentionally NOT duplicated here.
  */
 
-export type WhatsAppTemplateCategory =
-  | 'MARKETING'
-  | 'UTILITY'
-  | 'AUTHENTICATION';
+export type WhatsAppTemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
 
-export type WhatsAppTemplateHeaderType =
-  | 'TEXT'
-  | 'IMAGE'
-  | 'VIDEO'
-  | 'DOCUMENT';
+export type WhatsAppTemplateHeaderType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
 
 export type WhatsAppTemplateSubmissionStatus =
   | 'draft'
@@ -36,10 +29,7 @@ export type WhatsAppTemplateSubmissionStatus =
   | 'paused'
   | 'disabled';
 
-export type WhatsAppTemplateButtonType =
-  | 'QUICK_REPLY'
-  | 'URL'
-  | 'PHONE_NUMBER';
+export type WhatsAppTemplateButtonType = 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER';
 
 export interface WhatsAppTemplateButton {
   type: WhatsAppTemplateButtonType;
@@ -132,7 +122,6 @@ export interface TemplatePerformance {
   used_in_campaigns: number;
 }
 
-
 @Injectable({ providedIn: 'root' })
 export class WhatsAppTemplatesApiService {
   private readonly http = inject(HttpClient);
@@ -157,10 +146,7 @@ export class WhatsAppTemplatesApiService {
 
   /** Edit a draft / rejected template. Approved / pending rows
    *  reject with 403; the UI offers Duplicate instead. */
-  update(
-    id: string,
-    payload: WhatsAppTemplateUpsert,
-  ): Observable<WhatsAppTemplateRead> {
+  update(id: string, payload: WhatsAppTemplateUpsert): Observable<WhatsAppTemplateRead> {
     return this.http.patch<WhatsAppTemplateRead>(`${this.base}/${id}`, payload);
   }
 
@@ -175,32 +161,20 @@ export class WhatsAppTemplatesApiService {
    *  flips to `pending_review`. Approval / rejection arrives via
    *  the message_template_status_update webhook. */
   submit(id: string): Observable<WhatsAppTemplateSubmissionResult> {
-    return this.http.post<WhatsAppTemplateSubmissionResult>(
-      `${this.base}/${id}/submit`,
-      {},
-    );
+    return this.http.post<WhatsAppTemplateSubmissionResult>(`${this.base}/${id}/submit`, {});
   }
 
   /** Clone any template into a fresh draft. Name suffix is server-
    *  side (`_copy`, `_copy_2`, …). */
   duplicate(id: string): Observable<WhatsAppTemplateRead> {
-    return this.http.post<WhatsAppTemplateRead>(
-      `${this.base}/${id}/duplicate`,
-      {},
-    );
+    return this.http.post<WhatsAppTemplateRead>(`${this.base}/${id}/duplicate`, {});
   }
 
   /** Per-template performance card payload — sent / delivered / read /
    *  replied / click_through / failed counts, day-grain buckets, and
    *  failure breakdown. Step 10. */
-  performance(
-    id: string,
-    range: TemplatePerformanceRange,
-  ): Observable<TemplatePerformance> {
+  performance(id: string, range: TemplatePerformanceRange): Observable<TemplatePerformance> {
     const params = buildHttpParams({ range });
-    return this.http.get<TemplatePerformance>(
-      `${this.base}/${id}/performance`,
-      { params },
-    );
+    return this.http.get<TemplatePerformance>(`${this.base}/${id}/performance`, { params });
   }
 }

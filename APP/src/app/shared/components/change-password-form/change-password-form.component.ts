@@ -12,7 +12,11 @@ import { PasswordToggleDirective } from '@shared/directives/password-toggle.dire
 import { matchFieldValidator } from '@shared/validators/custom-validators';
 import { ChangePasswordApiService } from '@app/services/change-password-api.service';
 import { SNACKBAR_DURATION, SNACKBAR_ACTION } from '@core/constants/app.constants';
-import { MSG_ERROR_GENERIC, MSG_PASSWORD_CHANGED, MSG_PASSWORD_CHANGE_FAILED } from '@core/constants/messages.constants';
+import {
+  MSG_ERROR_GENERIC,
+  MSG_PASSWORD_CHANGED,
+  MSG_PASSWORD_CHANGE_FAILED,
+} from '@core/constants/messages.constants';
 
 @Component({
   selector: 'app-change-password-form',
@@ -62,7 +66,9 @@ export class ChangePasswordFormComponent {
         this.snackBar.open(MSG_PASSWORD_CHANGED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
         this.passwordForm.reset();
       } else {
-        this.snackBar.open(response.message || MSG_PASSWORD_CHANGE_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(response.message || MSG_PASSWORD_CHANGE_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });

@@ -1,10 +1,12 @@
 import traceback as tb
+
 import orjson
 from fastapi import Request as FastAPIRequest
-from src.core.logger import logger
-from src.core.db import async_session
-from src.models.error_log import ErrorLog
+
 from config import IS_DEVELOPMENT
+from src.core.db import async_session
+from src.core.logger import logger
+from src.models.error_log import ErrorLog
 
 
 async def log_error_to_db(
@@ -85,7 +87,15 @@ def _get_client_ip(request: FastAPIRequest) -> str:
     return request.client.host if request.client else ""
 
 
-SENSITIVE_FIELDS = {"password", "new_password", "old_password", "token", "secret", "otp_code", "two_factor_code"}
+SENSITIVE_FIELDS = {
+    "password",
+    "new_password",
+    "old_password",
+    "token",
+    "secret",
+    "otp_code",
+    "two_factor_code",
+}
 
 
 def _mask_sensitive_fields(data: dict):

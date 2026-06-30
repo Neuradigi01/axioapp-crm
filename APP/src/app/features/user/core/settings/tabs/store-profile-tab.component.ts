@@ -1,20 +1,11 @@
-﻿import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+﻿import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { FurnitureAuthService, OrgSummary } from '../../auth/auth.service';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  OrgSettings,
-  SettingsApiService,
-} from '../settings-api.service';
+import { OrgSettings, SettingsApiService } from '../settings-api.service';
 
 /**
  * Store Profile tab â€” the meat of OrgSettings. Logo, store name,
@@ -96,9 +87,7 @@ export class StoreProfileTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load settings.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load settings.');
         },
       });
   }
@@ -132,9 +121,7 @@ export class StoreProfileTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.saveError.set(
-            extractApiError(err) ?? 'Could not save settings.',
-          );
+          this.saveError.set(extractApiError(err) ?? 'Could not save settings.');
         },
       });
   }
@@ -158,5 +145,4 @@ export class StoreProfileTabComponent {
       locale: s.locale,
     });
   }
-
 }

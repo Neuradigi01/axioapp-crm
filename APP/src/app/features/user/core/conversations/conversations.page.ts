@@ -27,10 +27,7 @@ import {
   ComposerNotePayload,
 } from './compose-bar.component';
 import { ConversationListComponent } from './conversation-list.component';
-import {
-  InteractiveBuilderComponent,
-  InteractivePayload,
-} from './interactive-builder.component';
+import { InteractiveBuilderComponent, InteractivePayload } from './interactive-builder.component';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
 import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
 import {
@@ -235,9 +232,7 @@ export class ConversationsPageComponent {
   protected onTagsChanged(tags: ConversationTagRef[]): void {
     const id = this.selectedId();
     if (!id) return;
-    this.items.update((rows) =>
-      rows.map((r) => (r.id === id ? { ...r, tags } : r)),
-    );
+    this.items.update((rows) => rows.map((r) => (r.id === id ? { ...r, tags } : r)));
     this.detail.update((d) =>
       d
         ? {
@@ -308,9 +303,7 @@ export class ConversationsPageComponent {
       read_at: null,
       created_at: new Date().toISOString(),
     };
-    this.detail.update((d) =>
-      d ? { ...d, messages: [...d.messages, optimistic] } : d,
-    );
+    this.detail.update((d) => (d ? { ...d, messages: [...d.messages, optimistic] } : d));
 
     // Step 27b — pull the operator's Send-From selection (null
     // when single-number org / picker hidden) so the backend
@@ -326,9 +319,7 @@ export class ConversationsPageComponent {
             d
               ? {
                   ...d,
-                  messages: d.messages.map((m) =>
-                    m.id === optimistic.id ? real : m,
-                  ),
+                  messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
                 }
               : d,
           );
@@ -345,9 +336,7 @@ export class ConversationsPageComponent {
                 }
               : d,
           );
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not send message.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not send message.');
         },
       });
   }
@@ -378,9 +367,7 @@ export class ConversationsPageComponent {
       read_at: null,
       created_at: new Date().toISOString(),
     };
-    this.detail.update((d) =>
-      d ? { ...d, messages: [...d.messages, optimistic] } : d,
-    );
+    this.detail.update((d) => (d ? { ...d, messages: [...d.messages, optimistic] } : d));
 
     this.api
       .postNote(id, payload.text, payload.mentions)
@@ -391,9 +378,7 @@ export class ConversationsPageComponent {
             d
               ? {
                   ...d,
-                  messages: d.messages.map((m) =>
-                    m.id === optimistic.id ? real : m,
-                  ),
+                  messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
                 }
               : d,
           );
@@ -404,15 +389,11 @@ export class ConversationsPageComponent {
             d
               ? {
                   ...d,
-                  messages: d.messages.filter(
-                    (m) => m.id !== optimistic.id,
-                  ),
+                  messages: d.messages.filter((m) => m.id !== optimistic.id),
                 }
               : d,
           );
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not post the note.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not post the note.');
         },
       });
   }
@@ -439,17 +420,13 @@ export class ConversationsPageComponent {
             d
               ? {
                   ...d,
-                  messages: d.messages.map((m) =>
-                    m.id === updated.id ? updated : m,
-                  ),
+                  messages: d.messages.map((m) => (m.id === updated.id ? updated : m)),
                 }
               : d,
           );
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not update reaction.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not update reaction.');
         },
       });
   }
@@ -497,9 +474,7 @@ export class ConversationsPageComponent {
       read_at: null,
       created_at: new Date().toISOString(),
     };
-    this.detail.update((d) =>
-      d ? { ...d, messages: [...d.messages, optimistic] } : d,
-    );
+    this.detail.update((d) => (d ? { ...d, messages: [...d.messages, optimistic] } : d));
 
     this.api
       .sendInteractive(id, payload as unknown as Record<string, unknown>)
@@ -510,9 +485,7 @@ export class ConversationsPageComponent {
             d
               ? {
                   ...d,
-                  messages: d.messages.map((m) =>
-                    m.id === optimistic.id ? real : m,
-                  ),
+                  messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
                 }
               : d,
           );
@@ -523,15 +496,11 @@ export class ConversationsPageComponent {
             d
               ? {
                   ...d,
-                  messages: d.messages.filter(
-                    (m) => m.id !== optimistic.id,
-                  ),
+                  messages: d.messages.filter((m) => m.id !== optimistic.id),
                 }
               : d,
           );
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not send interactive message.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not send interactive message.');
         },
       });
   }
@@ -546,10 +515,8 @@ export class ConversationsPageComponent {
   protected onSendLocation(payload: ComposerLocationPayload): void {
     const id = this.selectedId();
     if (!id) return;
-    const previewLabel =
-      payload.name?.trim() || payload.address?.trim() || 'Shared location';
-    const sendFromPhoneId =
-      this.composeBar?.currentSendFromPhoneId() ?? null;
+    const previewLabel = payload.name?.trim() || payload.address?.trim() || 'Shared location';
+    const sendFromPhoneId = this.composeBar?.currentSendFromPhoneId() ?? null;
     const optimistic: ConversationMessage = {
       id: 'tmp-' + Math.random().toString(36).slice(2),
       org_id: '',
@@ -578,9 +545,7 @@ export class ConversationsPageComponent {
       read_at: null,
       created_at: new Date().toISOString(),
     };
-    this.detail.update((d) =>
-      d ? { ...d, messages: [...d.messages, optimistic] } : d,
-    );
+    this.detail.update((d) => (d ? { ...d, messages: [...d.messages, optimistic] } : d));
     this.api
       .send(id, `📍 ${previewLabel}`, null, sendFromPhoneId, [
         {
@@ -598,9 +563,7 @@ export class ConversationsPageComponent {
             d
               ? {
                   ...d,
-                  messages: d.messages.map((x) =>
-                    x.id === optimistic.id ? msg : x,
-                  ),
+                  messages: d.messages.map((x) => (x.id === optimistic.id ? msg : x)),
                 }
               : d,
           );
@@ -612,15 +575,11 @@ export class ConversationsPageComponent {
             d
               ? {
                   ...d,
-                  messages: d.messages.filter(
-                    (x) => x.id !== optimistic.id,
-                  ),
+                  messages: d.messages.filter((x) => x.id !== optimistic.id),
                 }
               : d,
           );
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not share location.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not share location.');
         },
       });
   }
@@ -667,9 +626,7 @@ export class ConversationsPageComponent {
       read_at: null,
       created_at: new Date().toISOString(),
     };
-    this.detail.update((d) =>
-      d ? { ...d, messages: [...d.messages, optimistic] } : d,
-    );
+    this.detail.update((d) => (d ? { ...d, messages: [...d.messages, optimistic] } : d));
 
     this.api
       .sendMedia(id, payload.file, payload.type, payload.caption)
@@ -680,9 +637,7 @@ export class ConversationsPageComponent {
             d
               ? {
                   ...d,
-                  messages: d.messages.map((m) =>
-                    m.id === optimistic.id ? real : m,
-                  ),
+                  messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
                 }
               : d,
           );
@@ -693,15 +648,11 @@ export class ConversationsPageComponent {
             d
               ? {
                   ...d,
-                  messages: d.messages.filter(
-                    (m) => m.id !== optimistic.id,
-                  ),
+                  messages: d.messages.filter((m) => m.id !== optimistic.id),
                 }
               : d,
           );
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not send media.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not send media.');
         },
       });
   }
@@ -733,19 +684,13 @@ export class ConversationsPageComponent {
         next: (updated) => {
           // Authoritative write-back — overrides any stale WS-driven
           // refresh that arrived during the PATCH round-trip.
-          this.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
-          this.detail.update((d) =>
-            d ? { ...d, conversation: updated } : d,
-          );
+          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
           this.closeReassign();
         },
         error: (err: HttpErrorResponse) => {
           this.reassignSubmitting.set(false);
-          this.reassignError.set(
-            extractApiError(err) ?? 'Could not update assignee.',
-          );
+          this.reassignError.set(extractApiError(err) ?? 'Could not update assignee.');
         },
       });
   }
@@ -758,17 +703,11 @@ export class ConversationsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
-          this.detail.update((d) =>
-            d ? { ...d, conversation: updated } : d,
-          );
+          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not update AI handling.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not update AI handling.');
         },
       });
   }
@@ -787,9 +726,7 @@ export class ConversationsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load conversations.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load conversations.');
         },
       });
   }
@@ -807,9 +744,7 @@ export class ConversationsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.detail.set(null);
           this.threadLoading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load thread.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load thread.');
         },
       });
   }
@@ -830,9 +765,7 @@ export class ConversationsPageComponent {
   private bumpListLastMessage(id: string, isoTs: string): void {
     this.items.update((rows) =>
       rows
-        .map((r) =>
-          r.id === id ? { ...r, last_message_at: isoTs } : r,
-        )
+        .map((r) => (r.id === id ? { ...r, last_message_at: isoTs } : r))
         .sort((a, b) => {
           const av = a.last_message_at ?? '';
           const bv = b.last_message_at ?? '';
@@ -840,5 +773,4 @@ export class ConversationsPageComponent {
         }),
     );
   }
-
 }

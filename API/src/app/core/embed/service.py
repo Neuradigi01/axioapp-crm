@@ -26,6 +26,7 @@ submission hot path this is acceptable for v1 since the per-IP +
 per-key rate limits in Step 2 cap abuse. If submission latency
 grows past comfort, cache `prefix → row` in Redis with a short TTL.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -33,8 +34,7 @@ import logging
 import secrets
 import string
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import bcrypt
 from fastapi import HTTPException, status
@@ -44,7 +44,6 @@ from src.app.core import audit
 from src.app.core.embed import data_access as _da
 from src.app.core.embed.models import EmbedKey
 from src.app.shared.db import async_session
-
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,7 @@ def _generate_plain_key() -> str:
     return f"{_KEY_PREFIX}{suffix}"
 
 
-def _hash_ip(ip: Optional[str]) -> Optional[str]:
+def _hash_ip(ip: str | None) -> str | None:
     """Return SHA-256(ip)[:16] for privacy-respecting tracking.
 
     The full IP is never persisted. The 16-char prefix is enough for
@@ -82,9 +81,7 @@ def _verify_key(plain: str, stored_hash: str) -> bool:
     """Constant-time bcrypt verify. Returns False on any error so a
     malformed stored hash never crashes the submission path."""
     try:
-        return bcrypt.checkpw(
-            plain.encode("utf-8"), stored_hash.encode("utf-8")
-        )
+        return bcrypt.checkpw(plain.encode("utf-8"), stored_hash.encode("utf-8"))
     except (ValueError, TypeError):
         return False
 
@@ -94,7 +91,7 @@ async def issue(
     *,
     org_id: uuid.UUID,
     actor_id: uuid.UUID,
-    name: Optional[str] = None,
+    name: str | None = None,
 ) -> tuple[EmbedKey, str]:
     """Generate + persist a new key. Returns (row, plaintext)."""
     plain = _generate_plain_key()
@@ -135,13 +132,11 @@ async def revoke(
     """Soft-revoke. Idempotent — re-revoking is a no-op."""
     row = await _da.get_embed_key_by_id(session, key_id)
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="embed key not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="embed key not found")
     if row.revoked_at is not None:
         return row  # already revoked — no-op
 
-    row.revoked_at = datetime.now(timezone.utc)
+    row.revoked_at = datetime.now(UTC)
     row.revoked_by = actor_id
     await session.commit()
     await session.refresh(row)
@@ -162,9 +157,7 @@ async def list_keys(
     return await _da.list_embed_keys(session)
 
 
-async def find_by_plain_key(
-    plain: str, *, ip: Optional[str] = None
-) -> Optional[EmbedKey]:
+async def find_by_plain_key(plain: str, *, ip: str | None = None) -> EmbedKey | None:
     """Submission-path lookup. Returns the matching live key row or
     None. Best-effort updates `last_used_at` / `last_used_ip` after
     a successful match (does not block the caller on failure).
@@ -180,10 +173,8 @@ async def find_by_plain_key(
         return None
 
     async with async_session() as session:
-        rows = await _da.list_embed_keys_by_prefix_unrevoked(
-            session, prefix
-        )
-        match: Optional[EmbedKey] = None
+        rows = await _da.list_embed_keys_by_prefix_unrevoked(session, prefix)
+        match: EmbedKey | None = None
         for candidate in rows:
             if _verify_key(plain, candidate.hash):
                 match = candidate
@@ -197,14 +188,12 @@ async def find_by_plain_key(
             await _da.update_embed_key_last_used(
                 session,
                 key_id=matched_id,
-                when=datetime.now(timezone.utc),
+                when=datetime.now(UTC),
                 ip_hash=_hash_ip(ip),
             )
             await session.commit()
         except Exception:
-            logger.exception(
-                "embed.last_used_update failed for key %s", matched_id
-            )
+            logger.exception("embed.last_used_update failed for key %s", matched_id)
 
         return match
 

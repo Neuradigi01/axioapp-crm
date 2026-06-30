@@ -1,4 +1,5 @@
 """Test the login rate limiter (10 attempts / minute / IP)."""
+
 from __future__ import annotations
 
 import pytest

@@ -19,18 +19,18 @@ The legacy `http_exception_handler` in `src/app/main.py` already passes
 `dict` details through verbatim, so the structure reaches the client
 without being collapsed into `{"success": false, "message": ...}`.
 """
+
 from __future__ import annotations
 
 from typing import Literal
 
 from fastapi import HTTPException, status
 
-
 EntitlementReason = Literal[
-    "feature_locked",   # plan does not grant the requested feature
-    "cap_reached",      # resource counter is at the plan's cap
-    "read_only",        # subscription status forbids writes
-    "trial_expired",    # convenience alias for read_only when triggered by trial expiry
+    "feature_locked",  # plan does not grant the requested feature
+    "cap_reached",  # resource counter is at the plan's cap
+    "read_only",  # subscription status forbids writes
+    "trial_expired",  # convenience alias for read_only when triggered by trial expiry
 ]
 
 

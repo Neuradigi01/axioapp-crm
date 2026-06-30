@@ -13,11 +13,12 @@ Three categories of operation:
 Audit events fire from each write path so the timeline picks up
 status changes for free.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Literal, Optional
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy import case, func, nulls_first, nulls_last, select
@@ -31,11 +32,8 @@ from src.app.core.tasks.schemas import TaskCreate, TaskUpdate
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.db.queries import ensure_found
 
-
 DueFilter = Literal["today", "overdue", "upcoming"]
-SortBy = Literal[
-    "due_at", "priority", "title", "created_at", "last_activity_at"
-]
+SortBy = Literal["due_at", "priority", "title", "created_at", "last_activity_at"]
 SortDir = Literal["asc", "desc"]
 
 
@@ -56,10 +54,10 @@ _PRIORITY_RANK = case(
 def _apply_task_filters(
     stmt,
     *,
-    status_filter: Optional[TaskStatus],
-    priority: Optional[TaskPriority],
-    q: Optional[str],
-    due_filter: Optional[DueFilter],
+    status_filter: TaskStatus | None,
+    priority: TaskPriority | None,
+    q: str | None,
+    due_filter: DueFilter | None,
     sort_by: SortBy,
     sort_dir: SortDir,
 ):
@@ -93,15 +91,9 @@ def _apply_task_filters(
 
     ordered = col.asc() if sort_dir == "asc" else col.desc()
     if sort_by == "due_at":
-        ordered = (
-            nulls_last(col.asc()) if sort_dir == "asc"
-            else nulls_first(col.desc())
-        )
+        ordered = nulls_last(col.asc()) if sort_dir == "asc" else nulls_first(col.desc())
     elif sort_by == "last_activity_at":
-        ordered = (
-            nulls_last(col.asc()) if sort_dir == "asc"
-            else nulls_last(col.desc())
-        )
+        ordered = nulls_last(col.asc()) if sort_dir == "asc" else nulls_last(col.desc())
 
     return stmt.order_by(ordered, Task.created_at.desc())
 
@@ -123,7 +115,7 @@ def _snapshot(t: Task) -> dict[str, Any]:
     return snapshot(t, fields=_SNAPSHOT_FIELDS)
 
 
-async def get_task(session: AsyncSession, task_id: uuid.UUID) -> Optional[Task]:
+async def get_task(session: AsyncSession, task_id: uuid.UUID) -> Task | None:
     """Return a single task, scoped to the active tenant."""
     return await _da.get_task_by_id(session, task_id)
 
@@ -175,7 +167,7 @@ async def update_task(
     # hook — not every task PATCH writes an activity (a title fix
     # doesn't, for instance), but the user still expects "recent
     # activity" to surface the edit.
-    task.last_activity_at = datetime.now(timezone.utc)
+    task.last_activity_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(task)
 
@@ -209,7 +201,7 @@ async def list_tasks_for_entity(
     *,
     related_entity_type: str,
     related_entity_id: uuid.UUID,
-    status_filter: Optional[TaskStatus] = None,
+    status_filter: TaskStatus | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Task], int]:
@@ -228,10 +220,10 @@ async def list_my_tasks(
     session: AsyncSession,
     *,
     user_id: uuid.UUID,
-    status_filter: Optional[TaskStatus] = None,
-    priority: Optional[TaskPriority] = None,
-    q: Optional[str] = None,
-    due_filter: Optional[DueFilter] = None,
+    status_filter: TaskStatus | None = None,
+    priority: TaskPriority | None = None,
+    q: str | None = None,
+    due_filter: DueFilter | None = None,
     sort_by: SortBy = "due_at",
     sort_dir: SortDir = "asc",
     page: int = 1,
@@ -255,11 +247,11 @@ async def list_all_in_org(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    status_filter: Optional[TaskStatus] = None,
-    priority: Optional[TaskPriority] = None,
-    assigned_to_id: Optional[uuid.UUID] = None,
-    q: Optional[str] = None,
-    due_filter: Optional[DueFilter] = None,
+    status_filter: TaskStatus | None = None,
+    priority: TaskPriority | None = None,
+    assigned_to_id: uuid.UUID | None = None,
+    q: str | None = None,
+    due_filter: DueFilter | None = None,
     sort_by: SortBy = "due_at",
     sort_dir: SortDir = "asc",
     page: int = 1,
@@ -288,9 +280,7 @@ async def _assert_user_in_org(
     session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
 ) -> None:
     """422 if the target user has no active membership in this org."""
-    if not await _da.user_has_active_membership(
-        session, org_id=org_id, user_uuid=user_uuid
-    ):
+    if not await _da.user_has_active_membership(session, org_id=org_id, user_uuid=user_uuid):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="target user is not a member of this organisation",
@@ -342,9 +332,7 @@ async def bulk_reassign_tasks(
             entity_type="task",
             entity_id=task.id,
             type=ActivityType.reassign,
-            payload=_reassign_payload(
-                from_id=before_id, to_id=assigned_to_id, note=note
-            ),
+            payload=_reassign_payload(from_id=before_id, to_id=assigned_to_id, note=note),
             user_id=actor_user_id,
         )
         reassigned += 1
@@ -372,7 +360,7 @@ async def bulk_mark_done_tasks(
             skipped += 1
             continue
         task.status = TaskStatus.done
-        task.last_activity_at = datetime.now(timezone.utc)
+        task.last_activity_at = datetime.now(UTC)
         done += 1
 
     await session.commit()
@@ -387,9 +375,7 @@ async def bulk_delete_tasks(
 ) -> int:
     """Hard delete in bulk. Single DELETE statement scoped by org_id
     so a misconfigured tenant context can't leak cross-org rows."""
-    rowcount = await _da.bulk_delete_tasks_by_ids(
-        session, ids=ids, org_id=org_id
-    )
+    rowcount = await _da.bulk_delete_tasks_by_ids(session, ids=ids, org_id=org_id)
     await session.commit()
     return rowcount
 

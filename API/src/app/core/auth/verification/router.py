@@ -31,9 +31,7 @@ class VerifyEmailResponse(BaseModel):
 @router.post("/send-otp", response_model=SendContactOtpResponse)
 async def send_otp(req: SendContactOtpRequest) -> SendContactOtpResponse:
     try:
-        result = await verification_service.send_contact_otp(
-            contact_type=req.type, value=req.value
-        )
+        result = await verification_service.send_contact_otp(contact_type=req.type, value=req.value)
     except VerificationError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
     return SendContactOtpResponse(otp_token=result.otp_token)

@@ -7,6 +7,7 @@ Covers:
   - checkout stamps time_out + computes duration_min (generated col)
   - perm-gated writes
 """
+
 from __future__ import annotations
 
 import uuid
@@ -31,9 +32,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -98,9 +97,7 @@ async def test_create_get_patch_delete(layered_client, seeded_admin):
     assert body["duration_min"] is None
     walk_in_id = body["id"]
 
-    got = await layered_client.get(
-        f"/api/v1/walk-ins/{walk_in_id}", headers=headers
-    )
+    got = await layered_client.get(f"/api/v1/walk-ins/{walk_in_id}", headers=headers)
     assert got.status_code == 200
 
     patch = await layered_client.patch(
@@ -112,14 +109,10 @@ async def test_create_get_patch_delete(layered_client, seeded_admin):
     assert patch.json()["status"] == "interested"
     assert patch.json()["notes"] == "Loved the Oak finish"
 
-    delete = await layered_client.delete(
-        f"/api/v1/walk-ins/{walk_in_id}", headers=headers
-    )
+    delete = await layered_client.delete(f"/api/v1/walk-ins/{walk_in_id}", headers=headers)
     assert delete.status_code == 204
 
-    after = await layered_client.get(
-        f"/api/v1/walk-ins/{walk_in_id}", headers=headers
-    )
+    after = await layered_client.get(f"/api/v1/walk-ins/{walk_in_id}", headers=headers)
     assert after.status_code == 404
 
 
@@ -143,9 +136,7 @@ async def test_create_rejects_unknown_contact(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_checkout_stamps_time_out_and_duration(
-    layered_client, seeded_admin
-):
+async def test_checkout_stamps_time_out_and_duration(layered_client, seeded_admin):
     """Checkout sets time_out=now; the generated column populates."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -179,9 +170,7 @@ async def test_checkout_stamps_time_out_and_duration(
     assert 0 <= duration < 1.0  # less than a minute
 
     # Idempotent — second checkout doesn't change time_out.
-    again = await layered_client.patch(
-        f"/api/v1/walk-ins/{walk_in_id}/checkout", headers=headers
-    )
+    again = await layered_client.patch(f"/api/v1/walk-ins/{walk_in_id}/checkout", headers=headers)
     assert again.json()["time_out"] == body["time_out"]
 
 
@@ -215,16 +204,12 @@ async def test_list_open_only_filter(layered_client, seeded_admin):
         )
     ).json()["id"]
     # Check the second one out so it has a time_out.
-    await layered_client.patch(
-        f"/api/v1/walk-ins/{closed_id}/checkout", headers=headers
-    )
+    await layered_client.patch(f"/api/v1/walk-ins/{closed_id}/checkout", headers=headers)
 
     all_resp = await layered_client.get("/api/v1/walk-ins", headers=headers)
     assert {w["id"] for w in all_resp.json()} == {open_id, closed_id}
 
-    open_only = await layered_client.get(
-        "/api/v1/walk-ins?open_only=true", headers=headers
-    )
+    open_only = await layered_client.get("/api/v1/walk-ins?open_only=true", headers=headers)
     assert [w["id"] for w in open_only.json()] == [open_id]
 
 

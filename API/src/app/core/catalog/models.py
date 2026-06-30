@@ -10,6 +10,7 @@ so the same SKU can mean different things in two different stores.
 Indexed for the two hot reads: `(org_id, category)` for the category
 filter, and a btree on `(org_id, sku)` for picker autocomplete.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -49,17 +50,13 @@ class CatalogItem(Base, TenantScoped):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
-    currency: Mapped[str] = mapped_column(
-        String(3), nullable=False, server_default=text("'INR'")
-    )
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default=text("'INR'"))
     custom_data: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
         server_default=text("'{}'::jsonb"),
     )
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

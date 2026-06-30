@@ -1,15 +1,7 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
-import {
-  Invoice,
-  InvoiceStatus,
-} from '../../types/subscription.types';
+import { Invoice, InvoiceStatus } from '../../types/subscription.types';
 
 interface InvoiceRowVM {
   id: string;
@@ -35,7 +27,8 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
   void: 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600',
   uncollectible:
     'bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:ring-rose-900',
-  draft: 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600',
+  draft:
+    'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600',
 };
 
 /**
@@ -58,21 +51,19 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
     <section
       class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
     >
-      <div
-        class="flex items-center gap-3 border-b border-zinc-200 px-6 py-4 dark:border-slate-700"
-      >
+      <div class="flex items-center gap-3 border-b border-zinc-200 px-6 py-4 dark:border-slate-700">
         <div
           class="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600"
         >
           <lucide-icon name="receipt" size="18" aria-hidden="true"></lucide-icon>
         </div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400">
+          <p
+            class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+          >
             Invoices
           </p>
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-slate-100">
-            Billing history
-          </h2>
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-slate-100">Billing history</h2>
         </div>
       </div>
 
@@ -89,9 +80,7 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
           >
             <lucide-icon name="receipt" size="18" aria-hidden="true"></lucide-icon>
           </div>
-          <p class="mt-3 text-sm font-medium text-zinc-700 dark:text-slate-200">
-            No invoices yet
-          </p>
+          <p class="mt-3 text-sm font-medium text-zinc-700 dark:text-slate-200">No invoices yet</p>
           <p class="mt-1 text-xs text-zinc-500 dark:text-slate-400">
             Once you upgrade and Stripe issues the first invoice, it'll appear here.
           </p>
@@ -163,15 +152,13 @@ export class InvoicesTableComponent {
   );
 }
 
-
 function toViewModel(invoice: Invoice): InvoiceRowVM {
   // `pdf_url` is the direct PDF; `hosted_invoice_url` is Stripe's
   // browser-facing view. Either is acceptable for a "Download" action,
   // and at least one is usually populated.
   const downloadUrl = invoice.pdf_url ?? invoice.hosted_invoice_url ?? null;
-  const amount = invoice.amount_paid_cents > 0
-    ? invoice.amount_paid_cents
-    : invoice.amount_due_cents;
+  const amount =
+    invoice.amount_paid_cents > 0 ? invoice.amount_paid_cents : invoice.amount_due_cents;
   return {
     id: invoice.id,
     date: (invoice.paid_at ?? invoice.created_at).slice(0, 10),
@@ -182,7 +169,6 @@ function toViewModel(invoice: Invoice): InvoiceRowVM {
     downloadUrl,
   };
 }
-
 
 function formatCurrency(cents: number, currency: string): string {
   // Stripe ships cents; divide for display. We avoid `Intl.NumberFormat`

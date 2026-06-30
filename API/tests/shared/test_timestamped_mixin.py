@@ -9,7 +9,7 @@ subclasses.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -57,8 +57,8 @@ def test_model_validate_from_attribute_row() -> None:
 
     class _Row:
         org_id = uuid.uuid4()
-        created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
-        updated_at = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        updated_at = datetime(2026, 6, 1, tzinfo=UTC)
         id = uuid.uuid4()
         name = "alpha"
 
@@ -86,12 +86,11 @@ def test_missing_org_id_raises() -> None:
         _Out.model_validate(
             {
                 "id": uuid.uuid4(),
-                "created_at": datetime.now(timezone.utc),
-                "updated_at": datetime.now(timezone.utc),
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC),
                 # org_id missing
             }
         )
     assert any(
-        err["loc"] == ("org_id",) and err["type"] == "missing"
-        for err in exc_info.value.errors()
+        err["loc"] == ("org_id",) and err["type"] == "missing" for err in exc_info.value.errors()
     )

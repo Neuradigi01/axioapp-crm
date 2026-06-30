@@ -10,36 +10,43 @@
     <h1 class="text-lg font-semibold text-zinc-900">Map columns</h1>
     @if (importRow(); as row) {
       <p class="text-xs text-zinc-500">
-        {{ row.original_filename }} · {{ row.row_count_estimate }} rows · source: {{ row.source_platform }}
+        {{ row.original_filename }} · {{ row.row_count_estimate }} rows · source:
+        {{ row.source_platform }}
       </p>
     }
   </header>
 
   <!-- Mobile / small viewport notice (mapping needs real-estate). -->
-  <div class="md:hidden rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+  <div
+    class="md:hidden rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700"
+  >
     Column mapping is easier on a desktop. Please open this page on a larger screen.
   </div>
 
   @if (loading()) {
     <p class="text-sm text-zinc-500">Loading import…</p>
   } @else if (loadError(); as err) {
-    <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ err }}</p>
+    <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ err }}
+    </p>
   } @else if (importRow(); as row) {
-
     <!-- Required-field warning -->
     @if (missingRequired().length > 0) {
       <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         <p class="font-medium">Required field(s) not mapped:</p>
         <ul class="mt-1 list-disc list-inside">
           @for (t of missingRequired(); track t.key) {
-            <li>{{ t.label }} <span class="text-amber-600">({{ t.key }})</span></li>
+            <li>
+              {{ t.label }} <span class="text-amber-600">({{ t.key }})</span>
+            </li>
           }
         </ul>
       </div>
     }
     @if (duplicateTargets().size > 0) {
       <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        Two or more columns are mapped to the same CRM field. Each field can only receive one column.
+        Two or more columns are mapped to the same CRM field. Each field can only receive one
+        column.
       </div>
     }
 
@@ -58,7 +65,9 @@
           @for (col of preview()?.columns ?? []; track $index) {
             <tr>
               <td class="px-4 py-3 font-medium text-zinc-900 align-top">{{ col }}</td>
-              <td class="px-4 py-3 text-xs text-zinc-600 align-top">{{ sampleValue(col) ?? '—' }}</td>
+              <td class="px-4 py-3 text-xs text-zinc-600 align-top">
+                {{ sampleValue(col) ?? '—' }}
+              </td>
               <td class="px-4 py-3 align-top">
                 <select
                   [value]="mapping()[col] ?? ''"
@@ -92,13 +101,25 @@
               <td class="px-4 py-3 text-center">
                 @switch (statusFor(col)) {
                   @case ('unmapped') {
-                    <lucide-icon name="circle-dashed" class="h-4 w-4 text-zinc-400" title="Not mapped" />
+                    <lucide-icon
+                      name="circle-dashed"
+                      class="h-4 w-4 text-zinc-400"
+                      title="Not mapped"
+                    />
                   }
                   @case ('mapped') {
-                    <lucide-icon name="check-circle-2" class="h-4 w-4 text-emerald-500" title="Mapped" />
+                    <lucide-icon
+                      name="check-circle-2"
+                      class="h-4 w-4 text-emerald-500"
+                      title="Mapped"
+                    />
                   }
                   @case ('duplicate') {
-                    <lucide-icon name="alert-triangle" class="h-4 w-4 text-red-500" title="Mapped to the same field as another column" />
+                    <lucide-icon
+                      name="alert-triangle"
+                      class="h-4 w-4 text-red-500"
+                      title="Mapped to the same field as another column"
+                    />
                   }
                 }
               </td>
@@ -148,7 +169,9 @@
     }
 
     @if (actionError(); as err) {
-      <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ err }}</div>
+      <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ err }}
+      </div>
     }
 
     <!-- Actions -->

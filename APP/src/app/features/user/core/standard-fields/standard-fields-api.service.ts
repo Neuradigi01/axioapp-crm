@@ -30,9 +30,7 @@ export class StandardFieldsApiService {
   }
 
   render(entity: string): Observable<StandardFieldRenderedListResponse> {
-    return this.http.get<StandardFieldRenderedListResponse>(
-      `${this.base}/${entity}/render`,
-    );
+    return this.http.get<StandardFieldRenderedListResponse>(`${this.base}/${entity}/render`);
   }
 
   upsert(
@@ -40,10 +38,7 @@ export class StandardFieldsApiService {
     fieldKey: string,
     payload: StandardFieldOverrideIn,
   ): Observable<StandardFieldOverrideOut> {
-    return this.http.put<StandardFieldOverrideOut>(
-      `${this.base}/${entity}/${fieldKey}`,
-      payload,
-    );
+    return this.http.put<StandardFieldOverrideOut>(`${this.base}/${entity}/${fieldKey}`, payload);
   }
 
   reset(entity: string, fieldKey: string): Observable<void> {

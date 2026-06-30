@@ -51,7 +51,5 @@ async def get_or_404(
     entity: str,
 ) -> T:
     """Fetch ``model`` by primary-key ``id``; raise 404 if not found."""
-    row = (
-        await session.execute(select(model).where(model.id == pk))
-    ).scalar_one_or_none()
+    row = (await session.execute(select(model).where(model.id == pk))).scalar_one_or_none()
     return ensure_found(row, entity=entity)

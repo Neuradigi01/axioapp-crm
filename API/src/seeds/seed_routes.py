@@ -1,4 +1,5 @@
 from sqlalchemy import select
+
 from src.core.db import async_session
 from src.models.routes import Route
 
@@ -34,7 +35,6 @@ DEFAULT_ROUTES = [
         "url": "/admin",
         "is_compulsory": True,
     },
-
     # ── Accounts children (parent_id: 1) ──
     {
         "id": 2,
@@ -116,7 +116,6 @@ DEFAULT_ROUTES = [
         "url": "/accounts/email-verification-notice",
         "is_compulsory": False,
     },
-
     # ── User panel (parent_id: 10) ──
     {
         "id": 12,
@@ -239,7 +238,6 @@ DEFAULT_ROUTES = [
         "is_compulsory": False,
         "nav_parent_id": 50,
     },
-
     # ── User > Notifications (parent_id: 10) ──
     {
         "id": 17,
@@ -254,7 +252,6 @@ DEFAULT_ROUTES = [
         "is_compulsory": True,
         "nav_parent_id": 0,
     },
-
     # ── Admin panel (parent_id: 11) ──
     {
         "id": 20,
@@ -338,7 +335,6 @@ DEFAULT_ROUTES = [
         "is_compulsory": True,
         "nav_parent_id": 0,
     },
-
     {
         "id": 30,
         "parent_id": 11,
@@ -485,7 +481,6 @@ DEFAULT_ROUTES = [
         "is_compulsory": False,
         "nav_parent_id": 60,
     },
-
     # ── Admin > Contact Us (parent_id: 11) ──
     {
         "id": 70,
@@ -501,7 +496,6 @@ DEFAULT_ROUTES = [
         "is_compulsory": False,
         "nav_parent_id": 0,
     },
-
     # ── Admin > News (parent_id: 11) ──
     {
         "id": 71,
@@ -517,7 +511,6 @@ DEFAULT_ROUTES = [
         "is_compulsory": False,
         "nav_parent_id": 0,
     },
-
     # ── Admin > Popups (parent_id: 11) ──
     {
         "id": 72,
@@ -533,7 +526,6 @@ DEFAULT_ROUTES = [
         "is_compulsory": False,
         "nav_parent_id": 0,
     },
-
     # ── Admin > Newsletter (parent_id: 11) ──
     {
         "id": 74,
@@ -549,7 +541,6 @@ DEFAULT_ROUTES = [
         "is_compulsory": False,
         "nav_parent_id": 0,
     },
-
     # ── Admin > Setup (parent_id: 11) ──
     {
         "id": 80,
@@ -593,7 +584,6 @@ DEFAULT_ROUTES = [
         "is_compulsory": False,
         "nav_parent_id": 80,
     },
-
     # ── Special ──
     {
         "id": 99,
@@ -612,9 +602,9 @@ async def seed_routes():
     async with async_session() as db:
         created = 0
         for route_data in DEFAULT_ROUTES:
-            existing = (await db.execute(
-                select(Route).where(Route.control_id == route_data["control_id"])
-            )).scalar_one_or_none()
+            existing = (
+                await db.execute(select(Route).where(Route.control_id == route_data["control_id"]))
+            ).scalar_one_or_none()
             if existing:
                 continue
 

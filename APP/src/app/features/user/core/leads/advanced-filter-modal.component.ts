@@ -11,12 +11,7 @@ import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FieldDef } from '../shared/dynamic-form/types';
-import {
-  FilterClause,
-  FilterDsl,
-  FilterOp,
-  StandardFilterField,
-} from '../shared/filter-dsl.types';
+import { FilterClause, FilterDsl, FilterOp, StandardFilterField } from '../shared/filter-dsl.types';
 
 /** UI categories drive the op-picker narrowing — keep this in sync
  * with the backend's `_FIELD_PY_TYPE` in `filter_dsl.py`. */
@@ -189,9 +184,7 @@ export class AdvancedFilterModalComponent {
 
   /** Does this op carry a single scalar value? (Most do.) */
   protected isScalarOp(op: FilterOp): boolean {
-    return ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'starts_with'].includes(
-      op,
-    );
+    return ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'starts_with'].includes(op);
   }
 
   /** Does this op carry a list value? */
@@ -254,27 +247,19 @@ export class AdvancedFilterModalComponent {
 
   protected onOpChange(id: number, newOp: string): void {
     if (!this.isFilterOp(newOp)) return;
-    this.rows.update((rows) =>
-      rows.map((r) => (r.id === id ? { ...r, op: newOp } : r)),
-    );
+    this.rows.update((rows) => rows.map((r) => (r.id === id ? { ...r, op: newOp } : r)));
   }
 
   protected onValueChange(id: number, value: string): void {
-    this.rows.update((rows) =>
-      rows.map((r) => (r.id === id ? { ...r, value } : r)),
-    );
+    this.rows.update((rows) => rows.map((r) => (r.id === id ? { ...r, value } : r)));
   }
 
   protected onValueHiChange(id: number, valueHi: string): void {
-    this.rows.update((rows) =>
-      rows.map((r) => (r.id === id ? { ...r, valueHi } : r)),
-    );
+    this.rows.update((rows) => rows.map((r) => (r.id === id ? { ...r, valueHi } : r)));
   }
 
   protected onValueListChange(id: number, valueList: string): void {
-    this.rows.update((rows) =>
-      rows.map((r) => (r.id === id ? { ...r, valueList } : r)),
-    );
+    this.rows.update((rows) => rows.map((r) => (r.id === id ? { ...r, valueList } : r)));
   }
 
   protected onCancel(): void {
@@ -345,10 +330,7 @@ export class AdvancedFilterModalComponent {
       return {
         field,
         op: row.op,
-        value: [
-          this.coerceScalar(field, row.value),
-          this.coerceScalar(field, row.valueHi),
-        ],
+        value: [this.coerceScalar(field, row.value), this.coerceScalar(field, row.valueHi)],
       };
     }
     if (row.value === '' || row.value === null) return null;

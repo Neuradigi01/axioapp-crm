@@ -13,10 +13,12 @@ handshake fired when we register a subscription — it echoes the
 token back as plain text without any signature check (Graph requires
 this; the only thing it proves is that we own the URL).
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
+from datetime import UTC
 from urllib.parse import urlencode
 
 from fastapi import (
@@ -29,7 +31,6 @@ from fastapi import (
     status,
 )
 from fastapi.responses import PlainTextResponse, RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import FRONTEND_URL
 from src.app.core.auth.dependencies import require_permissions
@@ -47,7 +48,6 @@ from src.app.core.email.schemas import EmailAccountUpsert
 from src.app.core.users.models import User
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
-
 
 logger = logging.getLogger(__name__)
 
@@ -100,27 +100,19 @@ async def callback_endpoint(
             reason=error_description or error,
         )
     if not code or not state:
-        return _settings_redirect(
-            status="microsoft_error", reason="missing_params"
-        )
+        return _settings_redirect(status="microsoft_error", reason="missing_params")
 
     try:
         payload = verify_state(state)
         if payload.provider != "microsoft":
-            return _settings_redirect(
-                status="microsoft_error", reason="provider_mismatch"
-            )
+            return _settings_redirect(status="microsoft_error", reason="provider_mismatch")
         org_id = uuid.UUID(payload.org_id)
         user_id = uuid.UUID(payload.user_id)
     except (OAuthStateError, ValueError) as exc:
         logger.warning("Microsoft callback state invalid: %s", exc)
-        return _settings_redirect(
-            status="microsoft_error", reason="invalid_state"
-        )
+        return _settings_redirect(status="microsoft_error", reason="invalid_state")
 
-    ctx_token = set_context(
-        RequestContext(org_id=org_id, user_id=user_id)
-    )
+    ctx_token = set_context(RequestContext(org_id=org_id, user_id=user_id))
     try:
         async with async_session() as session:
             try:
@@ -129,18 +121,14 @@ async def callback_endpoint(
                     redirect_uri=ms_oauth.graph_redirect_uri(),
                 )
             except HTTPException as exc:
-                logger.warning(
-                    "Microsoft code exchange failed: %s", exc.detail
-                )
+                logger.warning("Microsoft code exchange failed: %s", exc.detail)
                 return _settings_redirect(
                     status="microsoft_error",
                     reason="exchange_failed",
                 )
 
             me = await ms_oauth.fetch_userinfo(tokens.access_token)
-            email_address = me.get("mail") or me.get(
-                "userPrincipalName"
-            )
+            email_address = me.get("mail") or me.get("userPrincipalName")
             external_id = me.get("id") or email_address
             display_name = me.get("displayName")
             if not email_address or not external_id:
@@ -149,12 +137,9 @@ async def callback_endpoint(
                     reason="no_email_from_microsoft",
                 )
 
-            from datetime import datetime, timedelta, timezone
+            from datetime import datetime, timedelta
 
-            expires_at = (
-                datetime.now(timezone.utc)
-                + timedelta(seconds=tokens.expires_in_seconds or 3600)
-            )
+            expires_at = datetime.now(UTC) + timedelta(seconds=tokens.expires_in_seconds or 3600)
             account = await email_service.upsert(
                 session,
                 org_id=org_id,
@@ -167,8 +152,7 @@ async def callback_endpoint(
                     access_token=tokens.access_token,
                     refresh_token=tokens.refresh_token,
                     token_expires_at=expires_at,
-                    scopes_granted=tokens.scopes_granted
-                    or ms_oauth.MICROSOFT_SCOPES,
+                    scopes_granted=tokens.scopes_granted or ms_oauth.MICROSOFT_SCOPES,
                 ),
                 actor_id=user_id,
             )
@@ -178,9 +162,7 @@ async def callback_endpoint(
             # subscription id in `sync_cursor` (same column reused
             # across providers; see webhook.py docstring for the v1
             # constraint).
-            sub = await ms_webhook.subscribe_if_configured(
-                account, session
-            )
+            sub = await ms_webhook.subscribe_if_configured(account, session)
             if sub and sub.get("id"):
                 account.sync_cursor = str(sub["id"])
                 account.sync_state = EmailAccountSyncState.backfilling
@@ -247,9 +229,7 @@ async def webhook_notification_endpoint(
                 continue
             seen_subscriptions.add(sub_id)
 
-            account = await ms_webhook.find_account_by_subscription_id(
-                session, sub_id
-            )
+            account = await ms_webhook.find_account_by_subscription_id(session, sub_id)
             if account is None:
                 # Subscription belongs to a disconnected or unknown
                 # account. ACK so Graph stops retrying.

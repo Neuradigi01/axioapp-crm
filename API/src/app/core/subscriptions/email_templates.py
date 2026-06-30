@@ -15,10 +15,11 @@ classifiers see balanced content.
 When `plans.yaml` adds new emails, both the function below and the
 `BillingEmailKey` literal in `notifications.py` must extend.
 """
+
 from __future__ import annotations
 
-from typing import Any, Callable
-
+from collections.abc import Callable
+from typing import Any
 
 # Branding constant. Per the `feedback_branding_crm_not_furnicrm`
 # memory the customer-facing copy reads "CRM" — internal module names
@@ -59,23 +60,23 @@ def _shell(title: str, body_html: str) -> str:
         '<tr><td align="center">'
         '<table role="presentation" cellpadding="0" cellspacing="0" '
         'style="width:560px;max-width:560px;background:#ffffff;'
-        'border:1px solid #e5e7eb;border-radius:12px;'
-        'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,'
+        "border:1px solid #e5e7eb;border-radius:12px;"
+        "font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,"
         'Helvetica,Arial,sans-serif;color:#111827;">'
         '<tr><td style="padding:24px 28px 8px;">'
         f'<h1 style="margin:0 0 4px;font-size:20px;line-height:28px;'
         'font-weight:600;">'
-        f'{title}'
-        '</h1>'
-        '</td></tr>'
+        f"{title}"
+        "</h1>"
+        "</td></tr>"
         f'<tr><td style="padding:8px 28px 24px;font-size:14px;'
         f'line-height:22px;color:#374151;">{body_html}</td></tr>'
         '<tr><td style="padding:16px 28px 24px;font-size:12px;'
         'line-height:18px;color:#9ca3af;border-top:1px solid #f3f4f6;">'
         f'Questions? Reach us at <a href="mailto:{_SUPPORT_EMAIL}" '
         f'style="color:#3b82f6;text-decoration:none;">{_SUPPORT_EMAIL}</a>.'
-        '</td></tr>'
-        '</table></td></tr></table>'
+        "</td></tr>"
+        "</table></td></tr></table>"
     )
 
 
@@ -83,7 +84,7 @@ def _button(label: str, url: str) -> str:
     return (
         f'<p style="margin:20px 0;"><a href="{url}" '
         'style="display:inline-block;background:#2563eb;color:#ffffff;'
-        'padding:10px 18px;border-radius:8px;text-decoration:none;'
+        "padding:10px 18px;border-radius:8px;text-decoration:none;"
         f'font-weight:600;font-size:14px;">{label}</a></p>'
     )
 
@@ -106,7 +107,7 @@ def _render_trial_ending_soon(
         f"<p>Your free 14-day {_PRODUCT_NAME} trial{org_line} ends in "
         f"<strong>{days} days</strong>. Upgrade now to keep your team's "
         "data, automations, and integrations active.</p>"
-        + _button(f"Upgrade {_PRODUCT_NAME}", upgrade_url)
+        + _button(f"Upgrade {_PRODUCT_NAME}", upgrade_url),
     )
     body_text = (
         f"{_greeting(context)}\n\n"
@@ -129,7 +130,7 @@ def _render_trial_expired(
         f"<p>Your {_PRODUCT_NAME} trial period has ended. Your data is "
         "safe and your team can continue to <em>view</em> it, but new "
         "records and edits are paused until you upgrade.</p>"
-        + _button(f"Upgrade {_PRODUCT_NAME}", upgrade_url)
+        + _button(f"Upgrade {_PRODUCT_NAME}", upgrade_url),
     )
     body_text = (
         f"{_greeting(context)}\n\n"
@@ -147,10 +148,8 @@ def _render_payment_succeeded(
     amount = context.get("amount_paid_usd", 0)
     invoice_url = context.get("invoice_pdf_url", "")
     billing_url = context.get("billing_url", "")
-    subject = f"Payment received — thanks!"
-    invoice_block = (
-        _button("Download invoice", invoice_url) if invoice_url else ""
-    )
+    subject = "Payment received — thanks!"
+    invoice_block = _button("Download invoice", invoice_url) if invoice_url else ""
     body_html = _shell(
         "Payment received",
         f"<p>{_greeting(context)}</p>"
@@ -159,14 +158,12 @@ def _render_payment_succeeded(
         "is active and your invoice is attached below.</p>"
         + invoice_block
         + f'<p style="font-size:13px;color:#6b7280;">'
-        f'You can review billing history any time at '
+        f"You can review billing history any time at "
         f'<a href="{billing_url}" style="color:#3b82f6;'
         'text-decoration:none;">your billing settings</a>.'
-        "</p>"
+        "</p>",
     )
-    invoice_text_line = (
-        f"Download invoice: {invoice_url}\n" if invoice_url else ""
-    )
+    invoice_text_line = f"Download invoice: {invoice_url}\n" if invoice_url else ""
     body_text = (
         f"{_greeting(context)}\n\n"
         f"We received your payment of ${amount}. Your {_PRODUCT_NAME} "
@@ -191,7 +188,7 @@ def _render_payment_failed(
         "mode — your data is safe, but new writes will be paused until "
         "we receive a valid payment.</p>"
         f"<p>Please update your payment method to resume normal access.</p>"
-        + _button("Update payment method", billing_url)
+        + _button("Update payment method", billing_url),
     )
     body_text = (
         f"{_greeting(context)}\n\n"
@@ -217,8 +214,7 @@ def _render_seats_added(
         f"<p>{_greeting(context)}</p>"
         f"<p>You now have <strong>{total} seats</strong> on your "
         f"{_PRODUCT_NAME} plan ({added} added). New teammates can be "
-        "invited from your Team settings.</p>"
-        + _button("Manage seats", billing_url)
+        "invited from your Team settings.</p>" + _button("Manage seats", billing_url),
     )
     body_text = (
         f"{_greeting(context)}\n\n"
@@ -241,7 +237,7 @@ def _render_plan_changed(
         f"<p>{_greeting(context)}</p>"
         f"<p>You're now on <strong>{_PRODUCT_NAME} {plan_name}</strong>. "
         "Your new caps and feature access are live immediately.</p>"
-        + _button("Open billing settings", billing_url)
+        + _button("Open billing settings", billing_url),
     )
     body_text = (
         f"{_greeting(context)}\n\n"
@@ -268,7 +264,7 @@ def _render_subscription_archived(
         f"<p>{_greeting(context)}</p>"
         f"<p>Your {_PRODUCT_NAME} account has been archived after an "
         "extended read-only period. Your data will be retained for "
-        "90 more days. Email us if you'd like to restore access.</p>"
+        "90 more days. Email us if you'd like to restore access.</p>",
     )
     body_text = (
         f"{_greeting(context)}\n\n"
@@ -300,7 +296,8 @@ RENDERERS: dict[str, Renderer] = {
 
 
 def render(
-    template_key: str, context: dict[str, Any],
+    template_key: str,
+    context: dict[str, Any],
 ) -> tuple[str, str, str] | None:
     """Render a template; returns `(subject, html, text)` or `None`.
 

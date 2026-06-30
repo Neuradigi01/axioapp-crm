@@ -9,12 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
 /**
  * SMS sub-form for the central template editor (Step 12).
@@ -52,7 +47,6 @@ export type SmsFormGroup = FormGroup<{
   dlt_template_status: FormControl<'registered' | 'pending' | 'rejected'>;
 }>;
 
-
 const CONTENT_CATEGORY_OPTIONS: Array<{
   value: SmsFormGroup['controls']['dlt_content_category']['value'];
   label: string;
@@ -80,7 +74,6 @@ const CONTENT_CATEGORY_OPTIONS: Array<{
   },
 ];
 
-
 const STATUS_OPTIONS: Array<{
   value: SmsFormGroup['controls']['dlt_template_status']['value'];
   label: string;
@@ -89,7 +82,6 @@ const STATUS_OPTIONS: Array<{
   { value: 'registered', label: 'Registered (live)' },
   { value: 'rejected', label: 'Rejected by DLT' },
 ];
-
 
 @Component({
   selector: 'app-sms-form',
@@ -115,9 +107,8 @@ export class SmsFormComponent {
   // signals via valueChanges. Re-subscribed when the parent swaps
   // the form input (rare, but possible on draft → /:id navigation).
   private readonly bodyText = signal<string>('');
-  private readonly contentCategory = signal<
-    SmsFormGroup['controls']['dlt_content_category']['value']
-  >('transactional');
+  private readonly contentCategory =
+    signal<SmsFormGroup['controls']['dlt_content_category']['value']>('transactional');
 
   constructor() {
     effect((onCleanup) => {
@@ -140,9 +131,7 @@ export class SmsFormComponent {
   protected readonly bodyLength = computed(() => this.bodyText().length);
   protected readonly selectedCategoryDescription = computed(() => {
     const v = this.contentCategory();
-    return (
-      CONTENT_CATEGORY_OPTIONS.find((o) => o.value === v)?.description ?? ''
-    );
+    return CONTENT_CATEGORY_OPTIONS.find((o) => o.value === v)?.description ?? '';
   });
   /** TRAI-aware segment count: 160-char chunks for GSM-7. Anything
    *  past the first 160 splits at 153 (each header eats 7 bytes),
@@ -162,7 +151,10 @@ export class SmsFormComponent {
 
   protected onHeaderInput(value: string): void {
     // Header is 6-char uppercase alphanumeric per TRAI spec.
-    const normalised = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    const normalised = value
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 6);
     if (this.form().controls.dlt_header.value !== normalised) {
       this.form().controls.dlt_header.setValue(normalised);
     }

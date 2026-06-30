@@ -12,6 +12,7 @@
 Permission: ``whatsapp.automation.manage`` (Owner / Admin by default
 via role templates).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -23,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.integrations.whatsapp.connect import get_active_config
 from src.app.core.integrations.whatsapp.keyword_engine import evaluate_rules
 from src.app.core.integrations.whatsapp.models import (
     AssignmentStrategy,
@@ -32,7 +34,6 @@ from src.app.core.integrations.whatsapp.models import (
     WhatsAppKeywordAction,
     WhatsAppKeywordRule,
 )
-from src.app.core.integrations.whatsapp.connect import get_active_config
 from src.app.core.integrations.whatsapp.schemas import (
     AISettingsPatch,
     AISettingsRead,
@@ -49,28 +50,29 @@ from src.app.core.integrations.whatsapp.schemas import (
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(
     prefix="/whatsapp/keyword-rules",
     tags=["Integrations · WhatsApp · Automation"],
 )
 
 
-async def _project(
-    session: AsyncSession, rule: WhatsAppKeywordRule
-) -> KeywordRuleRead:
+async def _project(session: AsyncSession, rule: WhatsAppKeywordRule) -> KeywordRuleRead:
     """Hydrate `actions[]` onto the rule projection. Done in a single
     helper so the CRUD endpoints stay one-liners."""
     actions = (
-        await session.execute(
-            select(WhatsAppKeywordAction)
-            .where(WhatsAppKeywordAction.rule_id == rule.id)
-            .order_by(
-                WhatsAppKeywordAction.position.asc(),
-                WhatsAppKeywordAction.created_at.asc(),
+        (
+            await session.execute(
+                select(WhatsAppKeywordAction)
+                .where(WhatsAppKeywordAction.rule_id == rule.id)
+                .order_by(
+                    WhatsAppKeywordAction.position.asc(),
+                    WhatsAppKeywordAction.created_at.asc(),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return KeywordRuleRead.model_validate(
         {
             "id": rule.id,
@@ -95,15 +97,9 @@ async def _project(
     )
 
 
-async def _get_or_404(
-    session: AsyncSession, rule_id: uuid.UUID
-) -> WhatsAppKeywordRule:
+async def _get_or_404(session: AsyncSession, rule_id: uuid.UUID) -> WhatsAppKeywordRule:
     row = (
-        await session.execute(
-            select(WhatsAppKeywordRule).where(
-                WhatsAppKeywordRule.id == rule_id
-            )
-        )
+        await session.execute(select(WhatsAppKeywordRule).where(WhatsAppKeywordRule.id == rule_id))
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(
@@ -116,18 +112,20 @@ async def _get_or_404(
 @router.get("", response_model=list[KeywordRuleRead])
 async def list_rules_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> list[KeywordRuleRead]:
     rules = (
-        await db.execute(
-            select(WhatsAppKeywordRule).order_by(
-                WhatsAppKeywordRule.priority.asc(),
-                WhatsAppKeywordRule.created_at.asc(),
+        (
+            await db.execute(
+                select(WhatsAppKeywordRule).order_by(
+                    WhatsAppKeywordRule.priority.asc(),
+                    WhatsAppKeywordRule.created_at.asc(),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [await _project(db, r) for r in rules]
 
 
@@ -139,9 +137,7 @@ async def list_rules_endpoint(
 async def create_rule_endpoint(
     payload: KeywordRuleUpsert,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> KeywordRuleRead:
     rule = WhatsAppKeywordRule(
         org_id=user.org_id,
@@ -180,9 +176,7 @@ async def create_rule_endpoint(
 async def get_rule_endpoint(
     rule_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> KeywordRuleRead:
     rule = await _get_or_404(db, rule_id)
     return await _project(db, rule)
@@ -193,9 +187,7 @@ async def update_rule_endpoint(
     rule_id: uuid.UUID,
     payload: KeywordRuleUpsert,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> KeywordRuleRead:
     """Full rewrite — replaces the rule's actions atomically. Partial
     edits could surgically diff the actions list but the rule editor
@@ -215,11 +207,7 @@ async def update_rule_endpoint(
     rule.enabled = payload.enabled
     rule.priority = payload.priority
     # Replace actions in place — delete old, insert new.
-    await db.execute(
-        delete(WhatsAppKeywordAction).where(
-            WhatsAppKeywordAction.rule_id == rule.id
-        )
-    )
+    await db.execute(delete(WhatsAppKeywordAction).where(WhatsAppKeywordAction.rule_id == rule.id))
     for idx, action in enumerate(payload.actions):
         db.add(
             WhatsAppKeywordAction(
@@ -249,15 +237,11 @@ async def update_rule_endpoint(
     return await _project(db, rule)
 
 
-@router.delete(
-    "/{rule_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_rule_endpoint(
     rule_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> Response:
     rule = await _get_or_404(db, rule_id)
     snapshot = {"name": rule.name, "keywords": list(rule.keywords or [])}
@@ -277,21 +261,21 @@ async def delete_rule_endpoint(
 async def reorder_rules_endpoint(
     payload: KeywordRuleReorder,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> list[KeywordRuleRead]:
     """Reassigns `priority` based on the new id ordering — first id =
     priority 10, second = 20, etc. Steps of 10 leave room for the
     operator to manually drop a rule between two without a full
     reorder pass."""
     rules = (
-        await db.execute(
-            select(WhatsAppKeywordRule).where(
-                WhatsAppKeywordRule.id.in_(payload.rule_ids)
+        (
+            await db.execute(
+                select(WhatsAppKeywordRule).where(WhatsAppKeywordRule.id.in_(payload.rule_ids))
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     by_id = {r.id: r for r in rules}
     if len(by_id) != len(payload.rule_ids):
         raise HTTPException(
@@ -309,13 +293,17 @@ async def reorder_rules_endpoint(
         after={"rule_ids": [str(rid) for rid in payload.rule_ids]},
     )
     refreshed = (
-        await db.execute(
-            select(WhatsAppKeywordRule).order_by(
-                WhatsAppKeywordRule.priority.asc(),
-                WhatsAppKeywordRule.created_at.asc(),
+        (
+            await db.execute(
+                select(WhatsAppKeywordRule).order_by(
+                    WhatsAppKeywordRule.priority.asc(),
+                    WhatsAppKeywordRule.created_at.asc(),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [await _project(db, r) for r in refreshed]
 
 
@@ -323,9 +311,7 @@ async def reorder_rules_endpoint(
 async def test_rule_endpoint(
     payload: RuleTestRequest,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> RuleTestResponse:
     """Dry-run — evaluate `text` against the active rules + return
     the first match's id + projected action list. Performs no
@@ -362,9 +348,7 @@ async def _assignment_get_or_404(
 ) -> WhatsAppAssignmentRule:
     row = (
         await session.execute(
-            select(WhatsAppAssignmentRule).where(
-                WhatsAppAssignmentRule.id == rule_id
-            )
+            select(WhatsAppAssignmentRule).where(WhatsAppAssignmentRule.id == rule_id)
         )
     ).scalar_one_or_none()
     if row is None:
@@ -378,18 +362,20 @@ async def _assignment_get_or_404(
 @assignment_router.get("", response_model=list[AssignmentRuleRead])
 async def list_assignment_rules_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> list[AssignmentRuleRead]:
     rules = (
-        await db.execute(
-            select(WhatsAppAssignmentRule).order_by(
-                WhatsAppAssignmentRule.priority.asc(),
-                WhatsAppAssignmentRule.created_at.asc(),
+        (
+            await db.execute(
+                select(WhatsAppAssignmentRule).order_by(
+                    WhatsAppAssignmentRule.priority.asc(),
+                    WhatsAppAssignmentRule.created_at.asc(),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [AssignmentRuleRead.model_validate(r) for r in rules]
 
 
@@ -401,9 +387,7 @@ async def list_assignment_rules_endpoint(
 async def create_assignment_rule_endpoint(
     payload: AssignmentRuleUpsert,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> AssignmentRuleRead:
     rule = WhatsAppAssignmentRule(
         org_id=user.org_id,
@@ -428,16 +412,12 @@ async def create_assignment_rule_endpoint(
     return AssignmentRuleRead.model_validate(rule)
 
 
-@assignment_router.patch(
-    "/{rule_id}", response_model=AssignmentRuleRead
-)
+@assignment_router.patch("/{rule_id}", response_model=AssignmentRuleRead)
 async def update_assignment_rule_endpoint(
     rule_id: uuid.UUID,
     payload: AssignmentRuleUpsert,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> AssignmentRuleRead:
     rule = await _assignment_get_or_404(db, rule_id)
     before = {
@@ -472,15 +452,11 @@ async def update_assignment_rule_endpoint(
     return AssignmentRuleRead.model_validate(rule)
 
 
-@assignment_router.delete(
-    "/{rule_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@assignment_router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_assignment_rule_endpoint(
     rule_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> Response:
     rule = await _assignment_get_or_404(db, rule_id)
     snapshot = {"name": rule.name, "strategy": rule.strategy.value}
@@ -496,23 +472,23 @@ async def delete_assignment_rule_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@assignment_router.post(
-    "/reorder", response_model=list[AssignmentRuleRead]
-)
+@assignment_router.post("/reorder", response_model=list[AssignmentRuleRead])
 async def reorder_assignment_rules_endpoint(
     payload: AssignmentRuleReorder,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> list[AssignmentRuleRead]:
     rules = (
-        await db.execute(
-            select(WhatsAppAssignmentRule).where(
-                WhatsAppAssignmentRule.id.in_(payload.rule_ids)
+        (
+            await db.execute(
+                select(WhatsAppAssignmentRule).where(
+                    WhatsAppAssignmentRule.id.in_(payload.rule_ids)
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     by_id = {r.id: r for r in rules}
     if len(by_id) != len(payload.rule_ids):
         raise HTTPException(
@@ -530,13 +506,17 @@ async def reorder_assignment_rules_endpoint(
         after={"rule_ids": [str(rid) for rid in payload.rule_ids]},
     )
     refreshed = (
-        await db.execute(
-            select(WhatsAppAssignmentRule).order_by(
-                WhatsAppAssignmentRule.priority.asc(),
-                WhatsAppAssignmentRule.created_at.asc(),
+        (
+            await db.execute(
+                select(WhatsAppAssignmentRule).order_by(
+                    WhatsAppAssignmentRule.priority.asc(),
+                    WhatsAppAssignmentRule.created_at.asc(),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [AssignmentRuleRead.model_validate(r) for r in refreshed]
 
 
@@ -549,14 +529,10 @@ ai_settings_router = APIRouter(
 )
 
 
-@ai_settings_router.get(
-    "/settings", response_model=AISettingsRead
-)
+@ai_settings_router.get("/settings", response_model=AISettingsRead)
 async def get_ai_settings_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> AISettingsRead:
     """Read the org-wide AI knobs (default-enable, confidence
     threshold, handover keywords, system prompt). 409 when the org
@@ -577,15 +553,11 @@ async def get_ai_settings_endpoint(
     )
 
 
-@ai_settings_router.patch(
-    "/settings", response_model=AISettingsRead
-)
+@ai_settings_router.patch("/settings", response_model=AISettingsRead)
 async def patch_ai_settings_endpoint(
     payload: AISettingsPatch,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> AISettingsRead:
     bundle = await get_active_config(db)
     if bundle is None:
@@ -604,13 +576,9 @@ async def patch_ai_settings_endpoint(
     }
 
     if "ai_handling_default_enabled" in patch_dict:
-        config.ai_handling_default_enabled = bool(
-            patch_dict["ai_handling_default_enabled"]
-        )
+        config.ai_handling_default_enabled = bool(patch_dict["ai_handling_default_enabled"])
     if "ai_confidence_threshold" in patch_dict:
-        config.ai_confidence_threshold = float(
-            patch_dict["ai_confidence_threshold"]
-        )
+        config.ai_confidence_threshold = float(patch_dict["ai_confidence_threshold"])
     if "ai_handover_keywords" in patch_dict:
         # Strip + filter blanks at the boundary so the engine never
         # has to defend against empty-string substring matches.
@@ -619,9 +587,7 @@ async def patch_ai_settings_endpoint(
             kw.strip() for kw in raw if isinstance(kw, str) and kw.strip()
         ]
     if "ai_system_prompt" in patch_dict:
-        config.ai_system_prompt = (
-            patch_dict["ai_system_prompt"] or None
-        )
+        config.ai_system_prompt = patch_dict["ai_system_prompt"] or None
 
     await db.commit()
     await db.refresh(config)
@@ -654,8 +620,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.app.core.integrations.whatsapp.block_list import (
     BLOCK_REASONS,
     BlockListError,
+)
+from src.app.core.integrations.whatsapp.block_list import (
     add_entry as block_add_entry,
+)
+from src.app.core.integrations.whatsapp.block_list import (
     list_entries as block_list_entries,
+)
+from src.app.core.integrations.whatsapp.block_list import (
     remove_entry as block_remove_entry,
 )
 
@@ -740,15 +712,11 @@ async def add_blocked_endpoint(
             notes=payload.notes,
         )
     except BlockListError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     return _BlockEntryOut.model_validate(row)
 
 
-@block_list_router.delete(
-    "/{entry_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@block_list_router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_blocked_endpoint(
     entry_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

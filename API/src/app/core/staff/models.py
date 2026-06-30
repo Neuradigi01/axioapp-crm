@@ -14,6 +14,7 @@ Two tables:
 
 Both tenant-scoped, RLS-on, with org_id FK on every row per rule 2.
 """
+
 from __future__ import annotations
 
 import enum
@@ -63,9 +64,7 @@ class StaffProfile(Base, TenantScoped):
     monthly_target: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False, server_default=text("0")
     )
-    rating: Mapped[Decimal] = mapped_column(
-        Numeric(2, 1), nullable=False, server_default=text("0")
-    )
+    rating: Mapped[Decimal] = mapped_column(Numeric(2, 1), nullable=False, server_default=text("0"))
     employment_status: Mapped[EmploymentStatus] = mapped_column(
         employment_status_enum,
         nullable=False,
@@ -89,9 +88,7 @@ class StaffProfile(Base, TenantScoped):
 
 class Attendance(Base, TenantScoped):
     __tablename__ = "tbl_attendance"
-    __table_args__ = (
-        Index("ix_attendance_user_date", "user_id", "date"),
-    )
+    __table_args__ = (Index("ix_attendance_user_date", "user_id", "date"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -102,12 +99,8 @@ class Attendance(Base, TenantScoped):
         UUID(as_uuid=True),
         nullable=False,
     )
-    clock_in_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    clock_out_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    clock_in_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    clock_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # STORED generated column — minutes converted to hours. NULL until
     # the session is closed. The Postgres planner can read it without
     # recomputation on list / aggregate queries.

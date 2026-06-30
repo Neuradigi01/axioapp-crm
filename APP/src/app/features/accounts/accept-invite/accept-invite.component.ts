@@ -1,16 +1,6 @@
-﻿import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+﻿import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -72,45 +62,37 @@ export class AcceptInviteComponent {
     first_name: ['', [Validators.required, Validators.maxLength(128)]],
     last_name: ['', [Validators.maxLength(128)]],
     phone: [''],
-    password: [
-      '',
-      [Validators.required, Validators.minLength(8), Validators.maxLength(255)],
-    ],
+    password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(255)]],
     confirm_password: ['', [Validators.required]],
   });
 
   constructor() {
-    this.route.queryParamMap
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((params) => {
-        const token = params.get('token');
-        if (!token) {
-          this.invalidReason.set(
-            'No invitation token in the URL. Ask your admin for a fresh link.',
-          );
-          this.state.set('invalid');
-          return;
-        }
-        this.rawToken = token;
-        this.http
-          .get<InvitationPreview>(`${this.base}/lookup`, {
-            params: { token },
-          })
-          .pipe(takeUntilDestroyed(this.destroyRef))
-          .subscribe({
-            next: (info) => {
-              this.preview.set(info);
-              this.state.set('ready');
-            },
-            error: (err: HttpErrorResponse) => {
-              this.invalidReason.set(
-                extractApiError(err)
-                  ?? 'This invitation link is invalid or has expired.',
-              );
-              this.state.set('invalid');
-            },
-          });
-      });
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const token = params.get('token');
+      if (!token) {
+        this.invalidReason.set('No invitation token in the URL. Ask your admin for a fresh link.');
+        this.state.set('invalid');
+        return;
+      }
+      this.rawToken = token;
+      this.http
+        .get<InvitationPreview>(`${this.base}/lookup`, {
+          params: { token },
+        })
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (info) => {
+            this.preview.set(info);
+            this.state.set('ready');
+          },
+          error: (err: HttpErrorResponse) => {
+            this.invalidReason.set(
+              extractApiError(err) ?? 'This invitation link is invalid or has expired.',
+            );
+            this.state.set('invalid');
+          },
+        });
+    });
   }
 
   protected submit(): void {
@@ -144,11 +126,8 @@ export class AcceptInviteComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.submitError.set(
-            extractApiError(err) ?? 'Could not accept invitation.',
-          );
+          this.submitError.set(extractApiError(err) ?? 'Could not accept invitation.');
         },
       });
   }
-
 }

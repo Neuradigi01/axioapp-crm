@@ -18,6 +18,7 @@ Enroll + pause + resume + cancel are gated by `email.sequences.enroll`
 (those three roles + Employee — reps enroll their own leads into
 manager-built sequences).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -40,7 +41,6 @@ from src.app.core.email_sequences.schemas import (
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/email/sequences", tags=["Email Sequences"])
 
@@ -68,9 +68,7 @@ async def list_sequences_endpoint(
         # `steps=[]` on the list view to keep the response small —
         # consumers that need steps call GET /{id}.
         items.append(EmailSequenceRead.model_validate(r))
-    return EmailSequenceListResponse(
-        items=items, total=total, page=page, size=size
-    )
+    return EmailSequenceListResponse(items=items, total=total, page=page, size=size)
 
 
 @router.post(
@@ -102,9 +100,7 @@ async def get_sequence_endpoint(
     _user: User = Depends(require_permissions("email.read")),
 ) -> EmailSequenceRead:
     """Read one sequence + its ordered step list."""
-    seq, steps = await sequences_service.get_sequence_with_steps(
-        db, sequence_id=sequence_id
-    )
+    seq, steps = await sequences_service.get_sequence_with_steps(db, sequence_id=sequence_id)
     return _project_sequence(seq, steps)
 
 
@@ -146,9 +142,7 @@ async def delete_sequence_endpoint(
 # --- Enrollment ------------------------------------------------------------
 
 
-@router.post(
-    "/{sequence_id}/enroll", response_model=EnrollmentResponse
-)
+@router.post("/{sequence_id}/enroll", response_model=EnrollmentResponse)
 async def enroll_endpoint(
     sequence_id: uuid.UUID,
     payload: EnrollmentRequest,
@@ -174,9 +168,7 @@ async def enroll_endpoint(
     )
 
 
-@router.get(
-    "/enrollments", response_model=EnrollmentListResponse
-)
+@router.get("/enrollments", response_model=EnrollmentListResponse)
 async def list_enrollments_endpoint(
     sequence_id: uuid.UUID | None = Query(default=None),
     contact_id: uuid.UUID | None = Query(default=None),
@@ -203,9 +195,7 @@ async def list_enrollments_endpoint(
     )
 
 
-@router.post(
-    "/enrollments/{enrollment_id}/pause", response_model=EnrollmentRead
-)
+@router.post("/enrollments/{enrollment_id}/pause", response_model=EnrollmentRead)
 async def pause_enrollment_endpoint(
     enrollment_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -221,9 +211,7 @@ async def pause_enrollment_endpoint(
     return EnrollmentRead.model_validate(row)
 
 
-@router.post(
-    "/enrollments/{enrollment_id}/resume", response_model=EnrollmentRead
-)
+@router.post("/enrollments/{enrollment_id}/resume", response_model=EnrollmentRead)
 async def resume_enrollment_endpoint(
     enrollment_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -239,9 +227,7 @@ async def resume_enrollment_endpoint(
     return EnrollmentRead.model_validate(row)
 
 
-@router.post(
-    "/enrollments/{enrollment_id}/cancel", response_model=EnrollmentRead
-)
+@router.post("/enrollments/{enrollment_id}/cancel", response_model=EnrollmentRead)
 async def cancel_enrollment_endpoint(
     enrollment_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

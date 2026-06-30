@@ -28,13 +28,15 @@ Responsibilities:
 Filtered list joins the `contacts` table so `q` (name/phone/email
 search) and `source` (contact.source equality) can apply.
 """
+
 from __future__ import annotations
 
 import base64
 import json
 import uuid
+from collections.abc import Iterable
 from datetime import date, datetime
-from typing import Any, Iterable, Literal, Optional
+from typing import Any, Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, or_
@@ -43,12 +45,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core import activities, audit
 from src.app.core.activities.models import ActivityType
 from src.app.core.contacts.models import Contact
-from src.app.core.leads import data_access as _da, filter_dsl, scoring
+from src.app.core.leads import data_access as _da
+from src.app.core.leads import filter_dsl, scoring
 from src.app.core.leads.csv_export import resolve_custom_columns
 from src.app.core.leads.models import (
     Lead,
     LeadScoringRule,
-    LeadSource,
     LeadStatus,
 )
 from src.app.core.leads.schemas import (
@@ -63,7 +65,6 @@ from src.app.core.pipelines.service import get_pipeline_by_key
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.queries import ensure_found
-
 
 # Server-side whitelist for `?sort=` on the list endpoint. Anything
 # outside this set is rejected at the router via FastAPI's Literal
@@ -116,7 +117,7 @@ def _snapshot(lead: Lead) -> dict[str, Any]:
 async def _resolve_initial_stage(
     session: AsyncSession,
     *,
-    requested: Optional[str],
+    requested: str | None,
 ) -> str:
     """Pick the lead's starting stage. Caller-supplied wins if valid;
     otherwise we default to the first stage by display_order."""
@@ -124,20 +125,14 @@ async def _resolve_initial_stage(
     if pipeline is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "no 'leads' pipeline configured for this org — install the "
-                "pack first"
-            ),
+            detail=("no 'leads' pipeline configured for this org — install the pack first"),
         )
     stage_keys = {s.key for s in pipeline.stages}
     if requested:
         if requested not in stage_keys:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    f"pipeline_stage {requested!r} is not part of the leads "
-                    "pipeline"
-                ),
+                detail=(f"pipeline_stage {requested!r} is not part of the leads pipeline"),
             )
         return requested
     if not pipeline.stages:
@@ -151,13 +146,11 @@ async def _resolve_initial_stage(
 # --- CRUD ---
 
 
-async def get_lead(session: AsyncSession, lead_id: uuid.UUID) -> Optional[Lead]:
+async def get_lead(session: AsyncSession, lead_id: uuid.UUID) -> Lead | None:
     return await _da.get_lead_by_id(session, lead_id)
 
 
-async def get_lead_visible_to(
-    session: AsyncSession, *, caller, lead_id: uuid.UUID
-) -> Lead:
+async def get_lead_visible_to(session: AsyncSession, *, caller, lead_id: uuid.UUID) -> Lead:
     """Fetch a lead with row-level visibility enforced.
 
     Raises 404 when the lead doesn't exist OR when the caller lacks
@@ -169,22 +162,15 @@ async def get_lead_visible_to(
 
     lead = await _da.get_lead_by_id(session, lead_id)
     if lead is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
-        )
-    if (
-        lead.assigned_to_id != caller.legacy_uuid
-        and not await role_has_permission(session, caller.role_id, "users.read")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="lead not found")
+    if lead.assigned_to_id != caller.legacy_uuid and not await role_has_permission(
+        session, caller.role_id, "users.read"
     ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="lead not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="lead not found")
     return lead
 
 
-async def _ensure_contact_in_scope(
-    session: AsyncSession, contact_id: uuid.UUID
-) -> None:
+async def _ensure_contact_in_scope(session: AsyncSession, contact_id: uuid.UUID) -> None:
     if not await _da.contact_exists_in_org(session, contact_id):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -211,9 +197,7 @@ async def create_lead(
     staff fill in the blanks afterwards via the edit form.
     """
     await _ensure_contact_in_scope(session, payload.contact_id)
-    stage_key = await _resolve_initial_stage(
-        session, requested=payload.pipeline_stage
-    )
+    stage_key = await _resolve_initial_stage(session, requested=payload.pipeline_stage)
     cleaned_custom = await validate_custom_data(
         session,
         entity_type=_LEAD_ENTITY,
@@ -260,9 +244,7 @@ async def create_lead(
     return lead
 
 
-async def _publish_lead_created(
-    session: AsyncSession, *, org_id: uuid.UUID, lead: Lead
-) -> None:
+async def _publish_lead_created(session: AsyncSession, *, org_id: uuid.UUID, lead: Lead) -> None:
     """Build the ``lead.created`` envelope + publish via the bus.
     Snapshot's the contact + org so the recipient resolver + the
     template renderer have everything they need without per-handler
@@ -275,35 +257,25 @@ async def _publish_lead_created(
         from src.app.core.tenants.models import Organization
 
         contact = (
-            await session.execute(
-                select(Contact).where(Contact.id == lead.contact_id)
-            )
+            await session.execute(select(Contact).where(Contact.id == lead.contact_id))
         ).scalar_one_or_none()
         org = (
-            await session.execute(
-                select(Organization).where(Organization.id == org_id)
-            )
+            await session.execute(select(Organization).where(Organization.id == org_id))
         ).scalar_one_or_none()
 
         payload: dict = {
             "lead_id": str(lead.id),
             "contact_id": str(lead.contact_id),
             "source": str(lead.source) if lead.source else None,
-            "created_at": (
-                lead.created_at.isoformat() if lead.created_at else None
-            ),
+            "created_at": (lead.created_at.isoformat() if lead.created_at else None),
             "lead": {
                 "id": str(lead.id),
                 "source": str(lead.source) if lead.source else None,
                 "status": (
-                    lead.status.value
-                    if hasattr(lead.status, "value")
-                    else str(lead.status)
+                    lead.status.value if hasattr(lead.status, "value") else str(lead.status)
                 ),
                 "pipeline_stage": lead.pipeline_stage,
-                "assigned_to_id": (
-                    str(lead.assigned_to_id) if lead.assigned_to_id else None
-                ),
+                "assigned_to_id": (str(lead.assigned_to_id) if lead.assigned_to_id else None),
                 "budget": float(lead.budget) if lead.budget is not None else None,
                 "attribution": lead.attribution or {},
             },
@@ -401,15 +373,15 @@ async def delete_lead(session: AsyncSession, *, lead_id: uuid.UUID) -> None:
 async def _build_list_query(
     session: AsyncSession,
     *,
-    stage: Optional[str],
-    status_filter: Optional[LeadStatus],
-    assigned_to: Optional[uuid.UUID],
-    q: Optional[str],
-    source: Optional[str],
-    last_activity_lt: Optional[datetime],
-    last_activity_gt: Optional[datetime],
+    stage: str | None,
+    status_filter: LeadStatus | None,
+    assigned_to: uuid.UUID | None,
+    q: str | None,
+    source: str | None,
+    last_activity_lt: datetime | None,
+    last_activity_gt: datetime | None,
     custom_filters: Iterable[tuple[str, str]],
-    filter_dsl_payload: Optional[dict[str, Any]],
+    filter_dsl_payload: dict[str, Any] | None,
     sort: str,
 ) -> tuple[Any, list[Any], bool]:
     """Translate the union of convenience filters + DSL into a single
@@ -477,11 +449,7 @@ async def _build_list_query(
 def _order_clause(sort: str, order: str):
     sort_col = _SORT_COLUMNS[sort]
     if sort == "last_activity_at":
-        return (
-            sort_col.asc().nulls_last()
-            if order == "asc"
-            else sort_col.desc().nulls_last()
-        )
+        return sort_col.asc().nulls_last() if order == "asc" else sort_col.desc().nulls_last()
     return sort_col.asc() if order == "asc" else sort_col.desc()
 
 
@@ -499,9 +467,7 @@ def _encode_cursor(sort_value: Any, lead_id: uuid.UUID) -> str:
     return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii")
 
 
-def _decode_cursor(
-    cursor: str, sort: str
-) -> tuple[Any, uuid.UUID]:
+def _decode_cursor(cursor: str, sort: str) -> tuple[Any, uuid.UUID]:
     """Inverse of ``_encode_cursor``. Tampering → 400."""
     try:
         raw = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8")
@@ -539,25 +505,23 @@ async def list_leads_visible_to(
     session: AsyncSession,
     *,
     caller,
-    stage: Optional[str] = None,
-    status_filter: Optional[LeadStatus] = None,
-    assigned_to: Optional[uuid.UUID] = None,
-    q: Optional[str] = None,
-    source: Optional[str] = None,
-    last_activity_lt: Optional[datetime] = None,
-    last_activity_gt: Optional[datetime] = None,
-    sort: Literal[
-        "created_at", "last_activity_at", "lead_score", "contact_name"
-    ] = "created_at",
+    stage: str | None = None,
+    status_filter: LeadStatus | None = None,
+    assigned_to: uuid.UUID | None = None,
+    q: str | None = None,
+    source: str | None = None,
+    last_activity_lt: datetime | None = None,
+    last_activity_gt: datetime | None = None,
+    sort: Literal["created_at", "last_activity_at", "lead_score", "contact_name"] = "created_at",
     order: Literal["asc", "desc"] = "desc",
     custom_filters: Iterable[tuple[str, str]] = (),
-    filter_dsl_payload: Optional[dict[str, Any]] = None,
+    filter_dsl_payload: dict[str, Any] | None = None,
     page: int = 1,
     size: int = _LIMIT_DEFAULT,
-    cursor: Optional[str] = None,
-    limit: Optional[int] = None,
+    cursor: str | None = None,
+    limit: int | None = None,
     with_total: bool = True,
-) -> tuple[list[Lead], Optional[int], Optional[str]]:
+) -> tuple[list[Lead], int | None, str | None]:
     """Row-level visibility wrapper.
 
     Callers without `users.read` (employees vs. managers) only see
@@ -593,25 +557,23 @@ async def list_leads_visible_to(
 async def list_leads(
     session: AsyncSession,
     *,
-    stage: Optional[str] = None,
-    status_filter: Optional[LeadStatus] = None,
-    assigned_to: Optional[uuid.UUID] = None,
-    q: Optional[str] = None,
-    source: Optional[str] = None,
-    last_activity_lt: Optional[datetime] = None,
-    last_activity_gt: Optional[datetime] = None,
-    sort: Literal[
-        "created_at", "last_activity_at", "lead_score", "contact_name"
-    ] = "created_at",
+    stage: str | None = None,
+    status_filter: LeadStatus | None = None,
+    assigned_to: uuid.UUID | None = None,
+    q: str | None = None,
+    source: str | None = None,
+    last_activity_lt: datetime | None = None,
+    last_activity_gt: datetime | None = None,
+    sort: Literal["created_at", "last_activity_at", "lead_score", "contact_name"] = "created_at",
     order: Literal["asc", "desc"] = "desc",
     custom_filters: Iterable[tuple[str, str]] = (),
-    filter_dsl_payload: Optional[dict[str, Any]] = None,
+    filter_dsl_payload: dict[str, Any] | None = None,
     page: int = 1,
     size: int = _LIMIT_DEFAULT,
-    cursor: Optional[str] = None,
-    limit: Optional[int] = None,
+    cursor: str | None = None,
+    limit: int | None = None,
     with_total: bool = True,
-) -> tuple[list[Lead], Optional[int], Optional[str]]:
+) -> tuple[list[Lead], int | None, str | None]:
     """Filtered list of leads, supporting two pagination modes."""
     where, _filters, needs_contact_join = await _build_list_query(
         session,
@@ -632,7 +594,7 @@ async def list_leads(
     # ties and matches the composite indexes added in migration 0070.
     secondary = Lead.id.desc() if order == "desc" else Lead.id.asc()
 
-    total: Optional[int] = None
+    total: int | None = None
     if with_total:
         total = await _da.count_leads_with_where(
             session, where=where, needs_contact_join=needs_contact_join
@@ -643,8 +605,7 @@ async def list_leads(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"cursor pagination does not support sort={sort!r}; "
-                "use page/size mode instead"
+                f"cursor pagination does not support sort={sort!r}; use page/size mode instead"
             ),
         )
 
@@ -673,7 +634,7 @@ async def list_leads(
         )
         has_more = len(rows) > effective_limit
         page_rows = list(rows[:effective_limit])
-        next_cursor: Optional[str] = None
+        next_cursor: str | None = None
         if has_more and page_rows:
             tail = page_rows[-1]
             next_cursor = _encode_cursor(getattr(tail, sort), tail.id)
@@ -695,11 +656,7 @@ async def list_leads(
     has_more = len(rows) > effective_size
     page_rows = list(rows[:effective_size])
     next_cursor = None
-    if (
-        has_more
-        and page_rows
-        and sort in cursor_eligible_sorts
-    ):
+    if has_more and page_rows and sort in cursor_eligible_sorts:
         tail = page_rows[-1]
         next_cursor = _encode_cursor(getattr(tail, sort), tail.id)
     return page_rows, total, next_cursor
@@ -708,18 +665,16 @@ async def list_leads(
 async def list_leads_where(
     session: AsyncSession,
     *,
-    stage: Optional[str] = None,
-    status_filter: Optional[LeadStatus] = None,
-    assigned_to: Optional[uuid.UUID] = None,
-    q: Optional[str] = None,
-    source: Optional[str] = None,
-    last_activity_lt: Optional[datetime] = None,
-    last_activity_gt: Optional[datetime] = None,
+    stage: str | None = None,
+    status_filter: LeadStatus | None = None,
+    assigned_to: uuid.UUID | None = None,
+    q: str | None = None,
+    source: str | None = None,
+    last_activity_lt: datetime | None = None,
+    last_activity_gt: datetime | None = None,
     custom_filters: Iterable[tuple[str, str]] = (),
-    filter_dsl_payload: Optional[dict[str, Any]] = None,
-    sort: Literal[
-        "created_at", "last_activity_at", "lead_score", "contact_name"
-    ] = "created_at",
+    filter_dsl_payload: dict[str, Any] | None = None,
+    sort: Literal["created_at", "last_activity_at", "lead_score", "contact_name"] = "created_at",
 ) -> tuple[Any, bool]:
     """Companion to ``list_leads`` used by the CSV export: builds and
     returns the same combined WHERE clause + JOIN hint, without
@@ -749,8 +704,8 @@ async def move_stage_for_lead(
     lead_id: uuid.UUID,
     to_stage: str,
     user_id: uuid.UUID,
-    lost_reason: Optional[str] = None,
-    lost_reason_other: Optional[str] = None,
+    lost_reason: str | None = None,
+    lost_reason_other: str | None = None,
 ) -> Lead:
     """Move a lead to a new stage and keep `status` in sync."""
     lead = ensure_found(await get_lead(session, lead_id), entity="lead")
@@ -765,19 +720,14 @@ async def move_stage_for_lead(
         if lost_reason is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "lost_reason is required when moving a lead to a "
-                    "Lost stage"
-                ),
+                detail=("lost_reason is required when moving a lead to a Lost stage"),
             )
         if lost_reason not in LOST_REASONS:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"lost_reason must be one of {list(LOST_REASONS)}",
             )
-        if lost_reason == "other" and not (
-            lost_reason_other and lost_reason_other.strip()
-        ):
+        if lost_reason == "other" and not (lost_reason_other and lost_reason_other.strip()):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="lost_reason_other is required when lost_reason='other'",
@@ -827,9 +777,7 @@ async def _assert_user_in_org(
     session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
 ) -> None:
     """422 if the target user has no active membership in this org."""
-    if not await _da.user_has_active_membership(
-        session, org_id=org_id, user_uuid=user_uuid
-    ):
+    if not await _da.user_has_active_membership(session, org_id=org_id, user_uuid=user_uuid):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="target user is not a member of this organisation",
@@ -859,9 +807,7 @@ async def reassign_lead(
     same session so the lead update + the timeline row commit atomically."""
     lead = ensure_found(await get_lead(session, lead_id), entity="lead")
     if assigned_to_id is not None:
-        await _assert_user_in_org(
-            session, org_id=org_id, user_uuid=assigned_to_id
-        )
+        await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
     before_id = lead.assigned_to_id
     if before_id == assigned_to_id:
@@ -876,9 +822,7 @@ async def reassign_lead(
         entity_type="lead",
         entity_id=lead.id,
         type=ActivityType.reassign,
-        payload=_reassign_payload(
-            from_id=before_id, to_id=assigned_to_id, note=note
-        ),
+        payload=_reassign_payload(from_id=before_id, to_id=assigned_to_id, note=note),
         user_id=actor_user_id,
     )
     await session.commit()
@@ -906,9 +850,7 @@ async def bulk_reassign_leads(
     """Reassign N leads in one transaction. Returns rows actually touched
     (identity-reassign rows are silently skipped)."""
     if assigned_to_id is not None:
-        await _assert_user_in_org(
-            session, org_id=org_id, user_uuid=assigned_to_id
-        )
+        await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
     reassigned = 0
     for lid in ids:
@@ -925,9 +867,7 @@ async def bulk_reassign_leads(
             entity_type="lead",
             entity_id=lead.id,
             type=ActivityType.reassign,
-            payload=_reassign_payload(
-                from_id=before_id, to_id=assigned_to_id, note=note
-            ),
+            payload=_reassign_payload(from_id=before_id, to_id=assigned_to_id, note=note),
             user_id=actor_user_id,
         )
         reassigned += 1
@@ -944,9 +884,7 @@ async def bulk_delete_leads(
 ) -> int:
     """Hard-delete N leads. Belt + suspenders: `org_id` in WHERE alongside
     the per-tenant RLS policy."""
-    rowcount = await _da.bulk_delete_leads_by_ids(
-        session, ids=ids, org_id=org_id
-    )
+    rowcount = await _da.bulk_delete_leads_by_ids(session, ids=ids, org_id=org_id)
     await session.commit()
     return rowcount
 
@@ -976,16 +914,12 @@ def _validate_scoring_condition(condition: dict[str, Any]) -> None:
         ) from exc
 
 
-async def list_scoring_rules(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> list[LeadScoringRule]:
+async def list_scoring_rules(session: AsyncSession, *, org_id: uuid.UUID) -> list[LeadScoringRule]:
     """All rules (active + inactive) for the tenant, oldest first."""
     return await _da.list_scoring_rules_for_org(session, org_id)
 
 
-async def get_scoring_rule(
-    session: AsyncSession, *, rule_id: uuid.UUID
-) -> Optional[LeadScoringRule]:
+async def get_scoring_rule(session: AsyncSession, *, rule_id: uuid.UUID) -> LeadScoringRule | None:
     return await _da.get_scoring_rule_by_id(session, rule_id)
 
 
@@ -1044,9 +978,7 @@ async def update_scoring_rule(
     return rule
 
 
-async def delete_scoring_rule(
-    session: AsyncSession, *, rule_id: uuid.UUID
-) -> None:
+async def delete_scoring_rule(session: AsyncSession, *, rule_id: uuid.UUID) -> None:
     rule = ensure_found(await get_scoring_rule(session, rule_id=rule_id), entity="scoring rule")
     before = _scoring_snapshot(rule)
     org_id = rule.org_id

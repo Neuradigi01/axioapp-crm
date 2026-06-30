@@ -21,6 +21,7 @@ rolls back the seeds. Backfill migration
 ``0129_seed_user_welcome_existing_orgs`` runs the same seeders
 against every pre-existing org.
 """
+
 from __future__ import annotations
 
 import logging
@@ -37,7 +38,6 @@ from src.app.core.templates.models import (
     TemplateExternalStatus,
     TemplateInternalStatus,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -119,9 +119,7 @@ _INVOICE_SENT_BODY = (
 )
 
 _INVOICE_PAID_NAME = "Invoice Paid"
-_INVOICE_PAID_SUBJECT = (
-    "Payment received — invoice #{{ invoice.number }}"
-)
+_INVOICE_PAID_SUBJECT = "Payment received — invoice #{{ invoice.number }}"
 _INVOICE_PAID_BODY = (
     "Hi {{ contact.full_name }},\n\n"
     "Thanks — we've received your payment for invoice "
@@ -159,9 +157,7 @@ _LEAD_STALE_30D_BODY = (
 )
 
 _INVOICE_OVERDUE_NAME = "Invoice Overdue 7d"
-_INVOICE_OVERDUE_SUBJECT = (
-    "Reminder: invoice #{{ invoice.number }} is now overdue"
-)
+_INVOICE_OVERDUE_SUBJECT = "Reminder: invoice #{{ invoice.number }} is now overdue"
 _INVOICE_OVERDUE_BODY = (
     "Hi {{ contact.full_name }},\n\n"
     "This is a friendly reminder that invoice #{{ invoice.number }} "
@@ -383,9 +379,7 @@ async def seed_appointment_booked_template(
             "appointment.scheduled_at",
             "appointment.location",
         ],
-        change_note=(
-            "seeded by automation-engine Step 10 (Appointment Booked)"
-        ),
+        change_note=("seeded by automation-engine Step 10 (Appointment Booked)"),
     )
 
 
@@ -407,9 +401,7 @@ async def seed_appointment_reminder_24h_template(
             "appointment.scheduled_at",
             "appointment.location",
         ],
-        change_note=(
-            "seeded by automation-engine Step 10 (Appointment Reminder 24h)"
-        ),
+        change_note=("seeded by automation-engine Step 10 (Appointment Reminder 24h)"),
     )
 
 
@@ -430,9 +422,7 @@ async def seed_appointment_reminder_1h_template(
             "org.name",
             "appointment.location",
         ],
-        change_note=(
-            "seeded by automation-engine Step 10 (Appointment Reminder 1h)"
-        ),
+        change_note=("seeded by automation-engine Step 10 (Appointment Reminder 1h)"),
     )
 
 
@@ -522,9 +512,7 @@ async def seed_invoice_sent_template(
             "invoice.total_amount",
             "invoice.currency",
         ],
-        change_note=(
-            "seeded by automation-engine Step 11 (Invoice Sent)"
-        ),
+        change_note=("seeded by automation-engine Step 11 (Invoice Sent)"),
     )
 
 
@@ -548,9 +536,7 @@ async def seed_invoice_paid_template(
             "invoice.total_amount",
             "invoice.currency",
         ],
-        change_note=(
-            "seeded by automation-engine Step 11 (Invoice Paid)"
-        ),
+        change_note=("seeded by automation-engine Step 11 (Invoice Paid)"),
     )
 
 
@@ -574,9 +560,7 @@ async def seed_invoice_overdue_template(
             "invoice.total_amount",
             "invoice.currency",
         ],
-        change_note=(
-            "seeded by automation-engine Step 11 (Invoice Overdue 7d)"
-        ),
+        change_note=("seeded by automation-engine Step 11 (Invoice Overdue 7d)"),
     )
 
 
@@ -597,9 +581,7 @@ async def seed_contact_birthday_template(
         name=_CONTACT_BIRTHDAY_NAME,
         body=_CONTACT_BIRTHDAY_BODY,
         variables=["contact.full_name", "org.name"],
-        change_note=(
-            "seeded by automation-engine Step 12 (Contact Birthday)"
-        ),
+        change_note=("seeded by automation-engine Step 12 (Contact Birthday)"),
     )
 
 
@@ -621,9 +603,7 @@ async def seed_lead_stale_30d_template(
         subject=_LEAD_STALE_30D_SUBJECT,
         body=_LEAD_STALE_30D_BODY,
         variables=["contact.full_name", "org.name"],
-        change_note=(
-            "seeded by automation-engine Step 12 (Lead Stale 30d)"
-        ),
+        change_note=("seeded by automation-engine Step 12 (Lead Stale 30d)"),
     )
 
 

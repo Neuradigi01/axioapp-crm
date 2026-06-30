@@ -18,7 +18,10 @@ const STATUS_BADGE_MAP: Record<string, IBadgeConfig> = {
   Failed: { color: 'var(--badge-inactive-color)', bgVar: 'var(--badge-inactive-bg)' },
 };
 
-const DEFAULT_BADGE: IBadgeConfig = { color: 'var(--badge-closed-color)', bgVar: 'var(--badge-closed-bg)' };
+const DEFAULT_BADGE: IBadgeConfig = {
+  color: 'var(--badge-closed-color)',
+  bgVar: 'var(--badge-closed-bg)',
+};
 
 @Component({
   selector: 'app-login-history-table',
@@ -95,7 +98,9 @@ export class LoginHistoryTableComponent implements OnInit {
         this.loadData();
       }
     } catch {
-      this.snackBar.open('Failed to logout session', SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+      this.snackBar.open('Failed to logout session', SNACKBAR_ACTION, {
+        duration: SNACKBAR_DURATION,
+      });
     }
   }
 
@@ -105,10 +110,14 @@ export class LoginHistoryTableComponent implements OnInit {
 
   getDeviceIcon(deviceType: string): string {
     switch (deviceType?.toLowerCase()) {
-      case 'desktop': return 'computer';
-      case 'mobile': return 'smartphone';
-      case 'tablet': return 'tablet_mac';
-      default: return 'devices';
+      case 'desktop':
+        return 'computer';
+      case 'mobile':
+        return 'smartphone';
+      case 'tablet':
+        return 'tablet_mac';
+      default:
+        return 'devices';
     }
   }
 

@@ -22,11 +22,13 @@ The plaintext bearer token is decrypted inside `_get_tier_cached`'s
 call frame only — same contract as `templates.sync_templates`. Never
 logged, never returned to the API surface.
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import httpx
 from sqlalchemy import func, select
@@ -106,23 +108,17 @@ async def _fetch_tier_from_meta(
     raw Meta value (e.g. `"TIER_10K"`). Raises `WhatsAppNotConnected`
     on any non-2xx so the router maps to 409 with the same operator-
     facing message every other Meta-rejected path uses."""
-    url = (
-        f"https://graph.facebook.com/{api_version}/{phone_id}"
-        "?fields=messaging_limit_tier"
-    )
+    url = f"https://graph.facebook.com/{api_version}/{phone_id}?fields=messaging_limit_tier"
     headers = {"Authorization": f"Bearer {access_token}"}
     async with http_client_factory() as client:
         response = await client.get(url, headers=headers)
     if response.status_code >= 400:
         raise WhatsAppNotConnected(
-            f"Meta API rejected the capacity lookup: "
-            f"{_extract_meta_error(response)}"
+            f"Meta API rejected the capacity lookup: {_extract_meta_error(response)}"
         )
     body = response.json()
     if not isinstance(body, dict):
-        raise WhatsAppNotConnected(
-            f"Unexpected Meta response shape: {body!r}"
-        )
+        raise WhatsAppNotConnected(f"Unexpected Meta response shape: {body!r}")
     tier = body.get("messaging_limit_tier")
     if not isinstance(tier, str) or not tier:
         # Meta sometimes returns no tier field for a never-active
@@ -161,14 +157,10 @@ async def _get_tier_cached(
     update is committed inside this function so the next caller
     benefits — capacity lookups are read-heavy, so we'd rather pay one
     write per hour than dirty the session for the router to commit."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cached_tier = config.messaging_limit_tier
     cached_at = config.tier_synced_at
-    if (
-        cached_tier
-        and cached_at is not None
-        and now - cached_at < _TIER_CACHE_TTL
-    ):
+    if cached_tier and cached_at is not None and now - cached_at < _TIER_CACHE_TTL:
         return cached_tier
 
     tier = await _fetch_tier_from_meta(
@@ -196,7 +188,7 @@ async def _count_unique_recipients_today(session: AsyncSession) -> int:
     RLS scopes both the `messages` and `conversations` rows to the
     active org automatically (both are TenantScoped), so this query
     does NOT need an explicit `org_id` filter."""
-    cutoff = datetime.now(timezone.utc) - _USED_TODAY_WINDOW
+    cutoff = datetime.now(UTC) - _USED_TODAY_WINDOW
     stmt = (
         select(func.count(func.distinct(Message.conversation_id)))
         .join(Conversation, Conversation.id == Message.conversation_id)
@@ -245,14 +237,11 @@ async def get_send_capacity(
     bundle = await get_active_config(session)
     if bundle is None:
         raise WhatsAppNotConnected(
-            "WhatsApp is not connected for this org. "
-            "Connect it in Settings → Integrations."
+            "WhatsApp is not connected for this org. Connect it in Settings → Integrations."
         )
     integration, config = bundle
     if integration.access_token_enc is None:
-        raise WhatsAppNotConnected(
-            "Stored credentials are missing; reconnect required."
-        )
+        raise WhatsAppNotConnected("Stored credentials are missing; reconnect required.")
     plaintext_token = decrypt(integration.access_token_enc)
 
     tier = await _get_tier_cached(
@@ -271,9 +260,7 @@ async def get_send_capacity(
         usage_percent = 0
     else:
         remaining = max(0, daily_limit - used)
-        usage_percent = (
-            round(used / daily_limit * 100) if daily_limit else 0
-        )
+        usage_percent = round(used / daily_limit * 100) if daily_limit else 0
         # Cap display percent at 100 — possible if a sudden burst
         # raced the tier-refresh cron (won't exist here yet, but the
         # invariant is cheap to keep).

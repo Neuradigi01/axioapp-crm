@@ -11,6 +11,7 @@ Creates an ephemeral `test_pipeline_cards` table with a
   - unknown pipeline key → 404
   - unknown card_id → 404
 """
+
 from __future__ import annotations
 
 import uuid
@@ -24,7 +25,6 @@ from src.app.core.audit.models import AuditLog
 from src.app.core.pipelines.models import Pipeline, PipelineStage
 from src.app.core.pipelines.service import move_card, register_pipeline_table
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 _TEST_TABLE = "test_pipeline_cards"
 
@@ -97,19 +97,14 @@ async def _insert_card(stage: str | None = "new") -> uuid.UUID:
     cid = uuid.uuid4()
     async with test_engine.begin() as conn:
         await conn.execute(
-            text(
-                f"INSERT INTO {_TEST_TABLE} (id, pipeline_stage) "
-                "VALUES (:id, :s)"
-            ),
+            text(f"INSERT INTO {_TEST_TABLE} (id, pipeline_stage) VALUES (:id, :s)"),
             {"id": cid, "s": stage},
         )
     return cid
 
 
 @pytest.mark.asyncio
-async def test_move_card_updates_row_and_emits_activity_and_audit(
-    layered_client, seeded_admin
-):
+async def test_move_card_updates_row_and_emits_activity_and_audit(layered_client, seeded_admin):
     """Happy path: registered table, valid stage, card exists."""
     from tests.conftest import TestSession
 
@@ -138,9 +133,7 @@ async def test_move_card_updates_row_and_emits_activity_and_audit(
     async with test_engine.begin() as conn:
         new_stage = (
             await conn.execute(
-                text(
-                    f"SELECT pipeline_stage FROM {_TEST_TABLE} WHERE id = :id"
-                ),
+                text(f"SELECT pipeline_stage FROM {_TEST_TABLE} WHERE id = :id"),
                 {"id": card_id},
             )
         ).scalar_one()
@@ -151,12 +144,16 @@ async def test_move_card_updates_row_and_emits_activity_and_audit(
     try:
         async with TestSession() as session:
             acts = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_type == _TEST_TABLE)
-                    .where(Activity.entity_id == card_id)
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_type == _TEST_TABLE)
+                        .where(Activity.entity_id == card_id)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(acts) == 1
             a = acts[0]
             assert a.type.value == "status_change"
@@ -168,12 +165,16 @@ async def test_move_card_updates_row_and_emits_activity_and_audit(
             assert a.user_id == user.id
 
             audits = (
-                await session.execute(
-                    select(AuditLog)
-                    .where(AuditLog.action == "pipelines.card_moved")
-                    .where(AuditLog.entity_id == card_id)
+                (
+                    await session.execute(
+                        select(AuditLog)
+                        .where(AuditLog.action == "pipelines.card_moved")
+                        .where(AuditLog.entity_id == card_id)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(audits) == 1
             assert audits[0].before == {"pipeline": "moves", "stage": "new"}
             assert audits[0].after == {
@@ -210,10 +211,10 @@ async def test_move_to_same_stage_is_noop(layered_client, seeded_admin):
     try:
         async with TestSession() as session:
             acts = (
-                await session.execute(
-                    select(Activity).where(Activity.entity_id == card_id)
-                )
-            ).scalars().all()
+                (await session.execute(select(Activity).where(Activity.entity_id == card_id)))
+                .scalars()
+                .all()
+            )
             assert acts == []
     finally:
         reset_context(ctx_token)
@@ -222,6 +223,7 @@ async def test_move_to_same_stage_is_noop(layered_client, seeded_admin):
 @pytest.mark.asyncio
 async def test_unregistered_table_rejected(layered_client, seeded_admin):
     from fastapi import HTTPException
+
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -246,6 +248,7 @@ async def test_unregistered_table_rejected(layered_client, seeded_admin):
 @pytest.mark.asyncio
 async def test_unknown_stage_or_pipeline_or_card(layered_client, seeded_admin):
     from fastapi import HTTPException
+
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]

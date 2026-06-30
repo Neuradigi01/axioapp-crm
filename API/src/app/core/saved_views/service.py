@@ -15,6 +15,7 @@ Owner identity:
     codebase uses for cross-table user references. Routers extract it
     from ``caller.legacy_uuid`` and pass it in as ``user_id``.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -71,10 +72,7 @@ async def create_view(
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"a saved view named {payload.name!r} already exists for "
-                f"this user + entity"
-            ),
+            detail=(f"a saved view named {payload.name!r} already exists for this user + entity"),
         )
 
     view = SavedView(
@@ -129,9 +127,7 @@ async def update_view(
         if clash is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    "a saved view with that name already exists for this user"
-                ),
+                detail=("a saved view with that name already exists for this user"),
             )
 
     for key, value in changes.items():

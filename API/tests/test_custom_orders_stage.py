@@ -6,6 +6,7 @@ Reuses the core `pipelines.move_card` engine. Asserts:
     `CustomOrderStageHistory` row
   - same-stage move is a no-op (no extra history row)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -36,9 +37,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -61,9 +60,7 @@ async def _seed_custom_orders_pipeline(org_id: uuid.UUID) -> None:
     token = set_context(RequestContext(org_id=org_id))
     try:
         async with TestSession() as session:
-            p = Pipeline(
-                org_id=org_id, key="custom_orders", name="Custom Orders"
-            )
+            p = Pipeline(org_id=org_id, key="custom_orders", name="Custom Orders")
             session.add(p)
             await session.flush()
             for i, (k, name, won, lost) in enumerate(
@@ -134,9 +131,7 @@ async def test_invalid_stage_rejected(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_valid_move_writes_audit_activity_and_history(
-    layered_client, seeded_admin
-):
+async def test_valid_move_writes_audit_activity_and_history(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -171,12 +166,16 @@ async def test_valid_move_writes_audit_activity_and_history(
         async with TestSession() as session:
             # Activity from the pipeline engine.
             acts = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_type == "fp_custom_orders")
-                    .where(Activity.entity_id == uuid.UUID(order_id))
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_type == "fp_custom_orders")
+                        .where(Activity.entity_id == uuid.UUID(order_id))
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(acts) == 1
             assert acts[0].type.value == "status_change"
             assert acts[0].payload == {
@@ -187,26 +186,31 @@ async def test_valid_move_writes_audit_activity_and_history(
 
             # Audit from the pipeline engine.
             ads = (
-                await session.execute(
-                    select(AuditLog)
-                    .where(AuditLog.action == "pipelines.card_moved")
-                    .where(AuditLog.entity_id == uuid.UUID(order_id))
+                (
+                    await session.execute(
+                        select(AuditLog)
+                        .where(AuditLog.action == "pipelines.card_moved")
+                        .where(AuditLog.entity_id == uuid.UUID(order_id))
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(ads) == 1
 
             # Per-order stage-history rows: one for "create" + one for
             # this transition.
             rows = (
-                await session.execute(
-                    select(CustomOrderStageHistory)
-                    .where(
-                        CustomOrderStageHistory.order_id
-                        == uuid.UUID(order_id)
+                (
+                    await session.execute(
+                        select(CustomOrderStageHistory)
+                        .where(CustomOrderStageHistory.order_id == uuid.UUID(order_id))
+                        .order_by(CustomOrderStageHistory.changed_at.asc())
                     )
-                    .order_by(CustomOrderStageHistory.changed_at.asc())
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(rows) == 2
             assert rows[0].from_stage is None
             assert rows[0].to_stage == "measurement_scheduled"
@@ -252,13 +256,16 @@ async def test_same_stage_move_is_noop(layered_client, seeded_admin):
     try:
         async with TestSession() as session:
             rows = (
-                await session.execute(
-                    select(CustomOrderStageHistory).where(
-                        CustomOrderStageHistory.order_id
-                        == uuid.UUID(order_id)
+                (
+                    await session.execute(
+                        select(CustomOrderStageHistory).where(
+                            CustomOrderStageHistory.order_id == uuid.UUID(order_id)
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(rows) == 1  # only the creation row
     finally:
         reset_context(ctx)

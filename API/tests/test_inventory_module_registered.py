@@ -5,6 +5,7 @@ folder looking for a `module.py` that exposes a `MODULE` constant. This
 test re-runs that discovery and asserts the inventory descriptor shows
 up with the expected metadata.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -56,7 +57,5 @@ def test_inventory_hidden_from_users_without_perm():
 
 def test_inventory_visible_to_user_with_read_perm():
     discover_modules()
-    visible_ids = {
-        m.id for m in registry.list_for_user(granted=["inventory.read"])
-    }
+    visible_ids = {m.id for m in registry.list_for_user(granted=["inventory.read"])}
     assert "inventory" in visible_ids

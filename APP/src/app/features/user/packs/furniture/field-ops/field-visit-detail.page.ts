@@ -81,8 +81,9 @@ export class FieldVisitDetailPageComponent {
     notes: this.fb.control<string>('', { nonNullable: true }),
   });
 
-  readonly measurements: FormArray<FormGroup<MeasurementRowGroup>> =
-    this.fb.array<FormGroup<MeasurementRowGroup>>([]);
+  readonly measurements: FormArray<FormGroup<MeasurementRowGroup>> = this.fb.array<
+    FormGroup<MeasurementRowGroup>
+  >([]);
 
   protected readonly canShowMeasurements = computed(
     () => (this.visit()?.custom_order_id ?? null) !== null,
@@ -98,9 +99,7 @@ export class FieldVisitDetailPageComponent {
           this.loadError.set(null);
           return this.api.get(id).pipe(
             catchError((err: HttpErrorResponse) => {
-              this.loadError.set(
-                extractApiError(err) ?? 'Could not load visit.',
-              );
+              this.loadError.set(extractApiError(err) ?? 'Could not load visit.');
               this.loading.set(false);
               return of(null);
             }),
@@ -184,9 +183,7 @@ export class FieldVisitDetailPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.completing.set(false);
-          this.completeError.set(
-            extractApiError(err) ?? 'Could not complete the visit.',
-          );
+          this.completeError.set(extractApiError(err) ?? 'Could not complete the visit.');
         },
       });
   }
@@ -210,9 +207,7 @@ export class FieldVisitDetailPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.uploading.set(false);
-          this.uploadError.set(
-            extractApiError(err) ?? 'Could not upload photo.',
-          );
+          this.uploadError.set(extractApiError(err) ?? 'Could not upload photo.');
         },
       });
   }
@@ -234,7 +229,6 @@ export class FieldVisitDetailPageComponent {
       minute: '2-digit',
     });
   }
-
 
   private loadAppointment(id: string): void {
     this.appointmentsApi
@@ -270,7 +264,4 @@ export class FieldVisitDetailPageComponent {
       )
       .subscribe((rows) => this.photos.set(rows));
   }
-
-
-
 }

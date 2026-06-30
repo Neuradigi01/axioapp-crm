@@ -16,12 +16,7 @@ import { ContactsApiService } from '../../../core/contacts/contacts-api.service'
 import { InrPipe } from '../../../core/shared/pipes/inr.pipe';
 import { extractApiError } from '@core/services/api-error.util';
 import { deriveApiOrigin } from '@core/services/url.util';
-import {
-  BillingApiService,
-  InvoiceStatus,
-  InvoiceWithLines,
-  Payment,
-} from './billing-api.service';
+import { BillingApiService, InvoiceStatus, InvoiceWithLines, Payment } from './billing-api.service';
 
 /**
  * `/billing/invoices/:id` â€” full invoice view with line items, payment
@@ -71,9 +66,7 @@ export class InvoiceDetailPageComponent {
           this.loadError.set(null);
           return this.api.get(id).pipe(
             catchError((err: HttpErrorResponse) => {
-              this.loadError.set(
-                extractApiError(err) ?? 'Could not load invoice.',
-              );
+              this.loadError.set(extractApiError(err) ?? 'Could not load invoice.');
               this.loading.set(false);
               return of(null);
             }),
@@ -147,6 +140,4 @@ export class InvoiceDetailPageComponent {
         }
       });
   }
-
-
 }

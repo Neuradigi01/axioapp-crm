@@ -1,17 +1,17 @@
 """Pydantic v2 schemas for the furniture-pack field-ops module."""
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 from src.app.core.appointments.schemas import AppointmentCreate
 from src.app.packs.furniture.modules.field_ops.models import FieldVisitPurpose
 from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
-
 
 # --- Field visits ---------------------------------------------------------
 
@@ -24,28 +24,27 @@ class FieldVisitCreate(BaseModel):
 
     appointment: AppointmentCreate
     purpose: FieldVisitPurpose
-    custom_order_id: Optional[uuid.UUID] = None
-    notes: Optional[str] = None
+    custom_order_id: uuid.UUID | None = None
+    notes: str | None = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class FieldVisitUpdate(BaseModel):
-    purpose: Optional[FieldVisitPurpose] = None
-    custom_order_id: Optional[uuid.UUID] = None
-    notes: Optional[str] = None
-    signature_url: Optional[str] = Field(default=None, max_length=512)
-    custom_data: Optional[dict[str, Any]] = None
+    purpose: FieldVisitPurpose | None = None
+    custom_order_id: uuid.UUID | None = None
+    notes: str | None = None
+    signature_url: str | None = Field(default=None, max_length=512)
+    custom_data: dict[str, Any] | None = None
 
 
 class FieldVisitOut(TimestampedOrgScopedOut):
-
     id: uuid.UUID
     appointment_id: uuid.UUID
     purpose: FieldVisitPurpose
-    custom_order_id: Optional[uuid.UUID]
-    notes: Optional[str]
-    completed_at: Optional[datetime]
-    signature_url: Optional[str]
+    custom_order_id: uuid.UUID | None
+    notes: str | None
+    completed_at: datetime | None
+    signature_url: str | None
     custom_data: dict[str, Any]
 
 
@@ -67,15 +66,15 @@ class MeasurementCopyback(BaseModel):
     """
 
     item_label: str = Field(min_length=1, max_length=128)
-    length_cm: Optional[Decimal] = Field(default=None, ge=0)
-    width_cm: Optional[Decimal] = Field(default=None, ge=0)
-    height_cm: Optional[Decimal] = Field(default=None, ge=0)
-    notes: Optional[str] = None
+    length_cm: Decimal | None = Field(default=None, ge=0)
+    width_cm: Decimal | None = Field(default=None, ge=0)
+    height_cm: Decimal | None = Field(default=None, ge=0)
+    notes: str | None = None
 
 
 class FieldVisitCompletePayload(BaseModel):
-    notes: Optional[str] = None
-    signature_url: Optional[str] = Field(default=None, max_length=512)
+    notes: str | None = None
+    signature_url: str | None = Field(default=None, max_length=512)
     measurements: list[MeasurementCopyback] = Field(default_factory=list)
 
 
@@ -83,11 +82,10 @@ class FieldVisitCompletePayload(BaseModel):
 
 
 class FieldVisitPhotoOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     visit_id: uuid.UUID
     url: str
-    caption: Optional[str]
-    taken_at: Optional[datetime]
+    caption: str | None
+    taken_at: datetime | None
     created_at: datetime

@@ -5,6 +5,7 @@ Grants `contacts.read` + `contacts.write` (and the matching
 admin, logs in, and exercises create / list / patch / delete plus the
 custom-data validation rules + tenant isolation.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,9 +35,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -135,15 +134,11 @@ async def test_create_list_update_delete_contact(layered_client, seeded_admin):
     assert patch.json()["tags"] == ["vip"]
 
     # Delete
-    delete = await layered_client.delete(
-        f"/api/v1/contacts/{contact_id}", headers=headers
-    )
+    delete = await layered_client.delete(f"/api/v1/contacts/{contact_id}", headers=headers)
     assert delete.status_code == 204
 
     # Confirm gone
-    after = await layered_client.get(
-        f"/api/v1/contacts/{contact_id}", headers=headers
-    )
+    after = await layered_client.get(f"/api/v1/contacts/{contact_id}", headers=headers)
     assert after.status_code == 404
 
 
@@ -174,9 +169,7 @@ async def test_custom_data_unknown_key_rejected(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_custom_data_type_check_and_dob_accepted(
-    layered_client, seeded_admin
-):
+async def test_custom_data_type_check_and_dob_accepted(layered_client, seeded_admin):
     """A defined `dob` date field accepts ISO strings and rejects bad shapes."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -208,9 +201,7 @@ async def test_custom_data_type_check_and_dob_accepted(
 
 
 @pytest.mark.asyncio
-async def test_required_custom_field_enforced_on_create(
-    layered_client, seeded_admin
-):
+async def test_required_custom_field_enforced_on_create(layered_client, seeded_admin):
     """Required custom field absent on POST → 422."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]

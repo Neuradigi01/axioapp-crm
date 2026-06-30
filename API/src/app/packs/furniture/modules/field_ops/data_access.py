@@ -14,10 +14,11 @@ Operations:
       custom_order_exists_in_org — narrow projection existence check
         used by the visit-create validator
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,28 +31,23 @@ from src.app.packs.furniture.modules.field_ops.models import (
     FieldVisitPurpose,
 )
 
-
 # --- Field visits -------------------------------------------------------
 
 
-async def get_visit_by_id(
-    session: AsyncSession, visit_id: uuid.UUID
-) -> Optional[FieldVisit]:
+async def get_visit_by_id(session: AsyncSession, visit_id: uuid.UUID) -> FieldVisit | None:
     """Single-row read by PK. ``None`` on miss."""
     return (
-        await session.execute(
-            select(FieldVisit).where(FieldVisit.id == visit_id)
-        )
+        await session.execute(select(FieldVisit).where(FieldVisit.id == visit_id))
     ).scalar_one_or_none()
 
 
 async def list_visits_query(
     session: AsyncSession,
     *,
-    assigned_to_id: Optional[uuid.UUID] = None,
-    purpose: Optional[FieldVisitPurpose] = None,
-    completed: Optional[bool] = None,
-    custom_order_id: Optional[uuid.UUID] = None,
+    assigned_to_id: uuid.UUID | None = None,
+    purpose: FieldVisitPurpose | None = None,
+    completed: bool | None = None,
+    custom_order_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[FieldVisit], int]:
@@ -76,9 +72,9 @@ async def list_visits_query(
     count_stmt = select(func.count()).select_from(FieldVisit)
 
     if assigned_to_id is not None:
-        base = base.join(
-            Appointment, Appointment.id == FieldVisit.appointment_id
-        ).where(Appointment.assigned_to_id == assigned_to_id)
+        base = base.join(Appointment, Appointment.id == FieldVisit.appointment_id).where(
+            Appointment.assigned_to_id == assigned_to_id
+        )
         count_stmt = count_stmt.join(
             Appointment, Appointment.id == FieldVisit.appointment_id
         ).where(Appointment.assigned_to_id == assigned_to_id)
@@ -91,11 +87,7 @@ async def list_visits_query(
     base = base.order_by(FieldVisit.created_at.desc())
     total = (await session.execute(count_stmt)).scalar_one()
     offset = (page - 1) * size
-    rows = (
-        (await session.execute(base.offset(offset).limit(size)))
-        .scalars()
-        .all()
-    )
+    rows = (await session.execute(base.offset(offset).limit(size))).scalars().all()
     return list(rows), int(total)
 
 
@@ -104,9 +96,7 @@ def insert_visit(session: AsyncSession, visit: FieldVisit) -> None:
     session.add(visit)
 
 
-async def delete_visit_row(
-    session: AsyncSession, visit: FieldVisit
-) -> None:
+async def delete_visit_row(session: AsyncSession, visit: FieldVisit) -> None:
     """Mark a FieldVisit row for DELETE. Caller commits."""
     await session.delete(visit)
 
@@ -126,9 +116,7 @@ async def list_photos_for_visit(
     return list((await session.execute(stmt)).scalars().all())
 
 
-def insert_photo(
-    session: AsyncSession, photo: FieldVisitPhoto
-) -> None:
+def insert_photo(session: AsyncSession, photo: FieldVisitPhoto) -> None:
     """Register an already-constructed FieldVisitPhoto for INSERT."""
     session.add(photo)
 
@@ -136,16 +124,12 @@ def insert_photo(
 # --- Cross-module verifier ----------------------------------------------
 
 
-async def custom_order_exists_in_org(
-    session: AsyncSession, custom_order_id: uuid.UUID
-) -> bool:
+async def custom_order_exists_in_org(session: AsyncSession, custom_order_id: uuid.UUID) -> bool:
     """Narrow-column existence check against ``fp_custom_orders``.
     Used by the visit-create / update validator to reject out-of-org
     custom_order_id references with a friendly 422."""
     row = (
-        await session.execute(
-            select(CustomOrder.id).where(CustomOrder.id == custom_order_id)
-        )
+        await session.execute(select(CustomOrder.id).where(CustomOrder.id == custom_order_id))
     ).scalar_one_or_none()
     return row is not None
 

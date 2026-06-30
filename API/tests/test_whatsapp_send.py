@@ -3,6 +3,7 @@
 We don't go to the wire; the adapter is told to use a fake
 `AsyncClient`-shaped object that records the call.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -32,7 +33,7 @@ class _FakeAsyncClient:
         self._status = status
         self._body = body or {"messages": [{"id": "wamid.ABC"}]}
 
-    async def __aenter__(self) -> "_FakeAsyncClient":
+    async def __aenter__(self) -> _FakeAsyncClient:
         return self
 
     async def __aexit__(self, *exc: object) -> None:
@@ -71,9 +72,7 @@ async def test_send_posts_correct_envelope():
     assert len(client.calls) == 1
     call = client.calls[0]
     # URL composed from api_version + phone_id
-    assert call["url"] == (
-        "https://graph.facebook.com/v18.0/PHONE123/messages"
-    )
+    assert call["url"] == ("https://graph.facebook.com/v18.0/PHONE123/messages")
     # Phone normalised — digits only, NO leading "+" on the wire.
     assert call["json"]["to"] == "919876500000"
     assert call["json"]["messaging_product"] == "whatsapp"

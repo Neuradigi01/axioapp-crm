@@ -10,21 +10,19 @@ OAuth callback handlers (Steps 2 + 3) to pass plaintext tokens into
 `service.upsert()`. It is NEVER deserialised from an HTTP body; the
 router has no POST/PUT endpoint that accepts it.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from src.app.shared.schemas import ORMModel
 
-
 EmailAccountProviderLiteral = Literal["gmail", "microsoft"]
-EmailAccountSyncStateLiteral = Literal[
-    "pending", "backfilling", "live", "error", "disconnected"
-]
+EmailAccountSyncStateLiteral = Literal["pending", "backfilling", "live", "error", "disconnected"]
 
 
 class EmailAccountRead(ORMModel):
@@ -39,17 +37,17 @@ class EmailAccountRead(ORMModel):
     provider: EmailAccountProviderLiteral
     external_account_id: str
     email_address: str
-    display_name: Optional[str]
-    token_expires_at: Optional[datetime]
+    display_name: str | None
+    token_expires_at: datetime | None
     scopes_granted: list[str]
     sync_state: EmailAccountSyncStateLiteral
-    last_sync_at: Optional[datetime]
-    last_sync_error: Optional[str]
+    last_sync_at: datetime | None
+    last_sync_error: str | None
     daily_sent_count: int
     daily_sent_reset_at: datetime
     connected_at: datetime
-    disconnected_at: Optional[datetime]
-    disconnected_by: Optional[uuid.UUID]
+    disconnected_at: datetime | None
+    disconnected_by: uuid.UUID | None
 
 
 class EmailAccountUpsert(BaseModel):
@@ -61,10 +59,10 @@ class EmailAccountUpsert(BaseModel):
     provider: EmailAccountProviderLiteral
     external_account_id: str = Field(min_length=1, max_length=255)
     email_address: str = Field(min_length=3, max_length=320)
-    display_name: Optional[str] = Field(default=None, max_length=255)
+    display_name: str | None = Field(default=None, max_length=255)
     access_token: str = Field(min_length=1)
-    refresh_token: Optional[str] = None
-    token_expires_at: Optional[datetime] = None
+    refresh_token: str | None = None
+    token_expires_at: datetime | None = None
     scopes_granted: list[str] = Field(default_factory=list)
 
 

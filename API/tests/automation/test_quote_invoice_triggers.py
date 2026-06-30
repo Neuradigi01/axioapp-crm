@@ -22,20 +22,26 @@ Tests exercise the publishers + DAL directly; the Celery wrapper
 is one-line ``asyncio.run``. All ``deliver_run.apply_async`` calls
 are mocked so no real workers run.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.automation import (
     event_catalog,
+)
+from src.app.core.automation import (
     seeds as automation_seeds,
+)
+from src.app.core.automation import (
     tasks as automation_tasks,
 )
 from src.app.core.automation.dispatcher import dispatch_event
@@ -52,7 +58,6 @@ from src.app.core.billing.models import (
 )
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -65,10 +70,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo Workspace",
@@ -82,9 +84,7 @@ async def org_id(test_db):
 async def _install_seeds(test_db, org_id):
     token = set_context(RequestContext(org_id=org_id))
     try:
-        result = await automation_seeds.install_default_org_seeds(
-            test_db, org_id=org_id
-        )
+        result = await automation_seeds.install_default_org_seeds(test_db, org_id=org_id)
         await test_db.commit()
         return result
     finally:
@@ -160,19 +160,23 @@ async def test_invoice_seeds_create_three_triggers_per_org(test_db, org_id):
     assert "invoice_overdue_trigger_id" in result
 
     rows = (
-        await test_db.execute(
-            select(AutomationTrigger).where(
-                AutomationTrigger.org_id == org_id,
-                AutomationTrigger.event_type.in_(
-                    (
-                        "invoice.sent",
-                        "invoice.paid",
-                        "invoice.overdue_7d",
-                    )
-                ),
+        (
+            await test_db.execute(
+                select(AutomationTrigger).where(
+                    AutomationTrigger.org_id == org_id,
+                    AutomationTrigger.event_type.in_(
+                        (
+                            "invoice.sent",
+                            "invoice.paid",
+                            "invoice.overdue_7d",
+                        )
+                    ),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(rows) == 3
     assert all(r.channel.value == "email" for r in rows)
     assert all(r.recipient_resolver == "contact.email" for r in rows)
@@ -181,15 +185,9 @@ async def test_invoice_seeds_create_three_triggers_per_org(test_db, org_id):
 async def test_invoice_seeds_are_idempotent(test_db, org_id):
     first = await _install_seeds(test_db, org_id)
     second = await _install_seeds(test_db, org_id)
-    assert first["invoice_sent_trigger_id"] == second[
-        "invoice_sent_trigger_id"
-    ]
-    assert first["invoice_paid_trigger_id"] == second[
-        "invoice_paid_trigger_id"
-    ]
-    assert first["invoice_overdue_trigger_id"] == second[
-        "invoice_overdue_trigger_id"
-    ]
+    assert first["invoice_sent_trigger_id"] == second["invoice_sent_trigger_id"]
+    assert first["invoice_paid_trigger_id"] == second["invoice_paid_trigger_id"]
+    assert first["invoice_overdue_trigger_id"] == second["invoice_overdue_trigger_id"]
 
 
 # ---------------------------------------------------------------------------
@@ -206,7 +204,7 @@ async def test_invoice_sent_publisher_envelope(test_db, org_id):
         test_db,
         org_id=org_id,
         status=InvoiceStatus.issued,
-        issued_at=datetime.now(timezone.utc),
+        issued_at=datetime.now(UTC),
     )
     inv.number = 4021
     await test_db.commit()
@@ -247,7 +245,7 @@ async def test_invoice_paid_publisher_includes_extras(test_db, org_id):
     dict."""
     from src.app.core.billing import service as billing_service
 
-    paid_at = datetime.now(timezone.utc)
+    paid_at = datetime.now(UTC)
     inv = await _make_invoice(
         test_db,
         org_id=org_id,
@@ -296,7 +294,7 @@ async def test_invoice_paid_publisher_includes_extras(test_db, org_id):
 async def test_find_overdue_picks_up_8d_old_issued_invoice(test_db, org_id):
     """An ``issued`` invoice older than 7d shows up in the
     7-day-overdue scan."""
-    issued_at = datetime.now(timezone.utc) - timedelta(days=8)
+    issued_at = datetime.now(UTC) - timedelta(days=8)
     inv = await _make_invoice(
         test_db,
         org_id=org_id,
@@ -312,7 +310,7 @@ async def test_find_overdue_picks_up_8d_old_issued_invoice(test_db, org_id):
 async def test_find_overdue_skips_paid_draft_void(test_db, org_id):
     """Only ``issued`` invoices count — paid / draft / void are
     excluded from the scan."""
-    old = datetime.now(timezone.utc) - timedelta(days=30)
+    old = datetime.now(UTC) - timedelta(days=30)
     paid_inv = await _make_invoice(
         test_db,
         org_id=org_id,
@@ -341,7 +339,7 @@ async def test_find_overdue_skips_paid_draft_void(test_db, org_id):
 
 async def test_find_overdue_skips_recent_issued(test_db, org_id):
     """Issued invoice less than 7 days old → NOT overdue."""
-    recent = datetime.now(timezone.utc) - timedelta(days=3)
+    recent = datetime.now(UTC) - timedelta(days=3)
     inv = await _make_invoice(
         test_db,
         org_id=org_id,
@@ -385,9 +383,7 @@ async def test_overdue_dispatch_is_idempotent(test_db, org_id):
         "contact_id": str(contact_id),
         "total_amount": "45000.00",
         "currency": "INR",
-        "issued_at": (
-            datetime.now(timezone.utc) - timedelta(days=8)
-        ).isoformat(),
+        "issued_at": (datetime.now(UTC) - timedelta(days=8)).isoformat(),
         "days_overdue": 8,
         "contact": {
             "full_name": "Asha Mehta",

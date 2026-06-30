@@ -1,8 +1,6 @@
 <div class="space-y-4">
   <div>
-    <label class="block text-[11px] font-medium text-zinc-600 mb-1">
-      Event type
-    </label>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1"> Event type </label>
     <select
       [ngModel]="eventType()"
       (ngModelChange)="onEventTypeChange($event)"
@@ -22,16 +20,12 @@
         }
       </p>
     } @else {
-      <p class="text-[10px] text-rose-600 mt-1">
-        Event type is required.
-      </p>
+      <p class="text-[10px] text-rose-600 mt-1">Event type is required.</p>
     }
   </div>
 
   <div>
-    <label class="block text-[11px] font-medium text-zinc-600 mb-1">
-      Re-enrolment rule
-    </label>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1"> Re-enrolment rule </label>
     <select
       [ngModel]="reEnrollmentRule()"
       (ngModelChange)="onReEnrollmentChange($event)"
@@ -49,12 +43,9 @@
   </div>
 
   <div>
-    <label class="block text-[11px] font-medium text-zinc-600 mb-1">
-      Conditions
-    </label>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1"> Conditions </label>
     <p class="text-[10px] text-zinc-500 mb-2">
-      Filter which events of this type should fire the workflow. Leave
-      empty to fire on every event.
+      Filter which events of this type should fire the workflow. Leave empty to fire on every event.
     </p>
     <app-conditions-builder
       [tree]="conditions()"

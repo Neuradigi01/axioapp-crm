@@ -4,11 +4,12 @@
 `campaigns.schemas` — kept locally to avoid an import cycle with
 campaigns (groups are referenced BY campaigns, not the other way).
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -23,9 +24,9 @@ class GroupFilter(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    q: Optional[str] = None
-    source: Optional[str] = None
-    tag: Optional[str] = None
+    q: str | None = None
+    source: str | None = None
+    tag: str | None = None
 
 
 class GroupCreate(BaseModel):
@@ -39,25 +40,22 @@ class GroupCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     name: str = Field(min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=2000)
+    description: str | None = Field(default=None, max_length=2000)
     is_dynamic: bool = False
-    filter_json: Optional[GroupFilter] = None
-    contact_ids: Optional[list[uuid.UUID]] = Field(
+    filter_json: GroupFilter | None = None
+    contact_ids: list[uuid.UUID] | None = Field(
         default=None,
         description="Required for static groups; ignored for dynamic.",
     )
 
     @model_validator(mode="after")
-    def _check_mode_consistency(self) -> "GroupCreate":
+    def _check_mode_consistency(self) -> GroupCreate:
         if self.is_dynamic:
             if self.filter_json is None:
-                raise ValueError(
-                    "Dynamic groups require `filter_json`."
-                )
+                raise ValueError("Dynamic groups require `filter_json`.")
             if self.contact_ids:
                 raise ValueError(
-                    "Dynamic groups must not include `contact_ids`; "
-                    "use `filter_json` only."
+                    "Dynamic groups must not include `contact_ids`; use `filter_json` only."
                 )
         else:
             if self.contact_ids is None:
@@ -67,8 +65,7 @@ class GroupCreate(BaseModel):
                 )
             if self.filter_json is not None:
                 raise ValueError(
-                    "Static groups must not include `filter_json`; "
-                    "use `contact_ids` only."
+                    "Static groups must not include `filter_json`; use `contact_ids` only."
                 )
         return self
 
@@ -83,10 +80,10 @@ class GroupUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=2000)
-    filter_json: Optional[GroupFilter] = None
-    contact_ids: Optional[list[uuid.UUID]] = None
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
+    filter_json: GroupFilter | None = None
+    contact_ids: list[uuid.UUID] | None = None
 
 
 class GroupRead(ORMModel):
@@ -96,13 +93,13 @@ class GroupRead(ORMModel):
 
     id: uuid.UUID
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     is_dynamic: bool
-    filter_json: Optional[dict[str, Any]] = None
-    created_by_id: Optional[uuid.UUID] = None
+    filter_json: dict[str, Any] | None = None
+    created_by_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
-    member_count: Optional[int] = None
+    member_count: int | None = None
 
 
 class GroupDetail(GroupRead):
@@ -126,15 +123,13 @@ class PreviewSizeIn(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    filter_json: Optional[GroupFilter] = None
-    group_id: Optional[uuid.UUID] = None
+    filter_json: GroupFilter | None = None
+    group_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
-    def _exactly_one(self) -> "PreviewSizeIn":
+    def _exactly_one(self) -> PreviewSizeIn:
         if (self.filter_json is None) == (self.group_id is None):
-            raise ValueError(
-                "Provide exactly one of `filter_json` or `group_id`."
-            )
+            raise ValueError("Provide exactly one of `filter_json` or `group_id`.")
         return self
 
 

@@ -19,13 +19,14 @@ Auth model: this module decrypts the bearer token via the existing
 only inside the async function's call frame; never logged, never
 returned to the API surface.
 """
+
 from __future__ import annotations
 
 import logging
 import re
-import uuid
-from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 from sqlalchemy import select
@@ -55,14 +56,14 @@ _VARIABLE_RE = re.compile(r"\{\{(\d+)\}\}")
 
 def _extract_components(
     components: list[dict[str, Any]],
-) -> tuple[str, Optional[str], Optional[str], Optional[str]]:
+) -> tuple[str, str | None, str | None, str | None]:
     """Pull `(body, header_type, header_text, footer_text)` out of
     Meta's `components[]`. Body is required by Meta on every approved
     template; header / footer are optional."""
     body = ""
-    header_type: Optional[str] = None
-    header_text: Optional[str] = None
-    footer_text: Optional[str] = None
+    header_type: str | None = None
+    header_text: str | None = None
+    footer_text: str | None = None
     for component in components or []:
         ctype = (component.get("type") or "").upper()
         if ctype == "BODY":
@@ -93,7 +94,7 @@ async def _fetch_all_templates(
 ) -> list[dict[str, Any]]:
     """Walk Meta's `/{waba_id}/message_templates` cursor pagination
     until exhausted. Returns the flat list of template payloads."""
-    url: Optional[str] = (
+    url: str | None = (
         f"https://graph.facebook.com/{api_version}/{waba_id}"
         "/message_templates?limit=200"
         "&fields=name,language,category,status,components,id"
@@ -105,14 +106,10 @@ async def _fetch_all_templates(
             response = await client.get(url, headers=headers)
             if response.status_code >= 400:
                 message = _extract_meta_error(response)
-                raise WhatsAppNotConnected(
-                    f"Meta API rejected the template sync: {message}"
-                )
+                raise WhatsAppNotConnected(f"Meta API rejected the template sync: {message}")
             body = response.json()
             if not isinstance(body, dict):
-                raise WhatsAppNotConnected(
-                    f"Unexpected Meta response shape: {body!r}"
-                )
+                raise WhatsAppNotConnected(f"Unexpected Meta response shape: {body!r}")
             data = body.get("data") or []
             if isinstance(data, list):
                 out.extend(t for t in data if isinstance(t, dict))
@@ -151,14 +148,11 @@ async def sync_templates(
     bundle = await get_active_config(session)
     if bundle is None:
         raise WhatsAppNotConnected(
-            "WhatsApp is not connected for this org. "
-            "Connect it in Settings → Integrations."
+            "WhatsApp is not connected for this org. Connect it in Settings → Integrations."
         )
     integration, config = bundle
     if integration.access_token_enc is None:
-        raise WhatsAppNotConnected(
-            "Stored credentials are missing; reconnect required."
-        )
+        raise WhatsAppNotConnected("Stored credentials are missing; reconnect required.")
     plaintext_token = decrypt(integration.access_token_enc)
 
     meta_templates = await _fetch_all_templates(
@@ -169,18 +163,20 @@ async def sync_templates(
     )
 
     existing_rows = (
-        await session.execute(
-            select(WhatsAppTemplate).where(
-                WhatsAppTemplate.integration_id == integration.id
+        (
+            await session.execute(
+                select(WhatsAppTemplate).where(WhatsAppTemplate.integration_id == integration.id)
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     by_key: dict[tuple[str, str], WhatsAppTemplate] = {
         (row.name, row.language): row for row in existing_rows
     }
     seen_keys: set[tuple[str, str]] = set()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     added = 0
     updated = 0
 
@@ -268,15 +264,13 @@ async def sync_templates(
 async def list_templates(
     session: AsyncSession,
     *,
-    status: Optional[str] = None,
-    category: Optional[str] = None,
+    status: str | None = None,
+    category: str | None = None,
 ) -> list[WhatsAppTemplate]:
     """Templates for the active org. RLS handles org scoping; optional
     `status` / `category` filters narrow the picker view (e.g. only
     APPROVED + MARKETING for the campaign create-modal)."""
-    stmt = select(WhatsAppTemplate).order_by(
-        WhatsAppTemplate.category, WhatsAppTemplate.name
-    )
+    stmt = select(WhatsAppTemplate).order_by(WhatsAppTemplate.category, WhatsAppTemplate.name)
     if status is not None:
         stmt = stmt.where(WhatsAppTemplate.status == status)
     if category is not None:

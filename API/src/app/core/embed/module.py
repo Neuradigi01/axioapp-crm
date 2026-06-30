@@ -6,8 +6,8 @@ Settings → Integrations (Step 4 of this track). So `menu_position=None`
 keeps the module out of the sidebar while still registering its
 permission key on startup.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="embed",

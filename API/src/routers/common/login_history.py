@@ -1,18 +1,21 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.constants.route_ids import RouteIds
 from src.core.db import get_db
 from src.core.security.access_guard import AccessGuard
-from src.services.auth import login_history_service
 from src.schemas.login_history import LoginHistoryListRequest, LogoutSessionRequest
-from src.constants.route_ids import RouteIds
+from src.services.auth import login_history_service
 
 router = APIRouter(prefix="/login-history", tags=["Login History"])
 
 
-@router.post('/list')
+@router.post("/list")
 async def get_login_history(
     req: LoginHistoryListRequest,
-    token_payload: dict = Depends(AccessGuard([RouteIds.USER_LOGIN_HISTORY, RouteIds.ADMIN_LOGIN_HISTORY])),
+    token_payload: dict = Depends(
+        AccessGuard([RouteIds.USER_LOGIN_HISTORY, RouteIds.ADMIN_LOGIN_HISTORY])
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     role = token_payload["role"]
@@ -30,10 +33,12 @@ async def get_login_history(
     )
 
 
-@router.post('/logout-session')
+@router.post("/logout-session")
 async def logout_session(
     req: LogoutSessionRequest,
-    token_payload: dict = Depends(AccessGuard([RouteIds.USER_LOGIN_HISTORY, RouteIds.ADMIN_LOGIN_HISTORY])),
+    token_payload: dict = Depends(
+        AccessGuard([RouteIds.USER_LOGIN_HISTORY, RouteIds.ADMIN_LOGIN_HISTORY])
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     return await login_history_service.logout_session(
@@ -44,9 +49,11 @@ async def logout_session(
     )
 
 
-@router.get('/logout')
+@router.get("/logout")
 async def logout_current(
-    token_payload: dict = Depends(AccessGuard([RouteIds.USER_LOGIN_HISTORY, RouteIds.ADMIN_LOGIN_HISTORY])),
+    token_payload: dict = Depends(
+        AccessGuard([RouteIds.USER_LOGIN_HISTORY, RouteIds.ADMIN_LOGIN_HISTORY])
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     return await login_history_service.logout_current(

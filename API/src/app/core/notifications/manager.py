@@ -11,6 +11,7 @@ sockets, removing any that fail to send (treats them as dropped). All
 mutations of the registry happen under a single `asyncio.Lock` so two
 concurrent connects don't race.
 """
+
 from __future__ import annotations
 
 import asyncio

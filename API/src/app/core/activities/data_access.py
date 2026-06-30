@@ -16,6 +16,7 @@ Three operations:
     first. Tenant scoping is automatic via the ORM filter on
     ``TenantScoped``.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -104,9 +105,7 @@ async def list_activities_for_entity(
         .where(Activity.entity_id == entity_id)
     )
     total = (await session.execute(count_stmt)).scalar_one()
-    rows = (
-        await session.execute(base.offset((page - 1) * size).limit(size))
-    ).scalars().all()
+    rows = (await session.execute(base.offset((page - 1) * size).limit(size))).scalars().all()
     return list(rows), int(total)
 
 

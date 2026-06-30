@@ -53,9 +53,7 @@ export class FieldVisitsPageComponent {
   protected readonly openCount = computed(
     () => this.visits().filter((v) => !v.completed_at).length,
   );
-  protected readonly doneCount = computed(
-    () => this.visits().filter((v) => v.completed_at).length,
-  );
+  protected readonly doneCount = computed(() => this.visits().filter((v) => v.completed_at).length);
 
   constructor() {
     this.reload();
@@ -74,9 +72,7 @@ export class FieldVisitsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.visits.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load your visits.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load your visits.');
         },
       });
   }
@@ -90,19 +86,14 @@ export class FieldVisitsPageComponent {
       .subscribe({
         next: (updated) => {
           this.completing.set(null);
-          this.visits.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.visits.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
         },
         error: (err: HttpErrorResponse) => {
           this.completing.set(null);
-          this.completeError.set(
-            extractApiError(err) ?? 'Could not mark visit complete.',
-          );
+          this.completeError.set(extractApiError(err) ?? 'Could not mark visit complete.');
         },
       });
   }
-
 
   protected formatDateTime(iso: string | null): string {
     if (!iso) return 'â€”';
@@ -124,10 +115,7 @@ export class FieldVisitsPageComponent {
     });
   }
 
-  private _complete(
-    id: string,
-    payload: FieldVisitCompletePayload,
-  ): Observable<FieldVisit> {
+  private _complete(id: string, payload: FieldVisitCompletePayload): Observable<FieldVisit> {
     return this.http.post<FieldVisit>(`${this.base}/${id}/complete`, payload, {
       headers: this._authHeaders(),
     });
@@ -137,5 +125,4 @@ export class FieldVisitsPageComponent {
     const t = this.session.token();
     return new HttpHeaders(t ? { Authorization: `Bearer ${t}` } : {});
   }
-
 }

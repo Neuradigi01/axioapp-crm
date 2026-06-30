@@ -1,4 +1,5 @@
 """Models scoped to dev-only routes."""
+
 from __future__ import annotations
 
 import uuid

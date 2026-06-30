@@ -13,18 +13,18 @@ single role that has NO permissions attached. Each test grants the
 needed key(s) to that role explicitly to simulate Owner vs Admin
 behaviour without dragging in the role-templates installer.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import insert, select
+from sqlalchemy import select
 
 from src.app.core.permissions.models import Permission, RolePermission
 from src.app.core.subscriptions.dependencies import get_payment_provider
 from src.app.core.subscriptions.models import Subscription
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -63,9 +63,7 @@ async def _grant_permissions(role_id: uuid.UUID, keys: list[str]) -> None:
     async with TestSession() as session:
         for key in keys:
             perm_id = (
-                await session.execute(
-                    select(Permission.id).where(Permission.key == key)
-                )
+                await session.execute(select(Permission.id).where(Permission.key == key))
             ).scalar_one_or_none()
             if perm_id is None:
                 stmt = (
@@ -77,9 +75,7 @@ async def _grant_permissions(role_id: uuid.UUID, keys: list[str]) -> None:
                 row = (await session.execute(stmt)).scalar_one_or_none()
                 if row is None:
                     perm_id = (
-                        await session.execute(
-                            select(Permission.id).where(Permission.key == key)
-                        )
+                        await session.execute(select(Permission.id).where(Permission.key == key))
                     ).scalar_one()
                 else:
                     perm_id = row
@@ -96,7 +92,7 @@ async def _grant_permissions(role_id: uuid.UUID, keys: list[str]) -> None:
 async def _seed_active_basic(org_id: uuid.UUID) -> None:
     from tests.conftest import TestSession
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     async with TestSession() as session:
         session.add(
             Subscription(
@@ -146,7 +142,8 @@ async def test_public_plans_endpoint_requires_no_auth(layered_client):
 
 @pytest.mark.asyncio
 async def test_user_without_billing_read_gets_403_on_current(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
     await _seed_active_basic(org.id)
@@ -161,7 +158,8 @@ async def test_user_without_billing_read_gets_403_on_current(
 
 @pytest.mark.asyncio
 async def test_user_with_billing_read_gets_200_on_current(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
     role = seeded_admin["role"]
@@ -183,7 +181,8 @@ async def test_user_with_billing_read_gets_200_on_current(
 
 @pytest.mark.asyncio
 async def test_user_with_only_read_cannot_change_plan(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
     role = seeded_admin["role"]
@@ -201,7 +200,8 @@ async def test_user_with_only_read_cannot_change_plan(
 
 @pytest.mark.asyncio
 async def test_user_with_billing_manage_can_change_plan(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
     role = seeded_admin["role"]
@@ -241,7 +241,8 @@ async def test_user_with_only_read_cannot_cancel(layered_client, seeded_admin):
 
 @pytest.mark.asyncio
 async def test_user_with_billing_manage_can_cancel(
-    layered_client, seeded_admin,
+    layered_client,
+    seeded_admin,
 ):
     org = seeded_admin["org"]
     role = seeded_admin["role"]

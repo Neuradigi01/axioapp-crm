@@ -16,13 +16,14 @@ multiple WhatsApp phone numbers per org is a future surface (P2);
 today, one row per org per provider is the rule, and that propagates
 to one sidecar per integration row.
 """
+
 from __future__ import annotations
 
 import enum
 import re
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -108,17 +109,15 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     phone_id: Mapped[str] = mapped_column(Text, nullable=False)
     waba_id: Mapped[str] = mapped_column(Text, nullable=False)
     display_phone_number: Mapped[str] = mapped_column(Text, nullable=False)
-    verified_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    verified_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Fernet ciphertext — same key as parent integration's access_token_enc.
     # Nullable since whatsapp-platform-upgrade Step 2: Embedded Signup
     # orgs share one platform-level secret via env (`WHATSAPP_APP_SECRET`)
     # and don't need a per-org row here. Legacy manually-connected orgs
     # keep their per-org ciphertext as the signature-verifier fallback.
-    app_secret_enc: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    app_secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     verify_token: Mapped[str] = mapped_column(Text, nullable=False)
-    api_version: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default=text("'v18.0'")
-    )
+    api_version: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'v18.0'"))
     # Step 3.5.15 — per-org outbound rate cap (msg/sec). Operator-set
     # in Settings → Integrations → WhatsApp → Advanced. Free-tier Meta
     # WABAs are ~50/sec; business-verified can go up to 1000.
@@ -130,76 +129,44 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     # until the first capacity lookup populates it. Refreshed when
     # `tier_synced_at` is older than 1 hour to keep the Graph API call
     # rate well under Meta's per-token throttle.
-    messaging_limit_tier: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
-    tier_synced_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    messaging_limit_tier: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tier_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # whatsapp-platform-upgrade Step 12 — phone health snapshot.
     # Cached per hourly refresh by `health_service.refresh_from_meta`.
     # `health_synced_at` lets the UI render staleness; the event log
     # in `tbl_whatsapp_phone_health_events` carries the timeline of
     # changes.
-    quality_rating: Mapped[Optional[str]] = mapped_column(
-        String(length=16), nullable=True
-    )
-    name_status: Mapped[Optional[str]] = mapped_column(
-        String(length=32), nullable=True
-    )
-    throughput: Mapped[Optional[int]] = mapped_column(
-        Integer, nullable=True
-    )
-    restrictions: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
-        JSONB, nullable=True
-    )
-    health_synced_at: Mapped[Optional[datetime]] = mapped_column(
+    quality_rating: Mapped[str | None] = mapped_column(String(length=16), nullable=True)
+    name_status: Mapped[str | None] = mapped_column(String(length=32), nullable=True)
+    throughput: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    restrictions: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    health_synced_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     # whatsapp-platform-upgrade Step 11 — Meta Business profile editor.
     # Mirrors the `whatsapp_business_profile` Graph endpoint shape;
     # populated by `business_profile.refresh_from_meta` on first open
     # and on the operator-side Refresh button.
-    profile_about: Mapped[Optional[str]] = mapped_column(
-        String(length=139), nullable=True
-    )
-    profile_description: Mapped[Optional[str]] = mapped_column(
-        String(length=512), nullable=True
-    )
-    profile_address: Mapped[Optional[str]] = mapped_column(
-        String(length=256), nullable=True
-    )
-    profile_email: Mapped[Optional[str]] = mapped_column(
-        String(length=128), nullable=True
-    )
-    profile_websites: Mapped[Optional[list[str]]] = mapped_column(
-        JSONB, nullable=True
-    )
-    profile_vertical: Mapped[Optional[str]] = mapped_column(
-        String(length=64), nullable=True
-    )
-    profile_picture_url: Mapped[Optional[str]] = mapped_column(
-        String(length=512), nullable=True
-    )
-    profile_last_synced_at: Mapped[Optional[datetime]] = mapped_column(
+    profile_about: Mapped[str | None] = mapped_column(String(length=139), nullable=True)
+    profile_description: Mapped[str | None] = mapped_column(String(length=512), nullable=True)
+    profile_address: Mapped[str | None] = mapped_column(String(length=256), nullable=True)
+    profile_email: Mapped[str | None] = mapped_column(String(length=128), nullable=True)
+    profile_websites: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    profile_vertical: Mapped[str | None] = mapped_column(String(length=64), nullable=True)
+    profile_picture_url: Mapped[str | None] = mapped_column(String(length=512), nullable=True)
+    profile_last_synced_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     # Day-of-week schedule (storage only — Step 16 reads to decide
     # whether the away message fires). Shape:
     #   [{day: 0..6, intervals: [{open: "10:00", close: "19:00"}, …]}]
     # Day 0 = Monday. Closed days omit intervals.
-    business_hours: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
-        JSONB, nullable=True
-    )
+    business_hours: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     # Free-text storage for the Step-16 automation. Variable
     # substitution ({{contact.first_name}} etc.) happens at send time;
     # Step 11 only persists the template text.
-    greeting_message: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
-    away_message: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
+    greeting_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    away_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     # whatsapp-platform-upgrade Step 16 — auto-reply pipeline toggles
     # + out-of-session template fallbacks. The greeting / away text
     # above is used in-session (free-text reply); when the contact
@@ -211,12 +178,12 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     away_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
-    greeting_template_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    greeting_template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
         nullable=True,
     )
-    away_template_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    away_template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
         nullable=True,
@@ -234,9 +201,7 @@ class WhatsAppAccountConfig(Base, TenantScoped):
     ai_handover_keywords: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
     )
-    ai_system_prompt: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
+    ai_system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -282,39 +247,27 @@ class WhatsAppTemplate(Base, TenantScoped):
     category: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
-    header_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    header_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    footer_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    variable_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("0")
-    )
-    meta_template_id: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
+    header_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    header_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    footer_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    variable_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    meta_template_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     # whatsapp-platform-upgrade Step 8 — structured Meta component
     # payload. NULL for legacy sync rows (the next sync round repops);
     # populated on every new draft so we can resubmit verbatim. Each
     # element is a `{type, format?, text?, buttons?[]}` dict matching
     # Meta's `/{waba_id}/message_templates` POST shape.
-    body_components: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
-        JSONB, nullable=True
+    body_components: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    submission_status: Mapped[WhatsAppTemplateSubmissionStatus] = mapped_column(
+        whatsapp_template_submission_status_enum,
+        nullable=False,
+        server_default=text("'draft'"),
     )
-    submission_status: Mapped[WhatsAppTemplateSubmissionStatus] = (
-        mapped_column(
-            whatsapp_template_submission_status_enum,
-            nullable=False,
-            server_default=text("'draft'"),
-        )
-    )
-    rejection_reason: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
-    submitted_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submitted_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
     )
-    submitted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_synced_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -325,7 +278,7 @@ class WhatsAppTemplate(Base, TenantScoped):
     # every existing WA template; new templates get the link set at
     # create-draft time. ON DELETE CASCADE so removing the central
     # row also removes its WA extension.
-    message_template_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    message_template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_message_templates.id", ondelete="CASCADE"),
         nullable=True,
@@ -388,15 +341,9 @@ class WhatsAppPhoneHealthEvent(Base, TenantScoped):
     event_type: Mapped[WhatsAppPhoneHealthEventType] = mapped_column(
         whatsapp_phone_health_event_type_enum, nullable=False
     )
-    old_value: Mapped[Optional[dict[str, Any]]] = mapped_column(
-        JSONB, nullable=True
-    )
-    new_value: Mapped[Optional[dict[str, Any]]] = mapped_column(
-        JSONB, nullable=True
-    )
-    occurred_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    old_value: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    new_value: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -470,15 +417,9 @@ class WhatsAppKeywordRule(Base, TenantScoped):
         nullable=False,
         server_default=text("'contains'"),
     )
-    enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
-    priority: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("100")
-    )
-    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("100"))
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -506,9 +447,7 @@ class WhatsAppKeywordAction(Base, TenantScoped):
     )
     rule_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey(
-            "tbl_whatsapp_keyword_rules.id", ondelete="CASCADE"
-        ),
+        ForeignKey("tbl_whatsapp_keyword_rules.id", ondelete="CASCADE"),
         nullable=False,
     )
     action_type: Mapped[KeywordActionType] = mapped_column(
@@ -517,9 +456,7 @@ class WhatsAppKeywordAction(Base, TenantScoped):
     action_config: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
-    position: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("0")
-    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -572,21 +509,15 @@ class WhatsAppAssignmentRule(Base, TenantScoped):
     config: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
-    enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
-    priority: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("100")
-    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("100"))
     skip_outside_hours: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
-    last_assigned_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    last_assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
     )
-    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -618,11 +549,7 @@ class WhatsAppBlockListEntry(Base, TenantScoped):
     """
 
     __tablename__ = "tbl_whatsapp_block_list"
-    __table_args__ = (
-        UniqueConstraint(
-            "org_id", "phone_number", name="uq_block_list_org_phone"
-        ),
-    )
+    __table_args__ = (UniqueConstraint("org_id", "phone_number", name="uq_block_list_org_phone"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -643,9 +570,7 @@ class WhatsAppBlockListEntry(Base, TenantScoped):
         nullable=False,
         server_default=text("'other'"),
     )
-    blocked_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    blocked_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -670,9 +595,7 @@ class WhatsAppFlow(Base, TenantScoped):
     """
 
     __tablename__ = "tbl_whatsapp_flows"
-    __table_args__ = (
-        UniqueConstraint("org_id", "name", name="uq_wa_flows_org_name"),
-    )
+    __table_args__ = (UniqueConstraint("org_id", "name", name="uq_wa_flows_org_name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -709,12 +632,8 @@ class WhatsAppFlow(Base, TenantScoped):
         nullable=False,
         server_default=text("'{}'::jsonb"),
     )
-    meta_flow_id: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
-    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    meta_flow_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -751,9 +670,7 @@ class WhatsAppFlowSubmission(Base, TenantScoped):
         ForeignKey("tbl_whatsapp_flows.id", ondelete="SET NULL"),
         nullable=True,
     )
-    flow_token: Mapped[str | None] = mapped_column(
-        String(128), nullable=True
-    )
+    flow_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
     contact_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
@@ -769,12 +686,8 @@ class WhatsAppFlowSubmission(Base, TenantScoped):
         nullable=False,
         server_default=text("'{}'::jsonb"),
     )
-    action_taken: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
-    action_entity_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    action_taken: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    action_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -798,9 +711,7 @@ class WhatsAppQuickLink(Base, TenantScoped):
     on each insert as a fast read path."""
 
     __tablename__ = "tbl_whatsapp_quick_links"
-    __table_args__ = (
-        UniqueConstraint("code", name="uq_wa_quick_links_code"),
-    )
+    __table_args__ = (UniqueConstraint("code", name="uq_wa_quick_links_code"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -810,24 +721,14 @@ class WhatsAppQuickLink(Base, TenantScoped):
     code: Mapped[str] = mapped_column(String(32), nullable=False)
     label: Mapped[str] = mapped_column(String(128), nullable=False)
     phone_number: Mapped[str] = mapped_column(String(32), nullable=False)
-    prefilled_message: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )
-    prefilled_hash: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
-    click_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("0")
-    )
-    scan_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("0")
-    )
+    prefilled_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prefilled_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    click_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    scan_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     attributed_conversation_count: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("0")
     )
-    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -863,24 +764,12 @@ class WhatsAppQuickLinkClick(Base, TenantScoped):
         ForeignKey("tbl_whatsapp_quick_links.id", ondelete="CASCADE"),
         nullable=False,
     )
-    source: Mapped[str] = mapped_column(
-        String(8), nullable=False, server_default=text("'link'")
-    )
-    ua_family: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
-    region: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
-    referrer: Mapped[str | None] = mapped_column(
-        String(2048), nullable=True
-    )
-    ip_hash: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
-    matched_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    source: Mapped[str] = mapped_column(String(8), nullable=False, server_default=text("'link'"))
+    ua_family: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    region: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    referrer: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    ip_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    matched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     matched_conversation_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
     )

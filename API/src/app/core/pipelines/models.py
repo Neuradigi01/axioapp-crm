@@ -16,6 +16,7 @@ Tenant-scoped (RLS on, ORM filter applied). The pack installer (Phase
 4) is the canonical creator of rows; the HTTP layer here exposes
 read-only + label/color/order updates, never `key` changes.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -40,9 +41,7 @@ from src.app.shared.orm import TenantScoped
 
 class Pipeline(Base, TenantScoped):
     __tablename__ = "tbl_pipelines"
-    __table_args__ = (
-        UniqueConstraint("org_id", "key", name="uq_pipelines_org_key"),
-    )
+    __table_args__ = (UniqueConstraint("org_id", "key", name="uq_pipelines_org_key"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -57,7 +56,7 @@ class Pipeline(Base, TenantScoped):
         server_default=text("now()"),
     )
 
-    stages: Mapped[list["PipelineStage"]] = relationship(
+    stages: Mapped[list[PipelineStage]] = relationship(
         "PipelineStage",
         back_populates="pipeline",
         cascade="all, delete-orphan",
@@ -104,13 +103,7 @@ class PipelineStage(Base, TenantScoped):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     color: Mapped[str | None] = mapped_column(String(16), nullable=True)
     display_order: Mapped[int] = mapped_column(Integer, nullable=False)
-    is_won: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
-    is_lost: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
+    is_won: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    is_lost: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
 
-    pipeline: Mapped[Pipeline] = relationship(
-        "Pipeline", back_populates="stages"
-    )
+    pipeline: Mapped[Pipeline] = relationship("Pipeline", back_populates="stages")

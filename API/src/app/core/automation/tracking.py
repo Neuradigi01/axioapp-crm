@@ -24,6 +24,7 @@ tracking (opens-over-time, multiple-click attribution) is deferred
 per the spec's "out of scope". The columns stay on the run row for
 fast contact-timeline reads (no per-event join).
 """
+
 from __future__ import annotations
 
 import base64
@@ -32,12 +33,11 @@ import hmac
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
-
 
 logger = logging.getLogger(__name__)
 
@@ -80,16 +80,12 @@ def mint_token(*, run_id: uuid.UUID, action: Action) -> str:
     The renderer in :mod:`core.automation.tasks` calls this for
     each outbound email + bakes the token into the pixel/link URL.
     """
-    payload = f"{run_id}:{action}".encode("utf-8")
+    payload = f"{run_id}:{action}".encode()
     digest = hmac.new(_tracking_secret(), payload, hashlib.sha256).digest()
-    return (
-        base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")[:32]
-    )
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")[:32]
 
 
-def verify_token(
-    *, run_id: uuid.UUID, action: Action, token: str
-) -> bool:
+def verify_token(*, run_id: uuid.UUID, action: Action, token: str) -> bool:
     """Constant-time compare of the supplied token against the
     expected mint. Returns ``False`` on any input that isn't an
     exact match — never raises so the endpoint can return the
@@ -158,27 +154,24 @@ def _is_safe_redirect_target(url: str) -> bool:
     return lower.startswith("http://") or lower.startswith("https://")
 
 
-async def _stamp_engagement(
-    *, run_id: uuid.UUID, action: Action
-) -> None:
+async def _stamp_engagement(*, run_id: uuid.UUID, action: Action) -> None:
     """Set ``opened_at`` or ``clicked_at`` on the run row if not
     already set. Cross-tenant write (the row's own org_id supplies
     the tenant); we bypass the RequestContext check + go through a
     direct UPDATE so a stale public token doesn't need a tenant
     cookie to redeem."""
-    from sqlalchemy import select as _select, update as _update
+    from sqlalchemy import select as _select
+    from sqlalchemy import update as _update
 
     from src.app.core.automation.models import AutomationRun
     from src.app.shared.db import async_session
 
     column = "opened_at" if action == "open" else "clicked_at"
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     async with async_session() as session:
         run = (
-            await session.execute(
-                _select(AutomationRun).where(AutomationRun.id == run_id)
-            )
+            await session.execute(_select(AutomationRun).where(AutomationRun.id == run_id))
         ).scalar_one_or_none()
         if run is None:
             return
@@ -186,9 +179,7 @@ async def _stamp_engagement(
         if getattr(run, column) is not None:
             return
         await session.execute(
-            _update(AutomationRun)
-            .where(AutomationRun.id == run_id)
-            .values({column: now})
+            _update(AutomationRun).where(AutomationRun.id == run_id).values({column: now})
         )
         await session.commit()
 
@@ -220,10 +211,7 @@ def inject_tracking_pixel_and_links(
     from urllib.parse import quote
 
     open_token = mint_token(run_id=run_id, action="open")
-    pixel_url = (
-        f"{public_base_url.rstrip('/')}"
-        f"/api/v1/automations/track/open/{run_id}/{open_token}"
-    )
+    pixel_url = f"{public_base_url.rstrip('/')}/api/v1/automations/track/open/{run_id}/{open_token}"
     pixel_tag = (
         f'<img src="{pixel_url}" alt="" width="1" height="1" '
         'style="display:none;border:0;width:1px;height:1px"/>'
@@ -231,8 +219,7 @@ def inject_tracking_pixel_and_links(
 
     click_token = mint_token(run_id=run_id, action="click")
     click_prefix = (
-        f"{public_base_url.rstrip('/')}"
-        f"/api/v1/automations/track/click/{run_id}/{click_token}?u="
+        f"{public_base_url.rstrip('/')}/api/v1/automations/track/click/{run_id}/{click_token}?u="
     )
 
     def _rewrite_href(match: re.Match) -> str:
@@ -240,20 +227,14 @@ def inject_tracking_pixel_and_links(
         # Skip mailto:, tel:, and anchors — only http(s) links get
         # rewritten.
         lower = original.lower()
-        if not (
-            lower.startswith("http://") or lower.startswith("https://")
-        ):
+        if not (lower.startswith("http://") or lower.startswith("https://")):
             return match.group(0)
         return f'{match.group(1)}="{click_prefix}{quote(original, safe="")}"'
 
-    rewritten = re.sub(
-        r'(href|HREF)="([^"]+)"', _rewrite_href, html_body
-    )
+    rewritten = re.sub(r'(href|HREF)="([^"]+)"', _rewrite_href, html_body)
 
     if "</body>" in rewritten:
-        rewritten = rewritten.replace(
-            "</body>", f"{pixel_tag}</body>", 1
-        )
+        rewritten = rewritten.replace("</body>", f"{pixel_tag}</body>", 1)
     else:
         rewritten = f"{rewritten}{pixel_tag}"
     return rewritten

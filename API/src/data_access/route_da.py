@@ -1,6 +1,7 @@
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.routes import Route, AdminRoute
+
+from src.models.routes import AdminRoute, Route
 
 
 async def get_route_ids_by_user_types(db: AsyncSession, user_types: list[str]) -> list[int]:
@@ -43,11 +44,7 @@ async def get_children(db: AsyncSession, parent_id: int) -> list[Route]:
 
 
 async def cascade_active_status(db: AsyncSession, parent_id: int, is_active: bool):
-    stmt = (
-        update(Route)
-        .where(Route.parent_id == parent_id)
-        .values(is_active=is_active)
-    )
+    stmt = update(Route).where(Route.parent_id == parent_id).values(is_active=is_active)
     await db.execute(stmt)
 
 

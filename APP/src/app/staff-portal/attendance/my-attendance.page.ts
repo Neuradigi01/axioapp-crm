@@ -10,10 +10,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  StaffAttendance,
-  StaffPortalApiService,
-} from '../staff-portal-api.service';
+import { StaffAttendance, StaffPortalApiService } from '../staff-portal-api.service';
 
 /**
  * My Attendance â€” month list of the signed-in staff's own clock-in/out
@@ -63,9 +60,7 @@ export class MyAttendancePageComponent {
         error: (err: HttpErrorResponse) => {
           this.rows.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load attendance.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load attendance.');
         },
       });
   }
@@ -84,5 +79,4 @@ export class MyAttendancePageComponent {
   private _iso(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
-
 }

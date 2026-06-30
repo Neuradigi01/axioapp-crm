@@ -1,24 +1,9 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 
-import {
-  CanvasEdge,
-  CanvasNode,
-  CanvasStateService,
-} from './canvas-state.service';
-import {
-  NODE_HEIGHT,
-  NODE_WIDTH,
-} from './node.component';
+import { CanvasEdge, CanvasNode, CanvasStateService } from './canvas-state.service';
+import { NODE_HEIGHT, NODE_WIDTH } from './node.component';
 import { getNodeType } from './node-type-registry';
-
 
 /**
  * SVG edge between two node ports.
@@ -31,7 +16,6 @@ import { getNodeType } from './node-type-registry';
  * Click → delete confirmation through `CanvasStateService.deleteEdge`.
  */
 
-
 function outputPortX(index: number, total: number): number {
   if (total <= 1) return NODE_WIDTH / 2;
   const usable = NODE_WIDTH - 40;
@@ -39,17 +23,10 @@ function outputPortX(index: number, total: number): number {
   return 20 + step * index;
 }
 
-
-function buildPath(
-  sx: number,
-  sy: number,
-  tx: number,
-  ty: number,
-): string {
+function buildPath(sx: number, sy: number, tx: number, ty: number): string {
   const dy = Math.max(60, Math.abs(ty - sy) * 0.5);
   return `M ${sx} ${sy} C ${sx} ${sy + dy}, ${tx} ${ty - dy}, ${tx} ${ty}`;
 }
-
 
 @Component({
   selector: '[appWorkflowEdge]',
@@ -59,12 +36,7 @@ function buildPath(
   template: `
     <svg:g class="cursor-pointer" (click)="onClick($event)">
       <!-- Wide invisible hit-target so clicks land easily. -->
-      <svg:path
-        [attr.d]="path()"
-        stroke="transparent"
-        stroke-width="14"
-        fill="none"
-      />
+      <svg:path [attr.d]="path()" stroke="transparent" stroke-width="14" fill="none" />
       <svg:path
         [attr.d]="path()"
         [attr.stroke]="color()"
@@ -73,12 +45,7 @@ function buildPath(
         marker-end="url(#workflow-arrow)"
       />
       @if (edge().label) {
-        <svg:foreignObject
-          [attr.x]="midX() - 40"
-          [attr.y]="midY() - 12"
-          width="80"
-          height="24"
-        >
+        <svg:foreignObject [attr.x]="midX() - 40" [attr.y]="midY() - 12" width="80" height="24">
           <div class="flex justify-center">
             <span
               class="px-2 py-0.5 rounded-full bg-white border border-zinc-300 text-[10px] text-zinc-700 shadow-sm"
@@ -106,9 +73,7 @@ export class WorkflowEdgeComponent {
     const outputs = getNodeType(node.type)?.outputs ?? [];
     const idx = Math.max(
       0,
-      outputs.findIndex(
-        (o) => (o.label ?? null) === (this.edge().label ?? null),
-      ),
+      outputs.findIndex((o) => (o.label ?? null) === (this.edge().label ?? null)),
     );
     const x = (node.position?.x ?? 0) + outputPortX(idx, outputs.length);
     const y = (node.position?.y ?? 0) + NODE_HEIGHT;

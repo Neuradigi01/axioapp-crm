@@ -1,15 +1,14 @@
 """HTTP-level coverage for the lead-scoring engine (Step 5):
 
-  - POST /leads/scoring-rules + condition validation
-  - score recompute on create / update
-  - permission gate on scoring-rule CRUD
-  - rule with multiple matches sums + clamps at 100
-  - scoring rules can't reference contact-joined fields
-  - bulk recompute endpoint reports the touched count
+- POST /leads/scoring-rules + condition validation
+- score recompute on create / update
+- permission gate on scoring-rule CRUD
+- rule with multiple matches sums + clamps at 100
+- scoring rules can't reference contact-joined fields
+- bulk recompute endpoint reports the touched count
 """
-from __future__ import annotations
 
-import uuid
+from __future__ import annotations
 
 import pytest
 
@@ -153,16 +152,12 @@ async def test_inactive_rule_does_not_score(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_scoring_rule_rejects_contact_joined_field(
-    layered_client, seeded_admin
-):
+async def test_scoring_rule_rejects_contact_joined_field(layered_client, seeded_admin):
     """``contact_name`` is contact-joined and not in-memory evaluable;
     using it in a rule condition must be 422."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "leads.read", "leads.scoring.manage"
-    )
+    await _grant(seeded_admin["role"].id, "leads.read", "leads.scoring.manage")
     await _seed_leads_pipeline(org.id)
 
     token = await _login(
@@ -177,9 +172,7 @@ async def test_scoring_rule_rejects_contact_joined_field(
         layered_client,
         headers,
         name="Bad rule",
-        condition={
-            "all": [{"field": "contact_name", "op": "eq", "value": "John"}]
-        },
+        condition={"all": [{"field": "contact_name", "op": "eq", "value": "John"}]},
         points=10,
     )
     assert resp.status_code == 422
@@ -223,9 +216,7 @@ async def test_scoring_rule_requires_permission(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_recompute_endpoint_returns_touched_count(
-    layered_client, seeded_admin
-):
+async def test_recompute_endpoint_returns_touched_count(layered_client, seeded_admin):
     """After flipping a rule's points, the recompute endpoint reports
     how many lead rows changed."""
     org = seeded_admin["org"]
@@ -264,9 +255,7 @@ async def test_recompute_endpoint_returns_touched_count(
 
     # The leads were created BEFORE the rule, so their score is still
     # 0. Recompute should touch both.
-    recompute = await layered_client.post(
-        "/api/v1/leads/scoring-rules/recompute", headers=headers
-    )
+    recompute = await layered_client.post("/api/v1/leads/scoring-rules/recompute", headers=headers)
     assert recompute.status_code == 200, recompute.text
     assert recompute.json()["touched"] == 2
 

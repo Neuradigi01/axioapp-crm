@@ -9,10 +9,10 @@
 Shares the seed helpers from ``test_leads_crud`` (pipeline + contact)
 so the focus stays on the new behaviour.
 """
+
 from __future__ import annotations
 
 import json
-import uuid
 
 import pytest
 
@@ -86,9 +86,7 @@ async def test_cursor_walk_exhausts_set(layered_client, seeded_admin):
     seeded_ids: set[str] = set()
     for i in range(13):
         contact_id = await _seed_contact(org.id, full_name=f"Walk {i:02d}")
-        seeded_ids.add(
-            (await _create_lead(layered_client, headers, contact_id=contact_id))["id"]
-        )
+        seeded_ids.add((await _create_lead(layered_client, headers, contact_id=contact_id))["id"])
 
     seen: set[str] = set()
     cursor: str | None = None
@@ -130,9 +128,7 @@ async def test_with_total_false_omits_count(layered_client, seeded_admin):
     contact_id = await _seed_contact(org.id)
     await _create_lead(layered_client, headers, contact_id=contact_id)
 
-    resp = await layered_client.get(
-        "/api/v1/leads?with_total=false", headers=headers
-    )
+    resp = await layered_client.get("/api/v1/leads?with_total=false", headers=headers)
     assert resp.status_code == 200
     assert resp.json()["total"] is None
 
@@ -158,9 +154,7 @@ async def test_filter_dsl_status_qualified(layered_client, seeded_admin):
         await _create_lead(layered_client, headers, contact_id=contact_id)
 
     dsl = {"all": [{"field": "status", "op": "eq", "value": "active"}]}
-    resp = await layered_client.get(
-        f"/api/v1/leads?filter={json.dumps(dsl)}", headers=headers
-    )
+    resp = await layered_client.get(f"/api/v1/leads?filter={json.dumps(dsl)}", headers=headers)
     assert resp.status_code == 200, resp.text
     assert resp.json()["total"] == 3
 
@@ -182,9 +176,7 @@ async def test_filter_dsl_unknown_field_rejected(layered_client, seeded_admin):
     headers = {"Authorization": f"Bearer {token}"}
 
     dsl = {"all": [{"field": "not_a_field", "op": "eq", "value": "x"}]}
-    resp = await layered_client.get(
-        f"/api/v1/leads?filter={json.dumps(dsl)}", headers=headers
-    )
+    resp = await layered_client.get(f"/api/v1/leads?filter={json.dumps(dsl)}", headers=headers)
     assert resp.status_code == 422, resp.text
 
 
@@ -203,9 +195,7 @@ async def test_filter_dsl_invalid_json_rejected(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    resp = await layered_client.get(
-        "/api/v1/leads?filter=not-json", headers=headers
-    )
+    resp = await layered_client.get("/api/v1/leads?filter=not-json", headers=headers)
     assert resp.status_code == 422
 
 
@@ -215,9 +205,7 @@ async def test_csv_export_streams_filtered_rows(layered_client, seeded_admin):
     Excel-safe phone."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "leads.read", "leads.write", "leads.export"
-    )
+    await _grant(seeded_admin["role"].id, "leads.read", "leads.write", "leads.export")
     await _seed_leads_pipeline(org.id)
 
     token = await _login(

@@ -7,6 +7,7 @@ Reads need `settings.read`; mutations need `settings.write`. There's
 no `POST` or `DELETE` — the row is auto-created on first GET and
 removed only via org teardown (cascade from `organizations.id`).
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -17,7 +18,6 @@ from src.app.core.settings.schemas import OrgSettingsOut, OrgSettingsPatch
 from src.app.core.settings.service import get_or_create, patch_settings
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
 

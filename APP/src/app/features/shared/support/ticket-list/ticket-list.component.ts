@@ -1,4 +1,11 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  signal,
+  computed,
+  OnInit,
+} from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -11,7 +18,14 @@ import { PageLayoutComponent } from '@shared/components/page-layout/page-layout.
 import { TicketApiService, ITicketListRequest } from '@app/services/ticket-api.service';
 import { SharedService } from '@core/services/shared.service';
 import { getRoute } from '@core/services/routes-helper.service';
-import { BADGE_MAP, ROLE_ADMIN, SNACKBAR_ACTION, SNACKBAR_DURATION, TICKET_STATUS_OPTIONS, TICKET_PRIORITY_OPTIONS } from '@core/constants/app.constants';
+import {
+  BADGE_MAP,
+  ROLE_ADMIN,
+  SNACKBAR_ACTION,
+  SNACKBAR_DURATION,
+  TICKET_STATUS_OPTIONS,
+  TICKET_PRIORITY_OPTIONS,
+} from '@core/constants/app.constants';
 import { MSG_ERROR_GENERIC, MSG_ERROR_LOAD_FAILED } from '@core/constants/messages.constants';
 import { ITicket } from '@app/schemas/ticket';
 import { IPageEvent } from '@app/schemas/shared';
@@ -69,7 +83,8 @@ export class TicketListComponent implements OnInit {
       search_term: formVal.search || null,
       status: formVal.status === 'all' ? null : formVal.status,
       priority: this.isAdmin() && formVal.priority !== 'all' ? formVal.priority : null,
-      from_user_id: this.isAdmin() && formVal.from_user_id?.trim() ? formVal.from_user_id.trim() : null,
+      from_user_id:
+        this.isAdmin() && formVal.from_user_id?.trim() ? formVal.from_user_id.trim() : null,
       page_index: this.pageIndex,
       page_size: this.pageSize,
     };
@@ -80,7 +95,9 @@ export class TicketListComponent implements OnInit {
         this.data.set(res.data);
         this.dataCount.set(res.data_count);
       } else {
-        this.snackBar.open(res.message || MSG_ERROR_LOAD_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(res.message || MSG_ERROR_LOAD_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
@@ -116,7 +133,9 @@ export class TicketListComponent implements OnInit {
   getStatusBadge(status: string): { color: string; bgVar: string; label: string } {
     const key = status.toLowerCase();
     const badge = this.badgeMap[key];
-    return badge ? { ...badge, label: status } : { color: 'var(--page-text)', bgVar: 'var(--surface-2)', label: status };
+    return badge
+      ? { ...badge, label: status }
+      : { color: 'var(--page-text)', bgVar: 'var(--surface-2)', label: status };
   }
 
   exportToCSV(): void {

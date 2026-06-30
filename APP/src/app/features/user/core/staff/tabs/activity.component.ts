@@ -15,11 +15,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { RelativeTimePipe } from '../../activities/relative-time.pipe';
 import type { LucideIconName } from '../../shared/icons';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  StaffActivity,
-  StaffApiService,
-  StaffWithPerformance,
-} from '../staff-api.service';
+import { StaffActivity, StaffApiService, StaffWithPerformance } from '../staff-api.service';
 
 interface TypeMeta {
   icon: LucideIconName;
@@ -108,9 +104,7 @@ export class StaffActivityTabComponent {
       }
       g.items.push(item);
     }
-    return [...byKey.values()].sort((a, b) =>
-      b.dayKey.localeCompare(a.dayKey),
-    );
+    return [...byKey.values()].sort((a, b) => b.dayKey.localeCompare(a.dayKey));
   });
 
   constructor() {
@@ -174,11 +168,8 @@ export class StaffActivityTabComponent {
         error: (err: HttpErrorResponse) => {
           this.activities.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load activity.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load activity.');
         },
       });
   }
-
 }

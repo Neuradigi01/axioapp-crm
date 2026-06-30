@@ -10,18 +10,18 @@ Two shapes live here:
     the in-app billing page (Step 16) and trial banner (Step 15) load
     in a single round-trip.
 """
+
 from __future__ import annotations
 
 import math
 import uuid
-from datetime import datetime, timezone
-from typing import Annotated, Literal, Union
+from datetime import UTC, datetime
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.subscriptions.models import Subscription
 from src.app.core.subscriptions.plans import Plan
-
 
 SubscriptionStatus = Literal[
     "trialing",
@@ -153,7 +153,7 @@ class SubscriptionCurrentResponse(BaseModel):
         seats_in_use: int,
         usage_snapshot: dict[str, int],
         now: datetime | None = None,
-    ) -> "SubscriptionCurrentResponse":
+    ) -> SubscriptionCurrentResponse:
         """Compose the response from its four inputs.
 
         ``now`` is injectable so tests can pin time; production passes
@@ -175,14 +175,12 @@ class SubscriptionCurrentResponse(BaseModel):
             terminal-ish status flags reified as booleans so frontend
             templates don't need to know the enum vocabulary.
         """
-        moment = now or datetime.now(tz=timezone.utc)
+        moment = now or datetime.now(tz=UTC)
 
         trial: TrialInfo | None = None
         if sub.trial_started_at is not None and sub.trial_ends_at is not None:
             remaining_seconds = (sub.trial_ends_at - moment).total_seconds()
-            days_remaining = (
-                0 if remaining_seconds <= 0 else math.ceil(remaining_seconds / 86400)
-            )
+            days_remaining = 0 if remaining_seconds <= 0 else math.ceil(remaining_seconds / 86400)
             trial = TrialInfo(
                 started_at=sub.trial_started_at,
                 ends_at=sub.trial_ends_at,
@@ -316,7 +314,7 @@ class NoChangeResponse(BaseModel):
 # FastAPI handles this Annotated-discriminated-union as a `oneOf` in
 # OpenAPI and routes the right shape on the wire by `outcome`.
 PlanChangeResponse = Annotated[
-    Union[NeedsPaymentResponse, ScheduledResponse, NoChangeResponse],
+    NeedsPaymentResponse | ScheduledResponse | NoChangeResponse,
     Field(discriminator="outcome"),
 ]
 
@@ -385,11 +383,7 @@ class SeatChangeScheduledResponse(BaseModel):
 # Three-shape discriminated union for the POST response. Reuses
 # `NoChangeResponse` from the plan-change endpoint — same wire shape.
 SeatChangeResponse = Annotated[
-    Union[
-        SeatChangeNeedsPaymentResponse,
-        SeatChangeScheduledResponse,
-        NoChangeResponse,
-    ],
+    SeatChangeNeedsPaymentResponse | SeatChangeScheduledResponse | NoChangeResponse,
     Field(discriminator="outcome"),
 ]
 
@@ -444,7 +438,11 @@ class CheckoutResponse(BaseModel):
 
 
 InvoiceStatus = Literal[
-    "paid", "open", "void", "uncollectible", "draft",
+    "paid",
+    "open",
+    "void",
+    "uncollectible",
+    "draft",
 ]
 
 

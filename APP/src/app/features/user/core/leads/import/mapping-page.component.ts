@@ -49,7 +49,6 @@ import {
 
 const REQUIRED_TARGETS = ['contact.full_name'] as const;
 
-
 @Component({
   selector: 'app-import-mapping-page',
   standalone: true,
@@ -101,9 +100,7 @@ export class MappingPageComponent {
 
   /** Set of target keys mapped to at least one column. */
   protected readonly mappedTargetSet = computed(() => {
-    return new Set(
-      Object.values(this.mapping()).filter((v): v is string => !!v),
-    );
+    return new Set(Object.values(this.mapping()).filter((v): v is string => !!v));
   });
 
   /** Required targets that are not yet mapped to any column. */
@@ -149,7 +146,7 @@ export class MappingPageComponent {
       for (const [csvCol, crmField] of Object.entries(m)) {
         if (!crmField) continue;
         const idx = colIndex[csvCol];
-        out[crmField] = idx !== undefined ? row[idx] ?? null : null;
+        out[crmField] = idx !== undefined ? (row[idx] ?? null) : null;
       }
       return out;
     });
@@ -177,10 +174,9 @@ export class MappingPageComponent {
           // Redirect terminal/post-mapping imports to the result page —
           // mapping after the job has committed makes no sense.
           if (row.status !== 'awaiting_mapping') {
-            this.router.navigate(
-              ['/user/leads/import', this.importId, 'result'],
-              { replaceUrl: true },
-            );
+            this.router.navigate(['/user/leads/import', this.importId, 'result'], {
+              replaceUrl: true,
+            });
             return;
           }
           this.importRow.set(row);
@@ -239,10 +235,7 @@ export class MappingPageComponent {
     return out;
   }
 
-  private heuristicMatch(
-    csvColumn: string,
-    targets: MappingTarget[],
-  ): string | null {
+  private heuristicMatch(csvColumn: string, targets: MappingTarget[]): string | null {
     const c = csvColumn.toLowerCase().trim();
     if (!c) return null;
     // 1. Exact match on label or key (case-insensitive).
@@ -329,9 +322,7 @@ export class MappingPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.savePresetError.set(
-            extractApiError(err) ?? 'Could not save preset.',
-          );
+          this.savePresetError.set(extractApiError(err) ?? 'Could not save preset.');
         },
       });
   }
@@ -339,8 +330,7 @@ export class MappingPageComponent {
   // --- Cancel + Commit -----------------------------------------------
 
   protected cancelImport(): void {
-    if (!confirm('Cancel this import? The uploaded file will be discarded.'))
-      return;
+    if (!confirm('Cancel this import? The uploaded file will be discarded.')) return;
     this.cancelling.set(true);
     this.actionError.set(null);
     this.api
@@ -353,9 +343,7 @@ export class MappingPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.cancelling.set(false);
-          this.actionError.set(
-            extractApiError(err) ?? 'Could not cancel import.',
-          );
+          this.actionError.set(extractApiError(err) ?? 'Could not cancel import.');
         },
       });
   }
@@ -370,17 +358,11 @@ export class MappingPageComponent {
       .subscribe({
         next: () => {
           this.committing.set(false);
-          this.router.navigate([
-            '/user/leads/import',
-            this.importId,
-            'result',
-          ]);
+          this.router.navigate(['/user/leads/import', this.importId, 'result']);
         },
         error: (err: HttpErrorResponse) => {
           this.committing.set(false);
-          this.actionError.set(
-            extractApiError(err) ?? 'Could not commit mapping.',
-          );
+          this.actionError.set(extractApiError(err) ?? 'Could not commit mapping.');
         },
       });
   }

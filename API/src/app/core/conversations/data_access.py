@@ -26,10 +26,12 @@ Operations are grouped by entity for navigability:
       first_name, last_name)`` for the mention picker); the canonical
       users lookups remain in ``core/users/data_access.py``.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 
 from sqlalchemy import and_, delete, func, select
 from sqlalchemy.engine import Row
@@ -47,30 +49,27 @@ from src.app.core.conversations.models import (
 from src.app.core.users.models import OrganizationMember, User, UserInfo
 from src.app.shared.db.pagination import paginate
 
-
 # --- Conversations ------------------------------------------------------
 
 
 async def get_conversation_by_id(
     session: AsyncSession, conversation_id: uuid.UUID
-) -> Optional[Conversation]:
+) -> Conversation | None:
     """Single-row read by PK. ``None`` on miss (or cross-tenant — the
     ORM filter applies)."""
-    result = await session.execute(
-        select(Conversation).where(Conversation.id == conversation_id)
-    )
+    result = await session.execute(select(Conversation).where(Conversation.id == conversation_id))
     return result.scalar_one_or_none()
 
 
 async def list_conversations_query(
     session: AsyncSession,
     *,
-    channel: Optional[ConversationChannel] = None,
-    status_filter: Optional[ConversationStatus] = None,
-    assigned_to_id: Optional[uuid.UUID] = None,
+    channel: ConversationChannel | None = None,
+    status_filter: ConversationStatus | None = None,
+    assigned_to_id: uuid.UUID | None = None,
     assigned_to_unassigned: bool = False,
-    q: Optional[str] = None,
-    tag_ids: Optional[list[uuid.UUID]] = None,
+    q: str | None = None,
+    tag_ids: list[uuid.UUID] | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Conversation], int]:
@@ -118,7 +117,7 @@ async def find_conversation_for_channel_external(
     *,
     channel: ConversationChannel,
     external_id: str,
-) -> Optional[Conversation]:
+) -> Conversation | None:
     """Webhook intake pre-read — locate the conversation row that owns
     ``(channel, external_id)`` so the service can decide between
     "append to existing" and "create new"."""
@@ -131,9 +130,7 @@ async def find_conversation_for_channel_external(
     ).scalar_one_or_none()
 
 
-def insert_conversation(
-    session: AsyncSession, conversation: Conversation
-) -> None:
+def insert_conversation(session: AsyncSession, conversation: Conversation) -> None:
     """Register an already-constructed Conversation for INSERT."""
     session.add(conversation)
 
@@ -154,15 +151,11 @@ async def list_messages_for_conversation(
     return list((await session.execute(stmt)).scalars().all())
 
 
-async def get_message_by_id(
-    session: AsyncSession, message_id: uuid.UUID
-) -> Optional[Message]:
+async def get_message_by_id(session: AsyncSession, message_id: uuid.UUID) -> Message | None:
     """Single-row read by PK. Used by the reply-target and reaction
     paths."""
     return (
-        await session.execute(
-            select(Message).where(Message.id == message_id)
-        )
+        await session.execute(select(Message).where(Message.id == message_id))
     ).scalar_one_or_none()
 
 
@@ -171,7 +164,7 @@ async def get_message_by_channel_message_id(
     *,
     channel_message_id: str,
     conversation_id: uuid.UUID,
-) -> Optional[Message]:
+) -> Message | None:
     """Reverse lookup by Meta wamid scoped to one conversation. Used
     by inbound quoted-reply and reaction handlers to map wamid → our
     UUID. ``None`` when the target was sent through a different
@@ -212,7 +205,7 @@ def insert_message(session: AsyncSession, message: Message) -> None:
 async def list_tags_with_usage(
     session: AsyncSession,
     *,
-    search: Optional[str] = None,
+    search: str | None = None,
 ) -> list[Row]:
     """All tags for the active org with ``usage_count`` (number of
     conversations the tag is on), sorted by name. Outer-joined to the
@@ -238,14 +231,10 @@ async def list_tags_with_usage(
     return list((await session.execute(base)).all())
 
 
-async def get_tag_by_id(
-    session: AsyncSession, tag_id: uuid.UUID
-) -> Optional[ConversationTag]:
+async def get_tag_by_id(session: AsyncSession, tag_id: uuid.UUID) -> ConversationTag | None:
     """Single-row read by PK. ``None`` on miss."""
     return (
-        await session.execute(
-            select(ConversationTag).where(ConversationTag.id == tag_id)
-        )
+        await session.execute(select(ConversationTag).where(ConversationTag.id == tag_id))
     ).scalar_one_or_none()
 
 
@@ -266,10 +255,7 @@ async def list_tag_chips_for_conversation(
                     ConversationTagAssignment,
                     ConversationTagAssignment.tag_id == ConversationTag.id,
                 )
-                .where(
-                    ConversationTagAssignment.conversation_id
-                    == conversation_id
-                )
+                .where(ConversationTagAssignment.conversation_id == conversation_id)
                 .order_by(ConversationTag.name.asc())
             )
         ).all()
@@ -296,11 +282,7 @@ async def bulk_list_tag_chips_for_conversations(
                     ConversationTag,
                     ConversationTag.id == ConversationTagAssignment.tag_id,
                 )
-                .where(
-                    ConversationTagAssignment.conversation_id.in_(
-                        conversation_ids
-                    )
-                )
+                .where(ConversationTagAssignment.conversation_id.in_(conversation_ids))
                 .order_by(ConversationTag.name.asc())
             )
         ).all()
@@ -312,7 +294,7 @@ async def get_tag_assignment(
     *,
     conversation_id: uuid.UUID,
     tag_id: uuid.UUID,
-) -> Optional[ConversationTagAssignment]:
+) -> ConversationTagAssignment | None:
     """Existence read for the idempotent assign path. ``None`` when
     the conversation doesn't currently carry this tag."""
     return (
@@ -330,17 +312,13 @@ def insert_tag(session: AsyncSession, tag: ConversationTag) -> None:
     session.add(tag)
 
 
-def insert_tag_assignment(
-    session: AsyncSession, assignment: ConversationTagAssignment
-) -> None:
+def insert_tag_assignment(session: AsyncSession, assignment: ConversationTagAssignment) -> None:
     """Register an already-constructed ConversationTagAssignment for
     INSERT."""
     session.add(assignment)
 
 
-async def delete_tag_row(
-    session: AsyncSession, tag: ConversationTag
-) -> None:
+async def delete_tag_row(session: AsyncSession, tag: ConversationTag) -> None:
     """Mark a ConversationTag row for DELETE. The FK has
     ``ON DELETE CASCADE`` so every assignment to this tag goes with
     it."""

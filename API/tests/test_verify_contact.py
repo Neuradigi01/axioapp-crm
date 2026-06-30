@@ -1,7 +1,8 @@
 """Tests for `POST /api/v1/auth/verify-contact/send-otp` and `/verify-email`."""
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import orjson
@@ -13,10 +14,10 @@ from src.app.core.auth.verification.service import VerificationError
 from src.models.user import UserInfo
 from src.utilities.fernet_util import fernet
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Pure unit tests for token shape / validation (no DB, no HTTP)
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_build_email_verification_token_roundtrips():
     token = verification_service.build_email_verification_token(
@@ -26,7 +27,7 @@ def test_build_email_verification_token_roundtrips():
     assert payload["type"] == "email_verification"
     assert payload["value"] == "user@x.com"
     assert payload["user_id"] == "USR12345678"
-    assert payload["expires_at"] > int(datetime.now(timezone.utc).timestamp())
+    assert payload["expires_at"] > int(datetime.now(UTC).timestamp())
 
 
 def test_validate_otp_token_accepts_matching_payload():
@@ -85,7 +86,7 @@ def test_validate_otp_token_rejects_garbage():
 
 def test_validate_otp_token_rejects_expired():
     # Hand-build an expired token
-    expired_ts = int((datetime.now(timezone.utc) - timedelta(minutes=1)).timestamp())
+    expired_ts = int((datetime.now(UTC) - timedelta(minutes=1)).timestamp())
     payload = orjson.dumps(
         {"type": "email", "value": "u@x.com", "otp": "123456", "expires_at": expired_ts}
     ).decode()
@@ -102,6 +103,7 @@ def test_validate_otp_token_rejects_expired():
 # ──────────────────────────────────────────────────────────────────────
 # Integration tests for the HTTP endpoints (need DB via layered_client)
 # ──────────────────────────────────────────────────────────────────────
+
 
 def _email_send_patch():
     return patch(
@@ -154,17 +156,14 @@ async def test_send_otp_rejects_invalid_type(layered_client):
 
 
 @pytest.mark.asyncio
-async def test_verify_email_marks_user_verified(
-    layered_client, seeded_admin, test_db
-):
+async def test_verify_email_marks_user_verified(layered_client, seeded_admin, test_db):
     user = seeded_admin["user"]
     # `seeded_admin` builds the user with the legacy `user_id` text login
     # handle on `tbl_user_login.user_id`.
     from src.models.user import UserLogin
+
     login_handle = (
-        await test_db.execute(
-            select(UserLogin.user_id).where(UserLogin.id == user.id)
-        )
+        await test_db.execute(select(UserLogin.user_id).where(UserLogin.id == user.id))
     ).scalar_one()
 
     token = verification_service.build_email_verification_token(
@@ -198,15 +197,12 @@ async def test_verify_email_rejects_unknown_user(layered_client):
 
 
 @pytest.mark.asyncio
-async def test_verify_email_rejects_email_mismatch(
-    layered_client, seeded_admin, test_db
-):
+async def test_verify_email_rejects_email_mismatch(layered_client, seeded_admin, test_db):
     user = seeded_admin["user"]
     from src.models.user import UserLogin
+
     login_handle = (
-        await test_db.execute(
-            select(UserLogin.user_id).where(UserLogin.id == user.id)
-        )
+        await test_db.execute(select(UserLogin.user_id).where(UserLogin.id == user.id))
     ).scalar_one()
     # Token claims a different email than the user currently has on file
     token = verification_service.build_email_verification_token(

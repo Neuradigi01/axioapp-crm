@@ -14,8 +14,8 @@
       <div>
         <h3 class="text-base font-semibold text-zinc-900">Google Ads</h3>
         <p class="mt-0.5 text-sm text-zinc-600">
-          Lead Form Extensions → CRM. Reads `extension_feed_item` Lead Forms;
-          paste the webhook URL into each form in Google Ads.
+          Lead Form Extensions → CRM. Reads `extension_feed_item` Lead Forms; paste the webhook URL
+          into each form in Google Ads.
         </p>
         @if (integration()?.status === 'connected' && integration()?.account_label) {
           <p class="mt-1 text-xs text-zinc-500">
@@ -69,21 +69,16 @@
   }
 
   @if (needsReconnect()) {
-    <div
-      class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
-    >
-      <p class="font-medium">
-        Your Google Ads connection has expired.
-      </p>
+    <div class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+      <p class="font-medium">Your Google Ads connection has expired.</p>
       @if (integration()?.last_error) {
         <p class="mt-1 text-xs text-amber-700">
           {{ integration()?.last_error }}
         </p>
       }
       <p class="mt-2 text-xs">
-        Reconnect to issue a fresh refresh token. Existing form
-        subscriptions persist — Google Ads keeps the same form ids
-        across reconnects.
+        Reconnect to issue a fresh refresh token. Existing form subscriptions persist — Google Ads
+        keeps the same form ids across reconnects.
       </p>
     </div>
   }
@@ -131,13 +126,11 @@
   @if (isConnected()) {
     <!-- Webhook URL panel — admin pastes into Google Ads UI. -->
     @if (webhookUrl(); as url) {
-      <div
-        class="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-3"
-      >
+      <div class="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-3">
         <p class="text-xs font-medium text-zinc-700">Webhook URL</p>
         <p class="mt-1 text-xs text-zinc-600">
-          Paste this into each Google Ads Lead Form's "Webhook URL" field.
-          Disconnect rotates the secret — the old URL stops authenticating.
+          Paste this into each Google Ads Lead Form's "Webhook URL" field. Disconnect rotates the
+          secret — the old URL stops authenticating.
         </p>
         <div class="mt-2 flex items-center gap-2">
           <code
@@ -187,8 +180,8 @@
 
       @if (accountsLoaded() && accounts().length === 0) {
         <p class="mt-2 text-xs text-zinc-500">
-          No accessible Google Ads accounts. Confirm the connected Google
-          user has access to at least one Ads account.
+          No accessible Google Ads accounts. Confirm the connected Google user has access to at
+          least one Ads account.
         </p>
       }
 
@@ -201,11 +194,7 @@
           >
             <div class="flex items-center gap-2">
               <lucide-icon
-                [name]="
-                  expandedAccounts().has(acc.customer_id)
-                    ? 'chevron-down'
-                    : 'chevron-right'
-                "
+                [name]="expandedAccounts().has(acc.customer_id) ? 'chevron-down' : 'chevron-right'"
                 size="14"
                 class="text-zinc-500"
                 aria-hidden="true"
@@ -228,9 +217,7 @@
                   Loading forms…
                 </p>
               } @else if ((formsByAccount()[acc.customer_id] || []).length === 0) {
-                <p class="text-xs text-zinc-500">
-                  No Lead Forms on this account.
-                </p>
+                <p class="text-xs text-zinc-500">No Lead Forms on this account.</p>
               } @else {
                 <ul class="divide-y divide-zinc-100">
                   @for (form of formsByAccount()[acc.customer_id]; track form.form_id) {
@@ -272,11 +259,7 @@
                               aria-hidden="true"
                             ></lucide-icon>
                           } @else if (subscriptionsByForm()[form.form_id]) {
-                            <lucide-icon
-                              name="check"
-                              size="14"
-                              aria-hidden="true"
-                            ></lucide-icon>
+                            <lucide-icon name="check" size="14" aria-hidden="true"></lucide-icon>
                             Subscribed
                           } @else {
                             Subscribe

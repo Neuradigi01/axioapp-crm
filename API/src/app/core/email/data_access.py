@@ -17,10 +17,10 @@ Five operations:
     ``(user_id, provider, external_account_id)``.
   * ``insert_account``              — caller commits.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +35,7 @@ from src.app.core.email.models import (
 async def list_accounts_query(
     session: AsyncSession,
     *,
-    user_id: Optional[uuid.UUID] = None,
+    user_id: uuid.UUID | None = None,
 ) -> list[EmailAccount]:
     """All accounts visible to the active tenant, newest connection
     first. Pass ``user_id`` to scope to one user's accounts."""
@@ -46,21 +46,17 @@ async def list_accounts_query(
     return list(rows)
 
 
-async def get_account_by_id(
-    session: AsyncSession, *, account_id: uuid.UUID
-) -> Optional[EmailAccount]:
+async def get_account_by_id(session: AsyncSession, *, account_id: uuid.UUID) -> EmailAccount | None:
     """Tenant-scoped single-row read. ``None`` if missing OR if the
     caller's org cannot see it (RLS hides cross-tenant rows)."""
     return (
-        await session.execute(
-            select(EmailAccount).where(EmailAccount.id == account_id)
-        )
+        await session.execute(select(EmailAccount).where(EmailAccount.id == account_id))
     ).scalar_one_or_none()
 
 
 async def get_account_by_id_unscoped(
     session: AsyncSession, *, account_id: uuid.UUID
-) -> Optional[EmailAccount]:
+) -> EmailAccount | None:
     """Load an account BYPASSING the tenant filter — for Celery tasks
     and webhook entry points that have no JWT and need to learn the
     org from the row itself before setting ``RequestContext.org_id``.
@@ -80,9 +76,7 @@ async def get_account_by_id_unscoped(
         LIMIT 1
         """
     )
-    row = (
-        await session.execute(sql, {"account_id": str(account_id)})
-    ).mappings().first()
+    row = (await session.execute(sql, {"account_id": str(account_id)})).mappings().first()
     if row is None:
         return None
 
@@ -116,7 +110,7 @@ async def find_account_for_external(
     user_id: uuid.UUID,
     provider: EmailAccountProvider,
     external_account_id: str,
-) -> Optional[EmailAccount]:
+) -> EmailAccount | None:
     """The upsert's pre-read: locate an existing row for the
     ``(user_id, provider, external_account_id)`` tuple so the service
     can decide between INSERT and in-place UPDATE."""

@@ -35,28 +35,22 @@ and the `ip_hash` is useless for them — both are documented in the
 spec; treating opens as a noisy metric is the standard practice in
 the industry.
 """
+
 from __future__ import annotations
 
 import base64
 import binascii
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import sha256
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.contacts import data_access
-from src.app.core.contacts.models import Contact
-from src.app.core.conversations.models import (
-    Conversation,
-    ConversationChannel,
-    Message,
-)
 from src.app.core.email.tracking.models import (
     EmailMessageClick,
     EmailMessageOpen,
@@ -68,9 +62,8 @@ from src.app.core.email_sequences.models import (
     EnrollmentState,
 )
 from src.app.shared.context import RequestContext, reset_context, set_context
-from src.app.shared.db import async_session, get_db
+from src.app.shared.db import async_session
 from src.app.shared.rate_limit import InMemoryRateLimiter
-
 
 log = logging.getLogger(__name__)
 
@@ -86,15 +79,13 @@ _tracking_limiter = InMemoryRateLimiter(max_hits=100, window_seconds=60.0)
 
 
 # 43-byte 1×1 transparent GIF (the smallest possible GIF file).
-_TRANSPARENT_GIF = base64.b64decode(
-    "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-)
+_TRANSPARENT_GIF = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
 
 
 # --- Helpers --------------------------------------------------------------
 
 
-def _client_ip(request: Request) -> Optional[str]:
+def _client_ip(request: Request) -> str | None:
     """Best-effort client IP. Prefer `X-Forwarded-For` (set by the
     reverse proxy in prod); fall back to the socket peer."""
     xff = request.headers.get("x-forwarded-for")
@@ -103,7 +94,7 @@ def _client_ip(request: Request) -> Optional[str]:
     return request.client.host if request.client else None
 
 
-def _hash_prefix(value: Optional[str]) -> Optional[str]:
+def _hash_prefix(value: str | None) -> str | None:
     """16-char sha256 prefix of a stringy value. Never store raw IP /
     UA — DPDP minimisation."""
     if not value:
@@ -126,9 +117,7 @@ def _check_rate_limit(request: Request) -> None:
         )
 
 
-async def _resolve_message_org(
-    session: AsyncSession, *, message_id: uuid.UUID
-) -> Optional[uuid.UUID]:
+async def _resolve_message_org(session: AsyncSession, *, message_id: uuid.UUID) -> uuid.UUID | None:
     """Cross-org raw lookup of the message's org_id (RLS is off for
     these endpoints — no tenant context). Returns None when missing.
 
@@ -138,47 +127,41 @@ async def _resolve_message_org(
     from sqlalchemy import text as sql_text
 
     row = (
-        await session.execute(
-            sql_text("SELECT org_id FROM tbl_messages WHERE id = :mid"),
-            {"mid": str(message_id)},
+        (
+            await session.execute(
+                sql_text("SELECT org_id FROM tbl_messages WHERE id = :mid"),
+                {"mid": str(message_id)},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
     return row["org_id"] if row else None
 
 
-async def _record_open(
-    request: Request, *, message_id: uuid.UUID
-) -> None:
+async def _record_open(request: Request, *, message_id: uuid.UUID) -> None:
     """Insert a row into `email_message_opens`. Best-effort — a DB
     failure must not break the pixel response (the recipient just
     sees the 1×1 GIF either way)."""
     try:
         async with async_session() as session:
-            org_id = await _resolve_message_org(
-                session, message_id=message_id
-            )
+            org_id = await _resolve_message_org(session, message_id=message_id)
             if org_id is None:
                 return  # silently drop — token references a purged message
-            token = set_context(
-                RequestContext(org_id=org_id, user_id=None)
-            )
+            token = set_context(RequestContext(org_id=org_id, user_id=None))
             try:
                 row = EmailMessageOpen(
                     org_id=org_id,
                     message_id=message_id,
                     ip_hash=_hash_prefix(_client_ip(request)),
-                    user_agent_hash=_hash_prefix(
-                        request.headers.get("user-agent")
-                    ),
+                    user_agent_hash=_hash_prefix(request.headers.get("user-agent")),
                 )
                 session.add(row)
                 await session.commit()
             finally:
                 reset_context(token)
     except Exception:
-        log.exception(
-            "tracking._record_open failed for message=%s", message_id
-        )
+        log.exception("tracking._record_open failed for message=%s", message_id)
 
 
 async def _record_click(
@@ -191,14 +174,10 @@ async def _record_click(
     failure must not block the 302 redirect."""
     try:
         async with async_session() as session:
-            org_id = await _resolve_message_org(
-                session, message_id=message_id
-            )
+            org_id = await _resolve_message_org(session, message_id=message_id)
             if org_id is None:
                 return
-            token = set_context(
-                RequestContext(org_id=org_id, user_id=None)
-            )
+            token = set_context(RequestContext(org_id=org_id, user_id=None))
             try:
                 row = EmailMessageClick(
                     org_id=org_id,
@@ -213,22 +192,21 @@ async def _record_click(
             finally:
                 reset_context(token)
     except Exception:
-        log.exception(
-            "tracking._record_click failed for message=%s", message_id
-        )
+        log.exception("tracking._record_click failed for message=%s", message_id)
 
 
 async def _resolve_contact_from_message(
     session: AsyncSession, *, message_id: uuid.UUID
-) -> Optional[tuple[uuid.UUID, uuid.UUID, uuid.UUID]]:
+) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID] | None:
     """Return `(org_id, contact_id, conversation_id)` for a message
     whose conversation has channel=email. None when not resolvable."""
     from sqlalchemy import text as sql_text
 
     row = (
-        await session.execute(
-            sql_text(
-                """
+        (
+            await session.execute(
+                sql_text(
+                    """
                 SELECT c.org_id, c.contact_id, c.id AS conversation_id
                 FROM tbl_messages m
                 JOIN tbl_conversations c ON c.id = m.conversation_id
@@ -236,10 +214,13 @@ async def _resolve_contact_from_message(
                   AND c.channel = 'email'
                   AND c.contact_id IS NOT NULL
                 """
-            ),
-            {"mid": str(message_id)},
+                ),
+                {"mid": str(message_id)},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
     if row is None:
         return None
     return row["org_id"], row["contact_id"], row["conversation_id"]
@@ -247,26 +228,22 @@ async def _resolve_contact_from_message(
 
 async def _opt_out_contact(
     request: Request, *, message_id: uuid.UUID
-) -> tuple[bool, Optional[uuid.UUID]]:
+) -> tuple[bool, uuid.UUID | None]:
     """Set `contacts.email_opt_out=True` and cancel any active sequence
     enrollments for that contact. Returns `(success, contact_id)` so
     the landing page can echo confirmation."""
     try:
         async with async_session() as session:
-            resolved = await _resolve_contact_from_message(
-                session, message_id=message_id
-            )
+            resolved = await _resolve_contact_from_message(session, message_id=message_id)
             if resolved is None:
                 return False, None
             org_id, contact_id, _conv_id = resolved
-            token = set_context(
-                RequestContext(org_id=org_id, user_id=None)
-            )
+            token = set_context(RequestContext(org_id=org_id, user_id=None))
             try:
                 contact = await data_access.get_contact(session, contact_id)
                 if contact is None:
                     return False, None
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 contact.email_opt_out = True
                 contact.email_opt_out_at = now
 
@@ -275,18 +252,22 @@ async def _opt_out_contact(
                 # cancelled — the operator may resume them after a
                 # different consent signal.
                 active_enrollments = (
-                    await session.execute(
-                        select(EmailSequenceEnrollment).where(
-                            EmailSequenceEnrollment.contact_id == contact_id,
-                            EmailSequenceEnrollment.state.in_(
-                                [
-                                    EnrollmentState.active.value,
-                                    EnrollmentState.paused_on_reply.value,
-                                ]
-                            ),
+                    (
+                        await session.execute(
+                            select(EmailSequenceEnrollment).where(
+                                EmailSequenceEnrollment.contact_id == contact_id,
+                                EmailSequenceEnrollment.state.in_(
+                                    [
+                                        EnrollmentState.active.value,
+                                        EnrollmentState.paused_on_reply.value,
+                                    ]
+                                ),
+                            )
                         )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 for enr in active_enrollments:
                     enr.state = EnrollmentState.cancelled.value
                     enr.state_changed_at = now
@@ -309,9 +290,7 @@ async def _opt_out_contact(
             finally:
                 reset_context(token)
     except Exception:
-        log.exception(
-            "tracking._opt_out_contact failed for message=%s", message_id
-        )
+        log.exception("tracking._opt_out_contact failed for message=%s", message_id)
         return False, None
 
 
@@ -319,9 +298,7 @@ async def _opt_out_contact(
 
 
 @router.get("/o/{token}")
-async def open_pixel_endpoint(
-    token: str, request: Request
-) -> Response:
+async def open_pixel_endpoint(token: str, request: Request) -> Response:
     """Return the 1×1 transparent GIF and record the open."""
     _check_rate_limit(request)
     payload = decode(token)
@@ -342,8 +319,7 @@ async def open_pixel_endpoint(
             # Some clients (Gmail proxy) cache aggressively; no-store
             # is more guidance than law but helps when we want a
             # re-fetch.
-            "Cache-Control": "no-store, no-cache, must-revalidate, "
-            "max-age=0",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
             "Pragma": "no-cache",
             # Don't expose any framing — defence-in-depth.
             "X-Content-Type-Options": "nosniff",
@@ -352,9 +328,7 @@ async def open_pixel_endpoint(
 
 
 @router.get("/c/{token}")
-async def click_redirect_endpoint(
-    token: str, u: str, request: Request
-) -> RedirectResponse:
+async def click_redirect_endpoint(token: str, u: str, request: Request) -> RedirectResponse:
     """Decode the token + the `u=` query, record the click, redirect."""
     _check_rate_limit(request)
     payload = decode(token)
@@ -373,10 +347,7 @@ async def click_redirect_endpoint(
             detail="Not found.",
         )
     # Defence: don't blindly trust the target — require http/https.
-    if not (
-        target.lower().startswith("http://")
-        or target.lower().startswith("https://")
-    ):
+    if not (target.lower().startswith("http://") or target.lower().startswith("https://")):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Not found.",
@@ -429,9 +400,7 @@ _UNSUB_INVALID = """<!doctype html>
 
 
 @router.get("/unsubscribe/{token}", response_class=HTMLResponse)
-async def unsubscribe_endpoint(
-    token: str, request: Request
-) -> HTMLResponse:
+async def unsubscribe_endpoint(token: str, request: Request) -> HTMLResponse:
     """Decode the token, set `email_opt_out=true` on the contact, cancel
     active sequence enrollments, render a simple confirmation page."""
     _check_rate_limit(request)
@@ -440,9 +409,7 @@ async def unsubscribe_endpoint(
         return HTMLResponse(content=_UNSUB_INVALID, status_code=200)
     message_id = payload["message_id"]
     assert isinstance(message_id, uuid.UUID)
-    success, _contact_id = await _opt_out_contact(
-        request, message_id=message_id
-    )
+    success, _contact_id = await _opt_out_contact(request, message_id=message_id)
     if not success:
         return HTMLResponse(content=_UNSUB_INVALID, status_code=200)
     return HTMLResponse(content=_UNSUB_OK, status_code=200)

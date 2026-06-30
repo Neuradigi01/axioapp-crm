@@ -28,8 +28,8 @@ Adding a new event type:
   3. Publish via :func:`core.events.bus.publish` from the
      originating module.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 # --- Auth + onboarding ----------------------------------------------------
 
@@ -276,10 +276,7 @@ def list_descriptions() -> list[dict[str, str]]:
     """Stable-ordered list for the editor's trigger-event picker —
     matches the order of :data:`ALL_EVENTS` so domain groupings
     surface together."""
-    return [
-        {"event_type": ev, "description": EVENT_DESCRIPTIONS[ev]}
-        for ev in ALL_EVENTS
-    ]
+    return [{"event_type": ev, "description": EVENT_DESCRIPTIONS[ev]} for ev in ALL_EVENTS]
 
 
 __all__ = [

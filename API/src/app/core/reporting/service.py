@@ -12,11 +12,11 @@ fine for the dashboard cadence. If the org outgrows that, the right
 fix is a single `GROUP BY assigned_to_id` query per entity; not
 worth the complexity yet.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -78,7 +78,7 @@ async def compute_workload(
         )
     return {
         "users": entries,
-        "as_of": datetime.now(timezone.utc),
+        "as_of": datetime.now(UTC),
     }
 
 

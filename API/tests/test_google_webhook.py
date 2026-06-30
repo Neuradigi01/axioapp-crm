@@ -22,12 +22,12 @@ Eight groups:
      `disconnect` nulls it.
   8. DLQ: `replay_dlq` re-enqueues + marks replayed.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -50,7 +50,6 @@ from src.app.core.integrations.models import (
     IntegrationStatus,
     IntegrationSubscription,
 )
-
 
 _ORG_ID = uuid.uuid4()
 _INTEGRATION_ID = uuid.uuid4()
@@ -86,7 +85,8 @@ def _make_subscription(
         integration_id=_INTEGRATION_ID,
         external_form_id=form_id,
         external_form_label=None,
-        field_mapping=field_mapping or {
+        field_mapping=field_mapping
+        or {
             "FULL_NAME": "contact.full_name",
             "PHONE_NUMBER": "contact.phone",
             "WORK_EMAIL": "contact.email",
@@ -243,9 +243,7 @@ async def test_receiver_401_on_unknown_webhook_key(monkeypatch):
     monkeypatch.setattr(webhook_module.audit, "log", _noop_audit)
 
     app = _build_app()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/integrations/google/webhook/v1/garbage",
             json={"google_key": "garbage"},
@@ -256,9 +254,7 @@ async def test_receiver_401_on_unknown_webhook_key(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_receiver_401_when_integration_disconnected(monkeypatch):
-    integration = _make_integration(
-        status=IntegrationStatus.disconnected, webhook_secret=_SECRET
-    )
+    integration = _make_integration(status=IntegrationStatus.disconnected, webhook_secret=_SECRET)
 
     async def _return(*_a, **_k):
         return integration
@@ -271,9 +267,7 @@ async def test_receiver_401_when_integration_disconnected(monkeypatch):
     monkeypatch.setattr(webhook_module.audit, "log", _noop_audit)
 
     app = _build_app()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/integrations/google/webhook/v1/{_SECRET}",
             json={"google_key": _SECRET},
@@ -297,9 +291,7 @@ async def test_receiver_401_on_google_key_mismatch(monkeypatch):
     monkeypatch.setattr(webhook_module.audit, "log", _noop_audit)
 
     app = _build_app()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/integrations/google/webhook/v1/{_SECRET}",
             json={"google_key": "WRONG_KEY"},
@@ -330,15 +322,11 @@ async def test_receiver_200_and_enqueues_on_happy_path(monkeypatch):
             captured["args"] = args
 
     monkeypatch.setattr(tasks_module, "HAS_CELERY", True)
-    monkeypatch.setattr(
-        tasks_module, "process_google_lead", _FakeTask()
-    )
+    monkeypatch.setattr(tasks_module, "process_google_lead", _FakeTask())
 
     app = _build_app()
     body = _sample_payload()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/integrations/google/webhook/v1/{_SECRET}",
             json=body,
@@ -373,9 +361,7 @@ async def test_receiver_returns_200_even_if_enqueue_raises(monkeypatch):
     monkeypatch.setattr(tasks_module, "process_google_lead", _BrokenTask())
 
     app = _build_app()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/integrations/google/webhook/v1/{_SECRET}",
             json=_sample_payload(),
@@ -424,16 +410,12 @@ class _CapturingSession:
 
 @pytest.mark.asyncio
 async def test_process_async_dlqs_when_integration_disconnected(monkeypatch):
-    integration = _make_integration(
-        status=IntegrationStatus.disconnected
-    )
+    integration = _make_integration(status=IntegrationStatus.disconnected)
 
     async def _load(*_a, **_k):
         return integration
 
-    monkeypatch.setattr(
-        tasks_module, "_load_integration_unscoped", _load
-    )
+    monkeypatch.setattr(tasks_module, "_load_integration_unscoped", _load)
 
     captured: dict[str, Any] = {}
 
@@ -465,9 +447,7 @@ async def test_process_async_dlqs_when_integration_missing(monkeypatch):
     async def _load(*_a, **_k):
         return None
 
-    monkeypatch.setattr(
-        tasks_module, "_load_integration_unscoped", _load
-    )
+    monkeypatch.setattr(tasks_module, "_load_integration_unscoped", _load)
 
     captured: dict[str, Any] = {}
 
@@ -476,9 +456,7 @@ async def test_process_async_dlqs_when_integration_missing(monkeypatch):
         return MagicMock(id=uuid.uuid4())
 
     monkeypatch.setattr(tasks_module, "record_dlq", _record)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
     result = await tasks_module.process_google_lead_async(
         integration_id=_INTEGRATION_ID, payload={}
@@ -495,9 +473,7 @@ async def test_process_async_dlqs_on_missing_form_id(monkeypatch):
     async def _load(*_a, **_k):
         return integration
 
-    monkeypatch.setattr(
-        tasks_module, "_load_integration_unscoped", _load
-    )
+    monkeypatch.setattr(tasks_module, "_load_integration_unscoped", _load)
 
     captured: dict[str, Any] = {}
 
@@ -506,9 +482,7 @@ async def test_process_async_dlqs_on_missing_form_id(monkeypatch):
         return MagicMock(id=uuid.uuid4())
 
     monkeypatch.setattr(tasks_module, "record_dlq", _record)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
     # Payload has no form_id.
     payload = {"lead_id": "L-1", "user_column_data": []}
@@ -526,9 +500,7 @@ async def test_process_async_dlqs_on_no_subscription(monkeypatch):
     async def _load(*_a, **_k):
         return integration
 
-    monkeypatch.setattr(
-        tasks_module, "_load_integration_unscoped", _load
-    )
+    monkeypatch.setattr(tasks_module, "_load_integration_unscoped", _load)
 
     async def _find_none(*_a, **_k):
         return None
@@ -542,9 +514,7 @@ async def test_process_async_dlqs_on_no_subscription(monkeypatch):
         return MagicMock(id=uuid.uuid4())
 
     monkeypatch.setattr(tasks_module, "record_dlq", _record)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
     result = await tasks_module.process_google_lead_async(
         integration_id=_INTEGRATION_ID, payload=_sample_payload()
@@ -560,9 +530,7 @@ async def test_process_async_dlqs_when_subscription_disabled(monkeypatch):
     async def _load(*_a, **_k):
         return integration
 
-    monkeypatch.setattr(
-        tasks_module, "_load_integration_unscoped", _load
-    )
+    monkeypatch.setattr(tasks_module, "_load_integration_unscoped", _load)
 
     sub = _make_subscription(enabled=False)
 
@@ -575,9 +543,7 @@ async def test_process_async_dlqs_when_subscription_disabled(monkeypatch):
         return MagicMock(id=uuid.uuid4())
 
     monkeypatch.setattr(tasks_module, "record_dlq", _record)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
     result = await tasks_module.process_google_lead_async(
         integration_id=_INTEGRATION_ID, payload=_sample_payload()
@@ -596,9 +562,7 @@ async def test_process_async_creates_contact_and_lead(monkeypatch):
     async def _load(*_a, **_k):
         return integration
 
-    monkeypatch.setattr(
-        tasks_module, "_load_integration_unscoped", _load
-    )
+    monkeypatch.setattr(tasks_module, "_load_integration_unscoped", _load)
 
     sub = _make_subscription()
 
@@ -611,17 +575,13 @@ async def test_process_async_creates_contact_and_lead(monkeypatch):
     async def _no_existing_lead(*_a, **_k):
         return None
 
-    monkeypatch.setattr(
-        tasks_module, "_find_lead_by_external_id", _no_existing_lead
-    )
+    monkeypatch.setattr(tasks_module, "_find_lead_by_external_id", _no_existing_lead)
 
     # No existing contact.
     async def _no_existing_contact(*_a, **_k):
         return None
 
-    monkeypatch.setattr(
-        tasks_module, "find_existing_contact", _no_existing_contact
-    )
+    monkeypatch.setattr(tasks_module, "find_existing_contact", _no_existing_contact)
 
     new_contact_id = uuid.uuid4()
     new_lead_id = uuid.uuid4()
@@ -654,9 +614,7 @@ async def test_process_async_creates_contact_and_lead(monkeypatch):
         return None
 
     monkeypatch.setattr(tasks_module.audit, "log", _noop_audit)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
     result = await tasks_module.process_google_lead_async(
         integration_id=_INTEGRATION_ID, payload=_sample_payload()
@@ -696,13 +654,9 @@ async def test_process_async_idempotency_skips_existing_lead(monkeypatch):
     async def _existing(*_a, **_k):
         return existing_lead_id
 
-    monkeypatch.setattr(
-        tasks_module, "_load_integration_unscoped", _load
-    )
+    monkeypatch.setattr(tasks_module, "_load_integration_unscoped", _load)
     monkeypatch.setattr(tasks_module, "find_subscription", _find_sub)
-    monkeypatch.setattr(
-        tasks_module, "_find_lead_by_external_id", _existing
-    )
+    monkeypatch.setattr(tasks_module, "_find_lead_by_external_id", _existing)
 
     create_contact_called = {"called": False}
 
@@ -711,9 +665,7 @@ async def test_process_async_idempotency_skips_existing_lead(monkeypatch):
         return MagicMock(id=uuid.uuid4())
 
     monkeypatch.setattr(tasks_module, "create_contact", _create_contact)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
     result = await tasks_module.process_google_lead_async(
         integration_id=_INTEGRATION_ID, payload=_sample_payload()
@@ -745,16 +697,10 @@ async def test_process_async_reuses_existing_contact_on_dedup(monkeypatch):
     async def _existing_contact(*_a, **_k):
         return existing_contact_id
 
-    monkeypatch.setattr(
-        tasks_module, "_load_integration_unscoped", _load
-    )
+    monkeypatch.setattr(tasks_module, "_load_integration_unscoped", _load)
     monkeypatch.setattr(tasks_module, "find_subscription", _find_sub)
-    monkeypatch.setattr(
-        tasks_module, "_find_lead_by_external_id", _no_existing_lead
-    )
-    monkeypatch.setattr(
-        tasks_module, "find_existing_contact", _existing_contact
-    )
+    monkeypatch.setattr(tasks_module, "_find_lead_by_external_id", _no_existing_lead)
+    monkeypatch.setattr(tasks_module, "find_existing_contact", _existing_contact)
 
     contact_create_called = {"called": False}
 
@@ -783,9 +729,7 @@ async def test_process_async_reuses_existing_contact_on_dedup(monkeypatch):
     monkeypatch.setattr(tasks_module, "create_contact", _create_contact)
     monkeypatch.setattr(tasks_module, "ingest_lead", _ingest_lead)
     monkeypatch.setattr(tasks_module.audit, "log", _noop_audit)
-    monkeypatch.setattr(
-        tasks_module, "async_session", lambda: _CapturingSession()
-    )
+    monkeypatch.setattr(tasks_module, "async_session", lambda: _CapturingSession())
 
     result = await tasks_module.process_google_lead_async(
         integration_id=_INTEGRATION_ID, payload=_sample_payload()
@@ -855,9 +799,7 @@ async def test_replay_dlq_calls_delay_and_marks_replayed(monkeypatch):
     monkeypatch.setattr(dlq_module.audit, "log", _noop_audit)
 
     session = _CapturingSession()
-    result = await dlq_module.replay_dlq(
-        session, dlq_id=dlq_row.id, actor_id=actor_id
-    )
+    result = await dlq_module.replay_dlq(session, dlq_id=dlq_row.id, actor_id=actor_id)
 
     assert result is dlq_row
     assert dlq_row.replayed_at is not None
@@ -886,9 +828,7 @@ async def test_replay_dlq_409_when_integration_deleted(monkeypatch):
 
     session = _CapturingSession()
     with pytest.raises(Exception) as exc:
-        await dlq_module.replay_dlq(
-            session, dlq_id=dlq_row.id, actor_id=uuid.uuid4()
-        )
+        await dlq_module.replay_dlq(session, dlq_id=dlq_row.id, actor_id=uuid.uuid4())
     assert exc.value.status_code == 409
 
 
@@ -901,7 +841,5 @@ async def test_replay_dlq_404_when_missing(monkeypatch):
 
     session = _CapturingSession()
     with pytest.raises(Exception) as exc:
-        await dlq_module.replay_dlq(
-            session, dlq_id=uuid.uuid4(), actor_id=uuid.uuid4()
-        )
+        await dlq_module.replay_dlq(session, dlq_id=uuid.uuid4(), actor_id=uuid.uuid4())
     assert exc.value.status_code == 404

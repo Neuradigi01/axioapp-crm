@@ -14,6 +14,7 @@ script); see the file header for the bootstrap procedure.
 The `stripe` SDK is imported lazily via `_stripe_module()` so the test
 suite can monkeypatch the module without installing the SDK in CI.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -60,9 +61,7 @@ def _stripe_module():
 
 def _default_price_map_path() -> Path:
     """Path the seed script writes to and the provider loads from."""
-    return (
-        Path(__file__).resolve().parent.parent / "stripe_price_map.yaml"
-    )
+    return Path(__file__).resolve().parent.parent / "stripe_price_map.yaml"
 
 
 class StripeProvider:
@@ -98,7 +97,9 @@ class StripeProvider:
         return data
 
     def _resolve_price_id(
-        self, plan_code: str, billing_cycle: str,
+        self,
+        plan_code: str,
+        billing_cycle: str,
     ) -> str:
         plan_entry = self._price_map.get(plan_code) or {}
         price_id = plan_entry.get(billing_cycle)
@@ -112,7 +113,10 @@ class StripeProvider:
     # ---- protocol ----------------------------------------------------------
 
     async def create_customer(
-        self, org_id: uuid.UUID, email: str, name: str,
+        self,
+        org_id: uuid.UUID,
+        email: str,
+        name: str,
     ) -> str:
         result = await asyncio.to_thread(
             self._stripe.Customer.create,
@@ -151,7 +155,8 @@ class StripeProvider:
         if customer_id is not None:
             kwargs["customer"] = customer_id
         session = await asyncio.to_thread(
-            self._stripe.checkout.Session.create, **kwargs,
+            self._stripe.checkout.Session.create,
+            **kwargs,
         )
         return CheckoutSessionResult(
             url=session["url"],
@@ -170,19 +175,20 @@ class StripeProvider:
         # top level — quantity lives on subscription items. Fetch the
         # active subscription to discover the item ID, then rewrite it.
         sub = await asyncio.to_thread(
-            self._stripe.Subscription.retrieve, provider_subscription_id,
+            self._stripe.Subscription.retrieve,
+            provider_subscription_id,
         )
         items = sub["items"]["data"]
         if not items:
             raise RuntimeError(
-                f"Stripe subscription {provider_subscription_id} has no items "
-                "to update."
+                f"Stripe subscription {provider_subscription_id} has no items to update."
             )
         item = items[0]
         modified_item: dict[str, Any] = {"id": item["id"]}
         if plan_code is not None and billing_cycle is not None:
             modified_item["price"] = self._resolve_price_id(
-                plan_code, billing_cycle,
+                plan_code,
+                billing_cycle,
             )
         if seats is not None:
             modified_item["quantity"] = seats
@@ -193,7 +199,8 @@ class StripeProvider:
         )
 
     async def cancel_subscription(
-        self, provider_subscription_id: str,
+        self,
+        provider_subscription_id: str,
     ) -> None:
         # Cancel at period end — the customer keeps access through the
         # paid period and Step 13's webhook flips the local row when
@@ -205,7 +212,9 @@ class StripeProvider:
         )
 
     async def verify_webhook(
-        self, payload: bytes, signature: str,
+        self,
+        payload: bytes,
+        signature: str,
     ) -> dict[str, Any]:
         try:
             await asyncio.to_thread(
@@ -218,7 +227,8 @@ class StripeProvider:
             # Do NOT pass `exc` text to the response; that's diagnostic
             # only. The Step 13 handler maps this to a 400.
             log.warning(
-                "Stripe webhook signature verification failed: %s", exc,
+                "Stripe webhook signature verification failed: %s",
+                exc,
             )
             raise InvalidWebhookSignature("invalid signature") from exc
         # `construct_event` returns a `StripeObject` whose iteration is

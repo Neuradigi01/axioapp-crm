@@ -1,8 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  inject,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { UpgradeModalService } from '../services/upgrade-modal.service';
@@ -37,8 +33,7 @@ import { UpgradeModalService } from '../services/upgrade-modal.service';
           Upgrade cancelled
         </h1>
         <p class="mt-2 text-sm text-zinc-500 dark:text-slate-400">
-          You weren't charged. Pick up where you left off or head back to
-          Billing.
+          You weren't charged. Pick up where you left off or head back to Billing.
         </p>
         <div class="mt-5 flex items-center justify-center gap-2">
           <a

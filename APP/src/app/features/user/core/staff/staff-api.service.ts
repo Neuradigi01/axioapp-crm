@@ -91,10 +91,7 @@ export class StaffApiService {
     return this.http.get<StaffListItem[]>(this.base);
   }
 
-  upsertProfile(
-    userId: string,
-    payload: StaffProfileUpsert,
-  ): Observable<StaffProfileOut> {
+  upsertProfile(userId: string, payload: StaffProfileUpsert): Observable<StaffProfileOut> {
     return this.http.put<StaffProfileOut>(`${this.base}/${userId}`, payload);
   }
 
@@ -102,38 +99,26 @@ export class StaffApiService {
     return this.http.get<PerformanceOut>(`${this.base}/${userId}/performance`);
   }
 
-  attendance(
-    userId: string,
-    from?: string,
-    to?: string,
-  ): Observable<AttendanceOut[]> {
+  attendance(userId: string, from?: string, to?: string): Observable<AttendanceOut[]> {
     const params = buildHttpParams({ from, to });
-    return this.http.get<AttendanceOut[]>(
-      `${this.base}/${userId}/attendance`,
-      { params },
-    );
+    return this.http.get<AttendanceOut[]>(`${this.base}/${userId}/attendance`, { params });
   }
 
   activity(userId: string, limit = 100): Observable<StaffActivity[]> {
     const params = buildHttpParams({ limit });
-    return this.http.get<StaffActivity[]>(
-      `${this.base}/${userId}/activity`,
-      { params },
-    );
+    return this.http.get<StaffActivity[]>(`${this.base}/${userId}/activity`, { params });
   }
 
   clockIn(userId: string, notes?: string): Observable<AttendanceOut> {
-    return this.http.post<AttendanceOut>(
-      `${this.base}/${userId}/clock-in`,
-      { notes: notes ?? null },
-    );
+    return this.http.post<AttendanceOut>(`${this.base}/${userId}/clock-in`, {
+      notes: notes ?? null,
+    });
   }
 
   clockOut(userId: string, notes?: string): Observable<AttendanceOut> {
-    return this.http.post<AttendanceOut>(
-      `${this.base}/${userId}/clock-out`,
-      { notes: notes ?? null },
-    );
+    return this.http.post<AttendanceOut>(`${this.base}/${userId}/clock-out`, {
+      notes: notes ?? null,
+    });
   }
 
   /**
@@ -152,9 +137,7 @@ export class StaffApiService {
             return;
           }
           const calls = staff.map((s) =>
-            this.performance(s.id).pipe(
-              map((perf) => ({ staff: s, performance: perf })),
-            ),
+            this.performance(s.id).pipe(map((perf) => ({ staff: s, performance: perf }))),
           );
           forkJoin(calls).subscribe({
             next: (rows) => {

@@ -14,11 +14,11 @@ Frontend mount: ``/user/workflows`` (Step 13 list page).
 build templates (250), wire single-event triggers (Automations,
 260), then compose multi-step flowcharts (Workflows, 270).
 """
+
 from __future__ import annotations
 
 from src.app.core.module_registry import ModuleDescriptor
 from src.app.core.workflows.permissions import ALL_KEYS
-
 
 MODULE = ModuleDescriptor(
     id="workflows",

@@ -10,10 +10,10 @@ still needs the Meta-specific extension row (header type, language,
 button payloads) at send time — `get_wa_extension_for_campaign_template`
 resolves it via the Step-9 reciprocal link.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import and_, func, or_, select
@@ -39,9 +39,7 @@ async def get_wa_extension_for_campaign_template(
 ) -> WhatsAppTemplate | None:
     """Given the central row's UUID, return its WhatsApp extension row."""
     result = await session.execute(
-        select(WhatsAppTemplate).where(
-            WhatsAppTemplate.message_template_id == central_template_id
-        )
+        select(WhatsAppTemplate).where(WhatsAppTemplate.message_template_id == central_template_id)
     )
     return result.scalar_one_or_none()
 
@@ -53,12 +51,16 @@ async def get_wa_extensions_for_template_ids(
     if not central_template_ids:
         return {}
     rows = (
-        await session.execute(
-            select(WhatsAppTemplate).where(
-                WhatsAppTemplate.message_template_id.in_(central_template_ids)
+        (
+            await session.execute(
+                select(WhatsAppTemplate).where(
+                    WhatsAppTemplate.message_template_id.in_(central_template_ids)
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return {r.message_template_id: r for r in rows}
 
 
@@ -67,24 +69,21 @@ async def get_wa_extensions_for_template_ids(
 
 async def count_all_campaigns(session: AsyncSession) -> int:
     """Total campaign rows (auto-tenant-filtered) for paging."""
-    result = await session.execute(
-        select(func.count()).select_from(Campaign)
-    )
+    result = await session.execute(select(func.count()).select_from(Campaign))
     return int(result.scalar_one())
 
 
-async def list_campaigns_page(
-    session: AsyncSession, *, offset: int, limit: int
-) -> list[Campaign]:
+async def list_campaigns_page(session: AsyncSession, *, offset: int, limit: int) -> list[Campaign]:
     """Page of campaigns sorted newest-first."""
     rows = (
-        await session.execute(
-            select(Campaign)
-            .order_by(Campaign.created_at.desc())
-            .offset(offset)
-            .limit(limit)
+        (
+            await session.execute(
+                select(Campaign).order_by(Campaign.created_at.desc()).offset(offset).limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -94,9 +93,7 @@ def add_campaign(session: AsyncSession, campaign: Campaign) -> Campaign:
     return campaign
 
 
-async def delete_campaign_row(
-    session: AsyncSession, campaign: Campaign
-) -> None:
+async def delete_campaign_row(session: AsyncSession, campaign: Campaign) -> None:
     """Hard-delete a campaign row."""
     await session.delete(campaign)
 
@@ -154,9 +151,7 @@ async def bulk_upsert_queued_campaign_messages(
     await session.execute(
         pg_insert(CampaignMessage)
         .values(rows)
-        .on_conflict_do_nothing(
-            index_elements=["campaign_id", "contact_id"]
-        )
+        .on_conflict_do_nothing(index_elements=["campaign_id", "contact_id"])
     )
 
 
@@ -180,9 +175,7 @@ async def get_campaign_message_by_channel_id(
 ) -> CampaignMessage | None:
     """Look up a `CampaignMessage` row by Meta's `channel_message_id`."""
     result = await session.execute(
-        select(CampaignMessage).where(
-            CampaignMessage.channel_message_id == channel_message_id
-        )
+        select(CampaignMessage).where(CampaignMessage.channel_message_id == channel_message_id)
     )
     return result.scalar_one_or_none()
 
@@ -202,9 +195,7 @@ async def get_campaign_message_in_campaign(
     return result.scalar_one_or_none()
 
 
-async def count_queued_messages_for_campaign(
-    session: AsyncSession, campaign_id: uuid.UUID
-) -> int:
+async def count_queued_messages_for_campaign(session: AsyncSession, campaign_id: uuid.UUID) -> int:
     """Number of `status='queued'` rows still pending for one campaign."""
     result = await session.execute(
         select(func.count())
@@ -226,9 +217,7 @@ async def count_messages_filtered(
     if status_filter is not None:
         filters.append(CampaignMessage.status == status_filter)
     result = await session.execute(
-        select(func.count())
-        .select_from(CampaignMessage)
-        .where(and_(*filters))
+        select(func.count()).select_from(CampaignMessage).where(and_(*filters))
     )
     return int(result.scalar_one())
 
@@ -246,14 +235,18 @@ async def list_messages_page(
     if status_filter is not None:
         filters.append(CampaignMessage.status == status_filter)
     rows = (
-        await session.execute(
-            select(CampaignMessage)
-            .where(and_(*filters))
-            .order_by(CampaignMessage.created_at.asc())
-            .offset(offset)
-            .limit(limit)
+        (
+            await session.execute(
+                select(CampaignMessage)
+                .where(and_(*filters))
+                .order_by(CampaignMessage.created_at.asc())
+                .offset(offset)
+                .limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -295,9 +288,7 @@ async def get_conversation_by_external_id(
     return result.scalar_one_or_none()
 
 
-def add_conversation(
-    session: AsyncSession, conversation: Conversation
-) -> Conversation:
+def add_conversation(session: AsyncSession, conversation: Conversation) -> Conversation:
     """Stage a new conversation row in the unit-of-work."""
     session.add(conversation)
     return conversation

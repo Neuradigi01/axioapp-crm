@@ -25,18 +25,17 @@ Cases:
  13. ``AISettingsPatch`` rejects system prompt > 4096 chars.
  14. ``AISettingsPatch`` accepts all-None (partial update sentinel).
 """
+
 from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Optional
 
 import pytest
 from pydantic import ValidationError
 
 from src.app.core.ai.whatsapp_integration import (
     AIResponse,
-    ConversationTurn,
     generate_response,
     history_from_messages,
 )
@@ -52,7 +51,7 @@ class _FakeMessage:
     attributes ``history_from_messages`` reads."""
 
     direction: str
-    text: Optional[str]
+    text: str | None
     is_internal: bool = False
 
 
@@ -78,9 +77,7 @@ class TestHistoryProjection:
         assert [t.text for t in out] == ["hi", "real reply"]
 
     def test_caps_to_max_turns_newest_last(self):
-        msgs = [
-            _FakeMessage(direction="in", text=f"msg-{i}") for i in range(30)
-        ]
+        msgs = [_FakeMessage(direction="in", text=f"msg-{i}") for i in range(30)]
         out = history_from_messages(msgs, max_turns=5)
         assert len(out) == 5
         # Newest last — the last entry must be the highest-index message.
@@ -174,20 +171,12 @@ class TestHandoverKeywordMatcher:
         assert _matches_handover_keyword("anything", []) is False
 
     def test_no_match(self):
-        assert (
-            _matches_handover_keyword(
-                "what time do you open?", ["human", "agent"]
-            )
-            is False
-        )
+        assert _matches_handover_keyword("what time do you open?", ["human", "agent"]) is False
 
     def test_ignores_blank_keyword_entries(self):
         # Real config may have leading/trailing blank lines from the
         # textarea — these should not blanket-match every message.
-        assert (
-            _matches_handover_keyword("hello", ["", "  ", "human"])
-            is False
-        )
+        assert _matches_handover_keyword("hello", ["", "  ", "human"]) is False
 
 
 class TestAISettingsPatch:
@@ -199,9 +188,7 @@ class TestAISettingsPatch:
 
     def test_keyword_list_cap(self):
         with pytest.raises(ValidationError):
-            AISettingsPatch(
-                ai_handover_keywords=[f"kw-{i}" for i in range(51)]
-            )
+            AISettingsPatch(ai_handover_keywords=[f"kw-{i}" for i in range(51)])
 
     def test_system_prompt_max_length(self):
         with pytest.raises(ValidationError):
@@ -216,9 +203,7 @@ class TestAISettingsPatch:
 
     def test_extra_field_rejected(self):
         with pytest.raises(ValidationError):
-            AISettingsPatch.model_validate(
-                {"ai_confidence_threshold": 0.7, "bogus": True}
-            )
+            AISettingsPatch.model_validate({"ai_confidence_threshold": 0.7, "bogus": True})
 
     def test_valid_payload(self):
         patch = AISettingsPatch(

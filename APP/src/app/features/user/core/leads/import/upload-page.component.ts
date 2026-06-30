@@ -12,10 +12,7 @@ import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  ImportsApiService,
-  SourcePlatform,
-} from './imports-api.service';
+import { ImportsApiService, SourcePlatform } from './imports-api.service';
 
 /**
  * `/user/leads/import` — first user-facing surface of the bulk-import
@@ -51,7 +48,6 @@ const PLATFORMS: PlatformOption[] = [
   { value: 'custom', label: 'Custom / Other' },
 ];
 
-
 @Component({
   selector: 'app-import-upload-page',
   standalone: true,
@@ -74,10 +70,7 @@ export class UploadPageComponent {
   protected readonly error = signal<string | null>(null);
 
   protected readonly canSubmit = computed(
-    () =>
-      this.selectedFile() !== null &&
-      this.sourcePlatform() !== null &&
-      !this.uploading(),
+    () => this.selectedFile() !== null && this.sourcePlatform() !== null && !this.uploading(),
   );
 
   protected readonly fileSizeLabel = computed(() => {
@@ -134,17 +127,12 @@ export class UploadPageComponent {
       .subscribe({
         next: (row) => {
           this.uploading.set(false);
-          this.router.navigate([
-            '/user/leads/import',
-            row.id,
-            'mapping',
-          ]);
+          this.router.navigate(['/user/leads/import', row.id, 'mapping']);
         },
         error: (err: HttpErrorResponse) => {
           this.uploading.set(false);
           this.error.set(
-            extractApiError(err) ??
-              'Upload failed — please try again or check the file format.',
+            extractApiError(err) ?? 'Upload failed — please try again or check the file format.',
           );
         },
       });
@@ -155,9 +143,7 @@ export class UploadPageComponent {
       const name = file.name.toLowerCase();
       const okExtension = name.endsWith('.csv') || name.endsWith('.xlsx');
       if (!okExtension) {
-        this.error.set(
-          'Only .csv and .xlsx files are accepted. Pick a different file.',
-        );
+        this.error.set('Only .csv and .xlsx files are accepted. Pick a different file.');
         this.selectedFile.set(null);
         return;
       }

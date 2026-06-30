@@ -16,6 +16,7 @@ Stripe-side identifiers (`stripe_customer_id`, `stripe_subscription_id`)
 remain NULL during the trial and only populate after Step 13's webhook
 handler processes the first paid `checkout.session.completed` event.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -38,7 +39,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
-
 
 # Canonical status values. The CHECK constraint at the DB level mirrors
 # this tuple; the entitlement service uses the same list.
@@ -100,9 +100,7 @@ class Subscription(Base, TenantScoped):
             "subscriptions_active_per_org_uq",
             "org_id",
             unique=True,
-            postgresql_where=text(
-                f"status IN ({_in_clause(ACTIVE_STATUSES)})"
-            ),
+            postgresql_where=text(f"status IN ({_in_clause(ACTIVE_STATUSES)})"),
         ),
     )
 
@@ -137,9 +135,7 @@ class Subscription(Base, TenantScoped):
     trial_started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    trial_ends_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     current_period_start: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -150,19 +146,11 @@ class Subscription(Base, TenantScoped):
         nullable=False,
     )
 
-    read_only_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    archived_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    cancelled_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    read_only_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    stripe_customer_id: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, index=True
-    )
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     stripe_subscription_id: Mapped[str | None] = mapped_column(
         String(64), nullable=True, index=True
     )
@@ -173,24 +161,16 @@ class Subscription(Base, TenantScoped):
     # lifecycle task can flip the row at `current_period_end`. All three
     # stay NULL until a downgrade is scheduled and clear back to NULL
     # once `apply_scheduled_change_if_due` lands the change.
-    next_plan_code: Mapped[str | None] = mapped_column(
-        String(32), nullable=True
-    )
-    next_billing_cycle: Mapped[str | None] = mapped_column(
-        String(8), nullable=True
-    )
-    next_seats: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
-    )
+    next_plan_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    next_billing_cycle: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    next_seats: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Step 12 — most recent Stripe Checkout Session ID created for the
     # org. Set when an upgrade flow opens hosted checkout; cleared by
     # the Step 13 webhook on `checkout.session.completed` or
     # `checkout.session.expired`. A non-null value means there is a
     # pending payment intent the operator can re-share with the user.
-    pending_checkout_session_id: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )
+    pending_checkout_session_id: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -216,10 +196,7 @@ class Subscription(Base, TenantScoped):
     )
 
     def __repr__(self) -> str:  # pragma: no cover — debug aid
-        return (
-            f"<Subscription org={self.org_id} "
-            f"plan={self.plan_code} status={self.status}>"
-        )
+        return f"<Subscription org={self.org_id} plan={self.plan_code} status={self.status}>"
 
 
 # ---------------------------------------------------------------------------
@@ -285,15 +262,9 @@ class UsageCounter(Base, TenantScoped):
 
     resource: Mapped[str] = mapped_column(String(64), nullable=False)
     period_kind: Mapped[str] = mapped_column(String(16), nullable=False)
-    period_start: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    period_end: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    value: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, server_default=text("0")
-    )
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    value: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default=text("0"))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -302,10 +273,7 @@ class UsageCounter(Base, TenantScoped):
     )
 
     def __repr__(self) -> str:  # pragma: no cover — debug aid
-        return (
-            f"<UsageCounter org={self.org_id} "
-            f"resource={self.resource} value={self.value}>"
-        )
+        return f"<UsageCounter org={self.org_id} resource={self.resource} value={self.value}>"
 
 
 # ---------------------------------------------------------------------------
@@ -314,7 +282,11 @@ class UsageCounter(Base, TenantScoped):
 
 
 INVOICE_STATUSES: tuple[str, ...] = (
-    "paid", "open", "void", "uncollectible", "draft",
+    "paid",
+    "open",
+    "void",
+    "uncollectible",
+    "draft",
 )
 
 
@@ -361,29 +333,21 @@ class SubscriptionInvoice(Base, TenantScoped):
         UUID(as_uuid=True),
         nullable=False,
     )
-    stripe_invoice_id: Mapped[str] = mapped_column(
-        String(64), nullable=False
-    )
+    stripe_invoice_id: Mapped[str] = mapped_column(String(64), nullable=False)
     number: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     amount_due_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     amount_paid_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(
-        String(8), nullable=False, server_default=text("'USD'"),
+        String(8),
+        nullable=False,
+        server_default=text("'USD'"),
     )
-    period_start: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    period_end: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    hosted_invoice_url: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )
+    period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hosted_invoice_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     pdf_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    paid_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -410,18 +374,14 @@ class StripeWebhookEvent(Base):
 
     __tablename__ = "tbl_stripe_webhook_events"
 
-    stripe_event_id: Mapped[str] = mapped_column(
-        Text, primary_key=True
-    )
+    stripe_event_id: Mapped[str] = mapped_column(Text, primary_key=True)
     event_type: Mapped[str] = mapped_column(Text, nullable=False)
     received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=text("now()"),
     )
-    processed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 

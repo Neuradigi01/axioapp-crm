@@ -3,18 +3,13 @@
     <div>
       <h3 class="text-sm font-semibold text-zinc-900">Suppression list</h3>
       <p class="mt-1 text-xs text-zinc-500">
-        Addresses the send-guard refuses. Populated automatically by
-        hard bounces, spam complaints, and unsubscribes from your
-        configured email provider, plus any addresses you've added
+        Addresses the send-guard refuses. Populated automatically by hard bounces, spam complaints,
+        and unsubscribes from your configured email provider, plus any addresses you've added
         manually.
       </p>
     </div>
 
-    <form
-      [formGroup]="form"
-      (ngSubmit)="reload()"
-      class="flex flex-wrap items-end gap-2"
-    >
+    <form [formGroup]="form" (ngSubmit)="reload()" class="flex flex-wrap items-end gap-2">
       <label class="text-sm">
         <span class="block text-xs font-medium text-zinc-600">Channel</span>
         <select
@@ -59,7 +54,9 @@
   @if (loading()) {
     <div class="mt-4 text-center text-sm text-zinc-500">Loading…</div>
   } @else if (rows().length === 0) {
-    <div class="mt-4 rounded-md border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-500">
+    <div
+      class="mt-4 rounded-md border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-500"
+    >
       No suppressed addresses for the current filters.
     </div>
   } @else {
@@ -67,11 +64,31 @@
       <table class="min-w-full divide-y divide-zinc-200">
         <thead class="bg-zinc-50">
           <tr>
-            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Channel</th>
-            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Address</th>
-            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Reason</th>
-            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">Added</th>
-            <th class="px-3 py-2 text-right text-xs font-medium uppercase tracking-wide text-zinc-500">Action</th>
+            <th
+              class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Channel
+            </th>
+            <th
+              class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Address
+            </th>
+            <th
+              class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Reason
+            </th>
+            <th
+              class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Added
+            </th>
+            <th
+              class="px-3 py-2 text-right text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Action
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-100 bg-white text-sm">

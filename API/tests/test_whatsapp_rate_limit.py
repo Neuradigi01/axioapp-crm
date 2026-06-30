@@ -8,9 +8,9 @@ Two surfaces under test:
   2. Adapter 429 handling — Meta 429 response → `WhatsAppRateLimited`
      with `retry_after_seconds` parsed from `Retry-After` header.
 """
+
 from __future__ import annotations
 
-import asyncio
 import time
 import uuid
 
@@ -27,7 +27,6 @@ from src.app.core.integrations.whatsapp.rate_limit import (
     acquire_wa_rate_token,
     get_wa_rate_limiter,
 )
-
 
 # --- token bucket --------------------------------------------------------
 
@@ -115,9 +114,7 @@ class TestModuleHelpers:
         """The convenience wrapper takes a UUID + int rate and returns
         a float wait. No raising on valid args."""
         get_wa_rate_limiter().reset()
-        wait = await acquire_wa_rate_token(
-            uuid.uuid4(), rate_per_sec=10, count=1
-        )
+        wait = await acquire_wa_rate_token(uuid.uuid4(), rate_per_sec=10, count=1)
         assert wait == 0.0
 
 
@@ -216,9 +213,7 @@ class TestAdapter429:
     @pytest.mark.asyncio
     async def test_429_on_template_send_also_raises(self):
         """The 429 branch applies to `send_template` symmetrically."""
-        resp = httpx.Response(
-            429, headers={"retry-after": "10"}, content=b"{}"
-        )
+        resp = httpx.Response(429, headers={"retry-after": "10"}, content=b"{}")
         adapter = WhatsAppAdapter(
             phone_id="123",
             token="t",

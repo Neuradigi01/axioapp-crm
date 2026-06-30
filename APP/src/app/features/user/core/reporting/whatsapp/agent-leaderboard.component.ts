@@ -20,12 +20,7 @@ import {
   formatDuration,
 } from './whatsapp-reports.service';
 
-type SortKey =
-  | 'median'
-  | 'replies'
-  | 'conversations'
-  | 'p95'
-  | 'name';
+type SortKey = 'median' | 'replies' | 'conversations' | 'p95' | 'name';
 
 /**
  * Agent leaderboard (Step 20).
@@ -50,9 +45,7 @@ type SortKey =
           <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
             Agent leaderboard
           </p>
-          <p class="text-[11px] text-zinc-500">
-            Who's responding fastest. AI replies excluded.
-          </p>
+          <p class="text-[11px] text-zinc-500">Who's responding fastest. AI replies excluded.</p>
         </div>
         @if (loading()) {
           <span class="text-[11px] text-zinc-500">Loading…</span>
@@ -178,10 +171,7 @@ export class AgentLeaderboardComponent {
     return asc ? sorted : sorted.reverse();
   }
 
-  private sortField(
-    row: LeaderboardReport['rows'][number],
-    key: SortKey,
-  ): number | string | null {
+  private sortField(row: LeaderboardReport['rows'][number], key: SortKey): number | string | null {
     switch (key) {
       case 'name':
         return row.name.toLowerCase();
@@ -222,9 +212,7 @@ export class AgentLeaderboardComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not load agent leaderboard.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load agent leaderboard.');
         },
       });
   }

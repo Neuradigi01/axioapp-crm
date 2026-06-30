@@ -9,6 +9,7 @@ Covers:
   - 404 on nonexistent order
   - perm-gated writes (read works, write rejected without grant)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -36,9 +37,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -53,9 +52,7 @@ async def _login(client, *, org_slug: str, email: str, password: str) -> str:
 
 
 @pytest.mark.asyncio
-async def test_create_lands_in_initial_stage_and_logs_history(
-    layered_client, seeded_admin
-):
+async def test_create_lands_in_initial_stage_and_logs_history(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -89,13 +86,16 @@ async def test_create_lands_in_initial_stage_and_logs_history(
     try:
         async with TestSession() as session:
             rows = (
-                await session.execute(
-                    select(CustomOrderStageHistory).where(
-                        CustomOrderStageHistory.order_id
-                        == uuid.UUID(body["id"])
+                (
+                    await session.execute(
+                        select(CustomOrderStageHistory).where(
+                            CustomOrderStageHistory.order_id == uuid.UUID(body["id"])
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(rows) == 1
             assert rows[0].from_stage is None
             assert rows[0].to_stage == "measurement_scheduled"
@@ -139,9 +139,7 @@ async def test_list_and_filter_by_stage(layered_client, seeded_admin):
     assert resp.status_code == 200
     assert resp.json()["total"] == 3
 
-    resp = await layered_client.get(
-        "/api/v1/custom-orders?stage=design_phase", headers=headers
-    )
+    resp = await layered_client.get("/api/v1/custom-orders?stage=design_phase", headers=headers)
     assert resp.status_code == 200
     assert resp.json()["total"] == 0
 
@@ -171,9 +169,7 @@ async def test_get_patch_delete(layered_client, seeded_admin):
     order_id = resp.json()["id"]
 
     # GET
-    g = await layered_client.get(
-        f"/api/v1/custom-orders/{order_id}", headers=headers
-    )
+    g = await layered_client.get(f"/api/v1/custom-orders/{order_id}", headers=headers)
     assert g.status_code == 200
     assert g.json()["title"] == "Original"
 
@@ -188,14 +184,10 @@ async def test_get_patch_delete(layered_client, seeded_admin):
     assert p.json()["color"] == "Oak"  # untouched
 
     # DELETE
-    d = await layered_client.delete(
-        f"/api/v1/custom-orders/{order_id}", headers=headers
-    )
+    d = await layered_client.delete(f"/api/v1/custom-orders/{order_id}", headers=headers)
     assert d.status_code == 204
 
-    g2 = await layered_client.get(
-        f"/api/v1/custom-orders/{order_id}", headers=headers
-    )
+    g2 = await layered_client.get(f"/api/v1/custom-orders/{order_id}", headers=headers)
     assert g2.status_code == 404
 
 
@@ -269,9 +261,7 @@ async def test_get_nonexistent_returns_404(layered_client, seeded_admin):
     )
     headers = {"Authorization": f"Bearer {token}"}
 
-    resp = await layered_client.get(
-        f"/api/v1/custom-orders/{uuid.uuid4()}", headers=headers
-    )
+    resp = await layered_client.get(f"/api/v1/custom-orders/{uuid.uuid4()}", headers=headers)
     assert resp.status_code == 404
 
 

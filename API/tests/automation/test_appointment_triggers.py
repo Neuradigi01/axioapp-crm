@@ -13,19 +13,20 @@ Tests exercise the scanner + the publish chokepoint directly (the
 Celery wrapper is one-line ``asyncio.run``). All
 ``deliver_run.apply_async`` calls are mocked so no real workers run.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.appointments import (
     data_access as appointments_da,
-    tasks as appointment_tasks,
 )
 from src.app.core.appointments.models import (
     Appointment,
@@ -33,6 +34,8 @@ from src.app.core.appointments.models import (
 )
 from src.app.core.automation import (
     seeds as automation_seeds,
+)
+from src.app.core.automation import (
     tasks as automation_tasks,
 )
 from src.app.core.automation.dispatcher import dispatch_event
@@ -42,7 +45,6 @@ from src.app.core.automation.models import (
 )
 from src.app.core.automation.service import match_triggers
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -56,10 +58,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo Workspace",
@@ -73,9 +72,7 @@ async def org_id(test_db):
 async def _install_seeds(test_db, org_id):
     token = set_context(RequestContext(org_id=org_id))
     try:
-        result = await automation_seeds.install_default_org_seeds(
-            test_db, org_id=org_id
-        )
+        result = await automation_seeds.install_default_org_seeds(test_db, org_id=org_id)
         await test_db.commit()
         return result
     finally:
@@ -135,30 +132,33 @@ async def test_all_three_seeds_idempotent(test_db, org_id):
     first = await _install_seeds(test_db, org_id)
     second = await _install_seeds(test_db, org_id)
 
-    assert first["appointment_booked_trigger_id"] == second[
-        "appointment_booked_trigger_id"
-    ]
-    assert first["appointment_reminder_24h_trigger_id"] == second[
-        "appointment_reminder_24h_trigger_id"
-    ]
-    assert first["appointment_reminder_1h_trigger_id"] == second[
-        "appointment_reminder_1h_trigger_id"
-    ]
+    assert first["appointment_booked_trigger_id"] == second["appointment_booked_trigger_id"]
+    assert (
+        first["appointment_reminder_24h_trigger_id"]
+        == second["appointment_reminder_24h_trigger_id"]
+    )
+    assert (
+        first["appointment_reminder_1h_trigger_id"] == second["appointment_reminder_1h_trigger_id"]
+    )
 
     rows = (
-        await test_db.execute(
-            select(AutomationTrigger).where(
-                AutomationTrigger.org_id == org_id,
-                AutomationTrigger.event_type.in_(
-                    (
-                        "appointment.booked",
-                        "appointment.reminder_24h",
-                        "appointment.reminder_1h",
-                    )
-                ),
+        (
+            await test_db.execute(
+                select(AutomationTrigger).where(
+                    AutomationTrigger.org_id == org_id,
+                    AutomationTrigger.event_type.in_(
+                        (
+                            "appointment.booked",
+                            "appointment.reminder_24h",
+                            "appointment.reminder_1h",
+                        )
+                    ),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     # Exactly three rows — one per event_type, both install runs
     # collapsed.
     assert len(rows) == 3
@@ -212,11 +212,9 @@ async def test_appointment_create_publishes_booked(test_db, org_id):
         captured["scheduled_at"] = appt.scheduled_at
         captured["location"] = appt.location
 
-    with patch.object(
-        appt_service, "_publish_appointment_booked", side_effect=_capture
-    ):
+    with patch.object(appt_service, "_publish_appointment_booked", side_effect=_capture):
         # Insert appointment directly + invoke the publisher hook.
-        scheduled_at = datetime.now(timezone.utc) + timedelta(hours=48)
+        scheduled_at = datetime.now(UTC) + timedelta(hours=48)
         appt = Appointment(
             org_id=org_id,
             contact_id=contact_id,
@@ -231,9 +229,7 @@ async def test_appointment_create_publishes_booked(test_db, org_id):
         test_db.add(appt)
         await test_db.commit()
         await test_db.refresh(appt)
-        await appt_service._publish_appointment_booked(
-            session=test_db, org_id=org_id, appt=appt
-        )
+        await appt_service._publish_appointment_booked(session=test_db, org_id=org_id, appt=appt)
 
     assert captured["org_id"] == org_id
     assert captured["appt_id"] == appt.id
@@ -249,10 +245,8 @@ async def test_appointment_create_publishes_booked(test_db, org_id):
 async def test_scheduler_picks_up_24h_window(test_db, org_id):
     """An appointment scheduled ~24h out should appear in the 24h
     scan window."""
-    target = datetime.now(timezone.utc) + timedelta(hours=24)
-    appt = await _make_appointment(
-        test_db, org_id=org_id, scheduled_at=target
-    )
+    target = datetime.now(UTC) + timedelta(hours=24)
+    appt = await _make_appointment(test_db, org_id=org_id, scheduled_at=target)
 
     window_start = target - timedelta(minutes=30)
     window_end = target + timedelta(minutes=30)
@@ -266,10 +260,8 @@ async def test_scheduler_picks_up_24h_window(test_db, org_id):
 async def test_scheduler_picks_up_1h_window(test_db, org_id):
     """An appointment scheduled ~1h out should appear in the 1h
     scan window."""
-    target = datetime.now(timezone.utc) + timedelta(hours=1)
-    appt = await _make_appointment(
-        test_db, org_id=org_id, scheduled_at=target
-    )
+    target = datetime.now(UTC) + timedelta(hours=1)
+    appt = await _make_appointment(test_db, org_id=org_id, scheduled_at=target)
 
     window_start = target - timedelta(minutes=30)
     window_end = target + timedelta(minutes=30)
@@ -283,13 +275,11 @@ async def test_scheduler_picks_up_1h_window(test_db, org_id):
 async def test_scheduler_skips_past_appointments(test_db, org_id):
     """Rows whose scheduled_at is in the past should never appear in
     a forward-looking scan window."""
-    past = datetime.now(timezone.utc) - timedelta(hours=2)
-    appt = await _make_appointment(
-        test_db, org_id=org_id, scheduled_at=past
-    )
+    past = datetime.now(UTC) - timedelta(hours=2)
+    appt = await _make_appointment(test_db, org_id=org_id, scheduled_at=past)
 
     # 24h scan window — always centred on now+24h.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     rows = await appointments_da.find_due_for_reminder(
         test_db,
         window_start=now + timedelta(hours=23, minutes=30),
@@ -305,9 +295,7 @@ async def test_scheduler_skips_past_appointments(test_db, org_id):
 # ---------------------------------------------------------------------------
 
 
-async def test_scheduler_does_not_double_fire_same_appointment(
-    test_db, org_id
-):
+async def test_scheduler_does_not_double_fire_same_appointment(test_db, org_id):
     """Two dispatch passes for the same appointment + same
     deterministic event_id should yield exactly ONE run row."""
     await _install_seeds(test_db, org_id)

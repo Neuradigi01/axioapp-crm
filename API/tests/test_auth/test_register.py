@@ -1,18 +1,19 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
 import pytest_asyncio
-from unittest.mock import patch, AsyncMock
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
-from src.models import Base
-from src.models.user import UserLogin, UserInfo
 from src.core.security.password import hash_password
-from tests.conftest import test_engine, TestSession
+from src.models import Base
+from src.models.user import UserInfo, UserLogin
+from tests.conftest import TestSession, test_engine
 
 
 @pytest_asyncio.fixture
 async def client():
-    from main import app
     import src.core.db as db_module
+    from main import app
 
     original_session = db_module.async_session
     db_module.async_session = TestSession
@@ -60,8 +61,13 @@ async def test_register_duplicate_email(mock_email, mock_routes, client):
         user = UserLogin(user_id="other_user", password=hash_password("pass1234"), is_active=True)
         db.add(user)
         await db.flush()
-        info = UserInfo(member_id=user.id, first_name="Other", last_name="User",
-                        email="john@test.com", mobile_no="")
+        info = UserInfo(
+            member_id=user.id,
+            first_name="Other",
+            last_name="User",
+            email="john@test.com",
+            mobile_no="",
+        )
         db.add(info)
         await db.commit()
 
@@ -80,8 +86,13 @@ async def test_register_with_valid_referral(mock_email, mock_routes, client):
         referrer = UserLogin(user_id="referrer", password=hash_password("pass1234"), is_active=True)
         db.add(referrer)
         await db.flush()
-        info = UserInfo(member_id=referrer.id, first_name="Ref", last_name="User",
-                        email="referrer@test.com", mobile_no="")
+        info = UserInfo(
+            member_id=referrer.id,
+            first_name="Ref",
+            last_name="User",
+            email="referrer@test.com",
+            mobile_no="",
+        )
         db.add(info)
         await db.commit()
 

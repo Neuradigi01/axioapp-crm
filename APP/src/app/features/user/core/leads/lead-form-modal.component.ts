@@ -14,16 +14,10 @@ import { RouterLink } from '@angular/router';
 import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
-import {
-  ContactListItem,
-  ContactsApiService,
-} from '../contacts/contacts-api.service';
+import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
-import {
-  Pipeline,
-  PipelinesApiService,
-} from '../pipelines/pipelines-api.service';
+import { Pipeline, PipelinesApiService } from '../pipelines/pipelines-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators } from '../shared/validators';
@@ -99,9 +93,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
    * org marked them required. Budget additionally picks up min/max from
    * the override row when present.
    */
-  protected applyStandardValidators(
-    map: Record<string, StandardFieldRendered>,
-  ): void {
+  protected applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
     const budgetRow = map['budget'];
     const closeRow = map['expected_close_date'];
 
@@ -155,9 +147,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
       .pipe(
         debounceTime(200),
         distinctUntilChanged(),
-        switchMap((q) =>
-          this.contactsApi.list({ q: q || undefined, size: 8 }),
-        ),
+        switchMap((q) => this.contactsApi.list({ q: q || undefined, size: 8 })),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({

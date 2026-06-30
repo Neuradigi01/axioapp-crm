@@ -21,10 +21,11 @@ The variable-picker endpoint is the editor's source of truth (Step
 7's UI loads it once per editor open). The list is static per
 channel, so the response is small + cacheable.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -66,7 +67,6 @@ from src.app.core.templates.permissions import (
 from src.app.core.templates.schemas import (
     TemplateCreate,
     TemplateRead,
-    TemplateReviewRead,
     TemplateTestSendRead,
     TemplateUpdate,
     TemplateVersionRead,
@@ -80,7 +80,6 @@ from src.app.core.templates.variables import (
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/templates", tags=["Templates"])
 
@@ -116,7 +115,7 @@ class PreviewRequest(BaseModel):
 class PreviewResponse(BaseModel):
     """Rendered preview returned by ``POST /templates/{id}/preview``."""
 
-    subject: Optional[str] = None
+    subject: str | None = None
     body: str
 
 
@@ -127,7 +126,7 @@ class VariableDefOut(BaseModel):
     label: str
     type: str
     required: bool
-    default: Optional[str] = None
+    default: str | None = None
 
 
 # --- helpers -----------------------------------------------------------
@@ -148,10 +147,10 @@ def _to_variable_out(defn: VariableDef) -> VariableDefOut:
 
 @router.get("", response_model=TemplateListResponse)
 async def list_endpoint(
-    channel: Optional[ConversationChannel] = Query(default=None),
-    internal_status: Optional[TemplateInternalStatus] = Query(default=None),
-    external_status: Optional[TemplateExternalStatus] = Query(default=None),
-    q: Optional[str] = Query(default=None, max_length=255),
+    channel: ConversationChannel | None = Query(default=None),
+    internal_status: TemplateInternalStatus | None = Query(default=None),
+    external_status: TemplateExternalStatus | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=255),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -349,13 +348,9 @@ def _workflow_http_map(exc: TemplateError) -> HTTPException:
         exc,
         (InvalidWorkflowTransition, SelfApproveBlocked, PublishBlockedByExternal),
     ):
-        return HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     # Generic note-required / other TemplateError → 422.
-    return HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-    )
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
 
 
 @router.post("/{template_id}/submit", response_model=TemplateRead)
@@ -423,9 +418,7 @@ async def reject_endpoint(
     return TemplateRead.model_validate(template)
 
 
-@router.post(
-    "/{template_id}/request-changes", response_model=TemplateRead
-)
+@router.post("/{template_id}/request-changes", response_model=TemplateRead)
 async def request_changes_endpoint(
     template_id: uuid.UUID,
     payload: WorkflowActionPayload,
@@ -506,8 +499,8 @@ class ExternalStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: str
-    rejection_reason: Optional[str] = None
-    last_synced_at: Optional[str] = None
+    rejection_reason: str | None = None
+    last_synced_at: str | None = None
 
 
 def _meta_app_credentials() -> tuple[str, str]:
@@ -521,8 +514,7 @@ def _meta_app_credentials() -> tuple[str, str]:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
-                "Server is missing Meta App credentials — "
-                "set META_APP_ID and WHATSAPP_APP_SECRET."
+                "Server is missing Meta App credentials — set META_APP_ID and WHATSAPP_APP_SECRET."
             ),
         )
     return META_APP_ID, WHATSAPP_APP_SECRET
@@ -667,14 +659,14 @@ class SMSDltMetadataResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    dlt_entity_id: Optional[str] = None
-    dlt_template_id: Optional[str] = None
+    dlt_entity_id: str | None = None
+    dlt_template_id: str | None = None
     dlt_content_category: str = "transactional"
-    dlt_header: Optional[str] = None
-    dlt_principal_entity_id: Optional[str] = None
+    dlt_header: str | None = None
+    dlt_principal_entity_id: str | None = None
     dlt_template_status: str = "pending"
-    dlt_registered_at: Optional[str] = None
-    dlt_rejection_reason: Optional[str] = None
+    dlt_registered_at: str | None = None
+    dlt_rejection_reason: str | None = None
 
 
 class SMSDltMetadataPatch(BaseModel):
@@ -683,22 +675,15 @@ class SMSDltMetadataPatch(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    dlt_entity_id: Optional[str] = Field(default=None, max_length=128)
-    dlt_template_id: Optional[str] = Field(default=None, max_length=128)
-    dlt_content_category: Optional[
-        Literal[
-            "transactional",
-            "promotional",
-            "service_explicit",
-            "service_implicit",
-        ]
-    ] = None
-    dlt_header: Optional[str] = Field(default=None, max_length=6)
-    dlt_principal_entity_id: Optional[str] = Field(default=None, max_length=128)
-    dlt_template_status: Optional[
-        Literal["registered", "pending", "rejected"]
-    ] = None
-    dlt_rejection_reason: Optional[str] = Field(default=None, max_length=512)
+    dlt_entity_id: str | None = Field(default=None, max_length=128)
+    dlt_template_id: str | None = Field(default=None, max_length=128)
+    dlt_content_category: (
+        Literal["transactional", "promotional", "service_explicit", "service_implicit"] | None
+    ) = None
+    dlt_header: str | None = Field(default=None, max_length=6)
+    dlt_principal_entity_id: str | None = Field(default=None, max_length=128)
+    dlt_template_status: Literal["registered", "pending", "rejected"] | None = None
+    dlt_rejection_reason: str | None = Field(default=None, max_length=512)
 
 
 def _serialize_dlt_row(row) -> SMSDltMetadataResponse:
@@ -709,9 +694,7 @@ def _serialize_dlt_row(row) -> SMSDltMetadataResponse:
         dlt_header=row.dlt_header,
         dlt_principal_entity_id=row.dlt_principal_entity_id,
         dlt_template_status=row.dlt_template_status.value,
-        dlt_registered_at=(
-            row.dlt_registered_at.isoformat() if row.dlt_registered_at else None
-        ),
+        dlt_registered_at=(row.dlt_registered_at.isoformat() if row.dlt_registered_at else None),
         dlt_rejection_reason=row.dlt_rejection_reason,
     )
 
@@ -747,9 +730,7 @@ async def get_sms_dlt_endpoint(
 
     from src.app.core.templates import sms_extension
 
-    row = await sms_extension.get_dlt_metadata(
-        db, org_id=user.org_id, template_id=template_id
-    )
+    row = await sms_extension.get_dlt_metadata(db, org_id=user.org_id, template_id=template_id)
     if row is None:
         return SMSDltMetadataResponse()
     return _serialize_dlt_row(row)
@@ -863,11 +844,7 @@ async def preview_endpoint(
             detail="template not found",
         ) from exc
     body = resolve(template.body_text, payload.context)
-    subject = (
-        resolve(template.subject, payload.context)
-        if template.subject
-        else None
-    )
+    subject = resolve(template.subject, payload.context) if template.subject else None
     return PreviewResponse(subject=subject, body=body)
 
 

@@ -1,5 +1,7 @@
 @if (selected(); as item) {
-  <div class="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+  <div
+    class="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2"
+  >
     <div class="min-w-0">
       <p class="truncate text-sm font-medium text-zinc-900">{{ item.name }}</p>
       <p class="truncate text-xs text-zinc-500">
@@ -7,7 +9,7 @@
         @if (item.category) {
           <span class="ml-1 text-zinc-400">· {{ item.category }}</span>
         }
-        <span class="ml-1 text-zinc-700">{{ item.price | formatINR : true }}</span>
+        <span class="ml-1 text-zinc-700">{{ item.price | formatINR: true }}</span>
       </p>
     </div>
     <button
@@ -31,7 +33,9 @@
       class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100"
     />
     @if (open() && results().length > 0) {
-      <ul class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-zinc-200">
+      <ul
+        class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-zinc-200"
+      >
         @for (item of results(); track item.id) {
           <li>
             <button
@@ -45,7 +49,7 @@
                 @if (item.category) {
                   <span class="ml-1 text-zinc-400">· {{ item.category }}</span>
                 }
-                <span class="ml-1 text-zinc-700">{{ item.price | formatINR : true }}</span>
+                <span class="ml-1 text-zinc-700">{{ item.price | formatINR: true }}</span>
               </span>
             </button>
           </li>

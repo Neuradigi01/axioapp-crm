@@ -15,10 +15,9 @@
           Meta Ads <span class="text-zinc-500 font-normal">(Facebook + Instagram)</span>
         </h3>
         <p class="mt-0.5 text-sm text-zinc-600">
-          Subscribe to Page-level `leadgen` events. Subscribing a Page
-          delivers every Lead Form on it. Configure the webhook URL ONCE
-          in your Meta app dashboard — it's per environment, not per
-          integration.
+          Subscribe to Page-level `leadgen` events. Subscribing a Page delivers every Lead Form on
+          it. Configure the webhook URL ONCE in your Meta app dashboard — it's per environment, not
+          per integration.
         </p>
         @if (integration()?.account_label) {
           <p class="mt-1 text-xs text-zinc-500">
@@ -72,30 +71,24 @@
   }
 
   @if (needsReconnect()) {
-    <div
-      class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
-    >
-      <p class="font-medium">
-        Your Meta connection has expired or was revoked.
-      </p>
+    <div class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+      <p class="font-medium">Your Meta connection has expired or was revoked.</p>
       @if (integration()?.last_error) {
         <p class="mt-1 text-xs text-amber-700">
           {{ integration()?.last_error }}
         </p>
       }
       <p class="mt-2 text-xs">
-        Meta tokens don't refresh — re-authorise to mint a new one.
-        Long-lived tokens last ~60 days; the Settings page warns 7 days
-        before expiry.
+        Meta tokens don't refresh — re-authorise to mint a new one. Long-lived tokens last ~60 days;
+        the Settings page warns 7 days before expiry.
       </p>
     </div>
   } @else if (tokenExpiringSoon()) {
-    <div
-      class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
-    >
+    <div class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
       <p>
-        Token expires in <strong>{{ daysToExpiry() }} day{{ daysToExpiry() === 1 ? '' : 's' }}</strong>.
-        Reconnect now to avoid a delivery gap.
+        Token expires in
+        <strong>{{ daysToExpiry() }} day{{ daysToExpiry() === 1 ? '' : 's' }}</strong
+        >. Reconnect now to avoid a delivery gap.
       </p>
     </div>
   }
@@ -142,12 +135,10 @@
   @if (isConnected()) {
     @if (webhookUrl(); as url) {
       <div class="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-3">
-        <p class="text-xs font-medium text-zinc-700">
-          Environment webhook URL
-        </p>
+        <p class="text-xs font-medium text-zinc-700">Environment webhook URL</p>
         <p class="mt-1 text-xs text-zinc-600">
-          Configure this ONCE in your Meta app dashboard's Webhooks tab,
-          alongside the verify token from your environment config.
+          Configure this ONCE in your Meta app dashboard's Webhooks tab, alongside the verify token
+          from your environment config.
         </p>
         <div class="mt-2 flex items-center gap-2">
           <code
@@ -196,8 +187,7 @@
 
       @if (pagesLoaded() && pages().length === 0) {
         <p class="mt-2 text-xs text-zinc-500">
-          No Pages found. Confirm the connected Facebook user manages
-          at least one Page.
+          No Pages found. Confirm the connected Facebook user manages at least one Page.
         </p>
       }
 
@@ -210,11 +200,7 @@
               (click)="togglePageExpansion(page.page_id)"
             >
               <lucide-icon
-                [name]="
-                  expandedPages().has(page.page_id)
-                    ? 'chevron-down'
-                    : 'chevron-right'
-                "
+                [name]="expandedPages().has(page.page_id) ? 'chevron-down' : 'chevron-right'"
                 size="14"
                 class="text-zinc-500"
                 aria-hidden="true"
@@ -285,9 +271,7 @@
                   Loading forms…
                 </p>
               } @else if ((formsByPage()[page.page_id] || []).length === 0) {
-                <p class="text-xs text-zinc-500">
-                  No Lead Forms on this Page.
-                </p>
+                <p class="text-xs text-zinc-500">No Lead Forms on this Page.</p>
               } @else {
                 <ul class="divide-y divide-zinc-100">
                   @for (form of formsByPage()[page.page_id]; track form.form_id) {

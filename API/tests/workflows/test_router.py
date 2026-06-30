@@ -8,13 +8,12 @@ Auth uses ``seeded_admin`` from conftest. Workflow + template
 permission keys are granted per-test via ``_grant_keys`` so each
 scenario is hermetic.
 """
+
 from __future__ import annotations
 
 import uuid
 
 import pytest
-import pytest_asyncio
-from sqlalchemy import select, text as sql_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.app.core.permissions.models import RolePermission
@@ -23,7 +22,6 @@ from src.app.core.workflows.actions import (
     _clear_registry_for_tests,
     register_action,
 )
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -57,9 +55,7 @@ async def _grant_keys(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -174,9 +170,7 @@ async def test_create_workflow_invalid_graph_422(layered_client, seeded_admin):
                         "id": "s1",
                         "type": "send.email",
                         "position": {"x": 0, "y": 0},
-                        "config": {
-                            "template_id": "00000000-0000-0000-0000-000000000001"
-                        },
+                        "config": {"template_id": "00000000-0000-0000-0000-000000000001"},
                     }
                 ],
                 "edges": [],
@@ -234,17 +228,13 @@ async def test_list_workflows_filters_by_status(layered_client, seeded_admin):
     )
     assert create_resp.status_code == 201
 
-    resp = await layered_client.get(
-        "/api/v1/workflows?status=draft", headers=headers
-    )
+    resp = await layered_client.get("/api/v1/workflows?status=draft", headers=headers)
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["total"] >= 1
     assert all(it["status"] == "draft" for it in body["items"])
 
-    resp_active = await layered_client.get(
-        "/api/v1/workflows?status=active", headers=headers
-    )
+    resp_active = await layered_client.get("/api/v1/workflows?status=active", headers=headers)
     assert resp_active.status_code == 200
     assert resp_active.json()["total"] == 0
 

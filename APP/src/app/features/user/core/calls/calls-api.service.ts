@@ -108,13 +108,15 @@ export class CallsApiService {
 
   // --- Calls ---
 
-  listCalls(opts: {
-    contact_id?: string;
-    direction?: CallDirection;
-    assigned_to?: string;
-    page?: number;
-    size?: number;
-  } = {}): Observable<CallListResponse> {
+  listCalls(
+    opts: {
+      contact_id?: string;
+      direction?: CallDirection;
+      assigned_to?: string;
+      page?: number;
+      size?: number;
+    } = {},
+  ): Observable<CallListResponse> {
     const params = buildHttpParams({
       contact_id: opts.contact_id,
       direction: opts.direction,
@@ -144,19 +146,11 @@ export class CallsApiService {
   // --- Transcript ---
 
   getTranscript(callId: string): Observable<CallTranscript> {
-    return this.http.get<CallTranscript>(
-      `${this.base}/calls/${callId}/transcript`,
-    );
+    return this.http.get<CallTranscript>(`${this.base}/calls/${callId}/transcript`);
   }
 
-  upsertTranscript(
-    callId: string,
-    payload: CallTranscriptUpsert,
-  ): Observable<CallTranscript> {
-    return this.http.put<CallTranscript>(
-      `${this.base}/calls/${callId}/transcript`,
-      payload,
-    );
+  upsertTranscript(callId: string, payload: CallTranscriptUpsert): Observable<CallTranscript> {
+    return this.http.put<CallTranscript>(`${this.base}/calls/${callId}/transcript`, payload);
   }
 
   // --- Outcomes ---

@@ -44,7 +44,6 @@ import {
   EmailTemplatesApiService,
 } from '../../services/email-templates-api.service';
 
-
 @Component({
   selector: 'app-email-template-picker',
   standalone: true,
@@ -75,11 +74,7 @@ export class EmailTemplatePickerComponent {
 
   constructor() {
     this.searchCtrl.valueChanges
-      .pipe(
-        debounceTime(200),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef),
-      )
+      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe((q) => this._load(q.trim()));
   }
 
@@ -123,9 +118,7 @@ export class EmailTemplatePickerComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.rendering.set(null);
-          this.errored.emit(
-            extractApiError(err) ?? 'Failed to load template.',
-          );
+          this.errored.emit(extractApiError(err) ?? 'Failed to load template.');
         },
       });
   }

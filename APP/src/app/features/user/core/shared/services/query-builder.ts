@@ -32,9 +32,7 @@ import { HttpParams } from '@angular/common/http';
  *     with_total: query.with_total // boolean — false is preserved
  *   });
  */
-export function buildHttpParams(
-  query: Record<string, unknown>,
-): HttpParams {
+export function buildHttpParams(query: Record<string, unknown>): HttpParams {
   let params = new HttpParams();
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined || value === null || value === '') {
@@ -60,14 +58,7 @@ export function buildHttpParams(
  * lines that drifted whenever a new pagination param appeared on
  * `list()`).
  */
-const PAGINATION_KEYS = new Set([
-  'page',
-  'size',
-  'pageSize',
-  'cursor',
-  'limit',
-  'with_total',
-]);
+const PAGINATION_KEYS = new Set(['page', 'size', 'pageSize', 'cursor', 'limit', 'with_total']);
 
 /**
  * Return a shallow copy of `query` with every known pagination key

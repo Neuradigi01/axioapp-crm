@@ -18,8 +18,8 @@ change that doesn't appear in this map (identity transitions, e.g.
 `scheduled → scheduled`, are also rejected — a no-op should not be a
 PATCH).
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 ALLOWED_TRANSITIONS: dict[str, frozenset[str]] = {
     "scheduled": frozenset({"completed", "no_show", "cancelled"}),

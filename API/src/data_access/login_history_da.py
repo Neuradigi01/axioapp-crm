@@ -1,7 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import select, update, func, and_
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.models.login_history import LoginHistory
 
 
@@ -24,7 +25,7 @@ async def invalidate_token(
     remarks: str = "Logged out",
 ) -> bool:
     """Mark a token as inactive. Returns True if the token was active and invalidated."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stmt = (
         update(LoginHistory)
         .where(and_(LoginHistory.id == token_id, LoginHistory.is_token_active == True))
@@ -69,8 +70,9 @@ async def get_login_history(
 
 async def mark_expired_tokens(db: AsyncSession, token_validity_hours: int = 24):
     """Auto-mark tokens as expired if their login_at + validity has passed."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     from sqlalchemy import text
+
     stmt = (
         update(LoginHistory)
         .where(

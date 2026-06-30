@@ -82,7 +82,6 @@ export interface PlansResponse {
   annual_discount_pct: number;
 }
 
-
 /**
  * Request / response for `POST /api/v1/subscriptions/checkout`
  * (Step 12). The modal POSTs a `CheckoutRequest` and either
@@ -101,7 +100,6 @@ export interface CheckoutResponse {
   checkout_url: string;
   session_id: string;
 }
-
 
 /**
  * Wire types for the seat-management endpoints (Step 9 backend) used
@@ -148,7 +146,6 @@ export type SeatChangeResponse =
   | SeatChangeScheduledResponse
   | SeatChangeNoChangeResponse;
 
-
 /**
  * Mirror of the backend's `InvoiceRead` schema (Step 13.c).
  *
@@ -156,12 +153,7 @@ export type SeatChangeResponse =
  * not always supply `number` or `pdf_url` (e.g. drafts), and the
  * billing UI degrades gracefully when those are absent.
  */
-export type InvoiceStatus =
-  | 'paid'
-  | 'open'
-  | 'void'
-  | 'uncollectible'
-  | 'draft';
+export type InvoiceStatus = 'paid' | 'open' | 'void' | 'uncollectible' | 'draft';
 
 export interface Invoice {
   id: string;
@@ -178,7 +170,6 @@ export interface Invoice {
   paid_at: string | null;
   created_at: string;
 }
-
 
 export interface SubscriptionCurrent {
   id: string;

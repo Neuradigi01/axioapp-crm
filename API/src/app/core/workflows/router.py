@@ -19,6 +19,7 @@ The router never executes SQL directly — every read + write goes
 through :mod:`core.workflows.service` (manager spec 2026-06-25:
 "router never imports another module's DAL").
 """
+
 from __future__ import annotations
 
 import uuid
@@ -27,8 +28,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.auth.dependencies import get_current_user, require_permissions
+from src.app.core.auth.dependencies import require_permissions
 from src.app.core.users.models import User
+from src.app.core.workflows import data_access as _workflows_da
 from src.app.core.workflows import engine as workflows_engine
 from src.app.core.workflows import service as workflows_service
 from src.app.core.workflows import templates_gallery
@@ -63,10 +65,8 @@ from src.app.core.workflows.schemas import (
     WorkflowVersionListResponse,
     WorkflowVersionSummaryRead,
 )
-from src.app.core.workflows import data_access as _workflows_da
 from src.app.shared.context import get_context
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/workflows", tags=["Workflows"])
 
@@ -85,13 +85,9 @@ def _workflow_http_map(exc: WorkflowError) -> HTTPException:
             detail="workflow not found",
         )
     if isinstance(exc, DuplicateWorkflowName):
-        return HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     if isinstance(exc, WorkflowLocked):
-        return HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        )
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     if isinstance(exc, FolderHasWorkflows):
         return HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -185,9 +181,7 @@ async def create_folder_endpoint(
     _: User = Depends(require_permissions(PERM_WRITE)),
 ) -> WorkflowFolderRead:
     org_id = _require_org_id()
-    folder = await workflows_service.create_folder(
-        db, org_id=org_id, payload=payload
-    )
+    folder = await workflows_service.create_folder(db, org_id=org_id, payload=payload)
     return WorkflowFolderRead.model_validate(folder)
 
 
@@ -227,9 +221,7 @@ async def delete_folder_endpoint(
 ) -> Response:
     org_id = _require_org_id()
     try:
-        await workflows_service.delete_folder(
-            db, org_id=org_id, folder_id=folder_id
-        )
+        await workflows_service.delete_folder(db, org_id=org_id, folder_id=folder_id)
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -260,9 +252,7 @@ async def get_run_endpoint(
     org_id = _require_org_id()
     run = await _workflows_da.get_run(db, org_id=org_id, run_id=run_id)
     if run is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="run not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
     return WorkflowRunRead.model_validate(run)
 
 
@@ -282,12 +272,8 @@ async def list_run_steps_endpoint(
     # UI doesn't render an empty drawer.
     run = await _workflows_da.get_run(db, org_id=org_id, run_id=run_id)
     if run is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="run not found"
-        )
-    rows = await _workflows_da.list_step_runs(
-        db, org_id=org_id, run_id=run_id
-    )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+    rows = await _workflows_da.list_step_runs(db, org_id=org_id, run_id=run_id)
     return [WorkflowStepRunRead.model_validate(r) for r in rows]
 
 
@@ -376,9 +362,7 @@ async def get_workflow_endpoint(
 ) -> WorkflowRead:
     org_id = _require_org_id()
     try:
-        workflow = await workflows_service.get_workflow(
-            db, org_id=org_id, workflow_id=workflow_id
-        )
+        workflow = await workflows_service.get_workflow(db, org_id=org_id, workflow_id=workflow_id)
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     return WorkflowRead.model_validate(workflow)
@@ -448,9 +432,7 @@ async def patch_workflow_endpoint(
         raise _workflow_http_map(exc) from exc
     except ValueError as exc:
         # Invalid status transition (state-machine reject).
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return WorkflowRead.model_validate(workflow)
 
 
@@ -476,9 +458,7 @@ async def delete_workflow_endpoint(
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -508,9 +488,7 @@ async def activate_workflow_endpoint(
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return WorkflowRead.model_validate(workflow)
 
 
@@ -535,9 +513,7 @@ async def pause_workflow_endpoint(
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return WorkflowRead.model_validate(workflow)
 
 
@@ -585,9 +561,7 @@ async def clone_workflow_endpoint(
 
     org_id = _require_org_id()
     try:
-        source = await workflows_service.get_workflow(
-            db, org_id=org_id, workflow_id=workflow_id
-        )
+        source = await workflows_service.get_workflow(db, org_id=org_id, workflow_id=workflow_id)
         new_payload = WorkflowCreate(
             name=payload.name,
             description=source.description,
@@ -676,9 +650,7 @@ async def test_fire_workflow_endpoint(
             detail="no org context",
         )
     try:
-        workflow = await workflows_service.get_workflow(
-            db, org_id=org_id, workflow_id=workflow_id
-        )
+        workflow = await workflows_service.get_workflow(db, org_id=org_id, workflow_id=workflow_id)
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
 
@@ -926,9 +898,7 @@ async def export_workflow_endpoint(
             detail="no org context",
         )
     try:
-        body = await workflows_service.export_workflow(
-            db, org_id=org_id, workflow_id=workflow_id
-        )
+        body = await workflows_service.export_workflow(db, org_id=org_id, workflow_id=workflow_id)
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     return WorkflowExport.model_validate(body)

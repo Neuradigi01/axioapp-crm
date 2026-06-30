@@ -1,4 +1,5 @@
 """HTTP coverage for /api/v1/reviews — CRUD + reply + escalate."""
+
 from __future__ import annotations
 
 import uuid
@@ -21,9 +22,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -75,13 +74,9 @@ async def test_create_list_get_update_delete(layered_client, seeded_admin):
     assert listing.json()["total"] == 1
 
     # Filter by rating
-    by_rating = await layered_client.get(
-        "/api/v1/reviews?rating=4", headers=headers
-    )
+    by_rating = await layered_client.get("/api/v1/reviews?rating=4", headers=headers)
     assert by_rating.json()["total"] == 1
-    miss = await layered_client.get(
-        "/api/v1/reviews?rating=1", headers=headers
-    )
+    miss = await layered_client.get("/api/v1/reviews?rating=1", headers=headers)
     assert miss.json()["total"] == 0
 
     # Patch
@@ -95,9 +90,7 @@ async def test_create_list_get_update_delete(layered_client, seeded_admin):
     assert patch.json()["tags"] == ["delivery"]
 
     # Delete
-    delete = await layered_client.delete(
-        f"/api/v1/reviews/{rid}", headers=headers
-    )
+    delete = await layered_client.delete(f"/api/v1/reviews/{rid}", headers=headers)
     assert delete.status_code == 204
 
 

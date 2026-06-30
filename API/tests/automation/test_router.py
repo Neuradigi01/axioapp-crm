@@ -9,22 +9,16 @@ Auth uses ``seeded_admin`` from conftest. The three
 ``automations.*`` perm keys are granted per-test via ``_grant_keys``
 so each scenario is hermetic.
 """
+
 from __future__ import annotations
 
 import uuid
 
 import pytest
-import pytest_asyncio
-from sqlalchemy import select, text as sql_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from src.app.core.automation.models import (
-    AutomationRun,
-    AutomationRunStatus,
-)
 from src.app.core.permissions.models import RolePermission
 from src.app.core.permissions.service import register_permission
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -47,9 +41,7 @@ async def _grant_keys(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -133,9 +125,7 @@ async def test_create_then_read(layered_client, seeded_admin):
     tid = create_resp.json()["id"]
     assert create_resp.json()["enabled"] is True
 
-    get_resp = await layered_client.get(
-        f"/api/v1/automations/triggers/{tid}", headers=headers
-    )
+    get_resp = await layered_client.get(f"/api/v1/automations/triggers/{tid}", headers=headers)
     assert get_resp.status_code == 200
     assert get_resp.json()["event_type"] == "user.signed_up"
 
@@ -161,9 +151,7 @@ async def test_create_requires_write_perm(layered_client, seeded_admin):
     assert resp.status_code == 403
 
 
-async def test_create_channel_template_mismatch_returns_422(
-    layered_client, seeded_admin
-):
+async def test_create_channel_template_mismatch_returns_422(layered_client, seeded_admin):
     await _grant_keys(
         seeded_admin["role"].id,
         "automations.write",
@@ -194,9 +182,7 @@ async def test_create_channel_template_mismatch_returns_422(
     assert detail["code"] == "automation.template_channel_mismatch"
 
 
-async def test_create_invalid_condition_returns_422(
-    layered_client, seeded_admin
-):
+async def test_create_invalid_condition_returns_422(layered_client, seeded_admin):
     await _grant_keys(
         seeded_admin["role"].id,
         "automations.write",
@@ -248,14 +234,10 @@ async def test_create_duplicate_name_returns_409(layered_client, seeded_admin):
         "channel": "email",
         "template_id": template_id,
     }
-    r1 = await layered_client.post(
-        "/api/v1/automations/triggers", json=body, headers=headers
-    )
+    r1 = await layered_client.post("/api/v1/automations/triggers", json=body, headers=headers)
     assert r1.status_code == 201
     body["name"] = "dup"  # case collision
-    r2 = await layered_client.post(
-        "/api/v1/automations/triggers", json=body, headers=headers
-    )
+    r2 = await layered_client.post("/api/v1/automations/triggers", json=body, headers=headers)
     assert r2.status_code == 409
     assert r2.json()["detail"]["code"] == "automation.duplicate_trigger_name"
 
@@ -327,19 +309,13 @@ async def test_enable_disable_idempotent(layered_client, seeded_admin):
         headers=headers,
     )
     tid = create.json()["id"]
-    r1 = await layered_client.post(
-        f"/api/v1/automations/triggers/{tid}/disable", headers=headers
-    )
+    r1 = await layered_client.post(f"/api/v1/automations/triggers/{tid}/disable", headers=headers)
     assert r1.status_code == 200
     assert r1.json()["enabled"] is False
-    r2 = await layered_client.post(
-        f"/api/v1/automations/triggers/{tid}/disable", headers=headers
-    )
+    r2 = await layered_client.post(f"/api/v1/automations/triggers/{tid}/disable", headers=headers)
     assert r2.status_code == 200
     assert r2.json()["enabled"] is False
-    r3 = await layered_client.post(
-        f"/api/v1/automations/triggers/{tid}/enable", headers=headers
-    )
+    r3 = await layered_client.post(f"/api/v1/automations/triggers/{tid}/enable", headers=headers)
     assert r3.status_code == 200
     assert r3.json()["enabled"] is True
 
@@ -374,13 +350,9 @@ async def test_delete_returns_204_then_404(layered_client, seeded_admin):
         headers=headers,
     )
     tid = create.json()["id"]
-    delete = await layered_client.delete(
-        f"/api/v1/automations/triggers/{tid}", headers=headers
-    )
+    delete = await layered_client.delete(f"/api/v1/automations/triggers/{tid}", headers=headers)
     assert delete.status_code == 204
-    second = await layered_client.get(
-        f"/api/v1/automations/triggers/{tid}", headers=headers
-    )
+    second = await layered_client.get(f"/api/v1/automations/triggers/{tid}", headers=headers)
     assert second.status_code == 404
 
 
@@ -414,9 +386,7 @@ async def test_runs_endpoint_requires_runs_read_perm(layered_client, seeded_admi
         headers=headers,
     )
     tid = create.json()["id"]
-    resp = await layered_client.get(
-        f"/api/v1/automations/triggers/{tid}/runs", headers=headers
-    )
+    resp = await layered_client.get(f"/api/v1/automations/triggers/{tid}/runs", headers=headers)
     # Without automations.runs.read, expect 403.
     assert resp.status_code == 403
 
@@ -424,9 +394,7 @@ async def test_runs_endpoint_requires_runs_read_perm(layered_client, seeded_admi
 # --- event discovery -----------------------------------------------
 
 
-async def test_event_types_discovery_returns_catalog(
-    layered_client, seeded_admin
-):
+async def test_event_types_discovery_returns_catalog(layered_client, seeded_admin):
     await _grant_keys(seeded_admin["role"].id, "automations.read")
     token = await _login(
         layered_client,

@@ -1,21 +1,21 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
 import pytest_asyncio
-from unittest.mock import patch, AsyncMock
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
+from src.core.security.jwt import create_access_token
+from src.core.security.password import hash_password
 from src.models import Base
 from src.models.admin import Admin
-from src.models.user import UserLogin, UserInfo
-from src.models.routes import Route, AdminRoute
-from src.core.security.password import hash_password
-from src.core.security.jwt import create_access_token
-from tests.conftest import test_engine, TestSession
+from src.models.routes import AdminRoute, Route
+from tests.conftest import TestSession, test_engine
 
 
 @pytest_asyncio.fixture
 async def client():
-    from main import app
     import src.core.db as db_module
+    from main import app
 
     original_session = db_module.async_session
     db_module.async_session = TestSession
@@ -45,15 +45,39 @@ async def _seed(db):
 
     # Admin routes: compulsory dashboard + non-compulsory sub-admin management routes
     routes = [
-        Route(parent_id=0, control_id="admin_dashboard", user_type="Admin",
-              name="Dashboard", path="dashboard", url="/admin/dashboard",
-              is_nav_menu_item=True, order_no=1, is_compulsory=True),
-        Route(parent_id=0, control_id="admin_sub_admins_list", user_type="Admin",
-              name="Sub Admins", path="sub-admins", url="/admin/sub-admins",
-              is_nav_menu_item=True, order_no=2, is_compulsory=False),
-        Route(parent_id=0, control_id="any_logout", user_type="Any",
-              name="Logout", path="logout", url="/logout",
-              is_nav_menu_item=False, order_no=99, is_compulsory=True),
+        Route(
+            parent_id=0,
+            control_id="admin_dashboard",
+            user_type="Admin",
+            name="Dashboard",
+            path="dashboard",
+            url="/admin/dashboard",
+            is_nav_menu_item=True,
+            order_no=1,
+            is_compulsory=True,
+        ),
+        Route(
+            parent_id=0,
+            control_id="admin_sub_admins_list",
+            user_type="Admin",
+            name="Sub Admins",
+            path="sub-admins",
+            url="/admin/sub-admins",
+            is_nav_menu_item=True,
+            order_no=2,
+            is_compulsory=False,
+        ),
+        Route(
+            parent_id=0,
+            control_id="any_logout",
+            user_type="Any",
+            name="Logout",
+            path="logout",
+            url="/logout",
+            is_nav_menu_item=False,
+            order_no=99,
+            is_compulsory=True,
+        ),
     ]
     db.add_all(routes)
     await db.flush()
@@ -62,12 +86,14 @@ async def _seed(db):
 
 
 def _make_super_admin_token(route_ids):
-    return create_access_token({
-        "user_id": "super_admin",
-        "role": "Admin",
-        "access_rights": ",".join(str(r) for r in route_ids),
-        "is_super_admin": True,
-    })
+    return create_access_token(
+        {
+            "user_id": "super_admin",
+            "role": "Admin",
+            "access_rights": ",".join(str(r) for r in route_ids),
+            "is_super_admin": True,
+        }
+    )
 
 
 @pytest.mark.asyncio
@@ -318,7 +344,8 @@ async def test_sub_admin_login_gets_only_assigned_routes(mock_ip, mock_routes, c
     data = resp.json()
     assert data["success"] is True
 
-    from src.core.security.jwt import jwt, SECRET_KEY, ALGORITHM
+    from src.core.security.jwt import ALGORITHM, SECRET_KEY, jwt
+
     payload = jwt.decode(data["data"]["token"], SECRET_KEY, algorithms=[ALGORITHM])
     rights = {int(r) for r in payload["access_rights"].split(",") if r.strip()}
 

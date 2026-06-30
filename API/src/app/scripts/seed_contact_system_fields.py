@@ -8,6 +8,7 @@ operator can paste it into a non-dev database if needed.
 Usage:
     python -m src.app.scripts.seed_contact_system_fields
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -21,7 +22,6 @@ from src.app.core.custom_fields.models import CustomFieldDefinition, FieldSource
 from src.app.scripts.seed_demo_org import DEMO_ORG_ID
 from src.app.shared.context import RequestContext, set_context
 from src.app.shared.db import async_session
-
 
 SYSTEM_FIELDS: list[dict[str, Any]] = [
     {
@@ -77,10 +77,7 @@ async def seed_contact_system_fields() -> None:
                 )
             ).scalar_one_or_none()
             if existing is not None:
-                print(
-                    f"skip: contact/{row['field_key']} already exists "
-                    f"(id={existing})"
-                )
+                print(f"skip: contact/{row['field_key']} already exists (id={existing})")
                 continue
 
             stmt = (
@@ -99,9 +96,7 @@ async def seed_contact_system_fields() -> None:
                     pack_id=None,
                     validation=row["validation"],
                 )
-                .on_conflict_do_nothing(
-                    index_elements=["org_id", "entity_type", "field_key"]
-                )
+                .on_conflict_do_nothing(index_elements=["org_id", "entity_type", "field_key"])
             )
             await session.execute(stmt)
             inserted += 1

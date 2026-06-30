@@ -1,15 +1,17 @@
-import orjson
+from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
-from datetime import datetime, timedelta, timezone
+
+import orjson
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.core.logger import logger
-from src.providers import email_provider, sms_provider
-from src.data_access import user_da
-from src.utilities.fernet_util import fernet
-from src.utilities.app_utils import generate_otp
+
+from config import EMAIL_ENABLED, FRONTEND_URL, OTP_EXPIRY_MINUTES, SMS_ENABLED
 from src.constants import messages
-from config import EMAIL_ENABLED, SMS_ENABLED, OTP_EXPIRY_MINUTES, FRONTEND_URL
+from src.core.logger import logger
+from src.data_access import user_da
+from src.providers import email_provider, sms_provider
 from src.schemas.auth import SendContactOtpRequest
+from src.utilities.app_utils import generate_otp
+from src.utilities.fernet_util import fernet
 
 
 async def send_contact_otp(req: SendContactOtpRequest) -> dict:
@@ -21,8 +23,10 @@ async def send_contact_otp(req: SendContactOtpRequest) -> dict:
             return {"success": False, "message": messages.SMS_SYSTEM_DISABLED}
 
     otp_code = generate_otp()
-    expires_at = int((datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)).timestamp())
-    token_data = orjson.dumps({"type": req.type, "value": req.value, "otp": otp_code, "expires_at": expires_at}).decode()
+    expires_at = int((datetime.now(UTC) + timedelta(minutes=OTP_EXPIRY_MINUTES)).timestamp())
+    token_data = orjson.dumps(
+        {"type": req.type, "value": req.value, "otp": otp_code, "expires_at": expires_at}
+    ).decode()
     otp_token = fernet.encrypt(token_data)
 
     if req.type == "email":
@@ -34,13 +38,15 @@ async def send_contact_otp(req: SendContactOtpRequest) -> dict:
 
 
 def generate_email_verification_token(email: str, user_id: str) -> str:
-    expires_at = int((datetime.now(timezone.utc) + timedelta(hours=24)).timestamp())
-    token_data = orjson.dumps({
-        "type": "email_verification",
-        "value": email,
-        "user_id": user_id,
-        "expires_at": expires_at,
-    }).decode()
+    expires_at = int((datetime.now(UTC) + timedelta(hours=24)).timestamp())
+    token_data = orjson.dumps(
+        {
+            "type": "email_verification",
+            "value": email,
+            "user_id": user_id,
+            "expires_at": expires_at,
+        }
+    ).decode()
     return fernet.encrypt(token_data)
 
 
@@ -51,7 +57,7 @@ def validate_email_verification_token(token: str) -> tuple[dict | None, str | No
         decrypted = orjson.loads(fernet.decrypt(token))
         if decrypted.get("type") != "email_verification":
             return None, messages.VERIFICATION_TOKEN_INVALID
-        now = int(datetime.now(timezone.utc).timestamp())
+        now = int(datetime.now(UTC).timestamp())
         if now > decrypted.get("expires_at", 0):
             return None, messages.VERIFICATION_TOKEN_INVALID
         return decrypted, None
@@ -84,7 +90,9 @@ async def verify_email(db: AsyncSession, token: str) -> dict:
     return {"success": True, "message": messages.EMAIL_VERIFIED_SUCCESS}
 
 
-def validate_otp_token(otp_token: str, otp_code: str, expected_type: str, expected_value: str) -> str | None:
+def validate_otp_token(
+    otp_token: str, otp_code: str, expected_type: str, expected_value: str
+) -> str | None:
     """Decrypt and validate a stateless OTP token.
     Returns None if valid, or an error message string if invalid."""
     try:
@@ -95,7 +103,7 @@ def validate_otp_token(otp_token: str, otp_code: str, expected_type: str, expect
             return messages.VERIFICATION_TOKEN_MISMATCH
         if decrypted.get("otp") != otp_code:
             return messages.INVALID_OTP
-        now = int(datetime.now(timezone.utc).timestamp())
+        now = int(datetime.now(UTC).timestamp())
         if now > decrypted.get("expires_at", 0):
             return messages.VERIFICATION_TOKEN_INVALID
     except Exception as e:

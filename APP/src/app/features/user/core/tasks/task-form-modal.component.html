@@ -34,7 +34,9 @@
       <label class="block text-sm">
         <span class="mb-1 block text-xs font-medium text-zinc-600">
           {{ stdField('description')?.label ?? 'Description' }}
-          @if (stdField('description')?.is_required) { <span class="text-rose-600">*</span> }
+          @if (stdField('description')?.is_required) {
+            <span class="text-rose-600">*</span>
+          }
         </span>
         <textarea
           formControlName="description"
@@ -53,7 +55,9 @@
         <label class="block text-sm">
           <span class="mb-1 block text-xs font-medium text-zinc-600">
             {{ stdField('due_at')?.label ?? 'Due date' }}
-            @if (stdField('due_at')?.is_required) { <span class="text-rose-600">*</span> }
+            @if (stdField('due_at')?.is_required) {
+              <span class="text-rose-600">*</span>
+            }
           </span>
           <input
             type="datetime-local"
@@ -89,7 +93,9 @@
       <label class="block text-sm">
         <span class="mb-1 block text-xs font-medium text-zinc-600">
           {{ stdField('assigned_to_id')?.label ?? 'Assignee' }}
-          @if (stdField('assigned_to_id')?.is_required) { <span class="text-rose-600">*</span> }
+          @if (stdField('assigned_to_id')?.is_required) {
+            <span class="text-rose-600">*</span>
+          }
         </span>
         <select
           formControlName="assigned_to_id"
@@ -128,7 +134,7 @@
         [disabled]="form.invalid || saving()"
         class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create task') }}
+        {{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Create task' }}
       </button>
     </div>
   </form>

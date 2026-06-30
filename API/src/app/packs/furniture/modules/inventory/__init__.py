@@ -4,6 +4,7 @@ First Layer-2 (pack) module to touch the database. All tables are
 `fp_*` prefixed so platform tables and pack tables are clearly
 separated in any DB dump.
 """
+
 from src.app.packs.furniture.modules.inventory.service import (
     create_item,
     create_warehouse,
@@ -11,8 +12,8 @@ from src.app.packs.furniture.modules.inventory.service import (
     list_items,
     list_movements,
     list_warehouses,
-    record_movement,
     recompute_alerts,
+    record_movement,
 )
 
 __all__ = [

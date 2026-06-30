@@ -24,13 +24,14 @@ campaign picker's API (unchanged); a Step-8-aware ``list`` lives in
 All writes RLS-scope via the existing ``TenantScoped`` mixin — the
 router sets ``RequestContext.org_id`` from the JWT before calling in.
 """
+
 from __future__ import annotations
 
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Iterable, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -161,9 +162,7 @@ def _components_from_record(row: WhatsAppTemplate) -> list[dict[str, Any]]:
 
     components: list[dict[str, Any]] = []
     if row.header_type == "TEXT" and row.header_text:
-        components.append(
-            {"type": "HEADER", "format": "TEXT", "text": row.header_text}
-        )
+        components.append({"type": "HEADER", "format": "TEXT", "text": row.header_text})
     elif row.header_type in ("IMAGE", "VIDEO", "DOCUMENT"):
         components.append({"type": "HEADER", "format": row.header_type})
     components.append({"type": "BODY", "text": row.body})
@@ -178,8 +177,7 @@ async def _resolve_active_bundle(session: AsyncSession):
     bundle = await get_active_config(session)
     if bundle is None:
         raise WhatsAppNotConnected(
-            "WhatsApp is not connected for this org. "
-            "Connect it in Settings → Integrations."
+            "WhatsApp is not connected for this org. Connect it in Settings → Integrations."
         )
     return bundle
 
@@ -190,11 +188,9 @@ async def _resolve_active_bundle(session: AsyncSession):
 async def list_templates_managed(
     session: AsyncSession,
     *,
-    submission_status: Optional[
-        WhatsAppTemplateSubmissionStatus
-    ] = None,
-    category: Optional[str] = None,
-    language: Optional[str] = None,
+    submission_status: WhatsAppTemplateSubmissionStatus | None = None,
+    category: str | None = None,
+    language: str | None = None,
 ) -> list[WhatsAppTemplate]:
     """Step-8 listing — includes drafts and all lifecycle states.
 
@@ -202,13 +198,9 @@ async def list_templates_managed(
     uses and only wants Meta-approved rows), this returns every row
     the management surface needs to render. RLS auto-scopes to the
     active org."""
-    stmt = select(WhatsAppTemplate).order_by(
-        WhatsAppTemplate.category, WhatsAppTemplate.name
-    )
+    stmt = select(WhatsAppTemplate).order_by(WhatsAppTemplate.category, WhatsAppTemplate.name)
     if submission_status is not None:
-        stmt = stmt.where(
-            WhatsAppTemplate.submission_status == submission_status
-        )
+        stmt = stmt.where(WhatsAppTemplate.submission_status == submission_status)
     if category is not None:
         stmt = stmt.where(WhatsAppTemplate.category == category)
     if language is not None:
@@ -217,13 +209,9 @@ async def list_templates_managed(
     return list(rows)
 
 
-async def get_template_or_404(
-    session: AsyncSession, template_id: uuid.UUID
-) -> WhatsAppTemplate:
+async def get_template_or_404(session: AsyncSession, template_id: uuid.UUID) -> WhatsAppTemplate:
     row = (
-        await session.execute(
-            select(WhatsAppTemplate).where(WhatsAppTemplate.id == template_id)
-        )
+        await session.execute(select(WhatsAppTemplate).where(WhatsAppTemplate.id == template_id))
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(
@@ -261,10 +249,7 @@ async def create_draft(
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"A template named '{payload.name}' "
-                f"({payload.language}) already exists."
-            ),
+            detail=(f"A template named '{payload.name}' ({payload.language}) already exists."),
         )
 
     components = _payload_to_components(payload)
@@ -379,11 +364,14 @@ async def duplicate_template(
     duplicate twice) appends ``_copy_2``, ``_copy_3``, etc."""
     src = await get_template_or_404(session, template_id)
     new_name = await _allocate_copy_name(
-        session, integration_id=src.integration_id, base=src.name,
+        session,
+        integration_id=src.integration_id,
+        base=src.name,
         language=src.language,
     )
     components = (
-        list(src.body_components) if isinstance(src.body_components, list)
+        list(src.body_components)
+        if isinstance(src.body_components, list)
         else _components_from_record(src)
     )
     row = WhatsAppTemplate(
@@ -452,7 +440,7 @@ async def submit_for_approval(
     template_id: uuid.UUID,
     app_id: str,
     app_secret: str,
-    http_client_factory: Optional[HttpClientFactory] = None,
+    http_client_factory: HttpClientFactory | None = None,
 ) -> WhatsAppTemplate:
     """POST the draft to Meta's ``/{waba_id}/message_templates``.
 
@@ -466,16 +454,13 @@ async def submit_for_approval(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                f"Template is already in state "
-                f"'{row.submission_status.value}' — nothing to submit."
+                f"Template is already in state '{row.submission_status.value}' — nothing to submit."
             ),
         )
 
     integration, config = await _resolve_active_bundle(session)
     if integration.access_token_enc is None:
-        raise WhatsAppNotConnected(
-            "Stored credentials are missing; reconnect required."
-        )
+        raise WhatsAppNotConnected("Stored credentials are missing; reconnect required.")
     token = decrypt(integration.access_token_enc)
 
     client_kwargs: dict[str, Any] = {
@@ -508,22 +493,16 @@ async def submit_for_approval(
                 "message": exc.user_message,
             },
         )
-        raise HTTPException(
-            status_code=exc.http_status, detail=exc.user_message
-        )
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message)
 
-    meta_template_id = (
-        str(meta_body.get("id")) if meta_body.get("id") is not None else None
-    )
-    meta_status = (
-        str(meta_body.get("status")) if meta_body.get("status") else "PENDING"
-    )
+    meta_template_id = str(meta_body.get("id")) if meta_body.get("id") is not None else None
+    meta_status = str(meta_body.get("status")) if meta_body.get("status") else "PENDING"
 
     row.meta_template_id = meta_template_id
     row.status = meta_status
     row.submission_status = WhatsAppTemplateSubmissionStatus.pending_review
     row.submitted_by_user_id = actor_id
-    row.submitted_at = datetime.now(timezone.utc)
+    row.submitted_at = datetime.now(UTC)
     row.rejection_reason = None
     await session.commit()
     await session.refresh(row)
@@ -548,7 +527,7 @@ async def delete_template(
     template_id: uuid.UUID,
     app_id: str,
     app_secret: str,
-    http_client_factory: Optional[HttpClientFactory] = None,
+    http_client_factory: HttpClientFactory | None = None,
 ) -> None:
     """Local + Meta delete.
 
@@ -563,9 +542,7 @@ async def delete_template(
     if row.meta_template_id:
         integration, config = await _resolve_active_bundle(session)
         if integration.access_token_enc is None:
-            raise WhatsAppNotConnected(
-                "Stored credentials are missing; reconnect required."
-            )
+            raise WhatsAppNotConnected("Stored credentials are missing; reconnect required.")
         token = decrypt(integration.access_token_enc)
         client_kwargs: dict[str, Any] = {
             "api_version": config.api_version,
@@ -583,9 +560,7 @@ async def delete_template(
                 meta_template_id=row.meta_template_id,
             )
         except MetaGraphError as exc:
-            raise HTTPException(
-                status_code=exc.http_status, detail=exc.user_message
-            )
+            raise HTTPException(status_code=exc.http_status, detail=exc.user_message)
 
     snapshot = {
         "name": row.name,
@@ -612,11 +587,11 @@ async def apply_template_status_update(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    meta_template_id: Optional[str],
-    template_name: Optional[str],
-    language: Optional[str],
+    meta_template_id: str | None,
+    template_name: str | None,
+    language: str | None,
     event: str,
-    reason: Optional[str],
+    reason: str | None,
 ) -> bool:
     """Apply a ``message_template_status_update`` webhook event to the
     matching local row.
@@ -625,7 +600,7 @@ async def apply_template_status_update(
     falling back to the ``(name, language)`` pair. Returns True if a
     row was updated, False when no match was found (silent no-op —
     Meta sometimes replays for templates we don't track)."""
-    row: Optional[WhatsAppTemplate] = None
+    row: WhatsAppTemplate | None = None
     if meta_template_id:
         row = (
             await session.execute(
@@ -673,7 +648,7 @@ async def apply_template_status_update(
         # Backfill — Meta sent us an id we hadn't recorded yet (e.g.
         # the submit response was lost in transit).
         row.meta_template_id = meta_template_id
-    row.last_synced_at = datetime.now(timezone.utc)
+    row.last_synced_at = datetime.now(UTC)
 
     # tasks/template-library Step 9 — also sync the central
     # `tbl_message_templates.external_status` so the unified library's
@@ -690,6 +665,7 @@ async def apply_template_status_update(
         MessageTemplate,
         TemplateExternalStatus,
     )
+
     central_row = None
     central_before = None
     if central_external is not None:

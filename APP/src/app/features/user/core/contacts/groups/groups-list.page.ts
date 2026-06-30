@@ -15,24 +15,14 @@
  * action buttons unconditionally and lets the API enforce.
  */
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  ContactGroup,
-  ContactGroupsApiService,
-} from './groups-api.service';
-
+import { ContactGroup, ContactGroupsApiService } from './groups-api.service';
 
 @Component({
   selector: 'app-contact-groups-list-page',
@@ -84,9 +74,7 @@ export class ContactGroupsListPageComponent {
           this.pendingDelete.set(null);
           // Optimistic update — remove the row locally instead of
           // re-fetching the whole list.
-          this.groups.update((rows) =>
-            rows.filter((r) => r.id !== target.id),
-          );
+          this.groups.update((rows) => rows.filter((r) => r.id !== target.id));
         },
         error: (err: HttpErrorResponse) => {
           this.deleting.set(false);

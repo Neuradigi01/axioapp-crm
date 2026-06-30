@@ -31,18 +31,9 @@ import {
   EmbedSubmissionSummary,
 } from './embed-api.service';
 
-
 // Tree-shaking-friendly Chart.js registration (matches the calls-
 // analytics tab's pattern).
-Chart.register(
-  BarElement,
-  BarController,
-  CategoryScale,
-  LinearScale,
-  Tooltip,
-  Legend,
-);
-
+Chart.register(BarElement, BarController, CategoryScale, LinearScale, Tooltip, Legend);
 
 type RangePreset = '24h' | '7d' | '30d';
 
@@ -50,7 +41,6 @@ interface OutcomeBadge {
   label: string;
   cls: string;
 }
-
 
 /**
  * Submission log sub-tab. Three stacked sections drive Owner/Admin
@@ -80,9 +70,7 @@ export class SubmissionLogComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   // --- Filters ---------------------------------------------------------
-  protected readonly outcomeFilter = signal<EmbedSubmissionOutcome | null>(
-    null,
-  );
+  protected readonly outcomeFilter = signal<EmbedSubmissionOutcome | null>(null);
   protected readonly rangePreset = signal<RangePreset>('7d');
   protected readonly page = signal(1);
   protected readonly pageSize = 25;
@@ -101,18 +89,12 @@ export class SubmissionLogComponent {
     { value: 'invalid_payload', label: 'Errors' },
   ];
 
-  protected readonly rangeOptions: ReadonlyArray<RangePreset> = [
-    '24h',
-    '7d',
-    '30d',
-  ];
+  protected readonly rangeOptions: ReadonlyArray<RangePreset> = ['24h', '7d', '30d'];
 
   // --- Server-fetched state -------------------------------------------
   protected readonly listLoading = signal(false);
   protected readonly listError = signal<string | null>(null);
-  protected readonly listResponse = signal<EmbedSubmissionListResponse | null>(
-    null,
-  );
+  protected readonly listResponse = signal<EmbedSubmissionListResponse | null>(null);
 
   protected readonly summaryLoading = signal(false);
   protected readonly summaryError = signal<string | null>(null);
@@ -127,37 +109,35 @@ export class SubmissionLogComponent {
   });
 
   /** Stacked-bar chart data — one bar per day, four series per outcome. */
-  protected readonly chartData = computed<ChartConfiguration<'bar'>['data']>(
-    () => {
-      const s = this.summary();
-      if (!s) return { labels: [], datasets: [] };
-      return {
-        labels: s.by_day.map((b) => b.day.slice(5)), // "05-22"
-        datasets: [
-          {
-            label: 'Accepted',
-            backgroundColor: '#10b981',
-            data: s.by_day.map((b) => b.accepted),
-          },
-          {
-            label: 'Spam',
-            backgroundColor: '#f97316',
-            data: s.by_day.map((b) => b.rejected_spam),
-          },
-          {
-            label: 'Rate-limited',
-            backgroundColor: '#f59e0b',
-            data: s.by_day.map((b) => b.rate_limited),
-          },
-          {
-            label: 'Errors',
-            backgroundColor: '#ef4444',
-            data: s.by_day.map((b) => b.invalid_payload),
-          },
-        ],
-      };
-    },
-  );
+  protected readonly chartData = computed<ChartConfiguration<'bar'>['data']>(() => {
+    const s = this.summary();
+    if (!s) return { labels: [], datasets: [] };
+    return {
+      labels: s.by_day.map((b) => b.day.slice(5)), // "05-22"
+      datasets: [
+        {
+          label: 'Accepted',
+          backgroundColor: '#10b981',
+          data: s.by_day.map((b) => b.accepted),
+        },
+        {
+          label: 'Spam',
+          backgroundColor: '#f97316',
+          data: s.by_day.map((b) => b.rejected_spam),
+        },
+        {
+          label: 'Rate-limited',
+          backgroundColor: '#f59e0b',
+          data: s.by_day.map((b) => b.rate_limited),
+        },
+        {
+          label: 'Errors',
+          backgroundColor: '#ef4444',
+          data: s.by_day.map((b) => b.invalid_payload),
+        },
+      ],
+    };
+  });
 
   protected readonly chartOptions: ChartConfiguration<'bar'>['options'] = {
     responsive: true,
@@ -231,9 +211,7 @@ export class SubmissionLogComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.listLoading.set(false);
-          this.listError.set(
-            extractApiError(err) ?? 'Could not load submission log.',
-          );
+          this.listError.set(extractApiError(err) ?? 'Could not load submission log.');
         },
       });
   }
@@ -252,9 +230,7 @@ export class SubmissionLogComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.summaryLoading.set(false);
-          this.summaryError.set(
-            extractApiError(err) ?? 'Could not load summary.',
-          );
+          this.summaryError.set(extractApiError(err) ?? 'Could not load summary.');
         },
       });
   }
@@ -321,14 +297,10 @@ export class SubmissionLogComponent {
   }
 
   /** Quick-count helper for the counts card. */
-  protected countOf(
-    summary: EmbedSubmissionSummary,
-    outcome: EmbedSubmissionOutcome,
-  ): number {
+  protected countOf(summary: EmbedSubmissionSummary, outcome: EmbedSubmissionOutcome): number {
     return summary.by_outcome[outcome] ?? 0;
   }
 
   /** Type-narrowing helper so the template can pass into `submissionTrackBy`. */
-  protected trackById = (_: number, item: EmbedSubmissionRead): string =>
-    item.id;
+  protected trackById = (_: number, item: EmbedSubmissionRead): string => item.id;
 }

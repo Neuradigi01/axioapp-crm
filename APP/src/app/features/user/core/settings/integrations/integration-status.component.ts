@@ -32,9 +32,7 @@ import {
   ProviderDeliveryStatus,
 } from './integrations-api.service';
 
-
 const POLL_INTERVAL_MS = 30_000;
-
 
 @Component({
   selector: 'app-integration-status',
@@ -55,12 +53,8 @@ export class IntegrationStatusComponent {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
-  protected readonly providers = computed(
-    () => this.status()?.providers ?? [],
-  );
-  protected readonly dlqOpenTotal = computed(
-    () => this.status()?.dlq_open_total ?? 0,
-  );
+  protected readonly providers = computed(() => this.status()?.providers ?? []);
+  protected readonly dlqOpenTotal = computed(() => this.status()?.dlq_open_total ?? 0);
 
   private _pollSubscription: Subscription | null = null;
   private _visibilityHandler: (() => void) | null = null;
@@ -159,10 +153,7 @@ export class IntegrationStatusComponent {
     this._pollSubscription?.unsubscribe();
     this._pollSubscription = null;
     if (this._visibilityHandler && typeof document !== 'undefined') {
-      document.removeEventListener(
-        'visibilitychange',
-        this._visibilityHandler,
-      );
+      document.removeEventListener('visibilitychange', this._visibilityHandler);
       this._visibilityHandler = null;
     }
   }
@@ -174,9 +165,6 @@ export class IntegrationStatusComponent {
     this._visibilityHandler = () => {
       if (!document.hidden) this._refresh();
     };
-    document.addEventListener(
-      'visibilitychange',
-      this._visibilityHandler,
-    );
+    document.addEventListener('visibilitychange', this._visibilityHandler);
   }
 }

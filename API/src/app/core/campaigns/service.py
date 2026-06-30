@@ -18,19 +18,19 @@ Four concerns:
 Audience resolution reuses the same filter shape as `/contacts` so
 the engine doesn't reinvent query semantics.
 """
+
 from __future__ import annotations
 
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.contacts import service as contacts_service
 from src.app.core.campaigns import data_access as campaigns_da
 from src.app.core.campaigns.models import (
     Campaign,
@@ -43,6 +43,7 @@ from src.app.core.campaigns.schemas import (
     CampaignCreate,
     CampaignUpdate,
 )
+from src.app.core.contacts import service as contacts_service
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations.adapters import ChannelMessageRef
 from src.app.core.conversations.adapters.whatsapp import (
@@ -58,6 +59,8 @@ from src.app.core.conversations.models import (
 )
 from src.app.core.conversations.registry import (
     ChannelNotRegistered,
+)
+from src.app.core.conversations.registry import (
     resolve as resolve_channel,
 )
 from src.app.core.integrations.whatsapp.models import WhatsAppTemplate
@@ -77,15 +80,11 @@ async def list_campaigns(
 ) -> tuple[list[Campaign], int]:
     total = await campaigns_da.count_all_campaigns(session)
     offset = (page - 1) * size
-    rows = await campaigns_da.list_campaigns_page(
-        session, offset=offset, limit=size
-    )
+    rows = await campaigns_da.list_campaigns_page(session, offset=offset, limit=size)
     return rows, total
 
 
-async def get_campaign(
-    session: AsyncSession, campaign_id: uuid.UUID
-) -> Campaign:
+async def get_campaign(session: AsyncSession, campaign_id: uuid.UUID) -> Campaign:
     return await get_or_404(session, Campaign, campaign_id, entity="campaign")
 
 
@@ -109,9 +108,7 @@ async def _validate_template_channel_match(
     from src.app.core.templates import service as templates_service
 
     for tid in template_ids:
-        row = await templates_service.find_template(
-            session, org_id=org_id, template_id=tid
-        )
+        row = await templates_service.find_template(session, org_id=org_id, template_id=tid)
         if row is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -169,12 +166,8 @@ async def create_campaign(
         # Step 29 — A/B test config. Server defaults take over for
         # non-A/B campaigns (is_ab_test=false, split_ratio=50, etc.).
         is_ab_test=bool(payload.is_ab_test),
-        variant_a_template_id=payload.variant_a_template_id
-        if payload.is_ab_test
-        else None,
-        variant_b_template_id=payload.variant_b_template_id
-        if payload.is_ab_test
-        else None,
+        variant_a_template_id=payload.variant_a_template_id if payload.is_ab_test else None,
+        variant_b_template_id=payload.variant_b_template_id if payload.is_ab_test else None,
         split_ratio=int(payload.split_ratio),
         winner_metric=payload.winner_metric if payload.is_ab_test else None,
         winner_holdback_hours=int(payload.winner_holdback_hours),
@@ -211,9 +204,7 @@ async def update_campaign(
         campaign.name = payload.name
         changed = True
     if payload.audience_filter is not None:
-        campaign.audience_filter = payload.audience_filter.model_dump(
-            exclude_none=True
-        )
+        campaign.audience_filter = payload.audience_filter.model_dump(exclude_none=True)
         changed = True
     if payload.template is not None:
         campaign.template = payload.template
@@ -248,9 +239,7 @@ async def update_campaign(
     return campaign
 
 
-async def delete_campaign(
-    session: AsyncSession, *, campaign_id: uuid.UUID
-) -> None:
+async def delete_campaign(session: AsyncSession, *, campaign_id: uuid.UUID) -> None:
     campaign = await get_campaign(session, campaign_id)
     if campaign.status not in (CampaignStatus.draft, CampaignStatus.failed):
         raise HTTPException(
@@ -314,9 +303,7 @@ async def resolve_audience(
 # --- start + dispatch ----------------------------------------------------
 
 
-async def enqueue(
-    session: AsyncSession, *, campaign_id: uuid.UUID
-) -> dict[str, Any]:
+async def enqueue(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str, Any]:
     """Resolve audience → split into chunks → dispatch Celery tasks.
 
     Returns a small summary the router echoes back to the operator
@@ -347,9 +334,7 @@ async def enqueue(
             detail=str(exc),
         )
 
-    contact_ids = await resolve_audience(
-        session, audience_filter=campaign.audience_filter
-    )
+    contact_ids = await resolve_audience(session, audience_filter=campaign.audience_filter)
 
     # whatsapp-platform-upgrade Step 29 — minimum-audience guard.
     # A/B requires ≥ 50 recipients to keep the winner metric out
@@ -384,25 +369,16 @@ async def enqueue(
         }
 
     # Flip to running (or scheduled if schedule_at is in the future).
-    now = datetime.now(timezone.utc)
-    is_scheduled = (
-        campaign.schedule_at is not None and campaign.schedule_at > now
-    )
-    campaign.status = (
-        CampaignStatus.scheduled if is_scheduled else CampaignStatus.running
-    )
+    now = datetime.now(UTC)
+    is_scheduled = campaign.schedule_at is not None and campaign.schedule_at > now
+    campaign.status = CampaignStatus.scheduled if is_scheduled else CampaignStatus.running
     await session.commit()
 
-    chunks = [
-        contact_ids[i : i + CHUNK_SIZE]
-        for i in range(0, len(contact_ids), CHUNK_SIZE)
-    ]
+    chunks = [contact_ids[i : i + CHUNK_SIZE] for i in range(0, len(contact_ids), CHUNK_SIZE)]
 
     # Pre-queue placeholder rows so stats immediately reflect "queued: N".
     for chunk in chunks:
-        await _queue_chunk_rows(
-            session, campaign_id=campaign.id, contact_ids=chunk
-        )
+        await _queue_chunk_rows(session, campaign_id=campaign.id, contact_ids=chunk)
 
     # Step 3.5.14 — Celery-aware dispatch.
     #
@@ -416,12 +392,11 @@ async def enqueue(
     # their queued rows pre-inserted; the beat task
     # `dispatch_scheduled_campaigns` picks them up every 60s.
     if not is_scheduled:
+        from config import CELERY_ENABLED as _CELERY_ENABLED
         from src.app.core.campaigns.tasks import (
             HAS_CELERY,
             send_campaign_chunk,
         )
-
-        from config import CELERY_ENABLED as _CELERY_ENABLED
 
         if HAS_CELERY and _CELERY_ENABLED:
             for chunk in chunks:
@@ -440,8 +415,7 @@ async def enqueue(
 
                     run_ab_decision.apply_async(
                         args=[str(campaign.id)],
-                        countdown=int(campaign.winner_holdback_hours)
-                        * 3600,
+                        countdown=int(campaign.winner_holdback_hours) * 3600,
                     )
                 except Exception:  # noqa: BLE001
                     logger.exception(
@@ -450,9 +424,7 @@ async def enqueue(
                     )
         else:
             for chunk in chunks:
-                await dispatch_chunk(
-                    session, campaign_id=campaign.id, contact_ids=chunk
-                )
+                await dispatch_chunk(session, campaign_id=campaign.id, contact_ids=chunk)
 
     await audit.log(
         "campaigns.started",
@@ -497,9 +469,7 @@ async def _queue_chunk_rows(
     ]
     if not rows:
         return
-    await campaigns_da.bulk_upsert_queued_campaign_messages(
-        session, rows=rows
-    )
+    await campaigns_da.bulk_upsert_queued_campaign_messages(session, rows=rows)
     await session.commit()
 
 
@@ -561,9 +531,7 @@ async def dispatch_chunk(
             )
             if tid is not None
         ]
-        by_central = await campaigns_da.get_wa_extensions_for_template_ids(
-            session, ids
-        )
+        by_central = await campaigns_da.get_wa_extensions_for_template_ids(session, ids)
         template_a_row = by_central.get(campaign.variant_a_template_id)
         template_b_row = by_central.get(campaign.variant_b_template_id)
         if template_a_row is None or template_b_row is None:
@@ -591,10 +559,8 @@ async def dispatch_chunk(
         # Step 11 — lookup the WA extension via the central row's id
         # (the campaign's `template_id` now points at the central
         # library, not the WA extension).
-        template_row = (
-            await campaigns_da.get_wa_extension_for_campaign_template(
-                session, campaign.template_id
-            )
+        template_row = await campaigns_da.get_wa_extension_for_campaign_template(
+            session, campaign.template_id
         )
         if template_row is None:
             for cid in contact_ids:
@@ -620,9 +586,7 @@ async def dispatch_chunk(
         # Step 27a — rate limit follows the campaign's chosen phone
         # (NULL → org default). Each Meta phone has its own throughput
         # tier; mismatching them under-utilises the higher-tier number.
-        bundle = await get_active_config(
-            session, phone_id=campaign.send_from_phone_id
-        )
+        bundle = await get_active_config(session, phone_id=campaign.send_from_phone_id)
         if bundle is not None:
             _, _wa_config = bundle
             wa_rate_per_sec = max(1, int(_wa_config.rate_limit_per_sec or 50))
@@ -664,11 +628,7 @@ async def dispatch_chunk(
                 contact_id=cid,
                 split_ratio=int(campaign.split_ratio),
             )
-            template_row = (
-                template_a_row
-                if assigned_variant == "A"
-                else template_b_row
-            )
+            template_row = template_a_row if assigned_variant == "A" else template_b_row
 
         # Channel-specific opt-in check. Other channels (SMS / email)
         # have their own opt-out columns; this guard only applies to
@@ -676,8 +636,7 @@ async def dispatch_chunk(
         if campaign.channel == ConversationChannel.whatsapp:
             template_category = (
                 template_row.category.lower()
-                if template_row is not None
-                and getattr(template_row, "category", None)
+                if template_row is not None and getattr(template_row, "category", None)
                 else None
             )
             decision = evaluate_contact(
@@ -705,9 +664,7 @@ async def dispatch_chunk(
                 is_blocked,
             )
 
-            block_hit = await is_blocked(
-                session, org_id=campaign.org_id, phone=contact.phone
-            )
+            block_hit = await is_blocked(session, org_id=campaign.org_id, phone=contact.phone)
             if block_hit is not None:
                 await _mark_message(
                     session,
@@ -715,8 +672,7 @@ async def dispatch_chunk(
                     contact_id=cid,
                     new_status=CampaignMessageStatus.failed,
                     error=(
-                        f"send blocked: number is on the block list "
-                        f"(reason: {block_hit.reason})"
+                        f"send blocked: number is on the block list (reason: {block_hit.reason})"
                     ),
                 )
                 continue
@@ -750,9 +706,7 @@ async def dispatch_chunk(
                     acquire_wa_rate_token,
                 )
 
-                await acquire_wa_rate_token(
-                    campaign.org_id, rate_per_sec=wa_rate_per_sec
-                )
+                await acquire_wa_rate_token(campaign.org_id, rate_per_sec=wa_rate_per_sec)
             try:
                 if template_row is not None:
                     variables = _resolve_template_variables(campaign, contact)
@@ -794,9 +748,7 @@ async def dispatch_chunk(
                 break
 
         if send_error is not None or ref is None:
-            logger.exception(
-                "campaign send failed", extra={"contact_id": str(cid)}
-            )
+            logger.exception("campaign send failed", extra={"contact_id": str(cid)})
             await _mark_message(
                 session,
                 campaign_id=campaign_id,
@@ -806,7 +758,7 @@ async def dispatch_chunk(
             )
             continue
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         campaigns_da.add_outbound_message(
             session,
             Message(
@@ -836,9 +788,7 @@ async def dispatch_chunk(
         )
 
     # If this was the last queued chunk, flip the campaign to `done`.
-    pending = await campaigns_da.count_queued_messages_for_campaign(
-        session, campaign_id
-    )
+    pending = await campaigns_da.count_queued_messages_for_campaign(session, campaign_id)
     if pending == 0 and campaign.status == CampaignStatus.running:
         campaign.status = CampaignStatus.done
         await session.commit()
@@ -919,9 +869,7 @@ def _assign_ab_variant(
     valid edge cases the operator can set on the create modal."""
     import hashlib
 
-    h = hashlib.sha256(
-        f"{campaign_id}:{contact_id}".encode("utf-8")
-    ).digest()
+    h = hashlib.sha256(f"{campaign_id}:{contact_id}".encode()).digest()
     bucket = h[0] % 100
     return "A" if bucket < max(0, min(100, split_ratio)) else "B"
 
@@ -984,9 +932,7 @@ def _get_contact_field(contact: Contact, field_name: str) -> str:
     return ""
 
 
-def _resolve_template_variables(
-    campaign: Campaign, contact: Contact
-) -> dict[int, str]:
+def _resolve_template_variables(campaign: Campaign, contact: Contact) -> dict[int, str]:
     """Turn `campaign.template_variables` JSONB into a flat `{n: str}`
     dict the adapter's `send_template` consumes.
 
@@ -1028,10 +974,10 @@ def _resolve_template_variables(
 # when the outbound POST returns 200, and Meta's `sent` echo is
 # redundant.
 _META_STATUS_TO_LOCAL: dict[str, tuple[CampaignMessageStatus | None, str | None]] = {
-    "sent":      (None, None),
+    "sent": (None, None),
     "delivered": (CampaignMessageStatus.delivered, "delivered_at"),
-    "read":      (CampaignMessageStatus.read, "read_at"),
-    "failed":    (CampaignMessageStatus.failed, None),
+    "read": (CampaignMessageStatus.read, "read_at"),
+    "failed": (CampaignMessageStatus.failed, None),
 }
 
 
@@ -1063,9 +1009,7 @@ async def apply_meta_status(
         # Unknown Meta status; nothing to do but don't crash.
         return False
 
-    row = await campaigns_da.get_campaign_message_by_channel_id(
-        session, channel_message_id
-    )
+    row = await campaigns_da.get_campaign_message_by_channel_id(session, channel_message_id)
     if row is None:
         return False
 
@@ -1074,10 +1018,7 @@ async def apply_meta_status(
     # re-sends status events out of order; this guard keeps the row's
     # error stable and prevents misleading "delivered after failed"
     # signals in the UI.
-    if (
-        row.status == CampaignMessageStatus.failed
-        and meta_status != "failed"
-    ):
+    if row.status == CampaignMessageStatus.failed and meta_status != "failed":
         return False
 
     new_status, ts_column = mapping
@@ -1114,9 +1055,7 @@ async def apply_meta_status(
     return changed
 
 
-def _preview_template_body(
-    template_row: WhatsAppTemplate, variables: dict[int, str]
-) -> str:
+def _preview_template_body(template_row: WhatsAppTemplate, variables: dict[int, str]) -> str:
     """Substitute resolved variables into the template body for the
     inbox Message row's `text`. Meta renders the final message
     server-side from the approved template + parameters — this preview
@@ -1140,7 +1079,7 @@ async def list_messages(
     session: AsyncSession,
     *,
     campaign_id: uuid.UUID,
-    status_filter: "CampaignMessageStatus | None" = None,
+    status_filter: CampaignMessageStatus | None = None,
     page: int = 1,
     size: int = 100,
 ) -> tuple[list[CampaignMessage], int]:
@@ -1187,20 +1126,14 @@ async def retry_message(
     msg.error = None
     await session.commit()
 
-    await dispatch_chunk(
-        session, campaign_id=campaign_id, contact_ids=[msg.contact_id]
-    )
+    await dispatch_chunk(session, campaign_id=campaign_id, contact_ids=[msg.contact_id])
     await session.refresh(msg)
     return msg
 
 
-async def stats(
-    session: AsyncSession, *, campaign_id: uuid.UUID
-) -> dict[str, Any]:
+async def stats(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str, Any]:
     campaign = await get_campaign(session, campaign_id)
-    rows = await campaigns_da.stats_by_status(
-        session, campaign_id=campaign_id
-    )
+    rows = await campaigns_da.stats_by_status(session, campaign_id=campaign_id)
     by_status: dict[str, int] = {r[0].value: r[1] for r in rows}
     audience_size = sum(by_status.values())
     return {

@@ -17,16 +17,18 @@ Reads are scoped by the active org via the `TenantScoped` ORM mixin
 (see `shared/orm.py`) and Postgres RLS — the service does NOT add an
 explicit `org_id = ?` predicate because the loader already does it.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
-from src.app.core.subscriptions import data_access as _da, plans
+from src.app.core.subscriptions import data_access as _da
+from src.app.core.subscriptions import plans
 from src.app.core.subscriptions.models import Subscription
 from src.app.core.subscriptions.plans import Plan
 from src.app.core.subscriptions.schemas import (
@@ -46,7 +48,6 @@ from src.app.core.subscriptions.schemas import (
 )
 from src.app.core.users import service as users_service
 
-
 # Cycle lengths used when projecting `first_renewal_at` in the preview.
 _CYCLE_DAYS: dict[str, int] = {"monthly": 30, "annual": 365}
 
@@ -55,9 +56,7 @@ _CYCLE_DAYS: dict[str, int] = {"monthly": 30, "annual": 365}
 _REMAINING_CREDIT_NOTE = "kept until renewal"
 
 
-async def get_active_subscription(
-    session: AsyncSession, org_id: uuid.UUID
-) -> Subscription | None:
+async def get_active_subscription(session: AsyncSession, org_id: uuid.UUID) -> Subscription | None:
     """Return the org's currently-active subscription, or None."""
     return await _da.get_active_subscription_for_org(session, org_id)
 
@@ -79,13 +78,9 @@ async def compose_current_subscription_response(
         )
     plan = plans.get(sub.plan_code)
     if plan is None:
-        raise RuntimeError(
-            f"subscription {sub.id} references unknown plan {sub.plan_code!r}"
-        )
+        raise RuntimeError(f"subscription {sub.id} references unknown plan {sub.plan_code!r}")
     seats_in_use = await users_service.count_active_members(session, org_id)
-    usage_snap = await usage_service.snapshot(
-        session, org_id, list(RESOURCE_PERIOD_KIND.keys())
-    )
+    usage_snap = await usage_service.snapshot(session, org_id, list(RESOURCE_PERIOD_KIND.keys()))
     return SubscriptionCurrentResponse.from_components(
         sub=sub,
         plan=plan,
@@ -128,9 +123,7 @@ async def change_plan(
         )
     current_plan = plans.get(sub.plan_code)
     if current_plan is None:
-        raise RuntimeError(
-            f"subscription {sub.id} references unknown plan {sub.plan_code!r}"
-        )
+        raise RuntimeError(f"subscription {sub.id} references unknown plan {sub.plan_code!r}")
 
     effective_seats = seats if seats is not None else sub.seats_purchased
     seats_in_use = await users_service.count_active_members(session, org_id)
@@ -144,9 +137,12 @@ async def change_plan(
         return NoChangeResponse(outcome="no_change")
 
     if _is_upgrade(
-        current_plan, target_plan,
-        target_cycle=billing_cycle, current_cycle=sub.billing_cycle,
-        target_seats=effective_seats, current_seats=sub.seats_purchased,
+        current_plan,
+        target_plan,
+        target_cycle=billing_cycle,
+        current_cycle=sub.billing_cycle,
+        target_seats=effective_seats,
+        current_seats=sub.seats_purchased,
     ):
         await audit.log(
             "subscription.change_initiated",
@@ -168,7 +164,9 @@ async def change_plan(
             checkout_url=None,
             checkout_session_id=None,
             preview=_preview_needs_payment(
-                target_plan, billing_cycle, effective_seats,
+                target_plan,
+                billing_cycle,
+                effective_seats,
             ),
         )
 
@@ -183,9 +181,7 @@ async def change_plan(
     )
     await session.commit()
     await audit.log(
-        "subscription.change_rescheduled"
-        if was_rescheduled
-        else "subscription.change_scheduled",
+        "subscription.change_rescheduled" if was_rescheduled else "subscription.change_scheduled",
         entity_type="subscription",
         entity_id=sub.id,
         before={
@@ -213,7 +209,9 @@ async def change_plan(
 
 
 def _validate_change(
-    target_plan: Plan, effective_seats: int, seats_in_use: int,
+    target_plan: Plan,
+    effective_seats: int,
+    seats_in_use: int,
 ) -> None:
     """Enforce the four business rules before deciding outcome."""
     if target_plan.code == "trial":
@@ -245,17 +243,16 @@ def _is_upgrade(
 ) -> bool:
     """Classify the requested transition as "needs payment now" or not."""
     if target_plan.code != current_plan.code:
-        return (
-            target_plan.pricing.monthly_bundle_usd
-            > current_plan.pricing.monthly_bundle_usd
-        )
+        return target_plan.pricing.monthly_bundle_usd > current_plan.pricing.monthly_bundle_usd
     if target_cycle != current_cycle:
         return target_cycle == "annual"
     return target_seats > current_seats
 
 
 def _preview_needs_payment(
-    target_plan: Plan, billing_cycle: str, seats: int,
+    target_plan: Plan,
+    billing_cycle: str,
+    seats: int,
 ) -> NeedsPaymentPreview:
     """Build the preview payload for an upgrade."""
     if billing_cycle == "annual":
@@ -274,8 +271,7 @@ def _preview_needs_payment(
         billing_cycle=billing_cycle,  # type: ignore[arg-type]
         seats=seats,
         amount_due_usd=amount_due,
-        first_renewal_at=datetime.now(tz=timezone.utc)
-        + timedelta(days=cycle_days),
+        first_renewal_at=datetime.now(tz=UTC) + timedelta(days=cycle_days),
     )
 
 
@@ -285,7 +281,9 @@ def _preview_needs_payment(
 
 
 async def preview_seat_change(
-    session: AsyncSession, org_id: uuid.UUID, total_seats: int,
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    total_seats: int,
 ) -> SeatPreview:
     """Pure read — show the cost impact of moving to `total_seats`."""
     sub = await get_active_subscription(session, org_id)
@@ -296,19 +294,16 @@ async def preview_seat_change(
         )
     plan = plans.get(sub.plan_code)
     if plan is None:
-        raise RuntimeError(
-            f"subscription {sub.id} references unknown plan {sub.plan_code!r}"
-        )
+        raise RuntimeError(f"subscription {sub.id} references unknown plan {sub.plan_code!r}")
     return _compute_seat_preview(sub, plan, total_seats)
 
 
 async def change_seats(
-    session: AsyncSession, org_id: uuid.UUID, *, total_seats: int,
-) -> (
-    SeatChangeNeedsPaymentResponse
-    | SeatChangeScheduledResponse
-    | NoChangeResponse
-):
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    *,
+    total_seats: int,
+) -> SeatChangeNeedsPaymentResponse | SeatChangeScheduledResponse | NoChangeResponse:
     """Apply or schedule a seat change for the caller's org."""
     sub = await get_active_subscription(session, org_id)
     if sub is None:
@@ -324,9 +319,7 @@ async def change_seats(
 
     plan = plans.get(sub.plan_code)
     if plan is None:
-        raise RuntimeError(
-            f"subscription {sub.id} references unknown plan {sub.plan_code!r}"
-        )
+        raise RuntimeError(f"subscription {sub.id} references unknown plan {sub.plan_code!r}")
 
     if total_seats == sub.seats_purchased:
         return NoChangeResponse(outcome="no_change")
@@ -345,9 +338,7 @@ async def change_seats(
             )
 
         was_rescheduled = sub.next_seats is not None
-        await _da.update_subscription_next_seats(
-            session, sub_id=sub.id, next_seats=total_seats
-        )
+        await _da.update_subscription_next_seats(session, sub_id=sub.id, next_seats=total_seats)
         await session.commit()
         await audit.log(
             "subscription.seats_change_rescheduled"
@@ -393,7 +384,9 @@ async def change_seats(
 
 
 def _compute_seat_preview(
-    sub: Subscription, plan: Plan, total_seats: int,
+    sub: Subscription,
+    plan: Plan,
+    total_seats: int,
 ) -> SeatPreview:
     """Math for both the read-only preview endpoint and the commit response."""
     delta = total_seats - sub.seats_purchased
@@ -408,10 +401,8 @@ def _compute_seat_preview(
         else:
             extra_seat_period_cost = plan.pricing.extra_seat_monthly_usd
 
-        now = datetime.now(tz=timezone.utc)
-        period_total = (
-            sub.current_period_end - sub.current_period_start
-        ).total_seconds()
+        now = datetime.now(tz=UTC)
+        period_total = (sub.current_period_end - sub.current_period_start).total_seconds()
         period_remaining = (sub.current_period_end - now).total_seconds()
         if period_total <= 0:
             fraction = 0.0
@@ -425,15 +416,13 @@ def _compute_seat_preview(
     extras_after = max(0, total_seats - plan.pricing.included_seats)
     if sub.billing_cycle == "monthly":
         monthly_cost: int | None = (
-            plan.pricing.monthly_bundle_usd
-            + extras_after * plan.pricing.extra_seat_monthly_usd
+            plan.pricing.monthly_bundle_usd + extras_after * plan.pricing.extra_seat_monthly_usd
         )
         annual_cost: int | None = None
     else:
         monthly_cost = None
         annual_cost = (
-            plan.pricing.annual_bundle_usd
-            + extras_after * plan.pricing.extra_seat_annual_usd
+            plan.pricing.annual_bundle_usd + extras_after * plan.pricing.extra_seat_annual_usd
         )
 
     return SeatPreview(
@@ -454,7 +443,8 @@ def _compute_seat_preview(
 
 
 async def cancel_subscription(
-    session: AsyncSession, org_id: uuid.UUID,
+    session: AsyncSession,
+    org_id: uuid.UUID,
 ) -> CancelSubscriptionResponse:
     """Mark the org's subscription cancelled. Idempotent."""
     latest = await _da.get_latest_subscription_for_org(session, org_id)
@@ -471,7 +461,7 @@ async def cancel_subscription(
             already_cancelled=True,
         )
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     rowcount = await _da.update_subscription_cancelled_conditional(
         session, sub_id=latest.id, when=now
     )
@@ -519,7 +509,9 @@ async def ensure_stripe_customer(
         return sub.stripe_customer_id
 
     customer_id = await payment_provider.create_customer(
-        org_id=sub.org_id, email=email, name=name,
+        org_id=sub.org_id,
+        email=email,
+        name=name,
     )
     rowcount = await _da.update_subscription_stripe_customer_conditional(
         session, sub_id=sub.id, customer_id=customer_id
@@ -571,8 +563,10 @@ async def create_direct_checkout(
     _validate_change(target_plan, seats, seats_in_use)
 
     customer_id = await ensure_stripe_customer(
-        session, sub,
-        email=user_email, name=user_full_name,
+        session,
+        sub,
+        email=user_email,
+        name=user_full_name,
         payment_provider=payment_provider,
     )
 
@@ -625,8 +619,10 @@ async def attach_checkout_to_needs_payment(
         return response
 
     customer_id = await ensure_stripe_customer(
-        session, sub,
-        email=user_email, name=user_full_name,
+        session,
+        sub,
+        email=user_email,
+        name=user_full_name,
         payment_provider=payment_provider,
     )
     checkout = await payment_provider.create_checkout_session(
@@ -668,8 +664,10 @@ async def attach_checkout_to_seats_needs_payment(
         return response
 
     customer_id = await ensure_stripe_customer(
-        session, sub,
-        email=user_email, name=user_full_name,
+        session,
+        sub,
+        email=user_email,
+        name=user_full_name,
         payment_provider=payment_provider,
     )
     checkout = await payment_provider.create_checkout_session(
@@ -700,7 +698,8 @@ async def attach_checkout_to_seats_needs_payment(
 
 
 async def list_invoices(
-    session: AsyncSession, org_id: uuid.UUID,
+    session: AsyncSession,
+    org_id: uuid.UUID,
 ) -> list[InvoiceRead]:
     """Return every Stripe invoice mirrored for the org, newest first."""
     rows = await _da.list_invoices_for_org(session, org_id)

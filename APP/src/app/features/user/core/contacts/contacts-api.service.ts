@@ -48,11 +48,7 @@ export interface Contact {
 
 /** Step 22 — DPDP opt-in state machine. Mirrored from the backend
  *  ``whatsapp_opt_in_status`` ENUM. */
-export type WhatsAppOptInStatus =
-  | 'never_contacted'
-  | 'implicit'
-  | 'opted_in'
-  | 'opted_out';
+export type WhatsAppOptInStatus = 'never_contacted' | 'implicit' | 'opted_in' | 'opted_out';
 
 export type WhatsAppOptInSource =
   | 'form_widget'
@@ -128,13 +124,7 @@ export interface ContactListQuery {
 /** Targets the operator can map a CSV column to. Mirrors the
  * `ContactFieldTarget` literal in the backend schemas — keep both
  * lists in sync. */
-export type ContactFieldTarget =
-  | 'full_name'
-  | 'phone'
-  | 'email'
-  | 'source'
-  | 'tag'
-  | 'skip';
+export type ContactFieldTarget = 'full_name' | 'phone' | 'email' | 'source' | 'tag' | 'skip';
 
 /** Response from `POST /contacts/imports/upload`. */
 export interface ContactImportUploadOut {
@@ -178,11 +168,7 @@ export interface ContactImportCommitOut {
 }
 
 @Injectable({ providedIn: 'root' })
-export class ContactsApiService extends BaseCrudApiService<
-  Contact,
-  ContactCreate,
-  ContactUpdate
-> {
+export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreate, ContactUpdate> {
   protected readonly base = `${environment.apiBaseUrl}/contacts`;
   private readonly renderUrl = `${environment.apiBaseUrl}/custom-fields/contact/render`;
 
@@ -202,10 +188,7 @@ export class ContactsApiService extends BaseCrudApiService<
   }
 
   /** Single-row reassign. `userId === null` clears the owner. */
-  reassign(
-    id: string,
-    body: { userId: string | null; note?: string | null },
-  ): Observable<Contact> {
+  reassign(id: string, body: { userId: string | null; note?: string | null }): Observable<Contact> {
     return this.http.post<Contact>(`${this.base}/${id}/reassign`, {
       assigned_to_id: body.userId,
       note: body.note ?? null,
@@ -249,10 +232,9 @@ export class ContactsApiService extends BaseCrudApiService<
       email: query.email,
       exclude_id: query.excludeId,
     });
-    return this.http.get<{ matches: ContactDuplicateMatch[] }>(
-      `${this.base}/check-duplicate`,
-      { params },
-    );
+    return this.http.get<{ matches: ContactDuplicateMatch[] }>(`${this.base}/check-duplicate`, {
+      params,
+    });
   }
 
   /** Streamed CSV download of the current filter. Backend caps at 50k
@@ -295,10 +277,7 @@ export class ContactsApiService extends BaseCrudApiService<
       request_evidence?: Record<string, unknown>;
     },
   ): Observable<ConsentEvent> {
-    return this.http.post<ConsentEvent>(
-      `${this.base}/${contactId}/opt-in`,
-      body,
-    );
+    return this.http.post<ConsentEvent>(`${this.base}/${contactId}/opt-in`, body);
   }
 
   /** Manual opt-out override. Source is always `manual_entry` on this
@@ -310,10 +289,7 @@ export class ContactsApiService extends BaseCrudApiService<
       request_evidence?: Record<string, unknown>;
     },
   ): Observable<ConsentEvent> {
-    return this.http.post<ConsentEvent>(
-      `${this.base}/${contactId}/opt-out`,
-      body,
-    );
+    return this.http.post<ConsentEvent>(`${this.base}/${contactId}/opt-out`, body);
   }
 
   /** Step 1 of bulk import: stream the file to the backend, get back
@@ -321,33 +297,18 @@ export class ContactsApiService extends BaseCrudApiService<
   uploadImport(file: File): Observable<ContactImportUploadOut> {
     const form = new FormData();
     form.append('file', file, file.name);
-    return this.http.post<ContactImportUploadOut>(
-      `${this.base}/imports/upload`,
-      form,
-    );
+    return this.http.post<ContactImportUploadOut>(`${this.base}/imports/upload`, form);
   }
 
   /** Step 2 of bulk import: preview what commit would do without
    * touching the contacts table. Returns dupe + skip + error counts. */
-  dryRunImport(
-    importId: string,
-    body: ContactImportRunIn,
-  ): Observable<ContactImportDryRunOut> {
-    return this.http.post<ContactImportDryRunOut>(
-      `${this.base}/imports/${importId}/dry-run`,
-      body,
-    );
+  dryRunImport(importId: string, body: ContactImportRunIn): Observable<ContactImportDryRunOut> {
+    return this.http.post<ContactImportDryRunOut>(`${this.base}/imports/${importId}/dry-run`, body);
   }
 
   /** Step 3 of bulk import: write the contacts. Backend is idempotent
    * on `importId` so re-clicks don't double-insert. */
-  commitImport(
-    importId: string,
-    body: ContactImportRunIn,
-  ): Observable<ContactImportCommitOut> {
-    return this.http.post<ContactImportCommitOut>(
-      `${this.base}/imports/${importId}/commit`,
-      body,
-    );
+  commitImport(importId: string, body: ContactImportRunIn): Observable<ContactImportCommitOut> {
+    return this.http.post<ContactImportCommitOut>(`${this.base}/imports/${importId}/commit`, body);
   }
 }

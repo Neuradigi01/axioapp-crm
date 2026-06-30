@@ -4,8 +4,8 @@ Permissions `pos.use` + `pos.refund` are pack-side (the core engine
 already registers `billing.read/write/refund`). The sidebar entry
 points at the frontend POS route (built in Step 4.12).
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="fp_billing",

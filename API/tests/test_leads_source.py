@@ -10,6 +10,7 @@ Pins:
   - Audit row `leads.created` includes `source` in its `after` snapshot
     (the contract every later channel reuses).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -21,7 +22,7 @@ from sqlalchemy.exc import IntegrityError
 
 from src.app.core.audit.models import AuditLog
 from src.app.core.contacts.models import Contact
-from src.app.core.leads.models import Lead, LeadSource
+from src.app.core.leads.models import LeadSource
 from src.app.core.permissions.models import RolePermission
 from src.app.core.permissions.service import register_permission
 from src.app.core.pipelines.models import Pipeline, PipelineStage
@@ -39,9 +40,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -218,12 +217,16 @@ async def test_audit_log_records_source(layered_client, seeded_admin):
     try:
         async with TestSession() as session:
             rows = (
-                await session.execute(
-                    select(AuditLog)
-                    .where(AuditLog.action == "leads.created")
-                    .where(AuditLog.entity_id == uuid.UUID(lead_id))
+                (
+                    await session.execute(
+                        select(AuditLog)
+                        .where(AuditLog.action == "leads.created")
+                        .where(AuditLog.entity_id == uuid.UUID(lead_id))
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(rows) == 1
             assert rows[0].after is not None
             assert rows[0].after.get("source") == "widget"

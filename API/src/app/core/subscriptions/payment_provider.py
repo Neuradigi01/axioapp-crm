@@ -14,6 +14,7 @@ rest return either the provider ID (str) or `None`. Webhook events
 return raw `dict` because the upstream payload shape is provider-
 specific and each consumer (Step 13) decodes the keys it needs.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -41,7 +42,10 @@ class PaymentProvider(Protocol):
     """Abstract payment integration; runtime checked structurally."""
 
     async def create_customer(
-        self, org_id: uuid.UUID, email: str, name: str,
+        self,
+        org_id: uuid.UUID,
+        email: str,
+        name: str,
     ) -> str:
         """Create a Customer in the provider's system.
 
@@ -99,7 +103,9 @@ class PaymentProvider(Protocol):
         ...
 
     async def verify_webhook(
-        self, payload: bytes, signature: str,
+        self,
+        payload: bytes,
+        signature: str,
     ) -> dict[str, Any]:
         """Validate the provider's webhook signature.
 

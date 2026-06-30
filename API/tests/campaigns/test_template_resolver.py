@@ -14,6 +14,7 @@ The migration-mapping correctness (every WA → central) is implicit
 in the WA backfill test (Step 9's `test_wa_backfill.py`) — Step 11
 only swings the FK; the source data was already validated.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -24,13 +25,11 @@ from fastapi import HTTPException
 from sqlalchemy import text as sql_text
 
 from src.app.core.campaigns import service as campaigns_service
-from src.app.core.campaigns.schemas import CampaignCreate
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.templates import service as templates_service
 from src.app.core.templates.models import TemplateCategory
 from src.app.core.templates.schemas import TemplateCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -39,10 +38,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {"id": str(org_id), "name": "Demo", "slug": f"demo-{org_id.hex[:6]}"},
     )
     await test_db.commit()
@@ -73,9 +69,7 @@ async def _make_template(test_db, *, org_id, channel, name="T"):
 
 
 async def test_validator_passes_when_channel_matches(test_db, org_id):
-    template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     token = set_context(RequestContext(org_id=org_id))
     try:
         # No raise → pass.
@@ -90,9 +84,7 @@ async def test_validator_passes_when_channel_matches(test_db, org_id):
 
 
 async def test_validator_rejects_channel_mismatch(test_db, org_id):
-    wa_template = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.whatsapp
-    )
+    wa_template = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.whatsapp)
     token = set_context(RequestContext(org_id=org_id))
     try:
         with pytest.raises(HTTPException) as info:
@@ -153,9 +145,7 @@ async def test_validator_accepts_matching_ab_variants(test_db, org_id):
         reset_context(token)
 
 
-async def test_validator_rejects_when_one_ab_variant_wrong_channel(
-    test_db, org_id
-):
+async def test_validator_rejects_when_one_ab_variant_wrong_channel(test_db, org_id):
     wa = await _make_template(
         test_db,
         org_id=org_id,
@@ -192,16 +182,10 @@ async def test_wa_extension_lookup_returns_none_for_email(test_db, org_id):
     body directly (no Meta-template send path)."""
     from src.app.core.campaigns import data_access as campaigns_da
 
-    email_t = await _make_template(
-        test_db, org_id=org_id, channel=ConversationChannel.email
-    )
+    email_t = await _make_template(test_db, org_id=org_id, channel=ConversationChannel.email)
     token = set_context(RequestContext(org_id=org_id))
     try:
-        wa_row = (
-            await campaigns_da.get_wa_extension_for_campaign_template(
-                test_db, email_t.id
-            )
-        )
+        wa_row = await campaigns_da.get_wa_extension_for_campaign_template(test_db, email_t.id)
         assert wa_row is None
     finally:
         reset_context(token)

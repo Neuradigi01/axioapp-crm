@@ -14,14 +14,14 @@ explicitly in the WHERE clause as a belt-to-the-suspenders defense
 — Celery tasks + scripts that forget to set ``RequestContext.org_id``
 still get correct results.
 """
+
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from datetime import datetime
 
 from src.app.core.automation.models import (
     AutomationRun,
@@ -101,18 +101,12 @@ async def list_triggers(
             )
         )
 
-    total = (
-        await session.execute(
-            select(func.count()).select_from(base.subquery())
-        )
-    ).scalar_one()
+    total = (await session.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
 
     rows = (
         (
             await session.execute(
-                base.order_by(AutomationTrigger.id.asc())
-                .offset(offset)
-                .limit(limit)
+                base.order_by(AutomationTrigger.id.asc()).offset(offset).limit(limit)
             )
         )
         .scalars()
@@ -148,9 +142,7 @@ async def match_enabled_triggers(
     return list(result.scalars().all())
 
 
-def add_trigger(
-    session: AsyncSession, trigger: AutomationTrigger
-) -> AutomationTrigger:
+def add_trigger(session: AsyncSession, trigger: AutomationTrigger) -> AutomationTrigger:
     """Stage a new trigger row in the unit-of-work. Service commits."""
     session.add(trigger)
     return trigger
@@ -182,9 +174,7 @@ async def get_run_by_id_unscoped(
     because they don't carry a ``RequestContext``. Sets the org
     context internally before reading; safe to use ONLY from the
     Celery delivery path."""
-    result = await session.execute(
-        select(AutomationRun).where(AutomationRun.id == run_id)
-    )
+    result = await session.execute(select(AutomationRun).where(AutomationRun.id == run_id))
     return result.scalar_one_or_none()
 
 
@@ -210,9 +200,7 @@ async def find_run_by_event_id(
     return result.scalar_one_or_none()
 
 
-def add_run(
-    session: AsyncSession, run: AutomationRun
-) -> AutomationRun:
+def add_run(session: AsyncSession, run: AutomationRun) -> AutomationRun:
     """Stage a new run row in the unit-of-work. Dispatcher commits."""
     session.add(run)
     return run
@@ -247,18 +235,12 @@ async def list_runs(
     if since is not None:
         base = base.where(AutomationRun.scheduled_at >= since)
 
-    total = (
-        await session.execute(
-            select(func.count()).select_from(base.subquery())
-        )
-    ).scalar_one()
+    total = (await session.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
 
     rows = (
         (
             await session.execute(
-                base.order_by(AutomationRun.scheduled_at.desc())
-                .offset(offset)
-                .limit(limit)
+                base.order_by(AutomationRun.scheduled_at.desc()).offset(offset).limit(limit)
             )
         )
         .scalars()

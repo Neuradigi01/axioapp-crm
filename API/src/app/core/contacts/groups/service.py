@@ -21,15 +21,14 @@ Three groups of functions:
 All reads/writes go through the active session — the ORM tenant
 filter + Postgres RLS jointly enforce org isolation.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.shared.audit import log_entity_change
 from src.app.core.contacts.groups import data_access
 from src.app.core.contacts.groups.models import ContactGroup
 from src.app.core.contacts.groups.schemas import (
@@ -37,14 +36,12 @@ from src.app.core.contacts.groups.schemas import (
     GroupFilter,
     GroupUpdate,
 )
-
+from src.app.shared.audit import log_entity_change
 
 # --- reads ----------------------------------------------------------------
 
 
-async def get_group(
-    session: AsyncSession, group_id: uuid.UUID
-) -> ContactGroup:
+async def get_group(session: AsyncSession, group_id: uuid.UUID) -> ContactGroup:
     row = await data_access.get_group_by_id(session, group_id)
     if row is None:
         raise HTTPException(
@@ -64,9 +61,7 @@ async def list_groups(
     a `GroupListResponse` directly."""
     total = await data_access.count_groups(session)
     offset = (page - 1) * size
-    rows = await data_access.list_groups_page(
-        session, offset=offset, limit=size
-    )
+    rows = await data_access.list_groups_page(session, offset=offset, limit=size)
     return rows, total
 
 
@@ -124,9 +119,7 @@ async def create_group(
         after={
             "name": group.name,
             "is_dynamic": group.is_dynamic,
-            "member_count": (
-                len(payload.contact_ids or []) if not group.is_dynamic else None
-            ),
+            "member_count": (len(payload.contact_ids or []) if not group.is_dynamic else None),
         },
     )
     return group
@@ -156,9 +149,7 @@ async def update_group(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot set `filter_json` on a static group.",
             )
-        group.filter_json = payload.filter_json.model_dump(
-            exclude_none=True
-        )
+        group.filter_json = payload.filter_json.model_dump(exclude_none=True)
         changed = True
     if payload.contact_ids is not None:
         if group.is_dynamic:
@@ -198,9 +189,7 @@ async def update_group(
     return group
 
 
-async def delete_group(
-    session: AsyncSession, *, group_id: uuid.UUID
-) -> None:
+async def delete_group(session: AsyncSession, *, group_id: uuid.UUID) -> None:
     """Hard delete. CASCADE on the FK drops the member rows.
 
     Campaigns that reference the group via `audience_filter.group_id`
@@ -222,9 +211,7 @@ async def delete_group(
 # --- resolution -----------------------------------------------------------
 
 
-async def resolve_group_contacts(
-    session: AsyncSession, *, group_id: uuid.UUID
-) -> list[uuid.UUID]:
+async def resolve_group_contacts(session: AsyncSession, *, group_id: uuid.UUID) -> list[uuid.UUID]:
     """Return the list of contact IDs this group currently resolves to.
 
     Dynamic groups run the saved `filter_json` against `contacts`.
@@ -235,16 +222,14 @@ async def resolve_group_contacts(
         return await data_access.list_contact_ids_matching_filter(
             session, filter_json=group.filter_json
         )
-    return await data_access.list_static_member_contact_ids(
-        session, group_id
-    )
+    return await data_access.list_static_member_contact_ids(session, group_id)
 
 
 async def preview_audience_size(
     session: AsyncSession,
     *,
-    filter_json: Optional[GroupFilter] = None,
-    group_id: Optional[uuid.UUID] = None,
+    filter_json: GroupFilter | None = None,
+    group_id: uuid.UUID | None = None,
 ) -> int:
     """Count the contacts a filter or saved group would resolve to.
     Powers the "82 contacts will receive this" line in the Step 3.5.9
@@ -267,9 +252,7 @@ async def preview_audience_size(
     return len(contact_ids)
 
 
-async def get_member_count(
-    session: AsyncSession, *, group: ContactGroup
-) -> int:
+async def get_member_count(session: AsyncSession, *, group: ContactGroup) -> int:
     """Cheap COUNT used by list endpoints to attach `member_count` to
     each row. For dynamic groups this re-runs the filter — fine for
     the moderate list sizes we expect; if a tenant accumulates 100s
@@ -294,9 +277,7 @@ async def get_sample_member_ids(
         return await data_access.list_contact_ids_matching_filter_limited(
             session, filter_json=group.filter_json, limit=limit
         )
-    return await data_access.list_static_member_contact_ids_limited(
-        session, group.id, limit=limit
-    )
+    return await data_access.list_static_member_contact_ids_limited(session, group.id, limit=limit)
 
 
 __all__ = [

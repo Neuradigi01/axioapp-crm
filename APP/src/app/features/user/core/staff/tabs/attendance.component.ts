@@ -14,11 +14,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { CalendarComponent } from '../../shared/calendar/calendar.component';
 import { CalendarEvent } from '../../shared/calendar/calendar.component';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  StaffApiService,
-  AttendanceOut,
-  StaffWithPerformance,
-} from '../staff-api.service';
+import { StaffApiService, AttendanceOut, StaffWithPerformance } from '../staff-api.service';
 
 /**
  * Attendance tab â€” picks one staff member (the first row by default),
@@ -126,11 +122,8 @@ export class StaffAttendanceTabComponent {
         error: (err: HttpErrorResponse) => {
           this.attendance.set([]);
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load attendance.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load attendance.');
         },
       });
   }
-
 }

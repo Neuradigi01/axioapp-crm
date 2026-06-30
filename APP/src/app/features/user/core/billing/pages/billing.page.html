@@ -56,10 +56,7 @@
       <crm-seats-card [subscription]="sub" />
       <crm-usage-bars [usage]="sub.usage" />
     </div>
-    <crm-invoices-table
-      [invoices]="invoices()"
-      [isLoading]="invoicesLoading()"
-    />
+    <crm-invoices-table [invoices]="invoices()" [isLoading]="invoicesLoading()" />
   }
 </div>
 

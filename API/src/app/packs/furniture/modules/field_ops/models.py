@@ -11,6 +11,7 @@ Two `fp_*` tables, both TenantScoped + RLS-on:
 `purpose` is an ENUM, distinct from `appointments.purpose` (which is
 free-text). Field visits have a closed set of types for analytics.
 """
+
 from __future__ import annotations
 
 import enum
@@ -59,18 +60,14 @@ class FieldVisit(Base, TenantScoped):
         nullable=False,
         unique=True,
     )
-    purpose: Mapped[FieldVisitPurpose] = mapped_column(
-        field_visit_purpose_enum, nullable=False
-    )
+    purpose: Mapped[FieldVisitPurpose] = mapped_column(field_visit_purpose_enum, nullable=False)
     custom_order_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tbl_fp_custom_orders.id", ondelete="SET NULL"),
         nullable=True,
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     signature_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     custom_data: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=sql_text("'{}'::jsonb")
@@ -90,9 +87,7 @@ class FieldVisit(Base, TenantScoped):
 
 class FieldVisitPhoto(Base, TenantScoped):
     __tablename__ = "tbl_fp_field_visit_photos"
-    __table_args__ = (
-        Index("ix_fp_field_visit_photos_visit", "visit_id"),
-    )
+    __table_args__ = (Index("ix_fp_field_visit_photos_visit", "visit_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -106,9 +101,7 @@ class FieldVisitPhoto(Base, TenantScoped):
     )
     url: Mapped[str] = mapped_column(String(512), nullable=False)
     caption: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    taken_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

@@ -11,6 +11,7 @@ What we prove:
      status + body — caller (campaigns dispatch in 3.5.6) wraps it
      into a CampaignMessage.failed.
 """
+
 from __future__ import annotations
 
 import json
@@ -25,7 +26,6 @@ from src.app.core.conversations.adapters.whatsapp import (
     _render_template_components,
 )
 
-
 _ORG_ID = uuid.uuid4()
 
 
@@ -34,9 +34,7 @@ _ORG_ID = uuid.uuid4()
 
 class TestRenderComponents:
     def test_body_only_orders_by_variable_number(self):
-        out = _render_template_components(
-            variables={2: "sofa set", 1: "Asha"}
-        )
+        out = _render_template_components(variables={2: "sofa set", 1: "Asha"})
         assert out == [
             {
                 "type": "body",
@@ -142,9 +140,7 @@ class TestSendTemplate:
         )
 
         # URL hits the messages endpoint.
-        assert client.last_url == (
-            "https://graph.facebook.com/v18.0/123456789012345/messages"
-        )
+        assert client.last_url == ("https://graph.facebook.com/v18.0/123456789012345/messages")
         # Auth header carries the bearer token (NOT the env var fallback).
         assert client.last_headers["Authorization"] == "Bearer dev-token"
         # Payload is the exact Meta template envelope.
@@ -173,8 +169,7 @@ class TestSendTemplate:
             content=json.dumps(
                 {
                     "error": {
-                        "message": "(#131056) Pair (phone, language) "
-                        "not allowed",
+                        "message": "(#131056) Pair (phone, language) not allowed",
                         "code": 131056,
                     }
                 }
@@ -205,9 +200,7 @@ class TestSendTemplate:
         """A template with no `{{n}}` placeholders (e.g. plain
         announcement body) sends WITHOUT a `components` field —
         Meta rejects an empty `components: []`."""
-        meta_response = httpx.Response(
-            200, json={"messages": [{"id": "wamid.X"}]}
-        )
+        meta_response = httpx.Response(200, json={"messages": [{"id": "wamid.X"}]})
         client = _FakeHttpClient(meta_response)
         adapter = WhatsAppAdapter(
             phone_id="123",

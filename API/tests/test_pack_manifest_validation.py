@@ -9,6 +9,7 @@ Every rule the manifest enforces lives in `PackManifest` /
 - a stage can't be both is_won and is_lost
 - unknown top-level fields are rejected (`extra='forbid'`)
 """
+
 from __future__ import annotations
 
 import pytest
@@ -63,9 +64,7 @@ def test_duplicate_pipeline_keys_rejected():
 
 def test_pipeline_without_is_won_rejected():
     data = _minimal()
-    data["pipelines"][0]["stages"] = [
-        {"key": "new", "name": "New", "display_order": 0}
-    ]
+    data["pipelines"][0]["stages"] = [{"key": "new", "name": "New", "display_order": 0}]
     with pytest.raises(PackLoadError):
         load_pack_dict(data)
 

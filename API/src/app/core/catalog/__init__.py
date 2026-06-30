@@ -7,6 +7,7 @@ extends this with `fp_inventory_items` (multi-location, stock,
 images) — but the universal `catalog_items` table stays the
 authoritative "product interest" lookup core modules reference.
 """
+
 from src.app.core.catalog.service import (
     create_item,
     delete_item,

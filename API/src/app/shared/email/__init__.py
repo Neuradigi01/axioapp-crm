@@ -11,6 +11,7 @@ delivery (Mailgun / SES / SMTP) lands in Phase 6 deployment work; for
 now the LogEmailBackend prints the body so dev/test can read the
 accept link from the API log and click it manually.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -26,12 +27,10 @@ class Email:
 
 
 class EmailBackend(Protocol):
-    async def send(self, email: Email) -> None:
-        ...
+    async def send(self, email: Email) -> None: ...
 
 
 from config import EMAIL_ENABLED  # noqa: E402
-
 from src.app.shared.email.log_backend import LogEmailBackend  # noqa: E402
 from src.app.shared.email.smtp_backend import SmtpEmailBackend  # noqa: E402
 

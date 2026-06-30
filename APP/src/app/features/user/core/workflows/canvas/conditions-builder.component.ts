@@ -1,11 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -21,7 +15,6 @@ import {
   VariableGroup,
 } from './editors/editor-contract';
 
-
 /**
  * Conditions AST builder — single recursive component.
  *
@@ -35,7 +28,6 @@ import {
  * `<app-variable-picker>` is the richer browser surface; this dropdown
  * is the inline shortcut.
  */
-
 
 @Component({
   selector: 'app-conditions-builder',
@@ -170,10 +162,7 @@ export class ConditionsBuilderComponent {
     this.replaceAt(path, null);
   }
 
-  updateLeaf(
-    path: number[],
-    patch: Partial<Omit<ConditionLeaf, 'kind'>>,
-  ): void {
+  updateLeaf(path: number[], patch: Partial<Omit<ConditionLeaf, 'kind'>>): void {
     const node = this.resolve(path);
     if (!node || node.kind !== 'leaf') return;
     this.replaceAt(path, { ...node, ...patch });

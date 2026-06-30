@@ -26,12 +26,7 @@ export type TriggerChannel =
   | 'push'
   | 'web';
 
-export type AutomationRunStatus =
-  | 'queued'
-  | 'dispatched'
-  | 'sent'
-  | 'failed'
-  | 'skipped';
+export type AutomationRunStatus = 'queued' | 'dispatched' | 'sent' | 'failed' | 'skipped';
 
 export interface TriggerRead {
   id: string;
@@ -136,7 +131,6 @@ export interface DryRunResult {
   rendered_body: string | null;
 }
 
-
 @Injectable({ providedIn: 'root' })
 export class AutomationsApiService {
   private readonly http = inject(HttpClient);
@@ -165,24 +159,15 @@ export class AutomationsApiService {
   }
 
   update(id: string, payload: TriggerUpdatePayload): Observable<TriggerRead> {
-    return this.http.patch<TriggerRead>(
-      `${this.base}/triggers/${id}`,
-      payload,
-    );
+    return this.http.patch<TriggerRead>(`${this.base}/triggers/${id}`, payload);
   }
 
   enable(id: string): Observable<TriggerRead> {
-    return this.http.post<TriggerRead>(
-      `${this.base}/triggers/${id}/enable`,
-      {},
-    );
+    return this.http.post<TriggerRead>(`${this.base}/triggers/${id}/enable`, {});
   }
 
   disable(id: string): Observable<TriggerRead> {
-    return this.http.post<TriggerRead>(
-      `${this.base}/triggers/${id}/disable`,
-      {},
-    );
+    return this.http.post<TriggerRead>(`${this.base}/triggers/${id}/disable`, {});
   }
 
   delete(id: string): Observable<void> {
@@ -196,10 +181,7 @@ export class AutomationsApiService {
       limit: query.limit,
       offset: query.offset,
     });
-    return this.http.get<RunListResponse>(
-      `${this.base}/triggers/${triggerId}/runs`,
-      { params },
-    );
+    return this.http.get<RunListResponse>(`${this.base}/triggers/${triggerId}/runs`, { params });
   }
 
   listEventTypes(): Observable<EventCatalogEntry[]> {
@@ -209,36 +191,21 @@ export class AutomationsApiService {
   /** Step 8 — run the dispatcher path against a paste-in payload
    *  WITHOUT writing a run row or sending. Powers the editor's
    *  "Save & Test" modal. */
-  dryRun(
-    triggerId: string,
-    payload: Record<string, unknown>,
-  ): Observable<DryRunResult> {
-    return this.http.post<DryRunResult>(
-      `${this.base}/triggers/${triggerId}/dry-run`,
-      { payload },
-    );
+  dryRun(triggerId: string, payload: Record<string, unknown>): Observable<DryRunResult> {
+    return this.http.post<DryRunResult>(`${this.base}/triggers/${triggerId}/dry-run`, { payload });
   }
 
   /** Step 9 — re-queue a failed run. Refuses non-failed states
    *  server-side with 409 + a structured error code. */
   retry(runId: string): Observable<RunRead> {
-    return this.http.post<RunRead>(
-      `${this.base}/runs/${runId}/retry`,
-      {},
-    );
+    return this.http.post<RunRead>(`${this.base}/runs/${runId}/retry`, {});
   }
 
   /** Step 9 — manually fire a saved trigger with the supplied
    *  payload. Writes a fresh run row with a synthetic
    *  `event_id='manual:...'`. */
-  runNow(
-    triggerId: string,
-    payload: Record<string, unknown>,
-  ): Observable<RunRead> {
-    return this.http.post<RunRead>(
-      `${this.base}/triggers/${triggerId}/run-now`,
-      { payload },
-    );
+  runNow(triggerId: string, payload: Record<string, unknown>): Observable<RunRead> {
+    return this.http.post<RunRead>(`${this.base}/triggers/${triggerId}/run-now`, { payload });
   }
 
   /** Step 9 — general run-history filter; the contact detail

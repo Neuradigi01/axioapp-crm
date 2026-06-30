@@ -37,26 +37,25 @@ WA is the only channel with a real external review pipeline today
 Other channels raise :class:`SyncNotSupported`; the SMS-DLT path is
 out of scope until an SMS provider lands.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.templates import data_access as templates_da
-from src.app.core.templates.exceptions import TemplateError, TemplateNotFound
+from src.app.core.templates.exceptions import TemplateError
 from src.app.core.templates.models import (
     MessageTemplate,
     MessageTemplateReview,
     TemplateExternalStatus,
     TemplateReviewAction,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +66,7 @@ class SyncNotSupported(TemplateError):
     when an SMS provider ships."""
 
     def __init__(self, *, channel: str) -> None:
-        super().__init__(
-            f"the {channel!r} channel has no external status to sync"
-        )
+        super().__init__(f"the {channel!r} channel has no external status to sync")
         self.channel = channel
 
 
@@ -78,9 +75,7 @@ class MissingExtensionRow(TemplateError):
     template can't be located. Router maps to 409."""
 
     def __init__(self, *, channel: str, template_id: uuid.UUID) -> None:
-        super().__init__(
-            f"{channel} template {template_id} has no provider extension row"
-        )
+        super().__init__(f"{channel} template {template_id} has no provider extension row")
         self.channel = channel
         self.template_id = template_id
 
@@ -119,17 +114,18 @@ async def sync_external_status(
     :class:`MetaGraphError` bubbles up untouched."""
     from src.app.core.templates.service import get_template
 
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
 
     if template.channel != ConversationChannel.whatsapp:
         raise SyncNotSupported(channel=template.channel.value)
 
     old_status = template.external_status
     new_status, rejection_reason = await _fetch_wa_status(
-        session, org_id=org_id, template=template,
-        app_id=app_id, app_secret=app_secret,
+        session,
+        org_id=org_id,
+        template=template,
+        app_id=app_id,
+        app_secret=app_secret,
     )
 
     if new_status != old_status:
@@ -181,9 +177,7 @@ async def sync_all_pending(
     Per-template failures are logged + the loop continues. Returns
     a small dict of ``{checked, updated, failed}`` for the caller
     (Celery task) to surface in worker logs."""
-    pending = await templates_da.list_pending_external(
-        session, org_id=org_id
-    )
+    pending = await templates_da.list_pending_external(session, org_id=org_id)
     checked = 0
     updated = 0
     failed = 0
@@ -244,9 +238,7 @@ async def _fetch_wa_status(
 
     wa_row = await wa_da.get_by_message_template_id(session, template.id)
     if wa_row is None:
-        raise MissingExtensionRow(
-            channel=template.channel.value, template_id=template.id
-        )
+        raise MissingExtensionRow(channel=template.channel.value, template_id=template.id)
 
     if not wa_row.meta_template_id:
         # Never submitted — nothing to sync. Treat as n_a so the
@@ -255,9 +247,7 @@ async def _fetch_wa_status(
 
     bundle = await get_active_config(session)
     if bundle is None or bundle[0].access_token_enc is None:
-        raise MissingExtensionRow(
-            channel=template.channel.value, template_id=template.id
-        )
+        raise MissingExtensionRow(channel=template.channel.value, template_id=template.id)
 
     integration, config = bundle
     token = decrypt(integration.access_token_enc)
@@ -296,7 +286,7 @@ async def _fetch_wa_status(
         wa_row.rejection_reason = rejection_reason or wa_row.rejection_reason
     elif mapped == TemplateExternalStatus.approved:
         wa_row.rejection_reason = None
-    wa_row.last_synced_at = datetime.now(timezone.utc)
+    wa_row.last_synced_at = datetime.now(UTC)
 
     return mapped, rejection_reason
 
@@ -342,7 +332,6 @@ async def notify_external_status_change(
         return
 
     from src.app.core.notifications.service import notify
-    from src.app.shared.db import async_session
 
     recipients = await _resolve_notification_recipients(org_id, template)
     if not recipients:
@@ -398,9 +387,10 @@ async def _resolve_notification_recipients(
 
     async with async_session() as session:
         rows = (
-            await session.execute(
-                sql_text(
-                    """
+            (
+                await session.execute(
+                    sql_text(
+                        """
                     SELECT DISTINCT ul.legacy_uuid
                     FROM tbl_organization_members om
                     JOIN tbl_user_login ul ON ul.id = om.user_member_id
@@ -412,10 +402,13 @@ async def _resolve_notification_recipients(
                       AND ul.legacy_uuid IS NOT NULL
                       AND p.key = 'templates.submit_external'
                     """
-                ),
-                {"org_id": str(org_id)},
+                    ),
+                    {"org_id": str(org_id)},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
     for row in rows:
         recipient_set.add(row["legacy_uuid"])
     return list(recipient_set)
@@ -443,14 +436,10 @@ async def prepare_resubmit(
     from src.app.core.templates.models import TemplateInternalStatus
     from src.app.core.templates.service import get_template
 
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
 
     if template.external_status != TemplateExternalStatus.rejected:
-        raise TemplateError(
-            "resubmit is only available on rejected templates"
-        )
+        raise TemplateError("resubmit is only available on rejected templates")
 
     template.internal_status = TemplateInternalStatus.draft
     template.external_status = TemplateExternalStatus.n_a

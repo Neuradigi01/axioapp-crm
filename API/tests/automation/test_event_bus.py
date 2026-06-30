@@ -13,6 +13,7 @@ Covers the in-process pub/sub mechanics:
     design (any string accepted) so origin modules can publish
     forward-compatible events before consumers exist.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -20,7 +21,6 @@ import uuid
 import pytest
 
 from src.app.core.events import bus
-
 
 pytestmark = pytest.mark.asyncio
 

@@ -73,5 +73,4 @@ export class ReviewReplyModalComponent {
   protected stars(n: number): string {
     return 'â˜…â˜…â˜…â˜…â˜…'.slice(0, n) + 'â˜†â˜†â˜†â˜†â˜†'.slice(0, 5 - n);
   }
-
 }

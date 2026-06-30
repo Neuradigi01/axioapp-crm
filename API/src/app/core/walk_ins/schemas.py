@@ -6,27 +6,27 @@ create one if missing). `QuickRegisterResponse` returns both the
 walk-in row and the resolved contact so the caller can show the
 contact's existing tags / history alongside the new walk-in.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Literal, Optional
-
-from src.app.shared.schemas import ORMModel, TimestampedOrgScopedOut
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from src.app.core.contacts.schemas import ContactOut
 from src.app.core.walk_ins.models import WalkInStatus
+from src.app.shared.schemas import TimestampedOrgScopedOut
 
 
 class WalkInCreate(BaseModel):
     contact_id: uuid.UUID
-    requirement: Optional[str] = None
-    budget: Optional[Decimal] = Field(default=None, ge=0)
-    assigned_to_id: Optional[uuid.UUID] = None
-    notes: Optional[str] = None
+    requirement: str | None = None
+    budget: Decimal | None = Field(default=None, ge=0)
+    assigned_to_id: uuid.UUID | None = None
+    notes: str | None = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -36,12 +36,12 @@ class WalkInUpdate(BaseModel):
     this schema — the timing fields don't get rewritten through a
     generic PATCH."""
 
-    requirement: Optional[str] = None
-    budget: Optional[Decimal] = Field(default=None, ge=0)
-    assigned_to_id: Optional[uuid.UUID] = None
-    status: Optional[WalkInStatus] = None
-    notes: Optional[str] = None
-    custom_data: Optional[dict[str, Any]] = None
+    requirement: str | None = None
+    budget: Decimal | None = Field(default=None, ge=0)
+    assigned_to_id: uuid.UUID | None = None
+    status: WalkInStatus | None = None
+    notes: str | None = None
+    custom_data: dict[str, Any] | None = None
 
 
 class QuickRegisterPayload(BaseModel):
@@ -50,12 +50,12 @@ class QuickRegisterPayload(BaseModel):
 
     phone: str = Field(min_length=1, max_length=32)
     full_name: str = Field(min_length=1, max_length=255)
-    email: Optional[EmailStr] = None
-    source: Optional[str] = Field(default=None, max_length=64)
-    requirement: Optional[str] = None
-    budget: Optional[Decimal] = Field(default=None, ge=0)
-    assigned_to_id: Optional[uuid.UUID] = None
-    notes: Optional[str] = None
+    email: EmailStr | None = None
+    source: str | None = Field(default=None, max_length=64)
+    requirement: str | None = None
+    budget: Decimal | None = Field(default=None, ge=0)
+    assigned_to_id: uuid.UUID | None = None
+    notes: str | None = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -65,16 +65,16 @@ class WalkInOut(TimestampedOrgScopedOut):
     id: uuid.UUID
     contact_id: uuid.UUID
     time_in: datetime
-    time_out: Optional[datetime]
-    duration_min: Optional[Decimal]
-    requirement: Optional[str]
-    budget: Optional[Decimal]
-    assigned_to_id: Optional[uuid.UUID]
+    time_out: datetime | None
+    duration_min: Decimal | None
+    requirement: str | None
+    budget: Decimal | None
+    assigned_to_id: uuid.UUID | None
     status: WalkInStatus
-    notes: Optional[str]
+    notes: str | None
     custom_data: dict[str, Any]
-    last_activity_at: Optional[datetime]
-    linked_lead_id: Optional[uuid.UUID]
+    last_activity_at: datetime | None
+    linked_lead_id: uuid.UUID | None
 
 
 class QuickRegisterResponse(BaseModel):
@@ -92,16 +92,16 @@ class QuickRegisterResponse(BaseModel):
 class WalkInReassign(BaseModel):
     """Single-row reassign request. `null` clears the owner."""
 
-    assigned_to_id: Optional[uuid.UUID] = None
-    note: Optional[str] = Field(default=None, max_length=500)
+    assigned_to_id: uuid.UUID | None = None
+    note: str | None = Field(default=None, max_length=500)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class WalkInBulkReassign(BaseModel):
     ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
-    assigned_to_id: Optional[uuid.UUID] = None
-    note: Optional[str] = Field(default=None, max_length=500)
+    assigned_to_id: uuid.UUID | None = None
+    note: str | None = Field(default=None, max_length=500)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -143,8 +143,8 @@ class WalkInConvertRequest(BaseModel):
     """
 
     contact_link_mode: Literal["auto", "link"] = "auto"
-    linked_contact_id: Optional[uuid.UUID] = None
-    notes: Optional[str] = None
+    linked_contact_id: uuid.UUID | None = None
+    notes: str | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 

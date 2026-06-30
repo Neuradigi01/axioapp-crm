@@ -17,13 +17,12 @@ Neither function persists anything to `messages` / `activities` /
 `conversations` — that responsibility lives in Step 5's adapter.
 Step 2 is just primitives.
 """
+
 from __future__ import annotations
 
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +30,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.contacts.models import Contact
 from src.app.core.email.gmail.client import GmailClient, GmailHTTPError
 from src.app.core.email.models import EmailAccount
-
 
 # A page of messages can be up to 500 per Gmail's quota; we use 100
 # pages to keep latency tolerable and let the daemon back off.
@@ -56,7 +54,7 @@ class MatchedMessage:
     gmail_thread_id: str
     headers: dict[str, str]
     matched_contact_id: uuid.UUID
-    raw_b64url: Optional[str] = None
+    raw_b64url: str | None = None
 
 
 @dataclass(slots=True)
@@ -68,7 +66,7 @@ class SyncResult:
 
     matched: list[MatchedMessage] = field(default_factory=list)
     scanned_count: int = 0
-    new_cursor: Optional[str] = None
+    new_cursor: str | None = None
     truncated: bool = False
 
 
@@ -79,7 +77,7 @@ async def backfill(
     account: EmailAccount,
     session: AsyncSession,
     *,
-    client: Optional[GmailClient] = None,
+    client: GmailClient | None = None,
     days: int = 30,
 ) -> SyncResult:
     """Walk the last `days` of the mailbox, return every message that
@@ -93,13 +91,11 @@ async def backfill(
     query = f"newer_than:{days}d"
 
     result = SyncResult()
-    page_token: Optional[str] = None
-    first_history_id: Optional[str] = None
+    page_token: str | None = None
+    first_history_id: str | None = None
 
     while True:
-        envelope = await gc.list_messages(
-            q=query, page_token=page_token, max_results=_PAGE_SIZE
-        )
+        envelope = await gc.list_messages(q=query, page_token=page_token, max_results=_PAGE_SIZE)
         messages = envelope.get("messages") or []
         if not messages and not page_token:
             break
@@ -137,7 +133,7 @@ async def sync_incremental(
     account: EmailAccount,
     session: AsyncSession,
     *,
-    client: Optional[GmailClient] = None,
+    client: GmailClient | None = None,
 ) -> SyncResult:
     """Pull every messageAdded event since `account.sync_cursor`.
     Returns matched messages + the new cursor.
@@ -150,12 +146,11 @@ async def sync_incremental(
     """
     if not account.sync_cursor:
         raise RuntimeError(
-            f"email_account {account.id} has no sync_cursor — "
-            "run backfill() first to seed it."
+            f"email_account {account.id} has no sync_cursor — run backfill() first to seed it."
         )
     gc = client or GmailClient(account=account, session=session)
     result = SyncResult()
-    page_token: Optional[str] = None
+    page_token: str | None = None
     last_history_id: str = account.sync_cursor
 
     while True:
@@ -176,9 +171,7 @@ async def sync_incremental(
                     continue
                 result.scanned_count += 1
                 try:
-                    detail = await gc.get_message(
-                        msg_id, format="metadata"
-                    )
+                    detail = await gc.get_message(msg_id, format="metadata")
                 except GmailHTTPError as exc:
                     if exc.status_code == 404:
                         continue
@@ -211,9 +204,7 @@ _HEADERS_OF_INTEREST = {
 # Standard `Name <local@host>` pattern. Captures everything inside
 # the angle brackets; for bare-address tokens (no name), the regex
 # also accepts the unbracketed form.
-_ADDRESS_RE = re.compile(
-    r"(?:\"?([^<>\",]*)\"?\s*<([^<>\s]+)>)|([^,\s<>]+@[^,\s<>]+)"
-)
+_ADDRESS_RE = re.compile(r"(?:\"?([^<>\",]*)\"?\s*<([^<>\s]+)>)|([^,\s<>]+@[^,\s<>]+)")
 
 
 def _extract_headers(payload: dict) -> dict[str, str]:
@@ -254,9 +245,7 @@ def _collect_participants(headers: dict[str, str]) -> list[str]:
     return addrs
 
 
-async def _match_one(
-    detail: dict, session: AsyncSession
-) -> Optional[MatchedMessage]:
+async def _match_one(detail: dict, session: AsyncSession) -> MatchedMessage | None:
     """Return a `MatchedMessage` if any participant in `detail` is a
     known contact in the active tenant, else None.
 

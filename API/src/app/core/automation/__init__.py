@@ -20,6 +20,7 @@ file. The wiring lands in:
   publishers + frequency cap + deliverability polish
 
 See ``tasks/automation-engine/README.md`` for the full plan."""
+
 # Step 4 — wildcard bus subscriber. Side-effect import at module
 # load time so every FastAPI worker registers the dispatcher once
 # without main.py needing a dedicated wiring line. The conversations
@@ -27,4 +28,3 @@ See ``tasks/automation-engine/README.md`` for the full plan."""
 from src.app.core.automation.dispatcher import register_bus_subscriber
 
 register_bus_subscriber()
-

@@ -14,12 +14,12 @@ Not in ``core/integrations/models.py`` (which holds the provider-agnostic
 ``Integration`` + ``IntegrationSubscription`` + ``IntegrationDLQ``)
 because both tables here are Meta-specific.
 """
+
 from __future__ import annotations
 
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
@@ -47,7 +47,7 @@ class MetaPageToken(Base, TenantScoped):
         index=True,
     )
     page_id: Mapped[str] = mapped_column(Text, nullable=False)
-    page_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Fernet ciphertext. Decrypt only when about to call the Graph API.
     page_token_enc: Mapped[str] = mapped_column(Text, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -97,17 +97,11 @@ class MetaDataDeletionRequest(Base):
     # URL-safe 64-char token returned to Meta and embedded in the
     # status URL. High-entropy so the public lookup endpoint is
     # effectively a capability-keyed read.
-    confirmation_code: Mapped[str] = mapped_column(
-        String(64), nullable=False, unique=True
-    )
-    meta_user_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, index=True
-    )
+    confirmation_code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    meta_user_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     # Captured from the signed_request itself; lets us idempotently
     # collapse Meta retries that re-send the same `(user_id, issued_at)`.
-    issued_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     # Denormalised so the status page can show "2 orgs affected"
     # without joining back to tbl_integrations (which the public reader
     # has no permission to read).
@@ -130,12 +124,8 @@ class MetaDataDeletionRequest(Base):
         nullable=False,
         server_default=text("now()"),
     )
-    completed_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    failure_reason: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 __all__ = [

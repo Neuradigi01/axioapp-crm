@@ -5,6 +5,7 @@ users whose `staff_profile.employment_status='active'` — without a
 profile, the user can't appear on the tablet picker (HR hasn't set
 them up).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,14 +27,13 @@ async def _setup_active_staff(
     user_id: uuid.UUID, org_id: uuid.UUID, *, phone: str = "9876543210"
 ) -> None:
     """Add a phone + active staff_profile so PIN login becomes possible."""
-    from tests.conftest import TestSession
     from sqlalchemy import update
+
     from src.app.core.users.models import User
+    from tests.conftest import TestSession
 
     async with TestSession() as session:
-        await session.execute(
-            update(User).where(User.id == user_id).values(phone=phone)
-        )
+        await session.execute(update(User).where(User.id == user_id).values(phone=phone))
         session.add(
             StaffProfile(
                 org_id=org_id,
@@ -45,13 +45,9 @@ async def _setup_active_staff(
 
 
 @pytest.mark.asyncio
-async def test_pickable_users_excludes_users_without_profile(
-    layered_client, seeded_admin
-):
+async def test_pickable_users_excludes_users_without_profile(layered_client, seeded_admin):
     org = seeded_admin["org"]
-    resp = await layered_client.get(
-        f"/api/v1/staff-portal/users?org_slug={org.slug}"
-    )
+    resp = await layered_client.get(f"/api/v1/staff-portal/users?org_slug={org.slug}")
     assert resp.status_code == 200, resp.text
     assert resp.json() == []
 
@@ -62,9 +58,7 @@ async def test_pickable_users_returns_active_only(layered_client, seeded_admin):
     user = seeded_admin["user"]
     await _setup_active_staff(user.id, org.id)
 
-    resp = await layered_client.get(
-        f"/api/v1/staff-portal/users?org_slug={org.slug}"
-    )
+    resp = await layered_client.get(f"/api/v1/staff-portal/users?org_slug={org.slug}")
     assert resp.status_code == 200, resp.text
     rows = resp.json()
     assert len(rows) == 1
@@ -116,14 +110,13 @@ async def test_login_wrong_pin_returns_401(layered_client, seeded_admin):
 async def test_login_inactive_profile_returns_401(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    from tests.conftest import TestSession
     from sqlalchemy import update
+
     from src.app.core.users.models import User
+    from tests.conftest import TestSession
 
     async with TestSession() as session:
-        await session.execute(
-            update(User).where(User.id == user.id).values(phone="9876543210")
-        )
+        await session.execute(update(User).where(User.id == user.id).values(phone="9876543210"))
         session.add(
             StaffProfile(
                 org_id=org.id,
@@ -159,9 +152,7 @@ async def test_login_unknown_org_returns_404(layered_client, seeded_admin):
 
 
 @pytest.mark.asyncio
-async def test_login_rate_limited_after_five_failures(
-    layered_client, seeded_admin
-):
+async def test_login_rate_limited_after_five_failures(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
     await _setup_active_staff(user.id, org.id, phone="9876543210")
@@ -193,9 +184,7 @@ async def test_login_rate_limited_after_five_failures(
 
 
 @pytest.mark.asyncio
-async def test_admin_jwt_cannot_authenticate_staff_endpoints(
-    layered_client, seeded_admin
-):
+async def test_admin_jwt_cannot_authenticate_staff_endpoints(layered_client, seeded_admin):
     """An admin JWT (scope='admin') must never satisfy `get_current_staff`.
 
     Smoke-tests the scope separation without hitting any
@@ -204,6 +193,7 @@ async def test_admin_jwt_cannot_authenticate_staff_endpoints(
     unauthenticated). We exercise the dependency in unit form.
     """
     from fastapi import HTTPException
+
     from src.app.core.auth.dependencies import get_current_staff
     from src.app.shared.context import RequestContext, reset_context, set_context
 
@@ -218,6 +208,7 @@ async def test_admin_jwt_cannot_authenticate_staff_endpoints(
     )
     try:
         from tests.conftest import TestSession
+
         async with TestSession() as session:
             with pytest.raises(HTTPException) as excinfo:
                 await get_current_staff(db=session)

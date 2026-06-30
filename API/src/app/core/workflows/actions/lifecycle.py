@@ -24,11 +24,12 @@ Eight handlers register against the action registry:
   * ``lifecycle.remove_from_sequence`` — calls
     ``email_sequences.service.cancel_enrollment``.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -37,7 +38,6 @@ from sqlalchemy import select
 
 from src.app.core.workflows.actions import register_action
 from src.app.core.workflows.exceptions import ActionNotImplemented
-
 
 logger = logging.getLogger(__name__)
 
@@ -86,9 +86,7 @@ def _resolve_lead_id(*, node: dict[str, Any], context: dict[str, Any]):
     if explicit:
         return _coerce_uuid(explicit)
     payload = context.get("trigger_payload") or {}
-    raw = payload.get("lead_id") or (
-        payload.get("lead", {}) or {}
-    ).get("id")
+    raw = payload.get("lead_id") or (payload.get("lead", {}) or {}).get("id")
     return _coerce_uuid(raw)
 
 
@@ -120,11 +118,9 @@ async def _mark_converted(session, *, run, step_run, node, context):
         {
             "lead_id": str(lead_id),
             "new_lead_status": (
-                updated.status.value
-                if hasattr(updated.status, "value")
-                else str(updated.status)
+                updated.status.value if hasattr(updated.status, "value") else str(updated.status)
             ),
-            "conversion_recorded_at": datetime.now(timezone.utc).isoformat(),
+            "conversion_recorded_at": datetime.now(UTC).isoformat(),
         }
     )
 
@@ -179,7 +175,7 @@ async def _mark_unsubscribed(session, *, run, step_run, node, context):
         pass
 
     contact.email_opt_out = True
-    contact.email_opt_out_at = datetime.now(timezone.utc)
+    contact.email_opt_out_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(contact)
 
@@ -220,6 +216,8 @@ async def _enroll_in_workflow(session, *, run, step_run, node, context):
     logic the bus subscriber uses (find_existing_run + status check)."""
     from src.app.core.workflows import (
         data_access as workflows_da,
+    )
+    from src.app.core.workflows import (
         engine as workflows_engine,
     )
     from src.app.core.workflows.models import (
@@ -230,9 +228,7 @@ async def _enroll_in_workflow(session, *, run, step_run, node, context):
     cfg = node.get("config") or {}
     target_workflow_id = _coerce_uuid(cfg.get("workflow_id"))
     if target_workflow_id is None:
-        return _result_skipped(
-            "validation_failed", reason="missing_workflow_id"
-        )
+        return _result_skipped("validation_failed", reason="missing_workflow_id")
 
     target = await workflows_da.get_workflow(
         session, org_id=run.org_id, workflow_id=target_workflow_id
@@ -262,9 +258,7 @@ async def _enroll_in_workflow(session, *, run, step_run, node, context):
                     reason="contact_already_enrolled",
                 )
         elif rule == WorkflowReEnrollmentRule.daily:
-            today_midnight = datetime.now(timezone.utc).replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
+            today_midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
             existing = await workflows_da.find_existing_run(
                 session,
                 workflow_id=target.id,
@@ -308,9 +302,7 @@ async def _remove_from_workflow(session, *, run, step_run, node, context):
     cfg = node.get("config") or {}
     target_workflow_id = _coerce_uuid(cfg.get("workflow_id"))
     if target_workflow_id is None:
-        return _result_skipped(
-            "validation_failed", reason="missing_workflow_id"
-        )
+        return _result_skipped("validation_failed", reason="missing_workflow_id")
 
     contact_id = getattr(run, "contact_id", None)
     if contact_id is None:
@@ -321,21 +313,25 @@ async def _remove_from_workflow(session, *, run, step_run, node, context):
         WorkflowRunStatus.running,
     )
     rows = (
-        await session.execute(
-            select(WorkflowRun).where(
-                WorkflowRun.org_id == run.org_id,
-                WorkflowRun.workflow_id == target_workflow_id,
-                WorkflowRun.contact_id == contact_id,
-                WorkflowRun.status.in_(active_states),
+        (
+            await session.execute(
+                select(WorkflowRun).where(
+                    WorkflowRun.org_id == run.org_id,
+                    WorkflowRun.workflow_id == target_workflow_id,
+                    WorkflowRun.contact_id == contact_id,
+                    WorkflowRun.status.in_(active_states),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     canceled = 0
     for row in rows:
         row.status = WorkflowRunStatus.canceled
         row.outcome = WorkflowRunOutcome.canceled
         row.current_node_id = None
-        row.completed_at = datetime.now(timezone.utc)
+        row.completed_at = datetime.now(UTC)
         canceled += 1
     if canceled > 0:
         await session.commit()
@@ -358,17 +354,13 @@ async def _enroll_in_sequence(session, *, run, step_run, node, context):
     cfg = node.get("config") or {}
     sequence_id = _coerce_uuid(cfg.get("sequence_id"))
     if sequence_id is None:
-        return _result_skipped(
-            "validation_failed", reason="missing_sequence_id"
-        )
+        return _result_skipped("validation_failed", reason="missing_sequence_id")
 
     contact_id = getattr(run, "contact_id", None)
     if contact_id is None:
         return _result_skipped("target_not_found", reason="no_contact_id")
 
-    actor_id = (
-        getattr(run, "created_by_user_id", None) or uuid.uuid4()
-    )
+    actor_id = getattr(run, "created_by_user_id", None) or uuid.uuid4()
 
     try:
         results = await sequences_service.enroll(
@@ -409,9 +401,7 @@ async def _remove_from_sequence(session, *, run, step_run, node, context):
             reason="missing_enrollment_id — pass the enrollment id from a prior step's output",
         )
 
-    actor_id = (
-        getattr(run, "created_by_user_id", None) or uuid.uuid4()
-    )
+    actor_id = getattr(run, "created_by_user_id", None) or uuid.uuid4()
 
     try:
         await sequences_service.cancel_enrollment(
@@ -437,12 +427,8 @@ def register() -> None:
     register_action("lifecycle.archive_contact", lambda: _archive_contact)
     register_action("lifecycle.enroll_in_workflow", lambda: _enroll_in_workflow)
     register_action("lifecycle.enroll_in_sequence", lambda: _enroll_in_sequence)
-    register_action(
-        "lifecycle.remove_from_workflow", lambda: _remove_from_workflow
-    )
-    register_action(
-        "lifecycle.remove_from_sequence", lambda: _remove_from_sequence
-    )
+    register_action("lifecycle.remove_from_workflow", lambda: _remove_from_workflow)
+    register_action("lifecycle.remove_from_sequence", lambda: _remove_from_sequence)
 
 
 register()

@@ -35,6 +35,7 @@ exception path is reserved for un-typed runtime crashes; a Slack
 500 is a routine outage that we surface to the operator rather
 than killing the workflow).
 """
+
 from __future__ import annotations
 
 import logging
@@ -44,9 +45,10 @@ from typing import Any
 from src.app.core.workflows.actions import register_action
 from src.app.core.workflows.recipients import (
     UnknownResolver,
+)
+from src.app.core.workflows.recipients import (
     resolve as resolve_recipient,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -157,9 +159,7 @@ async def _resolve_recipient_or_skip(
         return None, "recipient_kind_missing"
 
     try:
-        recipient = await resolve_recipient(
-            kind, session, run=run, node=node, context=context
-        )
+        recipient = await resolve_recipient(kind, session, run=run, node=node, context=context)
     except UnknownResolver as exc:
         logger.warning(
             "workflows.send unknown_resolver kind=%s node=%s",
@@ -189,9 +189,7 @@ async def _load_template(session, *, run, template_id_raw: Any):
 
     from src.app.core.templates import data_access as templates_da
 
-    template = await templates_da.get_template(
-        session, org_id=run.org_id, template_id=template_id
-    )
+    template = await templates_da.get_template(session, org_id=run.org_id, template_id=template_id)
     if template is None:
         return None, "template_missing"
     return template, None
@@ -204,9 +202,7 @@ def _render_template(template, context: dict[str, Any]) -> tuple[str, str | None
     from src.app.core.templates.variables import resolve as render
 
     rendered_body = render(template.body_text or "", context)
-    rendered_subject = (
-        render(template.subject, context) if template.subject else None
-    )
+    rendered_subject = render(template.subject, context) if template.subject else None
     return rendered_body, rendered_subject
 
 
@@ -255,9 +251,7 @@ def _result_channel_error(reason: str, error_msg: str):
 
 
 async def _send_email(session, *, run, step_run, node, context):
-    recipient, skip = await _resolve_recipient_or_skip(
-        session, run=run, node=node, context=context
-    )
+    recipient, skip = await _resolve_recipient_or_skip(session, run=run, node=node, context=context)
     if skip is not None:
         return _result_skipped(skip)
 
@@ -272,9 +266,7 @@ async def _send_email(session, *, run, step_run, node, context):
         return gated
 
     cfg = node.get("config") or {}
-    template, skip = await _load_template(
-        session, run=run, template_id_raw=cfg.get("template_id")
-    )
+    template, skip = await _load_template(session, run=run, template_id_raw=cfg.get("template_id"))
     if skip is not None:
         return _result_skipped(skip)
 
@@ -321,9 +313,7 @@ async def _send_email(session, *, run, step_run, node, context):
 
 
 async def _send_whatsapp(session, *, run, step_run, node, context):
-    recipient, skip = await _resolve_recipient_or_skip(
-        session, run=run, node=node, context=context
-    )
+    recipient, skip = await _resolve_recipient_or_skip(session, run=run, node=node, context=context)
     if skip is not None:
         return _result_skipped(skip)
 
@@ -338,9 +328,7 @@ async def _send_whatsapp(session, *, run, step_run, node, context):
         return gated
 
     cfg = node.get("config") or {}
-    template, skip = await _load_template(
-        session, run=run, template_id_raw=cfg.get("template_id")
-    )
+    template, skip = await _load_template(session, run=run, template_id_raw=cfg.get("template_id"))
     if skip is not None:
         return _result_skipped(skip)
 
@@ -349,6 +337,8 @@ async def _send_whatsapp(session, *, run, step_run, node, context):
     from src.app.core.conversations.models import ConversationChannel
     from src.app.core.conversations.registry import (
         ChannelNotRegistered,
+    )
+    from src.app.core.conversations.registry import (
         resolve as resolve_adapter,
     )
 
@@ -373,9 +363,7 @@ async def _send_whatsapp(session, *, run, step_run, node, context):
         )
         return _result_channel_error("whatsapp_send_failed", str(exc))
 
-    return _result_sent(
-        getattr(ref, "channel_message_id", None), None, rendered_body
-    )
+    return _result_sent(getattr(ref, "channel_message_id", None), None, rendered_body)
 
 
 # --- send.sms / send.facebook / send.instagram / send.push --------------
@@ -415,15 +403,15 @@ def _make_adapter_send(channel_name: str, channel_enum):
 
         from src.app.core.conversations.registry import (
             ChannelNotRegistered,
+        )
+        from src.app.core.conversations.registry import (
             resolve as resolve_adapter,
         )
 
         try:
             adapter = resolve_adapter(channel_enum)
         except ChannelNotRegistered as exc:
-            return _result_channel_error(
-                f"{channel_name}_not_configured", str(exc)
-            )
+            return _result_channel_error(f"{channel_name}_not_configured", str(exc))
 
         try:
             ref = await adapter.send(
@@ -440,13 +428,9 @@ def _make_adapter_send(channel_name: str, channel_enum):
                 recipient,
                 exc,
             )
-            return _result_channel_error(
-                f"{channel_name}_send_failed", str(exc)
-            )
+            return _result_channel_error(f"{channel_name}_send_failed", str(exc))
 
-        return _result_sent(
-            getattr(ref, "channel_message_id", None), None, rendered_body
-        )
+        return _result_sent(getattr(ref, "channel_message_id", None), None, rendered_body)
 
     _handler.__name__ = f"_send_{channel_name}"
     return _handler
@@ -463,9 +447,7 @@ async def _send_slack(session, *, run, step_run, node, context):
     enhancement — Step 7 ships the literal-URL path only)."""
     cfg = node.get("config") or {}
     webhook_url = cfg.get("webhook_url")
-    if not isinstance(webhook_url, str) or not webhook_url.startswith(
-        "https://"
-    ):
+    if not isinstance(webhook_url, str) or not webhook_url.startswith("https://"):
         return _result_skipped("slack_webhook_missing")
 
     gated = await _gate_or_skip(
@@ -478,9 +460,7 @@ async def _send_slack(session, *, run, step_run, node, context):
     if gated is not None:
         return gated
 
-    template, skip = await _load_template(
-        session, run=run, template_id_raw=cfg.get("template_id")
-    )
+    template, skip = await _load_template(session, run=run, template_id_raw=cfg.get("template_id"))
     if skip is not None:
         return _result_skipped(skip)
 

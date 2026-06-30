@@ -21,11 +21,12 @@ even when called every 30s per Owner viewing the page.
 `dlq_open_total` is a quick `COUNT(*) WHERE replayed_at IS NULL`
 across the `integration_dlq` table — exact, not approximated.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.integrations.models import (
@@ -37,8 +38,6 @@ from src.app.core.integrations.schemas import (
     IntegrationStatusResponse,
     ProviderDeliveryStatus,
 )
-from sqlalchemy import select
-
 
 _PROVIDERS: tuple[IntegrationProvider, ...] = (
     IntegrationProvider.google_ads,
@@ -65,7 +64,7 @@ async def build_status(
     # 2. Per-provider 24h counters + last-delivery timestamp. One
     # raw SQL query per provider keeps things explicit; the audit_log
     # indexes do the heavy lifting.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     since = now - timedelta(hours=24)
     per_provider: list[ProviderDeliveryStatus] = []
     for provider in _PROVIDERS:
@@ -76,9 +75,7 @@ async def build_status(
             ProviderDeliveryStatus(
                 provider=provider.value,  # type: ignore[arg-type]
                 status=(
-                    integration_status.get(
-                        provider.value, IntegrationStatus.disconnected
-                    ).value
+                    integration_status.get(provider.value, IntegrationStatus.disconnected).value
                 ),  # type: ignore[arg-type]
                 last_delivery_at=last_at,
                 deliveries_24h_accepted=accepted,
@@ -130,9 +127,7 @@ async def _provider_counts(
           AND COALESCE(after->>'provider', '') = :provider
         """
     )
-    result = (
-        await session.execute(sql, {"since": since, "provider": provider})
-    ).mappings().first()
+    result = (await session.execute(sql, {"since": since, "provider": provider})).mappings().first()
     if result is None:
         return 0, 0, None
     return (

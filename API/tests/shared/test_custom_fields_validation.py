@@ -100,9 +100,7 @@ async def test_validate_enforces_required_on_create() -> None:
 async def test_validate_skips_required_check_on_update() -> None:
     """`require_all_required=False` is the partial-update mode — missing
     required keys are NOT an error then."""
-    session = _mock_session(
-        [_make_def("color", FieldType.text, is_required=True)]
-    )
+    session = _mock_session([_make_def("color", FieldType.text, is_required=True)])
     result = await validate_custom_data(
         session,
         entity_type="contact",
@@ -129,9 +127,7 @@ async def test_validate_propagates_per_value_error() -> None:
 async def test_validate_treats_explicit_none_as_missing_for_required() -> None:
     """If a required field is present with value=None, it still counts
     as missing (matches pre-refactor `key not in cleaned or cleaned[key] is None`)."""
-    session = _mock_session(
-        [_make_def("color", FieldType.text, is_required=True)]
-    )
+    session = _mock_session([_make_def("color", FieldType.text, is_required=True)])
     with pytest.raises(HTTPException) as exc:
         await validate_custom_data(
             session,

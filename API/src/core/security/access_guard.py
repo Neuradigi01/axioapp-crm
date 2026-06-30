@@ -1,4 +1,5 @@
 from fastapi import Depends, HTTPException, status
+
 from src.core.security.jwt import get_current_user
 
 
@@ -10,8 +11,7 @@ class AccessGuard:
         access_rights = token_payload.get("access_rights", "")
         if not access_rights:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
             )
 
         user_rights = {int(r) for r in str(access_rights).split(",") if r.strip()}
@@ -19,8 +19,7 @@ class AccessGuard:
 
         if not user_rights & required_rights:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
             )
 
         return token_payload

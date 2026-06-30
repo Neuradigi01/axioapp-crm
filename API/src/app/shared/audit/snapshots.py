@@ -22,10 +22,11 @@ order).
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Iterable
+from typing import Any
 
 
 def _coerce(value: Any) -> Any:

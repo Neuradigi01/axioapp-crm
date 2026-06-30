@@ -13,14 +13,12 @@
 import { CanvasNode } from '../canvas-state.service';
 import { RecipientOption, SEND_CATEGORIES } from './editor-contract';
 
-
 export interface SendEditorState {
   templateId: string;
   recipient: string;
   customRecipient: string;
   category: string;
 }
-
 
 export function readSendState(node: CanvasNode): SendEditorState {
   const cfg = node.config ?? {};
@@ -31,7 +29,6 @@ export function readSendState(node: CanvasNode): SendEditorState {
     category: (cfg['category'] as string) ?? 'marketing',
   };
 }
-
 
 /** Required-fields validity. Custom recipient → also need the path
  *  string filled in. */
@@ -44,9 +41,6 @@ export function sendIsValid(state: SendEditorState): boolean {
   return true;
 }
 
-
 export const SEND_CATEGORY_OPTIONS = SEND_CATEGORIES;
 
-export const RECIPIENT_PLACEHOLDERS: Readonly<
-  Record<string, RecipientOption[]>
-> = {};
+export const RECIPIENT_PLACEHOLDERS: Readonly<Record<string, RecipientOption[]>> = {};

@@ -1,14 +1,5 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  input,
-} from '@angular/core';
-import {
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
 /**
  * WhatsApp sub-form — channel-agnostic fields only (body + language).
@@ -25,7 +16,6 @@ export type WaFormGroup = FormGroup<{
   language: FormControl<string>;
 }>;
 
-
 const LANGUAGE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'en', label: 'English (en)' },
   { value: 'hi', label: 'Hindi (hi)' },
@@ -38,7 +28,6 @@ const LANGUAGE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'pa', label: 'Punjabi (pa)' },
   { value: 'bn', label: 'Bengali (bn)' },
 ];
-
 
 @Component({
   selector: 'app-wa-form',

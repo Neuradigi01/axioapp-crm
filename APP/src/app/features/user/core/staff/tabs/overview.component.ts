@@ -1,9 +1,4 @@
-﻿import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from '@angular/core';
+﻿import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { InrPipe } from '../../shared/pipes/inr.pipe';
@@ -28,11 +23,8 @@ export class StaffOverviewTabComponent {
   readonly rows = input.required<StaffWithPerformance[]>();
 
   protected readonly sortedRows = computed(() =>
-    [...this.rows()].sort((a, b) =>
-      a.staff.full_name.localeCompare(b.staff.full_name),
-    ),
+    [...this.rows()].sort((a, b) => a.staff.full_name.localeCompare(b.staff.full_name)),
   );
-
 
   protected avatarBg(id: string): string {
     const palette = [

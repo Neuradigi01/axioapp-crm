@@ -12,10 +12,11 @@ Two layers of tests:
     pulled from `plans.yaml`, and the structured `EntitlementError`
     raised on the right path.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -31,10 +32,10 @@ from src.app.core.subscriptions.models import Subscription
 from src.app.core.subscriptions.plans import KNOWN_FEATURE_KEYS
 from src.app.core.tenants.models import Organization
 
-
 # ---------------------------------------------------------------------------
 # Helpers — synthetic entitlements bundles (no DB)
 # ---------------------------------------------------------------------------
+
 
 def _stub_subscription(
     plan_code: str,
@@ -44,7 +45,7 @@ def _stub_subscription(
     trial_ends_at: datetime | None = None,
 ) -> Subscription:
     """Build an unpersisted Subscription row with the bare minimum to feed Entitlements."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     return Subscription(
         org_id=uuid.uuid4(),
         plan_code=plan_code,
@@ -68,6 +69,7 @@ def _entitlements_for(plan_code: str, **kwargs) -> Entitlements:
 # ---------------------------------------------------------------------------
 # Feature gates — pure
 # ---------------------------------------------------------------------------
+
 
 def test_basic_grants_basic_features():
     ent = _entitlements_for("basic")
@@ -116,6 +118,7 @@ def test_unknown_feature_key_returns_false():
 # Caps — pure
 # ---------------------------------------------------------------------------
 
+
 def test_basic_cap_math():
     ent = _entitlements_for("basic")
     assert ent.cap_for("contacts") == 5000
@@ -139,6 +142,7 @@ def test_unknown_resource_raises_keyerror():
 # ---------------------------------------------------------------------------
 # Status / is_read_only — pure
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize(
     "status,expected",
@@ -173,7 +177,7 @@ async def trial_org(test_db):
     o = _make_org("Trial Co")
     test_db.add(o)
     await test_db.flush()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     test_db.add(
         Subscription(
             org_id=o.id,
@@ -196,7 +200,7 @@ async def basic_org(test_db):
     o = _make_org("Basic Co")
     test_db.add(o)
     await test_db.flush()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     test_db.add(
         Subscription(
             org_id=o.id,
@@ -217,7 +221,7 @@ async def standard_org(test_db):
     o = _make_org("Standard Co")
     test_db.add(o)
     await test_db.flush()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     test_db.add(
         Subscription(
             org_id=o.id,
@@ -239,7 +243,7 @@ async def expired_trial_org(test_db):
     o = _make_org("Expired Trial Co")
     test_db.add(o)
     await test_db.flush()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     test_db.add(
         Subscription(
             org_id=o.id,
@@ -264,7 +268,7 @@ async def archived_paid_org(test_db):
     o = _make_org("Archived Co")
     test_db.add(o)
     await test_db.flush()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     test_db.add(
         Subscription(
             org_id=o.id,
@@ -282,6 +286,7 @@ async def archived_paid_org(test_db):
 
 
 # ----- load_for_org ----------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_load_for_org_returns_bundle(test_db, basic_org):
@@ -308,7 +313,7 @@ async def test_load_for_org_raises_on_unknown_plan_code(test_db):
     o = _make_org("Stale Plan Co")
     test_db.add(o)
     await test_db.flush()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     test_db.add(
         Subscription(
             org_id=o.id,
@@ -327,6 +332,7 @@ async def test_load_for_org_raises_on_unknown_plan_code(test_db):
 
 
 # ----- require_feature -------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_require_feature_passes_on_entitled_plan(test_db, standard_org):
@@ -370,6 +376,7 @@ async def test_require_feature_raises_read_only_for_archived_paid(test_db, archi
 
 # ----- require_capacity ------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_require_capacity_passes_under_cap(test_db, basic_org):
     await require_capacity(test_db, basic_org.id, "contacts", current=4999)
@@ -394,7 +401,7 @@ async def test_require_capacity_passes_on_unlimited(test_db, basic_org):
     o = _make_org("Enterprise Co")
     test_db.add(o)
     await test_db.flush()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     test_db.add(
         Subscription(
             org_id=o.id,
@@ -411,9 +418,7 @@ async def test_require_capacity_passes_on_unlimited(test_db, basic_org):
 
 
 @pytest.mark.asyncio
-async def test_require_capacity_raises_trial_expired_before_cap_check(
-    test_db, expired_trial_org
-):
+async def test_require_capacity_raises_trial_expired_before_cap_check(test_db, expired_trial_org):
     """Read-only short-circuit fires BEFORE the cap math is consulted."""
     with pytest.raises(EntitlementError) as excinfo:
         await require_capacity(test_db, expired_trial_org.id, "contacts", current=0)
@@ -424,10 +429,9 @@ async def test_require_capacity_raises_trial_expired_before_cap_check(
 # EntitlementError structured detail
 # ---------------------------------------------------------------------------
 
+
 def test_entitlement_error_detail_shape():
-    err = EntitlementError(
-        "feature_locked", required_plan="standard"
-    )
+    err = EntitlementError("feature_locked", required_plan="standard")
     assert err.status_code == 402
     assert err.detail["reason"] == "feature_locked"
     assert err.detail["required_plan"] == "standard"

@@ -18,10 +18,11 @@ Operations cover the ``tbl_standard_field_overrides`` table:
 The registry membership check + payload validation + the override
 merge logic all stay in ``service.py``.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -38,15 +39,19 @@ async def list_overrides_for_org(
     list-endpoint response shape can populate ``(items, total)`` in
     one DAL call."""
     rows = (
-        await session.execute(
-            select(StandardFieldOverride)
-            .where(StandardFieldOverride.org_id == org_id)
-            .order_by(
-                StandardFieldOverride.entity,
-                StandardFieldOverride.field_key,
+        (
+            await session.execute(
+                select(StandardFieldOverride)
+                .where(StandardFieldOverride.org_id == org_id)
+                .order_by(
+                    StandardFieldOverride.entity,
+                    StandardFieldOverride.field_key,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     total = (
         await session.execute(
             select(func.count())
@@ -66,15 +71,19 @@ async def list_overrides_for_entity(
     """Override rows for one entity, sorted by ``field_key``. Used by
     the per-entity list endpoint and by the merge."""
     rows = (
-        await session.execute(
-            select(StandardFieldOverride)
-            .where(
-                StandardFieldOverride.org_id == org_id,
-                StandardFieldOverride.entity == entity,
+        (
+            await session.execute(
+                select(StandardFieldOverride)
+                .where(
+                    StandardFieldOverride.org_id == org_id,
+                    StandardFieldOverride.entity == entity,
+                )
+                .order_by(StandardFieldOverride.field_key)
             )
-            .order_by(StandardFieldOverride.field_key)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -84,7 +93,7 @@ async def get_override_by_keys(
     org_id: uuid.UUID,
     entity: str,
     field_key: str,
-) -> Optional[StandardFieldOverride]:
+) -> StandardFieldOverride | None:
     """Single-row lookup by the unique ``(org_id, entity, field_key)``
     tuple. Used by the upsert's pre-read (to capture ``before`` for
     audit) + the reset's existence check."""

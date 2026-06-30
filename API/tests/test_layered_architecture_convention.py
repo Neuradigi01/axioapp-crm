@@ -52,13 +52,14 @@ left out of scope by a tasks/ track (e.g. Celery worker files
 covered by a future polish step). New backend code in 2026-06-25
 onward should never need to add an exception.
 """
+
 from __future__ import annotations
 
 import ast
-import re
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, NamedTuple
+from typing import NamedTuple
 
 # Walk targets: only the layered backend tree under src/app/core/ and
 # src/app/packs/. Other roots (tests/, alembic/, scripts/, shared/)
@@ -69,17 +70,11 @@ _SCAN_ROOTS = (_ROOT / "core", _ROOT / "packs")
 
 _SESSION_VARS = frozenset({"db", "session"})
 
-_TRANSACTION_ATTRS = frozenset(
-    {"commit", "rollback", "flush", "refresh"}
-)
+_TRANSACTION_ATTRS = frozenset({"commit", "rollback", "flush", "refresh"})
 
-_ROUTER_FORBIDDEN_ATTRS = frozenset(
-    {"execute", "add", "delete", "query", "merge"}
-)
+_ROUTER_FORBIDDEN_ATTRS = frozenset({"execute", "add", "delete", "query", "merge"})
 
-_SQLALCHEMY_CRUD_NAMES = frozenset(
-    {"select", "insert", "update", "delete"}
-)
+_SQLALCHEMY_CRUD_NAMES = frozenset({"select", "insert", "update", "delete"})
 
 
 # Files allowed to call transaction-control methods despite NOT being
@@ -368,15 +363,10 @@ class _ArchitectureVisitor(ast.NodeVisitor):
         self.layer_imports: list[tuple[str, str, int]] = []
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        if node.module and (
-            node.module == "sqlalchemy"
-            or node.module.startswith("sqlalchemy.")
-        ):
+        if node.module and (node.module == "sqlalchemy" or node.module.startswith("sqlalchemy.")):
             for alias in node.names:
                 if alias.name in _SQLALCHEMY_CRUD_NAMES:
-                    self.sqlalchemy_crud_imports.append(
-                        (alias.name, node.lineno)
-                    )
+                    self.sqlalchemy_crud_imports.append((alias.name, node.lineno))
         if node.module and node.module.startswith("src.app."):
             mod = node.module
             # Form 1: `from ...x.data_access import ...`
@@ -388,17 +378,13 @@ class _ArchitectureVisitor(ast.NodeVisitor):
                 # Form 2: `from ...x import data_access` (etc.)
                 for alias in node.names:
                     if alias.name in ("data_access", "service", "router"):
-                        self.layer_imports.append(
-                            (alias.name, f"{mod}.{alias.name}", node.lineno)
-                        )
+                        self.layer_imports.append((alias.name, f"{mod}.{alias.name}", node.lineno))
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
         func = node.func
         # Match `<var>.<attr>(...)` where <var> is `db` or `session`.
-        if isinstance(func, ast.Attribute) and isinstance(
-            func.value, ast.Name
-        ):
+        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
             if func.value.id in _SESSION_VARS:
                 attr = func.attr
                 if attr in _TRANSACTION_ATTRS:
@@ -408,13 +394,8 @@ class _ArchitectureVisitor(ast.NodeVisitor):
         # `session.add_all(...)` is the bulk variant of `session.add`
         # — treat it the same way (forbidden in routers, fine in DAL
         # via wrapper, allowed in DAL directly).
-        if isinstance(func, ast.Attribute) and isinstance(
-            func.value, ast.Name
-        ):
-            if (
-                func.value.id in _SESSION_VARS
-                and func.attr == "add_all"
-            ):
+        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+            if func.value.id in _SESSION_VARS and func.attr == "add_all":
                 self.crud_attr_calls.append(("add_all", node.lineno))
         self.generic_visit(node)
 
@@ -496,16 +477,8 @@ def _collect_violations() -> list[_Violation]:
             # SQL outside the 5-file layered layout. The router and
             # service rules above already handle their respective
             # files; this rule fires on everything else.
-            is_layered = (
-                _is_router_file(path)
-                or _is_service_file(path)
-                or _is_dal_file(path)
-            )
-            if (
-                not is_layered
-                and visitor.crud_attr_calls
-                and rel not in _HELPER_CRUD_EXCEPTIONS
-            ):
+            is_layered = _is_router_file(path) or _is_service_file(path) or _is_dal_file(path)
+            if not is_layered and visitor.crud_attr_calls and rel not in _HELPER_CRUD_EXCEPTIONS:
                 for attr, lineno in visitor.crud_attr_calls:
                     violations.append(
                         _Violation(
@@ -538,10 +511,7 @@ def _collect_violations() -> list[_Violation]:
                     )
 
             # --- Layer-direction import rules.
-            if (
-                _is_router_file(path)
-                and rel not in _ROUTER_DAL_IMPORT_EXCEPTIONS
-            ):
+            if _is_router_file(path) and rel not in _ROUTER_DAL_IMPORT_EXCEPTIONS:
                 for layer, mod, lineno in visitor.layer_imports:
                     if layer == "data_access":
                         violations.append(
@@ -556,10 +526,7 @@ def _collect_violations() -> list[_Violation]:
                                 ),
                             )
                         )
-            if (
-                _is_dal_file(path)
-                and rel not in _DAL_SERVICE_IMPORT_EXCEPTIONS
-            ):
+            if _is_dal_file(path) and rel not in _DAL_SERVICE_IMPORT_EXCEPTIONS:
                 for layer, mod, lineno in visitor.layer_imports:
                     if layer in ("service", "router"):
                         violations.append(
@@ -585,10 +552,7 @@ def _collect_violations() -> list[_Violation]:
             # paginate-style wrapper) stays allowed: it's the "filter
             # DSL gray area" the dal-backfill track explicitly left in
             # service for leads/tasks pipeline reads.
-            if (
-                _is_service_file(path)
-                and rel not in _SERVICE_SQL_EXCEPTIONS
-            ):
+            if _is_service_file(path) and rel not in _SERVICE_SQL_EXCEPTIONS:
                 for attr, lineno in visitor.crud_attr_calls:
                     violations.append(
                         _Violation(

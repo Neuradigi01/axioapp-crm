@@ -9,12 +9,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import {
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
@@ -67,7 +62,6 @@ const RESOLVER_OPTIONS: Array<{ value: string; label: string; needsConfig: boole
   { value: 'user.email', label: "User's email (system events)", needsConfig: false },
   { value: 'custom', label: 'Custom JSONPath', needsConfig: true },
 ];
-
 
 @Component({
   selector: 'app-automation-editor-page',
@@ -147,9 +141,7 @@ export class AutomationEditorPageComponent {
   protected readonly testResult = signal<DryRunResult | null>(null);
   protected readonly testRunning = signal<boolean>(false);
 
-  protected readonly canWrite = computed(() =>
-    this.auth.hasPermission('automations.write'),
-  );
+  protected readonly canWrite = computed(() => this.auth.hasPermission('automations.write'));
 
   protected readonly selectedEntry = computed<EventCatalogEntry | null>(() => {
     const et = this.form.controls.event_type.value;
@@ -160,9 +152,7 @@ export class AutomationEditorPageComponent {
     () => this.selectedEntry()?.sample_payload ?? {},
   );
 
-  protected readonly channelLocked = computed<boolean>(
-    () => this.trigger() !== null,
-  );
+  protected readonly channelLocked = computed<boolean>(() => this.trigger() !== null);
 
   constructor() {
     // Load the catalog once.
@@ -178,12 +168,10 @@ export class AutomationEditorPageComponent {
       });
 
     // Load the trigger when the route carries an :id.
-    this.route.paramMap
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((params) => {
-        const id = params.get('id');
-        if (id) this.loadTrigger(id);
-      });
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const id = params.get('id');
+      if (id) this.loadTrigger(id);
+    });
 
     // When the picked template changes, fetch its name once for
     // the chip label.
@@ -235,9 +223,7 @@ export class AutomationEditorPageComponent {
               delay_seconds: row.delay_seconds,
               recipient_resolver: row.recipient_resolver,
               recipient_resolver_config_path: String(
-                (row.recipient_resolver_config as Record<string, unknown>)?.[
-                  'path'
-                ] ?? '',
+                (row.recipient_resolver_config as Record<string, unknown>)?.['path'] ?? '',
               ),
             },
             { emitEvent: false },
@@ -249,9 +235,7 @@ export class AutomationEditorPageComponent {
           this.conditions.set(row.conditions || {});
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load automation.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load automation.');
         },
       });
   }
@@ -300,9 +284,7 @@ export class AutomationEditorPageComponent {
 
     const existing = this.trigger();
     const config =
-      v.recipient_resolver === 'custom'
-        ? { path: v.recipient_resolver_config_path.trim() }
-        : {};
+      v.recipient_resolver === 'custom' ? { path: v.recipient_resolver_config_path.trim() } : {};
 
     const payload = {
       name: v.name,
@@ -316,9 +298,7 @@ export class AutomationEditorPageComponent {
       recipient_resolver_config: config,
     };
 
-    const obs = existing
-      ? this.api.update(existing.id, payload)
-      : this.api.create(payload);
+    const obs = existing ? this.api.update(existing.id, payload) : this.api.create(payload);
 
     obs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (row) => {
@@ -326,10 +306,7 @@ export class AutomationEditorPageComponent {
         this.trigger.set(row);
         this.toast.set(existing ? 'Saved.' : 'Created.');
         if (!existing) {
-          void this.router.navigate(
-            ['/user/automations', row.id],
-            { replaceUrl: true },
-          );
+          void this.router.navigate(['/user/automations', row.id], { replaceUrl: true });
         }
         if (thenTest) {
           this.openTestModal(row.id);
@@ -337,9 +314,7 @@ export class AutomationEditorPageComponent {
       },
       error: (err: HttpErrorResponse) => {
         this.saving.set(false);
-        this.saveError.set(
-          extractApiError(err) ?? 'Could not save automation.',
-        );
+        this.saveError.set(extractApiError(err) ?? 'Could not save automation.');
       },
     });
   }

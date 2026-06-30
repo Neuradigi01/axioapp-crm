@@ -14,11 +14,11 @@ Three concerns:
 All mutations route through the caller's `AsyncSession` so the
 movement + qty update + alert recompute happen in one transaction.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -47,7 +47,6 @@ from src.app.packs.furniture.modules.inventory.schemas import (
 from src.app.shared.db.queries import ensure_found
 from src.app.shared.storage import get_storage
 
-
 # --- warehouses ---------------------------------------------------------
 
 
@@ -55,9 +54,7 @@ async def list_warehouses(session: AsyncSession) -> list[Warehouse]:
     return await _da.list_warehouses_query(session)
 
 
-async def get_warehouse(
-    session: AsyncSession, warehouse_id: uuid.UUID
-) -> Warehouse:
+async def get_warehouse(session: AsyncSession, warehouse_id: uuid.UUID) -> Warehouse:
     return ensure_found(
         await _da.get_warehouse_by_id(session, warehouse_id),
         entity="warehouse",
@@ -122,9 +119,7 @@ async def update_warehouse(
     return w
 
 
-async def delete_warehouse(
-    session: AsyncSession, *, warehouse_id: uuid.UUID
-) -> None:
+async def delete_warehouse(session: AsyncSession, *, warehouse_id: uuid.UUID) -> None:
     w = await get_warehouse(session, warehouse_id)
     await _da.delete_warehouse_row(session, w)
     try:
@@ -143,9 +138,9 @@ async def delete_warehouse(
 async def list_items(
     session: AsyncSession,
     *,
-    warehouse_id: Optional[uuid.UUID] = None,
-    category: Optional[str] = None,
-    q: Optional[str] = None,
+    warehouse_id: uuid.UUID | None = None,
+    category: str | None = None,
+    q: str | None = None,
     active_only: bool = False,
     page: int = 1,
     size: int = 50,
@@ -161,12 +156,8 @@ async def list_items(
     )
 
 
-async def get_item(
-    session: AsyncSession, item_id: uuid.UUID
-) -> InventoryItem:
-    return ensure_found(
-        await _da.get_item_by_id(session, item_id), entity="item"
-    )
+async def get_item(session: AsyncSession, item_id: uuid.UUID) -> InventoryItem:
+    return ensure_found(await _da.get_item_by_id(session, item_id), entity="item")
 
 
 async def create_item(
@@ -179,9 +170,7 @@ async def create_item(
     # but a 404 is friendlier than a generic 500).
     await get_warehouse(session, payload.warehouse_id)
     if payload.catalog_item_id is not None:
-        if not await _da.catalog_item_exists_in_org(
-            session, payload.catalog_item_id
-        ):
+        if not await _da.catalog_item_exists_in_org(session, payload.catalog_item_id):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"catalog_item_id {payload.catalog_item_id} not found",
@@ -232,9 +221,7 @@ async def create_item_full(
         name=payload.name,
         category=payload.category,
         price=payload.price,
-        custom_data=(
-            {"description": payload.description} if payload.description else {}
-        ),
+        custom_data=({"description": payload.description} if payload.description else {}),
         is_active=payload.is_active,
     )
     _da.insert_catalog_item(session, catalog)
@@ -267,10 +254,7 @@ async def create_item_full(
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"inventory item with SKU '{payload.sku}' already exists "
-                f"in this warehouse"
-            ),
+            detail=(f"inventory item with SKU '{payload.sku}' already exists in this warehouse"),
         )
     await session.refresh(inv)
     return inv
@@ -358,9 +342,7 @@ async def update_item(
     return item
 
 
-async def delete_item(
-    session: AsyncSession, *, item_id: uuid.UUID
-) -> None:
+async def delete_item(session: AsyncSession, *, item_id: uuid.UUID) -> None:
     item = await get_item(session, item_id)
     await _da.delete_item_row(session, item)
     await session.commit()
@@ -376,9 +358,9 @@ async def record_movement(
     user_id: uuid.UUID | None,
     type_: MovementType,
     qty: int,
-    reference_type: Optional[str] = None,
-    reference_id: Optional[uuid.UUID] = None,
-    notes: Optional[str] = None,
+    reference_type: str | None = None,
+    reference_id: uuid.UUID | None = None,
+    notes: str | None = None,
 ) -> InventoryMovement:
     """Atomically apply a stock movement."""
     item = await get_item(session, item_id)
@@ -407,10 +389,7 @@ async def record_movement(
     if new_on_hand < 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"insufficient stock: qty_on_hand={item.qty_on_hand}, "
-                f"requested delta={delta}"
-            ),
+            detail=(f"insufficient stock: qty_on_hand={item.qty_on_hand}, requested delta={delta}"),
         )
 
     movement = InventoryMovement(
@@ -426,7 +405,7 @@ async def record_movement(
     _da.insert_movement(session, movement)
     item.qty_on_hand = new_on_hand
     if type_ == MovementType.receipt:
-        item.last_received_at = datetime.now(timezone.utc)
+        item.last_received_at = datetime.now(UTC)
 
     try:
         await session.commit()
@@ -461,17 +440,13 @@ async def list_movements(
     item_id: uuid.UUID,
     limit: int = 100,
 ) -> list[InventoryMovement]:
-    return await _da.list_movements_for_item(
-        session, item_id=item_id, limit=limit
-    )
+    return await _da.list_movements_for_item(session, item_id=item_id, limit=limit)
 
 
 # --- alerts -------------------------------------------------------------
 
 
-async def recompute_alerts(
-    session: AsyncSession, *, item_id: uuid.UUID
-) -> None:
+async def recompute_alerts(session: AsyncSession, *, item_id: uuid.UUID) -> None:
     """Open or close the open alert for `item` so it matches current qty."""
     item = await get_item(session, item_id)
 
@@ -498,7 +473,7 @@ async def recompute_alerts(
         # Stock is healthy → close any open alert.
         if open_alert is not None:
             open_alert.status = AlertStatus.closed
-            open_alert.closed_at = datetime.now(timezone.utc)
+            open_alert.closed_at = datetime.now(UTC)
             await session.commit()
         return
 
@@ -535,8 +510,8 @@ async def recompute_alerts(
 async def list_alerts(
     session: AsyncSession,
     *,
-    severity: Optional[AlertSeverity] = None,
-    status_filter: Optional[AlertStatus] = None,
+    severity: AlertSeverity | None = None,
+    status_filter: AlertStatus | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[StockAlert], int]:
@@ -555,12 +530,10 @@ async def update_alert_status(
     alert_id: uuid.UUID,
     new_status: AlertStatus,
 ) -> StockAlert:
-    alert = ensure_found(
-        await _da.get_alert_by_id(session, alert_id), entity="alert"
-    )
+    alert = ensure_found(await _da.get_alert_by_id(session, alert_id), entity="alert")
     alert.status = new_status
     if new_status == AlertStatus.closed and alert.closed_at is None:
-        alert.closed_at = datetime.now(timezone.utc)
+        alert.closed_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(alert)
     return alert

@@ -17,10 +17,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { environment } from '../../../../../../environments/environment';
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  OpenRecordsCounts,
-  StaffApiService,
-} from './staff-api.service';
+import { OpenRecordsCounts, StaffApiService } from './staff-api.service';
 
 /** Compact user row passed in from the parent — only the fields the
  * modal needs to render and drive the transfer-target dropdown. */
@@ -93,9 +90,7 @@ export class StaffDeactivateModalComponent {
   /** Active members minus the deactivation target. */
   protected readonly transferCandidates = computed(() => {
     const targetId = this._user()?.id;
-    return this._usersInOrg().filter(
-      (u) => u.is_active && u.id !== targetId,
-    );
+    return this._usersInOrg().filter((u) => u.is_active && u.id !== targetId);
   });
 
   protected readonly hasOpenRecords = computed(() => {
@@ -127,9 +122,7 @@ export class StaffDeactivateModalComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loadingCounts.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not load open-record counts.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load open-record counts.');
         },
       });
   }
@@ -159,9 +152,7 @@ export class StaffDeactivateModalComponent {
           },
           error: (err: HttpErrorResponse) => {
             this.submitting.set(false);
-            this.error.set(
-              extractApiError(err) ?? 'Could not transfer records.',
-            );
+            this.error.set(extractApiError(err) ?? 'Could not transfer records.');
           },
         });
     } else {
@@ -180,9 +171,7 @@ export class StaffDeactivateModalComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not deactivate the user.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not deactivate the user.');
         },
       });
   }

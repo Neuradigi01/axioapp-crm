@@ -2,9 +2,7 @@
   <label class="block">
     <span class="text-xs font-medium text-zinc-700">
       Body
-      <span class="text-zinc-400">
-        ({{ bodyLength() }} / {{ BODY_MAX }} chars)
-      </span>
+      <span class="text-zinc-400"> ({{ bodyLength() }} / {{ BODY_MAX }} chars) </span>
     </span>
     <textarea
       formControlName="body_text"
@@ -15,9 +13,8 @@
       placeholder="Hi {{ '{' + '{' + 'contact.first_name' + '}' + '}' }}, thanks for messaging us!"
     ></textarea>
     <p class="mt-1 text-[10px] text-zinc-400">
-      Variables resolve from the central library at send time. Meta's
-      Messaging API enforces a 1000-character body limit for text
-      messages.
+      Variables resolve from the central library at send time. Meta's Messaging API enforces a
+      1000-character body limit for text messages.
     </p>
   </label>
 
@@ -29,9 +26,8 @@
       </span>
     </legend>
     <p class="text-[11px] text-zinc-500">
-      Optional buttons rendered under the message bubble. The recipient
-      taps one and Messenger sends the text back as their reply.
-      Max {{ QUICK_REPLY_MAX_LENGTH }} characters per reply.
+      Optional buttons rendered under the message bubble. The recipient taps one and Messenger sends
+      the text back as their reply. Max {{ QUICK_REPLY_MAX_LENGTH }} characters per reply.
     </p>
 
     <div class="mt-2 flex flex-col gap-2" formArrayName="quick_replies">
@@ -69,11 +65,9 @@
   </fieldset>
 
   <p class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] text-zinc-600">
-    <strong>Note:</strong> Facebook Messenger / Instagram Direct send
-    transport is not yet enabled — saving captures the template; the
-    dispatcher will refuse the send with a clear "connect a Messenger
-    integration" message until the channel adapter ships. There is no
-    external approval workflow for these channels (Meta dropped FB
-    Messenger templates post-2020; IG never had them).
+    <strong>Note:</strong> Facebook Messenger / Instagram Direct send transport is not yet enabled —
+    saving captures the template; the dispatcher will refuse the send with a clear "connect a
+    Messenger integration" message until the channel adapter ships. There is no external approval
+    workflow for these channels (Meta dropped FB Messenger templates post-2020; IG never had them).
   </p>
 </form>

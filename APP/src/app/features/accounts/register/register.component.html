@@ -8,7 +8,9 @@
     <!-- Name Row -->
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div>
-        <label for="first_name" class="mb-1 block text-sm font-medium text-zinc-700">First Name</label>
+        <label for="first_name" class="mb-1 block text-sm font-medium text-zinc-700"
+          >First Name</label
+        >
         <input
           id="first_name"
           type="text"
@@ -16,14 +18,22 @@
           autocomplete="given-name"
           class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
-        @if (registerForm.controls['first_name'].invalid && (registerForm.controls['first_name'].touched || registerForm.controls['first_name'].dirty)) {
+        @if (
+          registerForm.controls['first_name'].invalid &&
+          (registerForm.controls['first_name'].touched || registerForm.controls['first_name'].dirty)
+        ) {
           <p class="mt-1 text-xs text-rose-600">
-            <app-validation-message [control]="registerForm.controls['first_name']" label="First name" />
+            <app-validation-message
+              [control]="registerForm.controls['first_name']"
+              label="First name"
+            />
           </p>
         }
       </div>
       <div>
-        <label for="last_name" class="mb-1 block text-sm font-medium text-zinc-700">Last Name</label>
+        <label for="last_name" class="mb-1 block text-sm font-medium text-zinc-700"
+          >Last Name</label
+        >
         <input
           id="last_name"
           type="text"
@@ -31,9 +41,15 @@
           autocomplete="family-name"
           class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
-        @if (registerForm.controls['last_name'].invalid && (registerForm.controls['last_name'].touched || registerForm.controls['last_name'].dirty)) {
+        @if (
+          registerForm.controls['last_name'].invalid &&
+          (registerForm.controls['last_name'].touched || registerForm.controls['last_name'].dirty)
+        ) {
           <p class="mt-1 text-xs text-rose-600">
-            <app-validation-message [control]="registerForm.controls['last_name']" label="Last name" />
+            <app-validation-message
+              [control]="registerForm.controls['last_name']"
+              label="Last name"
+            />
           </p>
         }
       </div>
@@ -54,14 +70,21 @@
           <button
             type="button"
             (click)="sendEmailOtp()"
-            [disabled]="registerForm.get('email')!.invalid || isSendingEmailOtp() || emailTimer.remaining() > 0"
+            [disabled]="
+              registerForm.get('email')!.invalid ||
+              isSendingEmailOtp() ||
+              emailTimer.remaining() > 0
+            "
             class="shrink-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {{ isSendingEmailOtp() ? 'Sending…' : emailOtpSent() ? 'Resend' : 'Send OTP' }}
           </button>
         }
       </div>
-      @if (registerForm.controls['email'].invalid && (registerForm.controls['email'].touched || registerForm.controls['email'].dirty)) {
+      @if (
+        registerForm.controls['email'].invalid &&
+        (registerForm.controls['email'].touched || registerForm.controls['email'].dirty)
+      ) {
         <p class="mt-1 text-xs text-rose-600">
           <app-validation-message [control]="registerForm.controls['email']" label="Email" />
         </p>
@@ -73,7 +96,9 @@
 
     @if (needsEmailOtp() && emailOtpSent()) {
       <div>
-        <label for="email_otp_code" class="mb-1 block text-sm font-medium text-zinc-700">Email OTP</label>
+        <label for="email_otp_code" class="mb-1 block text-sm font-medium text-zinc-700"
+          >Email OTP</label
+        >
         <input
           id="email_otp_code"
           type="text"
@@ -86,7 +111,9 @@
 
     <!-- Mobile + Inline OTP -->
     <div>
-      <label for="mobile_no" class="mb-1 block text-sm font-medium text-zinc-700">Mobile Number</label>
+      <label for="mobile_no" class="mb-1 block text-sm font-medium text-zinc-700"
+        >Mobile Number</label
+      >
       <div class="flex gap-2">
         <input
           id="mobile_no"
@@ -99,7 +126,9 @@
           <button
             type="button"
             (click)="sendSmsOtp()"
-            [disabled]="!registerForm.get('mobile_no')!.value || isSendingSmsOtp() || smsTimer.remaining() > 0"
+            [disabled]="
+              !registerForm.get('mobile_no')!.value || isSendingSmsOtp() || smsTimer.remaining() > 0
+            "
             class="shrink-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {{ isSendingSmsOtp() ? 'Sending…' : smsOtpSent() ? 'Resend' : 'Send OTP' }}
@@ -113,7 +142,9 @@
 
     @if (needsSmsOtp() && smsOtpSent()) {
       <div>
-        <label for="mobile_otp_code" class="mb-1 block text-sm font-medium text-zinc-700">Mobile OTP</label>
+        <label for="mobile_otp_code" class="mb-1 block text-sm font-medium text-zinc-700"
+          >Mobile OTP</label
+        >
         <input
           id="mobile_otp_code"
           type="text"
@@ -175,7 +206,10 @@
           <lucide-icon [name]="pwToggle.hidden() ? 'eye' : 'eye-off'" class="h-4 w-4" />
         </button>
       </div>
-      @if (registerForm.controls['password'].invalid && (registerForm.controls['password'].touched || registerForm.controls['password'].dirty)) {
+      @if (
+        registerForm.controls['password'].invalid &&
+        (registerForm.controls['password'].touched || registerForm.controls['password'].dirty)
+      ) {
         <p class="mt-1 text-xs text-rose-600">
           <app-validation-message [control]="registerForm.controls['password']" label="Password" />
         </p>
@@ -184,7 +218,9 @@
 
     <!-- Confirm Password -->
     <div>
-      <label for="confirm_password" class="mb-1 block text-sm font-medium text-zinc-700">Confirm Password</label>
+      <label for="confirm_password" class="mb-1 block text-sm font-medium text-zinc-700"
+        >Confirm Password</label
+      >
       <div class="relative" appPasswordToggle #cpToggle="passwordToggle">
         <input
           id="confirm_password"
@@ -202,16 +238,25 @@
           <lucide-icon [name]="cpToggle.hidden() ? 'eye' : 'eye-off'" class="h-4 w-4" />
         </button>
       </div>
-      @if (registerForm.controls['confirm_password'].invalid && (registerForm.controls['confirm_password'].touched || registerForm.controls['confirm_password'].dirty)) {
+      @if (
+        registerForm.controls['confirm_password'].invalid &&
+        (registerForm.controls['confirm_password'].touched ||
+          registerForm.controls['confirm_password'].dirty)
+      ) {
         <p class="mt-1 text-xs text-rose-600">
-          <app-validation-message [control]="registerForm.controls['confirm_password']" label="Confirm password" />
+          <app-validation-message
+            [control]="registerForm.controls['confirm_password']"
+            label="Confirm password"
+          />
         </p>
       }
     </div>
 
     <!-- Referral ID -->
     <div>
-      <label for="referral_id" class="mb-1 block text-sm font-medium text-zinc-700">Referral ID (optional)</label>
+      <label for="referral_id" class="mb-1 block text-sm font-medium text-zinc-700"
+        >Referral ID (optional)</label
+      >
       <input
         id="referral_id"
         type="text"

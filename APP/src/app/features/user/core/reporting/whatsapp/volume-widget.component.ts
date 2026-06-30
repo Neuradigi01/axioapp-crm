@@ -46,9 +46,7 @@ import {
     <div class="rounded-md border border-zinc-200 bg-white p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Message volume
-          </p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Message volume</p>
           <p class="text-[11px] text-zinc-500">
             Customer + staff + AI traffic in the selected window.
           </p>
@@ -83,9 +81,7 @@ import {
         </div>
 
         @if (r.buckets.length === 0) {
-          <p class="py-8 text-center text-xs text-zinc-500">
-            No messages in this window.
-          </p>
+          <p class="py-8 text-center text-xs text-zinc-500">No messages in this window.</p>
         } @else {
           <apx-chart
             [series]="series()"
@@ -184,9 +180,7 @@ export class VolumeWidgetComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not load message volume.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load message volume.');
         },
       });
   }

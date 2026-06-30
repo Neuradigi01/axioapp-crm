@@ -79,7 +79,6 @@ const PREFIX_DESCRIPTORS: Array<{
   },
 ];
 
-
 @Component({
   selector: 'app-event-type-chip',
   standalone: true,

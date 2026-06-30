@@ -20,6 +20,7 @@ The 10-minute attribution window is a manager-tunable env var
 catch more legit conversions but risk false positives when a busy
 billboard generates concurrent inbounds.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -28,10 +29,10 @@ import os
 import secrets
 import string
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, text as sql_text, update
+from sqlalchemy import select, update
+from sqlalchemy import text as sql_text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -60,7 +61,7 @@ def _digits_only(raw: str) -> str:
     return "".join(c for c in raw if c.isdigit())
 
 
-def hash_prefilled(message: Optional[str]) -> Optional[str]:
+def hash_prefilled(message: str | None) -> str | None:
     """Stable SHA-256 of the normalised prefilled text. Whitespace
     collapsed + lowercased so a customer who pastes the message with
     a stray newline still attributes correctly. Returns None on an
@@ -77,7 +78,7 @@ def _new_slug() -> str:
     return "".join(secrets.choice(_SLUG_CHARSET) for _ in range(_SLUG_LEN))
 
 
-def _hash_ip(ip: Optional[str]) -> Optional[str]:
+def _hash_ip(ip: str | None) -> str | None:
     """Stable but anonymous IP hash for repeat-click dedup. SHA-256
     truncated to 16 hex chars — collision-tolerant for the small
     populations we track."""
@@ -101,18 +102,20 @@ async def list_links(
     """Paginated list for the Settings → WhatsApp → Quick links page."""
     from sqlalchemy import func
 
-    base = select(WhatsAppQuickLink).where(
-        WhatsAppQuickLink.org_id == org_id
-    )
+    base = select(WhatsAppQuickLink).where(WhatsAppQuickLink.org_id == org_id)
     total_stmt = select(func.count()).select_from(base.subquery())
     total = int((await session.execute(total_stmt)).scalar_one() or 0)
     rows = (
-        await session.execute(
-            base.order_by(WhatsAppQuickLink.created_at.desc())
-            .offset(max(0, (page - 1) * size))
-            .limit(max(1, min(size, 200)))
+        (
+            await session.execute(
+                base.order_by(WhatsAppQuickLink.created_at.desc())
+                .offset(max(0, (page - 1) * size))
+                .limit(max(1, min(size, 200)))
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows), total
 
 
@@ -120,19 +123,17 @@ async def create_link(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    actor_user_id: Optional[uuid.UUID],
+    actor_user_id: uuid.UUID | None,
     label: str,
     phone_number: str,
-    prefilled_message: Optional[str],
+    prefilled_message: str | None,
 ) -> WhatsAppQuickLink:
     """Create a quick link. Retries on slug collision up to
     ``_SLUG_MAX_RETRIES`` before giving up — 62^8 ≈ 218 trillion,
     so the retry budget is generous."""
     phone = _digits_only(phone_number)
     if not phone:
-        raise QuickLinksError(
-            "phone_number is required (digits-only)."
-        )
+        raise QuickLinksError("phone_number is required (digits-only).")
     if not label.strip():
         raise QuickLinksError("label is required.")
     prefilled = (prefilled_message or "").strip() or None
@@ -167,9 +168,7 @@ async def create_link(
             last_exc = exc
             await session.rollback()
             continue
-    raise QuickLinksError(
-        "Could not allocate a unique slug after several attempts."
-    ) from last_exc
+    raise QuickLinksError("Could not allocate a unique slug after several attempts.") from last_exc
 
 
 async def update_link(
@@ -177,9 +176,9 @@ async def update_link(
     *,
     org_id: uuid.UUID,
     link_id: uuid.UUID,
-    label: Optional[str] = None,
-    phone_number: Optional[str] = None,
-    prefilled_message: Optional[str] = None,
+    label: str | None = None,
+    phone_number: str | None = None,
+    prefilled_message: str | None = None,
 ) -> WhatsAppQuickLink:
     row = await _resolve_link(session, org_id=org_id, link_id=link_id)
     if label is not None:
@@ -192,7 +191,7 @@ async def update_link(
         cleaned = prefilled_message.strip() or None
         row.prefilled_message = cleaned
         row.prefilled_hash = hash_prefilled(cleaned)
-    row.updated_at = datetime.now(timezone.utc)
+    row.updated_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(row)
     return row
@@ -239,21 +238,15 @@ async def _resolve_link(
 # ---------------------------------------------------------------------------
 
 
-async def resolve_by_code(
-    session: AsyncSession, *, code: str
-) -> Optional[WhatsAppQuickLink]:
+async def resolve_by_code(session: AsyncSession, *, code: str) -> WhatsAppQuickLink | None:
     """Lookup a link by slug. Used by the public ``/wa/{code}``
     endpoint, which has no tenant context — we set
     ``app.public_quick_link='1'`` on the transaction so RLS allows
     the read. The setting is transaction-local and clears on
     commit."""
-    await session.execute(
-        sql_text("SELECT set_config('app.public_quick_link', '1', true)")
-    )
+    await session.execute(sql_text("SELECT set_config('app.public_quick_link', '1', true)"))
     row = (
-        await session.execute(
-            select(WhatsAppQuickLink).where(WhatsAppQuickLink.code == code)
-        )
+        await session.execute(select(WhatsAppQuickLink).where(WhatsAppQuickLink.code == code))
     ).scalar_one_or_none()
     return row
 
@@ -276,9 +269,9 @@ async def record_click(
     *,
     link: WhatsAppQuickLink,
     source: str,
-    ua_family: Optional[str],
-    referrer: Optional[str],
-    ip: Optional[str],
+    ua_family: str | None,
+    referrer: str | None,
+    ip: str | None,
 ) -> None:
     """Insert a click row + bump the appropriate denormalised
     counter. Called by the public redirect path. Best-effort:
@@ -287,11 +280,7 @@ async def record_click(
     ``source`` is ``'link'`` for short-URL clicks or ``'qr'`` for
     QR-code scans (the redirect endpoint passes ``?src=qr``)."""
     try:
-        await session.execute(
-            sql_text(
-                "SELECT set_config('app.public_quick_link', '1', true)"
-            )
-        )
+        await session.execute(sql_text("SELECT set_config('app.public_quick_link', '1', true)"))
         click = WhatsAppQuickLinkClick(
             org_id=link.org_id,
             link_id=link.id,
@@ -302,9 +291,7 @@ async def record_click(
         )
         session.add(click)
         column = (
-            WhatsAppQuickLink.scan_count
-            if click.source == "qr"
-            else WhatsAppQuickLink.click_count
+            WhatsAppQuickLink.scan_count if click.source == "qr" else WhatsAppQuickLink.click_count
         )
         await session.execute(
             update(WhatsAppQuickLink)
@@ -346,8 +333,8 @@ async def attribute_inbound(
     session: AsyncSession,
     *,
     conversation: Conversation,
-    inbound_text: Optional[str],
-) -> Optional[WhatsAppQuickLink]:
+    inbound_text: str | None,
+) -> WhatsAppQuickLink | None:
     """Best-effort pair an inbound text with a recent quick-link
     click. Returns the matched link when an attribution was
     written; ``None`` when nothing matched / the conversation was
@@ -385,9 +372,7 @@ async def attribute_inbound(
     if link is None:
         return None
 
-    cutoff = datetime.now(timezone.utc) - timedelta(
-        minutes=_window_minutes()
-    )
+    cutoff = datetime.now(UTC) - timedelta(minutes=_window_minutes())
     click = (
         await session.execute(
             select(WhatsAppQuickLinkClick)
@@ -403,15 +388,13 @@ async def attribute_inbound(
     if click is None:
         return None
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     click.matched_at = now
     click.matched_conversation_id = conversation.id
 
     conversation.acquisition_source = "qr"
     conversation.acquisition_campaign_id = str(link.id)
-    conversation.acquisition_landing_url = (
-        f"/wa/{link.code}"
-    )
+    conversation.acquisition_landing_url = f"/wa/{link.code}"
     conversation.acquisition_referral_payload = {
         "source": "qr_quick_link",
         "link_id": str(link.id),
@@ -424,11 +407,7 @@ async def attribute_inbound(
     await session.execute(
         update(WhatsAppQuickLink)
         .where(WhatsAppQuickLink.id == link.id)
-        .values(
-            attributed_conversation_count=(
-                WhatsAppQuickLink.attributed_conversation_count + 1
-            )
-        )
+        .values(attributed_conversation_count=(WhatsAppQuickLink.attributed_conversation_count + 1))
     )
     await session.commit()
     await audit.log(
@@ -454,13 +433,17 @@ async def link_stats(
     split + last 10 clicks."""
     link = await _resolve_link(session, org_id=org_id, link_id=link_id)
     recent = (
-        await session.execute(
-            select(WhatsAppQuickLinkClick)
-            .where(WhatsAppQuickLinkClick.link_id == link.id)
-            .order_by(WhatsAppQuickLinkClick.recorded_at.desc())
-            .limit(10)
+        (
+            await session.execute(
+                select(WhatsAppQuickLinkClick)
+                .where(WhatsAppQuickLinkClick.link_id == link.id)
+                .order_by(WhatsAppQuickLinkClick.recorded_at.desc())
+                .limit(10)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return {
         "id": str(link.id),
         "code": link.code,

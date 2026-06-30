@@ -16,6 +16,7 @@ production (a no-op against the dev owner role, but cheap to do).
 Usage:
     python -m src.app.scripts.seed_admin_user
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -32,17 +33,16 @@ from src.app.shared.context import RequestContext, set_context
 from src.app.shared.db import async_session
 from src.app.shared.security.password import hash_password
 
-
 ADMIN_ROLE_ID = uuid.UUID("00000000-0000-0000-0000-000000000010")
 ADMIN_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000011")
 
 PERMISSIONS = [
-    ("users.read",          "Read users",           "users"),
-    ("users.write",         "Manage users",         "users"),
-    ("roles.read",          "Read roles",           "roles"),
-    ("roles.write",         "Manage roles",         "roles"),
-    ("audit.read",          "Read audit logs",      "audit"),
-    ("custom_fields.read",  "Read custom fields",   "custom_fields"),
+    ("users.read", "Read users", "users"),
+    ("users.write", "Manage users", "users"),
+    ("roles.read", "Read roles", "roles"),
+    ("roles.write", "Manage roles", "roles"),
+    ("audit.read", "Read audit logs", "audit"),
+    ("custom_fields.read", "Read custom fields", "custom_fields"),
     ("custom_fields.write", "Manage custom fields", "custom_fields"),
 ]
 
@@ -72,10 +72,12 @@ async def seed_admin_user() -> None:
         # hook) with a different id.
         await session.execute(
             pg_insert(Permission)
-            .values([
-                {"key": key, "description": desc, "module": module}
-                for (key, desc, module) in PERMISSIONS
-            ])
+            .values(
+                [
+                    {"key": key, "description": desc, "module": module}
+                    for (key, desc, module) in PERMISSIONS
+                ]
+            )
             .on_conflict_do_nothing(index_elements=["key"])
         )
 
@@ -91,10 +93,7 @@ async def seed_admin_user() -> None:
         # 3) admin role gets every baseline permission.
         await session.execute(
             pg_insert(RolePermission)
-            .values([
-                {"role_id": ADMIN_ROLE_ID, "permission_id": pid}
-                for pid in permission_ids
-            ])
+            .values([{"role_id": ADMIN_ROLE_ID, "permission_id": pid} for pid in permission_ids])
             .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
         )
 
@@ -127,9 +126,7 @@ async def seed_admin_user() -> None:
         # 4b) Resolve the bigint login.id for this UUID identity so we
         # can FK into the profile + membership rows below.
         login_id = (
-            await session.execute(
-                select(User.id).where(User.legacy_uuid == ADMIN_USER_ID)
-            )
+            await session.execute(select(User.id).where(User.legacy_uuid == ADMIN_USER_ID))
         ).scalar_one()
 
         # 4c) Profile row. Split the fixed display name into first/last.
@@ -161,9 +158,7 @@ async def seed_admin_user() -> None:
                 is_active=True,
                 is_demo=True,
             )
-            .on_conflict_do_nothing(
-                index_elements=["organization_id", "user_member_id"]
-            )
+            .on_conflict_do_nothing(index_elements=["organization_id", "user_member_id"])
         )
         # Flip is_demo on the existing membership in case a pre-DR.7
         # seed run left it false.

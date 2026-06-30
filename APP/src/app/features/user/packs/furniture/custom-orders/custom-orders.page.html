@@ -80,10 +80,7 @@
     >
       <ng-template let-item>
         @let contact = contactFor($any(item).contact_id);
-        <a
-          [routerLink]="['/user/custom-orders', item.id]"
-          class="block w-full text-left"
-        >
+        <a [routerLink]="['/user/custom-orders', item.id]" class="block w-full text-left">
           <app-custom-order-card
             [order]="$any(item)"
             [contactName]="contact?.full_name ?? null"
@@ -102,10 +99,7 @@
     >
       <ng-template let-item>
         @let contact = contactFor($any(item).contact_id);
-        <a
-          [routerLink]="['/user/custom-orders', item.id]"
-          class="block text-left"
-        >
+        <a [routerLink]="['/user/custom-orders', item.id]" class="block text-left">
           <p class="font-medium text-zinc-900">{{ $any(item).title }}</p>
           <p class="text-xs text-zinc-500">
             {{ contact?.full_name ?? 'Unlinked' }}

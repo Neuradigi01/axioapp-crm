@@ -29,9 +29,8 @@ missing — the API container won't start, which is the right default
 for a security-critical setting (better to refuse to boot than to
 ship encryption you can't decrypt).
 """
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -80,14 +79,14 @@ def decrypt(cipher: str) -> str:
     return _fernet.decrypt(cipher.encode("utf-8")).decode("utf-8")
 
 
-def encrypt_optional(plain: Optional[str]) -> Optional[str]:
+def encrypt_optional(plain: str | None) -> str | None:
     """Convenience for the common case where the token may be None
     (refresh_token isn't always returned by every provider on every
     grant). None passes through unchanged."""
     return encrypt(plain) if plain is not None else None
 
 
-def decrypt_optional(cipher: Optional[str]) -> Optional[str]:
+def decrypt_optional(cipher: str | None) -> str | None:
     """Convenience for the common case where the ciphertext column is
     NULL (disconnected integration, or never had a refresh token)."""
     return decrypt(cipher) if cipher is not None else None

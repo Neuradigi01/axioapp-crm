@@ -21,11 +21,11 @@ Operations are grouped by entity:
       submission_outcome_totals, submission_daily_outcome_buckets,
       delete_submission_logs_older_than
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.engine import Row
@@ -39,18 +39,13 @@ from src.app.core.embed.models import (
     WidgetConfig,
 )
 
-
 # --- Embed keys ---------------------------------------------------------
 
 
-async def get_embed_key_by_id(
-    session: AsyncSession, key_id: uuid.UUID
-) -> Optional[EmbedKey]:
+async def get_embed_key_by_id(session: AsyncSession, key_id: uuid.UUID) -> EmbedKey | None:
     """Single-row read by PK. ``None`` on miss."""
     return (
-        await session.execute(
-            select(EmbedKey).where(EmbedKey.id == key_id)
-        )
+        await session.execute(select(EmbedKey).where(EmbedKey.id == key_id))
     ).scalar_one_or_none()
 
 
@@ -59,16 +54,14 @@ async def list_embed_keys(session: AsyncSession) -> list[EmbedKey]:
     first. Owners see revoked keys too so they can audit who issued
     and revoked what."""
     rows = (
-        await session.execute(
-            select(EmbedKey).order_by(EmbedKey.created_at.desc())
-        )
-    ).scalars().all()
+        (await session.execute(select(EmbedKey).order_by(EmbedKey.created_at.desc())))
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
-async def list_embed_keys_by_prefix_unrevoked(
-    session: AsyncSession, prefix: str
-) -> list[EmbedKey]:
+async def list_embed_keys_by_prefix_unrevoked(session: AsyncSession, prefix: str) -> list[EmbedKey]:
     """Candidates for the submission-path bcrypt verify. Filters to
     rows whose ``prefix`` matches and ``revoked_at IS NULL``. Caller
     opens the session OUTSIDE tenant context (the public endpoint has
@@ -82,7 +75,9 @@ async def list_embed_keys_by_prefix_unrevoked(
                     EmbedKey.revoked_at.is_(None),
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
 
@@ -91,7 +86,7 @@ async def update_embed_key_last_used(
     *,
     key_id: uuid.UUID,
     when: datetime,
-    ip_hash: Optional[str],
+    ip_hash: str | None,
 ) -> None:
     """Fire-and-forget UPDATE of ``last_used_at`` + ``last_used_ip``
     after a successful submission match. Caller commits."""
@@ -114,21 +109,17 @@ def insert_embed_key(session: AsyncSession, key: EmbedKey) -> None:
 
 async def get_widget_config_for_org(
     session: AsyncSession, org_id: uuid.UUID
-) -> Optional[WidgetConfig]:
+) -> WidgetConfig | None:
     """Single-row widget config keyed by ``org_id``. Used by both the
     authed Settings → Widget read AND the public submission path (the
     public caller bypasses tenant context — the explicit
     ``WHERE org_id = ...`` is the authorisation gate)."""
     return (
-        await session.execute(
-            select(WidgetConfig).where(WidgetConfig.org_id == org_id)
-        )
+        await session.execute(select(WidgetConfig).where(WidgetConfig.org_id == org_id))
     ).scalar_one_or_none()
 
 
-def insert_widget_config(
-    session: AsyncSession, config: WidgetConfig
-) -> None:
+def insert_widget_config(session: AsyncSession, config: WidgetConfig) -> None:
     """Register an already-constructed WidgetConfig for INSERT."""
     session.add(config)
 
@@ -151,16 +142,16 @@ async def list_custom_fields_for_widget_entities(
         (
             await session.execute(
                 select(CustomFieldDefinition)
-                .where(
-                    CustomFieldDefinition.entity_type.in_(entity_types)
-                )
+                .where(CustomFieldDefinition.entity_type.in_(entity_types))
                 .where(CustomFieldDefinition.is_hidden.is_(False))
                 .order_by(
                     CustomFieldDefinition.entity_type,
                     CustomFieldDefinition.display_order,
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
 
@@ -183,16 +174,16 @@ async def list_custom_field_defs_by_keys(
                     CustomFieldDefinition.field_key.in_(field_keys),
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
 
 # --- Submission logs ----------------------------------------------------
 
 
-def insert_submission_log(
-    session: AsyncSession, row: EmbedSubmissionLog
-) -> None:
+def insert_submission_log(session: AsyncSession, row: EmbedSubmissionLog) -> None:
     """Register an already-constructed EmbedSubmissionLog for INSERT."""
     session.add(row)
 
@@ -200,9 +191,9 @@ def insert_submission_log(
 async def list_submission_logs_query(
     session: AsyncSession,
     *,
-    outcome: Optional[EmbedSubmissionOutcome] = None,
-    range_from: Optional[datetime] = None,
-    range_to: Optional[datetime] = None,
+    outcome: EmbedSubmissionOutcome | None = None,
+    range_from: datetime | None = None,
+    range_to: datetime | None = None,
     page: int = 1,
     page_size: int = 25,
 ) -> tuple[list[EmbedSubmissionLog], int]:
@@ -216,19 +207,13 @@ async def list_submission_logs_query(
     if range_to is not None:
         base = base.where(EmbedSubmissionLog.created_at <= range_to)
 
-    total = (
-        await session.execute(
-            select(func.count()).select_from(base.subquery())
-        )
-    ).scalar_one()
+    total = (await session.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
 
     offset = (page - 1) * page_size
     rows = (
         (
             await session.execute(
-                base.order_by(EmbedSubmissionLog.created_at.desc())
-                .offset(offset)
-                .limit(page_size)
+                base.order_by(EmbedSubmissionLog.created_at.desc()).offset(offset).limit(page_size)
             )
         )
         .scalars()
@@ -272,9 +257,7 @@ async def submission_daily_outcome_buckets(
         (
             await session.execute(
                 select(
-                    func.date_trunc(
-                        "day", EmbedSubmissionLog.created_at
-                    ).label("day"),
+                    func.date_trunc("day", EmbedSubmissionLog.created_at).label("day"),
                     EmbedSubmissionLog.outcome,
                     func.count(EmbedSubmissionLog.id),
                 )
@@ -286,15 +269,11 @@ async def submission_daily_outcome_buckets(
     )
 
 
-async def delete_submission_logs_older_than(
-    session: AsyncSession, cutoff: datetime
-) -> int:
+async def delete_submission_logs_older_than(session: AsyncSession, cutoff: datetime) -> int:
     """Bulk DELETE older than ``cutoff``. Returns the row count
     purged. Caller commits."""
     result = await session.execute(
-        delete(EmbedSubmissionLog).where(
-            EmbedSubmissionLog.created_at < cutoff
-        )
+        delete(EmbedSubmissionLog).where(EmbedSubmissionLog.created_at < cutoff)
     )
     return int(result.rowcount or 0)
 

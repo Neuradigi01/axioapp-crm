@@ -17,6 +17,7 @@ The list endpoint is read-only and intentionally gates on the same
 manage key — junior staff don't need visibility into the flow
 library; that's a future split if/when we add a "flow author" role.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -41,7 +42,6 @@ from src.app.core.integrations.whatsapp.flows_service import (
 from src.app.core.integrations.whatsapp.models import WhatsAppFlow
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(
     prefix="/whatsapp/flows",
@@ -96,9 +96,7 @@ class _TemplateOut(BaseModel):
 
 @router.get("/templates", response_model=list[_TemplateOut])
 async def list_templates_endpoint(
-    _user: User = Depends(
-        require_permissions("whatsapp.flows.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.flows.manage")),
 ) -> list[_TemplateOut]:
     """Bundled templates for the SPA picker. Returns the four
     starter options (appointment_booking / lead_capture / feedback
@@ -110,15 +108,13 @@ async def list_templates_endpoint(
 @router.get("", response_model=list[_FlowOut])
 async def list_flows_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.flows.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.flows.manage")),
 ) -> list[_FlowOut]:
     rows = (
-        await db.execute(
-            select(WhatsAppFlow).order_by(WhatsAppFlow.created_at.desc())
-        )
-    ).scalars().all()
+        (await db.execute(select(WhatsAppFlow).order_by(WhatsAppFlow.created_at.desc())))
+        .scalars()
+        .all()
+    )
     return [_FlowOut.model_validate(r) for r in rows]
 
 
@@ -130,14 +126,10 @@ async def list_flows_endpoint(
 async def create_flow_endpoint(
     payload: _FlowCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.flows.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.flows.manage")),
 ) -> _FlowOut:
     try:
-        definition = payload.json_definition or load_template(
-            payload.category
-        )
+        definition = payload.json_definition or load_template(payload.category)
     except FlowsServiceError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -168,9 +160,7 @@ async def create_flow_endpoint(
 async def get_flow_endpoint(
     flow_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.flows.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.flows.manage")),
 ) -> _FlowOut:
     flow = await _resolve_flow(db, flow_id)
     return _FlowOut.model_validate(flow)
@@ -181,9 +171,7 @@ async def update_flow_endpoint(
     flow_id: uuid.UUID,
     payload: _FlowUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.flows.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.flows.manage")),
 ) -> _FlowOut:
     flow = await _resolve_flow(db, flow_id)
     if payload.name is not None:
@@ -202,15 +190,11 @@ async def update_flow_endpoint(
     return _FlowOut.model_validate(flow)
 
 
-@router.delete(
-    "/{flow_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/{flow_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_flow_endpoint(
     flow_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.flows.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.flows.manage")),
 ) -> Response:
     flow = await _resolve_flow(db, flow_id)
     await delete_flow(db, flow=flow)
@@ -221,17 +205,13 @@ async def delete_flow_endpoint(
 async def publish_flow_endpoint(
     flow_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.flows.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.flows.manage")),
 ) -> _FlowOut:
     flow = await _resolve_flow(db, flow_id)
     try:
         flow = await publish_flow(db, flow=flow)
     except FlowsServiceError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return _FlowOut.model_validate(flow)
 
 
@@ -243,29 +223,19 @@ async def test_send_endpoint(
     flow_id: uuid.UUID,
     payload: _TestSendRequest,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(
-        require_permissions("whatsapp.flows.manage")
-    ),
+    _user: User = Depends(require_permissions("whatsapp.flows.manage")),
 ) -> dict[str, Any]:
     flow = await _resolve_flow(db, flow_id)
     try:
-        meta_response = await test_send_flow(
-            db, flow=flow, to_phone=payload.to_phone
-        )
+        meta_response = await test_send_flow(db, flow=flow, to_phone=payload.to_phone)
     except FlowsServiceError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return {"sent": True, "meta": meta_response}
 
 
-async def _resolve_flow(
-    db: AsyncSession, flow_id: uuid.UUID
-) -> WhatsAppFlow:
+async def _resolve_flow(db: AsyncSession, flow_id: uuid.UUID) -> WhatsAppFlow:
     flow = (
-        await db.execute(
-            select(WhatsAppFlow).where(WhatsAppFlow.id == flow_id)
-        )
+        await db.execute(select(WhatsAppFlow).where(WhatsAppFlow.id == flow_id))
     ).scalar_one_or_none()
     if flow is None:
         raise HTTPException(

@@ -21,12 +21,13 @@ Three concerns live here:
      no-op (with a log line) when no handler is registered. Lets
      Steps 4 + 5 ship in either order.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Awaitable, Callable, Optional
 
 import redis.asyncio as aioredis
 
@@ -37,7 +38,6 @@ from config import (
     REDIS_PORT,
 )
 from src.app.core.email.models import EmailAccount
-
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ _LOCK_TTL_SECONDS = 300
 # --- Redis client (lazy module-level) ------------------------------------
 
 
-_redis_client: Optional[aioredis.Redis] = None
+_redis_client: aioredis.Redis | None = None
 
 
 def _redis() -> aioredis.Redis:
@@ -116,9 +116,7 @@ def enqueue_renewal(account_id: uuid.UUID) -> None:
 
         renew_account_watch.delay(str(account_id))
     except Exception:
-        logger.exception(
-            "enqueue_renewal failed for account=%s", account_id
-        )
+        logger.exception("enqueue_renewal failed for account=%s", account_id)
 
 
 # --- Per-account lock ----------------------------------------------------
@@ -136,9 +134,7 @@ async def account_lock(account_id: uuid.UUID):
     key = f"email_sync:{account_id}"
     client = _redis()
     try:
-        acquired = await client.set(
-            key, "1", nx=True, ex=_LOCK_TTL_SECONDS
-        )
+        acquired = await client.set(key, "1", nx=True, ex=_LOCK_TTL_SECONDS)
     except Exception:
         # Redis transient failure — fail open. Better to risk a
         # double-sync (idempotent because the cursor + matched-set
@@ -159,8 +155,7 @@ async def account_lock(account_id: uuid.UUID):
             await client.delete(key)
         except Exception:
             logger.exception(
-                "account_lock: Redis DEL failed for %s "
-                "(lock expires via TTL anyway)",
+                "account_lock: Redis DEL failed for %s (lock expires via TTL anyway)",
                 account_id,
             )
 
@@ -182,7 +177,7 @@ notifications.
 """
 
 
-_inbound_handler: Optional[InboundHandler] = None
+_inbound_handler: InboundHandler | None = None
 
 
 def register_inbound_handler(handler: InboundHandler) -> None:
@@ -198,15 +193,12 @@ def _clear_inbound_handler_for_tests() -> None:
     _inbound_handler = None
 
 
-async def dispatch_inbound(
-    account: EmailAccount, matched: dict
-) -> None:
+async def dispatch_inbound(account: EmailAccount, matched: dict) -> None:
     """Hand a matched message to the registered handler. No-op +
     log when no handler is registered (Step 5 not yet shipped)."""
     if _inbound_handler is None:
         logger.debug(
-            "dispatch_inbound: no handler registered; "
-            "account=%s message_id=%s",
+            "dispatch_inbound: no handler registered; account=%s message_id=%s",
             account.id,
             matched.get("message_id"),
         )

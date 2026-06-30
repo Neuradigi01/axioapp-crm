@@ -13,10 +13,11 @@ Six cases:
   6. `GET /tasks/all?sort_by=last_activity_at&sort_dir=desc` returns
      newest-activity-first (NULLs last).
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -40,9 +41,7 @@ async def _grant(role_id: uuid.UUID, *keys: str) -> None:
             await session.execute(
                 pg_insert(RolePermission)
                 .values(role_id=role_id, permission_id=perm.id)
-                .on_conflict_do_nothing(
-                    index_elements=["role_id", "permission_id"]
-                )
+                .on_conflict_do_nothing(index_elements=["role_id", "permission_id"])
             )
         await session.commit()
 
@@ -84,9 +83,7 @@ async def _seed_task(
 
 
 @pytest.mark.asyncio
-async def test_activity_insert_bumps_task_last_activity_at(
-    layered_client, seeded_admin
-):
+async def test_activity_insert_bumps_task_last_activity_at(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -123,18 +120,14 @@ async def test_activity_insert_bumps_task_last_activity_at(
     ctx = set_context(RequestContext(org_id=org.id))
     try:
         async with TestSession() as session:
-            row = (
-                await session.execute(select(Task).where(Task.id == task_id))
-            ).scalar_one()
+            row = (await session.execute(select(Task).where(Task.id == task_id))).scalar_one()
             assert row.last_activity_at is not None
     finally:
         reset_context(ctx)
 
 
 @pytest.mark.asyncio
-async def test_update_task_bumps_last_activity_at(
-    layered_client, seeded_admin
-):
+async def test_update_task_bumps_last_activity_at(layered_client, seeded_admin):
     """A title edit doesn't create an activity row, but the user
     still expects `last_activity_at` to reflect the edit."""
     from tests.conftest import TestSession
@@ -162,18 +155,14 @@ async def test_update_task_bumps_last_activity_at(
     ctx = set_context(RequestContext(org_id=org.id))
     try:
         async with TestSession() as session:
-            row = (
-                await session.execute(select(Task).where(Task.id == task_id))
-            ).scalar_one()
+            row = (await session.execute(select(Task).where(Task.id == task_id))).scalar_one()
             assert row.last_activity_at is not None
     finally:
         reset_context(ctx)
 
 
 @pytest.mark.asyncio
-async def test_bulk_reassign_writes_activity_per_row(
-    layered_client, seeded_admin
-):
+async def test_bulk_reassign_writes_activity_per_row(layered_client, seeded_admin):
     from tests.conftest import TestSession
 
     org = seeded_admin["org"]
@@ -192,6 +181,7 @@ async def test_bulk_reassign_writes_activity_per_row(
     # so we can use it as a temporary owner.
     async with TestSession() as session:
         from sqlalchemy import text as sql_text
+
         await session.execute(
             sql_text("INSERT INTO users (id) VALUES (:u) ON CONFLICT DO NOTHING"),
             {"u": str(other_uuid)},
@@ -231,28 +221,28 @@ async def test_bulk_reassign_writes_activity_per_row(
     try:
         async with TestSession() as session:
             for tid in ids:
-                row = (
-                    await session.execute(select(Task).where(Task.id == tid))
-                ).scalar_one()
+                row = (await session.execute(select(Task).where(Task.id == tid))).scalar_one()
                 assert row.assigned_to_id == user.legacy_uuid
 
             activities = (
-                await session.execute(
-                    select(Activity)
-                    .where(Activity.entity_type == "task")
-                    .where(Activity.entity_id.in_(ids))
-                    .where(Activity.type == ActivityType.reassign)
+                (
+                    await session.execute(
+                        select(Activity)
+                        .where(Activity.entity_type == "task")
+                        .where(Activity.entity_id.in_(ids))
+                        .where(Activity.type == ActivityType.reassign)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             assert len(activities) == 3
     finally:
         reset_context(ctx)
 
 
 @pytest.mark.asyncio
-async def test_bulk_mark_done_partial_success_with_already_done(
-    layered_client, seeded_admin
-):
+async def test_bulk_mark_done_partial_success_with_already_done(layered_client, seeded_admin):
     """Mixing open + already-done tasks → `{done, skipped}` split."""
     org = seeded_admin["org"]
     user = seeded_admin["user"]
@@ -294,9 +284,7 @@ async def test_bulk_delete_removes_rows(layered_client, seeded_admin):
     user = seeded_admin["user"]
     await _grant(seeded_admin["role"].id, "tasks.read", "tasks.write")
     ids = [
-        await _seed_task(
-            org.id, assigned_to_id=user.legacy_uuid, title=f"Drop {i}"
-        )
+        await _seed_task(org.id, assigned_to_id=user.legacy_uuid, title=f"Drop {i}")
         for i in range(2)
     ]
 
@@ -320,24 +308,20 @@ async def test_bulk_delete_removes_rows(layered_client, seeded_admin):
     try:
         async with TestSession() as session:
             remaining = (
-                await session.execute(select(Task).where(Task.id.in_(ids)))
-            ).scalars().all()
+                (await session.execute(select(Task).where(Task.id.in_(ids)))).scalars().all()
+            )
             assert remaining == []
     finally:
         reset_context(ctx)
 
 
 @pytest.mark.asyncio
-async def test_list_sort_by_last_activity_desc_nulls_last(
-    layered_client, seeded_admin
-):
+async def test_list_sort_by_last_activity_desc_nulls_last(layered_client, seeded_admin):
     org = seeded_admin["org"]
     user = seeded_admin["user"]
-    await _grant(
-        seeded_admin["role"].id, "tasks.read", "tasks.write", "users.read"
-    )
+    await _grant(seeded_admin["role"].id, "tasks.read", "tasks.write", "users.read")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     older = await _seed_task(
         org.id,
         assigned_to_id=user.legacy_uuid,
@@ -350,9 +334,7 @@ async def test_list_sort_by_last_activity_desc_nulls_last(
         title="Newer activity",
         last_activity_at=now - timedelta(minutes=10),
     )
-    never = await _seed_task(
-        org.id, assigned_to_id=user.legacy_uuid, title="Never touched"
-    )
+    never = await _seed_task(org.id, assigned_to_id=user.legacy_uuid, title="Never touched")
 
     token = await _login(
         layered_client,

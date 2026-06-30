@@ -12,12 +12,12 @@ queries:
 - `(org_id, assigned_to_id, status, due_at)` — "my open tasks, by due date".
 - `(org_id, related_entity_type, related_entity_id)` — "tasks on this contact".
 """
+
 from __future__ import annotations
 
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import DateTime, String, Text, text
 from sqlalchemy.dialects.postgresql import ENUM, UUID
@@ -61,20 +61,14 @@ class Task(Base, TenantScoped):
         server_default=text("gen_random_uuid()"),
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    due_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     assigned_to_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         nullable=False,
     )
-    related_entity_type: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True
-    )
-    related_entity_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    related_entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    related_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     status: Mapped[TaskStatus] = mapped_column(
         task_status_enum,
         nullable=False,
@@ -90,7 +84,7 @@ class Task(Base, TenantScoped):
     # paths (update_task) so even no-activity edits (title fixes,
     # priority shuffles) refresh recency. Mirrors contacts / leads /
     # walk-ins / appointments.
-    last_activity_at: Mapped[Optional[datetime]] = mapped_column(
+    last_activity_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

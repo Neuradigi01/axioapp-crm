@@ -34,6 +34,7 @@ Two field categories:
     handles them; the in-memory evaluator raises if asked, which is
     why scoring rules can't reference them.
 """
+
 from __future__ import annotations
 
 import enum
@@ -49,37 +50,49 @@ from sqlalchemy.sql.elements import ColumnElement
 from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead
 
-
 # --- whitelist tables -------------------------------------------------------
 
-LEAD_DIRECT_FIELDS: frozenset[str] = frozenset({
-    "status",
-    "source",
-    "assigned_to_id",
-    "lead_score",
-    "budget",
-    "last_activity_at",
-    "created_at",
-    "expected_close_date",
-    "pipeline_stage",
-})
+LEAD_DIRECT_FIELDS: frozenset[str] = frozenset(
+    {
+        "status",
+        "source",
+        "assigned_to_id",
+        "lead_score",
+        "budget",
+        "last_activity_at",
+        "created_at",
+        "expected_close_date",
+        "pipeline_stage",
+    }
+)
 
-CONTACT_JOINED_FIELDS: frozenset[str] = frozenset({
-    "contact_name",
-    "contact_phone",
-    "contact_email",
-})
+CONTACT_JOINED_FIELDS: frozenset[str] = frozenset(
+    {
+        "contact_name",
+        "contact_phone",
+        "contact_email",
+    }
+)
 
 ALL_FIELDS: frozenset[str] = LEAD_DIRECT_FIELDS | CONTACT_JOINED_FIELDS
 
-OPS: frozenset[str] = frozenset({
-    "eq", "neq",
-    "in", "nin",
-    "gt", "gte", "lt", "lte",
-    "contains", "starts_with",
-    "between",
-    "is_empty", "is_not_empty",
-})
+OPS: frozenset[str] = frozenset(
+    {
+        "eq",
+        "neq",
+        "in",
+        "nin",
+        "gt",
+        "gte",
+        "lt",
+        "lte",
+        "contains",
+        "starts_with",
+        "between",
+        "is_empty",
+        "is_not_empty",
+    }
+)
 
 # Ops that don't need a `value` (the field is being tested for null).
 _VALUELESS_OPS: frozenset[str] = frozenset({"is_empty", "is_not_empty"})
@@ -149,18 +162,14 @@ def parse(dsl: Any) -> Filter:
 
     extra_keys = set(dsl) - {"all", "any"}
     if extra_keys:
-        raise FilterDslError(
-            f"filter has unsupported top-level keys: {sorted(extra_keys)}"
-        )
+        raise FilterDslError(f"filter has unsupported top-level keys: {sorted(extra_keys)}")
 
     all_clauses = _parse_clause_list(dsl.get("all"), group="all")
     any_clauses = _parse_clause_list(dsl.get("any"), group="any")
 
     total = len(all_clauses) + len(any_clauses)
     if total > MAX_CLAUSES:
-        raise FilterDslError(
-            f"filter has {total} clauses; max is {MAX_CLAUSES}"
-        )
+        raise FilterDslError(f"filter has {total} clauses; max is {MAX_CLAUSES}")
 
     return Filter(all_=all_clauses, any_=any_clauses)
 
@@ -212,13 +221,9 @@ def matches(filter_: Filter, *, lead: Lead) -> bool:
     if filter_.is_empty():
         return True
 
-    if filter_.all_ and not all(
-        _clause_matches(c, lead) for c in filter_.all_
-    ):
+    if filter_.all_ and not all(_clause_matches(c, lead) for c in filter_.all_):
         return False
-    if filter_.any_ and not any(
-        _clause_matches(c, lead) for c in filter_.any_
-    ):
+    if filter_.any_ and not any(_clause_matches(c, lead) for c in filter_.any_):
         return False
     return True
 
@@ -261,43 +266,31 @@ def _parse_clause(raw: Any, *, group: str, index: int) -> Clause:
         raise FilterDslError(f"{where} must be an object")
     extra = set(raw) - {"field", "op", "value"}
     if extra:
-        raise FilterDslError(
-            f"{where} has unsupported keys: {sorted(extra)}"
-        )
+        raise FilterDslError(f"{where} has unsupported keys: {sorted(extra)}")
 
     field_ = raw.get("field")
     op = raw.get("op")
     if not isinstance(field_, str) or not field_:
         raise FilterDslError(f"{where}.field is required and must be a string")
     if not isinstance(op, str) or op not in OPS:
-        raise FilterDslError(
-            f"{where}.op {op!r} is not one of {sorted(OPS)}"
-        )
+        raise FilterDslError(f"{where}.op {op!r} is not one of {sorted(OPS)}")
 
     if field_.startswith(_CUSTOM_PREFIX):
-        key = field_[len(_CUSTOM_PREFIX):]
+        key = field_[len(_CUSTOM_PREFIX) :]
         if not key or len(key) > _MAX_CUSTOM_KEY_LEN:
-            raise FilterDslError(
-                f"{where}.field has an invalid custom_data key {key!r}"
-            )
+            raise FilterDslError(f"{where}.field has an invalid custom_data key {key!r}")
         # Key existence in custom_field_definitions is checked later by
         # the SQL builder (it needs the per-org set).
     elif field_ not in ALL_FIELDS:
-        raise FilterDslError(
-            f"{where}.field {field_!r} is not a recognised lead field"
-        )
+        raise FilterDslError(f"{where}.field {field_!r} is not a recognised lead field")
 
     value = raw.get("value")
     if op in _VALUELESS_OPS:
         if value is not None:
-            raise FilterDslError(
-                f"{where}: op {op!r} must not carry a value"
-            )
+            raise FilterDslError(f"{where}: op {op!r} must not carry a value")
     else:
         if "value" not in raw:
-            raise FilterDslError(
-                f"{where}: op {op!r} requires a 'value' key"
-            )
+            raise FilterDslError(f"{where}: op {op!r} requires a 'value' key")
 
     return Clause(field=field_, op=op, value=value)
 
@@ -308,9 +301,7 @@ def _clause_to_sql(
 ) -> tuple[ColumnElement, bool]:
     """Compile one clause → SQL boolean expression. Returns
     ``(expr, needs_contact_join)``."""
-    col, is_contact, py_type = _resolve_column(
-        clause.field, allowed_custom_keys
-    )
+    col, is_contact, py_type = _resolve_column(clause.field, allowed_custom_keys)
 
     if clause.op == "is_empty":
         return col.is_(None), is_contact
@@ -325,9 +316,7 @@ def _clause_to_sql(
     if clause.op == "between":
         values = _coerce_sequence(clause.value, py_type, clause.field)
         if len(values) != 2:
-            raise FilterDslError(
-                f"clause {clause.field}: 'between' needs a 2-element list"
-            )
+            raise FilterDslError(f"clause {clause.field}: 'between' needs a 2-element list")
         lo, hi = values
         return col.between(lo, hi), is_contact
 
@@ -347,15 +336,11 @@ def _clause_to_sql(
         return col <= scalar, is_contact
     if clause.op == "contains":
         if not isinstance(scalar, str):
-            raise FilterDslError(
-                f"clause {clause.field}: 'contains' needs a string value"
-            )
+            raise FilterDslError(f"clause {clause.field}: 'contains' needs a string value")
         return col.ilike(f"%{scalar}%"), is_contact
     if clause.op == "starts_with":
         if not isinstance(scalar, str):
-            raise FilterDslError(
-                f"clause {clause.field}: 'starts_with' needs a string value"
-            )
+            raise FilterDslError(f"clause {clause.field}: 'starts_with' needs a string value")
         return col.ilike(f"{scalar}%"), is_contact
 
     # Unreachable: parser already rejected unknown ops.
@@ -371,12 +356,9 @@ def _resolve_column(
     Returns ``(column, is_contact_joined, py_type)``.
     """
     if field_name.startswith(_CUSTOM_PREFIX):
-        key = field_name[len(_CUSTOM_PREFIX):]
+        key = field_name[len(_CUSTOM_PREFIX) :]
         if allowed_custom_keys is not None and key not in allowed_custom_keys:
-            raise FilterDslError(
-                f"custom_data.{key!r} is not a defined custom field for "
-                "this org"
-            )
+            raise FilterDslError(f"custom_data.{key!r} is not a defined custom field for this org")
         return Lead.custom_data[key].astext, False, "str"
 
     if field_name == "contact_name":
@@ -394,9 +376,7 @@ def _resolve_column(
 def _coerce_scalar(value: Any, py_type: str, field_name: str) -> Any:
     """Coerce a JSON-decoded value into the Python type the column expects."""
     if value is None:
-        raise FilterDslError(
-            f"clause {field_name}: value cannot be null (use is_empty)"
-        )
+        raise FilterDslError(f"clause {field_name}: value cannot be null (use is_empty)")
     try:
         if py_type == "str":
             if not isinstance(value, (str, int, float)):
@@ -406,9 +386,7 @@ def _coerce_scalar(value: Any, py_type: str, field_name: str) -> Any:
             return str(value)
         if py_type == "int":
             if isinstance(value, bool):
-                raise FilterDslError(
-                    f"clause {field_name}: expected int, got bool"
-                )
+                raise FilterDslError(f"clause {field_name}: expected int, got bool")
             return int(value)
         if py_type == "decimal":
             return Decimal(str(value))
@@ -429,17 +407,11 @@ def _coerce_scalar(value: Any, py_type: str, field_name: str) -> Any:
     raise FilterDslError(f"unhandled py_type {py_type!r}")
 
 
-def _coerce_sequence(
-    value: Any, py_type: str, field_name: str
-) -> list[Any]:
+def _coerce_sequence(value: Any, py_type: str, field_name: str) -> list[Any]:
     if not isinstance(value, (list, tuple)):
-        raise FilterDslError(
-            f"clause {field_name}: expected a list of values"
-        )
+        raise FilterDslError(f"clause {field_name}: expected a list of values")
     if not value:
-        raise FilterDslError(
-            f"clause {field_name}: value list cannot be empty"
-        )
+        raise FilterDslError(f"clause {field_name}: value list cannot be empty")
     return [_coerce_scalar(v, py_type, field_name) for v in value]
 
 
@@ -449,12 +421,11 @@ def _coerce_sequence(
 def _clause_matches(clause: Clause, lead: Lead) -> bool:
     if clause.field in CONTACT_JOINED_FIELDS:
         raise FilterDslError(
-            f"in-memory eval does not support contact-joined field "
-            f"{clause.field!r}"
+            f"in-memory eval does not support contact-joined field {clause.field!r}"
         )
 
     if clause.field.startswith(_CUSTOM_PREFIX):
-        key = clause.field[len(_CUSTOM_PREFIX):]
+        key = clause.field[len(_CUSTOM_PREFIX) :]
         lead_value: Any = (lead.custom_data or {}).get(key)
         py_type = "str"
     else:
@@ -481,9 +452,7 @@ def _clause_matches(clause: Clause, lead: Lead) -> bool:
     if op == "between":
         values = _coerce_sequence(clause.value, py_type, clause.field)
         if len(values) != 2:
-            raise FilterDslError(
-                f"clause {clause.field}: 'between' needs a 2-element list"
-            )
+            raise FilterDslError(f"clause {clause.field}: 'between' needs a 2-element list")
         lo, hi = values
         return _between(lead_value, lo, hi)
 

@@ -20,13 +20,12 @@ Neither function fetches the raw MIME — that's a separate call by
 the consumer via `GraphClient.get_message_raw(...)`. The metadata
 fetch path keeps backfill cheap on large mailboxes.
 """
+
 from __future__ import annotations
 
-import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,7 +33,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.contacts.models import Contact
 from src.app.core.email.microsoft.client import GraphClient, GraphHTTPError
 from src.app.core.email.models import EmailAccount
-
 
 # Page size for filter walks. Graph max is 1000 but smaller pages
 # play nicer with the per-tenant 10K/10min rate limit when many
@@ -71,7 +69,7 @@ class MatchedMessage:
     """
 
     graph_message_id: str
-    graph_conversation_id: Optional[str]
+    graph_conversation_id: str | None
     headers: dict[str, str]
     matched_contact_id: uuid.UUID
 
@@ -80,7 +78,7 @@ class MatchedMessage:
 class SyncResult:
     matched: list[MatchedMessage] = field(default_factory=list)
     scanned_count: int = 0
-    new_cursor: Optional[str] = None
+    new_cursor: str | None = None
     truncated: bool = False
     delta_link_expired: bool = False
 
@@ -92,7 +90,7 @@ async def backfill(
     account: EmailAccount,
     session: AsyncSession,
     *,
-    client: Optional[GraphClient] = None,
+    client: GraphClient | None = None,
     days: int = 30,
 ) -> SyncResult:
     """Filter-walk the last `days` of /me/messages, return matched
@@ -100,13 +98,11 @@ async def backfill(
     sync to pick up from.
     """
     gc = client or GraphClient(account=account, session=session)
-    cutoff = (
-        datetime.now(timezone.utc) - timedelta(days=days)
-    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cutoff = (datetime.now(UTC) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     filter_expr = f"receivedDateTime ge {cutoff}"
 
     result = SyncResult()
-    next_link: Optional[str] = None
+    next_link: str | None = None
 
     # Phase 1: filter walk.
     while True:
@@ -142,7 +138,7 @@ async def sync_incremental(
     account: EmailAccount,
     session: AsyncSession,
     *,
-    client: Optional[GraphClient] = None,
+    client: GraphClient | None = None,
 ) -> SyncResult:
     """Walk the stored deltaLink chain and collect matched messages.
 
@@ -153,14 +149,13 @@ async def sync_incremental(
     """
     if not account.sync_cursor:
         raise RuntimeError(
-            f"email_account {account.id} has no sync_cursor — "
-            "run backfill() first to seed it."
+            f"email_account {account.id} has no sync_cursor — run backfill() first to seed it."
         )
     gc = client or GraphClient(account=account, session=session)
     result = SyncResult()
 
-    next_url: Optional[str] = account.sync_cursor
-    last_delta_link: Optional[str] = None
+    next_url: str | None = account.sync_cursor
+    last_delta_link: str | None = None
 
     while next_url:
         try:
@@ -196,7 +191,7 @@ async def sync_incremental(
 # --- Internals -----------------------------------------------------------
 
 
-async def _seed_delta_cursor(gc: GraphClient) -> Optional[str]:
+async def _seed_delta_cursor(gc: GraphClient) -> str | None:
     """Walk `/me/messages/delta` quickly to obtain the current
     `@odata.deltaLink` — that's the "from this moment on" cursor.
 
@@ -206,15 +201,13 @@ async def _seed_delta_cursor(gc: GraphClient) -> Optional[str]:
     a one-time seed. If we hit the cap without seeing a deltaLink,
     return None and the caller falls back to a full re-backfill on
     next sync."""
-    next_url: Optional[str] = None
+    next_url: str | None = None
     pages = 0
     while pages < 50:
         if next_url:
             envelope = await gc.get_absolute(next_url)
         else:
-            envelope = await gc.list_messages_delta(
-                select="id", top=_PAGE_SIZE
-            )
+            envelope = await gc.list_messages_delta(select="id", top=_PAGE_SIZE)
         delta_link = envelope.get("@odata.deltaLink")
         if delta_link:
             return delta_link
@@ -225,9 +218,7 @@ async def _seed_delta_cursor(gc: GraphClient) -> Optional[str]:
     return None
 
 
-async def _match_one(
-    detail: dict, session: AsyncSession
-) -> Optional[MatchedMessage]:
+async def _match_one(detail: dict, session: AsyncSession) -> MatchedMessage | None:
     """Return a `MatchedMessage` if any participant in `detail`
     matches a known contact in the active tenant.
 
@@ -289,7 +280,7 @@ def _extract_headers(detail: dict) -> dict[str, str]:
     if from_obj.get("address"):
         name = from_obj.get("name") or ""
         addr = from_obj["address"]
-        headers["from"] = f'{name} <{addr}>' if name else addr
+        headers["from"] = f"{name} <{addr}>" if name else addr
     headers["to"] = _format_recipient_list(detail.get("toRecipients"))
     cc = _format_recipient_list(detail.get("ccRecipients"))
     if cc:
@@ -320,7 +311,7 @@ def _format_recipient_list(recipients) -> str:
         if not addr:
             continue
         name = ea.get("name") or ""
-        parts.append(f'{name} <{addr}>' if name else addr)
+        parts.append(f"{name} <{addr}>" if name else addr)
     return ", ".join(parts)
 
 

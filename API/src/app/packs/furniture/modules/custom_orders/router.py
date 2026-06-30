@@ -11,10 +11,10 @@ Permissions:
   - `custom_orders.write` → create / update / delete / measurements / photos
   - `custom_orders.move`  → move-stage
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import (
     APIRouter,
@@ -57,7 +57,6 @@ from src.app.packs.furniture.modules.custom_orders.service import (
 )
 from src.app.shared.db import get_db
 
-
 router = APIRouter(prefix="/custom-orders", tags=["Custom Orders"])
 
 
@@ -66,9 +65,9 @@ router = APIRouter(prefix="/custom-orders", tags=["Custom Orders"])
 
 @router.get("", response_model=CustomOrderListResponse)
 async def list_orders_endpoint(
-    stage: Optional[str] = Query(default=None, max_length=64),
-    assigned_to_id: Optional[uuid.UUID] = Query(default=None),
-    contact_id: Optional[uuid.UUID] = Query(default=None),
+    stage: str | None = Query(default=None, max_length=64),
+    assigned_to_id: uuid.UUID | None = Query(default=None),
+    contact_id: uuid.UUID | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -100,9 +99,7 @@ async def create_order_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("custom_orders.write")),
 ) -> CustomOrderOut:
-    order = await create_order(
-        db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload
-    )
+    order = await create_order(db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload)
     return CustomOrderOut.model_validate(order)
 
 
@@ -160,9 +157,7 @@ async def move_stage_endpoint(
 # --- measurements -------------------------------------------------------
 
 
-@router.get(
-    "/{order_id}/measurements", response_model=list[MeasurementOut]
-)
+@router.get("/{order_id}/measurements", response_model=list[MeasurementOut])
 async def list_measurements_endpoint(
     order_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -210,7 +205,7 @@ async def list_photos_endpoint(
 async def upload_photo_endpoint(
     order_id: uuid.UUID,
     file: UploadFile = File(...),
-    caption: Optional[str] = Form(default=None),
+    caption: str | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("custom_orders.write")),
 ) -> PhotoOut:
@@ -243,9 +238,7 @@ async def upload_photo_endpoint(
 # --- stage history reads -----------------------------------------------
 
 
-@router.get(
-    "/{order_id}/stage-history", response_model=list[StageHistoryOut]
-)
+@router.get("/{order_id}/stage-history", response_model=list[StageHistoryOut])
 async def list_stage_history_endpoint(
     order_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

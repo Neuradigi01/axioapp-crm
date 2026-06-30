@@ -1,4 +1,5 @@
 """Stock alerts open / close in lockstep with qty_on_hand vs reorder_level."""
+
 from __future__ import annotations
 
 import uuid
@@ -9,12 +10,12 @@ from sqlalchemy import select
 from src.app.packs.furniture.modules.inventory.models import (
     AlertSeverity,
     AlertStatus,
-    InventoryItem,
     MovementType,
     StockAlert,
 )
 from src.app.packs.furniture.modules.inventory.schemas import (
     InventoryItemCreate,
+    InventoryItemUpdate,
     WarehouseCreate,
 )
 from src.app.packs.furniture.modules.inventory.service import (
@@ -22,9 +23,6 @@ from src.app.packs.furniture.modules.inventory.service import (
     create_warehouse,
     record_movement,
     update_item,
-)
-from src.app.packs.furniture.modules.inventory.schemas import (
-    InventoryItemUpdate,
 )
 
 
@@ -56,9 +54,7 @@ async def _open_alert(test_db, item_id: uuid.UUID):
 
 
 @pytest.mark.asyncio
-async def test_alert_opened_when_qty_zero_and_reorder_positive(
-    test_db, seeded_admin
-):
+async def test_alert_opened_when_qty_zero_and_reorder_positive(test_db, seeded_admin):
     org = seeded_admin["org"]
     item = await _make_item(test_db, org.id, reorder_level=5)
     # Fresh item: qty_on_hand=0, reorder_level=5 → out-of-stock alert
@@ -76,16 +72,17 @@ async def test_alert_closes_when_restocked(test_db, seeded_admin):
 
     # Receipt 10 → qty_on_hand=10, above reorder_level=5 → alert closes
     await record_movement(
-        test_db, item_id=item.id, user_id=user.id,
-        type_=MovementType.receipt, qty=10,
+        test_db,
+        item_id=item.id,
+        user_id=user.id,
+        type_=MovementType.receipt,
+        qty=10,
     )
     assert (await _open_alert(test_db, item.id)) is None
 
 
 @pytest.mark.asyncio
-async def test_alert_low_then_out_when_dispatched_below_reorder(
-    test_db, seeded_admin
-):
+async def test_alert_low_then_out_when_dispatched_below_reorder(test_db, seeded_admin):
     """Dispatch 7 from on_hand=10, reorder_level=5 → on_hand=3 → low.
     Dispatch 3 more → on_hand=0 → out (severity upgraded on same alert).
     """
@@ -93,23 +90,32 @@ async def test_alert_low_then_out_when_dispatched_below_reorder(
     user = seeded_admin["user"]
     item = await _make_item(test_db, org.id, reorder_level=5)
     await record_movement(
-        test_db, item_id=item.id, user_id=user.id,
-        type_=MovementType.receipt, qty=10,
+        test_db,
+        item_id=item.id,
+        user_id=user.id,
+        type_=MovementType.receipt,
+        qty=10,
     )
     # No alert at on_hand=10 > reorder=5.
     assert (await _open_alert(test_db, item.id)) is None
 
     await record_movement(
-        test_db, item_id=item.id, user_id=user.id,
-        type_=MovementType.dispatch, qty=7,
+        test_db,
+        item_id=item.id,
+        user_id=user.id,
+        type_=MovementType.dispatch,
+        qty=7,
     )
     alert = await _open_alert(test_db, item.id)
     assert alert is not None
     assert alert.severity == AlertSeverity.low
 
     await record_movement(
-        test_db, item_id=item.id, user_id=user.id,
-        type_=MovementType.dispatch, qty=3,
+        test_db,
+        item_id=item.id,
+        user_id=user.id,
+        type_=MovementType.dispatch,
+        qty=3,
     )
     alert = await _open_alert(test_db, item.id)
     assert alert is not None
@@ -131,13 +137,17 @@ async def test_raising_reorder_level_opens_alert(test_db, seeded_admin):
     user = seeded_admin["user"]
     item = await _make_item(test_db, org.id, reorder_level=0)
     await record_movement(
-        test_db, item_id=item.id, user_id=user.id,
-        type_=MovementType.receipt, qty=3,
+        test_db,
+        item_id=item.id,
+        user_id=user.id,
+        type_=MovementType.receipt,
+        qty=3,
     )
     assert (await _open_alert(test_db, item.id)) is None
 
     await update_item(
-        test_db, item_id=item.id,
+        test_db,
+        item_id=item.id,
         payload=InventoryItemUpdate(reorder_level=5),
     )
     alert = await _open_alert(test_db, item.id)
@@ -151,8 +161,11 @@ async def test_suggested_reorder_qty_doubled_minus_on_hand(test_db, seeded_admin
     user = seeded_admin["user"]
     item = await _make_item(test_db, org.id, reorder_level=10)
     await record_movement(
-        test_db, item_id=item.id, user_id=user.id,
-        type_=MovementType.receipt, qty=3,
+        test_db,
+        item_id=item.id,
+        user_id=user.id,
+        type_=MovementType.receipt,
+        qty=3,
     )
     alert = await _open_alert(test_db, item.id)
     # suggested = max(10*2 - 3, 0) = 17

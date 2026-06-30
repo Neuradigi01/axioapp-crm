@@ -10,16 +10,16 @@ Where the origin module isn't shipped yet (quotes, orders), the
 test asserts the registered handler raises
 ``ActionNotImplemented``.
 """
+
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead, LeadStatus
@@ -27,12 +27,13 @@ from src.app.core.tasks.models import Task
 from src.app.core.workflows.actions import (
     _clear_registry_for_tests,
     _register_builtins,
-    resolve as resolve_action,
 )
 from src.app.core.workflows.actions import records as records_module
+from src.app.core.workflows.actions import (
+    resolve as resolve_action,
+)
 from src.app.core.workflows.exceptions import ActionNotImplemented
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -55,10 +56,7 @@ class _FakeStepRun:
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -161,9 +159,7 @@ async def test_update_contact_field_happy(test_db, org_id):
     assert result.output["contact_id"] == str(contact_id)
 
     refreshed = (
-        await test_db.execute(
-            select(Contact).where(Contact.id == contact_id)
-        )
+        await test_db.execute(select(Contact).where(Contact.id == contact_id))
     ).scalar_one()
     assert refreshed.tags == ["vip", "newsletter"]
 
@@ -245,9 +241,7 @@ async def test_update_lead_field_happy(test_db, org_id):
         reset_context(token)
 
     assert result.skip_reason is None
-    refreshed = (
-        await test_db.execute(select(Lead).where(Lead.id == lead.id))
-    ).scalar_one()
+    refreshed = (await test_db.execute(select(Lead).where(Lead.id == lead.id))).scalar_one()
     assert refreshed.source == "AdWords-Diwali"
 
 
@@ -279,9 +273,7 @@ async def test_update_lead_stage_happy(test_db, org_id):
         reset_context(token)
 
     assert result.skip_reason is None
-    refreshed = (
-        await test_db.execute(select(Lead).where(Lead.id == lead.id))
-    ).scalar_one()
+    refreshed = (await test_db.execute(select(Lead).where(Lead.id == lead.id))).scalar_one()
     assert refreshed.pipeline_stage == "negotiation"
 
 
@@ -327,9 +319,7 @@ async def test_create_task_happy_with_variable_render(test_db, org_id):
     assert "Asha Mehta" in result.output["task_title"]
 
     task = (
-        await test_db.execute(
-            select(Task).where(Task.id == uuid.UUID(result.output["task_id"]))
-        )
+        await test_db.execute(select(Task).where(Task.id == uuid.UUID(result.output["task_id"])))
     ).scalar_one()
     assert task.title == "Follow up with Asha Mehta"
 

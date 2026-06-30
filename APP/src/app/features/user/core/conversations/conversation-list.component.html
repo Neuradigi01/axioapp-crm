@@ -61,10 +61,7 @@
     }
     <!-- Step 14 — tag filter chip (hidden when org has no tags) -->
     <div class="flex items-center justify-end">
-      <app-tag-filter
-        [value]="tagFilterIds"
-        (filterChange)="tagFilterChange.emit($event)"
-      />
+      <app-tag-filter [value]="tagFilterIds" (filterChange)="tagFilterChange.emit($event)" />
     </div>
   </div>
 
@@ -93,7 +90,11 @@
               <span
                 [class]="
                   'mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ring-1 ' +
-                  owner.bg + ' ' + owner.text + ' ' + owner.ring
+                  owner.bg +
+                  ' ' +
+                  owner.text +
+                  ' ' +
+                  owner.ring
                 "
                 [title]="
                   c.assigned_to_id
@@ -124,11 +125,15 @@
                 <div class="flex items-center gap-2 text-xs text-zinc-500">
                   <span class="capitalize">{{ c.status }}</span>
                   @if (c.ai_handling) {
-                    <span class="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
+                    <span
+                      class="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700"
+                    >
                       AI Handled
                     </span>
                   } @else {
-                    <span class="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                    <span
+                      class="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+                    >
                       Needs Human
                     </span>
                   }
@@ -142,15 +147,15 @@
                       <app-tag-chip [tag]="t" />
                     }
                     @if (c.tags.length > 3) {
-                      <span class="text-[10px] text-zinc-500">
-                        +{{ c.tags.length - 3 }} more
-                      </span>
+                      <span class="text-[10px] text-zinc-500"> +{{ c.tags.length - 3 }} more </span>
                     }
                   </div>
                 }
               </div>
               @if (c.unread_count > 0) {
-                <span class="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+                <span
+                  class="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
+                >
                   {{ c.unread_count }}
                 </span>
               }

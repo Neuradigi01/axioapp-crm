@@ -1,4 +1,5 @@
 """Data-access layer for the email-verification flow."""
+
 from __future__ import annotations
 
 from sqlalchemy import select, update
@@ -28,14 +29,10 @@ async def get_user_id_and_email_by_handle(
     return int(row.id), row.email
 
 
-async def mark_email_verified(
-    session: AsyncSession, *, member_id: int
-) -> None:
+async def mark_email_verified(session: AsyncSession, *, member_id: int) -> None:
     """Flip `tbl_user_info.is_email_verified=True` for one user."""
     await session.execute(
-        update(UserInfo)
-        .where(UserInfo.member_id == member_id)
-        .values(is_email_verified=True)
+        update(UserInfo).where(UserInfo.member_id == member_id).values(is_email_verified=True)
     )
 
 

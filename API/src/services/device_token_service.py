@@ -1,4 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from config import PUSH_NOTIFICATION_ENABLED
 from src.constants import messages
 from src.data_access import device_token_da

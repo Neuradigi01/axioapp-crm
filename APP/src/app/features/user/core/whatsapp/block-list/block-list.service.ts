@@ -39,11 +39,7 @@ export class BlockListService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/integrations/whatsapp/block-list`;
 
-  list(
-    search?: string,
-    page = 1,
-    size = 50,
-  ): Observable<BlockListPage> {
+  list(search?: string, page = 1, size = 50): Observable<BlockListPage> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (search) params = params.set('search', search);
     return this.http.get<BlockListPage>(this.base, { params });

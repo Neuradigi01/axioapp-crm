@@ -3,8 +3,8 @@
 Sidebar entry at `menu_position=400`. Permission keys
 `catalog.read` / `catalog.write` register on startup.
 """
-from src.app.core.module_registry import ModuleDescriptor
 
+from src.app.core.module_registry import ModuleDescriptor
 
 MODULE = ModuleDescriptor(
     id="catalog",

@@ -18,11 +18,12 @@ The Google Ads REST API isn't called for real; we drive the client
 with a `_FakeAsyncClient` that records calls and returns canned
 responses (same approach as `test_whatsapp_send.py`).
 """
+
 from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -37,7 +38,6 @@ from src.app.core.integrations.models import (
     IntegrationProvider,
     IntegrationStatus,
 )
-
 
 # --- Shared fakes --------------------------------------------------------
 
@@ -71,9 +71,7 @@ class _FakeAsyncClient:
         # that matches the request URL wins.
         self.responses: list[tuple[str, str, _FakeResponse]] = []
 
-    def respond(
-        self, method: str, url_prefix: str, response: _FakeResponse
-    ) -> None:
+    def respond(self, method: str, url_prefix: str, response: _FakeResponse) -> None:
         self.responses.append((method.upper(), url_prefix, response))
 
     def _lookup(self, method: str, url: str) -> _FakeResponse:
@@ -93,12 +91,8 @@ class _FakeAsyncClient:
         )
         return self._lookup("POST", url)
 
-    async def get(
-        self, url: str, *, headers: Any = None
-    ) -> _FakeResponse:
-        self.calls.append(
-            {"method": "GET", "url": url, "headers": headers}
-        )
+    async def get(self, url: str, *, headers: Any = None) -> _FakeResponse:
+        self.calls.append({"method": "GET", "url": url, "headers": headers})
         return self._lookup("GET", url)
 
     async def request(
@@ -109,9 +103,7 @@ class _FakeAsyncClient:
         headers: Any = None,
         json: Any = None,
     ) -> _FakeResponse:
-        self.calls.append(
-            {"method": method.upper(), "url": url, "headers": headers, "json": json}
-        )
+        self.calls.append({"method": method.upper(), "url": url, "headers": headers, "json": json})
         return self._lookup(method, url)
 
 
@@ -151,6 +143,7 @@ def _silence_audit(monkeypatch):
     """The OAuth callback eventually calls `service.upsert(...)`, which
     fires `audit.log`. `audit.log` opens its own session — stub it out
     so unit tests don't touch the real DB."""
+
     async def _noop(*_a, **_k):
         return None
 
@@ -169,15 +162,9 @@ def _google_oauth_env(monkeypatch):
         "GOOGLE_OAUTH_REDIRECT_URI",
         "http://localhost:8000/api/v1/integrations/google/callback",
     )
-    monkeypatch.setattr(
-        gac_module, "GOOGLE_OAUTH_CLIENT_ID", "test-client-id"
-    )
-    monkeypatch.setattr(
-        gac_module, "GOOGLE_OAUTH_CLIENT_SECRET", "test-secret"
-    )
-    monkeypatch.setattr(
-        gac_module, "GOOGLE_ADS_DEVELOPER_TOKEN", "test-dev-token"
-    )
+    monkeypatch.setattr(gac_module, "GOOGLE_OAUTH_CLIENT_ID", "test-client-id")
+    monkeypatch.setattr(gac_module, "GOOGLE_OAUTH_CLIENT_SECRET", "test-secret")
+    monkeypatch.setattr(gac_module, "GOOGLE_ADS_DEVELOPER_TOKEN", "test-dev-token")
     monkeypatch.setattr(gac_module, "GOOGLE_ADS_API_VERSION", "v17")
 
 
@@ -191,8 +178,12 @@ _ACTOR_ID = uuid.uuid4()
 class TestStateSigning:
     def test_roundtrip_recovers_payload(self):
         signed = oauth._sign_state(
-            {"org_id": str(_ORG_ID), "actor_id": str(_ACTOR_ID),
-             "nonce": "n", "exp": int(time.time()) + 600}
+            {
+                "org_id": str(_ORG_ID),
+                "actor_id": str(_ACTOR_ID),
+                "nonce": "n",
+                "exp": int(time.time()) + 600,
+            }
         )
         decoded = oauth.verify_state(signed)
         assert decoded["org_id"] == str(_ORG_ID)
@@ -200,8 +191,7 @@ class TestStateSigning:
 
     def test_tampered_signature_raises(self):
         signed = oauth._sign_state(
-            {"org_id": str(_ORG_ID), "actor_id": None,
-             "nonce": "x", "exp": int(time.time()) + 600}
+            {"org_id": str(_ORG_ID), "actor_id": None, "nonce": "x", "exp": int(time.time()) + 600}
         )
         body, sig = signed.split(".", 1)
         # Flip a char near the START of the signature — the LAST char
@@ -216,8 +206,7 @@ class TestStateSigning:
 
     def test_expired_state_raises(self):
         signed = oauth._sign_state(
-            {"org_id": str(_ORG_ID), "actor_id": None,
-             "nonce": "x", "exp": int(time.time()) - 1}
+            {"org_id": str(_ORG_ID), "actor_id": None, "nonce": "x", "exp": int(time.time()) - 1}
         )
         with pytest.raises(Exception) as exc:
             oauth.verify_state(signed)
@@ -235,9 +224,7 @@ class TestStateSigning:
 
 class TestStartAuthorize:
     def test_returns_google_consent_url(self, _google_oauth_env):
-        url = oauth.start_authorize(
-            org_id=_ORG_ID, actor_id=_ACTOR_ID
-        )
+        url = oauth.start_authorize(org_id=_ORG_ID, actor_id=_ACTOR_ID)
         parsed = urlparse(url)
         assert parsed.netloc == "accounts.google.com"
         assert parsed.path == "/o/oauth2/v2/auth"
@@ -289,9 +276,7 @@ class TestExchangeCode:
             ),
         )
 
-        tokens = await oauth.exchange_code_for_tokens(
-            code="auth-code-123", http_client=client
-        )
+        tokens = await oauth.exchange_code_for_tokens(code="auth-code-123", http_client=client)
 
         assert tokens.access_token == "ya29.abc"
         assert tokens.refresh_token == "1//refresh"
@@ -310,14 +295,10 @@ class TestExchangeCode:
         client.respond(
             "POST",
             "https://oauth2.googleapis.com/token",
-            _FakeResponse(
-                400, {"error": "invalid_grant", "error_description": "Bad code"}
-            ),
+            _FakeResponse(400, {"error": "invalid_grant", "error_description": "Bad code"}),
         )
         with pytest.raises(Exception) as exc:
-            await oauth.exchange_code_for_tokens(
-                code="bad", http_client=client
-            )
+            await oauth.exchange_code_for_tokens(code="bad", http_client=client)
         assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
@@ -329,9 +310,7 @@ class TestExchangeCode:
             _FakeResponse(200, {"refresh_token": "only-refresh"}),
         )
         with pytest.raises(Exception) as exc:
-            await oauth.exchange_code_for_tokens(
-                code="x", http_client=client
-            )
+            await oauth.exchange_code_for_tokens(code="x", http_client=client)
         assert exc.value.status_code == 502
 
 
@@ -340,9 +319,7 @@ class TestExchangeCode:
 
 class TestHandleCallback:
     @pytest.mark.asyncio
-    async def test_happy_path_upserts_encrypted_tokens(
-        self, _google_oauth_env
-    ):
+    async def test_happy_path_upserts_encrypted_tokens(self, _google_oauth_env):
         client = _FakeAsyncClient()
         client.respond(
             "POST",
@@ -393,9 +370,7 @@ class TestHandleCallback:
         assert "https://www.googleapis.com/auth/adwords" in integration.scopes
 
     @pytest.mark.asyncio
-    async def test_callback_with_expired_state_raises(
-        self, _google_oauth_env
-    ):
+    async def test_callback_with_expired_state_raises(self, _google_oauth_env):
         client = _FakeAsyncClient()
         expired_state = oauth._sign_state(
             {
@@ -418,9 +393,7 @@ class TestHandleCallback:
         assert client.calls == []
 
     @pytest.mark.asyncio
-    async def test_callback_userinfo_failure_still_persists(
-        self, _google_oauth_env
-    ):
+    async def test_callback_userinfo_failure_still_persists(self, _google_oauth_env):
         """Userinfo is best-effort. If Google's userinfo endpoint
         returns a 500, we still complete the connect — `account_label`
         just stays None."""
@@ -474,9 +447,7 @@ def _connected_integration(
         account_id="1234567890",
         account_label="asha@example.com",
         access_token_enc=crypto.encrypt(access),
-        refresh_token_enc=(
-            crypto.encrypt(refresh) if refresh is not None else None
-        ),
+        refresh_token_enc=(crypto.encrypt(refresh) if refresh is not None else None),
         token_expires_at=expires_at,
         scopes=["https://www.googleapis.com/auth/adwords"],
         status=IntegrationStatus.connected,
@@ -486,7 +457,7 @@ def _connected_integration(
 class TestApiClientRefresh:
     @pytest.mark.asyncio
     async def test_uses_cached_token_when_fresh(self, _google_oauth_env):
-        fresh = datetime.now(timezone.utc) + timedelta(minutes=30)
+        fresh = datetime.now(UTC) + timedelta(minutes=30)
         row = _connected_integration(expires_at=fresh)
         session = _CapturingSession(existing=row)
         client = _FakeAsyncClient()
@@ -496,22 +467,15 @@ class TestApiClientRefresh:
             _FakeResponse(200, {"resourceNames": ["customers/1234567890"]}),
         )
 
-        rest = GoogleAdsRestClient(
-            integration=row, session=session, http_client=client
-        )
+        rest = GoogleAdsRestClient(integration=row, session=session, http_client=client)
         body = await rest.get("customers:listAccessibleCustomers")
         assert "resourceNames" in body
         # No refresh HTTP call — token still good.
-        assert all(
-            "oauth2.googleapis.com/token" not in c["url"]
-            for c in client.calls
-        )
+        assert all("oauth2.googleapis.com/token" not in c["url"] for c in client.calls)
 
     @pytest.mark.asyncio
-    async def test_refreshes_expired_token_and_persists(
-        self, _google_oauth_env
-    ):
-        stale = datetime.now(timezone.utc) - timedelta(minutes=5)
+    async def test_refreshes_expired_token_and_persists(self, _google_oauth_env):
+        stale = datetime.now(UTC) - timedelta(minutes=5)
         row = _connected_integration(expires_at=stale)
         session = _CapturingSession(existing=row)
         client = _FakeAsyncClient()
@@ -535,16 +499,11 @@ class TestApiClientRefresh:
             _FakeResponse(200, {"resourceNames": []}),
         )
 
-        rest = GoogleAdsRestClient(
-            integration=row, session=session, http_client=client
-        )
+        rest = GoogleAdsRestClient(integration=row, session=session, http_client=client)
         await rest.get("customers:listAccessibleCustomers")
 
         # Refresh fired with form-encoded data.
-        refresh_calls = [
-            c for c in client.calls
-            if "oauth2.googleapis.com/token" in c["url"]
-        ]
+        refresh_calls = [c for c in client.calls if "oauth2.googleapis.com/token" in c["url"]]
         assert len(refresh_calls) == 1
         assert refresh_calls[0]["data"]["grant_type"] == "refresh_token"
         assert refresh_calls[0]["data"]["client_id"] == "test-client-id"
@@ -552,17 +511,15 @@ class TestApiClientRefresh:
         # Row updated in place: new ciphertext + new expiry + commit.
         assert session.committed is True
         assert "rotated-access" not in (row.access_token_enc or "")
-        assert (
-            crypto.decrypt(row.access_token_enc) == "rotated-access"
-        )
+        assert crypto.decrypt(row.access_token_enc) == "rotated-access"
         # New expiry roughly 1h in the future (allow slack).
         assert row.token_expires_at is not None
-        delta = (row.token_expires_at - datetime.now(timezone.utc)).total_seconds()
+        delta = (row.token_expires_at - datetime.now(UTC)).total_seconds()
         assert 3500 < delta < 3700
 
     @pytest.mark.asyncio
     async def test_refresh_failure_flips_to_expired(self, _google_oauth_env):
-        stale = datetime.now(timezone.utc) - timedelta(minutes=5)
+        stale = datetime.now(UTC) - timedelta(minutes=5)
         row = _connected_integration(expires_at=stale)
         session = _CapturingSession(existing=row)
         client = _FakeAsyncClient()
@@ -572,9 +529,7 @@ class TestApiClientRefresh:
             _FakeResponse(401, {"error": "invalid_grant"}),
         )
 
-        rest = GoogleAdsRestClient(
-            integration=row, session=session, http_client=client
-        )
+        rest = GoogleAdsRestClient(integration=row, session=session, http_client=client)
         with pytest.raises(Exception) as exc:
             await rest.get("customers:listAccessibleCustomers")
         assert exc.value.status_code == 401
@@ -584,9 +539,7 @@ class TestApiClientRefresh:
     @pytest.mark.asyncio
     async def test_503_when_developer_token_missing(self, monkeypatch):
         monkeypatch.setattr(gac_module, "GOOGLE_ADS_DEVELOPER_TOKEN", "")
-        row = _connected_integration(
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
-        )
+        row = _connected_integration(expires_at=datetime.now(UTC) + timedelta(hours=1))
         session = _CapturingSession(existing=row)
         with pytest.raises(Exception) as exc:
             GoogleAdsRestClient(
@@ -598,9 +551,7 @@ class TestApiClientRefresh:
 
     @pytest.mark.asyncio
     async def test_409_when_integration_disconnected(self, _google_oauth_env):
-        row = _connected_integration(
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
-        )
+        row = _connected_integration(expires_at=datetime.now(UTC) + timedelta(hours=1))
         row.status = IntegrationStatus.disconnected
         session = _CapturingSession(existing=row)
         with pytest.raises(Exception) as exc:
@@ -618,7 +569,7 @@ class TestApiClientRefresh:
 class TestSyncForms:
     @pytest.mark.asyncio
     async def test_list_accessible_accounts(self, _google_oauth_env):
-        fresh = datetime.now(timezone.utc) + timedelta(hours=1)
+        fresh = datetime.now(UTC) + timedelta(hours=1)
         row = _connected_integration(expires_at=fresh)
         session = _CapturingSession(existing=row)
         client = _FakeAsyncClient()
@@ -635,9 +586,7 @@ class TestSyncForms:
                 },
             ),
         )
-        rest = GoogleAdsRestClient(
-            integration=row, session=session, http_client=client
-        )
+        rest = GoogleAdsRestClient(integration=row, session=session, http_client=client)
 
         accounts = await sync_forms.list_accessible_accounts(rest)
         assert [a.customer_id for a in accounts] == [
@@ -647,10 +596,8 @@ class TestSyncForms:
         assert accounts[0].resource_name == "customers/1234567890"
 
     @pytest.mark.asyncio
-    async def test_list_lead_forms_parses_search_stream(
-        self, _google_oauth_env
-    ):
-        fresh = datetime.now(timezone.utc) + timedelta(hours=1)
+    async def test_list_lead_forms_parses_search_stream(self, _google_oauth_env):
+        fresh = datetime.now(UTC) + timedelta(hours=1)
         row = _connected_integration(expires_at=fresh)
         session = _CapturingSession(existing=row)
         client = _FakeAsyncClient()
@@ -666,18 +613,14 @@ class TestSyncForms:
                                 "asset": {
                                     "id": "11111",
                                     "name": "Showroom Visit Form",
-                                    "resourceName": (
-                                        "customers/1234567890/assets/11111"
-                                    ),
+                                    "resourceName": ("customers/1234567890/assets/11111"),
                                 }
                             },
                             {
                                 "asset": {
                                     "id": "22222",
                                     "name": "Bulk Order Inquiry",
-                                    "resourceName": (
-                                        "customers/1234567890/assets/22222"
-                                    ),
+                                    "resourceName": ("customers/1234567890/assets/22222"),
                                 }
                             },
                         ]
@@ -685,21 +628,15 @@ class TestSyncForms:
                 ],
             ),
         )
-        rest = GoogleAdsRestClient(
-            integration=row, session=session, http_client=client
-        )
+        rest = GoogleAdsRestClient(integration=row, session=session, http_client=client)
 
-        forms = await sync_forms.list_lead_forms(
-            rest, customer_id="1234567890"
-        )
+        forms = await sync_forms.list_lead_forms(rest, customer_id="1234567890")
         assert [f.form_id for f in forms] == ["11111", "22222"]
         assert forms[0].name == "Showroom Visit Form"
 
     @pytest.mark.asyncio
-    async def test_list_lead_forms_empty_when_no_results(
-        self, _google_oauth_env
-    ):
-        fresh = datetime.now(timezone.utc) + timedelta(hours=1)
+    async def test_list_lead_forms_empty_when_no_results(self, _google_oauth_env):
+        fresh = datetime.now(UTC) + timedelta(hours=1)
         row = _connected_integration(expires_at=fresh)
         session = _CapturingSession(existing=row)
         client = _FakeAsyncClient()
@@ -708,10 +645,6 @@ class TestSyncForms:
             "https://googleads.googleapis.com/v17/customers/1234567890/googleAds:searchStream",
             _FakeResponse(200, {"results": []}),
         )
-        rest = GoogleAdsRestClient(
-            integration=row, session=session, http_client=client
-        )
-        forms = await sync_forms.list_lead_forms(
-            rest, customer_id="1234567890"
-        )
+        rest = GoogleAdsRestClient(integration=row, session=session, http_client=client)
+        forms = await sync_forms.list_lead_forms(rest, customer_id="1234567890")
         assert forms == []

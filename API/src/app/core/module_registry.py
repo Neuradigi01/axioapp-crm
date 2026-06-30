@@ -14,14 +14,16 @@ The same pass also registers each `MODULE.permissions` key into the
 `permissions` table via `permissions.service.register_permissions` so
 RBAC rows exist before any role tries to be granted them.
 """
+
 from __future__ import annotations
 
 import importlib
 import logging
 import pkgutil
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable, Literal
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -68,26 +70,18 @@ class ModuleDescriptor:
 
     def __post_init__(self) -> None:
         if not _ID_RE.match(self.id):
-            raise ValueError(
-                f"ModuleDescriptor.id {self.id!r} must match [a-z][a-z0-9_]*"
-            )
+            raise ValueError(f"ModuleDescriptor.id {self.id!r} must match [a-z][a-z0-9_]*")
         if not self.route.startswith("/"):
-            raise ValueError(
-                f"ModuleDescriptor.route {self.route!r} must start with '/'"
-            )
+            raise ValueError(f"ModuleDescriptor.route {self.route!r} must start with '/'")
         if not self.frontend_route.startswith("/"):
             raise ValueError(
                 f"ModuleDescriptor.frontend_route {self.frontend_route!r} must start with '/'"
             )
         if self.layer not in ("core", "pack"):
-            raise ValueError(
-                f"ModuleDescriptor.layer {self.layer!r} must be 'core' or 'pack'"
-            )
+            raise ValueError(f"ModuleDescriptor.layer {self.layer!r} must be 'core' or 'pack'")
         for key in self.permissions:
             if not _PERM_RE.match(key):
-                raise ValueError(
-                    f"permission key {key!r} must match '<module>.<action>'"
-                )
+                raise ValueError(f"permission key {key!r} must match '<module>.<action>'")
 
 
 class ModuleRegistry:
@@ -98,9 +92,7 @@ class ModuleRegistry:
 
     def register(self, descriptor: ModuleDescriptor) -> None:
         if descriptor.id in self._modules:
-            raise ValueError(
-                f"module {descriptor.id!r} is already registered"
-            )
+            raise ValueError(f"module {descriptor.id!r} is already registered")
         self._modules[descriptor.id] = descriptor
 
     def get(self, module_id: str) -> ModuleDescriptor | None:
@@ -198,9 +190,7 @@ def _walk_pack_module_files() -> list[str]:
             modules_pkg = importlib.import_module(modules_pkg_name)
         except ModuleNotFoundError:
             continue
-        for mod_info in pkgutil.iter_modules(
-            modules_pkg.__path__, prefix=f"{modules_pkg_name}."
-        ):
+        for mod_info in pkgutil.iter_modules(modules_pkg.__path__, prefix=f"{modules_pkg_name}."):
             if not mod_info.ispkg:
                 continue
             candidate = f"{mod_info.name}.module"

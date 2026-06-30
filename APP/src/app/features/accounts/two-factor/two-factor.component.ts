@@ -1,4 +1,13 @@
-import { Component, ChangeDetectionStrategy, signal, inject, OnInit, OnDestroy, ElementRef, viewChildren } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  signal,
+  inject,
+  OnInit,
+  OnDestroy,
+  ElementRef,
+  viewChildren,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -6,8 +15,22 @@ import { AuthApiService } from '@app/services/auth-api.service';
 import { AuthService } from '@core/services/auth.service';
 import { getRoute } from '@core/services/routes-helper.service';
 import { UserType, TwoFactorMethod } from '@app/schemas/common';
-import { TFA_METHOD_LABELS, OTP_EXPIRY_SECONDS, RESEND_COOLDOWN_SECONDS, ROLE_ADMIN, SNACKBAR_DURATION, SNACKBAR_ACTION } from '@core/constants/app.constants';
-import { MSG_ERROR_GENERIC, MSG_2FA_CODE_INVALID, MSG_2FA_CODE_RESENT, MSG_2FA_METHOD_SWITCHED, MSG_2FA_METHOD_SWITCH_FAILED, MSG_2FA_CODE_RESEND_FAILED } from '@core/constants/messages.constants';
+import {
+  TFA_METHOD_LABELS,
+  OTP_EXPIRY_SECONDS,
+  RESEND_COOLDOWN_SECONDS,
+  ROLE_ADMIN,
+  SNACKBAR_DURATION,
+  SNACKBAR_ACTION,
+} from '@core/constants/app.constants';
+import {
+  MSG_ERROR_GENERIC,
+  MSG_2FA_CODE_INVALID,
+  MSG_2FA_CODE_RESENT,
+  MSG_2FA_METHOD_SWITCHED,
+  MSG_2FA_METHOD_SWITCH_FAILED,
+  MSG_2FA_CODE_RESEND_FAILED,
+} from '@core/constants/messages.constants';
 import { createCountdownTimer } from '@core/services/countdown.service';
 import { DeviceInfoService } from '@core/services/device-info.service';
 
@@ -80,7 +103,9 @@ export class TwoFactorComponent implements OnInit, OnDestroy {
     this.rememberMe = state.rememberMe ?? false;
     this.method.set(state.method ?? 'authenticator');
     this.availableMethods.set(state.availableMethods ?? []);
-    this.loginUrl.set(this.userType === ROLE_ADMIN ? getRoute('admin_login').url : getRoute('login').url);
+    this.loginUrl.set(
+      this.userType === ROLE_ADMIN ? getRoute('admin_login').url : getRoute('login').url,
+    );
 
     this.startExpiryTimer();
     if (this.isOtpMethod) {
@@ -189,9 +214,13 @@ export class TwoFactorComponent implements OnInit, OnDestroy {
         if (this.isOtpMethod) {
           this.startResendCooldown();
         }
-        this.snackBar.open(response.message || MSG_2FA_METHOD_SWITCHED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(response.message || MSG_2FA_METHOD_SWITCHED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       } else {
-        this.snackBar.open(response.message || MSG_2FA_METHOD_SWITCH_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(response.message || MSG_2FA_METHOD_SWITCH_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
@@ -220,7 +249,9 @@ export class TwoFactorComponent implements OnInit, OnDestroy {
         this.startResendCooldown();
         this.snackBar.open(MSG_2FA_CODE_RESENT, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
       } else {
-        this.snackBar.open(response.message || MSG_2FA_CODE_RESEND_FAILED, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        this.snackBar.open(response.message || MSG_2FA_CODE_RESEND_FAILED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
       }
     } catch {
       this.snackBar.open(MSG_ERROR_GENERIC, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
@@ -236,7 +267,10 @@ export class TwoFactorComponent implements OnInit, OnDestroy {
     this.errorMessage.set('');
 
     try {
-      const loginFn = this.userType === ROLE_ADMIN ? this.authApi.adminLogin.bind(this.authApi) : this.authApi.login.bind(this.authApi);
+      const loginFn =
+        this.userType === ROLE_ADMIN
+          ? this.authApi.adminLogin.bind(this.authApi)
+          : this.authApi.login.bind(this.authApi);
       const response = await loginFn({
         identifier: this.identifier,
         password: this.password,
@@ -247,9 +281,10 @@ export class TwoFactorComponent implements OnInit, OnDestroy {
 
       if (response.success && response.data?.token) {
         this.auth.setToken(response.data.token, this.rememberMe);
-        const target = response.data.role === ROLE_ADMIN
-          ? getRoute('admin_dashboard').url
-          : getRoute('user_dashboard').url;
+        const target =
+          response.data.role === ROLE_ADMIN
+            ? getRoute('admin_dashboard').url
+            : getRoute('user_dashboard').url;
         this.router.navigate([target]);
         return;
       }

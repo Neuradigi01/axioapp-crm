@@ -26,10 +26,11 @@ What we prove:
      + sidecar rows (no duplicates), refreshes the token.
   6. Missing Meta App credentials → EmbeddedSignupNotConfigured.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -45,7 +46,6 @@ from src.app.core.integrations.whatsapp.meta_graph_client import (
     MetaGraphError,
 )
 from src.app.core.integrations.whatsapp.models import WhatsAppAccountConfig
-
 
 _ORG_ID = uuid.uuid4()
 _ACTOR_ID = uuid.uuid4()
@@ -126,17 +126,13 @@ def _stub_factory(routes: dict):
         async def __aexit__(self, *_a):
             return None
 
-        async def request(
-            self, method, url, params=None, data=None, headers=None
-        ):
+        async def request(self, method, url, params=None, data=None, headers=None):
             for (m, suffix), make_response in routes.items():
                 if m == method and url.endswith(suffix):
                     if callable(make_response):
                         return make_response(params=params, data=data)
                     return make_response
-            raise AssertionError(
-                f"Unstubbed Graph call: {method} {url}"
-            )
+            raise AssertionError(f"Unstubbed Graph call: {method} {url}")
 
     return lambda: _Client()
 
@@ -178,12 +174,8 @@ def _happy_routes():
                 ],
             },
         ),
-        ("POST", f"/{_WABA_ID}/subscribed_apps"): httpx.Response(
-            200, json={"success": True}
-        ),
-        ("POST", f"/{_PHONE_A_ID}/register"): httpx.Response(
-            200, json={"success": True}
-        ),
+        ("POST", f"/{_WABA_ID}/subscribed_apps"): httpx.Response(200, json={"success": True}),
+        ("POST", f"/{_PHONE_A_ID}/register"): httpx.Response(200, json={"success": True}),
     }
 
 
@@ -214,9 +206,7 @@ def audit_events(monkeypatch):
 
 class TestHappyPath:
     @pytest.mark.asyncio
-    async def test_persists_token_encrypted_and_emits_completed_audit(
-        self, audit_events
-    ):
+    async def test_persists_token_encrypted_and_emits_completed_audit(self, audit_events):
         session = _CapturingSession()
         result = await es.complete_embedded_signup(
             session,
@@ -238,12 +228,8 @@ class TestHappyPath:
         assert result["messaging_limit_tier"] == "TIER_1K"
         assert result["quality_rating"] == "GREEN"
 
-        integrations = [
-            r for r in session.added if isinstance(r, Integration)
-        ]
-        configs = [
-            r for r in session.added if isinstance(r, WhatsAppAccountConfig)
-        ]
+        integrations = [r for r in session.added if isinstance(r, Integration)]
+        configs = [r for r in session.added if isinstance(r, WhatsAppAccountConfig)]
         assert len(integrations) == 1
         assert len(configs) == 1
 
@@ -267,9 +253,7 @@ class TestHappyPath:
         assert "integration.whatsapp.embedded_signup.completed" in actions
 
     @pytest.mark.asyncio
-    async def test_multi_phone_waba_selects_requested_phone(
-        self, audit_events
-    ):
+    async def test_multi_phone_waba_selects_requested_phone(self, audit_events):
         session = _CapturingSession()
         routes = _happy_routes()
         # Two phones — pick the second one.
@@ -294,9 +278,7 @@ class TestHappyPath:
                 ],
             },
         )
-        routes[("POST", f"/{_PHONE_B_ID}/register")] = httpx.Response(
-            200, json={"success": True}
-        )
+        routes[("POST", f"/{_PHONE_B_ID}/register")] = httpx.Response(200, json={"success": True})
 
         result = await es.complete_embedded_signup(
             session,
@@ -319,9 +301,7 @@ class TestHappyPath:
 
 class TestErrorPaths:
     @pytest.mark.asyncio
-    async def test_code_exchange_400_maps_to_session_expired(
-        self, audit_events
-    ):
+    async def test_code_exchange_400_maps_to_session_expired(self, audit_events):
         session = _CapturingSession()
         routes = _happy_routes()
         routes[("GET", "/oauth/access_token")] = httpx.Response(
@@ -348,21 +328,14 @@ class TestErrorPaths:
         assert "session expired" in exc_info.value.user_message.lower()
 
         # No persist happened.
-        assert all(
-            not isinstance(r, Integration) for r in session.added
-        )
+        assert all(not isinstance(r, Integration) for r in session.added)
         # `failed` audit captured with the reason.
-        failed = [
-            a for a in audit_events
-            if a[0] == "integration.whatsapp.embedded_signup.failed"
-        ]
+        failed = [a for a in audit_events if a[0] == "integration.whatsapp.embedded_signup.failed"]
         assert failed, "expected a failed audit row"
         assert failed[0][1]["reason"] == "code_exchange"
 
     @pytest.mark.asyncio
-    async def test_subscribe_403_maps_to_contact_support(
-        self, audit_events
-    ):
+    async def test_subscribe_403_maps_to_contact_support(self, audit_events):
         session = _CapturingSession()
         routes = _happy_routes()
         routes[("POST", f"/{_WABA_ID}/subscribed_apps")] = httpx.Response(
@@ -391,10 +364,7 @@ class TestErrorPaths:
         assert exc_info.value.http_status == 403
         assert "contact support" in exc_info.value.user_message.lower()
 
-        failed = [
-            a for a in audit_events
-            if a[0] == "integration.whatsapp.embedded_signup.failed"
-        ]
+        failed = [a for a in audit_events if a[0] == "integration.whatsapp.embedded_signup.failed"]
         assert failed and failed[0][1]["reason"] == "subscribe_apps"
 
     @pytest.mark.asyncio
@@ -434,9 +404,7 @@ class TestErrorPaths:
 
 class TestIdempotency:
     @pytest.mark.asyncio
-    async def test_reconnect_updates_existing_rows_no_duplicates(
-        self, audit_events
-    ):
+    async def test_reconnect_updates_existing_rows_no_duplicates(self, audit_events):
         session = _CapturingSession()
         # Pre-stock an already-connected Integration + sidecar (an org
         # that hit the popup once, now coming back through it).
@@ -452,7 +420,7 @@ class TestIdempotency:
             scopes=None,
             status=IntegrationStatus.connected,
             last_error=None,
-            connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            connected_at=datetime(2026, 1, 1, tzinfo=UTC),
             connected_by=_ACTOR_ID,
         )
         existing_config = WhatsAppAccountConfig(
@@ -468,7 +436,7 @@ class TestIdempotency:
             api_version="v19.0",
             rate_limit_per_sec=50,
             messaging_limit_tier="TIER_250",
-            tier_synced_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            tier_synced_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session.rows[Integration].append(existing_integration)
         session.rows[WhatsAppAccountConfig].append(existing_config)
@@ -484,16 +452,10 @@ class TestIdempotency:
         )
 
         # No new rows added — same row mutated in place.
-        assert not any(
-            isinstance(r, Integration) for r in session.added
-        )
-        assert not any(
-            isinstance(r, WhatsAppAccountConfig) for r in session.added
-        )
+        assert not any(isinstance(r, Integration) for r in session.added)
+        assert not any(isinstance(r, WhatsAppAccountConfig) for r in session.added)
         # Token rotated.
-        assert crypto.decrypt(
-            existing_integration.access_token_enc
-        ) == _HAPPY_TOKEN
+        assert crypto.decrypt(existing_integration.access_token_enc) == _HAPPY_TOKEN
         # Tier refreshed.
         assert existing_config.messaging_limit_tier == "TIER_1K"
 
@@ -503,9 +465,7 @@ class TestIdempotency:
 
 class TestConfiguration:
     @pytest.mark.asyncio
-    async def test_missing_meta_app_credentials_raises_typed_error(
-        self, monkeypatch
-    ):
+    async def test_missing_meta_app_credentials_raises_typed_error(self, monkeypatch):
         monkeypatch.setattr(es, "META_APP_ID", "")
         monkeypatch.setattr(es, "META_APP_SECRET", "")
 
@@ -533,9 +493,7 @@ class TestEmbeddedSignupConfigEndpoint:
     rejects anything else."""
 
     @pytest.mark.asyncio
-    async def test_returns_env_values_in_documented_shape(
-        self, monkeypatch
-    ):
+    async def test_returns_env_values_in_documented_shape(self, monkeypatch):
         from src.app.core.integrations.whatsapp import router as wa_router
 
         monkeypatch.setattr(wa_router, "META_APP_ID", "1234567890")
@@ -544,9 +502,7 @@ class TestEmbeddedSignupConfigEndpoint:
             "WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID",
             "config_xyz",
         )
-        monkeypatch.setattr(
-            wa_router, "WHATSAPP_GRAPH_API_VERSION", "v19.0"
-        )
+        monkeypatch.setattr(wa_router, "WHATSAPP_GRAPH_API_VERSION", "v19.0")
 
         result = await wa_router.embedded_signup_config_endpoint(
             _user=object(),
@@ -557,18 +513,12 @@ class TestEmbeddedSignupConfigEndpoint:
         assert result.graph_api_version == "v19.0"
 
     @pytest.mark.asyncio
-    async def test_returns_empty_strings_when_unconfigured(
-        self, monkeypatch
-    ):
+    async def test_returns_empty_strings_when_unconfigured(self, monkeypatch):
         from src.app.core.integrations.whatsapp import router as wa_router
 
         monkeypatch.setattr(wa_router, "META_APP_ID", "")
-        monkeypatch.setattr(
-            wa_router, "WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID", ""
-        )
-        monkeypatch.setattr(
-            wa_router, "WHATSAPP_GRAPH_API_VERSION", "v19.0"
-        )
+        monkeypatch.setattr(wa_router, "WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID", "")
+        monkeypatch.setattr(wa_router, "WHATSAPP_GRAPH_API_VERSION", "v19.0")
 
         result = await wa_router.embedded_signup_config_endpoint(
             _user=object(),

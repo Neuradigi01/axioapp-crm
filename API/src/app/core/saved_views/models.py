@@ -24,6 +24,7 @@ Owner pointer:
     the view becomes inaccessible because login flow gates the FE
     fetch by ``user.legacy_uuid``.
 """
+
 from __future__ import annotations
 
 import uuid

@@ -1,17 +1,9 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { VariableGroup, variableGroupsForEvent } from './editors/editor-contract';
-
 
 /**
  * Context-aware variable picker.
@@ -26,7 +18,6 @@ import { VariableGroup, variableGroupsForEvent } from './editors/editor-contract
  * also has a small search input for fast filtering.
  */
 
-
 @Component({
   selector: 'app-variable-picker',
   standalone: true,
@@ -40,9 +31,7 @@ export class VariablePickerComponent {
 
   readonly query = signal('');
 
-  readonly groups = computed<VariableGroup[]>(() =>
-    variableGroupsForEvent(this.eventType()),
-  );
+  readonly groups = computed<VariableGroup[]>(() => variableGroupsForEvent(this.eventType()));
 
   readonly filtered = computed<VariableGroup[]>(() => {
     const q = this.query().trim().toLowerCase();

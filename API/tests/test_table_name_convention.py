@@ -17,6 +17,7 @@ Allowed exceptions (each one explained):
   Created with `Base.metadata.create_all` per-test, dropped at
   teardown, never deployed.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -25,7 +26,6 @@ import pkgutil
 import src.app as app_pkg
 from src.app.shared.db import Base
 
-
 _ALLOWED_EXCEPTIONS = {"users"}
 
 
@@ -33,9 +33,7 @@ def _import_all_model_modules() -> None:
     """Walk every package under `src.app` and import any module whose
     name ends in `.models`. Forces `Base.metadata` to register every
     declared mapper so we can introspect the full table set."""
-    for _finder, name, _ispkg in pkgutil.walk_packages(
-        app_pkg.__path__, prefix="src.app."
-    ):
+    for _finder, name, _ispkg in pkgutil.walk_packages(app_pkg.__path__, prefix="src.app."):
         if name.endswith(".models") or name.endswith("_models"):
             try:
                 importlib.import_module(name)

@@ -12,6 +12,7 @@ Action handlers are exercised through the dry-walk path which skips
 them entirely; therefore no real send / record / routing handler is
 needed in fixtures.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -19,7 +20,8 @@ from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import func, select, text as sql_text
+from sqlalchemy import func, select
+from sqlalchemy import text as sql_text
 
 from src.app.core.workflows import engine as workflows_engine
 from src.app.core.workflows.engine import DryRunResult, DryRunStep
@@ -31,7 +33,6 @@ from src.app.core.workflows.models import (
 )
 from src.app.shared.context import RequestContext, reset_context, set_context
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -39,10 +40,7 @@ pytestmark = pytest.mark.asyncio
 async def org_id(test_db):
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {
             "id": str(org_id),
             "name": "Demo",
@@ -81,18 +79,14 @@ async def _make_workflow(test_db, *, org_id) -> Workflow:
     return wf
 
 
-async def test_start_run_dry_run_returns_trace_without_celery_dispatch(
-    test_db, org_id
-):
+async def test_start_run_dry_run_returns_trace_without_celery_dispatch(test_db, org_id):
     """`start_run(dry_run=True)` returns a `DryRunResult` with a step
     per node visited and never schedules a Celery dispatch."""
     wf = await _make_workflow(test_db, org_id=org_id)
 
     token = set_context(RequestContext(org_id=org_id))
     try:
-        with patch.object(
-            workflows_engine, "_schedule_process_step"
-        ) as sched:
+        with patch.object(workflows_engine, "_schedule_process_step") as sched:
             result = await workflows_engine.start_run(
                 test_db,
                 workflow=wf,
@@ -119,9 +113,7 @@ async def test_start_run_dry_run_returns_trace_without_celery_dispatch(
     sched.assert_not_called()
 
 
-async def test_dry_run_does_not_persist_run_or_step_run_rows(
-    test_db, org_id
-):
+async def test_dry_run_does_not_persist_run_or_step_run_rows(test_db, org_id):
     """`dry_run=True` is pure in-memory — no `tbl_workflow_runs` and
     no `tbl_workflow_step_runs` rows are written, regardless of how
     many nodes the dry-walk visits."""
@@ -129,15 +121,11 @@ async def test_dry_run_does_not_persist_run_or_step_run_rows(
 
     runs_before = (
         await test_db.execute(
-            select(func.count()).select_from(WorkflowRun).where(
-                WorkflowRun.workflow_id == wf.id
-            )
+            select(func.count()).select_from(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)
         )
     ).scalar_one()
     step_runs_before = (
-        await test_db.execute(
-            select(func.count()).select_from(WorkflowStepRun)
-        )
+        await test_db.execute(select(func.count()).select_from(WorkflowStepRun))
     ).scalar_one()
 
     token = set_context(RequestContext(org_id=org_id))
@@ -156,20 +144,14 @@ async def test_dry_run_does_not_persist_run_or_step_run_rows(
 
     runs_after = (
         await test_db.execute(
-            select(func.count()).select_from(WorkflowRun).where(
-                WorkflowRun.workflow_id == wf.id
-            )
+            select(func.count()).select_from(WorkflowRun).where(WorkflowRun.workflow_id == wf.id)
         )
     ).scalar_one()
     step_runs_after = (
-        await test_db.execute(
-            select(func.count()).select_from(WorkflowStepRun)
-        )
+        await test_db.execute(select(func.count()).select_from(WorkflowStepRun))
     ).scalar_one()
 
-    assert runs_after == runs_before, (
-        "test-fire must not insert tbl_workflow_runs rows"
-    )
+    assert runs_after == runs_before, "test-fire must not insert tbl_workflow_runs rows"
     assert step_runs_after == step_runs_before, (
         "test-fire must not insert tbl_workflow_step_runs rows"
     )

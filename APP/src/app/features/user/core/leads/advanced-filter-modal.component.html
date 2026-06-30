@@ -32,14 +32,19 @@
     <!-- Body -->
     <div class="flex-1 overflow-y-auto px-5 py-4">
       @if (rows().length === 0) {
-        <p class="rounded-md bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 ring-1 ring-zinc-200">
-          No clauses yet. Click <span class="font-medium text-zinc-700">+ Add filter</span> to start.
+        <p
+          class="rounded-md bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 ring-1 ring-zinc-200"
+        >
+          No clauses yet. Click <span class="font-medium text-zinc-700">+ Add filter</span> to
+          start.
         </p>
       }
 
       <div class="space-y-2">
         @for (row of rows(); track row.id) {
-          <div class="grid grid-cols-1 items-start gap-2 rounded-md border border-zinc-200 bg-white p-2 sm:grid-cols-[1fr_auto_2fr_auto]">
+          <div
+            class="grid grid-cols-1 items-start gap-2 rounded-md border border-zinc-200 bg-white p-2 sm:grid-cols-[1fr_auto_2fr_auto]"
+          >
             <!-- Field -->
             <select
               [value]="row.field"
@@ -76,9 +81,7 @@
             <!-- Value -->
             <div class="min-w-0">
               @if (isValuelessOp(row.op)) {
-                <span class="block py-1.5 text-xs italic text-zinc-500">
-                  No value needed
-                </span>
+                <span class="block py-1.5 text-xs italic text-zinc-500"> No value needed </span>
               } @else if (isListOp(row.op)) {
                 <input
                   type="text"
@@ -155,7 +158,9 @@
     </div>
 
     <!-- Footer -->
-    <footer class="flex items-center justify-between gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3">
+    <footer
+      class="flex items-center justify-between gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3"
+    >
       <button
         type="button"
         (click)="onReset()"

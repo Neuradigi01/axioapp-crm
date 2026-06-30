@@ -11,6 +11,7 @@ Paths handed to a backend are storage-relative POSIX keys
 paths. The backend owns the mapping from key to physical location and to
 public URL.
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -34,9 +35,7 @@ class StorageBackend(ABC):
     """Write blobs and resolve their public URLs."""
 
     @abstractmethod
-    def put(
-        self, path: str, data: bytes, content_type: str | None = None
-    ) -> StoredFileRef:
+    def put(self, path: str, data: bytes, content_type: str | None = None) -> StoredFileRef:
         """Persist `data` under storage-relative `path` and return a ref.
 
         `content_type` is advisory — local disk ignores it (the static

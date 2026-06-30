@@ -14,20 +14,22 @@ after applying the mapping; columns mapped to `None` are dropped.
 This module knows nothing about CRM types — every cell is a string
 (or None). Pydantic / Lead creation downstream does the coercion.
 """
+
 from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
 class ParsedRow:
-    row_number: int                       # 1-based data-row index
-    raw: dict[str, Optional[str]]         # original column → value
-    mapped: dict[str, Optional[str]]      # crm field key → value
+    row_number: int  # 1-based data-row index
+    raw: dict[str, str | None]  # original column → value
+    mapped: dict[str, str | None]  # crm field key → value
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +37,7 @@ class HeaderInfo:
     """Returned alongside the row iterator so callers can build a
     well-shaped error CSV without re-reading the file."""
 
-    columns: list[str]                     # original column order, deduped
+    columns: list[str]  # original column order, deduped
 
 
 def _open_file_bytes(path: str) -> bytes:
@@ -56,15 +58,15 @@ def _decode_csv(data: bytes) -> str:
 
 
 def _apply_mapping(
-    raw: dict[str, Optional[str]], mapping: dict[str, Optional[str]]
-) -> dict[str, Optional[str]]:
+    raw: dict[str, str | None], mapping: dict[str, str | None]
+) -> dict[str, str | None]:
     """Project `raw` (csv column → value) through `mapping`
     (csv column → crm field key) to get `mapped` (crm field key → value).
 
     Unmapped columns are dropped. Columns mapped to None/empty target
     are also dropped (the UI uses None to mean "ignore this column").
     """
-    out: dict[str, Optional[str]] = {}
+    out: dict[str, str | None] = {}
     for col, target in mapping.items():
         if not target:
             continue
@@ -74,7 +76,7 @@ def _apply_mapping(
 
 
 def parse_csv_rows(
-    storage_path: str, mapping: dict[str, Optional[str]]
+    storage_path: str, mapping: dict[str, str | None]
 ) -> tuple[HeaderInfo, Iterator[ParsedRow]]:
     """Parse a CSV file at `storage_path` against `mapping`."""
     data = _open_file_bytes(storage_path)
@@ -90,7 +92,7 @@ def parse_csv_rows(
 
     def _iter() -> Iterator[ParsedRow]:
         for idx, row in enumerate(reader, start=1):
-            raw: dict[str, Optional[str]] = {}
+            raw: dict[str, str | None] = {}
             for i, col in enumerate(columns):
                 value = row[i] if i < len(row) else None
                 if isinstance(value, str):
@@ -106,7 +108,7 @@ def parse_csv_rows(
 
 
 def parse_xlsx_rows(
-    storage_path: str, mapping: dict[str, Optional[str]]
+    storage_path: str, mapping: dict[str, str | None]
 ) -> tuple[HeaderInfo, Iterator[ParsedRow]]:
     """Parse an XLSX file's first sheet at `storage_path`."""
     try:
@@ -133,7 +135,7 @@ def parse_xlsx_rows(
     def _iter() -> Iterator[ParsedRow]:
         try:
             for idx, row in enumerate(rows_iter, start=1):
-                raw: dict[str, Optional[str]] = {}
+                raw: dict[str, str | None] = {}
                 for i, col in enumerate(columns):
                     if not col:
                         continue
@@ -155,7 +157,7 @@ def parse_xlsx_rows(
 
 
 def parse_rows(
-    storage_path: str, mapping: dict[str, Optional[str]]
+    storage_path: str, mapping: dict[str, str | None]
 ) -> tuple[HeaderInfo, Iterator[ParsedRow]]:
     """Dispatch to the CSV or XLSX parser based on extension."""
     ext = storage_path.rsplit(".", 1)[-1].lower()

@@ -8,11 +8,7 @@ import { CreateCampaignModalComponent } from './create-campaign-modal.component'
 import { CampaignsApiService } from './campaigns-api.service';
 import { ContactGroupsApiService } from '../contacts/groups/groups-api.service';
 import { IntegrationsApiService } from '../settings/integrations/integrations-api.service';
-import {
-  TemplateRead,
-  TemplatesApiService,
-} from '../templates/templates-api.service';
-
+import { TemplateRead, TemplatesApiService } from '../templates/templates-api.service';
 
 /**
  * Step 15 — verifies the campaign Create modal's picker reads from
@@ -21,10 +17,7 @@ import {
  * change.
  */
 
-
-function makeTemplate(
-  overrides: Partial<TemplateRead> = {},
-): TemplateRead {
+function makeTemplate(overrides: Partial<TemplateRead> = {}): TemplateRead {
   return {
     id: 'tpl-1',
     org_id: 'org-1',
@@ -48,7 +41,6 @@ function makeTemplate(
   };
 }
 
-
 describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
   let templatesSpy: jasmine.SpyObj<TemplatesApiService>;
   let integrationsSpy: jasmine.SpyObj<IntegrationsApiService>;
@@ -56,17 +48,12 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
   let groupsSpy: jasmine.SpyObj<ContactGroupsApiService>;
 
   function makeFixture(): ComponentFixture<CreateCampaignModalComponent> {
-    templatesSpy = jasmine.createSpyObj<TemplatesApiService>(
-      'TemplatesApiService',
-      ['list'],
-    );
-    templatesSpy.list.and.returnValue(
-      of({ items: [], total: 0, limit: 200, offset: 0 }),
-    );
-    integrationsSpy = jasmine.createSpyObj<IntegrationsApiService>(
-      'IntegrationsApiService',
-      ['getWhatsAppCapacity', 'listWhatsAppTemplates'],
-    );
+    templatesSpy = jasmine.createSpyObj<TemplatesApiService>('TemplatesApiService', ['list']);
+    templatesSpy.list.and.returnValue(of({ items: [], total: 0, limit: 200, offset: 0 }));
+    integrationsSpy = jasmine.createSpyObj<IntegrationsApiService>('IntegrationsApiService', [
+      'getWhatsAppCapacity',
+      'listWhatsAppTemplates',
+    ]);
     integrationsSpy.getWhatsAppCapacity.and.returnValue(
       of({
         is_unlimited: true,
@@ -77,17 +64,12 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
       } as never),
     );
     integrationsSpy.listWhatsAppTemplates.and.returnValue(of([]));
-    campaignsSpy = jasmine.createSpyObj<CampaignsApiService>(
-      'CampaignsApiService',
-      ['create'],
-    );
-    groupsSpy = jasmine.createSpyObj<ContactGroupsApiService>(
-      'ContactGroupsApiService',
-      ['list', 'previewSize'],
-    );
-    groupsSpy.list.and.returnValue(
-      of({ items: [], total: 0, page: 1, size: 0 }),
-    );
+    campaignsSpy = jasmine.createSpyObj<CampaignsApiService>('CampaignsApiService', ['create']);
+    groupsSpy = jasmine.createSpyObj<ContactGroupsApiService>('ContactGroupsApiService', [
+      'list',
+      'previewSize',
+    ]);
+    groupsSpy.list.and.returnValue(of({ items: [], total: 0, page: 1, size: 0 }));
     groupsSpy.previewSize.and.returnValue(of({ count: 0 }));
 
     TestBed.configureTestingModule({

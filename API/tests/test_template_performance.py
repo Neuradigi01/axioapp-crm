@@ -15,6 +15,7 @@ Cases:
   6. Failure classifier maps "template was paused" → template_paused.
   7. Empty / None error text returns ("other", "Other").
 """
+
 from __future__ import annotations
 
 from src.app.core.integrations.whatsapp.templates_analytics import (
@@ -45,49 +46,35 @@ class TestRateHelper:
 
 class TestFailureClassifier:
     def test_rate_limited_substring(self):
-        bucket, label = _classify_failure(
-            "Rate limit hit on Meta's side, retry in 30 minutes."
-        )
+        bucket, label = _classify_failure("Rate limit hit on Meta's side, retry in 30 minutes.")
         assert bucket == "rate_limited"
         assert label == "Rate limited"
 
     def test_throttle_substring_also_rate_limited(self):
-        bucket, _ = _classify_failure(
-            "Sending throttled — wait for capacity."
-        )
+        bucket, _ = _classify_failure("Sending throttled — wait for capacity.")
         assert bucket == "rate_limited"
 
     def test_blocked_maps_to_opted_out(self):
-        bucket, label = _classify_failure(
-            "Recipient has blocked the business."
-        )
+        bucket, label = _classify_failure("Recipient has blocked the business.")
         assert bucket == "opted_out"
         assert label == "Recipient opted out"
 
     def test_invalid_number(self):
-        bucket, label = _classify_failure(
-            "The phone number is invalid for messaging."
-        )
+        bucket, label = _classify_failure("The phone number is invalid for messaging.")
         assert bucket == "invalid_number"
         assert label == "Invalid number"
 
     def test_template_paused(self):
-        bucket, label = _classify_failure(
-            "Template was paused due to poor quality rating."
-        )
+        bucket, label = _classify_failure("Template was paused due to poor quality rating.")
         assert bucket == "template_paused"
         assert label == "Template paused"
 
     def test_disabled_also_template_paused(self):
-        bucket, _ = _classify_failure(
-            "Template has been disabled by Meta."
-        )
+        bucket, _ = _classify_failure("Template has been disabled by Meta.")
         assert bucket == "template_paused"
 
     def test_unknown_falls_back_to_other(self):
-        bucket, label = _classify_failure(
-            "Some never-before-seen Meta error string."
-        )
+        bucket, label = _classify_failure("Some never-before-seen Meta error string.")
         assert bucket == "other"
         assert label == "Other"
 

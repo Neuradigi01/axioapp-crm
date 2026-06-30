@@ -11,11 +11,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  Call,
-  CallTranscript,
-  CallsApiService,
-} from '../calls-api.service';
+import { Call, CallTranscript, CallsApiService } from '../calls-api.service';
 
 /**
  * Transcripts tab â€” left rail of calls (newest first), right pane shows
@@ -85,9 +81,7 @@ export class CallTranscriptsTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.saveError.set(
-            extractApiError(err) ?? 'Could not save transcript.',
-          );
+          this.saveError.set(extractApiError(err) ?? 'Could not save transcript.');
         },
       });
   }
@@ -110,9 +104,7 @@ export class CallTranscriptsTabComponent {
         error: (err: HttpErrorResponse) => {
           this.calls.set([]);
           this.callsLoading.set(false);
-          this.listError.set(
-            extractApiError(err) ?? 'Could not load calls.',
-          );
+          this.listError.set(extractApiError(err) ?? 'Could not load calls.');
         },
       });
   }
@@ -139,12 +131,9 @@ export class CallTranscriptsTabComponent {
           if (err.status === 404) {
             this.transcriptHas404.set(true);
           } else {
-            this.saveError.set(
-              extractApiError(err) ?? 'Could not load transcript.',
-            );
+            this.saveError.set(extractApiError(err) ?? 'Could not load transcript.');
           }
         },
       });
   }
-
 }

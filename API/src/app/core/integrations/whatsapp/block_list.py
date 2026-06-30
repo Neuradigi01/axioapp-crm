@@ -30,13 +30,13 @@ Redis cache layer here would buy a microsecond at the cost of a
 new invalidation path — defer until profiling shows the lookup
 actually matters. The risk-section of the step spec captures this.
 """
+
 from __future__ import annotations
 
 import logging
 import re
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -80,7 +80,7 @@ class BlockedNumberHit:
 _NORMALISE_RE = re.compile(r"\D+")
 
 
-def normalise_phone(raw: Optional[str]) -> str:
+def normalise_phone(raw: str | None) -> str:
     """Strip everything except digits — same rule the contact phone
     column + the WhatsApp inbound webhook use. Returns ``""`` on
     None / empty so callers can short-circuit cheaply."""
@@ -91,10 +91,7 @@ def normalise_phone(raw: Optional[str]) -> str:
 
 def _validate_reason(reason: str) -> str:
     if reason not in BLOCK_REASONS:
-        raise BlockListError(
-            f"unknown reason {reason!r}; must be one of "
-            f"{sorted(BLOCK_REASONS)}"
-        )
+        raise BlockListError(f"unknown reason {reason!r}; must be one of {sorted(BLOCK_REASONS)}")
     return reason
 
 
@@ -102,8 +99,8 @@ async def is_blocked(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    phone: Optional[str],
-) -> Optional[BlockedNumberHit]:
+    phone: str | None,
+) -> BlockedNumberHit | None:
     """Return the matching block-list row when ``phone`` is blocked
     in the active org, ``None`` otherwise.
 
@@ -135,16 +132,14 @@ async def is_blocked(
         return None
     if row is None:
         return None
-    return BlockedNumberHit(
-        id=row.id, phone_number=row.phone_number, reason=row.reason
-    )
+    return BlockedNumberHit(id=row.id, phone_number=row.phone_number, reason=row.reason)
 
 
 async def list_entries(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    search: Optional[str] = None,
+    search: str | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[WhatsAppBlockListEntry], int]:
@@ -153,30 +148,28 @@ async def list_entries(
     ``search`` does an ``ILIKE %x%`` against ``phone_number`` after
     digit normalisation — operators pasting raw "+91 99…" still
     find the row."""
-    base = select(WhatsAppBlockListEntry).where(
-        WhatsAppBlockListEntry.org_id == org_id
-    )
+    base = select(WhatsAppBlockListEntry).where(WhatsAppBlockListEntry.org_id == org_id)
     if search:
         needle = normalise_phone(search)
         if needle:
-            base = base.where(
-                WhatsAppBlockListEntry.phone_number.ilike(f"%{needle}%")
-            )
+            base = base.where(WhatsAppBlockListEntry.phone_number.ilike(f"%{needle}%"))
 
     from sqlalchemy import func
 
     total_stmt = select(func.count()).select_from(base.subquery())
-    total = int(
-        (await session.execute(total_stmt)).scalar_one() or 0
-    )
+    total = int((await session.execute(total_stmt)).scalar_one() or 0)
 
     rows = (
-        await session.execute(
-            base.order_by(WhatsAppBlockListEntry.created_at.desc())
-            .offset(max(0, (page - 1) * size))
-            .limit(max(1, min(size, 200)))
+        (
+            await session.execute(
+                base.order_by(WhatsAppBlockListEntry.created_at.desc())
+                .offset(max(0, (page - 1) * size))
+                .limit(max(1, min(size, 200)))
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows), total
 
 
@@ -186,8 +179,8 @@ async def add_entry(
     org_id: uuid.UUID,
     phone: str,
     reason: str,
-    actor_user_id: Optional[uuid.UUID] = None,
-    notes: Optional[str] = None,
+    actor_user_id: uuid.UUID | None = None,
+    notes: str | None = None,
 ) -> WhatsAppBlockListEntry:
     """Block a number. Idempotent on ``(org_id, phone)`` — the
     unique constraint converts a re-block attempt into a 409-shaped
@@ -210,9 +203,7 @@ async def add_entry(
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
-        raise BlockListError(
-            f"phone {phone} is already on the block list"
-        ) from exc
+        raise BlockListError(f"phone {phone} is already on the block list") from exc
     await session.refresh(row)
 
     await audit.log(
@@ -233,7 +224,7 @@ async def remove_entry(
     *,
     org_id: uuid.UUID,
     entry_id: uuid.UUID,
-    actor_user_id: Optional[uuid.UUID] = None,
+    actor_user_id: uuid.UUID | None = None,
 ) -> bool:
     """Unblock by row id. Returns True when a row was deleted,
     False when the id is unknown / cross-tenant (RLS already
@@ -276,9 +267,7 @@ class BlockedNumberOutbound(RuntimeError):
     Step-21 failure classifier can bucket it."""
 
     def __init__(self, phone: str, reason: str) -> None:
-        super().__init__(
-            f"phone {phone} is on the block list (reason: {reason})"
-        )
+        super().__init__(f"phone {phone} is on the block list (reason: {reason})")
         self.phone = phone
         self.reason = reason
 

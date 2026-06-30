@@ -1,21 +1,10 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CanvasNode } from '../canvas-state.service';
-import {
-  EMAIL_RECIPIENTS,
-  SEND_CATEGORIES,
-} from './editor-contract';
+import { EMAIL_RECIPIENTS, SEND_CATEGORIES } from './editor-contract';
 import { readSendState, sendIsValid } from './send-editor-shared';
-
 
 @Component({
   selector: 'app-send-email-editor',

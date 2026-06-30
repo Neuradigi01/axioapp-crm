@@ -19,11 +19,12 @@ Seven groups:
   7. `MetaGraphClient` — 401 OAuthException flips status to `expired`
      and raises `MetaTokenExpiredError`. `connected`-status guard at init.
 """
+
 from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -32,6 +33,8 @@ import pytest
 from src.app.core.integrations import crypto, service
 from src.app.core.integrations.meta import (
     api_client as gac_module,
+)
+from src.app.core.integrations.meta import (
     oauth,
     subscriptions,
 )
@@ -44,7 +47,6 @@ from src.app.core.integrations.models import (
     IntegrationProvider,
     IntegrationStatus,
 )
-
 
 # --- shared fakes --------------------------------------------------------
 
@@ -70,9 +72,7 @@ class _FakeAsyncClient:
         self.calls: list[dict] = []
         self.responses: list[tuple[str, str, _FakeResponse]] = []
 
-    def respond(
-        self, method: str, url_prefix: str, response: _FakeResponse
-    ) -> None:
+    def respond(self, method: str, url_prefix: str, response: _FakeResponse) -> None:
         self.responses.append((method.upper(), url_prefix, response))
 
     def _lookup(self, method: str, url: str) -> _FakeResponse:
@@ -84,17 +84,18 @@ class _FakeAsyncClient:
             f"registered={[(m, p) for m, p, _ in self.responses]}"
         )
 
-    async def get(
-        self, url: str, *, params: Any = None, headers: Any = None
-    ) -> _FakeResponse:
-        self.calls.append(
-            {"method": "GET", "url": url, "params": params, "headers": headers}
-        )
+    async def get(self, url: str, *, params: Any = None, headers: Any = None) -> _FakeResponse:
+        self.calls.append({"method": "GET", "url": url, "params": params, "headers": headers})
         return self._lookup("GET", url)
 
     async def post(
-        self, url: str, *, params: Any = None, data: Any = None,
-        json: Any = None, headers: Any = None,
+        self,
+        url: str,
+        *,
+        params: Any = None,
+        data: Any = None,
+        json: Any = None,
+        headers: Any = None,
     ) -> _FakeResponse:
         self.calls.append(
             {
@@ -209,9 +210,13 @@ class TestStateSigning:
 
     def test_tampered_signature_raises(self):
         signed = oauth._sign_state(
-            {"provider": "meta", "org_id": str(_ORG_ID),
-             "actor_id": None, "nonce": "x",
-             "exp": int(time.time()) + 600}
+            {
+                "provider": "meta",
+                "org_id": str(_ORG_ID),
+                "actor_id": None,
+                "nonce": "x",
+                "exp": int(time.time()) + 600,
+            }
         )
         body, sig = signed.split(".", 1)
         # Flip the FIRST char of the signature — the last char of a
@@ -225,9 +230,13 @@ class TestStateSigning:
 
     def test_expired_state_raises(self):
         signed = oauth._sign_state(
-            {"provider": "meta", "org_id": str(_ORG_ID),
-             "actor_id": None, "nonce": "x",
-             "exp": int(time.time()) - 1}
+            {
+                "provider": "meta",
+                "org_id": str(_ORG_ID),
+                "actor_id": None,
+                "nonce": "x",
+                "exp": int(time.time()) - 1,
+            }
         )
         with pytest.raises(Exception) as exc:
             oauth.verify_state(signed)
@@ -238,9 +247,13 @@ class TestStateSigning:
         must not authenticate the Meta callback even though both
         providers share the HMAC secret."""
         signed = oauth._sign_state(
-            {"provider": "google_ads", "org_id": str(_ORG_ID),
-             "actor_id": None, "nonce": "x",
-             "exp": int(time.time()) + 600}
+            {
+                "provider": "google_ads",
+                "org_id": str(_ORG_ID),
+                "actor_id": None,
+                "nonce": "x",
+                "exp": int(time.time()) + 600,
+            }
         )
         with pytest.raises(Exception) as exc:
             oauth.verify_state(signed)
@@ -258,9 +271,7 @@ class TestStateSigning:
 
 class TestStartAuthorize:
     def test_returns_facebook_consent_url(self, _meta_oauth_env):
-        url = oauth.start_authorize(
-            org_id=_ORG_ID, actor_id=_ACTOR_ID
-        )
+        url = oauth.start_authorize(org_id=_ORG_ID, actor_id=_ACTOR_ID)
         parsed = urlparse(url)
         assert parsed.netloc == "www.facebook.com"
         assert "/dialog/oauth" in parsed.path
@@ -307,9 +318,7 @@ class TestExchangeShortToken:
             ),
         )
 
-        token = await oauth.exchange_code_for_short_token(
-            "auth-code-123", http_client=client
-        )
+        token = await oauth.exchange_code_for_short_token("auth-code-123", http_client=client)
         assert token == "short-abc"
         # The call shape: GET with params, not POST.
         assert client.calls[0]["method"] == "GET"
@@ -328,9 +337,7 @@ class TestExchangeShortToken:
             ),
         )
         with pytest.raises(Exception) as exc:
-            await oauth.exchange_code_for_short_token(
-                "bad", http_client=client
-            )
+            await oauth.exchange_code_for_short_token("bad", http_client=client)
         assert exc.value.status_code == 400
 
 
@@ -350,33 +357,24 @@ class TestExchangeLongLived:
             ),
         )
 
-        tokens = await oauth.exchange_for_long_lived_token(
-            "short-abc", http_client=client
-        )
+        tokens = await oauth.exchange_for_long_lived_token("short-abc", http_client=client)
         assert tokens.access_token == "long-xyz"
         # ~60 days in the future, allow generous slack.
         delta = tokens.expires_at - int(time.time())
         assert 5000000 < delta < 5300000
         # Was a fb_exchange_token grant.
-        assert (
-            client.calls[0]["params"]["grant_type"]
-            == "fb_exchange_token"
-        )
+        assert client.calls[0]["params"]["grant_type"] == "fb_exchange_token"
         assert client.calls[0]["params"]["fb_exchange_token"] == "short-abc"
 
     @pytest.mark.asyncio
-    async def test_falls_back_to_60_days_when_expires_in_missing(
-        self, _meta_oauth_env
-    ):
+    async def test_falls_back_to_60_days_when_expires_in_missing(self, _meta_oauth_env):
         client = _FakeAsyncClient()
         client.respond(
             "GET",
             "https://graph.facebook.com/v19.0/oauth/access_token",
             _FakeResponse(200, {"access_token": "long-xyz"}),
         )
-        tokens = await oauth.exchange_for_long_lived_token(
-            "short-abc", http_client=client
-        )
+        tokens = await oauth.exchange_for_long_lived_token("short-abc", http_client=client)
         delta = tokens.expires_at - int(time.time())
         # Default = 60 days.
         assert 5100000 < delta < 5200000
@@ -387,9 +385,7 @@ class TestExchangeLongLived:
 
 class TestHandleCallback:
     @pytest.mark.asyncio
-    async def test_happy_path_upserts_encrypted_token(
-        self, _meta_oauth_env
-    ):
+    async def test_happy_path_upserts_encrypted_token(self, _meta_oauth_env):
         client = _FakeAsyncClient()
         # Both token-endpoint legs hit the same URL — _FakeAsyncClient
         # returns the same canned response for both. We use a richer
@@ -447,9 +443,7 @@ class TestHandleCallback:
             assert required in integration.scopes
 
     @pytest.mark.asyncio
-    async def test_callback_with_expired_state_raises(
-        self, _meta_oauth_env
-    ):
+    async def test_callback_with_expired_state_raises(self, _meta_oauth_env):
         client = _FakeAsyncClient()
         expired_state = oauth._sign_state(
             {
@@ -473,16 +467,12 @@ class TestHandleCallback:
         assert client.calls == []
 
     @pytest.mark.asyncio
-    async def test_callback_userinfo_failure_still_persists(
-        self, _meta_oauth_env
-    ):
+    async def test_callback_userinfo_failure_still_persists(self, _meta_oauth_env):
         client = _FakeAsyncClient()
         client.respond(
             "GET",
             "https://graph.facebook.com/v19.0/oauth/access_token",
-            _FakeResponse(
-                200, {"access_token": "long-token", "expires_in": 5184000}
-            ),
+            _FakeResponse(200, {"access_token": "long-token", "expires_in": 5184000}),
         )
         client.respond(
             "GET",
@@ -509,9 +499,7 @@ class TestHandleCallback:
 # --- 6. subscriptions helpers -------------------------------------------
 
 
-def _connected_meta(
-    *, access: str = "long-user-token"
-) -> Integration:
+def _connected_meta(*, access: str = "long-user-token") -> Integration:
     return Integration(
         id=uuid.uuid4(),
         org_id=_ORG_ID,
@@ -519,7 +507,7 @@ def _connected_meta(
         account_label="asha@example.com",
         access_token_enc=crypto.encrypt(access),
         refresh_token_enc=None,
-        token_expires_at=datetime.now(timezone.utc) + timedelta(days=60),
+        token_expires_at=datetime.now(UTC) + timedelta(days=60),
         scopes=["pages_show_list", "leads_retrieval"],
         status=IntegrationStatus.connected,
     )
@@ -554,9 +542,7 @@ class TestSubscriptions:
                 },
             ),
         )
-        graph = MetaGraphClient(
-            integration=row, session=session, http_client=client
-        )
+        graph = MetaGraphClient(integration=row, session=session, http_client=client)
         pages = await subscriptions.list_pages(graph)
         assert [p.page_id for p in pages] == ["page-1", "page-2"]
         assert pages[0].name == "Mumbai Showroom"
@@ -586,9 +572,7 @@ class TestSubscriptions:
                 },
             ),
         )
-        graph = MetaGraphClient(
-            integration=row, session=session, http_client=client
-        )
+        graph = MetaGraphClient(integration=row, session=session, http_client=client)
         pages = await subscriptions.list_pages(graph)
         assert [p.page_id for p in pages] == ["p-1"]
 
@@ -611,9 +595,7 @@ class TestSubscriptions:
                 },
             ),
         )
-        graph = MetaGraphClient(
-            integration=row, session=session, http_client=client
-        )
+        graph = MetaGraphClient(integration=row, session=session, http_client=client)
         forms = await subscriptions.list_lead_forms_for_page(
             graph, page_id="page-1", page_token="page-tok-1"
         )
@@ -632,12 +614,8 @@ class TestSubscriptions:
             "https://graph.facebook.com/v19.0/page-1/subscribed_apps",
             _FakeResponse(200, {"success": True}),
         )
-        graph = MetaGraphClient(
-            integration=row, session=session, http_client=client
-        )
-        ok = await subscriptions.subscribe_page(
-            graph, page_id="page-1", page_token="page-tok-1"
-        )
+        graph = MetaGraphClient(integration=row, session=session, http_client=client)
+        ok = await subscriptions.subscribe_page(graph, page_id="page-1", page_token="page-tok-1")
         assert ok is True
         call = client.calls[0]
         assert call["method"] == "POST"
@@ -656,12 +634,8 @@ class TestSubscriptions:
             "https://graph.facebook.com/v19.0/page-1/subscribed_apps",
             _FakeResponse(200, {"success": True}),
         )
-        graph = MetaGraphClient(
-            integration=row, session=session, http_client=client
-        )
-        ok = await subscriptions.unsubscribe_page(
-            graph, page_id="page-1", page_token="page-tok-1"
-        )
+        graph = MetaGraphClient(integration=row, session=session, http_client=client)
+        ok = await subscriptions.unsubscribe_page(graph, page_id="page-1", page_token="page-tok-1")
         assert ok is True
         assert client.calls[0]["method"] == "DELETE"
 
@@ -683,18 +657,10 @@ class TestSubscriptions:
                 },
             ),
         )
-        graph = MetaGraphClient(
-            integration=row, session=session, http_client=client
-        )
-        assert (
-            await subscriptions.find_page_token(graph, page_id="p-2")
-            == "tok-B"
-        )
+        graph = MetaGraphClient(integration=row, session=session, http_client=client)
+        assert await subscriptions.find_page_token(graph, page_id="p-2") == "tok-B"
         # Unknown page → None.
-        assert (
-            await subscriptions.find_page_token(graph, page_id="p-99")
-            is None
-        )
+        assert await subscriptions.find_page_token(graph, page_id="p-99") is None
 
 
 # --- 7. Graph client: expired-token detection ---------------------------
@@ -714,9 +680,7 @@ class TestExpiredTokenDetection:
                 {"error": {"type": "OAuthException", "code": 190, "message": "Token expired"}},
             ),
         )
-        graph = MetaGraphClient(
-            integration=row, session=session, http_client=client
-        )
+        graph = MetaGraphClient(integration=row, session=session, http_client=client)
         with pytest.raises(MetaTokenExpiredError):
             await subscriptions.list_pages(graph)
         assert row.status == IntegrationStatus.expired
@@ -724,9 +688,7 @@ class TestExpiredTokenDetection:
         assert session.committed is True
 
     @pytest.mark.asyncio
-    async def test_400_with_oauth_exception_also_flips_status(
-        self, _meta_oauth_env
-    ):
+    async def test_400_with_oauth_exception_also_flips_status(self, _meta_oauth_env):
         """Meta sometimes returns 400 (not 401) for revoked tokens.
         The OAuthException sub-code is what we check."""
         row = _connected_meta()
@@ -740,9 +702,7 @@ class TestExpiredTokenDetection:
                 {"error": {"type": "OAuthException", "code": 190, "message": "Revoked"}},
             ),
         )
-        graph = MetaGraphClient(
-            integration=row, session=session, http_client=client
-        )
+        graph = MetaGraphClient(integration=row, session=session, http_client=client)
         with pytest.raises(MetaTokenExpiredError):
             await subscriptions.list_pages(graph)
         assert row.status == IntegrationStatus.expired
@@ -762,9 +722,7 @@ class TestExpiredTokenDetection:
                 {"error": {"type": "GraphMethodException", "code": 100, "message": "Bad request"}},
             ),
         )
-        graph = MetaGraphClient(
-            integration=row, session=session, http_client=client
-        )
+        graph = MetaGraphClient(integration=row, session=session, http_client=client)
         with pytest.raises(Exception) as exc:
             await subscriptions.list_pages(graph)
         # Bubbles up as 502, not MetaTokenExpiredError.
@@ -778,7 +736,5 @@ class TestExpiredTokenDetection:
         row.status = IntegrationStatus.disconnected
         session = _CapturingSession(existing=row)
         with pytest.raises(Exception) as exc:
-            MetaGraphClient(
-                integration=row, session=session, http_client=_FakeAsyncClient()
-            )
+            MetaGraphClient(integration=row, session=session, http_client=_FakeAsyncClient())
         assert exc.value.status_code == 409

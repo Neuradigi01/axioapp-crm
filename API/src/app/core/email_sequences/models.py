@@ -29,12 +29,12 @@ State machine for `EnrollmentState`:
 Tenant-scoped via `TenantScoped` mixin + RLS policy from migrations
 0084 + 0085.
 """
+
 from __future__ import annotations
 
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -74,12 +74,8 @@ class EmailSequence(Base, TenantScoped):
         server_default=text("gen_random_uuid()"),
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -91,9 +87,7 @@ class EmailSequence(Base, TenantScoped):
         server_default=text("now()"),
         onupdate=text("now()"),
     )
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     @property
     def is_deleted(self) -> bool:
@@ -108,16 +102,10 @@ class EmailSequenceStep(Base, TenantScoped):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    sequence_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
+    sequence_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     step_order: Mapped[int] = mapped_column(Integer, nullable=False)
-    delay_days: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("0")
-    )
-    template_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
+    delay_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    template_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -133,18 +121,10 @@ class EmailSequenceEnrollment(Base, TenantScoped):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    sequence_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
-    contact_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
-    lead_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
-    enrolled_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
+    sequence_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    contact_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    enrolled_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     enrolled_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -153,9 +133,7 @@ class EmailSequenceEnrollment(Base, TenantScoped):
     # Stored as TEXT with a DB CHECK constraint (migration 0085) — not
     # a Postgres ENUM, so adding a state in v2 doesn't need an enum-
     # alter migration.
-    state: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default=text("'active'")
-    )
+    state: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
     state_changed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -188,27 +166,13 @@ class EmailSequenceEnrollmentStep(Base, TenantScoped):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    enrollment_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
-    step_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
-    scheduled_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    sent_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    skipped: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
-    skip_reason: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
-    message_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    step_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    skipped: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    skip_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    message_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

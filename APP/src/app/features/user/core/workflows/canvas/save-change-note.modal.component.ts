@@ -1,15 +1,7 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
-
 
 /**
  * Save-change-note modal — pops when the operator clicks Save Draft
@@ -22,13 +14,11 @@ import { LucideAngularModule } from 'lucide-angular';
  * `PATCH /workflows/{id}` payload's `change_note` field.
  */
 
-
 function defaultNote(now: Date = new Date()): string {
   const hh = now.getHours().toString().padStart(2, '0');
   const mm = now.getMinutes().toString().padStart(2, '0');
   return `Edited at ${hh}:${mm}`;
 }
-
 
 @Component({
   selector: 'app-save-change-note-modal',

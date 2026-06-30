@@ -48,4 +48,11 @@ export interface IUpdateUserProfileRequest {
   state_id: number | null;
 }
 
-export type TfaView = 'loading' | 'disabled' | 'setup-authenticator' | 'setup-otp' | 'enabled' | 'change-method' | 'disable';
+export type TfaView =
+  | 'loading'
+  | 'disabled'
+  | 'setup-authenticator'
+  | 'setup-otp'
+  | 'enabled'
+  | 'change-method'
+  | 'disable';

@@ -14,11 +14,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
-import {
-  TemplateChannel,
-  TemplatesApiService,
-  VariableDef,
-} from '../templates-api.service';
+import { TemplateChannel, TemplatesApiService, VariableDef } from '../templates-api.service';
 
 /**
  * Variable picker — shows the allowed `{{contact.*}} / {{org.*}} / etc.`

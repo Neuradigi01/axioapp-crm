@@ -24,6 +24,7 @@ Regex match safety: pattern length capped at the schema layer
 (200 chars); evaluation wrapped in try/except so an operator
 typo doesn't crash inbound webhook handling.
 """
+
 from __future__ import annotations
 
 import logging
@@ -31,8 +32,8 @@ import re
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -95,9 +96,7 @@ def _cooldown_active(rule_id: uuid.UUID, contact_key: str) -> bool:
 
 
 def _set_cooldown(rule_id: uuid.UUID, contact_key: str) -> None:
-    _COOLDOWN_CACHE[(rule_id, contact_key)] = (
-        time.monotonic() + _COOLDOWN_SECONDS
-    )
+    _COOLDOWN_CACHE[(rule_id, contact_key)] = time.monotonic() + _COOLDOWN_SECONDS
 
 
 # --- match helpers --------------------------------------------------------
@@ -126,9 +125,7 @@ def _match_regex(keywords: list[str], text: str) -> bool:
             if re.search(pattern, text, flags=re.IGNORECASE):
                 return True
         except re.error:
-            logger.warning(
-                "keyword_engine: invalid regex pattern %r", pattern
-            )
+            logger.warning("keyword_engine: invalid regex pattern %r", pattern)
             continue
     return False
 
@@ -152,7 +149,7 @@ def _rule_matches(rule: WhatsAppKeywordRule, text: str) -> bool:
 
 @dataclass(frozen=True, slots=True)
 class RuleEvaluationResult:
-    rule: Optional[WhatsAppKeywordRule]
+    rule: WhatsAppKeywordRule | None
     actions: list[WhatsAppKeywordAction]
 
 
@@ -165,28 +162,36 @@ async def evaluate_rules(
     actions. Used by both the live dispatcher and the dry-run
     endpoint. RLS auto-scopes to the active org via TenantScoped."""
     rules = (
-        await session.execute(
-            select(WhatsAppKeywordRule)
-            .where(WhatsAppKeywordRule.enabled.is_(True))
-            .order_by(
-                WhatsAppKeywordRule.priority.asc(),
-                WhatsAppKeywordRule.created_at.asc(),
+        (
+            await session.execute(
+                select(WhatsAppKeywordRule)
+                .where(WhatsAppKeywordRule.enabled.is_(True))
+                .order_by(
+                    WhatsAppKeywordRule.priority.asc(),
+                    WhatsAppKeywordRule.created_at.asc(),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     for rule in rules:
         if _rule_matches(rule, text):
             actions = (
-                await session.execute(
-                    select(WhatsAppKeywordAction)
-                    .where(WhatsAppKeywordAction.rule_id == rule.id)
-                    .order_by(
-                        WhatsAppKeywordAction.position.asc(),
-                        WhatsAppKeywordAction.created_at.asc(),
+                (
+                    await session.execute(
+                        select(WhatsAppKeywordAction)
+                        .where(WhatsAppKeywordAction.rule_id == rule.id)
+                        .order_by(
+                            WhatsAppKeywordAction.position.asc(),
+                            WhatsAppKeywordAction.created_at.asc(),
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return RuleEvaluationResult(rule=rule, actions=list(actions))
 
     return RuleEvaluationResult(rule=None, actions=[])
@@ -214,7 +219,7 @@ async def _action_reply_text(
         text=body,
         attachments=[],
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     sent_at = ref.sent_at or now
     msg = Message(
         org_id=conversation.org_id,
@@ -267,7 +272,7 @@ async def _action_reply_template(
         header_type=template.header_type,
         header_text=template.header_text,
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     sent_at = ref.sent_at or now
     msg = Message(
         org_id=conversation.org_id,
@@ -293,7 +298,7 @@ async def _action_tag_conversation(
     *,
     conversation: Conversation,
     config: dict[str, Any],
-    actor_id: Optional[uuid.UUID],
+    actor_id: uuid.UUID | None,
 ) -> None:
     raw_id = (config or {}).get("tag_id")
     if not isinstance(raw_id, str):
@@ -349,8 +354,8 @@ async def dispatch_keyword_rules(
     session: AsyncSession,
     *,
     conversation: Conversation,
-    text: Optional[str],
-) -> Optional[uuid.UUID]:
+    text: str | None,
+) -> uuid.UUID | None:
     """Live evaluation + action dispatch. Called from
     `receive_webhook` AFTER the auto-reply pipeline.
 
@@ -385,13 +390,9 @@ async def dispatch_keyword_rules(
         action_type = action.action_type
         try:
             if action_type == KeywordActionType.reply_text:
-                await _action_reply_text(
-                    session, conversation=conversation, config=config
-                )
+                await _action_reply_text(session, conversation=conversation, config=config)
             elif action_type == KeywordActionType.reply_template:
-                await _action_reply_template(
-                    session, conversation=conversation, config=config
-                )
+                await _action_reply_template(session, conversation=conversation, config=config)
             elif action_type == KeywordActionType.tag_conversation:
                 await _action_tag_conversation(
                     session,
@@ -400,9 +401,7 @@ async def dispatch_keyword_rules(
                     actor_id=None,
                 )
             elif action_type == KeywordActionType.assign_to_user:
-                _action_assign_to_user(
-                    conversation=conversation, config=config
-                )
+                _action_assign_to_user(conversation=conversation, config=config)
             elif action_type == KeywordActionType.escalate_to_ai:
                 _action_escalate_to_ai(conversation)
         except WhatsAppNotConnected:

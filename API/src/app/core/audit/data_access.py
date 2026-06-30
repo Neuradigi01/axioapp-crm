@@ -13,6 +13,7 @@ Two operations:
     ``action`` / ``entity_type`` / date-range filters. Tenant scoping
     is automatic via the ORM filter on ``TenantScoped``.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -80,9 +81,7 @@ async def list_audit_logs_query(
     count_stmt = select(func.count()).select_from(AuditLog).where(*filters)
 
     total = (await session.execute(count_stmt)).scalar_one()
-    rows = (
-        await session.execute(base.offset((page - 1) * size).limit(size))
-    ).scalars().all()
+    rows = (await session.execute(base.offset((page - 1) * size).limit(size))).scalars().all()
     return list(rows), total
 
 

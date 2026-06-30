@@ -2,7 +2,9 @@
   <div class="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
     <header class="border-b border-zinc-200 px-5 py-3">
       <h2 class="text-sm font-semibold text-zinc-900">Review template</h2>
-      <p class="mt-0.5 text-xs text-zinc-500">{{ template().name }} · v{{ template().current_version }}</p>
+      <p class="mt-0.5 text-xs text-zinc-500">
+        {{ template().name }} · v{{ template().current_version }}
+      </p>
     </header>
 
     <div class="space-y-3 px-5 py-4">
@@ -11,7 +13,11 @@
           type="button"
           (click)="setAction('approve')"
           class="rounded-md border px-2 py-2 font-medium ring-inset"
-          [class]="action() === 'approve' ? 'border-emerald-300 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'"
+          [class]="
+            action() === 'approve'
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
+              : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+          "
         >
           <lucide-icon name="check" size="14" class="mr-1 inline" />
           Approve
@@ -20,7 +26,11 @@
           type="button"
           (click)="setAction('request_changes')"
           class="rounded-md border px-2 py-2 font-medium"
-          [class]="action() === 'request_changes' ? 'border-amber-300 bg-amber-50 text-amber-800 ring-1 ring-amber-200' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'"
+          [class]="
+            action() === 'request_changes'
+              ? 'border-amber-300 bg-amber-50 text-amber-800 ring-1 ring-amber-200'
+              : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+          "
         >
           <lucide-icon name="pencil" size="14" class="mr-1 inline" />
           Request changes
@@ -29,7 +39,11 @@
           type="button"
           (click)="setAction('reject')"
           class="rounded-md border px-2 py-2 font-medium"
-          [class]="action() === 'reject' ? 'border-rose-300 bg-rose-50 text-rose-800 ring-1 ring-rose-200' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'"
+          [class]="
+            action() === 'reject'
+              ? 'border-rose-300 bg-rose-50 text-rose-800 ring-1 ring-rose-200'
+              : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+          "
         >
           <lucide-icon name="x" size="14" class="mr-1 inline" />
           Reject
@@ -63,7 +77,9 @@
       }
     </div>
 
-    <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3">
+    <footer
+      class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3"
+    >
       <button
         type="button"
         (click)="close()"

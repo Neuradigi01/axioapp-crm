@@ -29,6 +29,7 @@ class TwoFactorChallenge:
     if the preferred is no longer usable — e.g. EMAIL_ENABLED flipped off).
     `available_methods` lets the UI offer "try another way".
     """
+
     method: str
     available_methods: list[str]
 
@@ -102,9 +103,7 @@ async def enforce_at_login(
         )
 
     if not submitted_code:
-        await _send_or_noop(
-            db, method=preferred, member_id=member_id, email=email, mobile=mobile
-        )
+        await _send_or_noop(db, method=preferred, member_id=member_id, email=email, mobile=mobile)
         await db.commit()
         return TwoFactorChallenge(method=preferred, available_methods=available)
 
@@ -159,8 +158,6 @@ async def switch_method(
             detail=f"Method '{method}' is not available",
         )
 
-    await _send_or_noop(
-        db, method=method, member_id=member_id, email=email, mobile=mobile
-    )
+    await _send_or_noop(db, method=method, member_id=member_id, email=email, mobile=mobile)
     await db.commit()
     return TryAnotherWayResult(method=method, available_methods=available)

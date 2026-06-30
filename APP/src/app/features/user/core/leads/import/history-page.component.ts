@@ -96,9 +96,7 @@ export class HistoryPageComponent {
     { value: 'custom', label: 'Custom' },
   ];
 
-  protected readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.total() / PAGE_SIZE)),
-  );
+  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / PAGE_SIZE)));
 
   protected readonly hasResults = computed(() => this.rows().length > 0);
 
@@ -120,8 +118,10 @@ export class HistoryPageComponent {
     this.loadError.set(null);
     this.api
       .list({
-        status: this.statusFilter() === 'all' ? undefined : this.statusFilter() as LeadImportStatus,
-        sourcePlatform: this.platformFilter() === 'all' ? undefined : this.platformFilter() as SourcePlatform,
+        status:
+          this.statusFilter() === 'all' ? undefined : (this.statusFilter() as LeadImportStatus),
+        sourcePlatform:
+          this.platformFilter() === 'all' ? undefined : (this.platformFilter() as SourcePlatform),
         page: this.page(),
         size: PAGE_SIZE,
       })
@@ -134,9 +134,7 @@ export class HistoryPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not load import history.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not load import history.');
         },
       });
   }
@@ -149,9 +147,7 @@ export class HistoryPageComponent {
   }
 
   protected onPlatformChange(event: Event): void {
-    this.platformFilter.set(
-      (event.target as HTMLSelectElement).value as PlatformFilter,
-    );
+    this.platformFilter.set((event.target as HTMLSelectElement).value as PlatformFilter);
     this.page.set(1);
   }
 
@@ -166,9 +162,7 @@ export class HistoryPageComponent {
   // --- kebab + actions ----------------------------------------------
 
   protected toggleKebab(importId: string): void {
-    this.kebab.update((k) =>
-      k.importId === importId ? { importId: null } : { importId },
-    );
+    this.kebab.update((k) => (k.importId === importId ? { importId: null } : { importId }));
   }
 
   protected closeKebab(): void {
@@ -211,8 +205,7 @@ export class HistoryPageComponent {
       .downloadErrors(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (blob) =>
-          this.triggerBlobDownload(blob, `import-${row.id}-errors.csv`),
+        next: (blob) => this.triggerBlobDownload(blob, `import-${row.id}-errors.csv`),
         error: () => this.loadError.set('Could not download error report.'),
         complete: () => this.downloading.set(null),
       });
@@ -232,9 +225,7 @@ export class HistoryPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.cancelling.set(null);
-          this.loadError.set(
-            extractApiError(err) ?? 'Could not cancel import.',
-          );
+          this.loadError.set(extractApiError(err) ?? 'Could not cancel import.');
         },
       });
   }

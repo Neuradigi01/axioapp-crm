@@ -15,6 +15,7 @@ Tenant-scoped (RLS on, ORM filter applied). Indexed for the hot path:
 `(org_id, pipeline_stage)` for the kanban "show this column" reads;
 `assigned_to_id` for "my leads".
 """
+
 from __future__ import annotations
 
 import enum
@@ -132,9 +133,7 @@ class Lead(Base, TenantScoped):
     # in the DB via the `ck_leads_lost_reason_picklist` CHECK
     # constraint added in migration 0054.
     lost_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    lost_reason_other: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
+    lost_reason_other: Mapped[str | None] = mapped_column(String(255), nullable=True)
     custom_data: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,

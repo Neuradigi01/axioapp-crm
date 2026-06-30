@@ -24,6 +24,7 @@ path read the live body in one query without scanning versions.
 are append-only audit tables. No service writes to them in Step 1;
 Steps 4 + 5 wire them.
 """
+
 from __future__ import annotations
 
 import enum
@@ -170,9 +171,7 @@ class MessageTemplate(Base, TenantScoped):
         primary_key=True,
         server_default=sql_text("gen_random_uuid()"),
     )
-    channel: Mapped[ConversationChannel] = mapped_column(
-        conversation_channel_enum, nullable=False
-    )
+    channel: Mapped[ConversationChannel] = mapped_column(conversation_channel_enum, nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     category: Mapped[TemplateCategory] = mapped_column(
         template_category_enum,
@@ -190,9 +189,7 @@ class MessageTemplate(Base, TenantScoped):
     # 998-char ceiling matches RFC 5322 subject-line max; push truncates
     # to its own 50-char limit in the editor layer.
     subject: Mapped[str | None] = mapped_column(String(998), nullable=True)
-    preview_text: Mapped[str | None] = mapped_column(
-        String(190), nullable=True
-    )
+    preview_text: Mapped[str | None] = mapped_column(String(190), nullable=True)
     # Set of ``{{var}}`` references the body uses, parsed by the
     # service layer on create/update (Step 2). Stored as a list of
     # strings, e.g. ``["contact.first_name", "org.name"]``.
@@ -211,18 +208,12 @@ class MessageTemplate(Base, TenantScoped):
     )
     # Meta template id / future DLT template id / future provider ids.
     # Kept as free text because each provider's id shape differs.
-    external_provider_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
+    external_provider_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     current_version: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=sql_text("1")
     )
-    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
-    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -266,9 +257,7 @@ class MessageTemplateVersion(Base, TenantScoped):
     variables: Mapped[list[Any]] = mapped_column(
         JSONB, nullable=False, server_default=sql_text("'[]'::jsonb")
     )
-    changed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    changed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     changed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -302,9 +291,7 @@ class MessageTemplateReview(Base, TenantScoped):
         nullable=False,
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
-    reviewer_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    reviewer_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     action: Mapped[TemplateReviewAction] = mapped_column(
         template_review_action_enum, nullable=False
     )
@@ -343,16 +330,10 @@ class MessageTemplateTestSend(Base, TenantScoped):
         nullable=False,
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
-    channel: Mapped[ConversationChannel] = mapped_column(
-        conversation_channel_enum, nullable=False
-    )
+    channel: Mapped[ConversationChannel] = mapped_column(conversation_channel_enum, nullable=False)
     sent_to: Mapped[str] = mapped_column(String(255), nullable=False)
-    sent_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
-    channel_message_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
+    sent_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    channel_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sent_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

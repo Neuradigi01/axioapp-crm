@@ -17,6 +17,7 @@ The public endpoint applies an IP-based rate limit (in-process
 sliding window — sufficient for the 1k-link scale we expect; if
 a customer ships ten million billboards we'll move to a Redis
 backend, see the risks section of the step spec)."""
+
 from __future__ import annotations
 
 import logging
@@ -110,13 +111,9 @@ async def list_endpoint(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> _QuickLinkListOut:
-    rows, total = await list_links(
-        db, org_id=user.org_id, page=page, size=size
-    )
+    rows, total = await list_links(db, org_id=user.org_id, page=page, size=size)
     return _QuickLinkListOut(
         items=[_QuickLinkOut.model_validate(r) for r in rows],
         total=total,
@@ -133,9 +130,7 @@ async def list_endpoint(
 async def create_endpoint(
     payload: _QuickLinkCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> _QuickLinkOut:
     try:
         row = await create_link(
@@ -159,9 +154,7 @@ async def update_endpoint(
     link_id: uuid.UUID,
     payload: _QuickLinkUpdate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> _QuickLinkOut:
     try:
         row = await update_link(
@@ -173,28 +166,20 @@ async def update_endpoint(
             prefilled_message=payload.prefilled_message,
         )
     except QuickLinksError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     return _QuickLinkOut.model_validate(row)
 
 
-@router.delete(
-    "/{link_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_endpoint(
     link_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> Response:
     try:
         await delete_link(db, org_id=user.org_id, link_id=link_id)
     except QuickLinksError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -202,18 +187,12 @@ async def delete_endpoint(
 async def stats_endpoint(
     link_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> dict[str, Any]:
     try:
-        return await link_stats(
-            db, org_id=user.org_id, link_id=link_id
-        )
+        return await link_stats(db, org_id=user.org_id, link_id=link_id)
     except QuickLinksError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 
 @router.get(
@@ -226,14 +205,13 @@ async def qr_png_endpoint(
     size: int = Query(default=512, ge=128, le=2048),
     request: Request = None,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> Response:
+    from sqlalchemy import select
+
     from src.app.core.integrations.whatsapp.models import (
         WhatsAppQuickLink,
     )
-    from sqlalchemy import select
 
     row = (
         await db.execute(
@@ -244,9 +222,7 @@ async def qr_png_endpoint(
         )
     ).scalar_one_or_none()
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="link not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="link not found")
     public_url = _public_redirect_url(request, row.code) + "?src=qr"
     try:
         blob = render_png(public_url, size_px=size)
@@ -259,9 +235,7 @@ async def qr_png_endpoint(
         content=blob,
         media_type="image/png",
         headers={
-            "Content-Disposition": (
-                f'inline; filename="qr-{row.code}.png"'
-            ),
+            "Content-Disposition": (f'inline; filename="qr-{row.code}.png"'),
             "Cache-Control": "public, max-age=600",
         },
     )
@@ -276,14 +250,13 @@ async def qr_svg_endpoint(
     link_id: uuid.UUID,
     request: Request = None,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(
-        require_permissions("whatsapp.automation.manage")
-    ),
+    user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> Response:
+    from sqlalchemy import select
+
     from src.app.core.integrations.whatsapp.models import (
         WhatsAppQuickLink,
     )
-    from sqlalchemy import select
 
     row = (
         await db.execute(
@@ -294,9 +267,7 @@ async def qr_svg_endpoint(
         )
     ).scalar_one_or_none()
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="link not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="link not found")
     public_url = _public_redirect_url(request, row.code) + "?src=qr"
     try:
         blob = render_svg(public_url)
@@ -309,9 +280,7 @@ async def qr_svg_endpoint(
         content=blob,
         media_type="image/svg+xml",
         headers={
-            "Content-Disposition": (
-                f'inline; filename="qr-{row.code}.svg"'
-            ),
+            "Content-Disposition": (f'inline; filename="qr-{row.code}.svg"'),
             "Cache-Control": "public, max-age=600",
         },
     )

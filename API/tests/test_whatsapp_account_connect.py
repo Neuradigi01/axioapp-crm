@@ -22,10 +22,11 @@ What we prove:
      persists `last_error` on rejection; recovers to connected on
      success.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -47,7 +48,6 @@ from src.app.core.integrations.whatsapp.schemas import (
     WhatsAppConnectIn,
     WhatsAppStatusOut,
 )
-
 
 _ORG_ID = uuid.uuid4()
 _ACTOR_ID = uuid.uuid4()
@@ -201,7 +201,7 @@ def _existing_connected_pair() -> tuple[Integration, WhatsAppAccountConfig]:
         scopes=None,
         status=IntegrationStatus.connected,
         last_error=None,
-        connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         connected_by=_ACTOR_ID,
     )
     config = WhatsAppAccountConfig(
@@ -235,12 +235,8 @@ class TestConnect:
         )
 
         # One Integration row + one WhatsAppAccountConfig row inserted.
-        integrations = [
-            r for r in session.added if isinstance(r, Integration)
-        ]
-        configs = [
-            r for r in session.added if isinstance(r, WhatsAppAccountConfig)
-        ]
+        integrations = [r for r in session.added if isinstance(r, Integration)]
+        configs = [r for r in session.added if isinstance(r, WhatsAppAccountConfig)]
         assert len(integrations) == 1
         assert len(configs) == 1
 
@@ -259,10 +255,7 @@ class TestConnect:
         assert integration.access_token_enc is not None
         assert "plaintext-token" not in integration.access_token_enc
         assert integration.access_token_enc.startswith("gAAAA")
-        assert (
-            crypto.decrypt(integration.access_token_enc)
-            == "EAAxxx-plaintext-token"
-        )
+        assert crypto.decrypt(integration.access_token_enc) == "EAAxxx-plaintext-token"
 
         # Sidecar shape.
         assert config.org_id == _ORG_ID
@@ -291,9 +284,7 @@ class TestConnect:
     @pytest.mark.asyncio
     async def test_invalid_token_marks_error_no_sidecar(self):
         session = _CapturingSession()
-        with pytest.raises(
-            wa_connect.MetaValidationError, match="Invalid OAuth"
-        ):
+        with pytest.raises(wa_connect.MetaValidationError, match="Invalid OAuth"):
             await wa_connect.connect_account(
                 session,
                 org_id=_ORG_ID,
@@ -303,17 +294,13 @@ class TestConnect:
             )
 
         # Failure path: Integration row added with status=error.
-        integrations = [
-            r for r in session.added if isinstance(r, Integration)
-        ]
+        integrations = [r for r in session.added if isinstance(r, Integration)]
         assert len(integrations) == 1
         assert integrations[0].status == IntegrationStatus.error
         assert "Invalid OAuth" in (integrations[0].last_error or "")
 
         # And NO sidecar created — rejected creds don't deserve a cache.
-        configs = [
-            r for r in session.added if isinstance(r, WhatsAppAccountConfig)
-        ]
+        configs = [r for r in session.added if isinstance(r, WhatsAppAccountConfig)]
         assert configs == []
 
 
@@ -328,9 +315,7 @@ class TestDisconnect:
         session.rows[Integration] = [integration]
         session.rows[WhatsAppAccountConfig] = [config]
 
-        row = await wa_connect.disconnect_account(
-            session, actor_id=_ACTOR_ID
-        )
+        row = await wa_connect.disconnect_account(session, actor_id=_ACTOR_ID)
 
         assert row is integration
         assert row.access_token_enc is None
@@ -343,9 +328,7 @@ class TestDisconnect:
     @pytest.mark.asyncio
     async def test_disconnect_missing_row_returns_none(self):
         session = _CapturingSession()
-        row = await wa_connect.disconnect_account(
-            session, actor_id=_ACTOR_ID
-        )
+        row = await wa_connect.disconnect_account(session, actor_id=_ACTOR_ID)
         assert row is None
         assert session.commits == 0
 
@@ -357,9 +340,7 @@ class TestDisconnect:
         integration.access_token_enc = None
         session.rows[Integration] = [integration]
 
-        row = await wa_connect.disconnect_account(
-            session, actor_id=_ACTOR_ID
-        )
+        row = await wa_connect.disconnect_account(session, actor_id=_ACTOR_ID)
         assert row is integration
         # No second commit — already disconnected.
         assert session.commits == 0
@@ -376,9 +357,7 @@ class TestTestConnection:
         session.rows[Integration] = [integration]
         session.rows[WhatsAppAccountConfig] = [config]
 
-        result = await wa_connect.test_connection(
-            session, http_client_factory=_meta_ok_factory()
-        )
+        result = await wa_connect.test_connection(session, http_client_factory=_meta_ok_factory())
         assert result["status"] == "connected"
         assert integration.status == IntegrationStatus.connected
         assert integration.last_error is None
@@ -390,24 +369,16 @@ class TestTestConnection:
         session.rows[Integration] = [integration]
         session.rows[WhatsAppAccountConfig] = [config]
 
-        with pytest.raises(
-            wa_connect.MetaValidationError, match="Invalid OAuth"
-        ):
-            await wa_connect.test_connection(
-                session, http_client_factory=_meta_401_factory()
-            )
+        with pytest.raises(wa_connect.MetaValidationError, match="Invalid OAuth"):
+            await wa_connect.test_connection(session, http_client_factory=_meta_401_factory())
         assert integration.status == IntegrationStatus.error
         assert "Invalid OAuth" in (integration.last_error or "")
 
     @pytest.mark.asyncio
     async def test_raises_when_never_connected(self):
         session = _CapturingSession()
-        with pytest.raises(
-            wa_connect.MetaValidationError, match="not connected"
-        ):
-            await wa_connect.test_connection(
-                session, http_client_factory=_meta_ok_factory()
-            )
+        with pytest.raises(wa_connect.MetaValidationError, match="not connected"):
+            await wa_connect.test_connection(session, http_client_factory=_meta_ok_factory())
 
     @pytest.mark.asyncio
     async def test_raises_when_disconnected(self):
@@ -417,12 +388,8 @@ class TestTestConnection:
         integration.access_token_enc = None
         session.rows[Integration] = [integration]
 
-        with pytest.raises(
-            wa_connect.MetaValidationError, match="disconnected"
-        ):
-            await wa_connect.test_connection(
-                session, http_client_factory=_meta_ok_factory()
-            )
+        with pytest.raises(wa_connect.MetaValidationError, match="disconnected"):
+            await wa_connect.test_connection(session, http_client_factory=_meta_ok_factory())
 
 
 # --- status projection ---------------------------------------------------

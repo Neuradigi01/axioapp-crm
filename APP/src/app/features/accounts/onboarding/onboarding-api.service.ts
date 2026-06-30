@@ -19,8 +19,6 @@ export class OnboardingApiService {
   /** Public endpoint — no auth required. Returns the ordered list of
    * tiles (real packs + "Coming soon" placeholders). */
   getCatalog(): Observable<CatalogResponse> {
-    return this.http.get<CatalogResponse>(
-      `${environment.apiBaseUrl}/packs/catalog`,
-    );
+    return this.http.get<CatalogResponse>(`${environment.apiBaseUrl}/packs/catalog`);
   }
 }

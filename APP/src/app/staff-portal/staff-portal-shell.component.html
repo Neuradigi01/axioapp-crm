@@ -1,8 +1,14 @@
 <div class="flex min-h-screen flex-col bg-zinc-50">
   <!-- Top bar -->
-  <header class="flex flex-col gap-3 border-b border-zinc-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+  <header
+    class="flex flex-col gap-3 border-b border-zinc-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6"
+  >
     <div class="flex items-center gap-3">
-      <div class="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-sm font-bold text-white">F</div>
+      <div
+        class="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-sm font-bold text-white"
+      >
+        F
+      </div>
       <div class="min-w-0">
         <p class="text-sm font-semibold text-zinc-900">Staff Portal</p>
         @if (fullName(); as name) {
@@ -36,11 +42,7 @@
             : 'bg-emerald-600 text-white hover:bg-emerald-700')
         "
       >
-        {{
-          clockingIn() ? 'Clocking In…'
-          : clockingOut() ? 'Clocking Out…'
-          : clockButtonLabel()
-        }}
+        {{ clockingIn() ? 'Clocking In…' : clockingOut() ? 'Clocking Out…' : clockButtonLabel() }}
       </button>
       <button
         type="button"

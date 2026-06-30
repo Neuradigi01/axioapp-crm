@@ -7,13 +7,15 @@ pre-check. Verifies that every transition appends one
 
 Uses the function-scoped ``test_db`` fixture from ``conftest.py``.
 """
+
 from __future__ import annotations
 
 import uuid
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import select
+from sqlalchemy import text as sql_text
 
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.settings.models import OrgSettings
@@ -26,7 +28,6 @@ from src.app.core.templates.exceptions import (
     TemplateError,
 )
 from src.app.core.templates.models import (
-    MessageTemplate,
     MessageTemplateReview,
     TemplateCategory,
     TemplateExternalStatus,
@@ -35,7 +36,6 @@ from src.app.core.templates.models import (
 )
 from src.app.core.templates.schemas import TemplateCreate
 from src.app.shared.context import RequestContext, reset_context, set_context
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -46,10 +46,7 @@ async def org_and_settings(test_db):
     so individual tests can flip the toggles by direct row mutation."""
     org_id = uuid.uuid4()
     await test_db.execute(
-        sql_text(
-            "INSERT INTO tbl_organizations (id, name, slug) "
-            "VALUES (:id, :name, :slug)"
-        ),
+        sql_text("INSERT INTO tbl_organizations (id, name, slug) VALUES (:id, :name, :slug)"),
         {"id": str(org_id), "name": "Demo", "slug": f"demo-{org_id.hex[:6]}"},
     )
     settings = OrgSettings(org_id=org_id)
@@ -70,9 +67,7 @@ def _email_payload(name: str = "T") -> TemplateCreate:
 
 
 async def _make_draft(test_db, *, org_id, author_uuid=None):
-    token = set_context(
-        RequestContext(org_id=org_id, user_id=author_uuid or uuid.uuid4())
-    )
+    token = set_context(RequestContext(org_id=org_id, user_id=author_uuid or uuid.uuid4()))
     try:
         return await templates_service.create_template(
             test_db,
@@ -139,12 +134,16 @@ async def test_full_happy_path(test_db, org_and_settings):
 
         # 3 review rows recorded.
         reviews = (
-            await test_db.execute(
-                select(MessageTemplateReview)
-                .where(MessageTemplateReview.template_id == template.id)
-                .order_by(MessageTemplateReview.created_at.asc())
+            (
+                await test_db.execute(
+                    select(MessageTemplateReview)
+                    .where(MessageTemplateReview.template_id == template.id)
+                    .order_by(MessageTemplateReview.created_at.asc())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert [r.action for r in reviews] == [
             TemplateReviewAction.submit,
             TemplateReviewAction.approve,
@@ -232,13 +231,17 @@ async def test_archive_idempotent(test_db, org_and_settings):
         assert t2.internal_status == TemplateInternalStatus.archived
         # Only one review row (the first archive); the second was a no-op.
         count = (
-            await test_db.execute(
-                select(MessageTemplateReview).where(
-                    MessageTemplateReview.template_id == template.id,
-                    MessageTemplateReview.action == TemplateReviewAction.archive,
+            (
+                await test_db.execute(
+                    select(MessageTemplateReview).where(
+                        MessageTemplateReview.template_id == template.id,
+                        MessageTemplateReview.action == TemplateReviewAction.archive,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(count) == 1
     finally:
         reset_context(token)
@@ -334,9 +337,7 @@ async def test_self_approve_blocked_by_default(test_db, org_and_settings):
         reset_context(token)
 
 
-async def test_self_approve_allowed_when_org_setting_on(
-    test_db, org_and_settings
-):
+async def test_self_approve_allowed_when_org_setting_on(test_db, org_and_settings):
     org_id, settings = org_and_settings
     settings.template_review_self_approve_allowed = True
     await test_db.commit()
@@ -365,9 +366,7 @@ async def test_self_approve_allowed_when_org_setting_on(
 # --- mandatory-review toggle -------------------------------------------
 
 
-async def test_publish_from_draft_when_review_optional(
-    test_db, org_and_settings
-):
+async def test_publish_from_draft_when_review_optional(test_db, org_and_settings):
     """Default ``template_review_mandatory=false`` lets ``draft →
     published`` happen without an intermediate review."""
     org_id, _ = org_and_settings
@@ -385,9 +384,7 @@ async def test_publish_from_draft_when_review_optional(
         reset_context(token)
 
 
-async def test_publish_from_draft_blocked_when_review_mandatory(
-    test_db, org_and_settings
-):
+async def test_publish_from_draft_blocked_when_review_mandatory(test_db, org_and_settings):
     """With ``template_review_mandatory=true`` the workflow forces
     every template through ``in_review → approved`` first."""
     org_id, settings = org_and_settings

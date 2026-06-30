@@ -1,11 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 
-import {
-  WorkflowGraph,
-  WorkflowRead,
-} from '../workflows-api.service';
+import { WorkflowGraph, WorkflowRead } from '../workflows-api.service';
 import { getNodeType } from './node-type-registry';
-
 
 /**
  * Per-tab canvas state for the workflow editor.
@@ -28,17 +24,14 @@ import { getNodeType } from './node-type-registry';
  * this workflow" banner.
  */
 
-
 export type CanvasNode = NonNullable<WorkflowGraph['nodes']>[number];
 export type CanvasEdge = NonNullable<WorkflowGraph['edges']>[number];
-
 
 const MAX_UNDO = 50;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4.0;
 const DEFAULT_NODE_WIDTH = 220;
 const DEFAULT_NODE_HEIGHT = 110;
-
 
 function cloneGraph(graph: WorkflowGraph): WorkflowGraph {
   return {
@@ -51,11 +44,9 @@ function cloneGraph(graph: WorkflowGraph): WorkflowGraph {
   };
 }
 
-
 function emptyGraph(): WorkflowGraph {
   return { nodes: [], edges: [] };
 }
-
 
 function newNodeId(): string {
   // Sufficient uniqueness within a single workflow; the engine treats
@@ -63,11 +54,9 @@ function newNodeId(): string {
   return `n_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
 }
 
-
 function newEdgeId(): string {
   return `e_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
 }
-
 
 @Injectable()
 export class CanvasStateService {
@@ -107,7 +96,6 @@ export class CanvasStateService {
     if (id === null) return null;
     return this.nodesSig().find((n) => n.id === id) ?? null;
   });
-
 
   // --- load + serialize -----------------------------------------------
 
@@ -182,7 +170,6 @@ export class CanvasStateService {
     this.workflowIdSig.set(value);
   }
 
-
   // --- undo / redo plumbing -------------------------------------------
 
   private pushUndo(): void {
@@ -230,7 +217,6 @@ export class CanvasStateService {
     this.canRedo.set(this.redoStack.length > 0);
   }
 
-
   // --- node mutations -------------------------------------------------
 
   addNode(
@@ -258,9 +244,7 @@ export class CanvasStateService {
     if (!this.nodesSig().some((n) => n.id === nodeId)) return;
     this.pushUndo();
     this.nodesSig.update((arr) => arr.filter((n) => n.id !== nodeId));
-    this.edgesSig.update((arr) =>
-      arr.filter((e) => e.source !== nodeId && e.target !== nodeId),
-    );
+    this.edgesSig.update((arr) => arr.filter((e) => e.source !== nodeId && e.target !== nodeId));
     if (this.selectedNodeIdSig() === nodeId) {
       this.selectedNodeIdSig.set(null);
     }
@@ -328,11 +312,7 @@ export class CanvasStateService {
     if (!this.nodesSig().some((n) => n.id === nodeId)) return;
     this.pushUndo();
     this.nodesSig.update((arr) =>
-      arr.map((n) =>
-        n.id === nodeId
-          ? { ...n, config: { ...(n.config ?? {}), ...patch } }
-          : n,
-      ),
+      arr.map((n) => (n.id === nodeId ? { ...n, config: { ...(n.config ?? {}), ...patch } } : n)),
     );
     this.dirtySig.set(true);
   }
@@ -341,21 +321,15 @@ export class CanvasStateService {
     this.selectedNodeIdSig.set(nodeId);
   }
 
-
   // --- edge mutations -------------------------------------------------
 
-  addEdge(
-    source: string,
-    target: string,
-    label: string | null = null,
-  ): CanvasEdge | null {
+  addEdge(source: string, target: string, label: string | null = null): CanvasEdge | null {
     // Reject self-loops + cycles to the same target.
     if (source === target) return null;
     // Reject duplicate edges (same source/target/label).
     if (
       this.edgesSig().some(
-        (e) =>
-          e.source === source && e.target === target && (e.label ?? null) === label,
+        (e) => e.source === source && e.target === target && (e.label ?? null) === label,
       )
     ) {
       return null;
@@ -384,7 +358,6 @@ export class CanvasStateService {
     this.edgesSig.update((arr) => arr.filter((e) => e.id !== edgeId));
     this.dirtySig.set(true);
   }
-
 
   // --- camera ---------------------------------------------------------
 

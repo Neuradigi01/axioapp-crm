@@ -1,12 +1,18 @@
 import os
 import uuid
 from datetime import datetime
+
 from fastapi import UploadFile
+
 from config import STATIC_DIR
 from src.constants import messages
 from src.constants.file_types import (
-    ALLOWED_EXTENSIONS, BLOCKED_EXTENSIONS, MAX_FILE_SIZE_BYTES,
-    FILE_MAGIC_BYTES, MIME_EXTENSION_MAP, TEXT_EXTENSIONS,
+    ALLOWED_EXTENSIONS,
+    BLOCKED_EXTENSIONS,
+    FILE_MAGIC_BYTES,
+    MAX_FILE_SIZE_BYTES,
+    MIME_EXTENSION_MAP,
+    TEXT_EXTENSIONS,
 )
 
 
@@ -22,10 +28,10 @@ def _detect_file_type(content: bytes) -> str | None:
     Returns the MIME type string if recognized, None otherwise.
     """
     for magic, mime in FILE_MAGIC_BYTES.items():
-        if content[:len(magic)] == magic:
+        if content[: len(magic)] == magic:
             # WebP: RIFF container must also contain 'WEBP' at offset 8
-            if magic == b'RIFF':
-                if len(content) >= 12 and content[8:12] == b'WEBP':
+            if magic == b"RIFF":
+                if len(content) >= 12 and content[8:12] == b"WEBP":
                     return mime
                 continue
             return mime
@@ -109,12 +115,12 @@ def save_file(content: bytes, ext: str, original_filename: str, subfolder: str =
     detected_mime = _detect_file_type(content)
     if detected_mime is None:
         mime_map = {
-            '.txt': 'text/plain',
-            '.csv': 'text/csv',
-            '.rtf': 'application/rtf',
-            '.svg': 'image/svg+xml',
+            ".txt": "text/plain",
+            ".csv": "text/csv",
+            ".rtf": "application/rtf",
+            ".svg": "image/svg+xml",
         }
-        detected_mime = mime_map.get(ext, 'application/octet-stream')
+        detected_mime = mime_map.get(ext, "application/octet-stream")
 
     relative_path = f"uploads/{subfolder}/{date_folder}/{stored_name}"
 

@@ -14,6 +14,7 @@ Tenant-scoped (RLS on, ORM filter applied). `uploaded_by` is a plain
 UUID with no FK — post-0037 convention (the legacy `users` table is
 on soak).
 """
+
 from __future__ import annotations
 
 import enum
@@ -62,9 +63,7 @@ class LeadImport(Base, TenantScoped):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    uploaded_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
+    uploaded_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     source_platform: Mapped[str] = mapped_column(String(32), nullable=False)
     original_filename: Mapped[str] = mapped_column(Text, nullable=False)
@@ -77,9 +76,7 @@ class LeadImport(Base, TenantScoped):
         nullable=False,
         server_default=text("'awaiting_mapping'"),
     )
-    mapping: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True
-    )
+    mapping: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     counts: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     error_report_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -122,13 +119,9 @@ class ImportPreset(Base):
     source_platform: Mapped[str] = mapped_column(String(32), nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     mapping: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    is_system: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
+    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     # No FK — post-0037 convention.
-    created_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

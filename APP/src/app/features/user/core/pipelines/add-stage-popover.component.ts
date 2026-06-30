@@ -14,11 +14,7 @@ import { FormsModule } from '@angular/forms';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  PipelineStage,
-  PipelinesApiService,
-  StageCreate,
-} from './pipelines-api.service';
+import { PipelineStage, PipelinesApiService, StageCreate } from './pipelines-api.service';
 
 /**
  * Reusable popover for adding a new pipeline stage. Self-contained,

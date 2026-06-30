@@ -1,4 +1,14 @@
-import { Component, ChangeDetectionStrategy, signal, output, inject, OnInit, OnDestroy, ElementRef, viewChild } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  signal,
+  output,
+  inject,
+  OnInit,
+  OnDestroy,
+  ElementRef,
+  viewChild,
+} from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 import { AuthApiService } from '@app/services/auth-api.service';
@@ -120,7 +130,9 @@ export class CaptchaComponent implements OnInit, OnDestroy {
   // ── reCAPTCHA v3 (invisible) ────────────────────────────────────────
 
   private async initRecaptchaV3(): Promise<void> {
-    await this.loadRecaptchaScript(`https://www.google.com/recaptcha/api.js?render=${this.recaptchaSiteKey}`);
+    await this.loadRecaptchaScript(
+      `https://www.google.com/recaptcha/api.js?render=${this.recaptchaSiteKey}`,
+    );
     await this.executeRecaptchaV3();
   }
 

@@ -18,9 +18,11 @@ pattern matches the conversations channel registry; a future
 config-driven rewrite would slot in here without touching the
 engine's call sites.
 """
+
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 class ActionNotRegistered(Exception):
@@ -61,9 +63,7 @@ def resolve(action_type: str) -> Any:
     ``errored`` with ``error='unknown_action'``."""
     factory = _factories.get(action_type)
     if factory is None:
-        raise ActionNotRegistered(
-            f"no handler registered for action type '{action_type}'"
-        )
+        raise ActionNotRegistered(f"no handler registered for action type '{action_type}'")
     return factory()
 
 

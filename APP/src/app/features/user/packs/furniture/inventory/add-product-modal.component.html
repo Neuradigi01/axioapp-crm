@@ -1,10 +1,12 @@
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 px-4 py-8 overflow-y-auto">
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 px-4 py-8 overflow-y-auto"
+>
   <div class="w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl">
     <header class="mb-4">
       <h2 class="text-lg font-semibold text-zinc-900">Add new product</h2>
       <p class="mt-1 text-xs text-zinc-500">
-        Creates a catalog entry and an inventory row in one transaction.
-        Image upload is optional and runs after the create.
+        Creates a catalog entry and an inventory row in one transaction. Image upload is optional
+        and runs after the create.
       </p>
     </header>
 
@@ -21,12 +23,7 @@
             } @else {
               📷
             }
-            <input
-              type="file"
-              accept="image/*"
-              (change)="onFile($event)"
-              class="hidden"
-            />
+            <input type="file" accept="image/*" (change)="onFile($event)" class="hidden" />
           </label>
           @if (selectedFile(); as file) {
             <button

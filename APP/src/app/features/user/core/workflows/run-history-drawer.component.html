@@ -1,8 +1,5 @@
 @if (workflowId(); as wid) {
-  <div
-    class="fixed inset-0 z-40 flex justify-end bg-zinc-900/30"
-    (click)="close()"
-  >
+  <div class="fixed inset-0 z-40 flex justify-end bg-zinc-900/30" (click)="close()">
     <aside
       class="flex h-full w-full max-w-2xl flex-col border-l border-zinc-200 bg-white shadow-xl"
       (click)="$event.stopPropagation()"
@@ -35,7 +32,9 @@
             {{ err }}
           </div>
         } @else if (runs().length === 0) {
-          <div class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
+          <div
+            class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+          >
             No runs yet for this workflow.
           </div>
         } @else {
@@ -65,14 +64,15 @@
                           {{ run.status }}
                         </span>
                         @if (run.outcome) {
-                          <span class="inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600 ring-1 ring-inset ring-zinc-200">
+                          <span
+                            class="inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600 ring-1 ring-inset ring-zinc-200"
+                          >
                             {{ run.outcome }}
                           </span>
                         }
                       </div>
                       <div class="mt-0.5 truncate text-xs text-zinc-500">
-                        v{{ run.version }} ·
-                        started {{ run.started_at | date: 'short' }}
+                        v{{ run.version }} · started {{ run.started_at | date: 'short' }}
                         @if (run.current_node_id) {
                           · at <span class="font-mono">{{ run.current_node_id }}</span>
                         }
@@ -89,7 +89,9 @@
                         Loading steps…
                       </div>
                     } @else if (stepsError(); as err) {
-                      <div class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700">
+                      <div
+                        class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700"
+                      >
                         {{ err }}
                       </div>
                     } @else if (steps().length === 0) {
@@ -98,7 +100,9 @@
                       <ol class="space-y-1.5">
                         @for (step of steps(); track trackStep($index, step)) {
                           <li class="flex items-start gap-2 text-xs">
-                            <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700">
+                            <span
+                              class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700"
+                            >
                               {{ step.step_index + 1 }}
                             </span>
                             <div class="min-w-0 flex-1">

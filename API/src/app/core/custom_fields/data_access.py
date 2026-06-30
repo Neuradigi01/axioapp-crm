@@ -16,10 +16,10 @@ Per the architecture spec, ``custom_data`` JSONB column-level writes
 (inside other entities' service files) stay where they are — those
 are property mutations, not "queries".
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,13 +29,11 @@ from src.app.core.custom_fields.models import CustomFieldDefinition
 
 async def get_field_by_id(
     session: AsyncSession, field_id: uuid.UUID
-) -> Optional[CustomFieldDefinition]:
+) -> CustomFieldDefinition | None:
     """Single-row read by PK. ``None`` on miss (or cross-tenant — the
     ORM filter applies)."""
     result = await session.execute(
-        select(CustomFieldDefinition).where(
-            CustomFieldDefinition.id == field_id
-        )
+        select(CustomFieldDefinition).where(CustomFieldDefinition.id == field_id)
     )
     return result.scalar_one_or_none()
 
@@ -48,9 +46,7 @@ async def list_fields_query(
 ) -> list[CustomFieldDefinition]:
     """List definitions for one entity, ordered by display_order then
     field_key. Caller decides whether to include hidden rows."""
-    stmt = select(CustomFieldDefinition).where(
-        CustomFieldDefinition.entity_type == entity_type
-    )
+    stmt = select(CustomFieldDefinition).where(CustomFieldDefinition.entity_type == entity_type)
     if not include_hidden:
         stmt = stmt.where(CustomFieldDefinition.is_hidden.is_(False))
     stmt = stmt.order_by(
@@ -61,16 +57,12 @@ async def list_fields_query(
     return list(result.scalars().all())
 
 
-def insert_field(
-    session: AsyncSession, field: CustomFieldDefinition
-) -> None:
+def insert_field(session: AsyncSession, field: CustomFieldDefinition) -> None:
     """Register an already-constructed CustomFieldDefinition for INSERT."""
     session.add(field)
 
 
-async def delete_field_row(
-    session: AsyncSession, field: CustomFieldDefinition
-) -> None:
+async def delete_field_row(session: AsyncSession, field: CustomFieldDefinition) -> None:
     """Mark a CustomFieldDefinition row for DELETE. Caller commits."""
     await session.delete(field)
 

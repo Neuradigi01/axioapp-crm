@@ -34,12 +34,13 @@ successful send always logs; a failed send logs nothing here but
 the calling router surfaces the adapter's exception verbatim so
 the operator sees exactly what went wrong.
 """
+
 from __future__ import annotations
 
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,16 +48,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.templates.exceptions import (
     InvalidRecipient,
-    TemplateNotFound,
     TestSendNotSupported,
 )
 from src.app.core.templates.models import (
-    MessageTemplate,
     MessageTemplateTestSend,
 )
 from src.app.core.templates.service import get_template
 from src.app.core.templates.variables import resolve
-
 
 logger = logging.getLogger(__name__)
 
@@ -154,9 +152,7 @@ async def _dispatch_email(
     from src.app.shared.email import Email, get_email_backend
 
     backend = get_email_backend()
-    await backend.send(
-        Email(to=recipient, subject=subject, body_text=body, body_html=None)
-    )
+    await backend.send(Email(to=recipient, subject=subject, body_text=body, body_html=None))
     return None
 
 
@@ -218,16 +214,12 @@ async def dispatch_test_send(
     operator sees the real reason. The audit row is only written
     when the adapter call returns successfully.
     """
-    template = await get_template(
-        session, org_id=org_id, template_id=template_id
-    )
+    template = await get_template(session, org_id=org_id, template_id=template_id)
 
     cleaned_recipient = _validate_recipient(template.channel, recipient)
     context = _build_context(sample_context)
     rendered_body = resolve(template.body_text, context)
-    rendered_subject = (
-        resolve(template.subject, context) if template.subject else None
-    )
+    rendered_subject = resolve(template.subject, context) if template.subject else None
 
     if template.channel == ConversationChannel.email:
         # Subject is mandatory for email at the schema layer; this is
@@ -257,14 +249,13 @@ async def dispatch_test_send(
         sent_to=cleaned_recipient,
         sent_by_user_id=user_id,
         channel_message_id=channel_message_id,
-        sent_at=datetime.now(timezone.utc),
+        sent_at=datetime.now(UTC),
     )
     session.add(audit)
     await session.commit()
     await session.refresh(audit)
     logger.info(
-        "templates.test_send org=%s template=%s channel=%s recipient=%s "
-        "channel_message_id=%s",
+        "templates.test_send org=%s template=%s channel=%s recipient=%s channel_message_id=%s",
         org_id,
         template.id,
         template.channel.value,

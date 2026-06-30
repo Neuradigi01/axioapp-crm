@@ -7,12 +7,12 @@ The router-level test exercises:
     are persisted, and the contact is auto-resolved (created with
     `full_name = phone` when none matches).
 """
+
 from __future__ import annotations
 
 import hashlib
 import hmac
 import json
-import uuid
 
 import pytest
 from sqlalchemy import select
@@ -31,7 +31,6 @@ from src.app.core.conversations.registry import (
     register_channel,
     unregister_channel,
 )
-
 
 APP_SECRET = "wa-test-secret"
 VERIFY_TOKEN = "wa-verify-tok"
@@ -115,9 +114,7 @@ async def test_verify_handshake_wrong_token_returns_403(layered_client):
 
 
 @pytest.mark.asyncio
-async def test_webhook_rejects_invalid_signature(
-    layered_client, seeded_admin
-):
+async def test_webhook_rejects_invalid_signature(layered_client, seeded_admin):
     body = json.dumps(_sample_envelope()).encode()
     resp = await layered_client.post(
         "/api/v1/conversations/webhooks/whatsapp",
@@ -132,9 +129,7 @@ async def test_webhook_rejects_invalid_signature(
 
 
 @pytest.mark.asyncio
-async def test_webhook_persists_message_and_creates_contact(
-    layered_client, seeded_admin
-):
+async def test_webhook_persists_message_and_creates_contact(layered_client, seeded_admin):
     body = json.dumps(_sample_envelope()).encode()
     resp = await layered_client.post(
         "/api/v1/conversations/webhooks/whatsapp",
@@ -165,9 +160,7 @@ async def test_webhook_persists_message_and_creates_contact(
 
         # Auto-created contact named after phone.
         contact = (
-            await session.execute(
-                select(Contact).where(Contact.id == conv.contact_id)
-            )
+            await session.execute(select(Contact).where(Contact.id == conv.contact_id))
         ).scalar_one()
         assert contact.phone == "+919876500000"
         assert contact.full_name == "+919876500000"
@@ -175,9 +168,7 @@ async def test_webhook_persists_message_and_creates_contact(
 
 
 @pytest.mark.asyncio
-async def test_webhook_existing_contact_reused(
-    layered_client, seeded_admin
-):
+async def test_webhook_existing_contact_reused(layered_client, seeded_admin):
     """If a contact with the matching phone already exists, link to
     it instead of creating a duplicate placeholder."""
     from tests.conftest import TestSession
@@ -214,9 +205,7 @@ async def test_webhook_existing_contact_reused(
 
 
 @pytest.mark.asyncio
-async def test_webhook_unparseable_envelope_returns_400(
-    layered_client, seeded_admin
-):
+async def test_webhook_unparseable_envelope_returns_400(layered_client, seeded_admin):
     body = json.dumps({"hello": "world"}).encode()
     resp = await layered_client.post(
         "/api/v1/conversations/webhooks/whatsapp",

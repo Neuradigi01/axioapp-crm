@@ -28,6 +28,7 @@ Caching is per-request: the `get_entitlements` FastAPI dependency
 passes it into the handler. Multiple `require_*` calls inside the
 same handler reuse the same instance — no extra DB hits.
 """
+
 from __future__ import annotations
 
 import logging
@@ -41,7 +42,6 @@ from src.app.core.subscriptions.exceptions import EntitlementError
 from src.app.core.subscriptions.models import Subscription
 from src.app.core.subscriptions.plans import KNOWN_FEATURE_KEYS, Cap, Plan
 from src.app.core.subscriptions.service import get_active_subscription
-
 
 log = logging.getLogger(__name__)
 
@@ -111,9 +111,8 @@ class Entitlements:
 # Loading
 # ---------------------------------------------------------------------------
 
-async def load_for_org(
-    session: AsyncSession, org_id: uuid.UUID
-) -> Entitlements:
+
+async def load_for_org(session: AsyncSession, org_id: uuid.UUID) -> Entitlements:
     """Materialise the entitlements bundle for `org_id`.
 
     Raises `EntitlementError("read_only")` if the org has no active
@@ -144,9 +143,8 @@ async def load_for_org(
 # Imperative checks — call from service layer / decorators
 # ---------------------------------------------------------------------------
 
-async def require_feature(
-    session: AsyncSession, org_id: uuid.UUID, feature_key: str
-) -> None:
+
+async def require_feature(session: AsyncSession, org_id: uuid.UUID, feature_key: str) -> None:
     """Raise 402 if the org's plan does not grant `feature_key`.
 
     Read-only / past_due / archived / cancelled subscriptions raise
@@ -188,15 +186,14 @@ async def require_capacity(
         required_plan=required,
         resource=resource,
         cap=cap,
-        message=(
-            f"You have reached the {resource} limit on your current plan."
-        ),
+        message=(f"You have reached the {resource} limit on your current plan."),
     )
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _require_writeable(ent: Entitlements) -> None:
     """Raise `read_only` (or `trial_expired`) if the subscription status forbids writes.
@@ -210,9 +207,7 @@ def _require_writeable(ent: Entitlements) -> None:
     if not ent.is_read_only:
         return
     reason = (
-        "trial_expired"
-        if ent.status == "read_only" and ent.plan_code == "trial"
-        else "read_only"
+        "trial_expired" if ent.status == "read_only" and ent.plan_code == "trial" else "read_only"
     )
     raise EntitlementError(reason)
 

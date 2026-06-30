@@ -1,15 +1,6 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 
-import {
-  FeatureAccessService,
-  PlanCode,
-} from '../../services/feature-access.service';
+import { FeatureAccessService, PlanCode } from '../../services/feature-access.service';
 import { UpgradeModalService } from '../../services/upgrade-modal.service';
 
 export type LockedFeatureVariant = 'page' | 'inline';
@@ -81,9 +72,7 @@ export class LockedFeatureComponent {
     return 'standard';
   });
 
-  protected readonly planLabel = computed<string>(() =>
-    this.access.labelFor(this.resolvedPlan()),
-  );
+  protected readonly planLabel = computed<string>(() => this.access.labelFor(this.resolvedPlan()));
 
   protected onUpgrade(): void {
     this.upgradeModal.open({ plan: this.resolvedPlan() });

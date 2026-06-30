@@ -1,12 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
@@ -14,11 +8,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 import { FlowBuilderComponent } from './flow-builder.component';
 import { FlowTemplatePickerComponent } from './flow-template-picker.component';
-import {
-  FlowCategory,
-  FlowRow,
-  FlowsService,
-} from './flows.service';
+import { FlowCategory, FlowRow, FlowsService } from './flows.service';
 
 type Mode = 'list' | 'pick' | 'build';
 
@@ -48,8 +38,7 @@ type Mode = 'list' | 'pick' | 'build';
         <div>
           <h1 class="text-xl font-semibold text-zinc-900">WhatsApp Flows</h1>
           <p class="text-xs text-zinc-500">
-            In-chat forms (booking, lead capture, feedback) customers
-            fill inside WhatsApp.
+            In-chat forms (booking, lead capture, feedback) customers fill inside WhatsApp.
           </p>
         </div>
         @if (mode() === 'list') {
@@ -297,9 +286,7 @@ export class WhatsAppFlowsPageComponent {
   }
 
   protected onTestSend(row: FlowRow): void {
-    const to = prompt(
-      `Send "${row.name}" to which phone number?\n(E.164 format, e.g. +91…)`,
-    );
+    const to = prompt(`Send "${row.name}" to which phone number?\n(E.164 format, e.g. +91…)`);
     if (!to) return;
     this.api
       .testSend(row.id, to)
@@ -307,9 +294,7 @@ export class WhatsAppFlowsPageComponent {
       .subscribe({
         next: () => this.toast.set(`Test send queued to ${to}.`),
         error: (err: HttpErrorResponse) =>
-          this.error.set(
-            extractApiError(err) ?? 'Test send failed.',
-          ),
+          this.error.set(extractApiError(err) ?? 'Test send failed.'),
       });
   }
 

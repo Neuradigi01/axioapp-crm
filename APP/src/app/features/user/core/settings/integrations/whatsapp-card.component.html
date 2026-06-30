@@ -16,10 +16,9 @@
           <span class="text-zinc-500 font-normal">(Cloud API)</span>
         </h3>
         <p class="mt-0.5 text-sm text-zinc-600">
-          Connect your WhatsApp Business Account so campaigns can send
-          template messages from your verified number. Sign in to Meta
-          in a popup and pick your number — no tokens to copy. Self-
-          hosted Meta App? Use the Advanced option below.
+          Connect your WhatsApp Business Account so campaigns can send template messages from your
+          verified number. Sign in to Meta in a popup and pick your number — no tokens to copy.
+          Self- hosted Meta App? Use the Advanced option below.
         </p>
         @if (status()?.display_phone_number) {
           <p class="mt-1 text-xs text-zinc-500">
@@ -43,19 +42,21 @@
                   <span class="font-mono text-zinc-700">
                     +{{ n.display_phone_number }}
                     @if (n.verified_name) {
-                      <span class="ml-1 font-sans text-zinc-500">
-                        — {{ n.verified_name }}
-                      </span>
+                      <span class="ml-1 font-sans text-zinc-500"> — {{ n.verified_name }} </span>
                     }
                   </span>
                   <span class="flex items-center gap-1 text-[10px]">
                     @if (n.is_default) {
-                      <span class="rounded-full bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      <span
+                        class="rounded-full bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium text-white"
+                      >
                         Default
                       </span>
                     }
                     @if (n.quality_rating) {
-                      <span class="rounded bg-white px-1.5 py-0.5 text-zinc-700 ring-1 ring-zinc-200">
+                      <span
+                        class="rounded bg-white px-1.5 py-0.5 text-zinc-700 ring-1 ring-zinc-200"
+                      >
                         Quality: {{ n.quality_rating }}
                       </span>
                     }
@@ -64,7 +65,8 @@
               }
             </ul>
             <p class="mt-1 text-[10px] text-zinc-500">
-              Use the Send-From picker on the composer / campaign create modal to choose which number to send from.
+              Use the Send-From picker on the composer / campaign create modal to choose which
+              number to send from.
             </p>
           </div>
         }
@@ -124,14 +126,12 @@
   }
 
   @if (isError() && status()?.last_error && !inlineError()) {
-    <div
-      class="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900"
-    >
+    <div class="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
       <p class="font-medium">Last Meta call failed.</p>
       <p class="mt-1 text-xs">{{ status()?.last_error }}</p>
       <p class="mt-2 text-xs">
-        Reconnect to mint a fresh token, or Disconnect to clear the
-        broken state. Campaigns won't send while this card is red.
+        Reconnect to mint a fresh token, or Disconnect to clear the broken state. Campaigns won't
+        send while this card is red.
       </p>
     </div>
   }
@@ -162,8 +162,8 @@
         }
       </button>
       <p class="mt-2 text-xs text-zinc-500">
-        You'll sign in to Meta in a popup and pick your WhatsApp
-        Business number. Takes about 2 minutes — no tokens to copy.
+        You'll sign in to Meta in a popup and pick your WhatsApp Business number. Takes about 2
+        minutes — no tokens to copy.
       </p>
 
       <!-- Advanced (self-host) — collapsible wrapper around the
@@ -190,9 +190,8 @@
         @if (manualAdvancedExpanded()) {
           <div class="border-t border-zinc-200 p-3">
             <p class="mb-3 text-xs text-zinc-500">
-              Use this path when you've registered your own Meta App
-              and want to bring your own tokens. Paste the five values
-              from Meta's WhatsApp Manager.
+              Use this path when you've registered your own Meta App and want to bring your own
+              tokens. Paste the five values from Meta's WhatsApp Manager.
             </p>
             <button
               type="button"
@@ -316,44 +315,36 @@
 
   <!-- Connected details panel (phone_id, waba_id — copyable). -->
   @if (isConnected() && !formExpanded()) {
-    <dl class="mt-5 grid grid-cols-1 gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-2">
+    <dl
+      class="mt-5 grid grid-cols-1 gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-2"
+    >
       <div>
-        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
-          Phone Number ID
-        </dt>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Phone Number ID</dt>
         <dd class="mt-0.5 font-mono text-sm text-zinc-800">
           {{ status()?.phone_id }}
         </dd>
       </div>
       <div>
-        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
-          WABA ID
-        </dt>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">WABA ID</dt>
         <dd class="mt-0.5 font-mono text-sm text-zinc-800">
           {{ status()?.waba_id }}
         </dd>
       </div>
       <div>
-        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
-          Display number
-        </dt>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Display number</dt>
         <dd class="mt-0.5 text-sm text-zinc-800">
           {{ status()?.display_phone_number }}
         </dd>
       </div>
       <div>
-        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
-          Graph API version
-        </dt>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Graph API version</dt>
         <dd class="mt-0.5 font-mono text-sm text-zinc-800">
           {{ status()?.api_version }}
         </dd>
       </div>
       @if (status()?.connected_at; as connectedAt) {
         <div>
-          <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Connected
-          </dt>
+          <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Connected</dt>
           <dd class="mt-0.5 text-sm text-zinc-800">
             {{ connectedAt | date: 'medium' }}
           </dd>
@@ -388,9 +379,7 @@
           ></lucide-icon>
           Synced templates
           @if (templatesLoaded()) {
-            <span class="text-xs font-normal text-zinc-500">
-              ({{ templates().length }})
-            </span>
+            <span class="text-xs font-normal text-zinc-500"> ({{ templates().length }}) </span>
           }
         </span>
         @if (templatesLoading() && !templatesLoaded()) {
@@ -462,9 +451,7 @@
           } @else if (templates().length > 0) {
             <div class="overflow-x-auto">
               <table class="min-w-full text-sm">
-                <thead
-                  class="bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500"
-                >
+                <thead class="bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500">
                   <tr>
                     <th class="px-3 py-2 text-left">Name</th>
                     <th class="px-3 py-2 text-left">Language</th>
@@ -532,9 +519,7 @@
                           }
                         }
                       </td>
-                      <td
-                        class="px-3 py-2 text-right font-mono text-xs text-zinc-700"
-                      >
+                      <td class="px-3 py-2 text-right font-mono text-xs text-zinc-700">
                         {{ t.variable_count }}
                       </td>
                       <td class="px-3 py-2 text-xs text-zinc-600">
@@ -597,9 +582,8 @@
           autocomplete="off"
         />
         <span class="mt-1 block text-xs text-zinc-500">
-          Generate in Meta Business Settings → System Users → Add Token.
-          Scopes: <code>whatsapp_business_messaging</code> +
-          <code>whatsapp_business_management</code>.
+          Generate in Meta Business Settings → System Users → Add Token. Scopes:
+          <code>whatsapp_business_messaging</code> + <code>whatsapp_business_management</code>.
         </span>
       </label>
 
@@ -631,8 +615,8 @@
           autocomplete="off"
         />
         <span class="mt-1 block text-xs text-zinc-500">
-          Any random string — you'll paste the same value into Meta's
-          webhook console when wiring up delivery events.
+          Any random string — you'll paste the same value into Meta's webhook console when wiring up
+          delivery events.
         </span>
       </label>
 
@@ -651,9 +635,7 @@
         </button>
         @if (advancedExpanded()) {
           <label class="mt-2 block">
-            <span class="text-xs font-medium text-zinc-700">
-              Graph API version
-            </span>
+            <span class="text-xs font-medium text-zinc-700"> Graph API version </span>
             <input
               type="text"
               class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
@@ -666,9 +648,7 @@
           </label>
 
           <label class="mt-3 block">
-            <span class="text-xs font-medium text-zinc-700">
-              Rate limit (msg/sec)
-            </span>
+            <span class="text-xs font-medium text-zinc-700"> Rate limit (msg/sec) </span>
             <input
               type="number"
               min="1"
@@ -678,9 +658,8 @@
               autocomplete="off"
             />
             <span class="mt-1 block text-xs text-zinc-500">
-              Default <code>50</code>. Free-tier WABAs ~50/sec; business-
-              verified can bump up to <code>1000</code>. Higher values
-              risk Meta rate-limit (429) errors.
+              Default <code>50</code>. Free-tier WABAs ~50/sec; business- verified can bump up to
+              <code>1000</code>. Higher values risk Meta rate-limit (429) errors.
             </span>
           </label>
         }

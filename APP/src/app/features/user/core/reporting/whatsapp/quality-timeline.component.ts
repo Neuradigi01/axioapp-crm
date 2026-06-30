@@ -67,9 +67,7 @@ import {
         </p>
       } @else if (report(); as r) {
         @if (r.volume.length === 0) {
-          <p class="py-8 text-center text-xs text-zinc-500">
-            No outbound traffic in this window.
-          </p>
+          <p class="py-8 text-center text-xs text-zinc-500">No outbound traffic in this window.</p>
         } @else {
           <apx-chart
             [series]="series()"
@@ -184,14 +182,16 @@ export class QualityTimelineComponent {
 
   protected humanEvent(t: string): string {
     return (
-      {
-        quality_change: 'Quality',
-        tier_change: 'Tier',
-        name_status_change: 'Display name',
-        restriction_added: 'Restriction',
-        restriction_lifted: 'Restriction lifted',
-      } as Record<string, string>
-    )[t] ?? t;
+      (
+        {
+          quality_change: 'Quality',
+          tier_change: 'Tier',
+          name_status_change: 'Display name',
+          restriction_added: 'Restriction',
+          restriction_lifted: 'Restriction lifted',
+        } as Record<string, string>
+      )[t] ?? t
+    );
   }
 
   protected eventDot(t: string): string {
@@ -241,9 +241,7 @@ export class QualityTimelineComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set(
-            extractApiError(err) ?? 'Could not load quality timeline.',
-          );
+          this.error.set(extractApiError(err) ?? 'Could not load quality timeline.');
         },
       });
   }

@@ -9,21 +9,21 @@ read-side. Writes are intentionally narrow:
   (`assigned_to_id`, `status`, `ai_handling`). No way to retroactively
   rewrite history.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from src.app.shared.schemas import ORMModel, PaginatedResponse
 from src.app.core.conversations.models import (
     ConversationChannel,
     ConversationStatus,
     MessageDirection,
 )
-
+from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 AttachmentType = Literal["image", "video", "audio", "document"]
 
@@ -45,9 +45,9 @@ class AttachmentPayload(BaseModel):
     type: AttachmentType
     media_id: str = Field(min_length=1, max_length=128)
     mime_type: str = Field(min_length=1, max_length=128)
-    filename: Optional[str] = Field(default=None, max_length=255)
-    size_bytes: Optional[int] = Field(default=None, ge=0)
-    caption: Optional[str] = Field(default=None, max_length=1024)
+    filename: str | None = Field(default=None, max_length=255)
+    size_bytes: int | None = Field(default=None, ge=0)
+    caption: str | None = Field(default=None, max_length=1024)
 
 
 # --- Interactive messages (whatsapp-platform-upgrade Step 6) ----------
@@ -109,8 +109,8 @@ class ReplyButtonsPayload(BaseModel):
     kind: Literal["reply_buttons"] = "reply_buttons"
     body: str = Field(min_length=1, max_length=_INTERACTIVE_BODY_MAX)
     buttons: list[_ReplyButton] = Field(min_length=1, max_length=_BUTTONS_MAX_COUNT)
-    header: Optional[_InteractiveHeader] = None
-    footer: Optional[str] = Field(default=None, max_length=_INTERACTIVE_FOOTER_MAX)
+    header: _InteractiveHeader | None = None
+    footer: str | None = Field(default=None, max_length=_INTERACTIVE_FOOTER_MAX)
 
 
 class CtaUrlPayload(BaseModel):
@@ -125,8 +125,8 @@ class CtaUrlPayload(BaseModel):
     body: str = Field(min_length=1, max_length=_INTERACTIVE_BODY_MAX)
     button_text: str = Field(min_length=1, max_length=_BUTTON_TITLE_MAX)
     url: str = Field(min_length=1, max_length=_CTA_URL_MAX, pattern=r"^https?://.+")
-    header: Optional[_InteractiveHeader] = None
-    footer: Optional[str] = Field(default=None, max_length=_INTERACTIVE_FOOTER_MAX)
+    header: _InteractiveHeader | None = None
+    footer: str | None = Field(default=None, max_length=_INTERACTIVE_FOOTER_MAX)
 
 
 class _ListRow(BaseModel):
@@ -134,7 +134,7 @@ class _ListRow(BaseModel):
 
     id: str = Field(min_length=1, max_length=_LIST_ROW_ID_MAX)
     title: str = Field(min_length=1, max_length=_LIST_ROW_TITLE_MAX)
-    description: Optional[str] = Field(default=None, max_length=_LIST_ROW_DESCRIPTION_MAX)
+    description: str | None = Field(default=None, max_length=_LIST_ROW_DESCRIPTION_MAX)
 
 
 class _ListSection(BaseModel):
@@ -153,11 +153,9 @@ class ListPayload(BaseModel):
     kind: Literal["list"] = "list"
     body: str = Field(min_length=1, max_length=_INTERACTIVE_BODY_MAX)
     button_text: str = Field(min_length=1, max_length=_LIST_BUTTON_TEXT_MAX)
-    sections: list[_ListSection] = Field(
-        min_length=1, max_length=_LIST_SECTIONS_MAX_COUNT
-    )
-    header: Optional[_InteractiveHeader] = None
-    footer: Optional[str] = Field(default=None, max_length=_INTERACTIVE_FOOTER_MAX)
+    sections: list[_ListSection] = Field(min_length=1, max_length=_LIST_SECTIONS_MAX_COUNT)
+    header: _InteractiveHeader | None = None
+    footer: str | None = Field(default=None, max_length=_INTERACTIVE_FOOTER_MAX)
 
 
 InteractivePayload = Annotated[
@@ -169,18 +167,18 @@ InteractivePayload = Annotated[
 class MessageSendPayload(BaseModel):
     text: str = Field(default="", max_length=4096)
     attachments: list[dict[str, Any]] = Field(default_factory=list)
-    interactive: Optional[InteractivePayload] = None
+    interactive: InteractivePayload | None = None
     # whatsapp-platform-upgrade Step 7: quoted reply. Optional UUID of
     # a previous message in the same conversation. Service resolves it
     # to the channel's wamid before calling the adapter; mismatch
     # (wrong conv / no channel_message_id yet) surfaces as 400.
-    reply_to_message_id: Optional[uuid.UUID] = None
+    reply_to_message_id: uuid.UUID | None = None
     # whatsapp-platform-upgrade Step 27a — multi-number per org.
     # When set, the composer pins the outbound to a specific
     # connected phone instead of defaulting to whichever number
     # the conversation arrived on. NULL preserves the legacy
     # behaviour for every single-number org.
-    send_from_phone_id: Optional[str] = Field(default=None, max_length=64)
+    send_from_phone_id: str | None = Field(default=None, max_length=64)
 
 
 # --- Tags (whatsapp-platform-upgrade Step 14) ------------------------
@@ -219,11 +217,9 @@ class TagCreate(BaseModel):
     color: str = Field(default="zinc", max_length=16)
 
     @model_validator(mode="after")
-    def _check_color_in_palette(self) -> "TagCreate":
+    def _check_color_in_palette(self) -> TagCreate:
         if self.color not in _TAG_COLORS:
-            raise ValueError(
-                f"color must be one of: {sorted(_TAG_COLORS)}"
-            )
+            raise ValueError(f"color must be one of: {sorted(_TAG_COLORS)}")
         return self
 
 
@@ -233,15 +229,13 @@ class TagUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=64)
-    color: Optional[str] = Field(default=None, max_length=16)
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    color: str | None = Field(default=None, max_length=16)
 
     @model_validator(mode="after")
-    def _check_color(self) -> "TagUpdate":
+    def _check_color(self) -> TagUpdate:
         if self.color is not None and self.color not in _TAG_COLORS:
-            raise ValueError(
-                f"color must be one of: {sorted(_TAG_COLORS)}"
-            )
+            raise ValueError(f"color must be one of: {sorted(_TAG_COLORS)}")
         return self
 
 
@@ -249,7 +243,7 @@ class TagOut(ORMModel):
     id: uuid.UUID
     name: str
     color: str
-    created_by_user_id: Optional[uuid.UUID] = None
+    created_by_user_id: uuid.UUID | None = None
     created_at: datetime
     # Populated by `list_tags` (count of assignments). Defaults to 0
     # when read via the per-conversation embed.
@@ -289,26 +283,25 @@ class ReactionRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    emoji: Optional[str] = Field(default=None, max_length=16)
+    emoji: str | None = Field(default=None, max_length=16)
 
 
 class ConversationPatch(BaseModel):
-    assigned_to_id: Optional[uuid.UUID] = None
-    status: Optional[ConversationStatus] = None
-    ai_handling: Optional[bool] = None
+    assigned_to_id: uuid.UUID | None = None
+    status: ConversationStatus | None = None
+    ai_handling: bool | None = None
 
 
 class ConversationOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     channel: ConversationChannel
     external_id: str
-    contact_id: Optional[uuid.UUID]
-    assigned_to_id: Optional[uuid.UUID]
+    contact_id: uuid.UUID | None
+    assigned_to_id: uuid.UUID | None
     status: ConversationStatus
     ai_handling: bool
-    last_message_at: Optional[datetime]
+    last_message_at: datetime | None
     unread_count: int
     created_at: datetime
     # Step 14 — assigned tags as embedded `{id, name, color}` triples.
@@ -319,13 +312,13 @@ class ConversationOut(ORMModel):
     # list / detail payload so the chip can render without a
     # second fetch; the full referral envelope ships from
     # `GET /{id}/attribution`.
-    acquisition_source: Optional[str] = None
-    acquisition_campaign_id: Optional[str] = None
-    acquisition_ad_id: Optional[str] = None
+    acquisition_source: str | None = None
+    acquisition_campaign_id: str | None = None
+    acquisition_ad_id: str | None = None
     # Step 27a — Meta phone-id the conversation arrived on. NULL
     # for legacy conversations. The composer reads this to default
     # "Send from" back to the same number.
-    received_via_phone_id: Optional[str] = None
+    received_via_phone_id: str | None = None
 
 
 class ConversationAttributionOut(BaseModel):
@@ -339,13 +332,13 @@ class ConversationAttributionOut(BaseModel):
     metadata under ``_resolved``."""
 
     conversation_id: uuid.UUID
-    source: Optional[str]
-    campaign_id: Optional[str]
-    campaign_name: Optional[str]
-    ad_id: Optional[str]
-    ad_name: Optional[str]
-    landing_url: Optional[str]
-    deeplink: Optional[str]
+    source: str | None
+    campaign_id: str | None
+    campaign_name: str | None
+    ad_id: str | None
+    ad_name: str | None
+    landing_url: str | None
+    deeplink: str | None
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -353,23 +346,22 @@ ConversationListResponse = PaginatedResponse[ConversationOut]
 
 
 class MessageOut(ORMModel):
-
     id: uuid.UUID
     org_id: uuid.UUID
     conversation_id: uuid.UUID
     direction: MessageDirection
-    sender_user_id: Optional[uuid.UUID]
-    text: Optional[str]
+    sender_user_id: uuid.UUID | None
+    text: str | None
     attachments: list[dict[str, Any]]
     # Outbound interactive envelope (whatsapp-platform-upgrade Step 6).
     # The inbox bubble renders buttons / list rows from this dict; the
     # raw shape mirrors what the operator built in the composer.
-    interactive_payload: Optional[dict[str, Any]] = None
+    interactive_payload: dict[str, Any] | None = None
     # whatsapp-platform-upgrade Step 7: quoted-reply target + the
     # reaction list applied to this message by its viewers. `reactions`
     # entries are `{user, emoji, ts}` dicts — see `core/conversations/
     # service._apply_reaction` for write rules.
-    reply_to_message_id: Optional[uuid.UUID] = None
+    reply_to_message_id: uuid.UUID | None = None
     reactions: list[dict[str, Any]] = Field(default_factory=list)
     # whatsapp-platform-upgrade Step 13 — internal notes flag +
     # @mentions. The frontend renders is_internal=true with yellow
@@ -382,10 +374,10 @@ class MessageOut(ORMModel):
     # "🤖 AI" badge on the bubble. Defaults False for human +
     # auto-reply + keyword-rule messages.
     is_ai: bool = False
-    channel_message_id: Optional[str]
-    sent_at: Optional[datetime]
-    delivered_at: Optional[datetime]
-    read_at: Optional[datetime]
+    channel_message_id: str | None
+    sent_at: datetime | None
+    delivered_at: datetime | None
+    read_at: datetime | None
     created_at: datetime
 
 
@@ -400,9 +392,9 @@ class WhatsAppSessionState(BaseModel):
     part). Both are 0 / None when out of session."""
 
     in_session: bool
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     hours_remaining: float = 0.0
-    last_customer_message_at: Optional[datetime] = None
+    last_customer_message_at: datetime | None = None
 
 
 class ConversationDetail(BaseModel):
@@ -411,4 +403,4 @@ class ConversationDetail(BaseModel):
     # Step 15 — populated only for WhatsApp conversations. NULL on
     # every other channel (no session-window concept). The banner
     # component renders nothing when this is None.
-    whatsapp_session_state: Optional[WhatsAppSessionState] = None
+    whatsapp_session_state: WhatsAppSessionState | None = None

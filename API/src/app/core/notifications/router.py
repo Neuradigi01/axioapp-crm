@@ -10,10 +10,10 @@ All endpoints are scoped to the caller (`user_id`). There's no
 permission gate: every authenticated user can read and ack their own
 notifications. Tenant scoping is automatic via the ORM filter.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,13 +35,12 @@ from src.app.core.notifications.service import (
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
-
 router = APIRouter(tags=["Notifications"])
 
 
 @router.get("/notifications", response_model=list[NotificationOut])
 async def list_notifications(
-    unread: Optional[bool] = Query(default=None),
+    unread: bool | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -56,9 +55,7 @@ async def mark_notification_read(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> NotificationOut:
-    notification = await mark_read(
-        db, user_id=user.legacy_uuid, notification_id=notification_id
-    )
+    notification = await mark_read(db, user_id=user.legacy_uuid, notification_id=notification_id)
     if notification is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -76,9 +73,7 @@ async def mark_all_notifications_read(
     return ReadAllResponse(marked=n)
 
 
-@router.get(
-    "/notification-preferences", response_model=list[NotificationPreferenceOut]
-)
+@router.get("/notification-preferences", response_model=list[NotificationPreferenceOut])
 async def list_my_preferences(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),

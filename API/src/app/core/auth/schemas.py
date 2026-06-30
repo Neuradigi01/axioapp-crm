@@ -1,4 +1,5 @@
 """Pydantic v2 request/response shapes for the auth router."""
+
 from __future__ import annotations
 
 import uuid
@@ -38,6 +39,7 @@ class TwoFactorChallengeResponse(BaseModel):
     no code was submitted. The OTP (for email/sms) has already been
     dispatched; the UI prompts the user and re-POSTs `/auth/login` with
     the code in `two_factor_code`."""
+
     requires_two_factor: Literal[True] = True
     method: str
     available_methods: list[str]
@@ -81,6 +83,7 @@ class RegisterRequest(BaseModel):
     a legacy `organization_name` field get silently accepted (no 422) —
     the field is dropped before reaching the service.
     """
+
     email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=8, max_length=128)
     first_name: str = Field(min_length=1, max_length=64)
@@ -135,6 +138,7 @@ class SessionOut(BaseModel):
     uses it to mark that row "This session" and hide the Sign-out button.
     Used by the Settings → Login history tab.
     """
+
     id: uuid.UUID
     created_at: datetime
     expires_at: datetime
@@ -162,5 +166,6 @@ class TwoFactorStatusResponse(BaseModel):
     lives in a dedicated future track since it needs ActionToken
     re-auth and TOTP secret rotation.
     """
+
     enabled: bool
     method: str | None

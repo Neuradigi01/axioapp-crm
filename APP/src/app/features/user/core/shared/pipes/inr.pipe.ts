@@ -17,10 +17,7 @@ import { Pipe, PipeTransform } from '@angular/core';
  */
 @Pipe({ name: 'formatINR', standalone: true })
 export class InrPipe implements PipeTransform {
-  transform(
-    value: number | string | null | undefined,
-    compact = false,
-  ): string {
+  transform(value: number | string | null | undefined, compact = false): string {
     if (value === null || value === undefined || value === '') return '—';
     const n = typeof value === 'string' ? Number(value) : value;
     if (!Number.isFinite(n)) return '—';

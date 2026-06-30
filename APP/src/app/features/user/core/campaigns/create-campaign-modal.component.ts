@@ -75,9 +75,13 @@ function toPickerRow(row: TemplateRead): PickerRow {
  *  fallback. Push templates exist in the library (Step 13) but
  *  aren't a campaign channel yet; they re-enter this set when push
  *  send transport ships. */
-const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<ConversationChannel>(
-  ['whatsapp', 'email', 'sms', 'facebook', 'instagram'],
-);
+const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<ConversationChannel>([
+  'whatsapp',
+  'email',
+  'sms',
+  'facebook',
+  'instagram',
+]);
 
 /**
  * Create-campaign modal.
@@ -132,9 +136,7 @@ export class CreateCampaignModalComponent {
   /** Three modes — Everyone (default), Saved group, Custom filter.
    *  Per Step 3.5.9 pre-implementation choice (a) — "Everyone" is
    *  the safest default for a fresh campaign. */
-  protected readonly audienceMode = signal<'everyone' | 'group' | 'filter'>(
-    'everyone',
-  );
+  protected readonly audienceMode = signal<'everyone' | 'group' | 'filter'>('everyone');
   protected readonly groups = signal<ContactGroup[]>([]);
   protected readonly groupsLoaded = signal(false);
   protected readonly selectedGroupId = signal<string | null>(null);
@@ -198,9 +200,7 @@ export class CreateCampaignModalComponent {
   ];
 
   protected readonly selectedTemplate = computed<PickerRow | null>(
-    () =>
-      this.templates().find((t) => t.id === this.selectedTemplateId()) ??
-      null,
+    () => this.templates().find((t) => t.id === this.selectedTemplateId()) ?? null,
   );
 
   protected readonly templateVariableNumbers = computed<number[]>(() => {
@@ -267,17 +267,16 @@ export class CreateCampaignModalComponent {
     variant_a_template_id: this.fb.control<string | null>(null),
     variant_b_template_id: this.fb.control<string | null>(null),
     split_ratio: this.fb.control<number>(50, { nonNullable: true }),
-    winner_metric: this.fb.control<
-      'reply_rate' | 'read_rate' | 'click_rate' | null
-    >(null),
+    winner_metric: this.fb.control<'reply_rate' | 'read_rate' | 'click_rate' | null>(null),
     winner_holdback_hours: this.fb.control<number>(24, {
       nonNullable: true,
     }),
   });
 
-  protected readonly isWhatsApp = computed(() =>
-    // computed reads channel via valueChanges — track manually
-    false,
+  protected readonly isWhatsApp = computed(
+    () =>
+      // computed reads channel via valueChanges — track manually
+      false,
   );
 
   constructor() {
@@ -402,12 +401,10 @@ export class CreateCampaignModalComponent {
         return of(null);
       }
       this.audienceCountLoading.set(true);
-      return this.groupsApi
-        .previewSize({ group_id: gid })
-        .pipe(
-          switchMap((r) => of(r.count)),
-          catchError(() => of(null)),
-        );
+      return this.groupsApi.previewSize({ group_id: gid }).pipe(
+        switchMap((r) => of(r.count)),
+        catchError(() => of(null)),
+      );
     }
     // filter mode — call shape uses `GroupFilter` (the
     // preview-size endpoint is owned by the groups API and only
@@ -423,12 +420,10 @@ export class CreateCampaignModalComponent {
       return of(null);
     }
     this.audienceCountLoading.set(true);
-    return this.groupsApi
-      .previewSize({ filter_json: filter })
-      .pipe(
-        switchMap((r) => of(r.count)),
-        catchError(() => of(null)),
-      );
+    return this.groupsApi.previewSize({ filter_json: filter }).pipe(
+      switchMap((r) => of(r.count)),
+      catchError(() => of(null)),
+    );
   }
 
   protected onTemplateChange(templateId: string): void {
@@ -497,9 +492,7 @@ export class CreateCampaignModalComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
-          const rows: PickerRow[] = res.items.map((row) =>
-            toPickerRow(row),
-          );
+          const rows: PickerRow[] = res.items.map((row) => toPickerRow(row));
           this.templatesCache.set(channel, rows);
           this.templates.set(rows);
           this.templatesLoaded.set(true);
@@ -544,9 +537,7 @@ export class CreateCampaignModalComponent {
 
   /** Coloured-band hint for the banner. `null` when capacity isn't
    *  loaded yet or WhatsApp isn't connected. */
-  protected readonly capacityBand = computed<
-    'green' | 'amber' | 'red' | null
-  >(() => {
+  protected readonly capacityBand = computed<'green' | 'amber' | 'red' | null>(() => {
     const c = this.capacity();
     if (!c || c.is_unlimited) return null;
     if (c.usage_percent >= 90) return 'red';
@@ -557,9 +548,10 @@ export class CreateCampaignModalComponent {
   /** Banner severity for the audience-vs-quota cross-check. `error`
    *  when the selected audience exceeds remaining quota; `warning`
    *  when it would consume >50% of remaining. `null` otherwise. */
-  protected readonly audienceQuotaWarning = computed<
-    { kind: 'error' | 'warning'; message: string } | null
-  >(() => {
+  protected readonly audienceQuotaWarning = computed<{
+    kind: 'error' | 'warning';
+    message: string;
+  } | null>(() => {
     const c = this.capacity();
     if (!c || c.is_unlimited) return null;
     if (this.channelSignal() !== 'whatsapp') return null;
@@ -609,9 +601,7 @@ export class CreateCampaignModalComponent {
     if (mode === 'group') {
       const gid = this.selectedGroupId();
       if (!gid) {
-        this.submitError.set(
-          'Pick a saved group, or switch to a different audience mode.',
-        );
+        this.submitError.set('Pick a saved group, or switch to a different audience mode.');
         return;
       }
       audience.group_id = gid;
@@ -637,16 +627,12 @@ export class CreateCampaignModalComponent {
       for (const n of this.templateVariableNumbers()) {
         const b = bindings[String(n)];
         if (!b || !b.value.trim()) {
-          this.submitError.set(
-            `Fill in a value for variable {{${n}}}.`,
-          );
+          this.submitError.set(`Fill in a value for variable {{${n}}}.`);
           return;
         }
       }
     } else if (!v.template.trim()) {
-      this.submitError.set(
-        'Provide a message body or pick a template.',
-      );
+      this.submitError.set('Provide a message body or pick a template.');
       return;
     }
 
@@ -660,9 +646,7 @@ export class CreateCampaignModalComponent {
         template: useTemplatePicker ? null : v.template,
         template_id: useTemplatePicker ? this.selectedTemplateId() : null,
         template_variables: useTemplatePicker ? this.variables() : null,
-        schedule_at: v.schedule_at
-          ? new Date(v.schedule_at).toISOString()
-          : null,
+        schedule_at: v.schedule_at ? new Date(v.schedule_at).toISOString() : null,
         // Step 27b — null on single-number orgs (picker hidden);
         // when set, the dispatcher pins the campaign to this
         // specific WhatsApp phone instead of the org default.
@@ -671,12 +655,8 @@ export class CreateCampaignModalComponent {
         // when is_ab_test is false; the variant pair + metric are
         // required otherwise (server validates).
         is_ab_test: v.is_ab_test ?? false,
-        variant_a_template_id: v.is_ab_test
-          ? (v.variant_a_template_id ?? null)
-          : null,
-        variant_b_template_id: v.is_ab_test
-          ? (v.variant_b_template_id ?? null)
-          : null,
+        variant_a_template_id: v.is_ab_test ? (v.variant_a_template_id ?? null) : null,
+        variant_b_template_id: v.is_ab_test ? (v.variant_b_template_id ?? null) : null,
         split_ratio: v.split_ratio ?? 50,
         winner_metric: v.is_ab_test ? (v.winner_metric ?? null) : null,
         winner_holdback_hours: v.winner_holdback_hours ?? 24,
@@ -689,9 +669,7 @@ export class CreateCampaignModalComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.submitError.set(
-            extractApiError(err) ?? 'Could not create campaign.',
-          );
+          this.submitError.set(extractApiError(err) ?? 'Could not create campaign.');
         },
       });
   }

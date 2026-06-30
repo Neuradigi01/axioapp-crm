@@ -23,13 +23,13 @@ pytest-asyncio fixtures (asyncpg's "another operation in progress"
 error on the second test using the fixture). Manual smoke covers
 end-to-end DB writes — the unit tests cover the contract.
 """
+
 from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from typing import Optional
 
 import pytest
 
@@ -48,7 +48,6 @@ from src.app.core.email.oauth import (
 )
 from src.app.core.email.schemas import EmailAccountRead, EmailAccountUpsert
 from src.app.core.integrations import crypto
-
 
 _ORG_ID = uuid.uuid4()
 _USER_ID = uuid.uuid4()
@@ -88,7 +87,7 @@ class _CapturingSession:
     DB. Returns a configurable row from `execute()` to simulate
     "no existing row" vs "existing row"."""
 
-    def __init__(self, *, existing: Optional[EmailAccount] = None):
+    def __init__(self, *, existing: EmailAccount | None = None):
         self.existing = existing
         self.added: list = []
         self.commits = 0
@@ -143,7 +142,7 @@ class TestServiceUpsert:
             display_name="Asha Patel",
             access_token="plain-access",
             refresh_token="plain-refresh",
-            token_expires_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+            token_expires_at=datetime(2026, 7, 1, tzinfo=UTC),
             scopes_granted=[
                 "https://www.googleapis.com/auth/gmail.modify",
                 "openid",
@@ -190,13 +189,13 @@ class TestServiceUpsert:
             display_name=None,
             access_token_enc=crypto.encrypt("old-access"),
             refresh_token_enc=crypto.encrypt("old-refresh"),
-            token_expires_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            token_expires_at=datetime(2025, 1, 1, tzinfo=UTC),
             scopes_granted=["old-scope"],
             sync_state=EmailAccountSyncState.error,
             last_sync_error="quota exceeded",
             daily_sent_count=0,
-            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            connected_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+            connected_at=datetime(2025, 1, 1, tzinfo=UTC),
         )
         session = _CapturingSession(existing=existing)
         payload = EmailAccountUpsert(
@@ -270,19 +269,17 @@ class TestServiceDisconnect:
             email_address="asha@example.com",
             access_token_enc=crypto.encrypt("a"),
             refresh_token_enc=crypto.encrypt("r"),
-            token_expires_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+            token_expires_at=datetime(2026, 7, 1, tzinfo=UTC),
             scopes_granted=["s"],
             sync_cursor="history-id-12345",
             sync_state=EmailAccountSyncState.live,
             daily_sent_count=0,
-            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+            connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session = _CapturingSession(existing=existing)
 
-        row = await service.disconnect(
-            session, account_id=existing.id, actor_id=_ACTOR_ID
-        )
+        row = await service.disconnect(session, account_id=existing.id, actor_id=_ACTOR_ID)
 
         assert row is existing
         assert row.access_token_enc is None
@@ -296,9 +293,7 @@ class TestServiceDisconnect:
     @pytest.mark.asyncio
     async def test_disconnect_missing_returns_none(self):
         session = _CapturingSession(existing=None)
-        row = await service.disconnect(
-            session, account_id=uuid.uuid4(), actor_id=_ACTOR_ID
-        )
+        row = await service.disconnect(session, account_id=uuid.uuid4(), actor_id=_ACTOR_ID)
         assert row is None
         assert session.commits == 0
 
@@ -316,13 +311,11 @@ class TestServiceDisconnect:
             scopes_granted=[],
             sync_state=EmailAccountSyncState.disconnected,
             daily_sent_count=0,
-            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+            connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session = _CapturingSession(existing=existing)
-        row = await service.disconnect(
-            session, account_id=existing.id, actor_id=_ACTOR_ID
-        )
+        row = await service.disconnect(session, account_id=existing.id, actor_id=_ACTOR_ID)
         assert row is existing
         # No second commit — already disconnected.
         assert session.commits == 0
@@ -343,8 +336,8 @@ class TestServiceUpdateSyncState:
             sync_state=EmailAccountSyncState.error,
             last_sync_error="provider 500",
             daily_sent_count=0,
-            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+            connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session = _CapturingSession(existing=existing)
 
@@ -373,8 +366,8 @@ class TestServiceUpdateSyncState:
             scopes_granted=[],
             sync_state=EmailAccountSyncState.live,
             daily_sent_count=0,
-            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+            connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session = _CapturingSession(existing=existing)
 
@@ -401,8 +394,8 @@ class TestDecryptTokens:
             scopes_granted=[],
             sync_state=EmailAccountSyncState.disconnected,
             daily_sent_count=0,
-            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+            connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         with pytest.raises(RuntimeError, match="no access token"):
             service.decrypt_tokens(row)
@@ -457,19 +450,16 @@ class TestRefreshIfExpired:
             email_address="x@example.com",
             access_token_enc=crypto.encrypt("current-access"),
             refresh_token_enc=crypto.encrypt("current-refresh"),
-            token_expires_at=datetime.now(timezone.utc)
-            + timedelta(hours=1),
+            token_expires_at=datetime.now(UTC) + timedelta(hours=1),
             scopes_granted=["gmail.modify"],
             sync_state=EmailAccountSyncState.live,
             daily_sent_count=0,
-            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+            connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session = _CapturingSession(existing=account)
 
-        tokens = await service.refresh_if_expired(
-            session, account=account
-        )
+        tokens = await service.refresh_if_expired(session, account=account)
 
         assert provider.refresh_calls == 0
         assert tokens.access_token == "current-access"
@@ -496,19 +486,16 @@ class TestRefreshIfExpired:
             email_address="x@example.com",
             access_token_enc=crypto.encrypt("about-to-expire"),
             refresh_token_enc=crypto.encrypt("current-refresh"),
-            token_expires_at=datetime.now(timezone.utc)
-            + timedelta(minutes=2),
+            token_expires_at=datetime.now(UTC) + timedelta(minutes=2),
             scopes_granted=["gmail.modify"],
             sync_state=EmailAccountSyncState.live,
             daily_sent_count=0,
-            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+            connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session = _CapturingSession(existing=account)
 
-        tokens = await service.refresh_if_expired(
-            session, account=account
-        )
+        tokens = await service.refresh_if_expired(session, account=account)
 
         assert provider.refresh_calls == 1
         assert tokens.access_token == "brand-new-access"
@@ -539,13 +526,12 @@ class TestRefreshIfExpired:
             email_address="x@example.com",
             access_token_enc=crypto.encrypt("a"),
             refresh_token_enc=None,
-            token_expires_at=datetime.now(timezone.utc)
-            - timedelta(minutes=1),
+            token_expires_at=datetime.now(UTC) - timedelta(minutes=1),
             scopes_granted=[],
             sync_state=EmailAccountSyncState.live,
             daily_sent_count=0,
-            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+            connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session = _CapturingSession(existing=account)
 
@@ -565,13 +551,12 @@ class TestRefreshIfExpired:
             email_address="x@example.com",
             access_token_enc=crypto.encrypt("a"),
             refresh_token_enc=crypto.encrypt("r"),
-            token_expires_at=datetime.now(timezone.utc)
-            - timedelta(minutes=1),
+            token_expires_at=datetime.now(UTC) - timedelta(minutes=1),
             scopes_granted=[],
             sync_state=EmailAccountSyncState.live,
             daily_sent_count=0,
-            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            connected_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            daily_sent_reset_at=datetime(2026, 1, 1, tzinfo=UTC),
+            connected_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         session = _CapturingSession(existing=account)
         with pytest.raises(RuntimeError, match="no OAuth provider"):
@@ -642,14 +627,14 @@ class TestEmailAccountReadProjection:
             display_name="X",
             access_token_enc="ENCRYPTED-LEAK-CANARY-ACCESS",
             refresh_token_enc="ENCRYPTED-LEAK-CANARY-REFRESH",
-            token_expires_at=datetime.now(timezone.utc),
+            token_expires_at=datetime.now(UTC),
             scopes_granted=["s"],
             sync_state="live",
-            last_sync_at=datetime.now(timezone.utc),
+            last_sync_at=datetime.now(UTC),
             last_sync_error=None,
             daily_sent_count=0,
-            daily_sent_reset_at=datetime.now(timezone.utc),
-            connected_at=datetime.now(timezone.utc),
+            daily_sent_reset_at=datetime.now(UTC),
+            connected_at=datetime.now(UTC),
             disconnected_at=None,
             disconnected_by=None,
         )

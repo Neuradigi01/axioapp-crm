@@ -5,11 +5,11 @@ set → dispatch) needs a real DB session + httpx; covered by manual
 smoke against a Meta test number. Here we lock down the pure parsing
 helpers + the forward-only status state machine the routing depends on.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from types import SimpleNamespace
+from datetime import UTC, datetime
 
 import pytest
 
@@ -19,10 +19,8 @@ from src.app.core.campaigns.models import (
     CampaignMessageStatus,
 )
 from src.app.core.conversations.adapters.whatsapp import (
-    WhatsAppStatusEvent,
     parse_statuses,
 )
-
 
 # --- parse_statuses ------------------------------------------------------
 
@@ -55,9 +53,7 @@ class TestParseStatuses:
         assert e.channel_message_id == "wamid.HBgM..."
         assert e.status == "delivered"
         assert e.recipient_id == "919876543210"
-        assert e.timestamp == datetime.fromtimestamp(
-            1700000000, tz=timezone.utc
-        )
+        assert e.timestamp == datetime.fromtimestamp(1700000000, tz=UTC)
         assert e.error is None
 
     def test_failed_event_includes_error(self):
@@ -98,17 +94,7 @@ class TestParseStatuses:
         falls through to the inbound-message path."""
         payload = {
             "entry": [
-                {
-                    "changes": [
-                        {
-                            "value": {
-                                "messages": [
-                                    {"from": "919876543210", "id": "wamid.M"}
-                                ]
-                            }
-                        }
-                    ]
-                }
+                {"changes": [{"value": {"messages": [{"from": "919876543210", "id": "wamid.M"}]}}]}
             ]
         }
         assert parse_statuses(payload) == []
@@ -145,14 +131,7 @@ class TestParseStatuses:
         }
         events = parse_statuses(payload)
         # Allow a fudge factor of 5 seconds — test runtime.
-        assert (
-            abs(
-                (
-                    events[0].timestamp - datetime.now(timezone.utc)
-                ).total_seconds()
-            )
-            < 5
-        )
+        assert abs((events[0].timestamp - datetime.now(UTC)).total_seconds()) < 5
 
     def test_multiple_statuses_in_one_payload(self):
         """Meta occasionally batches multiple events in a single POST."""
@@ -229,10 +208,10 @@ def _make_message(
         channel_message_id=channel_message_id,
         status=status,
         error=error,
-        sent_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        sent_at=datetime(2026, 5, 1, tzinfo=UTC),
         delivered_at=delivered_at,
         read_at=read_at,
-        created_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 5, 1, tzinfo=UTC),
     )
 
 
@@ -241,7 +220,7 @@ class TestApplyMetaStatus:
     async def test_delivered_stamps_timestamp_and_advances_status(self):
         row = _make_message(status=CampaignMessageStatus.sent)
         session = _FakeSession(row)
-        ts = datetime(2026, 5, 2, 10, 0, tzinfo=timezone.utc)
+        ts = datetime(2026, 5, 2, 10, 0, tzinfo=UTC)
         updated = await campaigns_service.apply_meta_status(
             session,
             channel_message_id="wamid.X",
@@ -257,10 +236,10 @@ class TestApplyMetaStatus:
     async def test_read_advances_past_delivered(self):
         row = _make_message(
             status=CampaignMessageStatus.delivered,
-            delivered_at=datetime(2026, 5, 2, tzinfo=timezone.utc),
+            delivered_at=datetime(2026, 5, 2, tzinfo=UTC),
         )
         session = _FakeSession(row)
-        ts = datetime(2026, 5, 2, 11, 0, tzinfo=timezone.utc)
+        ts = datetime(2026, 5, 2, 11, 0, tzinfo=UTC)
         updated = await campaigns_service.apply_meta_status(
             session,
             channel_message_id="wamid.X",
@@ -271,7 +250,7 @@ class TestApplyMetaStatus:
         assert row.status == CampaignMessageStatus.read
         assert row.read_at == ts
         # Delivered timestamp untouched.
-        assert row.delivered_at == datetime(2026, 5, 2, tzinfo=timezone.utc)
+        assert row.delivered_at == datetime(2026, 5, 2, tzinfo=UTC)
 
     @pytest.mark.asyncio
     async def test_forward_only_does_not_downgrade(self):
@@ -279,20 +258,20 @@ class TestApplyMetaStatus:
         the status back."""
         row = _make_message(
             status=CampaignMessageStatus.read,
-            read_at=datetime(2026, 5, 2, tzinfo=timezone.utc),
-            delivered_at=datetime(2026, 5, 2, tzinfo=timezone.utc),
+            read_at=datetime(2026, 5, 2, tzinfo=UTC),
+            delivered_at=datetime(2026, 5, 2, tzinfo=UTC),
         )
         session = _FakeSession(row)
         updated = await campaigns_service.apply_meta_status(
             session,
             channel_message_id="wamid.X",
             meta_status="delivered",
-            timestamp=datetime(2026, 5, 3, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 5, 3, tzinfo=UTC),
         )
         assert updated is False
         assert row.status == CampaignMessageStatus.read
         # Delivered timestamp was already set; no change.
-        assert row.delivered_at == datetime(2026, 5, 2, tzinfo=timezone.utc)
+        assert row.delivered_at == datetime(2026, 5, 2, tzinfo=UTC)
 
     @pytest.mark.asyncio
     async def test_failed_event_marks_failed_with_error(self):
@@ -302,7 +281,7 @@ class TestApplyMetaStatus:
             session,
             channel_message_id="wamid.X",
             meta_status="failed",
-            timestamp=datetime(2026, 5, 2, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 5, 2, tzinfo=UTC),
             error="Recipient not on WhatsApp",
         )
         assert updated is True
@@ -313,15 +292,13 @@ class TestApplyMetaStatus:
     async def test_failed_is_terminal_against_late_delivered(self):
         """A `delivered` event after `failed` is ignored — failed is
         the terminal state."""
-        row = _make_message(
-            status=CampaignMessageStatus.failed, error="prior failure"
-        )
+        row = _make_message(status=CampaignMessageStatus.failed, error="prior failure")
         session = _FakeSession(row)
         updated = await campaigns_service.apply_meta_status(
             session,
             channel_message_id="wamid.X",
             meta_status="delivered",
-            timestamp=datetime(2026, 5, 2, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 5, 2, tzinfo=UTC),
         )
         assert updated is False
         assert row.status == CampaignMessageStatus.failed
@@ -336,7 +313,7 @@ class TestApplyMetaStatus:
             session,
             channel_message_id="wamid.X",
             meta_status="sent",
-            timestamp=datetime(2026, 5, 2, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 5, 2, tzinfo=UTC),
         )
         assert updated is False
         assert session.commits == 0
@@ -351,7 +328,7 @@ class TestApplyMetaStatus:
             session,
             channel_message_id="wamid.UNKNOWN",
             meta_status="delivered",
-            timestamp=datetime(2026, 5, 2, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 5, 2, tzinfo=UTC),
         )
         assert updated is False
 
@@ -362,6 +339,6 @@ class TestApplyMetaStatus:
             session,
             channel_message_id="",
             meta_status="delivered",
-            timestamp=datetime(2026, 5, 2, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 5, 2, tzinfo=UTC),
         )
         assert updated is False

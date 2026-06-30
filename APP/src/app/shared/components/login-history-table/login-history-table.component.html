@@ -33,26 +33,32 @@
         </thead>
         <tbody>
           @for (row of data(); track row.token_id) {
-            <tr [class.login-history__row--current]="isCurrentSession(row)"
-                [class.login-history__row--failed]="row.login_status === 'Failed'">
+            <tr
+              [class.login-history__row--current]="isCurrentSession(row)"
+              [class.login-history__row--failed]="row.login_status === 'Failed'"
+            >
               @if (showUserColumns()) {
                 <td>{{ row.user_id }}</td>
                 <td>{{ row.user_type }}</td>
               }
-              <td>{{ row.on_date | date:'medium' }}</td>
+              <td>{{ row.on_date | date: 'medium' }}</td>
               <td>
                 <span>{{ row.ip_address }}</span>
                 @if (row.sender_ip) {
-                  <br><small class="login-history__muted">via {{ row.sender_ip }}</small>
+                  <br /><small class="login-history__muted">via {{ row.sender_ip }}</small>
                 }
               </td>
               <td>
                 <div class="login-history__device">
-                  <mat-icon class="login-history__device-icon">{{ getDeviceIcon(row.device_type) }}</mat-icon>
+                  <mat-icon class="login-history__device-icon">{{
+                    getDeviceIcon(row.device_type)
+                  }}</mat-icon>
                   <div>
                     <span>{{ row.device || 'Unknown' }}</span>
                     @if (row.os) {
-                      <br><small class="login-history__muted">{{ row.os }} {{ row.os_version }}</small>
+                      <br /><small class="login-history__muted"
+                        >{{ row.os }} {{ row.os_version }}</small
+                      >
                     }
                   </div>
                 </div>
@@ -65,12 +71,16 @@
               </td>
               <td>
                 @if (row.city || row.country) {
-                  <span>{{ row.city }}{{ row.city && row.country ? ', ' : '' }}{{ row.country }}</span>
+                  <span
+                    >{{ row.city }}{{ row.city && row.country ? ', ' : '' }}{{ row.country }}</span
+                  >
                   @if (row.latitude && row.longitude) {
-                    <button mat-icon-button
-                            class="login-history__map-btn"
-                            matTooltip="Open in Google Maps"
-                            (click)="openMap(row.latitude, row.longitude)">
+                    <button
+                      mat-icon-button
+                      class="login-history__map-btn"
+                      matTooltip="Open in Google Maps"
+                      (click)="openMap(row.latitude, row.longitude)"
+                    >
                       <mat-icon>location_on</mat-icon>
                     </button>
                   }
@@ -80,13 +90,18 @@
               </td>
               <td>
                 @let badge = getStatusBadge(row.login_status);
-                <span class="login-history__badge"
-                      [style.color]="badge.color"
-                      [style.background-color]="badge.bgVar">
+                <span
+                  class="login-history__badge"
+                  [style.color]="badge.color"
+                  [style.background-color]="badge.bgVar"
+                >
                   {{ row.login_status }}
                 </span>
                 @if (row.by_admin_token_id) {
-                  <span class="login-history__admin-indicator" matTooltip="Login by admin impersonation">
+                  <span
+                    class="login-history__admin-indicator"
+                    matTooltip="Login by admin impersonation"
+                  >
                     <mat-icon>admin_panel_settings</mat-icon>
                     By Admin
                   </span>
@@ -96,10 +111,12 @@
                 @if (isCurrentSession(row)) {
                   <span class="login-history__current-badge">This device</span>
                 } @else if (canLogout(row)) {
-                  <button mat-stroked-button
-                          color="warn"
-                          class="login-history__logout-btn"
-                          (click)="logoutSession(row.token_id)">
+                  <button
+                    mat-stroked-button
+                    color="warn"
+                    class="login-history__logout-btn"
+                    (click)="logoutSession(row.token_id)"
+                  >
                     <mat-icon>logout</mat-icon>
                     Logout
                   </button>
@@ -124,7 +141,8 @@
         [pageIndex]="pageIndex()"
         [pageSizeOptions]="[10, 25, 50, 100]"
         (page)="onPageChange($event)"
-        showFirstLastButtons />
+        showFirstLastButtons
+      />
     }
   </div>
 </div>

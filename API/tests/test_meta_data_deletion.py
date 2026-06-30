@@ -8,6 +8,7 @@ scrub mutates real DB rows; we assert it builds + runs without raising).
 Mirrors the surrounding ``test_whatsapp_*`` test files: pure-Python
 fakes for the DB, no Meta network, no Celery broker.
 """
+
 from __future__ import annotations
 
 import base64
@@ -16,7 +17,7 @@ import hmac
 import json
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -25,7 +26,6 @@ from src.app.core.integrations.meta.models import (
     MetaDataDeletionRequest,
     MetaDataDeletionStatus,
 )
-
 
 _APP_SECRET = "test-app-secret-xyz"
 _META_USER_ID = "10001234567890"
@@ -51,11 +51,7 @@ def _make_signed_request(
         "issued_at": issued_at,
     }
     payload_json = json.dumps(payload, separators=(",", ":"))
-    payload_b64 = (
-        base64.urlsafe_b64encode(payload_json.encode("utf-8"))
-        .decode("ascii")
-        .rstrip("=")
-    )
+    payload_b64 = base64.urlsafe_b64encode(payload_json.encode("utf-8")).decode("ascii").rstrip("=")
     sig = hmac.new(
         app_secret.encode("utf-8"),
         payload_b64.encode("utf-8"),
@@ -65,9 +61,7 @@ def _make_signed_request(
     if tamper:
         # Flip a bit in the payload portion AFTER signing — the
         # signature no longer matches the contents.
-        payload_b64 = payload_b64[:-1] + (
-            "A" if payload_b64[-1] != "A" else "B"
-        )
+        payload_b64 = payload_b64[:-1] + ("A" if payload_b64[-1] != "A" else "B")
     return f"{sig_b64}.{payload_b64}"
 
 
@@ -110,15 +104,11 @@ class TestSignedRequestParser:
 
     def test_no_dot_separator_raises_malformed(self):
         with pytest.raises(dd.MalformedRequestError):
-            dd.parse_signed_request(
-                "no-dot-here", app_secret=_APP_SECRET
-            )
+            dd.parse_signed_request("no-dot-here", app_secret=_APP_SECRET)
 
     def test_garbage_base64_raises_malformed(self):
         with pytest.raises(dd.MalformedRequestError):
-            dd.parse_signed_request(
-                "not_b64!.also_not_b64!", app_secret=_APP_SECRET
-            )
+            dd.parse_signed_request("not_b64!.also_not_b64!", app_secret=_APP_SECRET)
 
     def test_missing_user_id_raises_malformed(self):
         # Build a payload with no user_id; sign it correctly so the
@@ -129,18 +119,14 @@ class TestSignedRequestParser:
         }
         payload_json = json.dumps(payload, separators=(",", ":"))
         payload_b64 = (
-            base64.urlsafe_b64encode(payload_json.encode("utf-8"))
-            .decode("ascii")
-            .rstrip("=")
+            base64.urlsafe_b64encode(payload_json.encode("utf-8")).decode("ascii").rstrip("=")
         )
         sig = hmac.new(
             _APP_SECRET.encode("utf-8"),
             payload_b64.encode("utf-8"),
             hashlib.sha256,
         ).digest()
-        sig_b64 = (
-            base64.urlsafe_b64encode(sig).decode("ascii").rstrip("=")
-        )
+        sig_b64 = base64.urlsafe_b64encode(sig).decode("ascii").rstrip("=")
         signed = f"{sig_b64}.{payload_b64}"
         with pytest.raises(dd.MalformedRequestError):
             dd.parse_signed_request(signed, app_secret=_APP_SECRET)
@@ -199,9 +185,7 @@ class TestStatusLookup:
     @pytest.mark.asyncio
     async def test_demo_code_returns_synthetic_completed(self):
         session = _CapturingSession()
-        result = await dd.get_status_by_code(
-            session, confirmation_code=dd.DEMO_CONFIRMATION_CODE
-        )
+        result = await dd.get_status_by_code(session, confirmation_code=dd.DEMO_CONFIRMATION_CODE)
         assert result is not None
         assert result["status"] == "completed"
         assert result["is_demo"] is True
@@ -215,16 +199,14 @@ class TestStatusLookup:
             id=uuid.uuid4(),
             confirmation_code="abc123def456",
             meta_user_id=_META_USER_ID,
-            issued_at=datetime(2026, 6, 19, tzinfo=timezone.utc),
+            issued_at=datetime(2026, 6, 19, tzinfo=UTC),
             affected_org_ids=[uuid.uuid4(), uuid.uuid4()],
             status=MetaDataDeletionStatus.in_progress,
-            requested_at=datetime(2026, 6, 19, tzinfo=timezone.utc),
+            requested_at=datetime(2026, 6, 19, tzinfo=UTC),
         )
         session.rows.append(request_row)
 
-        result = await dd.get_status_by_code(
-            session, confirmation_code="abc123def456"
-        )
+        result = await dd.get_status_by_code(session, confirmation_code="abc123def456")
         assert result is not None
         assert result["status"] == "in_progress"
         assert result["affected_org_count"] == 2
@@ -236,9 +218,7 @@ class TestStatusLookup:
     @pytest.mark.asyncio
     async def test_unknown_code_returns_none(self):
         session = _CapturingSession()
-        result = await dd.get_status_by_code(
-            session, confirmation_code="does-not-exist"
-        )
+        result = await dd.get_status_by_code(session, confirmation_code="does-not-exist")
         assert result is None
 
 

@@ -17,14 +17,15 @@ The `/me/*` set deliberately reuses the same service functions from
 (`get_current_staff` vs `require_permissions(...)`) and the implicit
 "the user is themselves" identity.
 """
+
 from __future__ import annotations
 
 from datetime import date as Date
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.activities.schemas import ActivityOut
 from src.app.core.auth.dependencies import get_current_staff
 from src.app.core.staff.schemas import (
     AttendanceOut,
@@ -34,12 +35,15 @@ from src.app.core.staff.schemas import (
 )
 from src.app.core.staff.service import (
     clock_in as svc_clock_in,
+)
+from src.app.core.staff.service import (
     clock_out as svc_clock_out,
+)
+from src.app.core.staff.service import (
     compute_performance,
     list_activities_for,
     list_attendance,
 )
-from src.app.core.activities.schemas import ActivityOut
 from src.app.core.staff_portal.schemas import (
     StaffLoginPayload,
     StaffLoginResponse,
@@ -49,7 +53,6 @@ from src.app.core.staff_portal.schemas import (
 from src.app.core.staff_portal.service import list_pickable_users, login
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
-
 
 router = APIRouter(prefix="/staff-portal", tags=["StaffPortal"])
 
@@ -108,14 +111,12 @@ async def me_performance_endpoint(
 
 @router.get("/me/attendance", response_model=list[AttendanceOut])
 async def me_attendance_endpoint(
-    from_: Optional[Date] = Query(default=None, alias="from"),
-    to: Optional[Date] = Query(default=None),
+    from_: Date | None = Query(default=None, alias="from"),
+    to: Date | None = Query(default=None),
     user: User = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ) -> list[AttendanceOut]:
-    rows = await list_attendance(
-        db, user_id=user.legacy_uuid, from_dt=from_, to_dt=to
-    )
+    rows = await list_attendance(db, user_id=user.legacy_uuid, from_dt=from_, to_dt=to)
     return [AttendanceOut.model_validate(r) for r in rows]
 
 
@@ -129,17 +130,13 @@ async def me_activity_endpoint(
     return [ActivityOut.model_validate(r) for r in rows]
 
 
-@router.post(
-    "/me/clock-in", response_model=AttendanceOut, status_code=201
-)
+@router.post("/me/clock-in", response_model=AttendanceOut, status_code=201)
 async def me_clock_in_endpoint(
     payload: ClockInPayload,
     user: User = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ) -> AttendanceOut:
-    row = await svc_clock_in(
-        db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload
-    )
+    row = await svc_clock_in(db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload)
     return AttendanceOut.model_validate(row)
 
 

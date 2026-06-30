@@ -35,6 +35,7 @@ Usage
 The script writes the IDs to `app/core/subscriptions/stripe_price_map.yaml`.
 Commit that file after a fresh seed; runtime reads it.
 """
+
 from __future__ import annotations
 
 import logging
@@ -53,8 +54,7 @@ log = logging.getLogger(__name__)
 # Resolved here (not as a constant import from the provider) so the
 # seed script has no runtime dependency on `stripe_provider.py`.
 _PRICE_MAP_PATH: Path = (
-    Path(__file__).resolve().parent.parent
-    / "core" / "subscriptions" / "stripe_price_map.yaml"
+    Path(__file__).resolve().parent.parent / "core" / "subscriptions" / "stripe_price_map.yaml"
 )
 
 
@@ -92,7 +92,8 @@ def _metadata_value(obj, key: str) -> str | None:
 
 
 def _find_existing_product(
-    stripe_sdk, plan_code: str,
+    stripe_sdk,
+    plan_code: str,
 ) -> str | None:
     """Match by `metadata.plan_code`. Returns the Stripe Product ID or `None`."""
     for product in stripe_sdk.Product.list(limit=100).auto_paging_iter():
@@ -102,7 +103,10 @@ def _find_existing_product(
 
 
 def _find_existing_price(
-    stripe_sdk, product_id: str, plan_code: str, billing_cycle: str,
+    stripe_sdk,
+    product_id: str,
+    plan_code: str,
+    billing_cycle: str,
 ) -> str | None:
     """Match by Product + (plan_code, billing_cycle) metadata pair."""
     listing = stripe_sdk.Price.list(product=product_id, limit=100)
@@ -129,15 +133,23 @@ def _ensure_product(stripe_sdk, plan: plans_module.Plan) -> str:
 
 
 def _ensure_price(
-    stripe_sdk, product_id: str, plan: plans_module.Plan, billing_cycle: str,
+    stripe_sdk,
+    product_id: str,
+    plan: plans_module.Plan,
+    billing_cycle: str,
 ) -> str:
     existing = _find_existing_price(
-        stripe_sdk, product_id, plan.code, billing_cycle,
+        stripe_sdk,
+        product_id,
+        plan.code,
+        billing_cycle,
     )
     if existing is not None:
         log.info(
             "Price for %r/%r already exists: %s",
-            plan.code, billing_cycle, existing,
+            plan.code,
+            billing_cycle,
+            existing,
         )
         return existing
 
@@ -171,7 +183,9 @@ def _ensure_price(
     )
     log.info(
         "Created Price for %r/%r: %s",
-        plan.code, billing_cycle, created["id"],
+        plan.code,
+        billing_cycle,
+        created["id"],
     )
     return created["id"]
 

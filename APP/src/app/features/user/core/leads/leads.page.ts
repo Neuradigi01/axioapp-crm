@@ -18,10 +18,7 @@ import { forkJoin, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { ContactsApiService } from '../contacts/contacts-api.service';
-import {
-  ItemMovedEvent,
-  PipelineItem,
-} from '../pipelines/pipelines-api.service';
+import { ItemMovedEvent, PipelineItem } from '../pipelines/pipelines-api.service';
 import { PipelineBoardComponent } from '../pipelines/pipeline-board.component';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ColumnDef, ColumnPrefsService } from '../shared/column-prefs.service';
@@ -35,7 +32,10 @@ import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.direct
 import { FieldDef } from '../shared/dynamic-form/types';
 import { clauseCount, FilterDsl } from '../shared/filter-dsl.types';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
-import { ReassignConfirm, ReassignModalComponent } from '../shared/reassign-modal/reassign-modal.component';
+import {
+  ReassignConfirm,
+  ReassignModalComponent,
+} from '../shared/reassign-modal/reassign-modal.component';
 import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { AdvancedFilterModalComponent } from './advanced-filter-modal.component';
@@ -57,11 +57,7 @@ import {
   LeadsApiService,
   SortOrder,
 } from './leads-api.service';
-import {
-  SavedView,
-  SavedViewConfig,
-  SavedViewsApiService,
-} from './saved-views-api.service';
+import { SavedView, SavedViewConfig, SavedViewsApiService } from './saved-views-api.service';
 
 /**
  * Top-level Leads page.
@@ -223,18 +219,12 @@ export class LeadsPageComponent {
     if (this.state.items().length === 0) return 0;
     return (this.currentPage() - 1) * this.state.pageSize() + 1;
   });
-  readonly pageRangeEnd = computed(
-    () => this.pageRangeStart() + this.state.items().length - 1,
-  );
+  readonly pageRangeEnd = computed(() => this.pageRangeStart() + this.state.items().length - 1);
 
   /** Customized columns for the list-view table. */
-  readonly columns = signal<ColumnDef[]>(
-    this.columnPrefs.get('leads', DEFAULT_LEAD_COLUMNS),
-  );
+  readonly columns = signal<ColumnDef[]>(this.columnPrefs.get('leads', DEFAULT_LEAD_COLUMNS));
   protected readonly defaultColumns = DEFAULT_LEAD_COLUMNS;
-  readonly visibleColumns = computed(() =>
-    this.columns().filter((c) => c.visible),
-  );
+  readonly visibleColumns = computed(() => this.columns().filter((c) => c.visible));
   protected isColumnVisible(key: string): boolean {
     return this.visibleColumns().some((c) => c.key === key);
   }
@@ -273,9 +263,7 @@ export class LeadsPageComponent {
   });
 
   /** Display name in the toolbar trigger. */
-  readonly currentViewName = computed<string | null>(
-    () => this.currentView()?.name ?? null,
-  );
+  readonly currentViewName = computed<string | null>(() => this.currentView()?.name ?? null);
 
   /** True when the active view belongs to the current user (gates the
    * "Update / Delete this view" affordances). Shared views applied by
@@ -326,9 +314,7 @@ export class LeadsPageComponent {
   readonly loadedCount = computed(() => this.state.items().length);
   readonly newTodayCount = computed(() => {
     const todayKey = this.todayKey();
-    return this.state.items().filter(
-      (l) => this.dateKey(l.created_at) === todayKey,
-    ).length;
+    return this.state.items().filter((l) => this.dateKey(l.created_at) === todayKey).length;
   });
 
   private todayKey(): string {
@@ -449,14 +435,18 @@ export class LeadsPageComponent {
   };
 
   /** Cast Lead[] to PipelineItem[] for the board/list inputs. */
-  readonly pipelineItems = computed<PipelineItem[]>(
-    () => this.state.items() as PipelineItem[],
-  );
+  readonly pipelineItems = computed<PipelineItem[]>(() => this.state.items() as PipelineItem[]);
 
   constructor() {
     this.state.bulkActions.set([
       { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'leads.reassign' },
-      { key: 'delete', label: 'Delete', icon: 'trash-2', danger: true, permissionKey: 'leads.write' },
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: 'trash-2',
+        danger: true,
+        permissionKey: 'leads.write',
+      },
     ]);
     // Leads list defaults to 50 rows; shared service defaults to 25.
     this.state.pageSize.set(50);
@@ -491,19 +481,17 @@ export class LeadsPageComponent {
     // landing on the page from anywhere in the app drops the user
     // straight into the create-lead modal. Strip the param after
     // consuming it so a refresh doesn't re-open.
-    this.route.queryParamMap
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((params) => {
-        if (params.get('new') !== null && this.modalState() === null) {
-          this.openCreate();
-          this.router.navigate([], {
-            relativeTo: this.route,
-            queryParams: { new: null },
-            queryParamsHandling: 'merge',
-            replaceUrl: true,
-          });
-        }
-      });
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      if (params.get('new') !== null && this.modalState() === null) {
+        this.openCreate();
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { new: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      }
+    });
   }
 
   protected setView(v: View): void {
@@ -644,9 +632,7 @@ export class LeadsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.exporting.set(false);
-          this.exportError.set(
-            extractApiError(err) ?? 'Could not export leads.',
-          );
+          this.exportError.set(extractApiError(err) ?? 'Could not export leads.');
         },
       });
   }
@@ -800,13 +786,9 @@ export class LeadsPageComponent {
           // (owner, entity, name) constraint trips. Surface the original
           // detail so the user can rename.
           if (err.status === 409) {
-            this.saveViewError.set(
-              extractApiError(err) ?? 'You already have a view by that name.',
-            );
+            this.saveViewError.set(extractApiError(err) ?? 'You already have a view by that name.');
           } else {
-            this.saveViewError.set(
-              extractApiError(err) ?? 'Could not save view.',
-            );
+            this.saveViewError.set(extractApiError(err) ?? 'Could not save view.');
           }
         },
       });
@@ -825,15 +807,11 @@ export class LeadsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.savedViews.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.savedViews.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.viewsMenuOpen.set(false);
         },
         error: (err: HttpErrorResponse) => {
-          this.state.loadError.set(
-            extractApiError(err) ?? 'Could not update view.',
-          );
+          this.state.loadError.set(extractApiError(err) ?? 'Could not update view.');
         },
       });
   }
@@ -848,14 +826,10 @@ export class LeadsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.savedViews.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.savedViews.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
         },
         error: (err: HttpErrorResponse) => {
-          this.state.loadError.set(
-            extractApiError(err) ?? 'Could not change sharing.',
-          );
+          this.state.loadError.set(extractApiError(err) ?? 'Could not change sharing.');
         },
       });
   }
@@ -880,17 +854,13 @@ export class LeadsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.savedViews.update((rows) =>
-            rows.filter((r) => r.id !== view.id),
-          );
+          this.savedViews.update((rows) => rows.filter((r) => r.id !== view.id));
           this.currentViewId.set(null);
           this.closeDeleteViewConfirm();
         },
         error: (err: HttpErrorResponse) => {
           this.deleteViewSubmitting.set(false);
-          this.state.loadError.set(
-            extractApiError(err) ?? 'Could not delete view.',
-          );
+          this.state.loadError.set(extractApiError(err) ?? 'Could not delete view.');
         },
       });
   }
@@ -1021,18 +991,14 @@ export class LeadsPageComponent {
     const before = this.state.items();
     // Optimistic local update so the kanban doesn't flicker.
     this.state.items.update((rows) =>
-      rows.map((r) =>
-        r.id === event.itemId ? { ...r, pipeline_stage: event.toStage } : r,
-      ),
+      rows.map((r) => (r.id === event.itemId ? { ...r, pipeline_stage: event.toStage } : r)),
     );
     this.api
       .moveStage(event.itemId, event.toStage)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.state.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
         },
         error: (err: HttpErrorResponse) => {
           // Backend signals "moving to Lost needs a reason" with a 422
@@ -1064,17 +1030,13 @@ export class LeadsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.state.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.lostReasonSubmitting.set(false);
           this.pendingLostMove.set(null);
         },
         error: (err: HttpErrorResponse) => {
           this.lostReasonSubmitting.set(false);
-          this.lostReasonError.set(
-            extractApiError(err) ?? 'Could not mark lead as Lost.',
-          );
+          this.lostReasonError.set(extractApiError(err) ?? 'Could not mark lead as Lost.');
         },
       });
   }
@@ -1157,19 +1119,17 @@ export class LeadsPageComponent {
     const final$ = moveStageTo
       ? update$.pipe(switchMap(() => this.api.moveStage(id, moveStageTo)))
       : update$;
-    final$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => {
-          this.submitting.set(false);
-          this.closeModal();
-          this.reload();
-        },
-        error: (err: HttpErrorResponse) => {
-          this.submitting.set(false);
-          this.formError.set(extractApiError(err) ?? 'Could not save lead.');
-        },
-      });
+    final$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.closeModal();
+        this.reload();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.submitting.set(false);
+        this.formError.set(extractApiError(err) ?? 'Could not save lead.');
+      },
+    });
   }
 
   // --- Single reassign (pencil on a card / list row) ----------------------
@@ -1198,16 +1158,12 @@ export class LeadsPageComponent {
           this.singleReassignSubmitting.set(false);
           // Replace just the touched row in place so the kanban doesn't
           // flicker its full re-layout for a single owner change.
-          this.state.items.update((rows) =>
-            rows.map((r) => (r.id === updated.id ? updated : r)),
-          );
+          this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.closeSingleReassign();
         },
         error: (err: HttpErrorResponse) => {
           this.singleReassignSubmitting.set(false);
-          this.singleReassignError.set(
-            extractApiError(err) ?? 'Could not reassign lead.',
-          );
+          this.singleReassignError.set(extractApiError(err) ?? 'Could not reassign lead.');
         },
       });
   }
@@ -1289,11 +1245,7 @@ export class LeadsPageComponent {
   }
 
   private fetchContacts(ids: string[]): void {
-    forkJoin(
-      ids.map((id) =>
-        this.contactsApi.get(id).pipe(catchError(() => of(null))),
-      ),
-    )
+    forkJoin(ids.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((results) => {
         this.contactsById.update((cache) => {
@@ -1312,5 +1264,4 @@ export class LeadsPageComponent {
         });
       });
   }
-
 }

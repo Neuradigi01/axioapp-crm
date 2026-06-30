@@ -9,6 +9,7 @@ one place.
 Audit events (`custom_fields.created`, `.updated`, `.deleted`) fire
 inside each write path so callers don't need to remember.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -18,7 +19,6 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.shared.audit import log_entity_change
 from src.app.core.custom_fields import data_access as _da
 from src.app.core.custom_fields.models import (
     CustomFieldDefinition,
@@ -30,6 +30,7 @@ from src.app.core.custom_fields.schemas import (
     CustomFieldUpdate,
     _validate_options,
 )
+from src.app.shared.audit import log_entity_change
 
 
 class CustomFieldError(HTTPException):
@@ -58,9 +59,7 @@ def _snapshot(field: CustomFieldDefinition) -> dict[str, Any]:
     }
 
 
-async def get_field(
-    session: AsyncSession, field_id: uuid.UUID
-) -> CustomFieldDefinition | None:
+async def get_field(session: AsyncSession, field_id: uuid.UUID) -> CustomFieldDefinition | None:
     """Return a single definition by id, scoped to the active tenant."""
     return await _da.get_field_by_id(session, field_id)
 
@@ -77,9 +76,7 @@ async def list_fields(
     )
 
 
-async def render_fields(
-    session: AsyncSession, *, entity_type: str
-) -> list[CustomFieldDefinition]:
+async def render_fields(session: AsyncSession, *, entity_type: str) -> list[CustomFieldDefinition]:
     """Visible, ordered list used by the frontend form renderer."""
     return await list_fields(session, entity_type=entity_type, include_hidden=False)
 
@@ -183,10 +180,7 @@ async def create_managed_field(
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"custom field '{field_key}' already exists for "
-                f"entity '{entity_type}'"
-            ),
+            detail=(f"custom field '{field_key}' already exists for entity '{entity_type}'"),
         ) from exc
     await session.refresh(field)
 
@@ -277,9 +271,7 @@ async def update_field(
     return field
 
 
-async def delete_field(
-    session: AsyncSession, *, field_id: uuid.UUID
-) -> None:
+async def delete_field(session: AsyncSession, *, field_id: uuid.UUID) -> None:
     """Delete a definition. Only `source=user` is deletable via HTTP."""
     field = await get_field(session, field_id)
     if field is None:
