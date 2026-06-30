@@ -146,6 +146,39 @@ class ActionResult:
 ActionHandler = Callable[..., Awaitable[ActionResult]]
 
 
+# --- Dry-run support (Step 14) ------------------------------------------
+
+
+@dataclass(slots=True)
+class DryRunStep:
+    """One hop in a dry-run trace."""
+
+    node_id: str
+    node_type: str
+    edge_label: str | None
+    skip_reason: str | None
+
+
+@dataclass(slots=True)
+class DryRunResult:
+    """Synthetic ``start_run`` result for ``dry_run=True``.
+
+    No DB rows are written. ``steps`` records every node the engine
+    would visit; ``outcome`` records what the run would finish with.
+    """
+
+    workflow_id: uuid.UUID
+    steps: list[DryRunStep]
+    outcome: str
+    error: str | None
+
+
+# Hard ceiling on dry-walk depth so a malformed graph (e.g. a cycle
+# through a wait-for-event timeout edge) can't spin forever in the
+# test-fire path.
+_DRY_RUN_MAX_HOPS = 200
+
+
 # --- start_run ----------------------------------------------------------
 
 
@@ -156,7 +189,8 @@ async def start_run(
     contact_id: uuid.UUID | None,
     trigger_event_id: str | None,
     trigger_payload: dict[str, Any] | None = None,
-) -> WorkflowRun:
+    dry_run: bool = False,
+) -> "WorkflowRun | DryRunResult":
     """Enrol a contact into a workflow. Inserts the run row pointed
     at the trigger node + enqueues the first :func:`process_step`
     Celery dispatch.
@@ -173,6 +207,14 @@ async def start_run(
     if trigger_node is None:
         raise ValueError(
             f"workflow {workflow.id} has no trigger node — refusing to start"
+        )
+
+    if dry_run:
+        # Test-fire path: walk the graph in memory + return a synthetic
+        # trace. No rows are written; no adapter calls run. The frontend
+        # uses this to preview what a real fire would do.
+        return _dry_walk(
+            workflow=workflow, start_node_id=trigger_node["id"]
         )
 
     run = WorkflowRun(
@@ -530,6 +572,111 @@ def _extract_wait_seconds(node: dict[str, Any]) -> int:
         if isinstance(value, (int, float)) and value > 0:
             return int(value)
     return 60
+
+
+# --- _dry_walk (Step 14 — test-fire support) -----------------------------
+
+
+def _dry_walk(
+    *,
+    workflow: Workflow,
+    start_node_id: str,
+) -> DryRunResult:
+    """Simulate a run synchronously without any DB writes or side effects.
+
+    Walks the graph from ``start_node_id`` (the trigger), picking the
+    first outbound edge at each fork — branch / switch / ab_split / wait-
+    for-event all collapse to the first available label since there's
+    no real event payload to evaluate against. Wait nodes are recorded
+    as visited and walked past immediately (no actual delay).
+
+    Bounded by ``_DRY_RUN_MAX_HOPS`` so a cyclic graph can't run forever.
+    """
+    graph = workflow.graph or {}
+    nodes_by_id: dict[str, dict[str, Any]] = {
+        n["id"]: n for n in (graph.get("nodes") or []) if "id" in n
+    }
+    edges = graph.get("edges") or []
+
+    steps: list[DryRunStep] = []
+    visited: set[str] = set()
+    current: str | None = start_node_id
+
+    for _ in range(_DRY_RUN_MAX_HOPS):
+        if current is None or current not in nodes_by_id:
+            outcome = (
+                "goal_reached"
+                if (
+                    workflow.goal_node_id is not None
+                    and steps
+                    and steps[-1].node_id == workflow.goal_node_id
+                )
+                else "completed"
+            )
+            return DryRunResult(
+                workflow_id=workflow.id,
+                steps=steps,
+                outcome=outcome,
+                error=None,
+            )
+
+        if current in visited:
+            # Cycle guard — record the loop and stop with an error.
+            steps.append(
+                DryRunStep(
+                    node_id=current,
+                    node_type=str(nodes_by_id[current].get("type") or ""),
+                    edge_label=None,
+                    skip_reason="dry_run_cycle_detected",
+                )
+            )
+            return DryRunResult(
+                workflow_id=workflow.id,
+                steps=steps,
+                outcome="errored",
+                error="dry-run encountered a cycle",
+            )
+        visited.add(current)
+
+        node = nodes_by_id[current]
+        node_type = str(node.get("type") or "")
+
+        # Pick the first outbound edge regardless of label — dry-run
+        # can't evaluate real conditions, so we trace the deterministic
+        # "happy path" through the graph.
+        outbound = [e for e in edges if e.get("source") == current]
+        next_edge_label = outbound[0].get("label") if outbound else None
+        next_node_id = outbound[0].get("target") if outbound else None
+
+        steps.append(
+            DryRunStep(
+                node_id=current,
+                node_type=node_type,
+                edge_label=next_edge_label,
+                skip_reason=None,
+            )
+        )
+
+        if next_node_id is None:
+            is_goal = (
+                workflow.goal_node_id is not None
+                and workflow.goal_node_id == current
+            )
+            return DryRunResult(
+                workflow_id=workflow.id,
+                steps=steps,
+                outcome="goal_reached" if is_goal else "completed",
+                error=None,
+            )
+        current = next_node_id
+
+    # Hop ceiling hit — surface as an error so a runaway graph is loud.
+    return DryRunResult(
+        workflow_id=workflow.id,
+        steps=steps,
+        outcome="errored",
+        error=f"dry-run exceeded {_DRY_RUN_MAX_HOPS} hops",
+    )
 
 
 # --- resume_after_wait --------------------------------------------------

@@ -105,7 +105,7 @@ The `actions/` sub-package is the only one allowed beyond the single-file conven
 | 11 | [Flow control (wait / if-else / switch / A/B / goal / wait-for-event)](step-11-flow-control-actions.md) | **COMPLETED** | ~1 day |
 | 12 | [Marketing consent + quiet hours + frequency cap compliance](step-12-compliance-gates.md) | **COMPLETED** | ~1 day |
 | 13 | [Workflow list UI + folders/categories](step-13-workflow-list-ui.md) | **COMPLETED** | ~1 day |
-| 14 | [Workflow canvas UI (node palette + drag-drop)](step-14-workflow-canvas-ui.md) | **Pending** | ~2 days |
+| 14 | [Workflow canvas UI (node palette + drag-drop)](step-14-workflow-canvas-ui.md) | **COMPLETED** | ~2 days |
 | 15 | [Node editor drawers (per-node config)](step-15-node-editor-drawers.md) | **Pending** | ~1.5 days |
 | 16 | [Templates gallery + clone-from-default](step-16-templates-gallery.md) | **Pending** | ~0.5 days |
 | 17 | [Version history + rollback + import/export JSON](step-17-version-history.md) | **Pending** | ~1 day |

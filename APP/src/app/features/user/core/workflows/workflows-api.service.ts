@@ -182,6 +182,26 @@ export interface WorkflowRunListQuery {
   offset?: number;
 }
 
+export interface WorkflowTestFireRequest {
+  event_type?: string;
+  contact_id?: string | null;
+  payload?: Record<string, unknown>;
+}
+
+export interface WorkflowTestFireStep {
+  node_id: string;
+  node_type: string;
+  edge_label: string | null;
+  skip_reason: string | null;
+}
+
+export interface WorkflowTestFireResponse {
+  workflow_id: string;
+  steps: WorkflowTestFireStep[];
+  outcome: 'goal_reached' | 'completed' | 'canceled' | 'errored';
+  error: string | null;
+}
+
 
 @Injectable({ providedIn: 'root' })
 export class WorkflowsApiService {
@@ -228,6 +248,16 @@ export class WorkflowsApiService {
 
   clone(id: string, name: string): Observable<WorkflowRead> {
     return this.http.post<WorkflowRead>(`${this.base}/${id}/clone`, { name });
+  }
+
+  testFire(
+    id: string,
+    payload: WorkflowTestFireRequest,
+  ): Observable<WorkflowTestFireResponse> {
+    return this.http.post<WorkflowTestFireResponse>(
+      `${this.base}/${id}/test-fire`,
+      payload,
+    );
   }
 
   // --- Folders ------------------------------------------------------

@@ -382,6 +382,27 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // tasks/workflows Step 14 — SVG canvas editor. /new boots a
+        // fresh draft; /:id loads the existing workflow. Write-gated
+        // because every interaction (drag-drop, save, activate)
+        // implies a mutation; read-only users land on the list page
+        // instead.
+        path: 'workflows/new',
+        canActivate: [permissionGuard('workflows.write')],
+        loadComponent: () =>
+          import(
+            './core/workflows/canvas/workflow-canvas.page'
+          ).then((m) => m.WorkflowCanvasPageComponent),
+      },
+      {
+        path: 'workflows/:id',
+        canActivate: [permissionGuard('workflows.read')],
+        loadComponent: () =>
+          import(
+            './core/workflows/canvas/workflow-canvas.page'
+          ).then((m) => m.WorkflowCanvasPageComponent),
+      },
+      {
         // tasks/automation-engine Step 7 — single-event trigger
         // list. Read-gated; "New automation" + inline
         // enable/disable affordances inside the page hide for

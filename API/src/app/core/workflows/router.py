@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import get_current_user, require_permissions
 from src.app.core.users.models import User
+from src.app.core.workflows import engine as workflows_engine
 from src.app.core.workflows import service as workflows_service
 from src.app.core.workflows.exceptions import (
     ActivationBlocked,
@@ -604,6 +605,92 @@ async def clone_workflow_endpoint(
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     return WorkflowRead.model_validate(clone)
+
+
+# --- Step 14: test-fire (dry-run preview) ------------------------------
+
+
+class WorkflowTestFireRequest(BaseModel):
+    """Operator-supplied event seed for the dry-run. All fields are
+    optional — the engine doesn't actually consult them in v1 (the
+    dry walk picks the first outbound edge at every fork), but the
+    shape is stable so Step 19 can extend it with explicit branch
+    overrides without a frontend change."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    event_type: str | None = Field(default=None, max_length=120)
+    contact_id: uuid.UUID | None = Field(default=None)
+    payload: dict | None = Field(default=None)
+
+
+class WorkflowTestFireStepRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    node_id: str
+    node_type: str
+    edge_label: str | None = None
+    skip_reason: str | None = None
+
+
+class WorkflowTestFireResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    workflow_id: uuid.UUID
+    steps: list[WorkflowTestFireStepRead]
+    outcome: str
+    error: str | None = None
+
+
+@router.post(
+    "/{workflow_id}/test-fire",
+    response_model=WorkflowTestFireResponse,
+)
+async def test_fire_workflow_endpoint(
+    workflow_id: uuid.UUID,
+    payload: WorkflowTestFireRequest,
+    user: User = Depends(require_permissions(PERM_WRITE)),
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowTestFireResponse:
+    """Synthetic dry-run of a workflow — useful for the canvas
+    operator to preview what would happen before they activate.
+
+    Walks the graph from the trigger node in memory, recording each
+    node visit, the edge it would follow, and the eventual outcome.
+    No ``tbl_workflow_runs`` / ``tbl_workflow_step_runs`` rows land,
+    no adapter is called, no external IO. Gated on ``workflows.write``
+    because the trace can leak workflow topology.
+    """
+    ctx = get_context()
+    org_id = ctx.org_id if ctx is not None else None
+    if org_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="no org context",
+        )
+    try:
+        workflow = await workflows_service.get_workflow(
+            db, org_id=org_id, workflow_id=workflow_id
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+
+    try:
+        result = await workflows_engine.start_run(
+            db,
+            workflow=workflow,
+            contact_id=payload.contact_id,
+            trigger_event_id=None,
+            trigger_payload=payload.payload or {},
+            dry_run=True,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    return WorkflowTestFireResponse.model_validate(result)
 
 
 __all__ = ["router"]
