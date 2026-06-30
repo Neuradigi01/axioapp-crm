@@ -22,11 +22,11 @@
         <div class="flex items-center gap-2">
           @if (canWrite()) {
             <a
-              routerLink="/user/workflows/new"
+              routerLink="/user/workflows/gallery"
               class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
             >
               <lucide-icon name="file-text" size="14" />
-              Create from template
+              Start from template
             </a>
             <a
               routerLink="/user/workflows/new"
@@ -179,7 +179,7 @@
           @if (canWrite() && !hasFilters()) {
             <div class="mt-4 flex justify-center gap-2">
               <a
-                routerLink="/user/workflows/new"
+                routerLink="/user/workflows/gallery"
                 class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
               >
                 <lucide-icon name="file-text" size="14" />

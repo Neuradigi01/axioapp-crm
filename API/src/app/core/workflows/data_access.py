@@ -70,6 +70,17 @@ async def get_workflow_by_name(
     return result.scalar_one_or_none()
 
 
+async def list_workflow_names(
+    session: AsyncSession, *, org_id: uuid.UUID
+) -> list[str]:
+    """Every workflow name in the org. Powers the gallery-clone path's
+    name-uniqification — avoids an N+1 retry loop on collision."""
+    result = await session.execute(
+        select(Workflow.name).where(Workflow.org_id == org_id)
+    )
+    return [row for (row,) in result.all()]
+
+
 async def list_workflows(
     session: AsyncSession,
     *,

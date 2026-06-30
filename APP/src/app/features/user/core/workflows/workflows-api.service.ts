@@ -202,6 +202,31 @@ export interface WorkflowTestFireResponse {
   error: string | null;
 }
 
+export interface WorkflowGalleryEntry {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  channels: string[];
+  goal_node_label: string;
+  est_setup_time_minutes: number;
+  est_completion_rate_pct: number;
+  screenshot_url: string | null;
+  graph_preview: WorkflowGraph;
+  is_marketing: boolean;
+  re_enrollment_rule: WorkflowReEnrollment;
+}
+
+export interface WorkflowGalleryListResponse {
+  items: WorkflowGalleryEntry[];
+  total: number;
+}
+
+export interface WorkflowGalleryCloneRequest {
+  name?: string | null;
+  folder_id?: string | null;
+}
+
 
 @Injectable({ providedIn: 'root' })
 export class WorkflowsApiService {
@@ -256,6 +281,24 @@ export class WorkflowsApiService {
   ): Observable<WorkflowTestFireResponse> {
     return this.http.post<WorkflowTestFireResponse>(
       `${this.base}/${id}/test-fire`,
+      payload,
+    );
+  }
+
+  // --- Step 16: gallery + clone-from-gallery -----------------------
+
+  listGallery(): Observable<WorkflowGalleryListResponse> {
+    return this.http.get<WorkflowGalleryListResponse>(
+      `${this.base}/gallery`,
+    );
+  }
+
+  cloneFromGallery(
+    templateId: string,
+    payload: WorkflowGalleryCloneRequest,
+  ): Observable<WorkflowRead> {
+    return this.http.post<WorkflowRead>(
+      `${this.base}/gallery/${templateId}/clone`,
       payload,
     );
   }

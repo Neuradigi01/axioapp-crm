@@ -382,6 +382,18 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // tasks/workflows Step 16 — gallery of 15 default workflow
+        // templates. Read-gated; the "Use this template" CTA inside
+        // the page needs `workflows.clone` server-side, but the
+        // gallery is browse-friendly to read-only employees.
+        path: 'workflows/gallery',
+        canActivate: [permissionGuard('workflows.read')],
+        loadComponent: () =>
+          import(
+            './core/workflows/gallery/workflows-gallery.page'
+          ).then((m) => m.WorkflowsGalleryPageComponent),
+      },
+      {
         // tasks/workflows Step 14 — SVG canvas editor. /new boots a
         // fresh draft; /:id loads the existing workflow. Write-gated
         // because every interaction (drag-drop, save, activate)

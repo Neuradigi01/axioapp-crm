@@ -31,6 +31,7 @@ from src.app.core.auth.dependencies import get_current_user, require_permissions
 from src.app.core.users.models import User
 from src.app.core.workflows import engine as workflows_engine
 from src.app.core.workflows import service as workflows_service
+from src.app.core.workflows import templates_gallery
 from src.app.core.workflows.exceptions import (
     ActivationBlocked,
     DuplicateWorkflowName,
@@ -691,6 +692,103 @@ async def test_fire_workflow_endpoint(
         ) from exc
 
     return WorkflowTestFireResponse.model_validate(result)
+
+
+# --- Step 16: templates gallery + clone-from-gallery -------------------
+
+
+class WorkflowGalleryEntryRead(BaseModel):
+    """Serialised gallery template. The ``graph_preview`` field is a
+    full workflow-graph dict (same shape as
+    ``WorkflowRead.graph``) so the frontend canvas component can
+    render it directly in read-only mode."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    description: str
+    category: str
+    channels: list[str]
+    goal_node_label: str
+    est_setup_time_minutes: int
+    est_completion_rate_pct: int
+    screenshot_url: str | None = None
+    graph_preview: dict
+    is_marketing: bool
+    re_enrollment_rule: str
+
+
+class WorkflowGalleryListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    items: list[WorkflowGalleryEntryRead]
+    total: int
+
+
+class WorkflowGalleryCloneRequest(BaseModel):
+    """Operator-supplied overrides for the cloned workflow."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, max_length=120)
+    folder_id: uuid.UUID | None = Field(default=None)
+
+
+@router.get("/gallery", response_model=WorkflowGalleryListResponse)
+async def list_workflow_gallery_endpoint(
+    _user: User = Depends(require_permissions(PERM_READ)),
+) -> WorkflowGalleryListResponse:
+    """Return the static gallery catalogue. Org-agnostic — every org
+    sees the same 15 templates plus any pack-registered entries
+    (Layer 2; not present in v1)."""
+    entries = templates_gallery.list_gallery()
+    return WorkflowGalleryListResponse(
+        items=[WorkflowGalleryEntryRead.model_validate(e) for e in entries],
+        total=len(entries),
+    )
+
+
+@router.post(
+    "/gallery/{template_id}/clone",
+    response_model=WorkflowRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def clone_workflow_from_gallery_endpoint(
+    template_id: str,
+    payload: WorkflowGalleryCloneRequest,
+    user: User = Depends(require_permissions(PERM_CLONE)),
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowRead:
+    """Clone the named gallery template into the caller's org as a
+    new draft workflow. Send-action nodes land with their
+    ``template_id`` stripped — the Step-15 editor's validation
+    markers prompt the operator to pick a real template per node
+    before activating."""
+    ctx = get_context()
+    org_id = ctx.org_id if ctx is not None else None
+    if org_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="no org context",
+        )
+    try:
+        clone = await templates_gallery.clone_from_gallery(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            template_id=template_id,
+            name=payload.name,
+            folder_id=payload.folder_id,
+        )
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"gallery template '{exc.args[0]}' not found",
+        ) from exc
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowRead.model_validate(clone)
 
 
 __all__ = ["router"]
