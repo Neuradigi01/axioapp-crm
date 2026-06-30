@@ -1,7 +1,7 @@
 # Step 19 — Analytics + "why didn't this fire?" diagnostics
 
 **Goal:** Two related surfaces — per-workflow analytics dashboards (enrolled / completed / exited-at-step funnel + goal-conversion rate + send metrics + cost estimate) AND the diagnostics tool ("pick a contact + event, show why this workflow did or didn't fire").
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 4 (run + step_run audit rows). Step 11 (goal node tracking). Step 12 (compliance skip-reasons populate step_runs).
 
 ---

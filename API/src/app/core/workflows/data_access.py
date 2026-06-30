@@ -665,10 +665,326 @@ async def next_step_index(
     return int(result.scalar_one()) + 1
 
 
+# --- Step 19: analytics + cached counters --------------------------------
+
+
+async def aggregate_runs_in_window(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+    since: datetime,
+    until: datetime,
+) -> dict[str, int | float | None]:
+    """Headline counters for the analytics dashboard. One round-trip
+    via FILTER aggregates. Returns ``enrolled / completed /
+    goal_reached / errored / running`` counts plus the average
+    completion time (seconds) across completed runs."""
+    stmt = select(
+        func.count(WorkflowRun.id).label("enrolled"),
+        func.count(WorkflowRun.id)
+        .filter(WorkflowRun.status == WorkflowRunStatus.completed)
+        .label("completed"),
+        func.count(WorkflowRun.id)
+        .filter(WorkflowRun.outcome == "goal_reached")
+        .label("goal_reached"),
+        func.count(WorkflowRun.id)
+        .filter(WorkflowRun.status == WorkflowRunStatus.errored)
+        .label("errored"),
+        func.count(WorkflowRun.id)
+        .filter(WorkflowRun.status == WorkflowRunStatus.running)
+        .label("running"),
+        func.avg(
+            func.extract("epoch", WorkflowRun.completed_at)
+            - func.extract("epoch", WorkflowRun.started_at)
+        )
+        .filter(WorkflowRun.status == WorkflowRunStatus.completed)
+        .label("avg_completion_seconds"),
+    ).where(
+        WorkflowRun.org_id == org_id,
+        WorkflowRun.workflow_id == workflow_id,
+        WorkflowRun.started_at >= since,
+        WorkflowRun.started_at < until,
+    )
+    row = (await session.execute(stmt)).one()
+    return {
+        "enrolled": int(row.enrolled or 0),
+        "completed": int(row.completed or 0),
+        "goal_reached": int(row.goal_reached or 0),
+        "errored": int(row.errored or 0),
+        "running": int(row.running or 0),
+        "avg_completion_seconds": (
+            float(row.avg_completion_seconds)
+            if row.avg_completion_seconds is not None
+            else None
+        ),
+    }
+
+
+async def aggregate_funnel(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+    since: datetime,
+    until: datetime,
+) -> list[dict[str, str | int]]:
+    """Per-node funnel: groups step_runs (joined to their parent
+    run for the start-time window) by ``node_id`` + ``status``.
+    Returns one dict per ``node_id`` with completed / skipped /
+    errored / total counts. The frontend joins this against the
+    workflow graph for ordering + node labels."""
+    stmt = (
+        select(
+            WorkflowStepRun.node_id,
+            WorkflowStepRun.status,
+            func.count(WorkflowStepRun.id).label("count"),
+        )
+        .join(WorkflowRun, WorkflowRun.id == WorkflowStepRun.run_id)
+        .where(
+            WorkflowStepRun.org_id == org_id,
+            WorkflowRun.workflow_id == workflow_id,
+            WorkflowRun.started_at >= since,
+            WorkflowRun.started_at < until,
+        )
+        .group_by(WorkflowStepRun.node_id, WorkflowStepRun.status)
+    )
+    rows = (await session.execute(stmt)).all()
+    by_node: dict[str, dict[str, int]] = {}
+    for node_id, status_value, count in rows:
+        status_str = getattr(status_value, "value", status_value)
+        bucket = by_node.setdefault(
+            node_id,
+            {"completed": 0, "skipped": 0, "errored": 0, "running": 0, "pending": 0},
+        )
+        bucket[str(status_str)] = int(count)
+    out: list[dict[str, str | int]] = []
+    for node_id, counts in by_node.items():
+        total = sum(counts.values())
+        out.append(
+            {
+                "node_id": node_id,
+                "total": total,
+                "completed_count": counts.get("completed", 0),
+                "skipped_count": counts.get("skipped", 0),
+                "errored_count": counts.get("errored", 0),
+            }
+        )
+    return out
+
+
+async def aggregate_skip_reasons(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+    since: datetime,
+    until: datetime,
+) -> dict[str, dict[str, int]]:
+    """``{node_id: {skip_reason: count}}`` — the per-step breakdown
+    the funnel-click drawer renders. Filters to skipped step_runs
+    with a non-null ``skip_reason``."""
+    stmt = (
+        select(
+            WorkflowStepRun.node_id,
+            WorkflowStepRun.skip_reason,
+            func.count(WorkflowStepRun.id).label("count"),
+        )
+        .join(WorkflowRun, WorkflowRun.id == WorkflowStepRun.run_id)
+        .where(
+            WorkflowStepRun.org_id == org_id,
+            WorkflowRun.workflow_id == workflow_id,
+            WorkflowRun.started_at >= since,
+            WorkflowRun.started_at < until,
+            WorkflowStepRun.skip_reason.is_not(None),
+        )
+        .group_by(WorkflowStepRun.node_id, WorkflowStepRun.skip_reason)
+    )
+    rows = (await session.execute(stmt)).all()
+    out: dict[str, dict[str, int]] = {}
+    for node_id, reason, count in rows:
+        out.setdefault(node_id, {})[str(reason)] = int(count)
+    return out
+
+
+async def aggregate_daily_rate(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+    since: datetime,
+    until: datetime,
+) -> list[dict[str, str | int]]:
+    """Daily series for sparklines. One row per day with
+    ``enrolled / completed / goal_reached`` counts. The frontend
+    fills gaps for days with no runs."""
+    day = func.date_trunc("day", WorkflowRun.started_at)
+    stmt = (
+        select(
+            day.label("day"),
+            func.count(WorkflowRun.id).label("enrolled"),
+            func.count(WorkflowRun.id)
+            .filter(WorkflowRun.status == WorkflowRunStatus.completed)
+            .label("completed"),
+            func.count(WorkflowRun.id)
+            .filter(WorkflowRun.outcome == "goal_reached")
+            .label("goal_reached"),
+        )
+        .where(
+            WorkflowRun.org_id == org_id,
+            WorkflowRun.workflow_id == workflow_id,
+            WorkflowRun.started_at >= since,
+            WorkflowRun.started_at < until,
+        )
+        .group_by(day)
+        .order_by(day)
+    )
+    rows = (await session.execute(stmt)).all()
+    return [
+        {
+            "date": row.day.date().isoformat(),
+            "enrolled": int(row.enrolled or 0),
+            "completed": int(row.completed or 0),
+            "goal_reached": int(row.goal_reached or 0),
+        }
+        for row in rows
+    ]
+
+
+async def aggregate_send_metrics(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+    since: datetime,
+    until: datetime,
+) -> list[dict[str, str | int]]:
+    """Per-channel send rollup. A "send" step_run is identified by
+    ``node_id``-derived channel + the node's ``type`` (looked up
+    later by the service against the workflow graph). At the DAL
+    level we return ``{node_id, status, count}`` grouped tuples;
+    the service maps ``node_id → channel`` via the graph."""
+    stmt = (
+        select(
+            WorkflowStepRun.node_id,
+            WorkflowStepRun.status,
+            func.count(WorkflowStepRun.id).label("count"),
+        )
+        .join(WorkflowRun, WorkflowRun.id == WorkflowStepRun.run_id)
+        .where(
+            WorkflowStepRun.org_id == org_id,
+            WorkflowRun.workflow_id == workflow_id,
+            WorkflowRun.started_at >= since,
+            WorkflowRun.started_at < until,
+        )
+        .group_by(WorkflowStepRun.node_id, WorkflowStepRun.status)
+    )
+    rows = (await session.execute(stmt)).all()
+    return [
+        {
+            "node_id": node_id,
+            "status": str(getattr(status_value, "value", status_value)),
+            "count": int(count),
+        }
+        for node_id, status_value, count in rows
+    ]
+
+
+async def refresh_cached_counters(
+    session: AsyncSession,
+    *,
+    today_midnight_utc: datetime,
+) -> int:
+    """Cross-tenant 5-minute beat refresh. Recomputes
+    ``cached_running_count`` (live count of running runs) +
+    ``cached_completed_today_count`` (completed runs since UTC
+    midnight) for every workflow in one UPDATE-FROM-AGGREGATE.
+
+    Cross-tenant intentionally — the beat task opens the session
+    without a tenant context. Returns the number of workflow rows
+    updated. NO ``session.commit()`` here — the service layer
+    commits."""
+    from sqlalchemy import update
+
+    running_subq = (
+        select(
+            WorkflowRun.workflow_id.label("workflow_id"),
+            func.count(WorkflowRun.id).label("running_count"),
+        )
+        .where(WorkflowRun.status == WorkflowRunStatus.running)
+        .group_by(WorkflowRun.workflow_id)
+        .subquery()
+    )
+    completed_today_subq = (
+        select(
+            WorkflowRun.workflow_id.label("workflow_id"),
+            func.count(WorkflowRun.id).label("completed_today_count"),
+        )
+        .where(
+            WorkflowRun.status == WorkflowRunStatus.completed,
+            WorkflowRun.completed_at >= today_midnight_utc,
+        )
+        .group_by(WorkflowRun.workflow_id)
+        .subquery()
+    )
+
+    # Wipe to zero first so workflows with no recent activity drop
+    # back to 0 (otherwise they'd carry stale counts forever).
+    await session.execute(
+        update(Workflow).values(
+            cached_running_count=0,
+            cached_completed_today_count=0,
+        )
+    )
+
+    # Per-row UPDATE keyed on workflow_id. Separate statements so
+    # the partial coverage (some workflows in one subquery + not the
+    # other) doesn't drop rows.
+    await session.execute(
+        update(Workflow)
+        .values(cached_running_count=running_subq.c.running_count)
+        .where(Workflow.id == running_subq.c.workflow_id)
+    )
+    result = await session.execute(
+        update(Workflow)
+        .values(cached_completed_today_count=completed_today_subq.c.completed_today_count)
+        .where(Workflow.id == completed_today_subq.c.workflow_id)
+    )
+    return int(result.rowcount or 0)
+
+
+async def get_run_with_workflow(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run_id: uuid.UUID,
+) -> tuple[WorkflowRun, Workflow] | None:
+    """Single round-trip for the Step-19 run-detail page header —
+    returns the run + its parent workflow. ``None`` on miss or
+    cross-tenant."""
+    stmt = (
+        select(WorkflowRun, Workflow)
+        .join(Workflow, Workflow.id == WorkflowRun.workflow_id)
+        .where(
+            WorkflowRun.id == run_id,
+            WorkflowRun.org_id == org_id,
+        )
+    )
+    row = (await session.execute(stmt)).first()
+    if row is None:
+        return None
+    return row[0], row[1]
+
+
 __all__ = [
     "add_folder",
     "add_version",
     "add_workflow",
+    "aggregate_daily_rate",
+    "aggregate_funnel",
+    "aggregate_runs_in_window",
+    "aggregate_send_metrics",
+    "aggregate_skip_reasons",
     "count_recent_marketing_sends",
     "count_versions",
     "count_workflows_in_folder",
@@ -680,6 +996,7 @@ __all__ = [
     "get_run",
     "get_run_for_processing",
     "get_run_unscoped",
+    "get_run_with_workflow",
     "get_version",
     "get_workflow",
     "get_workflow_by_name",
@@ -696,4 +1013,5 @@ __all__ = [
     "list_waits_for_run",
     "list_workflows",
     "next_step_index",
+    "refresh_cached_counters",
 ]

@@ -306,6 +306,15 @@ class Workflow(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("ARRAY[]::text[]"),
     )
+    # Step 19 — list-page mini-stats. Refreshed every 5 minutes by
+    # ``tasks.refresh_workflow_cached_counters``; the full analytics
+    # endpoint queries live so these are best-effort only.
+    cached_running_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=sql_text("0")
+    )
+    cached_completed_today_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=sql_text("0")
+    )
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

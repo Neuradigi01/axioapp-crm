@@ -23,6 +23,7 @@ through :mod:`core.workflows.service` (manager spec 2026-06-25:
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -48,13 +49,18 @@ from src.app.core.workflows.permissions import (
     PERM_ACTIVATE,
     PERM_CLONE,
     PERM_READ,
+    PERM_VIEW_ANALYTICS,
+    PERM_VIEW_DIAGNOSTICS,
     PERM_WRITE,
 )
 from src.app.core.workflows.schemas import (
     ABStatsResponse,
     PairABRequest,
     RollbackRequest,
+    WorkflowAnalyticsResponse,
     WorkflowCreate,
+    WorkflowDailyRateResponse,
+    WorkflowDiagnosticsResponse,
     WorkflowExport,
     WorkflowFolderCreate,
     WorkflowFolderRead,
@@ -1053,6 +1059,142 @@ async def get_workflow_ab_stats_endpoint(
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     return ABStatsResponse.model_validate(body)
+
+
+# --- Step 19: analytics + diagnostics + run-detail ---------------------
+
+
+def _parse_window(
+    since: datetime | None,
+    until: datetime | None,
+    default_days: int = 30,
+) -> tuple[datetime, datetime]:
+    """Default-fill the (since, until) window to the last
+    ``default_days``. Both bounds become UTC-aware so the DAL's
+    timestamptz comparisons stay timezone-correct."""
+    from datetime import UTC, timedelta
+
+    now = datetime.now(UTC)
+    if until is None:
+        until_resolved = now
+    elif until.tzinfo is None:
+        until_resolved = until.replace(tzinfo=UTC)
+    else:
+        until_resolved = until
+    if since is None:
+        since_resolved = until_resolved - timedelta(days=default_days)
+    elif since.tzinfo is None:
+        since_resolved = since.replace(tzinfo=UTC)
+    else:
+        since_resolved = since
+    if since_resolved >= until_resolved:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="`since` must be strictly before `until`",
+        )
+    return since_resolved, until_resolved
+
+
+@router.get(
+    "/diagnostics/trace",
+    response_model=WorkflowDiagnosticsResponse,
+)
+async def trace_diagnostics_endpoint(
+    contact_id: uuid.UUID = Query(...),
+    event_type: str = Query(..., min_length=1, max_length=120),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_VIEW_DIAGNOSTICS)),
+) -> WorkflowDiagnosticsResponse:
+    """Step-19 "why didn't this fire?" trace. For every workflow in
+    the org that subscribes to ``event_type``, evaluates the trigger
+    conditions against a synthesised payload from the contact and
+    surfaces the per-leaf condition-AST trace + re-enrollment
+    decision."""
+    from src.app.core.workflows import diagnostics as _diagnostics
+
+    org_id = _require_org_id()
+    body = await _diagnostics.trace_event_for_contact(
+        db,
+        org_id=org_id,
+        contact_id=contact_id,
+        event_type=event_type,
+        payload=None,
+    )
+    return WorkflowDiagnosticsResponse.model_validate(body)
+
+
+@router.get(
+    "/runs/{run_id}",
+    response_model=dict,
+)
+async def get_run_detail_endpoint(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_READ)),
+) -> dict:
+    """Step-19 per-run timeline. Returns the run row + parent
+    workflow + ordered step_runs (each enriched with the node's
+    graph label + type)."""
+    org_id = _require_org_id()
+    try:
+        return await workflows_service.get_run_detail(
+            db, org_id=org_id, run_id=run_id
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+
+
+@router.get(
+    "/{workflow_id}/analytics",
+    response_model=WorkflowAnalyticsResponse,
+)
+async def get_workflow_analytics_endpoint(
+    workflow_id: uuid.UUID,
+    since: datetime | None = Query(default=None),
+    until: datetime | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_VIEW_ANALYTICS)),
+) -> WorkflowAnalyticsResponse:
+    """Headline KPIs + funnel + skip-reason breakdown + send rollup
+    over the (since, until) window. Defaults to the last 30 days."""
+    org_id = _require_org_id()
+    since_dt, until_dt = _parse_window(since, until)
+    try:
+        body = await workflows_service.get_workflow_analytics(
+            db,
+            org_id=org_id,
+            workflow_id=workflow_id,
+            since=since_dt,
+            until=until_dt,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowAnalyticsResponse.model_validate(body)
+
+
+@router.get(
+    "/{workflow_id}/analytics/daily",
+    response_model=WorkflowDailyRateResponse,
+)
+async def get_workflow_daily_rate_endpoint(
+    workflow_id: uuid.UUID,
+    days: int = Query(default=30, ge=1, le=365),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_VIEW_ANALYTICS)),
+) -> WorkflowDailyRateResponse:
+    """Per-day enrolled / completed / goal-reached series. Dense
+    response — days with zero runs return explicit 0 rows."""
+    org_id = _require_org_id()
+    try:
+        items = await workflows_service.get_workflow_daily_rate(
+            db,
+            org_id=org_id,
+            workflow_id=workflow_id,
+            days=days,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowDailyRateResponse(items=items)
 
 
 __all__ = ["router"]

@@ -57,6 +57,15 @@
     </button>
 
     <!-- Step 17 — version drawer + export + import -->
+    @if (state.workflowId(); as wfId) {
+      <a
+        [routerLink]="['/user/workflows', wfId, 'analytics']"
+        class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+        title="Analytics dashboard"
+      >
+        <lucide-icon name="BarChart3" class="w-4 h-4"></lucide-icon>
+      </a>
+    }
     <button
       type="button"
       class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
@@ -161,10 +170,7 @@
   }
 
   @if (isABPaired() && state.workflowId(); as wfId) {
-    <app-ab-stats-banner
-      [workflowId]="wfId"
-      (unpair)="unpairAB()"
-    />
+    <app-ab-stats-banner [workflowId]="wfId" (unpair)="unpairAB()" />
   }
 
   <!-- Main 3-column layout -->

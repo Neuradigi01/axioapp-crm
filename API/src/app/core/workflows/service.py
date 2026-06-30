@@ -884,6 +884,107 @@ async def get_ab_stats(
     }
 
 
+# --- Step 19: analytics + diagnostics ----------------------------------
+
+
+async def get_workflow_analytics(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+    since: datetime,
+    until: datetime,
+) -> dict:
+    """Headline analytics for the Step-19 dashboard. Resolves the
+    workflow (raises :class:`WorkflowNotFound` on miss / cross-tenant)
+    + delegates to :mod:`core.workflows.analytics`."""
+    from src.app.core.workflows import analytics as _analytics
+
+    workflow = await get_workflow(
+        session, org_id=org_id, workflow_id=workflow_id
+    )
+    return await _analytics.compute_workflow_metrics(
+        session,
+        org_id=org_id,
+        workflow=workflow,
+        since=since,
+        until=until,
+    )
+
+
+async def get_workflow_daily_rate(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+    days: int,
+) -> list[dict]:
+    """Daily sparkline series."""
+    from src.app.core.workflows import analytics as _analytics
+
+    workflow = await get_workflow(
+        session, org_id=org_id, workflow_id=workflow_id
+    )
+    return await _analytics.compute_daily_rate(
+        session,
+        org_id=org_id,
+        workflow=workflow,
+        days=days,
+    )
+
+
+async def get_run_detail(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run_id: uuid.UUID,
+) -> dict:
+    """Compose the run-detail page payload: the run row, its parent
+    workflow's id + name, and the ordered step_runs.
+
+    Raises :class:`WorkflowNotFound` on miss (mapped to 404)."""
+    from src.app.core.workflows.schemas import (
+        WorkflowRunRead,
+        WorkflowStepRunRead,
+    )
+
+    pair = await _da.get_run_with_workflow(
+        session, org_id=org_id, run_id=run_id
+    )
+    if pair is None:
+        raise WorkflowNotFound(f"run {run_id} not found")
+    run, workflow = pair
+    step_runs = await _da.list_step_runs(
+        session, org_id=org_id, run_id=run_id
+    )
+    nodes_by_id = workflow.graph_nodes_by_id
+    enriched_steps = []
+    for step in step_runs:
+        node = nodes_by_id.get(step.node_id) or {}
+        config = node.get("config") or {}
+        label = (
+            config.get("label")
+            or config.get("name")
+            or config.get("title")
+            or step.node_id
+        )
+        # Validate via the Pydantic schema so enum values coerce to
+        # their string forms + the FastAPI encoder sees a plain dict
+        # (not the SQLAlchemy ORM object).
+        step_dict = WorkflowStepRunRead.model_validate(step).model_dump(
+            mode="json"
+        )
+        step_dict["node_label"] = label
+        step_dict["node_type"] = node.get("type") or "unknown"
+        enriched_steps.append(step_dict)
+    return {
+        "run": WorkflowRunRead.model_validate(run).model_dump(mode="json"),
+        "workflow_id": str(workflow.id),
+        "workflow_name": workflow.name,
+        "steps": enriched_steps,
+    }
+
+
 def _next_unique_name(base: str, existing: set[str]) -> str:
     """Bump ``base`` to ``base (2)``, ``base (3)``, … until unused."""
     if base not in existing:

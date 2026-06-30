@@ -19,6 +19,14 @@
           </p>
         </div>
         <div class="flex items-center gap-2">
+          <a
+            routerLink="/user/workflows/diagnostics"
+            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            title="Why didn't this workflow fire?"
+          >
+            <lucide-icon name="Beaker" size="14" />
+            Diagnostics
+          </a>
           @if (canWrite()) {
             <a
               routerLink="/user/workflows/gallery"

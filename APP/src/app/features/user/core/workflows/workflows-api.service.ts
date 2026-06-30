@@ -274,6 +274,110 @@ export interface WorkflowImportRequest {
   name?: string | null;
 }
 
+// --- Step 19: analytics + diagnostics + run-detail ---------------------
+
+export interface WorkflowAnalyticsTotals {
+  enrolled: number;
+  completed: number;
+  goal_reached: number;
+  errored: number;
+  running: number;
+  conversion_rate: number;
+  avg_completion_seconds: number | null;
+  estimated_cost_cents: number;
+}
+
+export interface WorkflowFunnelRow {
+  node_id: string;
+  label: string;
+  node_type: string;
+  total: number;
+  completed_count: number;
+  skipped_count: number;
+  errored_count: number;
+}
+
+export interface WorkflowSendMetricRow {
+  channel: string;
+  total: number;
+  delivered: number;
+  skipped: number;
+  errored: number;
+  delivery_rate: number;
+}
+
+export interface WorkflowAnalyticsResponse {
+  workflow_id: string;
+  window: { since: string; until: string };
+  totals: WorkflowAnalyticsTotals;
+  funnel: WorkflowFunnelRow[];
+  skip_reasons: Record<string, Record<string, number>>;
+  send_metrics: WorkflowSendMetricRow[];
+}
+
+export interface WorkflowDailyRateRow {
+  date: string;
+  enrolled: number;
+  completed: number;
+  goal_reached: number;
+}
+
+export interface WorkflowDailyRateResponse {
+  items: WorkflowDailyRateRow[];
+}
+
+export interface DiagnosticsConditionTrace {
+  kind: 'leaf' | 'all' | 'any' | 'not' | 'empty' | 'invalid';
+  result: boolean;
+  op?: string | null;
+  path?: string | null;
+  value?: unknown;
+  resolved_value?: unknown;
+  missing?: boolean;
+  children?: DiagnosticsConditionTrace[];
+  error?: string | null;
+}
+
+export interface WorkflowDiagnosticsEntry {
+  workflow_id: string;
+  workflow_name: string;
+  eligible: boolean;
+  reason: string | null;
+  trigger_condition_trace: DiagnosticsConditionTrace | null;
+  re_enrollment_decision: 'allowed' | 'blocked_once' | 'blocked_daily' | 'n/a';
+  resolved_context: Record<string, unknown>;
+}
+
+export interface WorkflowDiagnosticsResponse {
+  contact_id: string;
+  event_type: string;
+  synthesised_payload: boolean;
+  entries: WorkflowDiagnosticsEntry[];
+}
+
+export interface WorkflowRunDetailStep {
+  id: string;
+  run_id: string;
+  node_id: string;
+  step_index: number;
+  status: WorkflowStepRunStatus;
+  started_at: string;
+  completed_at: string | null;
+  output_edge_label: string | null;
+  skip_reason: string | null;
+  payload: Record<string, unknown>;
+  error: string | null;
+  node_label: string;
+  node_type: string;
+}
+
+export interface WorkflowRunDetailResponse {
+  run: WorkflowRunRead;
+  workflow_id: string;
+  workflow_name: string;
+  steps: WorkflowRunDetailStep[];
+}
+
 // --- Step 18: A/B testing ---------------------------------------------
 
 export type ABWinnerMetric = 'goal_conversion' | 'reply_rate' | 'open_rate' | 'custom';
@@ -410,6 +514,43 @@ export class WorkflowsApiService {
 
   getABStats(workflowId: string): Observable<ABStatsResponse> {
     return this.http.get<ABStatsResponse>(`${this.base}/${workflowId}/ab-stats`);
+  }
+
+  // --- Step 19: analytics + diagnostics + run-detail -----------------
+
+  getAnalytics(
+    workflowId: string,
+    query: { since?: string; until?: string } = {},
+  ): Observable<WorkflowAnalyticsResponse> {
+    const params = buildHttpParams({
+      since: query.since,
+      until: query.until,
+    });
+    return this.http.get<WorkflowAnalyticsResponse>(`${this.base}/${workflowId}/analytics`, {
+      params,
+    });
+  }
+
+  getDailyRate(workflowId: string, days = 30): Observable<WorkflowDailyRateResponse> {
+    const params = buildHttpParams({ days });
+    return this.http.get<WorkflowDailyRateResponse>(`${this.base}/${workflowId}/analytics/daily`, {
+      params,
+    });
+  }
+
+  traceDiagnostics(query: {
+    contact_id: string;
+    event_type: string;
+  }): Observable<WorkflowDiagnosticsResponse> {
+    const params = buildHttpParams({
+      contact_id: query.contact_id,
+      event_type: query.event_type,
+    });
+    return this.http.get<WorkflowDiagnosticsResponse>(`${this.base}/diagnostics/trace`, { params });
+  }
+
+  getRunDetail(runId: string): Observable<WorkflowRunDetailResponse> {
+    return this.http.get<WorkflowRunDetailResponse>(`${this.base}/runs/${runId}`);
   }
 
   // --- Folders ------------------------------------------------------

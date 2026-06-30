@@ -251,9 +251,53 @@ async def _notify_ab_decision(session, *, workflow, outcome: dict[str, Any]) -> 
         )
 
 
+# ---------------------------------------------------------------------------
+# refresh_workflow_cached_counters — Step 19
+# ---------------------------------------------------------------------------
+
+
+@_shared_task(
+    name="src.app.core.workflows.tasks.refresh_workflow_cached_counters",
+)
+def refresh_workflow_cached_counters() -> dict[str, Any]:
+    """Beat-scheduled every 5 minutes. Recomputes
+    ``cached_running_count`` + ``cached_completed_today_count`` on
+    every workflow so the list page's per-row mini-stats render
+    without per-row aggregate queries.
+
+    Cross-tenant — opens a DB session WITHOUT a tenant context so
+    one UPDATE-FROM-AGGREGATE covers every org. Best-effort: a stale
+    counter for 5 minutes is acceptable; the analytics endpoint
+    queries live for accuracy."""
+    return asyncio.run(_refresh_cached_counters_async())
+
+
+async def _refresh_cached_counters_async() -> dict[str, Any]:
+    from datetime import UTC, datetime
+
+    from src.app.core.workflows import data_access as _wf_da
+    from src.app.shared.db import async_session
+
+    today_midnight_utc = datetime.now(UTC).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    async with async_session() as session:
+        try:
+            updated = await _wf_da.refresh_cached_counters(
+                session, today_midnight_utc=today_midnight_utc
+            )
+            await session.commit()
+            return {"updated": updated}
+        except Exception:
+            await session.rollback()
+            logger.exception("workflows.refresh_workflow_cached_counters failed")
+            return {"updated": 0, "error": True}
+
+
 __all__ = [
     "evaluate_ab_winners",
     "expire_waits",
     "process_step",
+    "refresh_workflow_cached_counters",
     "sweep_waits",
 ]

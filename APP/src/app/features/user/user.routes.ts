@@ -357,15 +357,43 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // tasks/workflows Step 19 — "why didn't this fire?" diagnostics.
+        // MUST precede `workflows/:id` so `:id` doesn't swallow
+        // `diagnostics`. Gated on `workflows.view_diagnostics` (Owner
+        // / Admin only by default).
+        path: 'workflows/diagnostics',
+        canActivate: [permissionGuard('workflows.view_diagnostics')],
+        loadComponent: () =>
+          import('./core/workflows/diagnostics/diagnostics.page').then(
+            (m) => m.WorkflowDiagnosticsPageComponent,
+          ),
+      },
+      {
+        // tasks/workflows Step 19 — per-run timeline. MUST precede
+        // `workflows/:id` so `:id` doesn't swallow `runs`.
+        path: 'workflows/runs/:run_id',
+        canActivate: [permissionGuard('workflows.read')],
+        loadComponent: () =>
+          import('./core/workflows/run-detail.page').then((m) => m.WorkflowRunDetailPageComponent),
+      },
+      {
+        // tasks/workflows Step 19 — per-workflow analytics dashboard.
+        // MUST precede `workflows/:id`.
+        path: 'workflows/:id/analytics',
+        canActivate: [permissionGuard('workflows.view_analytics')],
+        loadComponent: () =>
+          import('./core/workflows/analytics/workflow-analytics.page').then(
+            (m) => m.WorkflowAnalyticsPageComponent,
+          ),
+      },
+      {
         // tasks/workflows Step 18 — full-page side-by-side A/B
         // comparison. MUST precede `workflows/:id` so `:id` doesn't
         // swallow `ab-compare`.
         path: 'workflows/:id/ab-compare',
         canActivate: [permissionGuard('workflows.read')],
         loadComponent: () =>
-          import(
-            './core/workflows/ab/ab-comparison.page'
-          ).then((m) => m.ABComparisonPageComponent),
+          import('./core/workflows/ab/ab-comparison.page').then((m) => m.ABComparisonPageComponent),
       },
       {
         path: 'workflows/:id',

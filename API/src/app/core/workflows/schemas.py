@@ -201,6 +201,10 @@ class WorkflowRead(ORMModel):
     ab_test_min_runs_per_variant: int | None = None
     ab_test_winner_workflow_id: uuid.UUID | None = None
     ab_test_decided_at: datetime | None = None
+    # Step 19 — list-page mini-stats refreshed every 5 min by
+    # ``tasks.refresh_workflow_cached_counters``.
+    cached_running_count: int = 0
+    cached_completed_today_count: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -408,6 +412,118 @@ class ABStatsResponse(BaseModel):
     min_runs_per_variant: int
 
 
+# --- Step 19: analytics + diagnostics -----------------------------------
+
+
+class WorkflowAnalyticsWindow(BaseModel):
+    """The (since, until) window an analytics response covers."""
+
+    since: datetime
+    until: datetime
+
+
+class WorkflowAnalyticsTotals(BaseModel):
+    """Headline KPI block for the analytics dashboard."""
+
+    enrolled: int
+    completed: int
+    goal_reached: int
+    errored: int
+    running: int
+    conversion_rate: float
+    avg_completion_seconds: float | None
+    estimated_cost_cents: int
+
+
+class WorkflowFunnelRow(BaseModel):
+    """One node's slot in the per-step funnel."""
+
+    node_id: str
+    label: str
+    node_type: str
+    total: int
+    completed_count: int
+    skipped_count: int
+    errored_count: int
+
+
+class WorkflowSendMetricRow(BaseModel):
+    """One channel's rollup row."""
+
+    channel: str
+    total: int
+    delivered: int
+    skipped: int
+    errored: int
+    delivery_rate: float
+
+
+class WorkflowAnalyticsResponse(BaseModel):
+    """Full analytics response — drives the Step-19 dashboard."""
+
+    workflow_id: uuid.UUID
+    window: WorkflowAnalyticsWindow
+    totals: WorkflowAnalyticsTotals
+    funnel: list[WorkflowFunnelRow]
+    skip_reasons: dict[str, dict[str, int]]
+    send_metrics: list[WorkflowSendMetricRow]
+
+
+class WorkflowDailyRateRow(BaseModel):
+    """One day's enrolled/completed/goal-reached counts."""
+
+    date: str
+    enrolled: int
+    completed: int
+    goal_reached: int
+
+
+class WorkflowDailyRateResponse(BaseModel):
+    items: list[WorkflowDailyRateRow]
+
+
+class _DiagnosticsConditionTrace(BaseModel):
+    """The per-leaf evaluation trace the diagnostics tool surfaces.
+
+    Each entry mirrors one leaf node of the condition AST: the path
+    that was resolved, the resolved value (post-coercion), and the
+    True/False the evaluator returned. Compound nodes (``all`` /
+    ``any`` / ``not``) carry their child traces inline."""
+
+    op: str | None = None
+    path: str | None = None
+    resolved_value: Any | None = None
+    value: Any | None = None
+    result: bool
+    missing: bool = False
+    kind: Literal["leaf", "all", "any", "not", "empty", "invalid"] = "leaf"
+    children: list[Any] | None = None
+    error: str | None = None
+
+
+class WorkflowDiagnosticsEntry(BaseModel):
+    """One workflow's eligibility decision in the diagnostics
+    response."""
+
+    workflow_id: uuid.UUID
+    workflow_name: str
+    eligible: bool
+    reason: str | None
+    trigger_condition_trace: _DiagnosticsConditionTrace | None
+    re_enrollment_decision: Literal["allowed", "blocked_once", "blocked_daily", "n/a"]
+    resolved_context: dict[str, Any]
+
+
+class WorkflowDiagnosticsResponse(BaseModel):
+    """Top-level diagnostics response — every workflow in the org
+    that subscribes to the event."""
+
+    contact_id: uuid.UUID
+    event_type: str
+    synthesised_payload: bool
+    entries: list[WorkflowDiagnosticsEntry]
+
+
 __all__ = [
     "ABStatsResponse",
     "EventWaitRead",
@@ -416,14 +532,23 @@ __all__ = [
     "NodePosition",
     "PairABRequest",
     "RollbackRequest",
+    "WorkflowAnalyticsResponse",
+    "WorkflowAnalyticsTotals",
+    "WorkflowAnalyticsWindow",
     "WorkflowCreate",
+    "WorkflowDailyRateResponse",
+    "WorkflowDailyRateRow",
+    "WorkflowDiagnosticsEntry",
+    "WorkflowDiagnosticsResponse",
     "WorkflowExport",
     "WorkflowFolderCreate",
     "WorkflowFolderRead",
+    "WorkflowFunnelRow",
     "WorkflowGraph",
     "WorkflowImportRequest",
     "WorkflowRead",
     "WorkflowRunRead",
+    "WorkflowSendMetricRow",
     "WorkflowStepRunRead",
     "WorkflowUpdate",
     "WorkflowVersionDetailRead",

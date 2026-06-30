@@ -153,6 +153,11 @@ _TRANSACTION_EXCEPTIONS: dict[str, str] = {
     # --- Templates helpers
     "core/templates/sms_extension.py": "SMS DLT extension writer",
     "core/templates/workflow.py": "Template review workflow",
+    # --- Workflows module helpers (Celery beat tasks + engine + trigger
+    # handler — own session semantics, run outside a request context)
+    "core/workflows/engine.py": "Workflow execution engine (own txn / session)",
+    "core/workflows/tasks.py": "Celery workflow workers (sweeps + A/B + cached counters)",
+    "core/workflows/trigger_handlers.py": "Event-bus subscriber (own txn)",
     # --- Pack billing module — router-only PDF generation shell, completion deferred
     "packs/furniture/modules/billing/router.py": "Pack billing PDF stub (Phase 4 follow-up)",
 }
@@ -289,6 +294,13 @@ _HELPER_CRUD_EXCEPTIONS: dict[str, str] = {
     "core/templates/workflow.py": "Template review workflow",
     # --- Tenants ownership transfer
     "core/tenants/ownership.py": "Ownership-transfer flow",
+    # --- Workflows module helpers (engine + Celery workers + bus handler).
+    # All run their own session in Celery / bus context, not via a request.
+    "core/workflows/engine.py": "Workflow execution engine (CRUD on runs / step_runs)",
+    "core/workflows/tasks.py": "Celery workflow workers (sweeps + cached counters)",
+    "core/workflows/trigger_handlers.py": "Event-bus subscriber (lookup + start_run)",
+    "core/workflows/ab_testing.py": "A/B testing engine helper (own session)",
+    "core/workflows/diagnostics.py": "Diagnostics trace (read-only, own session)",
 }
 
 

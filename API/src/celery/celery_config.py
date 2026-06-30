@@ -178,4 +178,12 @@ beat_schedule = {
         'task': 'src.app.core.workflows.tasks.evaluate_ab_winners',
         'schedule': crontab(minute=0),
     },
+    # tasks/workflows Step 19 — refresh per-workflow
+    # ``cached_running_count`` + ``cached_completed_today_count``
+    # so the list page's mini-stats render without per-row aggregate
+    # queries. Best-effort; the full analytics endpoint queries live.
+    "workflows-refresh-cached-counters": {
+        "task": "src.app.core.workflows.tasks.refresh_workflow_cached_counters",
+        "schedule": crontab(minute="*/5"),
+    },
 }
