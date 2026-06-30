@@ -199,7 +199,7 @@ async def test_dispatch_honors_delay_seconds(test_db, org_id):
 
 async def test_deliver_run_sends_via_email_backend(test_db, org_id):
     template = await _make_email_template(test_db, org_id=org_id)
-    trigger = await _make_trigger(test_db, org_id=org_id, template=template)
+    await _make_trigger(test_db, org_id=org_id, template=template)
 
     with patch.object(automation_tasks.deliver_run, "apply_async"):
         runs = await dispatcher.dispatch_event(

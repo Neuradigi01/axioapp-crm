@@ -82,7 +82,7 @@ async def create_warehouse(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"warehouse '{payload.name}' already exists for this org",
-        )
+        ) from None
     await session.refresh(w)
     await audit.log(
         "inventory.warehouse_created",
@@ -129,7 +129,7 @@ async def delete_warehouse(session: AsyncSession, *, warehouse_id: uuid.UUID) ->
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="warehouse still has inventory items — empty it first",
-        )
+        ) from None
 
 
 # --- items --------------------------------------------------------------
@@ -198,7 +198,7 @@ async def create_item(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"inventory item with sku '{payload.sku}' already exists in this warehouse",
-        )
+        ) from None
     await session.refresh(item)
     # Open initial alert if reorder_level > 0 and qty_on_hand == 0.
     await recompute_alerts(session, item_id=item.id)
@@ -232,7 +232,7 @@ async def create_item_full(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"catalog SKU '{payload.sku}' already exists for this org",
-        )
+        ) from None
 
     inv = InventoryItem(
         org_id=org_id,
@@ -255,7 +255,7 @@ async def create_item_full(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(f"inventory item with SKU '{payload.sku}' already exists in this warehouse"),
-        )
+        ) from None
     await session.refresh(inv)
     return inv
 
@@ -414,7 +414,7 @@ async def record_movement(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"movement violated DB constraint: {exc.orig}",
-        )
+        ) from exc
     await session.refresh(movement)
     await session.refresh(item)
 

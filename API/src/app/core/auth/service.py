@@ -320,7 +320,7 @@ async def register_with_new_org(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"role template install failed: {exc}",
-        )
+        ) from exc
 
     # Base pack — installs the default Leads pipeline + 6 stages, lead
     # sources, call outcomes. Best-effort: if the manifest can't be
@@ -499,7 +499,7 @@ async def register_user_only(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"role template install failed: {exc}",
-        )
+        ) from exc
     reset_context(token)
 
     owner_role = installed.get("owner")
@@ -726,7 +726,7 @@ async def complete_onboarding(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"pack manifest unreadable: {exc}",
-        )
+        ) from exc
 
     ctx_token = set_context(RequestContext(org_id=org.id))
     try:

@@ -19,16 +19,14 @@ helpers compose with that filter transparently.
 
 from __future__ import annotations
 
-from typing import Any, TypeVar
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-T = TypeVar("T")
 
-
-def ensure_found(row: T | None, *, entity: str) -> T:
+def ensure_found[T](row: T | None, *, entity: str) -> T:
     """Return ``row`` if not None, else raise HTTP 404.
 
     The detail message format is ``f"{entity} not found"`` — bit-identical
@@ -43,7 +41,7 @@ def ensure_found(row: T | None, *, entity: str) -> T:
     return row
 
 
-async def get_or_404(
+async def get_or_404[T](
     session: AsyncSession,
     model: type[T],
     pk: Any,

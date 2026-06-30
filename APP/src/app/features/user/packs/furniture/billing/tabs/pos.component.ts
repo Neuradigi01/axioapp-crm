@@ -13,7 +13,6 @@ import { LucideAngularModule } from 'lucide-angular';
 import { Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
-import { environment } from '../../../../../../../environments/environment';
 import { CatalogApiService } from '../../../../core/catalog/catalog-api.service';
 import {
   ContactListItem,

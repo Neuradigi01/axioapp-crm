@@ -9,7 +9,6 @@ import {
   inject,
   input,
   output,
-  signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 

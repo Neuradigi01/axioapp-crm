@@ -95,7 +95,7 @@ def send_campaign_chunk(self, campaign_id: str, contact_ids: list[str]) -> dict[
         )
     except (ConnectionError, TimeoutError) as exc:
         if HAS_CELERY:
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
         raise
 
 

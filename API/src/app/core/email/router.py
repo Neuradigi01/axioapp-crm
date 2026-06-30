@@ -152,7 +152,7 @@ async def bounce_webhook_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="invalid_json",
-        )
+        ) from None
 
     # Provider-specific HMAC. Mailgun is in-band; the rest are
     # gateway-validated so we accept them by shape.
@@ -183,7 +183,7 @@ async def bounce_webhook_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
-        )
+        ) from exc
 
     if not events:
         return BounceWebhookResponse()

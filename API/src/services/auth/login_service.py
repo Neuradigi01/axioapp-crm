@@ -174,14 +174,14 @@ async def authenticate_user(
     user = await resolve_user(db, identifier)
     if not user or not user.is_active:
         # Record failed attempt with unknown user_id
-        record = await _create_login_record(
+        await _create_login_record(
             db, identifier, "User", ip_address, sender_ip, ip_info, device_info
         )
         await db.commit()
         return {"success": False, "message": messages.INVALID_CREDENTIALS}
 
     if not verify_password(password, user.password):
-        record = await _create_login_record(
+        await _create_login_record(
             db, user.user_id, "User", ip_address, sender_ip, ip_info, device_info
         )
         await db.commit()

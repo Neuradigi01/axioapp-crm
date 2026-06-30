@@ -145,7 +145,7 @@ async def create_endpoint(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
-        )
+        ) from exc
     return _QuickLinkOut.model_validate(row)
 
 
@@ -166,7 +166,7 @@ async def update_endpoint(
             prefilled_message=payload.prefilled_message,
         )
     except QuickLinksError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return _QuickLinkOut.model_validate(row)
 
 
@@ -179,7 +179,7 @@ async def delete_endpoint(
     try:
         await delete_link(db, org_id=user.org_id, link_id=link_id)
     except QuickLinksError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -192,7 +192,7 @@ async def stats_endpoint(
     try:
         return await link_stats(db, org_id=user.org_id, link_id=link_id)
     except QuickLinksError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get(
@@ -230,7 +230,7 @@ async def qr_png_endpoint(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
-        )
+        ) from exc
     return Response(
         content=blob,
         media_type="image/png",
@@ -275,7 +275,7 @@ async def qr_svg_endpoint(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
-        )
+        ) from exc
     return Response(
         content=blob,
         media_type="image/svg+xml",

@@ -73,7 +73,7 @@ async def create_outcome(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"call outcome '{payload.key}' already exists for this org",
-        )
+        ) from None
     await session.refresh(outcome)
     await log_entity_change(
         action="calls.outcome_created",

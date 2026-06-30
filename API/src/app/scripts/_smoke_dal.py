@@ -14,6 +14,7 @@ import src.app.core.auth.data_access as auth_da
 import src.app.core.contacts.data_access as contacts_da
 import src.app.core.tenants.data_access as tenants_da
 import src.app.core.users.data_access as users_da
+import src.app.core.users.service as users_service
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 

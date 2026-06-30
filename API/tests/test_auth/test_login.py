@@ -273,7 +273,7 @@ async def test_admin_login_success(mock_ip, mock_routes, client):
 async def test_admin_login_super_admin_gets_all_rights(mock_ip, mock_routes, client):
     async with TestSession() as db:
         await _seed_admin(db, is_super_admin=True)
-        routes = await _seed_routes(db)
+        await _seed_routes(db)
         await db.commit()
 
     resp = await client.post(

@@ -374,7 +374,7 @@ async def test_delete_stage_with_cards_relocates_then_deletes(layered_client, se
             leads = (
                 (await session.execute(select(Lead).where(Lead.id.in_([l1, l2])))).scalars().all()
             )
-            assert {l.pipeline_stage for l in leads} == {"proposal"}
+            assert {lead.pipeline_stage for lead in leads} == {"proposal"}
 
             still_there = (
                 await session.execute(

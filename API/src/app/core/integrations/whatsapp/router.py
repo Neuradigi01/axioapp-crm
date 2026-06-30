@@ -134,7 +134,7 @@ async def connect_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
-        )
+        ) from exc
     return WhatsAppStatusOut.model_validate(projection)
 
 
@@ -169,7 +169,7 @@ async def test_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
-        )
+        ) from exc
     return WhatsAppStatusOut.model_validate(projection)
 
 
@@ -230,12 +230,12 @@ async def embedded_signup_exchange_endpoint(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
-        )
+        ) from exc
     except MetaGraphError as exc:
         raise HTTPException(
             status_code=exc.http_status,
             detail=exc.user_message,
-        )
+        ) from exc
     return EmbeddedSignupExchangeOut.model_validate(result)
 
 
@@ -309,7 +309,7 @@ async def sync_templates_endpoint(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
-        )
+        ) from exc
     return WhatsAppTemplateSyncOut.model_validate(counts)
 
 
@@ -373,7 +373,7 @@ async def business_profile_get_endpoint(
     try:
         config = await bp_get_profile(db, phone_id=phone_id)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return _config_to_profile_out(config)
 
 
@@ -401,9 +401,9 @@ async def business_profile_patch_endpoint(
             phone_id=phone_id,
         )
     except WhatsAppNotConnected as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except BusinessProfileError as exc:
-        raise HTTPException(status_code=exc.http_status, detail=exc.user_message)
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
     return _config_to_profile_out(config)
 
 
@@ -423,9 +423,9 @@ async def business_profile_refresh_endpoint(
     try:
         config = await bp_refresh_from_meta(db, phone_id=phone_id)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except BusinessProfileError as exc:
-        raise HTTPException(status_code=exc.http_status, detail=exc.user_message)
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
     return _config_to_profile_out(config)
 
 
@@ -456,9 +456,9 @@ async def business_profile_picture_endpoint(
             phone_id=phone_id,
         )
     except WhatsAppNotConnected as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except BusinessProfileError as exc:
-        raise HTTPException(status_code=exc.http_status, detail=exc.user_message)
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
     return _config_to_profile_out(config)
 
 
@@ -480,7 +480,7 @@ async def auto_reply_settings_get_endpoint(
     try:
         config = await bp_get_profile(db, auto_refresh=False)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return AutoReplySettingsRead(
         greeting_enabled=config.greeting_enabled,
         greeting_message=config.greeting_message,
@@ -512,7 +512,7 @@ async def auto_reply_settings_patch_endpoint(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="WhatsApp is not connected for this org.",
-        )
+        ) from None
     if bundle is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -622,7 +622,7 @@ async def phone_health_endpoint(
     try:
         payload = await get_phone_health(db)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return WhatsAppPhoneHealthRead(**payload)
 
 
@@ -641,7 +641,7 @@ async def phone_health_refresh_endpoint(
         await health_refresh_from_meta(db)
         payload = await get_phone_health(db)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return WhatsAppPhoneHealthRead(**payload)
 
 
@@ -669,5 +669,5 @@ async def capacity_endpoint(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
-        )
+        ) from exc
     return WhatsAppCapacityOut.model_validate(capacity)

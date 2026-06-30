@@ -9,7 +9,6 @@ import {
   input,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { QuickLink, QuickLinksService } from './quick-links.service';

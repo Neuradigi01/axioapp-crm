@@ -14,7 +14,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
-import { ConsentEvent, ContactsApiService, OptInHistory } from '../contacts-api.service';
+import { ContactsApiService, OptInHistory } from '../contacts-api.service';
 import { ContactDataExportButtonComponent } from './data-export-button.component';
 import { OptInChipComponent } from './opt-in-chip.component';
 

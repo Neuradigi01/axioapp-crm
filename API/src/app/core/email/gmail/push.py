@@ -274,7 +274,7 @@ async def verify_oidc_jwt(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Push token header not parseable.",
-        )
+        ) from None
     kid = unverified_header.get("kid")
     if not kid:
         raise HTTPException(
@@ -306,7 +306,7 @@ async def verify_oidc_jwt(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Push token rejected: {exc}",
-        )
+        ) from exc
 
     if GOOGLE_GMAIL_PUBSUB_SA_EMAIL:
         if claims.get("email") != GOOGLE_GMAIL_PUBSUB_SA_EMAIL:

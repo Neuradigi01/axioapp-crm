@@ -14,6 +14,17 @@ import { LucideAngularModule } from 'lucide-angular';
 import { AuthApiService } from '@app/services/auth-api.service';
 import { CaptchaType } from '@app/schemas/auth';
 
+declare global {
+  interface Window {
+    grecaptcha?: {
+      render(container: HTMLElement, params: Record<string, unknown>): number;
+      reset(widgetId?: number): void;
+      execute(siteKey: string, opts: { action: string }): Promise<string>;
+      ready(cb: () => void): void;
+    };
+  }
+}
+
 @Component({
   selector: 'app-captcha',
   templateUrl: './captcha.component.html',
@@ -96,12 +107,12 @@ export class CaptchaComponent implements OnInit, OnDestroy {
 
   private renderRecaptchaV2Widget(): void {
     const container = this.recaptchaContainer()?.nativeElement;
-    if (!container || !this.recaptchaSiteKey || !(window as any).grecaptcha?.render) return;
+    if (!container || !this.recaptchaSiteKey || !window.grecaptcha?.render) return;
 
     this.resetRecaptchaV2Widget();
     container.innerHTML = '';
 
-    this.recaptchaWidgetId = (window as any).grecaptcha.render(container, {
+    this.recaptchaWidgetId = window.grecaptcha!.render(container, {
       sitekey: this.recaptchaSiteKey,
       callback: (token: string) => {
         this.captchaToken.set(token);
@@ -115,9 +126,9 @@ export class CaptchaComponent implements OnInit, OnDestroy {
   }
 
   private resetRecaptchaV2Widget(): void {
-    if (this.recaptchaWidgetId !== null && (window as any).grecaptcha?.reset) {
+    if (this.recaptchaWidgetId !== null && window.grecaptcha?.reset) {
       try {
-        (window as any).grecaptcha.reset(this.recaptchaWidgetId);
+        window.grecaptcha!.reset(this.recaptchaWidgetId);
       } catch {
         // Widget may already be destroyed
       }
@@ -138,7 +149,7 @@ export class CaptchaComponent implements OnInit, OnDestroy {
 
   private async executeRecaptchaV3(): Promise<void> {
     try {
-      const grecaptcha = (window as any).grecaptcha;
+      const grecaptcha = window.grecaptcha;
       if (!grecaptcha?.execute) return;
 
       const token: string = await grecaptcha.execute(this.recaptchaSiteKey, { action: 'submit' });
@@ -156,8 +167,8 @@ export class CaptchaComponent implements OnInit, OnDestroy {
     return new Promise((resolve, reject) => {
       if (document.querySelector(`script[src^="${src.split('?')[0]}"]`)) {
         const check = () => {
-          if ((window as any).grecaptcha?.ready) {
-            (window as any).grecaptcha.ready(() => resolve());
+          if (window.grecaptcha?.ready) {
+            window.grecaptcha!.ready(() => resolve());
           } else {
             setTimeout(check, 100);
           }
@@ -172,8 +183,8 @@ export class CaptchaComponent implements OnInit, OnDestroy {
       script.defer = true;
       script.onload = () => {
         const check = () => {
-          if ((window as any).grecaptcha?.ready) {
-            (window as any).grecaptcha.ready(() => resolve());
+          if (window.grecaptcha?.ready) {
+            window.grecaptcha!.ready(() => resolve());
           } else {
             setTimeout(check, 100);
           }

@@ -98,7 +98,7 @@ async def list_managed_endpoint(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(f"Unknown submission_status '{submission_status}'."),
-            )
+            ) from None
     rows = await list_templates_managed(
         db,
         submission_status=sub_status,
@@ -121,7 +121,7 @@ async def create_endpoint(
     try:
         row = await create_draft(db, actor_id=user.legacy_uuid, payload=payload)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return WhatsAppTemplateRead.model_validate(row)
 
 
@@ -157,7 +157,7 @@ async def delete_endpoint(
             app_secret=app_secret,
         )
     except WhatsAppNotConnected as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -180,7 +180,7 @@ async def submit_endpoint(
             app_secret=app_secret,
         )
     except WhatsAppNotConnected as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return WhatsAppTemplateSubmissionOut(
         id=row.id,
         submission_status=row.submission_status.value,

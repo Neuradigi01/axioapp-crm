@@ -99,7 +99,7 @@ async def create_group(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"A group named '{payload.name}' already exists.",
-        )
+        ) from None
 
     if not payload.is_dynamic and payload.contact_ids:
         await data_access.bulk_upsert_members(
@@ -178,7 +178,7 @@ async def update_group(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Update conflict — name may already be in use.",
-        )
+        ) from None
     await session.refresh(group)
     await log_entity_change(
         action="contacts.group.updated",

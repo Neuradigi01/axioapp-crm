@@ -73,7 +73,7 @@ def validate_otp_token(
     try:
         payload = orjson.loads(fernet.decrypt(otp_token))
     except Exception:
-        raise VerificationError("Invalid verification token")
+        raise VerificationError("Invalid verification token") from None
 
     if payload.get("type") != expected_type:
         raise VerificationError("Invalid verification token")
@@ -111,7 +111,7 @@ async def verify_email_token(db: AsyncSession, token: str) -> None:
     try:
         payload = orjson.loads(fernet.decrypt(token))
     except Exception:
-        raise VerificationError("Invalid verification token")
+        raise VerificationError("Invalid verification token") from None
 
     if payload.get("type") != "email_verification":
         raise VerificationError("Invalid verification token")

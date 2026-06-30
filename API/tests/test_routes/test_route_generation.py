@@ -107,7 +107,7 @@ async def test_routes_json_contains_all_routes(setup_tables):
     from config import ROUTES_API
 
     async with TestSession() as db:
-        routes = await _seed_routes(db)
+        await _seed_routes(db)
         await db.commit()
 
     await generate_routes_json()

@@ -28,7 +28,6 @@ import {
 } from '../templates/whatsapp-templates-api.service';
 
 import {
-  KeywordAction,
   KeywordActionPayload,
   KeywordActionType,
   KeywordMatchType,

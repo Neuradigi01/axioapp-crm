@@ -8,7 +8,6 @@ import {
   HostListener,
   ViewChild,
   computed,
-  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -31,7 +30,6 @@ import { VersionHistoryDrawerComponent } from './version-history-drawer.componen
 import {
   WorkflowExportBody,
   WorkflowGraph,
-  WorkflowRead,
   WorkflowStatus,
   WorkflowTestFireResponse,
   WorkflowVersionDetail,
@@ -493,7 +491,7 @@ export class WorkflowCanvasPageComponent {
   }
 
   @HostListener('window:mouseup', ['$event'])
-  onWindowMouseUp(event: MouseEvent): void {
+  onWindowMouseUp(_event: MouseEvent): void {
     if (this.panDrag) {
       this.panDrag = null;
     }

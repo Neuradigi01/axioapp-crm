@@ -86,7 +86,7 @@ export class TestSendModalComponent {
     if (!v) return false;
     if (this.template().channel === 'email') return EMAIL_RE.test(v);
     if (this.template().channel === 'whatsapp' || this.template().channel === 'sms') {
-      const cleaned = v.replace(/[\s+\-]/g, '');
+      const cleaned = v.replace(/[\s+-]/g, '');
       return PHONE_RE.test(cleaned);
     }
     return v.length > 0;

@@ -370,7 +370,7 @@ async def export_contact_data_endpoint(
             requested_by_user_id=user.legacy_uuid,
         )
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     from src.app.core import audit
 
     await audit.log(
@@ -447,7 +447,9 @@ async def post_opt_in_endpoint(
             ip_address=_client_ip(request),
         )
     except ConsentError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     if not result.persisted:
         # Idempotent no-op — re-fetch the most recent event so the
         # caller still gets a meaningful row back instead of a 201
@@ -491,7 +493,9 @@ async def post_opt_out_endpoint(
             ip_address=_client_ip(request),
         )
     except ConsentError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     if not result.persisted:
         recent = await list_consent_events(db, contact_id=contact_id, limit=1)
         if recent:

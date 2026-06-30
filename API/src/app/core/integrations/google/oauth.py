@@ -116,7 +116,7 @@ def _verify_state(state: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid OAuth state.",
-        )
+        ) from None
     if not hmac.compare_digest(provided, expected):
         # `compare_digest` is timing-safe — important for HMAC.
         raise HTTPException(
@@ -129,7 +129,7 @@ def _verify_state(state: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Malformed OAuth state.",
-        )
+        ) from None
     exp = payload.get("exp")
     if not isinstance(exp, int) or exp < int(time.time()):
         raise HTTPException(

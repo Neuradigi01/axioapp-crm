@@ -177,7 +177,9 @@ async def whatsapp_volume_endpoint(
             granularity=granularity,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _VolumeReportOut.model_validate(report)
 
 
@@ -200,7 +202,9 @@ async def whatsapp_response_time_endpoint(
             groupby=groupby,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _ResponseTimeReportOut.model_validate(report)
 
 
@@ -217,7 +221,9 @@ async def whatsapp_outcomes_endpoint(
     try:
         report = await compute_outcomes(session, org_id=user.org_id, range_key=range)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _OutcomesReportOut.model_validate(report)
 
 
@@ -234,7 +240,9 @@ async def whatsapp_agent_leaderboard_endpoint(
     try:
         report = await compute_agent_leaderboard(session, org_id=user.org_id, range_key=range)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _LeaderboardReportOut.model_validate(report)
 
 
@@ -383,7 +391,9 @@ async def whatsapp_cost_endpoint(
             range_key=range,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _CostReportOut.model_validate(report)
 
 
@@ -400,7 +410,9 @@ async def whatsapp_quality_timeline_endpoint(
     try:
         report = await compute_quality_timeline(session, org_id=user.org_id, range_key=range)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _QualityTimelineOut.model_validate(report)
 
 
@@ -417,7 +429,9 @@ async def whatsapp_ai_metrics_endpoint(
     try:
         report = await compute_ai_metrics(session, org_id=user.org_id, range_key=range)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _AIMetricsOut.model_validate(report)
 
 
@@ -457,7 +471,9 @@ async def whatsapp_ad_attribution_endpoint(
     try:
         report = await compute_ad_attribution(session, org_id=user.org_id, range_key=range)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _AdAttributionReportOut.model_validate(report)
 
 

@@ -206,7 +206,7 @@ async def build_contact_data_export(
         )
         zf.writestr(
             f"{prefix}/leads.json",
-            _to_json_bytes([_serialise_lead(l) for l in lead_rows]),
+            _to_json_bytes([_serialise_lead(lead) for lead in lead_rows]),
         )
 
         conversation_meta: list[dict[str, Any]] = []

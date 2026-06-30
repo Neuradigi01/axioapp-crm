@@ -332,7 +332,7 @@ async def enqueue(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str,
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
-        )
+        ) from exc
 
     contact_ids = await resolve_audience(session, audience_filter=campaign.audience_filter)
 

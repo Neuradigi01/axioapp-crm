@@ -25,7 +25,6 @@ import {
 
 import { extractApiError } from '@core/services/api-error.util';
 import {
-  QualityEvent,
   QualityTimelineReport,
   ReportRange,
   WhatsAppReportsService,

@@ -126,7 +126,7 @@ def process_meta_lead(self, payload: dict[str, Any]) -> dict[str, Any]:
         return asyncio.run(process_meta_lead_async(payload=payload))
     except (ConnectionError, TimeoutError) as exc:
         if HAS_CELERY:
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
         raise
 
 
@@ -521,7 +521,7 @@ def delete_meta_user_data(self, request_id: str) -> dict[str, Any]:
         return asyncio.run(delete_meta_user_data_async(request_id=request_id))
     except (ConnectionError, TimeoutError) as exc:
         if HAS_CELERY:
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
         raise
 
 

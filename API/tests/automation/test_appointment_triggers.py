@@ -181,7 +181,6 @@ async def test_appointment_create_publishes_booked(test_db, org_id):
     # in-scope checks pass.
     contact_id = uuid.uuid4()
     user_id = uuid.uuid4()
-    user_member_id = uuid.uuid4()
     await test_db.execute(
         sql_text(
             "INSERT INTO tbl_contacts (id, org_id, full_name, phone, email) "

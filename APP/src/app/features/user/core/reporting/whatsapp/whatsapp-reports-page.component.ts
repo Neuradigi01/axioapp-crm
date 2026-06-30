@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 
 import { AdRoiWidgetComponent } from './ad-roi-widget.component';
 import { AgentLeaderboardComponent } from './agent-leaderboard.component';

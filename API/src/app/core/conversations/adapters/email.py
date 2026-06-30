@@ -33,6 +33,7 @@ to the handler, so the ORM tenant filter + RLS work transparently.
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -98,8 +99,6 @@ _SUBJECT_THREADING_WINDOW = timedelta(days=30)
 # environments so a customer's reply (which echoes the value into
 # `In-Reply-To`) always threads back. Override per-deploy if the
 # product domain changes via `EMAIL_MESSAGE_ID_DOMAIN` env var.
-import os
-
 _MESSAGE_ID_DOMAIN = os.getenv("EMAIL_MESSAGE_ID_DOMAIN", "furnicrm.app")
 
 # Step 8 — public tracking base URL. Defaults to local in dev; in
@@ -902,8 +901,8 @@ __all__ = [
 #
 # Idempotent: re-importing this module just overwrites the
 # registrations with the same callables.
-from src.app.core.conversations.registry import register_channel
-from src.app.core.email.sync_daemon import register_inbound_handler
+from src.app.core.conversations.registry import register_channel  # noqa: E402
+from src.app.core.email.sync_daemon import register_inbound_handler  # noqa: E402
 
 
 def _step5_register() -> None:

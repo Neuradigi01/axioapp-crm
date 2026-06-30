@@ -324,8 +324,6 @@ async def change_seats(
     if total_seats == sub.seats_purchased:
         return NoChangeResponse(outcome="no_change")
 
-    seats_in_use = await users_service.count_active_members(session, org_id)
-
     if total_seats < sub.seats_purchased:
         bundle_min = 1
         if total_seats < bundle_min:

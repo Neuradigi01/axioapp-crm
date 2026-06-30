@@ -257,7 +257,7 @@ class MetaGraphClient:
             raise MetaGraphError(
                 http_status=502,
                 user_message=(f"Meta API returned a non-JSON body during {stage}."),
-            )
+            ) from None
         if not isinstance(body, dict):
             raise MetaGraphError(
                 http_status=502,

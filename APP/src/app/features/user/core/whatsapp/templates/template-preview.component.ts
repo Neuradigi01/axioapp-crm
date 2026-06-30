@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Input, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, signal } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import {

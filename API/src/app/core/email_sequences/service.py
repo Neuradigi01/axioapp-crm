@@ -157,7 +157,7 @@ async def create_sequence(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(f"A sequence named {payload.name!r} already exists in this workspace."),
-        )
+        ) from None
 
     steps = _materialise_steps(org_id=org_id, sequence_id=seq.id, payload_steps=payload.steps)
     email_seq_da.add_sequence_steps(session, steps)
@@ -256,7 +256,7 @@ async def update_sequence(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(f"A sequence named {seq.name!r} already exists in this workspace."),
-        )
+        ) from None
     await session.refresh(seq)
     if new_steps is not None:
         for s in new_steps:
@@ -400,7 +400,7 @@ async def enroll(
         new_enrollment_rows.append((enrollment, es, contact_id))
 
     await session.commit()
-    for enrollment, es, contact_id in new_enrollment_rows:
+    for enrollment, _es, contact_id in new_enrollment_rows:
         await session.refresh(enrollment)
         results.append(
             EnrollmentResultRow(

@@ -227,7 +227,7 @@ export class WhatsAppAutomationPageComponent {
     this.mode.set('list');
   }
 
-  protected onSaved(rule: KeywordRule): void {
+  protected onSaved(_rule: KeywordRule): void {
     this.toast.set(this.mode() === 'create' ? 'Rule created.' : 'Rule saved.');
     this.closeEditor();
     this.reload();

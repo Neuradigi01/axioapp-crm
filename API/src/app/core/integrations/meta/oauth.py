@@ -129,7 +129,7 @@ def verify_state(state: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid OAuth state.",
-        )
+        ) from None
     if not hmac.compare_digest(provided, expected):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -141,7 +141,7 @@ def verify_state(state: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Malformed OAuth state.",
-        )
+        ) from None
     if payload.get("provider") != _PROVIDER_TAG:
         # Defence against a Google state being replayed here. Both
         # providers use the same secret, so HMAC alone would accept it.
@@ -367,7 +367,7 @@ def _parse_meta_response(response: httpx.Response, *, endpoint: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Meta {endpoint} returned non-JSON.",
-        )
+        ) from None
     if response.status_code >= 400 or "error" in body:
         err = body.get("error") or {"raw": response.text[:200]}
         raise HTTPException(

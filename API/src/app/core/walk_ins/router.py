@@ -123,6 +123,10 @@ async def get_walk_in_endpoint(
     walk_in = await get_walk_in(db, walk_in_id)
     if walk_in is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="walk-in not found")
+    # Local import mirrors walk_ins/service.py — avoids a permissions<->walk_ins
+    # circular import at module load.
+    from src.app.core.permissions.service import role_has_permission
+
     # Row-level visibility: non-privileged callers can only fetch
     # walk-ins assigned to them. 404 (not 403) so we don't leak the
     # existence of walk-ins outside the caller's book.

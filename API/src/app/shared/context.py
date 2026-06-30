@@ -31,7 +31,10 @@ class RequestContext:
 
 _request_context: ContextVar[RequestContext] = ContextVar(
     "request_context",
-    default=RequestContext(),
+    # RequestContext is a frozen (immutable) dataclass, so sharing one default
+    # instance across contexts is safe — B039's mutable-default concern does
+    # not apply.
+    default=RequestContext(),  # noqa: B039
 )
 
 

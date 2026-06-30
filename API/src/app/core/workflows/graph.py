@@ -247,7 +247,9 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
                 try:
                     validate_conditions(conds)
                 except InvalidCondition as exc:
-                    raise InvalidGraph(f"trigger node '{n.id}' has invalid conditions: {exc}")
+                    raise InvalidGraph(
+                        f"trigger node '{n.id}' has invalid conditions: {exc}"
+                    ) from exc
         # Condition nodes — already required to carry conditions
         # above; validate the AST shape.
         if n.type in _CONDITION_TYPES:
@@ -255,7 +257,9 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
             try:
                 validate_conditions(conds)
             except InvalidCondition as exc:
-                raise InvalidGraph(f"condition node '{n.id}' has invalid conditions: {exc}")
+                raise InvalidGraph(
+                    f"condition node '{n.id}' has invalid conditions: {exc}"
+                ) from exc
         # Branch nodes — validate each branch's conditions.
         if n.type == "branch.if":
             branches = cfg.get("branches") or []
@@ -274,7 +278,7 @@ def validate_graph(graph: WorkflowGraph, *, goal_node_id: str | None = None) -> 
                 except InvalidCondition as exc:
                     raise InvalidGraph(
                         f"branch node '{n.id}' branches[{i}] has invalid conditions: {exc}"
-                    )
+                    ) from exc
 
 
 async def validate_graph_with_db(

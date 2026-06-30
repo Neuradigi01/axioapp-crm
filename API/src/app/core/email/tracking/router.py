@@ -345,7 +345,7 @@ async def click_redirect_endpoint(token: str, u: str, request: Request) -> Redir
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Not found.",
-        )
+        ) from None
     # Defence: don't blindly trust the target — require http/https.
     if not (target.lower().startswith("http://") or target.lower().startswith("https://")):
         raise HTTPException(

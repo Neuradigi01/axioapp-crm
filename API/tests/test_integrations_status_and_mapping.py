@@ -23,6 +23,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from pydantic import ValidationError
 
 from src.app.core.integrations import service
 from src.app.core.integrations import status as status_module
@@ -373,5 +374,5 @@ class TestMappingPayloadSchema:
     def test_rejects_unknown_top_level_keys(self):
         # `extra="forbid"` — sending fields other than `mapping`
         # raises ValidationError. Defends against typo'd request bodies.
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             SubscriptionMappingUpdate.model_validate({"mapping": {}, "extra_field": "x"})

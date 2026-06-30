@@ -164,7 +164,7 @@ class TestEstimate:
             counts={"marketing": 10, "bogus": 5},
         )
         # Pull the utility line, which absorbed the bogus 5.
-        util_line = next(l for l in report.lines if l.category == "utility")
+        util_line = next(line for line in report.lines if line.category == "utility")
         assert util_line.count == 5
 
     def test_currency_per_region(self):
@@ -177,7 +177,7 @@ class TestEstimate:
 
     def test_service_line_is_zero_cost(self):
         report = cost_estimator.estimate(region="IN", counts={"service": 9999})
-        service_line = next(l for l in report.lines if l.category == "service")
+        service_line = next(line for line in report.lines if line.category == "service")
         assert service_line.total == 0.0
         assert report.total == 0.0
 
@@ -186,7 +186,7 @@ class TestEstimate:
         assert report.total == 0.0
         # All four category lines still present so the UI table stays
         # consistent across windows with no traffic.
-        assert {l.category for l in report.lines} == set(cost_estimator.CATEGORIES)
+        assert {line.category for line in report.lines} == set(cost_estimator.CATEGORIES)
 
     def test_is_estimate_flag(self):
         report = cost_estimator.estimate(region="IN", counts={"marketing": 1})

@@ -41,6 +41,22 @@ from src.app.core.subscriptions.payment_provider import PaymentProvider
 from src.app.core.subscriptions.providers.stripe_provider import (
     InvalidWebhookSignature,
 )
+from src.app.core.subscriptions.webhooks.handlers.checkout_completed import (
+    on_checkout_completed,
+)
+from src.app.core.subscriptions.webhooks.handlers.invoice_failed import (
+    on_invoice_failed,
+)
+from src.app.core.subscriptions.webhooks.handlers.invoice_paid import (
+    on_invoice_finalized,
+    on_invoice_paid,
+)
+from src.app.core.subscriptions.webhooks.handlers.subscription_cancelled import (
+    on_subscription_cancelled,
+)
+from src.app.core.subscriptions.webhooks.handlers.subscription_updated import (
+    on_subscription_updated,
+)
 from src.app.shared.db import get_db
 
 log = logging.getLogger(__name__)
@@ -79,7 +95,7 @@ async def stripe_webhook(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"error": "invalid_signature"},
-        )
+        ) from None
 
     event_id = event.get("id")
     event_type = event.get("type", "")
@@ -139,7 +155,7 @@ async def stripe_webhook(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": "handler_failed"},
-        )
+        ) from exc
 
     await db.execute(
         update(StripeWebhookEvent)
@@ -171,23 +187,6 @@ async def _no_op(
         event.get("type"),
     )
 
-
-from src.app.core.subscriptions.webhooks.handlers.checkout_completed import (
-    on_checkout_completed,
-)
-from src.app.core.subscriptions.webhooks.handlers.invoice_failed import (
-    on_invoice_failed,
-)
-from src.app.core.subscriptions.webhooks.handlers.invoice_paid import (
-    on_invoice_finalized,
-    on_invoice_paid,
-)
-from src.app.core.subscriptions.webhooks.handlers.subscription_cancelled import (
-    on_subscription_cancelled,
-)
-from src.app.core.subscriptions.webhooks.handlers.subscription_updated import (
-    on_subscription_updated,
-)
 
 # Mapping event type → async handler. Each handler accepts
 # `(db, event_dict)` and returns `None`. Tests assert on this table

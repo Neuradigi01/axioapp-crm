@@ -134,7 +134,7 @@ async def create_flow_endpoint(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
-        )
+        ) from exc
     flow = WhatsAppFlow(
         org_id=user.org_id,
         name=payload.name,
@@ -151,7 +151,7 @@ async def create_flow_endpoint(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"A flow named {payload.name!r} already exists.",
-        )
+        ) from None
     await db.refresh(flow)
     return _FlowOut.model_validate(flow)
 
@@ -185,7 +185,7 @@ async def update_flow_endpoint(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Another flow already uses that name.",
-        )
+        ) from None
     await db.refresh(flow)
     return _FlowOut.model_validate(flow)
 
@@ -211,7 +211,7 @@ async def publish_flow_endpoint(
     try:
         flow = await publish_flow(db, flow=flow)
     except FlowsServiceError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return _FlowOut.model_validate(flow)
 
 
@@ -229,7 +229,7 @@ async def test_send_endpoint(
     try:
         meta_response = await test_send_flow(db, flow=flow, to_phone=payload.to_phone)
     except FlowsServiceError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return {"sent": True, "meta": meta_response}
 
 

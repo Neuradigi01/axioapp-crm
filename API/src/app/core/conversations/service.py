@@ -391,12 +391,7 @@ async def receive_webhook(
     # has no acquisition source yet, try to pair the inbound text with
     # a recent quick-link click whose `prefilled_hash` matches. Single-
     # touch — same convention as Step 24.
-    if (
-        conv.channel == ConversationChannel.whatsapp
-        and not customer_opted_out
-        and not conv.acquisition_source
-        and parsed.text
-    ):
+    if conv.channel == ConversationChannel.whatsapp and not conv.acquisition_source and parsed.text:
         try:
             from src.app.core.integrations.whatsapp.quick_links import (
                 attribute_inbound,

@@ -145,7 +145,7 @@ async def list_pages_endpoint(
         raise HTTPException(
             status_code=401,
             detail="Meta token expired — reconnect required.",
-        )
+        ) from None
     return [
         {
             "page_id": p.page_id,
@@ -184,7 +184,7 @@ async def list_lead_forms_endpoint(
         raise HTTPException(
             status_code=401,
             detail="Meta token expired — reconnect required.",
-        )
+        ) from None
     return [{"form_id": f.form_id, "name": f.name, "status": f.status} for f in forms]
 
 
@@ -216,7 +216,7 @@ async def subscribe_page_endpoint(
         raise HTTPException(
             status_code=401,
             detail="Meta token expired — reconnect required.",
-        )
+        ) from None
     if not ok:
         raise HTTPException(
             status_code=502,
@@ -260,7 +260,7 @@ async def unsubscribe_page_endpoint(
         raise HTTPException(
             status_code=401,
             detail="Meta token expired — reconnect required.",
-        )
+        ) from None
     if not ok:
         raise HTTPException(
             status_code=502,
@@ -310,7 +310,7 @@ async def data_deletion_callback_endpoint(request: Request) -> dict:
             "meta_data_deletion: rejected signed_request reason=%s",
             type(exc).__name__,
         )
-        raise HTTPException(status_code=400, detail="invalid signed_request")
+        raise HTTPException(status_code=400, detail="invalid signed_request") from exc
 
     user_id = payload["user_id"]
     issued_at = payload["issued_at"]

@@ -69,7 +69,7 @@ register_subscribers()
 # remove_from_sequence). add_to_list / remove_from_list /
 # block_contact / archive_contact are placeholders that raise
 # ActionNotImplemented until the underlying CRM modules ship.
-from src.app.core.workflows.actions import (
+from src.app.core.workflows.actions import (  # noqa: E402
     flow_control,  # noqa: F401
     lifecycle,  # noqa: F401
     records,  # noqa: F401

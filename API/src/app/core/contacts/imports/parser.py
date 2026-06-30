@@ -53,8 +53,7 @@ def _file_kind(filename: str) -> str:
 def _csv_rows(data: bytes) -> Iterator[list[str]]:
     text = _decode_csv(data)
     reader = csv.reader(io.StringIO(text))
-    for row in reader:
-        yield row
+    yield from reader
 
 
 # --- XLSX ---------------------------------------------------------------

@@ -267,7 +267,7 @@ async def create_subscription(
                 f"Subscription already exists for form "
                 f"{payload.external_form_id} on this integration."
             ),
-        )
+        ) from None
     await session.refresh(row)
     await log_entity_change(
         action="integration.subscription.created",

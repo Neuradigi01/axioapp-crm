@@ -70,7 +70,9 @@ def _claims_from_bearer(creds: HTTPAuthorizationCredentials | None) -> TokenClai
     try:
         return decode_token(creds.credentials)
     except InvalidToken:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        ) from None
 
 
 @router.post("/login", response_model=None)

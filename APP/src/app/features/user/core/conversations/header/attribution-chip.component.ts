@@ -13,7 +13,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { environment } from '../../../../../../environments/environment';
-import { extractApiError } from '@core/services/api-error.util';
 
 interface AttributionResponse {
   conversation_id: string;

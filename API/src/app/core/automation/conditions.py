@@ -187,7 +187,7 @@ def _validate_leaf(node: dict[str, Any]) -> None:
         try:
             re.compile(pattern)
         except re.error as exc:
-            raise _ConditionError(f"'regex' pattern does not compile: {exc}")
+            raise _ConditionError(f"'regex' pattern does not compile: {exc}") from exc
 
 
 def _eval_leaf(node: dict[str, Any], payload: dict[str, Any]) -> bool:

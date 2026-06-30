@@ -493,7 +493,7 @@ async def submit_for_approval(
                 "message": exc.user_message,
             },
         )
-        raise HTTPException(status_code=exc.http_status, detail=exc.user_message)
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
 
     meta_template_id = str(meta_body.get("id")) if meta_body.get("id") is not None else None
     meta_status = str(meta_body.get("status")) if meta_body.get("status") else "PENDING"
@@ -560,7 +560,7 @@ async def delete_template(
                 meta_template_id=row.meta_template_id,
             )
         except MetaGraphError as exc:
-            raise HTTPException(status_code=exc.http_status, detail=exc.user_message)
+            raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
 
     snapshot = {
         "name": row.name,

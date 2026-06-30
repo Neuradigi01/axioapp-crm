@@ -28,6 +28,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+from fastapi import HTTPException
 
 from src.app.core.integrations import crypto, service
 from src.app.core.integrations.google import api_client as gac_module
@@ -213,9 +214,9 @@ class TestStateSigning:
         assert "expired" in str(exc.value.detail).lower()
 
     def test_malformed_state_raises(self):
-        with pytest.raises(Exception):
+        with pytest.raises(HTTPException):
             oauth.verify_state("not-a-state")
-        with pytest.raises(Exception):
+        with pytest.raises(HTTPException):
             oauth.verify_state("")
 
 

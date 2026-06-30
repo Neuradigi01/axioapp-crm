@@ -133,7 +133,7 @@ def process_google_lead(self, integration_id: str, payload: dict[str, Any]) -> d
     except (ConnectionError, TimeoutError) as exc:
         # Transient — let Celery's autoretry policy handle it.
         if HAS_CELERY:
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
         raise
 
 

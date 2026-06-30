@@ -20,17 +20,15 @@ the right rows surface based on the active `RequestContext`.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.shared.db import Base
 
-T = TypeVar("T", bound=Base)
 
-
-class Repository(Generic[T]):
+class Repository[T: Base]:
     """Generic CRUD for a single mapped class."""
 
     def __init__(self, session: AsyncSession, model: type[T]) -> None:

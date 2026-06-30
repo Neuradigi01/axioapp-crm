@@ -295,7 +295,7 @@ async def send_message_endpoint(
             send_from_phone_id=payload.send_from_phone_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return MessageOut.model_validate(msg)
 
 
@@ -353,7 +353,7 @@ async def react_endpoint(
             emoji=payload.emoji,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return MessageOut.model_validate(msg)
 
 
@@ -402,12 +402,12 @@ async def send_media_message_endpoint(
             size_bytes=len(file_bytes),
         )
     except MediaUploadError as exc:
-        raise HTTPException(status_code=exc.http_status, detail=exc.user_message)
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
 
     try:
         bundle = await resolve_whatsapp_adapter(db)
     except WhatsAppNotConnected as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     # Resolve the per-org Cloud API credentials. The adapter holds them
     # in private attrs; we read directly because the upload uses the
@@ -431,7 +431,7 @@ async def send_media_message_endpoint(
             filename=file.filename or "file",
         )
     except MediaUploadError as exc:
-        raise HTTPException(status_code=exc.http_status, detail=exc.user_message)
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
 
     effective_caption = caption if captions_supported(type) else None
 
@@ -556,7 +556,7 @@ async def export_conversation_pdf_endpoint(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
-        )
+        ) from exc
     return Response(
         content=blob,
         media_type="application/pdf",
@@ -638,7 +638,7 @@ async def webhook_verify_endpoint(
     try:
         adapter = resolve(channel)
     except ChannelNotRegistered as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if not hasattr(adapter, "verify_subscription"):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -665,7 +665,7 @@ async def webhook_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"webhook body is not valid JSON: {exc}",
-        )
+        ) from exc
 
     # WhatsApp follows the per-org routing flow (Step 3.5.12) — extract
     # phone_id from the payload, look up the org's config, verify the
@@ -678,7 +678,7 @@ async def webhook_endpoint(
     try:
         adapter = resolve(channel)
     except ChannelNotRegistered as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if hasattr(adapter, "verify_signature"):
         signature = request.headers.get("x-hub-signature-256")
         if not adapter.verify_signature(raw, signature):
@@ -689,7 +689,7 @@ async def webhook_endpoint(
     try:
         msg = await receive_webhook(db, channel=channel, payload=payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     # Reaction events return None — the row update is enough; the SPA
     # picks up the change on the next thread poll / WS push.
     if msg is None:
@@ -910,7 +910,7 @@ async def _handle_whatsapp_webhook(
             received_via_phone_id=config.phone_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if msg is None:
         return {"reaction_applied": True}
     return {"message_id": str(msg.id)}

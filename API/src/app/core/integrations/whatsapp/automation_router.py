@@ -19,11 +19,25 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.integrations.whatsapp.block_list import (
+    BLOCK_REASONS,
+    BlockListError,
+)
+from src.app.core.integrations.whatsapp.block_list import (
+    add_entry as block_add_entry,
+)
+from src.app.core.integrations.whatsapp.block_list import (
+    list_entries as block_list_entries,
+)
+from src.app.core.integrations.whatsapp.block_list import (
+    remove_entry as block_remove_entry,
+)
 from src.app.core.integrations.whatsapp.connect import get_active_config
 from src.app.core.integrations.whatsapp.keyword_engine import evaluate_rules
 from src.app.core.integrations.whatsapp.models import (
@@ -615,23 +629,6 @@ async def patch_ai_settings_endpoint(
 # --- Block list (whatsapp-platform-upgrade Step 23) ---------------------
 
 
-from pydantic import BaseModel, ConfigDict, Field
-
-from src.app.core.integrations.whatsapp.block_list import (
-    BLOCK_REASONS,
-    BlockListError,
-)
-from src.app.core.integrations.whatsapp.block_list import (
-    add_entry as block_add_entry,
-)
-from src.app.core.integrations.whatsapp.block_list import (
-    list_entries as block_list_entries,
-)
-from src.app.core.integrations.whatsapp.block_list import (
-    remove_entry as block_remove_entry,
-)
-
-
 class _BlockEntryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -712,7 +709,7 @@ async def add_blocked_endpoint(
             notes=payload.notes,
         )
     except BlockListError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return _BlockEntryOut.model_validate(row)
 
 
