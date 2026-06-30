@@ -167,6 +167,10 @@ class WorkflowUpdate(BaseModel):
     graph: WorkflowGraph | None = None
     goal_node_id: str | None = Field(default=None, max_length=64)
     cost_per_run_cents: int | None = Field(default=None, ge=0)
+    # Step 17 — operator-supplied description of the change, lands on
+    # the new ``tbl_workflow_versions`` row + drives the version-
+    # history drawer's column.
+    change_note: str | None = Field(default=None, max_length=240)
 
 
 class WorkflowRead(ORMModel):
@@ -292,17 +296,93 @@ class EventWaitRead(ORMModel):
     created_at: datetime
 
 
+# --- Step 17: version history + rollback + import/export ---------------
+
+
+class WorkflowVersionSummaryRead(ORMModel):
+    """Row in the version-history drawer's list. The full graph is
+    fetched separately via :class:`WorkflowVersionDetailRead` when the
+    operator clicks "View" — keeps the drawer scroll cheap."""
+
+    id: uuid.UUID
+    version: int
+    change_note: str | None = None
+    created_by_user_id: uuid.UUID | None = None
+    created_at: datetime
+
+
+class WorkflowVersionListResponse(BaseModel):
+    items: list[WorkflowVersionSummaryRead]
+    total: int
+
+
+class WorkflowVersionDetailRead(WorkflowVersionSummaryRead):
+    """Full graph for one historical version — drives the "View"
+    overlay in the canvas page."""
+
+    workflow_id: uuid.UUID
+    graph: dict
+
+
+class RollbackRequest(BaseModel):
+    """`POST /workflows/{id}/rollback` body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target_version: int = Field(..., ge=1)
+    change_note: str | None = Field(default=None, max_length=240)
+
+
+class WorkflowExport(BaseModel):
+    """Schema for the portable JSON export. Internal UUIDs (template
+    references, contact ids) are kept verbatim — the importer
+    remaps unknown references to ``null`` so the new draft surfaces
+    the missing-template validation marker per the Step-15 editor.
+
+    ``schema_version`` is 1 today. If we evolve the graph shape, the
+    importer will need a per-version migration step before persisting.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(..., max_length=120)
+    description: str | None = None
+    category: str
+    graph: WorkflowGraph
+    re_enrollment_rule: str = "once"
+    is_marketing: bool = True
+    goal_node_id: str | None = None
+    cost_per_run_cents: int = 0
+    schema_version: int = Field(default=1, ge=1, le=1)
+
+
+class WorkflowImportRequest(BaseModel):
+    """`POST /workflows/import` body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    json_body: WorkflowExport = Field(..., alias="json")
+    target_folder_id: uuid.UUID | None = Field(default=None)
+    name: str | None = Field(default=None, max_length=120)
+
+
 __all__ = [
     "EventWaitRead",
     "GraphEdge",
     "GraphNode",
     "NodePosition",
+    "RollbackRequest",
     "WorkflowCreate",
+    "WorkflowExport",
     "WorkflowFolderCreate",
     "WorkflowFolderRead",
     "WorkflowGraph",
+    "WorkflowImportRequest",
     "WorkflowRead",
     "WorkflowRunRead",
     "WorkflowStepRunRead",
     "WorkflowUpdate",
+    "WorkflowVersionDetailRead",
+    "WorkflowVersionListResponse",
+    "WorkflowVersionSummaryRead",
 ]

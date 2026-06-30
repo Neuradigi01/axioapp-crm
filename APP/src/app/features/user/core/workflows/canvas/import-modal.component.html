@@ -1,0 +1,93 @@
+<div
+  class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-6"
+  (click)="busy() ? null : cancel.emit()"
+>
+  <div
+    class="bg-white rounded-xl border border-zinc-200 shadow-xl w-full max-w-md"
+    (click)="$event.stopPropagation()"
+  >
+    <header class="px-5 py-3 border-b border-zinc-200 flex items-center gap-2">
+      <h2 class="text-sm font-semibold text-zinc-800 flex-1">
+        Import workflow JSON
+      </h2>
+      <button
+        type="button"
+        class="text-zinc-400 hover:text-zinc-700"
+        [disabled]="busy()"
+        (click)="cancel.emit()"
+      >
+        <lucide-icon name="X" class="w-4 h-4"></lucide-icon>
+      </button>
+    </header>
+
+    <div class="px-5 py-4 space-y-3">
+      <label
+        class="block px-3 py-6 text-center text-xs text-zinc-600 border-2 border-dashed border-zinc-300 rounded cursor-pointer hover:border-zinc-500 hover:bg-zinc-50"
+      >
+        <lucide-icon name="Upload" class="w-5 h-5 mb-1 text-zinc-500 inline"></lucide-icon>
+        @if (fileName()) {
+          <p class="text-zinc-700 font-medium truncate">{{ fileName() }}</p>
+          <p class="text-[10px] text-zinc-500 mt-1">Click to pick a different file.</p>
+        } @else {
+          <p>Click to pick a .workflow.json file</p>
+          <p class="text-[10px] text-zinc-400 mt-1">Up to 5 MB.</p>
+        }
+        <input
+          type="file"
+          accept=".json,application/json"
+          class="hidden"
+          (change)="onFileChange($event)"
+        />
+      </label>
+
+      @if (error()) {
+        <p class="text-xs text-rose-600 px-1">{{ error() }}</p>
+      }
+
+      @if (parsed()) {
+        <div>
+          <label class="block text-[11px] font-medium text-zinc-600 mb-1">
+            Name for the new draft
+          </label>
+          <input
+            type="text"
+            [ngModel]="overrideName()"
+            (ngModelChange)="overrideName.set($event)"
+            [disabled]="busy()"
+            class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+            maxlength="120"
+          />
+          <p class="text-[10px] text-zinc-500 mt-1">
+            Name conflicts auto-suffix as <code>(2)</code>, <code>(3)</code>, …
+            Send-action template references will be remapped to null —
+            you'll pick real templates per node before activating.
+          </p>
+        </div>
+      }
+    </div>
+
+    <footer class="px-5 py-3 border-t border-zinc-200 flex items-center gap-2">
+      <div class="flex-1"></div>
+      <button
+        type="button"
+        class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+        [disabled]="busy()"
+        (click)="cancel.emit()"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        class="px-3 py-1.5 text-xs rounded bg-zinc-900 text-white hover:bg-zinc-800"
+        [disabled]="!canSubmit()"
+        (click)="onSubmit()"
+      >
+        @if (busy()) {
+          Importing…
+        } @else {
+          Import as draft
+        }
+      </button>
+    </footer>
+  </div>
+</div>

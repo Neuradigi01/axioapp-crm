@@ -117,6 +117,10 @@ export interface WorkflowUpdatePayload {
   graph?: WorkflowGraph;
   goal_node_id?: string | null;
   cost_per_run_cents?: number;
+  /** Step 17 — describes the change saved with this PATCH. Lands on
+   *  the new `tbl_workflow_versions` row + drives the version-history
+   *  drawer's column. */
+  change_note?: string | null;
 }
 
 export interface WorkflowFolder {
@@ -227,6 +231,49 @@ export interface WorkflowGalleryCloneRequest {
   folder_id?: string | null;
 }
 
+// --- Step 17: version history + rollback + import / export -------------
+
+export interface WorkflowVersionSummary {
+  id: string;
+  version: number;
+  change_note: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+}
+
+export interface WorkflowVersionListResponse {
+  items: WorkflowVersionSummary[];
+  total: number;
+}
+
+export interface WorkflowVersionDetail extends WorkflowVersionSummary {
+  workflow_id: string;
+  graph: WorkflowGraph;
+}
+
+export interface WorkflowRollbackRequest {
+  target_version: number;
+  change_note?: string | null;
+}
+
+export interface WorkflowExportBody {
+  name: string;
+  description: string | null;
+  category: string;
+  graph: WorkflowGraph;
+  re_enrollment_rule: WorkflowReEnrollment;
+  is_marketing: boolean;
+  goal_node_id: string | null;
+  cost_per_run_cents: number;
+  schema_version: number;
+}
+
+export interface WorkflowImportRequest {
+  json: WorkflowExportBody;
+  target_folder_id?: string | null;
+  name?: string | null;
+}
+
 
 @Injectable({ providedIn: 'root' })
 export class WorkflowsApiService {
@@ -301,6 +348,53 @@ export class WorkflowsApiService {
       `${this.base}/gallery/${templateId}/clone`,
       payload,
     );
+  }
+
+  // --- Step 17: version history + rollback + import / export ---------
+
+  listVersions(
+    workflowId: string,
+    query: { limit?: number; offset?: number } = {},
+  ): Observable<WorkflowVersionListResponse> {
+    const params = buildHttpParams({
+      limit: query.limit,
+      offset: query.offset,
+    });
+    return this.http.get<WorkflowVersionListResponse>(
+      `${this.base}/${workflowId}/versions`,
+      { params },
+    );
+  }
+
+  getVersion(
+    workflowId: string,
+    version: number,
+  ): Observable<WorkflowVersionDetail> {
+    return this.http.get<WorkflowVersionDetail>(
+      `${this.base}/${workflowId}/versions/${version}`,
+    );
+  }
+
+  rollback(
+    workflowId: string,
+    payload: WorkflowRollbackRequest,
+  ): Observable<WorkflowRead> {
+    return this.http.post<WorkflowRead>(
+      `${this.base}/${workflowId}/rollback`,
+      payload,
+    );
+  }
+
+  exportWorkflow(workflowId: string): Observable<WorkflowExportBody> {
+    return this.http.get<WorkflowExportBody>(
+      `${this.base}/${workflowId}/export`,
+    );
+  }
+
+  importWorkflow(
+    payload: WorkflowImportRequest,
+  ): Observable<WorkflowRead> {
+    return this.http.post<WorkflowRead>(`${this.base}/import`, payload);
   }
 
   // --- Folders ------------------------------------------------------

@@ -151,6 +151,19 @@ export class CanvasStateService {
     });
   }
 
+  /** Swap in a graph for preview-only — used by the version-history
+   *  drawer's "View" action to render a historical version on the
+   *  canvas without touching dirty/undo/redo state. The caller is
+   *  responsible for snapshotting the current graph and calling
+   *  `loadPreview(backup)` again when the user clicks "Back to
+   *  current". */
+  loadPreview(graph: WorkflowGraph): void {
+    const cloned = cloneGraph(graph);
+    this.nodesSig.set(cloned.nodes);
+    this.edgesSig.set(cloned.edges);
+    this.selectedNodeIdSig.set(null);
+  }
+
   clearDirty(): void {
     this.dirtySig.set(false);
   }

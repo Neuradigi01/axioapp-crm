@@ -24,6 +24,7 @@ import {
   CanvasStateService,
 } from './canvas-state.service';
 import { WorkflowEdgeComponent } from './edge.component';
+import { ImportModalComponent } from './import-modal.component';
 import { NodeEditorComponent } from './node-editor.component';
 import { NodePaletteComponent } from './node-palette.component';
 import {
@@ -32,10 +33,15 @@ import {
   WorkflowNodeComponent,
 } from './node.component';
 import { getNodeType } from './node-type-registry';
+import { SaveChangeNoteModalComponent } from './save-change-note.modal.component';
+import { VersionHistoryDrawerComponent } from './version-history-drawer.component';
 import {
+  WorkflowExportBody,
+  WorkflowGraph,
   WorkflowRead,
   WorkflowStatus,
   WorkflowTestFireResponse,
+  WorkflowVersionDetail,
   WorkflowsApiService,
 } from '../workflows-api.service';
 import { WorkflowStatusBadgeComponent } from '../workflow-status-badge.component';
@@ -86,8 +92,11 @@ const AUTOSAVE_INTERVAL_MS = 30_000;
     FormsModule,
     RouterLink,
     LucideAngularModule,
+    ImportModalComponent,
     NodeEditorComponent,
     NodePaletteComponent,
+    SaveChangeNoteModalComponent,
+    VersionHistoryDrawerComponent,
     WorkflowNodeComponent,
     WorkflowEdgeComponent,
     WorkflowStatusBadgeComponent,
@@ -109,6 +118,14 @@ export class WorkflowCanvasPageComponent {
   readonly error = signal<string | null>(null);
   readonly testFireBusy = signal(false);
   readonly testFireTrace = signal<WorkflowTestFireResponse | null>(null);
+
+  // Step 17 — version history + import/export.
+  readonly showVersionDrawer = signal(false);
+  readonly viewingVersion = signal<number | null>(null);
+  private previewBackup: WorkflowGraph | null = null;
+  readonly showImportModal = signal(false);
+  readonly importBusy = signal(false);
+  readonly showChangeNoteModal = signal(false);
 
   // Camera + edge-drag local state.
   readonly pendingEdge = signal<PendingEdge | null>(null);
@@ -207,15 +224,41 @@ export class WorkflowCanvasPageComponent {
       });
   }
 
-  save(opts: { silent?: boolean } = {}): void {
+  save(opts: { silent?: boolean; changeNote?: string } = {}): void {
+    // Step 17 — explicit Save Draft on an existing workflow pops the
+    // change-note modal so the version row gets a meaningful label.
+    // Auto-save (`silent: true`) and brand-new workflows skip it.
+    const id = this.state.workflowId();
+    if (
+      id &&
+      !opts.silent &&
+      opts.changeNote === undefined &&
+      this.state.dirty()
+    ) {
+      this.showChangeNoteModal.set(true);
+      return;
+    }
+    this.flushSave(opts);
+  }
+
+  private flushSave(
+    opts: { silent?: boolean; changeNote?: string } = {},
+  ): void {
     const id = this.state.workflowId();
     const graph = this.state.serializeGraph();
     const name = this.state.name().trim() || 'Untitled workflow';
     this.saving.set(true);
     this.error.set(null);
 
+    const patchBody: {
+      name: string;
+      graph: typeof graph;
+      change_note?: string;
+    } = { name, graph };
+    if (opts.changeNote) patchBody.change_note = opts.changeNote;
+
     const obs = id
-      ? this.api.patch(id, { name, graph })
+      ? this.api.patch(id, patchBody)
       : this.api.create({ name, graph });
 
     obs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -238,6 +281,135 @@ export class WorkflowCanvasPageComponent {
         this.saving.set(false);
       },
     });
+  }
+
+  // --- Step 17 — change-note + version + import/export -------------
+
+  confirmChangeNote(payload: { note: string }): void {
+    this.showChangeNoteModal.set(false);
+    this.flushSave({ changeNote: payload.note });
+  }
+
+  cancelChangeNote(): void {
+    if (this.saving()) return;
+    this.showChangeNoteModal.set(false);
+  }
+
+  toggleVersionDrawer(): void {
+    this.showVersionDrawer.update((open) => !open);
+  }
+
+  closeVersionDrawer(): void {
+    if (this.viewingVersion() !== null) {
+      this.backToCurrentFromVersion();
+    }
+    this.showVersionDrawer.set(false);
+  }
+
+  viewHistoricalVersion(detail: WorkflowVersionDetail): void {
+    // Snapshot the current live graph so we can put it back.
+    if (this.viewingVersion() === null) {
+      this.previewBackup = this.state.serializeGraph();
+    }
+    this.state.loadPreview(detail.graph);
+    this.viewingVersion.set(detail.version);
+  }
+
+  backToCurrentFromVersion(): void {
+    if (this.previewBackup) {
+      this.state.loadPreview(this.previewBackup);
+    }
+    this.previewBackup = null;
+    this.viewingVersion.set(null);
+  }
+
+  rollbackToVersion(payload: { version: number; changeNote: string }): void {
+    const id = this.state.workflowId();
+    if (!id) return;
+    this.saving.set(true);
+    this.api
+      .rollback(id, {
+        target_version: payload.version,
+        change_note: payload.changeNote,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (workflow) => {
+          // Drop the preview overlay (rollback already replaced the
+          // live graph), reload state from the fresh row, and refresh
+          // the drawer so the new version row appears.
+          this.previewBackup = null;
+          this.viewingVersion.set(null);
+          this.state.load(workflow);
+          this.saving.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.error.set(extractApiError(err) ?? 'Rollback failed.');
+          this.saving.set(false);
+        },
+      });
+  }
+
+  exportWorkflow(): void {
+    const id = this.state.workflowId();
+    if (!id) return;
+    this.api
+      .exportWorkflow(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (body) => this.downloadJson(body),
+        error: (err: HttpErrorResponse) =>
+          this.error.set(extractApiError(err) ?? 'Export failed.'),
+      });
+  }
+
+  private downloadJson(body: WorkflowExportBody): void {
+    const filename =
+      (body.name || 'workflow')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') + '.workflow.json';
+    const blob = new Blob([JSON.stringify(body, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  openImportModal(): void {
+    this.showImportModal.set(true);
+  }
+
+  cancelImport(): void {
+    if (this.importBusy()) return;
+    this.showImportModal.set(false);
+  }
+
+  confirmImport(payload: {
+    body: WorkflowExportBody;
+    name: string | null;
+  }): void {
+    this.importBusy.set(true);
+    this.api
+      .importWorkflow({ json: payload.body, name: payload.name })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (workflow) => {
+          this.importBusy.set(false);
+          this.showImportModal.set(false);
+          this.router.navigate(['/user/workflows', workflow.id]);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.importBusy.set(false);
+          this.error.set(extractApiError(err) ?? 'Import failed.');
+        },
+      });
   }
 
   activate(): void {
