@@ -14,14 +14,17 @@
     "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
+    "@whiskeysockets/baileys": "6.7.23",
     "axios": "1.7.7",
     "express": "4.21.1",
     "pino": "9.5.0",
+    "qrcode": "1.5.4",
     "zod": "3.23.8"
   },
   "devDependencies": {
     "@types/express": "5.0.0",
     "@types/node": "22.9.0",
+    "@types/qrcode": "1.5.5",
     "pino-pretty": "11.3.0",
     "tsx": "4.19.2",
     "typescript": "5.6.3"

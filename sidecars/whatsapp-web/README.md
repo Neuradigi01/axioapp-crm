@@ -13,20 +13,28 @@ sidecars/whatsapp-web/
 ├── Dockerfile
 ├── .env.example
 ├── src/
-│   ├── index.ts          Express bootstrap
-│   ├── config.ts         zod env loader (fail-fast)
-│   ├── logger.ts         pino + redaction
-│   ├── auth.ts           sign / verify / HMAC middleware
+│   ├── index.ts                Express bootstrap + manager.restoreAll
+│   ├── config.ts               zod env loader (fail-fast)
+│   ├── logger.ts               pino + redaction
+│   ├── auth.ts                 sign / verify / HMAC middleware
+│   ├── sessions/
+│   │   ├── types.ts            ManagedSession, SessionStatus, payload types
+│   │   ├── auth-store.ts       filesystem-backed Baileys auth state (UUID-locked)
+│   │   └── manager.ts          Baileys lifecycle, reconnect backoff, restoreAll
+│   ├── events/
+│   │   └── bus.ts              in-process EventEmitter (qr / connection events)
 │   └── routes/
-│       └── health.ts     GET /health
+│       ├── health.ts           GET /health
+│       └── sessions.ts         POST/GET/DELETE /sessions
 └── tests/
-    └── auth.test.ts      node:test cases for HMAC
+    ├── _baileys-mock.ts        Baileys factory mock (no network)
+    ├── auth.test.ts            node:test cases for HMAC
+    └── sessions.test.ts        auth-store + manager + restoreAll
 ```
 
 Future folders introduced in later steps:
 
-- `src/sessions/` — Baileys lifecycle + filesystem auth store (Step 2).
-- `src/routes/sessions.ts`, `messages.ts` — connect / send (Steps 2–3).
+- `src/routes/messages.ts` — `/send-text` + `/send-media` (Step 3).
 - `src/events/forwarder.ts` — POSTs to FastAPI `/whatsapp-web/events` (Step 3).
 
 ## Required env vars
@@ -111,12 +119,68 @@ Both directions sign the **raw request body** with HMAC-SHA-256 and put the dige
 
 Local dev reads from `.env`. Production deploys must inject env at runtime from the same SOPS-encrypted source the FastAPI service uses (`secrets.enc.env` decrypted via `sops exec-env`). The sidecar itself just reads `process.env` — wiring is a deploy concern, not a code concern, and is **not** in scope for this step.
 
-## Session storage (Step 2 preview)
+## Session lifecycle (Step 2)
 
-Baileys credentials will persist to:
+A session is one Baileys connection to `web.whatsapp.com` bound to a `(org_id, session_id)` pair. Both ids are UUIDs — the auth-store enforces this with a regex before touching the filesystem, so a malformed id cannot escape `STORAGE_DIR`.
+
+### Endpoints
+
+| Method | Path | Body / Notes |
+|---|---|---|
+| `POST` | `/sessions` | `{ "org_id": UUID, "session_id": UUID }` — idempotent. Returns `{ session_id, org_id, status, paired, phone_number?, last_error? }`. If the session already exists, returns the current view (no re-pair). |
+| `GET` | `/sessions/{session_id}` | Returns the current view. `404` if not found. **Never returns the QR data URL** — QR transport is the event bus → Step 3's forwarder → FastAPI SSE. |
+| `DELETE` | `/sessions/{session_id}` | Logs out (if paired) or ends the socket (if pairing), removes the entry, deletes auth state on disk. Returns `204`. |
+
+### States
 
 ```
-storage/sessions/{org_id}/{session_id}/
+pairing → connected → reconnecting → connected (loop on transient close)
+        ↘ disconnected (on DisconnectReason.loggedOut — creds wiped)
 ```
 
-This directory is gitignored and excluded from the Docker image. In Step 2 it becomes a mounted volume (or persistent claim) so a restart re-instantiates each paired session without re-scanning the QR.
+Reconnect backoff is 5 s / 15 s / 60 s, capped at 60 s. Each reconnect emits `connection.reconnecting` on the bus. A `loggedOut` close wipes auth state and emits `connection.logged_out`; the operator must `POST /sessions` again to re-pair.
+
+### Storage
+
+Baileys credentials are persisted by `useMultiFileAuthState` to:
+
+```
+{STORAGE_DIR}/sessions/{org_id}/{session_id}/
+```
+
+This directory is gitignored and excluded from the Docker image. Mount it as a volume in production so a sidecar restart re-instantiates every saved session without re-scanning the QR.
+
+### Single replica
+
+The session manager is process-local (`Map<sessionId, ManagedSession>`). Run **one** replica per `STORAGE_DIR`. Multi-replica needs a Redis-backed ownership lock — explicitly out of scope.
+
+### Event bus
+
+`src/events/bus.ts` exposes typed emitters for:
+
+| Event | Payload | Fires when |
+|---|---|---|
+| `qr.updated` | `{ sessionId, orgId, qrDataUrl }` | Baileys produces a new pairing string; `qrDataUrl` is a PNG data URL. |
+| `connection.opened` | `{ sessionId, orgId, phoneNumber }` | First time the socket reaches `connection: 'open'` after a `qr` (or after restore). |
+| `connection.logged_out` | `{ sessionId, orgId, reason }` | Baileys closes with `DisconnectReason.loggedOut`. Creds are wiped before this fires. |
+| `connection.reconnecting` | `{ sessionId, orgId, attempt, reason }` | Any non-logout close. Manager schedules a recreate after backoff. |
+
+Step 3 will subscribe to these and HMAC-POST them to FastAPI.
+
+## Baileys version pinning
+
+`@whiskeysockets/baileys` is pinned **exact** (no `^`) in `package.json`. WhatsApp protocol breakages typically need a Baileys bump within 24–48 h; the operator must:
+
+1. Read the Baileys release notes.
+2. Bump the version in `package.json`.
+3. `npm install` and run `npm test`.
+4. Smoke `POST /sessions` against a burner number.
+5. Commit + redeploy.
+
+Never use `^` or `~` here — silent transitive upgrades have caused multi-hour outages elsewhere.
+
+## restoreAll
+
+`SessionManager.restoreAll()` runs at boot, scans `STORAGE_DIR/sessions/<orgId>/<sessionId>/`, and calls `create({orgId, sessionId})` for every directory pair that passes UUID validation. Restores are staggered (100 ms gap) so a host with thousands of sessions doesn't punch a single instantaneous burst at WhatsApp's web tier.
+
+If a session's creds were wiped by `connection.logged_out` since the last shutdown, `restoreAll` will re-pair and emit a fresh `qr.updated`. The frontend's SSE channel (Step 6) shows this to the operator, who can re-scan.

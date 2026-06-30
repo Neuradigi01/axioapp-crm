@@ -3,6 +3,8 @@ import { config } from "./config.js";
 import { logger } from "./logger.js";
 import { hmacMiddleware } from "./auth.js";
 import { healthRouter } from "./routes/health.js";
+import { sessionsRouter } from "./routes/sessions.js";
+import { manager } from "./sessions/manager.js";
 
 type RawBodyRequest = Request & { rawBody?: Buffer };
 
@@ -21,6 +23,8 @@ app.use(healthRouter);
 
 app.use(hmacMiddleware);
 
+app.use(sessionsRouter);
+
 app.use((_req, res) => {
   res.status(404).json({ error: "not found" });
 });
@@ -30,16 +34,26 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: "internal error" });
 });
 
-const server = app.listen(config.SIDECAR_PORT, () => {
-  logger.info(
-    { port: config.SIDECAR_PORT, node_env: config.NODE_ENV },
-    "sidecar.listening",
-  );
-});
+async function bootstrap(): Promise<void> {
+  try {
+    await manager.restoreAll();
+  } catch (err) {
+    logger.error({ err }, "manager.restoreAll_failed");
+  }
 
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => {
-    logger.info({ signal }, "sidecar.shutdown");
-    server.close(() => process.exit(0));
+  const server = app.listen(config.SIDECAR_PORT, () => {
+    logger.info(
+      { port: config.SIDECAR_PORT, node_env: config.NODE_ENV },
+      "sidecar.listening",
+    );
   });
+
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.on(signal, () => {
+      logger.info({ signal }, "sidecar.shutdown");
+      server.close(() => process.exit(0));
+    });
+  }
 }
+
+void bootstrap();
