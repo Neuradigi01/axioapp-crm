@@ -3,19 +3,23 @@ import type {
   ConnectionLoggedOutPayload,
   ConnectionOpenedPayload,
   ConnectionReconnectingPayload,
+  MessageReceivedBusPayload,
+  MessageStatusBusPayload,
   QrUpdatedPayload,
 } from "../sessions/types.js";
 
-export type SidecarEvent =
-  | { type: "qr.updated"; payload: QrUpdatedPayload }
-  | { type: "connection.opened"; payload: ConnectionOpenedPayload }
-  | { type: "connection.logged_out"; payload: ConnectionLoggedOutPayload }
-  | { type: "connection.reconnecting"; payload: ConnectionReconnectingPayload };
+export type BusEventName =
+  | "qr.updated"
+  | "connection.opened"
+  | "connection.logged_out"
+  | "connection.reconnecting"
+  | "message.received"
+  | "message.status";
 
 class Bus extends EventEmitter {}
 
 export const bus: Bus = new Bus();
-bus.setMaxListeners(50);
+bus.setMaxListeners(100);
 
 export function emitQrUpdated(payload: QrUpdatedPayload): void {
   bus.emit("qr.updated", payload);
@@ -33,4 +37,12 @@ export function emitConnectionReconnecting(
   payload: ConnectionReconnectingPayload,
 ): void {
   bus.emit("connection.reconnecting", payload);
+}
+
+export function emitMessageReceived(payload: MessageReceivedBusPayload): void {
+  bus.emit("message.received", payload);
+}
+
+export function emitMessageStatus(payload: MessageStatusBusPayload): void {
+  bus.emit("message.status", payload);
 }

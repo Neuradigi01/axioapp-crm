@@ -4,7 +4,10 @@ import { logger } from "./logger.js";
 import { hmacMiddleware } from "./auth.js";
 import { healthRouter } from "./routes/health.js";
 import { sessionsRouter } from "./routes/sessions.js";
+import { messagesRouter } from "./routes/messages.js";
+import { mediaRouter } from "./routes/media.js";
 import { manager } from "./sessions/manager.js";
+import { forwarder } from "./events/forwarder.js";
 
 type RawBodyRequest = Request & { rawBody?: Buffer };
 
@@ -12,7 +15,7 @@ const app = express();
 
 app.use(
   express.json({
-    limit: "10mb",
+    limit: "25mb",
     verify: (req, _res, buf) => {
       (req as RawBodyRequest).rawBody = Buffer.from(buf);
     },
@@ -24,6 +27,8 @@ app.use(healthRouter);
 app.use(hmacMiddleware);
 
 app.use(sessionsRouter);
+app.use(messagesRouter);
+app.use(mediaRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "not found" });
@@ -35,6 +40,8 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
 });
 
 async function bootstrap(): Promise<void> {
+  forwarder.start();
+
   try {
     await manager.restoreAll();
   } catch (err) {

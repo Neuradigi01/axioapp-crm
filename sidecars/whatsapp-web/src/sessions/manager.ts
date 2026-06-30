@@ -1,5 +1,6 @@
 import makeWASocket, {
   DisconnectReason,
+  type WAMessage,
   type WASocket,
 } from "@whiskeysockets/baileys";
 import { pino } from "pino";
@@ -10,8 +11,15 @@ import {
   emitConnectionLoggedOut,
   emitConnectionOpened,
   emitConnectionReconnecting,
+  emitMessageReceived,
+  emitMessageStatus,
   emitQrUpdated,
 } from "../events/bus.js";
+import {
+  isGroupJid,
+  statusKindFromBaileys,
+  translateInbound,
+} from "../events/translator.js";
 import { filesystemStorage, isValidUuid, type SessionStorage } from "./auth-store.js";
 import type { ManagedSession, SessionStatus } from "./types.js";
 
@@ -22,7 +30,10 @@ interface ManagerDeps {
   makeSocket?: MakeSocket;
   reconnectBackoffMs?: (attempt: number) => number;
   restoreStaggerMs?: number;
+  mediaCacheSize?: number;
 }
+
+const DEFAULT_MEDIA_CACHE = 500;
 
 const DEFAULT_BACKOFF: (n: number) => number = (n) =>
   Math.min(60_000, [5_000, 15_000, 60_000][Math.min(n, 2)] ?? 60_000);
@@ -74,16 +85,40 @@ function disconnectReason(err: unknown): { code: number | undefined; label: stri
 
 export class SessionManager {
   private readonly sessions = new Map<string, ManagedSession>();
+  private readonly mediaCache = new Map<string, Map<string, WAMessage>>();
   private readonly storage: SessionStorage;
   private readonly makeSocket: MakeSocket;
   private readonly backoff: (attempt: number) => number;
   private readonly restoreStaggerMs: number;
+  private readonly mediaCacheSize: number;
 
   constructor(deps: ManagerDeps = {}) {
     this.storage = deps.storage ?? filesystemStorage;
     this.makeSocket = deps.makeSocket ?? makeWASocket;
     this.backoff = deps.reconnectBackoffMs ?? DEFAULT_BACKOFF;
     this.restoreStaggerMs = deps.restoreStaggerMs ?? 100;
+    this.mediaCacheSize = deps.mediaCacheSize ?? DEFAULT_MEDIA_CACHE;
+  }
+
+  private rememberMedia(sessionId: string, msg: WAMessage): void {
+    const id = msg.key?.id;
+    if (!id) return;
+    let cache = this.mediaCache.get(sessionId);
+    if (!cache) {
+      cache = new Map();
+      this.mediaCache.set(sessionId, cache);
+    }
+    if (cache.has(id)) cache.delete(id);
+    cache.set(id, msg);
+    while (cache.size > this.mediaCacheSize) {
+      const oldest = cache.keys().next().value;
+      if (!oldest) break;
+      cache.delete(oldest);
+    }
+  }
+
+  findMessage(sessionId: string, messageId: string): WAMessage | undefined {
+    return this.mediaCache.get(sessionId)?.get(messageId);
   }
 
   get(sessionId: string): ManagedSession | null {
@@ -131,8 +166,75 @@ export class SessionManager {
       void this.handleConnectionUpdate(session, update);
     });
 
+    sock.ev.on("messages.upsert", (payload) => {
+      this.handleMessagesUpsert(session, payload as { messages: WAMessage[]; type?: string });
+    });
+
+    sock.ev.on("messages.update", (updates) => {
+      this.handleMessagesUpdate(session, updates as Array<{
+        key: { id?: string | null; remoteJid?: string | null; fromMe?: boolean | null };
+        update: { status?: number | null };
+      }>);
+    });
+
     logger.info({ sessionId, orgId }, "session.created");
     return session;
+  }
+
+  private handleMessagesUpsert(
+    session: ManagedSession,
+    payload: { messages: WAMessage[]; type?: string },
+  ): void {
+    for (const msg of payload.messages ?? []) {
+      const remoteJid = msg.key?.remoteJid ?? undefined;
+      if (isGroupJid(remoteJid)) {
+        logger.info({ sessionId: session.sessionId, remoteJid }, "session.skipped_group_message");
+        continue;
+      }
+      if (msg.key?.fromMe) continue;
+      this.rememberMedia(session.sessionId, msg);
+      const envelope = translateInbound({
+        orgId: session.orgId,
+        sessionId: session.sessionId,
+        waMessage: msg,
+      });
+      if (envelope) {
+        emitMessageReceived({ envelope });
+      }
+    }
+  }
+
+  private handleMessagesUpdate(
+    session: ManagedSession,
+    updates: Array<{
+      key: { id?: string | null; remoteJid?: string | null; fromMe?: boolean | null };
+      update: { status?: number | null };
+    }>,
+  ): void {
+    for (const u of updates) {
+      const kind = statusKindFromBaileys(u.update.status ?? null);
+      if (!kind) continue;
+      const id = u.key.id;
+      const chatJid = u.key.remoteJid;
+      if (!id || !chatJid) continue;
+      if (isGroupJid(chatJid)) continue;
+      const type =
+        kind === "delivered"
+          ? "message.delivered"
+          : kind === "read"
+            ? "message.read"
+            : "message.failed";
+      emitMessageStatus({
+        envelope: {
+          type,
+          session_id: session.sessionId,
+          org_id: session.orgId,
+          provider_message_id: id,
+          chat_jid: chatJid,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
   }
 
   private async handleConnectionUpdate(
@@ -198,6 +300,7 @@ export class SessionManager {
         });
         logger.info({ sessionId: session.sessionId }, "session.logged_out");
         this.sessions.delete(session.sessionId);
+        this.mediaCache.delete(session.sessionId);
         return;
       }
 
@@ -237,6 +340,7 @@ export class SessionManager {
       logger.warn({ err, sessionId }, "session.close_failed");
     }
     this.sessions.delete(sessionId);
+    this.mediaCache.delete(sessionId);
     await this.storage.destroy(session.orgId, sessionId).catch((err) => {
       logger.warn({ err, sessionId }, "session.destroy_creds_failed");
     });

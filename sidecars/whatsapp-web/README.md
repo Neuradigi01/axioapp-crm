@@ -32,10 +32,14 @@ sidecars/whatsapp-web/
     └── sessions.test.ts        auth-store + manager + restoreAll
 ```
 
-Future folders introduced in later steps:
+### Step 3 additions
 
-- `src/routes/messages.ts` — `/send-text` + `/send-media` (Step 3).
-- `src/events/forwarder.ts` — POSTs to FastAPI `/whatsapp-web/events` (Step 3).
+- `src/routes/messages.ts` — `/send-text` + `/send-media`.
+- `src/routes/media.ts` — `/sessions/{id}/download-media/{provider_message_id}`.
+- `src/events/forwarder.ts` — bus → HMAC-signed POSTs to FastAPI.
+- `src/events/translator.ts` — pure Baileys → canonical envelope.
+- `src/events/retry-queue.ts` — in-memory backoff queue.
+- `src/sessions/rate-limit.ts` — per-session token bucket.
 
 ## Required env vars
 
@@ -178,6 +182,152 @@ Step 3 will subscribe to these and HMAC-POST them to FastAPI.
 5. Commit + redeploy.
 
 Never use `^` or `~` here — silent transitive upgrades have caused multi-hour outages elsewhere.
+
+## Outbound endpoints (Step 3)
+
+All endpoints are HMAC-gated (`X-Sidecar-Signature`).
+
+### `POST /sessions/{sessionId}/send-text`
+
+Body:
+
+```json
+{
+  "to": "919876543210",
+  "body": "hello from sidecar",
+  "reply_to": { "id": "<provider_message_id>", "remote_jid": "919876543210@s.whatsapp.net" }
+}
+```
+
+- `to` is **digits-only**, no `+`. Sidecar appends `@s.whatsapp.net`.
+- `body` ≤ 4096 chars.
+- `reply_to` is optional.
+
+Response (`200`):
+
+```json
+{ "message_id": "BAE5XXXX", "timestamp": "2026-06-30T08:00:00.000Z" }
+```
+
+Error responses:
+
+| Status | Body | Meaning |
+|---|---|---|
+| `400` | `{ "error": "invalid body", "issues": [...] }` | zod validation failed. |
+| `404` | `{ "error": "session not found" }` | No session with that id. |
+| `409` | `{ "error": "session_not_connected", "status": "pairing" }` | Session not yet paired or reconnecting. |
+| `429` | `{ "error": "rate_limited", "retry_after_seconds": 1 }` | Per-session token bucket empty. `Retry-After` header set. |
+| `502` | `{ "error": "baileys_send_failed", "message": "...", "code": 500 }` | Baileys threw a Boom error. |
+
+### `POST /sessions/{sessionId}/send-media`
+
+Body:
+
+```json
+{
+  "to": "919876543210",
+  "media_type": "image",
+  "base64": "<base64 bytes>",
+  "mime_type": "image/jpeg",
+  "filename": "photo.jpg",
+  "caption": "smile"
+}
+```
+
+- `media_type ∈ { image, video, audio, document }`.
+- `base64` ≤ 16 MB (WhatsApp's hard cap). The Express body limit is set to 25 MB to accommodate the encoded payload plus headers.
+- `mime_type` is required and must be supplied by the caller — sidecar does not sniff.
+- `filename` only honoured for `document`.
+- `caption` allowed for `image` / `video` / `document`.
+
+Response shape and error responses are identical to `/send-text`.
+
+### `GET /sessions/{sessionId}/download-media/{provider_message_id}`
+
+FastAPI calls this when it decides to fetch the binary for a previously-received media message. The sidecar holds the last **500 inbound message references per session** in an LRU; if the id is not in the LRU, returns `404 { "error": "message not in cache" }`. Otherwise streams the decrypted media bytes with the original `Content-Type`.
+
+### Rate limit
+
+Per-session token bucket, **capacity 1, refill every 1.2 s** (capped, conservative — Step 8 documents tuning). Burst attempts get `429` with `Retry-After` and `retry_after_seconds`.
+
+## Outbound events (Step 3)
+
+Every event below is POSTed to `${FASTAPI_BASE_URL}/api/v1/integrations/whatsapp-web/events` with:
+
+- Body: JSON.
+- Header: `X-Fastapi-Signature: sha256=<hex>` over the raw body, signed with `FASTAPI_HMAC_SECRET`.
+- Retry: 1 s → 5 s → 30 s → 2 min → 10 min, then drop with a `retry-queue.dropped` error log. No on-disk DLQ.
+
+### Canonical shapes
+
+`qr.updated`:
+
+```json
+{
+  "type": "qr.updated",
+  "session_id": "uuid",
+  "org_id": "uuid",
+  "qr_data_url": "data:image/png;base64,..."
+}
+```
+
+`connection.opened`:
+
+```json
+{ "type": "connection.opened", "session_id": "uuid", "org_id": "uuid", "phone_number": "919876543210" }
+```
+
+`connection.logged_out`:
+
+```json
+{ "type": "connection.logged_out", "session_id": "uuid", "org_id": "uuid", "reason": "loggedOut" }
+```
+
+`connection.reconnecting`:
+
+```json
+{ "type": "connection.reconnecting", "session_id": "uuid", "org_id": "uuid", "attempt": 1, "reason": "connectionClosed" }
+```
+
+`message.received`:
+
+```json
+{
+  "type": "message.received",
+  "session_id": "uuid",
+  "org_id": "uuid",
+  "provider_message_id": "BAE5XXXX",
+  "from": "919876543210",
+  "chat_jid": "919876543210@s.whatsapp.net",
+  "from_me": false,
+  "timestamp": "2026-06-30T08:00:00.000Z",
+  "message_type": "text|image|video|audio|document|sticker|location|contacts|reaction|unknown",
+  "text": "...",
+  "media": { "mime_type": "image/jpeg", "sha256": "hex", "size_bytes": 12345, "filename": "...", "caption": "..." },
+  "location": { "latitude": 12.34, "longitude": 56.78, "name": "...", "address": "..." },
+  "reaction": { "target_id": "BAE5YYYY", "emoji": "👍" },
+  "raw": { "<full Baileys payload>": "..." }
+}
+```
+
+`message.delivered` / `message.read` / `message.failed`:
+
+```json
+{
+  "type": "message.delivered",
+  "session_id": "uuid",
+  "org_id": "uuid",
+  "provider_message_id": "BAE5XXXX",
+  "chat_jid": "919876543210@s.whatsapp.net",
+  "timestamp": "2026-06-30T08:00:00.000Z"
+}
+```
+
+### Skipped events
+
+- **Group messages** (`*@g.us`) are dropped with a single info-log (`session.skipped_group_message`). 1:1 only in v1.
+- **`fromMe: true` echoes** of our own sends are dropped — the `/send-text` response already carries the id, so re-forwarding would dedupe in FastAPI anyway.
+- **Status codes 2 (PENDING) and 3 (SERVER_ACK / "sent")** are dropped — only `delivered`, `read`, `failed` are forwarded.
 
 ## restoreAll
 
