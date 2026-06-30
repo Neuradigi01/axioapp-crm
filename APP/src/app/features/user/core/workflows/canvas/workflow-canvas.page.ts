@@ -30,6 +30,7 @@ import { VersionHistoryDrawerComponent } from './version-history-drawer.componen
 import {
   WorkflowExportBody,
   WorkflowGraph,
+  WorkflowRead,
   WorkflowStatus,
   WorkflowTestFireResponse,
   WorkflowVersionDetail,
@@ -123,12 +124,8 @@ export class WorkflowCanvasPageComponent {
   readonly loadedWorkflow = signal<WorkflowRead | null>(null);
   readonly showPairModal = signal(false);
 
-  readonly isABPaired = computed(
-    () => this.loadedWorkflow()?.ab_paired_workflow_id != null,
-  );
-  readonly isABDecided = computed(
-    () => this.loadedWorkflow()?.ab_test_decided_at != null,
-  );
+  readonly isABPaired = computed(() => this.loadedWorkflow()?.ab_paired_workflow_id != null);
+  readonly isABDecided = computed(() => this.loadedWorkflow()?.ab_test_decided_at != null);
 
   // Camera + edge-drag local state.
   readonly pendingEdge = signal<PendingEdge | null>(null);
@@ -715,7 +712,6 @@ export class WorkflowCanvasPageComponent {
   readonly selectedNode = computed(() => this.state.selectedNode());
   readonly statuses: WorkflowStatus[] = ['draft', 'active', 'paused', 'archived'];
 
-
   // --- Step 18 — A/B pairing + banner refresh -------------------------
 
   openPairModal(): void {
@@ -751,8 +747,7 @@ export class WorkflowCanvasPageComponent {
           this.loadedWorkflow.set(workflow);
           this.state.setStatus(workflow.status);
         },
-        error: (err) =>
-          this.error.set(extractApiError(err) ?? 'Unpair failed.'),
+        error: (err) => this.error.set(extractApiError(err) ?? 'Unpair failed.'),
       });
   }
 }

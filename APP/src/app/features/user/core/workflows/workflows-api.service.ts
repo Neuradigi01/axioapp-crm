@@ -274,14 +274,9 @@ export interface WorkflowImportRequest {
   name?: string | null;
 }
 
-<<<<<<< HEAD
 // --- Step 18: A/B testing ---------------------------------------------
 
-export type ABWinnerMetric =
-  | 'goal_conversion'
-  | 'reply_rate'
-  | 'open_rate'
-  | 'custom';
+export type ABWinnerMetric = 'goal_conversion' | 'reply_rate' | 'open_rate' | 'custom';
 
 export interface PairABRequest {
   sibling_id: string;
@@ -308,9 +303,6 @@ export interface ABStatsResponse {
   min_runs_per_variant: number;
 }
 
-
-=======
->>>>>>> ca72f6424858470152dfc533fa19615166225bb0
 @Injectable({ providedIn: 'root' })
 export class WorkflowsApiService {
   private readonly http = inject(HttpClient);
@@ -408,27 +400,16 @@ export class WorkflowsApiService {
 
   // --- Step 18: A/B testing ----------------------------------------
 
-  pairAB(
-    workflowId: string,
-    payload: PairABRequest,
-  ): Observable<WorkflowRead> {
-    return this.http.post<WorkflowRead>(
-      `${this.base}/${workflowId}/pair-ab`,
-      payload,
-    );
+  pairAB(workflowId: string, payload: PairABRequest): Observable<WorkflowRead> {
+    return this.http.post<WorkflowRead>(`${this.base}/${workflowId}/pair-ab`, payload);
   }
 
   unpairAB(workflowId: string): Observable<WorkflowRead> {
-    return this.http.post<WorkflowRead>(
-      `${this.base}/${workflowId}/unpair-ab`,
-      {},
-    );
+    return this.http.post<WorkflowRead>(`${this.base}/${workflowId}/unpair-ab`, {});
   }
 
   getABStats(workflowId: string): Observable<ABStatsResponse> {
-    return this.http.get<ABStatsResponse>(
-      `${this.base}/${workflowId}/ab-stats`,
-    );
+    return this.http.get<ABStatsResponse>(`${this.base}/${workflowId}/ab-stats`);
   }
 
   // --- Folders ------------------------------------------------------

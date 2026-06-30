@@ -35,15 +35,9 @@ from src.app.core.integrations.meta.router import router as meta_router
 from src.app.core.integrations.meta.webhook import (
     router as meta_webhook_router,
 )
-<<<<<<< HEAD
-from src.app.core.integrations.whatsapp.router import (
-    router as whatsapp_router,
-)
 from src.app.core.integrations.whatsapp_web.router import (
     router as whatsapp_web_router,
 )
-=======
->>>>>>> 4eebc921498dfa0e68d79e8f08ffcb0460822c66
 from src.app.core.integrations.models import IntegrationProvider
 from src.app.core.integrations.schemas import (
     IntegrationDLQListResponse,

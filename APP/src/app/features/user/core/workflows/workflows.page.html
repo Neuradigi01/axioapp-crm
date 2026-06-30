@@ -238,10 +238,7 @@
                       {{ row.name }}
                     </a>
                     @if (row.description) {
-                      <div
-                        class="mt-0.5 truncate text-xs text-zinc-500"
-                        [title]="row.description ?? ''"
-                      >
+                      <div class="mt-0.5 truncate text-xs text-zinc-500" [title]="row.description">
                         {{ row.description }}
                       </div>
                     }
@@ -264,7 +261,11 @@
                           [routerLink]="['/user/workflows', row.id, 'ab-compare']"
                           (click)="$event.stopPropagation()"
                           class="inline-flex items-center gap-1 rounded bg-sky-100 px-1.5 py-0.5 text-sky-700 hover:bg-sky-200"
-                          [title]="row.ab_test_decided_at ? 'A/B winner picked — view comparison' : 'A/B test running — view comparison'"
+                          [title]="
+                            row.ab_test_decided_at
+                              ? 'A/B winner picked — view comparison'
+                              : 'A/B test running — view comparison'
+                          "
                         >
                           <lucide-icon name="Beaker" size="10" class="inline-block" />
                           @if (row.ab_test_decided_at) {
