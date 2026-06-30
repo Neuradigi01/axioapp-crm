@@ -161,4 +161,11 @@ beat_schedule = {
         'task': 'src.app.core.workflows.tasks.expire_waits',
         'schedule': crontab(minute='*/2'),
     },
+    # tasks/workflows Step 18 — hourly sweep that picks A/B-test
+    # winners after the holdback elapses. Inconclusive results
+    # auto-extend the holdback by 50% (capped at 30 days total).
+    'workflows-evaluate-ab': {
+        'task': 'src.app.core.workflows.tasks.evaluate_ab_winners',
+        'schedule': crontab(minute=0),
+    },
 }

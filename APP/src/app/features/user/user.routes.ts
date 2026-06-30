@@ -407,6 +407,17 @@ export const userRoutes: Routes = [
           ).then((m) => m.WorkflowCanvasPageComponent),
       },
       {
+        // tasks/workflows Step 18 — full-page side-by-side A/B
+        // comparison. MUST precede `workflows/:id` so `:id` doesn't
+        // swallow `ab-compare`.
+        path: 'workflows/:id/ab-compare',
+        canActivate: [permissionGuard('workflows.read')],
+        loadComponent: () =>
+          import(
+            './core/workflows/ab/ab-comparison.page'
+          ).then((m) => m.ABComparisonPageComponent),
+      },
+      {
         path: 'workflows/:id',
         canActivate: [permissionGuard('workflows.read')],
         loadComponent: () =>

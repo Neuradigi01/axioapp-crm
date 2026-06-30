@@ -49,6 +49,8 @@ from src.app.core.workflows.permissions import (
     PERM_WRITE,
 )
 from src.app.core.workflows.schemas import (
+    ABStatsResponse,
+    PairABRequest,
     RollbackRequest,
     WorkflowCreate,
     WorkflowExport,
@@ -982,6 +984,105 @@ async def import_workflow_endpoint(
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     return WorkflowRead.model_validate(workflow)
+
+
+# --- Step 18: A/B test pairing + unpair + stats ----------------------
+
+
+@router.post(
+    "/{workflow_id}/pair-ab",
+    response_model=WorkflowRead,
+)
+async def pair_workflow_ab_endpoint(
+    workflow_id: uuid.UUID,
+    payload: PairABRequest,
+    user: User = Depends(require_permissions(PERM_WRITE)),
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowRead:
+    """Pair the named workflow with ``sibling_id`` as an A/B test.
+
+    Returns the *primary* (the workflow whose id is in the URL) after
+    the pair lands + both workflows transition to active. 422 on
+    invalid pairing (different triggers, not-draft sides, missing
+    goal, already paired)."""
+    ctx = get_context()
+    org_id = ctx.org_id if ctx is not None else None
+    if org_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="no org context",
+        )
+    try:
+        primary, _sibling = await workflows_service.pair_for_ab(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            workflow_id=workflow_id,
+            sibling_id=payload.sibling_id,
+            holdback_seconds=payload.holdback_seconds,
+            metric=payload.metric,
+            min_runs_per_variant=payload.min_runs_per_variant,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowRead.model_validate(primary)
+
+
+@router.post(
+    "/{workflow_id}/unpair-ab",
+    response_model=WorkflowRead,
+)
+async def unpair_workflow_ab_endpoint(
+    workflow_id: uuid.UUID,
+    user: User = Depends(require_permissions(PERM_WRITE)),
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowRead:
+    """Operator-initiated A/B-test cancel. Both workflows keep their
+    current status (no auto-archive) + new enrolments stop splitting."""
+    ctx = get_context()
+    org_id = ctx.org_id if ctx is not None else None
+    if org_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="no org context",
+        )
+    try:
+        primary = await workflows_service.unpair_ab(
+            db,
+            org_id=org_id,
+            user_id=getattr(user, "legacy_uuid", None),
+            workflow_id=workflow_id,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return WorkflowRead.model_validate(primary)
+
+
+@router.get(
+    "/{workflow_id}/ab-stats",
+    response_model=ABStatsResponse,
+)
+async def get_workflow_ab_stats_endpoint(
+    workflow_id: uuid.UUID,
+    _user: User = Depends(require_permissions(PERM_READ)),
+    db: AsyncSession = Depends(get_db),
+) -> ABStatsResponse:
+    """Live A/B conversion-rate stats + significance for the paired
+    siblings. Drives the canvas banner + comparison page."""
+    ctx = get_context()
+    org_id = ctx.org_id if ctx is not None else None
+    if org_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="no org context",
+        )
+    try:
+        body = await workflows_service.get_ab_stats(
+            db, org_id=org_id, workflow_id=workflow_id
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return ABStatsResponse.model_validate(body)
 
 
 __all__ = ["router"]

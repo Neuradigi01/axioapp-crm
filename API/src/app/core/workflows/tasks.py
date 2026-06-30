@@ -157,4 +157,106 @@ async def _expire_waits_async() -> dict[str, Any]:
     }
 
 
-__all__ = ["expire_waits", "process_step", "sweep_waits"]
+# ---------------------------------------------------------------------------
+# evaluate_ab_winners — Step 18
+# ---------------------------------------------------------------------------
+
+
+@_shared_task(
+    name="src.app.core.workflows.tasks.evaluate_ab_winners",
+)
+def evaluate_ab_winners() -> dict[str, Any]:
+    """Beat-scheduled hourly. Picks paired workflows whose
+    ``ab_test_holdback_until <= now()`` AND whose
+    ``ab_test_decided_at IS NULL``; for each pair, calls
+    :func:`core.workflows.ab_testing.evaluate_pair_for_decision` which
+    either auto-promotes the winner (decisive) or extends the
+    holdback by 50% (inconclusive).
+
+    Cross-tenant — opens a DB session WITHOUT a tenant context so
+    the partial index sweep returns every org's due pairs in one
+    pass. Notifications to the workflow owner are emitted via
+    :mod:`core.notifications.service.notify` on the decisive path.
+    """
+    return asyncio.run(_evaluate_ab_winners_async())
+
+
+async def _evaluate_ab_winners_async() -> dict[str, Any]:
+    from src.app.core.workflows import ab_testing
+    from src.app.shared.db import async_session
+
+    decisions = 0
+    extensions = 0
+    errors = 0
+
+    async with async_session() as session:
+        pairs = await ab_testing.list_pairs_due_for_decision(session)
+        for wf in pairs:
+            try:
+                outcome = await ab_testing.evaluate_pair_for_decision(
+                    session, workflow=wf
+                )
+                await session.commit()
+                if outcome.get("status") == "decided":
+                    decisions += 1
+                    await _notify_ab_decision(session, workflow=wf, outcome=outcome)
+                elif outcome.get("status") == "extended":
+                    extensions += 1
+            except Exception:
+                logger.exception(
+                    "workflows.evaluate_ab_winners failed workflow=%s", wf.id
+                )
+                errors += 1
+                try:
+                    await session.rollback()
+                except Exception:
+                    pass
+
+    return {
+        "checked": len(pairs),
+        "decided": decisions,
+        "extended": extensions,
+        "errors": errors,
+    }
+
+
+async def _notify_ab_decision(session, *, workflow, outcome: dict[str, Any]) -> None:
+    """Best-effort notification to the workflow owner. Failures are
+    swallowed — the auto-promote has already landed; a missed
+    notification shouldn't roll it back."""
+    try:
+        from src.app.core.notifications import service as notifications_service
+    except Exception:
+        return
+    owner_id = workflow.created_by_user_id
+    if owner_id is None:
+        return
+    result = outcome.get("result", {})
+    a_rate = result.get("a_rate", 0)
+    b_rate = result.get("b_rate", 0)
+    winner_id = outcome.get("winner_workflow_id")
+    try:
+        await notifications_service.notify(
+            session,
+            org_id=workflow.org_id,
+            user_id=owner_id,
+            title="A/B test decided",
+            body=(
+                f"Workflow '{workflow.name}' A/B test concluded: "
+                f"winner={'A' if str(workflow.id) == winner_id else 'B'} "
+                f"(a={a_rate:.1%} b={b_rate:.1%})."
+            ),
+        )
+    except Exception:
+        logger.exception(
+            "workflows.evaluate_ab_winners notify_failed workflow=%s",
+            workflow.id,
+        )
+
+
+__all__ = [
+    "evaluate_ab_winners",
+    "expire_waits",
+    "process_step",
+    "sweep_waits",
+]

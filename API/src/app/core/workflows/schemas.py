@@ -132,6 +132,9 @@ class WorkflowGraph(BaseModel):
 
 _WorkflowStatusLiteral = Literal["draft", "active", "paused", "archived"]
 _ReEnrollmentLiteral = Literal["once", "daily", "never"]
+_ABWinnerMetricLiteral = Literal[
+    "goal_conversion", "reply_rate", "open_rate", "custom"
+]
 
 
 class WorkflowCreate(BaseModel):
@@ -191,6 +194,15 @@ class WorkflowRead(ORMModel):
     cost_per_run_cents: int
     enabled_event_types: list[str]
     ab_sibling_id: uuid.UUID | None
+    # Step 18 — A/B-test columns; surfaced so the canvas banner +
+    # comparison page can render without a second round-trip.
+    ab_paired_workflow_id: uuid.UUID | None = None
+    ab_test_started_at: datetime | None = None
+    ab_test_holdback_until: datetime | None = None
+    ab_test_winner_metric: _ABWinnerMetricLiteral | None = None
+    ab_test_min_runs_per_variant: int | None = None
+    ab_test_winner_workflow_id: uuid.UUID | None = None
+    ab_test_decided_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -366,11 +378,49 @@ class WorkflowImportRequest(BaseModel):
     name: str | None = Field(default=None, max_length=120)
 
 
+# --- Step 18: A/B testing ----------------------------------------------
+
+
+class PairABRequest(BaseModel):
+    """`POST /workflows/{id}/pair-ab` body — pair the named workflow
+    with ``sibling_id`` as an A/B test. Both must be drafts with the
+    same trigger event_type."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sibling_id: uuid.UUID
+    holdback_seconds: int = Field(..., ge=3600, le=60 * 60 * 24 * 30)
+    metric: _ABWinnerMetricLiteral = "goal_conversion"
+    min_runs_per_variant: int = Field(default=50, ge=10, le=10_000)
+
+
+class ABStatsResponse(BaseModel):
+    """Live A/B stats — drives the canvas banner + comparison page."""
+
+    workflow_id: uuid.UUID
+    sibling_workflow_id: uuid.UUID
+    a_workflow_id: uuid.UUID
+    b_workflow_id: uuid.UUID
+    a_total_runs: int
+    a_goal_runs: int
+    a_rate: float
+    b_total_runs: int
+    b_goal_runs: int
+    b_rate: float
+    p_value: float | None
+    winner: Literal["a", "b", "inconclusive"]
+    holdback_until: datetime | None
+    decided_at: datetime | None
+    min_runs_per_variant: int
+
+
 __all__ = [
+    "ABStatsResponse",
     "EventWaitRead",
     "GraphEdge",
     "GraphNode",
     "NodePosition",
+    "PairABRequest",
     "RollbackRequest",
     "WorkflowCreate",
     "WorkflowExport",

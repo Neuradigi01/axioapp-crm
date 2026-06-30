@@ -18,6 +18,7 @@ from typing import Any
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Enum as SAEnum,
     ForeignKey,
     Index,
     Integer,
@@ -131,6 +132,28 @@ class WorkflowReEnrollmentRule(str, enum.Enum):
     never = "never"
 
 
+class ABWinnerMetric(str, enum.Enum):
+    """Step-18 A/B-test scoring choice.
+
+    ``goal_conversion`` — `goal_reached` outcome / total runs. The
+                          default + the most reliable signal.
+    ``reply_rate``      — fraction of runs whose contact replied to a
+                          send-action message. v2 polish — currently
+                          treated identically to ``goal_conversion``
+                          by the picker.
+    ``open_rate``       — fraction of runs whose email-send completed
+                          + tracked an open. Treated identically to
+                          ``goal_conversion`` for now.
+    ``custom``          — reserved for v3; falls back to
+                          ``goal_conversion``.
+    """
+
+    goal_conversion = "goal_conversion"
+    reply_rate = "reply_rate"
+    open_rate = "open_rate"
+    custom = "custom"
+
+
 workflow_re_enrollment_rule_enum = ENUM(
     WorkflowReEnrollmentRule,
     name="workflow_re_enrollment_rule",
@@ -236,6 +259,43 @@ class Workflow(Base, TenantScoped):
         UUID(as_uuid=True),
         ForeignKey("tbl_workflows.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    # Step 18 — A/B-test pairing columns. ``ab_paired_workflow_id``
+    # is the bidirectional sibling pointer set when an operator pairs
+    # two drafts; the engine reads it to 50/50-split enrolment.
+    # ``ab_sibling_id`` above remains the engine-side "where also to
+    # send this contact" column for weighted future extensions.
+    ab_paired_workflow_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_workflows.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    ab_test_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ab_test_holdback_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ab_test_winner_metric: Mapped[ABWinnerMetric] = mapped_column(
+        SAEnum(
+            ABWinnerMetric,
+            name="ab_winner_metric",
+            native_enum=True,
+            create_constraint=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False,
+        server_default=sql_text("'goal_conversion'"),
+        default=ABWinnerMetric.goal_conversion,
+    )
+    ab_test_min_runs_per_variant: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=sql_text("50")
+    )
+    ab_test_winner_workflow_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    ab_test_decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     goal_node_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     cost_per_run_cents: Mapped[int] = mapped_column(
@@ -479,6 +539,7 @@ class WorkflowEventWait(Base, TenantScoped):
 
 
 __all__ = [
+    "ABWinnerMetric",
     "Workflow",
     "WorkflowEventWait",
     "WorkflowFolder",

@@ -48,6 +48,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.app.core.events import bus as events_bus
 from src.app.core.events.conditions import evaluate_safe
 from src.app.core.events.event_catalog import ALL_EVENTS
@@ -172,7 +174,9 @@ async def _on_event(envelope: dict[str, Any]) -> None:
                     )
                     continue
 
-                effective_workflow = _split_for_ab(workflow)
+                effective_workflow = await _split_for_ab(
+                    session, workflow=workflow, contact_id=contact_id
+                )
                 await _maybe_start_run(
                     session,
                     workflow=effective_workflow,
@@ -302,12 +306,25 @@ def _trigger_conditions_match(
     return evaluate_safe(conditions, payload)
 
 
-def _split_for_ab(workflow: Workflow) -> Workflow:
-    """A/B sibling split placeholder. Step 18 will replace this with
-    the actual 50/50 split (or weighted, depending on operator
-    configuration). v1 returns the workflow unchanged so the call
-    site is stable + the engine path is exercised."""
-    return workflow
+async def _split_for_ab(
+    session: AsyncSession,
+    *,
+    workflow: Workflow,
+    contact_id: uuid.UUID | None,
+) -> Workflow:
+    """A/B sibling split — delegates to
+    :func:`core.workflows.ab_testing.enroll_with_ab_split`.
+
+    Step 18 wires the real deterministic split: when the workflow is
+    paired (``ab_paired_workflow_id`` set), the contact is hashed
+    against the pair key to pick A or B; otherwise the workflow is
+    returned unchanged.
+    """
+    from src.app.core.workflows.ab_testing import enroll_with_ab_split
+
+    return await enroll_with_ab_split(
+        session, workflow=workflow, contact_id=contact_id
+    )
 
 
 def register_subscribers() -> None:

@@ -45,6 +45,8 @@ import {
   WorkflowsApiService,
 } from '../workflows-api.service';
 import { WorkflowStatusBadgeComponent } from '../workflow-status-badge.component';
+import { ABPairModalComponent } from '../ab/ab-pair-modal.component';
+import { ABStatsBannerComponent } from '../ab/ab-stats-banner.component';
 
 
 /**
@@ -100,6 +102,8 @@ const AUTOSAVE_INTERVAL_MS = 30_000;
     WorkflowNodeComponent,
     WorkflowEdgeComponent,
     WorkflowStatusBadgeComponent,
+    ABPairModalComponent,
+    ABStatsBannerComponent,
   ],
   templateUrl: './workflow-canvas.page.html',
 })
@@ -126,6 +130,18 @@ export class WorkflowCanvasPageComponent {
   readonly showImportModal = signal(false);
   readonly importBusy = signal(false);
   readonly showChangeNoteModal = signal(false);
+
+  // Step 18 — full workflow record (for A/B affordances). Refreshed on
+  // every successful load + after pair/unpair.
+  readonly loadedWorkflow = signal<WorkflowRead | null>(null);
+  readonly showPairModal = signal(false);
+
+  readonly isABPaired = computed(
+    () => this.loadedWorkflow()?.ab_paired_workflow_id != null,
+  );
+  readonly isABDecided = computed(
+    () => this.loadedWorkflow()?.ab_test_decided_at != null,
+  );
 
   // Camera + edge-drag local state.
   readonly pendingEdge = signal<PendingEdge | null>(null);
@@ -215,6 +231,7 @@ export class WorkflowCanvasPageComponent {
       .subscribe({
         next: (workflow) => {
           this.state.load(workflow);
+          this.loadedWorkflow.set(workflow);
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
@@ -266,6 +283,7 @@ export class WorkflowCanvasPageComponent {
         this.state.setWorkflowId(workflow.id);
         this.state.setStatus(workflow.status);
         this.state.clearDirty();
+        this.loadedWorkflow.set(workflow);
         this.saving.set(false);
         if (!id && !opts.silent) {
           // Created — swap the URL so subsequent refreshes load the
@@ -766,4 +784,45 @@ export class WorkflowCanvasPageComponent {
 
   readonly selectedNode = computed(() => this.state.selectedNode());
   readonly statuses: WorkflowStatus[] = ['draft', 'active', 'paused', 'archived'];
+
+
+  // --- Step 18 — A/B pairing + banner refresh -------------------------
+
+  openPairModal(): void {
+    if (!this.loadedWorkflow()) return;
+    this.showPairModal.set(true);
+  }
+
+  cancelPair(): void {
+    this.showPairModal.set(false);
+  }
+
+  confirmPair(workflow: WorkflowRead): void {
+    this.showPairModal.set(false);
+    this.loadedWorkflow.set(workflow);
+    this.state.setStatus(workflow.status);
+  }
+
+  unpairAB(): void {
+    const id = this.state.workflowId();
+    if (!id) return;
+    if (
+      !confirm(
+        'Cancel this A/B test? Both workflows revert to standalone — no winner will be recorded.',
+      )
+    ) {
+      return;
+    }
+    this.api
+      .unpairAB(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (workflow) => {
+          this.loadedWorkflow.set(workflow);
+          this.state.setStatus(workflow.status);
+        },
+        error: (err) =>
+          this.error.set(extractApiError(err) ?? 'Unpair failed.'),
+      });
+  }
 }

@@ -99,6 +99,18 @@
       }
     </button>
 
+    @if (state.workflowId() && !isABPaired()) {
+      <button
+        type="button"
+        class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50 inline-flex items-center gap-1.5"
+        (click)="openPairModal()"
+        title="Run an A/B test against a sibling draft"
+      >
+        <lucide-icon name="Beaker" class="w-3.5 h-3.5"></lucide-icon>
+        Run A/B test
+      </button>
+    }
+
     @if (state.status() === 'active') {
       <button
         type="button"
@@ -148,6 +160,13 @@
     <div class="px-4 py-2 bg-rose-50 border-b border-rose-200 text-rose-800 text-xs">
       {{ error() }}
     </div>
+  }
+
+  @if (isABPaired() && state.workflowId(); as wfId) {
+    <app-ab-stats-banner
+      [workflowId]="wfId"
+      (unpair)="unpairAB()"
+    />
   }
 
   <!-- Main 3-column layout -->
@@ -390,6 +409,15 @@
     <app-import-modal
       (cancel)="cancelImport()"
       (confirm)="confirmImport($event)"
+    />
+  }
+
+  <!-- Step 18 — A/B pair modal -->
+  @if (showPairModal() && loadedWorkflow(); as primary) {
+    <app-ab-pair-modal
+      [primary]="primary"
+      (cancel)="cancelPair()"
+      (confirm)="confirmPair($event)"
     />
   }
 </div>

@@ -1,7 +1,7 @@
 # Step 18 — A/B test entire workflows + winner selection
 
 **Goal:** Two-workflow A/B testing. Operator picks an "A" workflow + builds a "B" variant; at enrollment, the engine 50/50 splits contacts between them. After a configurable hold-back window, the engine picks the winner by goal-conversion rate and auto-promotes (loser archived, winner activated).
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 5 (`_split_for_ab` placeholder shipped). Step 11 (`goal` node — drives the conversion metric). Step 19's analytics aren't required for this — A/B uses a simpler local rate calculation.
 
 ---

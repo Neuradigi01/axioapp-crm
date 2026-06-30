@@ -28,6 +28,7 @@ exception path. Until Step 12 lands the hook is a no-op.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -738,6 +739,209 @@ async def import_workflow(
     )
 
 
+# --- Step 18: A/B pairing + unpair + stats ---------------------------
+
+
+async def pair_for_ab(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    workflow_id: uuid.UUID,
+    sibling_id: uuid.UUID,
+    holdback_seconds: int,
+    metric: str,
+    min_runs_per_variant: int,
+) -> tuple[Workflow, Workflow]:
+    """Pair two drafts as an A/B test + flip both to active.
+
+    Refuses (via :class:`InvalidGraph`) when:
+
+      * the two workflows aren't both ``status='draft'``;
+      * their trigger ``event_type``s differ — the engine can't
+        50/50 a contact when the matchers fire on different events;
+      * either workflow lacks a goal node — the winner-picker has
+        no signal to score on;
+      * either is already paired.
+
+    On success: stamps ``ab_paired_workflow_id`` on both rows, sets
+    ``ab_test_started_at = now()``, ``ab_test_holdback_until = now()
+    + holdback_seconds``, persists the chosen metric +
+    min-runs-per-variant, and transitions both to
+    ``status='active'``.
+    """
+    from src.app.core.workflows.models import ABWinnerMetric
+
+    if workflow_id == sibling_id:
+        raise InvalidGraph(
+            "A/B pair refused: workflow can't pair with itself"
+        )
+
+    primary = await get_workflow(
+        session, org_id=org_id, workflow_id=workflow_id
+    )
+    sibling = await get_workflow(
+        session, org_id=org_id, workflow_id=sibling_id
+    )
+
+    if primary.status != WorkflowStatus.draft:
+        raise InvalidGraph(
+            f"A/B pair refused: primary workflow is "
+            f"'{primary.status.value}', expected 'draft'"
+        )
+    if sibling.status != WorkflowStatus.draft:
+        raise InvalidGraph(
+            f"A/B pair refused: sibling workflow is "
+            f"'{sibling.status.value}', expected 'draft'"
+        )
+    if (
+        primary.ab_paired_workflow_id is not None
+        or sibling.ab_paired_workflow_id is not None
+    ):
+        raise InvalidGraph(
+            "A/B pair refused: one of the workflows is already paired"
+        )
+
+    primary_events = set(primary.enabled_event_types or [])
+    sibling_events = set(sibling.enabled_event_types or [])
+    if not primary_events or primary_events != sibling_events:
+        raise InvalidGraph(
+            "A/B pair refused: both workflows must share the same "
+            "trigger event_type(s)"
+        )
+    if primary.goal_node_id is None or sibling.goal_node_id is None:
+        raise InvalidGraph(
+            "A/B pair refused: both workflows must define a goal node"
+        )
+
+    now = datetime.now(timezone.utc)
+    holdback_until = now + timedelta(seconds=holdback_seconds)
+    chosen_metric = ABWinnerMetric(metric)
+
+    for wf in (primary, sibling):
+        wf.ab_paired_workflow_id = (
+            sibling.id if wf.id == primary.id else primary.id
+        )
+        wf.ab_test_started_at = now
+        wf.ab_test_holdback_until = holdback_until
+        wf.ab_test_winner_metric = chosen_metric
+        wf.ab_test_min_runs_per_variant = min_runs_per_variant
+        wf.ab_test_winner_workflow_id = None
+        wf.ab_test_decided_at = None
+        wf.status = WorkflowStatus.active
+        wf.updated_by_user_id = user_id
+
+    await session.commit()
+    await session.refresh(primary)
+    await session.refresh(sibling)
+    return primary, sibling
+
+
+async def unpair_ab(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    workflow_id: uuid.UUID,
+) -> Workflow:
+    """Operator-initiated early cancel of an A/B test.
+
+    Both workflows stay in their current status (no auto-archive of
+    either side); new enrolments stop splitting. The paired
+    pointers + holdback metadata are cleared. In-flight runs
+    continue to completion.
+    """
+    primary = await get_workflow(
+        session, org_id=org_id, workflow_id=workflow_id
+    )
+    sibling_id = primary.ab_paired_workflow_id
+    if sibling_id is None:
+        raise InvalidGraph(
+            "A/B unpair refused: workflow isn't part of an A/B test"
+        )
+    sibling = await _da.get_workflow(
+        session, org_id=org_id, workflow_id=sibling_id
+    )
+
+    for wf in (primary, sibling):
+        if wf is None:
+            continue
+        wf.ab_paired_workflow_id = None
+        wf.ab_test_started_at = None
+        wf.ab_test_holdback_until = None
+        wf.ab_test_winner_workflow_id = None
+        wf.ab_test_decided_at = None
+        wf.updated_by_user_id = user_id
+
+    await session.commit()
+    await session.refresh(primary)
+    return primary
+
+
+async def get_ab_stats(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+) -> dict:
+    """Compute live A/B stats for the canvas banner + comparison page.
+
+    "A" / "B" labels follow the same lower-id-first ordering the
+    picker uses so the banner stays stable regardless of which
+    side the operator inspected.
+    """
+    from src.app.core.workflows import ab_testing
+
+    primary = await get_workflow(
+        session, org_id=org_id, workflow_id=workflow_id
+    )
+    sibling_id = primary.ab_paired_workflow_id
+    if sibling_id is None:
+        raise InvalidGraph(
+            "A/B stats refused: workflow isn't part of an A/B test"
+        )
+    sibling = await _da.get_workflow(
+        session, org_id=org_id, workflow_id=sibling_id
+    )
+    if sibling is None:
+        raise InvalidGraph(
+            "A/B stats: sibling workflow is missing — was it deleted?"
+        )
+
+    a_workflow, b_workflow = (
+        (primary, sibling)
+        if str(primary.id) < str(sibling.id)
+        else (sibling, primary)
+    )
+    min_runs = max(
+        primary.ab_test_min_runs_per_variant or 50,
+        sibling.ab_test_min_runs_per_variant or 50,
+    )
+    result = await ab_testing.pick_winner(
+        session,
+        a_workflow_id=a_workflow.id,
+        b_workflow_id=b_workflow.id,
+        min_runs_per_variant=min_runs,
+    )
+    return {
+        "workflow_id": primary.id,
+        "sibling_workflow_id": sibling.id,
+        "a_workflow_id": a_workflow.id,
+        "b_workflow_id": b_workflow.id,
+        "a_total_runs": result.a_total,
+        "a_goal_runs": result.a_goal,
+        "a_rate": result.a_rate,
+        "b_total_runs": result.b_total,
+        "b_goal_runs": result.b_goal,
+        "b_rate": result.b_rate,
+        "p_value": result.p_value,
+        "winner": result.winner,
+        "holdback_until": primary.ab_test_holdback_until,
+        "decided_at": primary.ab_test_decided_at,
+        "min_runs_per_variant": min_runs,
+    }
+
+
 def _next_unique_name(base: str, existing: set[str]) -> str:
     """Bump ``base`` to ``base (2)``, ``base (3)``, … until unused."""
     if base not in existing:
@@ -757,14 +961,17 @@ __all__ = [
     "create_workflow",
     "delete_folder",
     "export_workflow",
+    "get_ab_stats",
     "get_workflow",
     "get_workflow_version",
     "import_workflow",
     "list_folders",
     "list_workflow_versions",
     "list_workflows",
+    "pair_for_ab",
     "patch_folder",
     "rollback_workflow",
+    "unpair_ab",
     "update_enabled_event_types_from_graph",
     "update_workflow",
 ]

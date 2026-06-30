@@ -71,6 +71,16 @@ export interface WorkflowRead {
   cost_per_run_cents: number;
   enabled_event_types: string[];
   ab_sibling_id: string | null;
+  // Step 18 — A/B columns surfaced for the canvas banner +
+  // comparison page. Null when the workflow isn't part of an A/B
+  // test.
+  ab_paired_workflow_id?: string | null;
+  ab_test_started_at?: string | null;
+  ab_test_holdback_until?: string | null;
+  ab_test_winner_metric?: 'goal_conversion' | 'reply_rate' | 'open_rate' | 'custom' | null;
+  ab_test_min_runs_per_variant?: number | null;
+  ab_test_winner_workflow_id?: string | null;
+  ab_test_decided_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -274,6 +284,39 @@ export interface WorkflowImportRequest {
   name?: string | null;
 }
 
+// --- Step 18: A/B testing ---------------------------------------------
+
+export type ABWinnerMetric =
+  | 'goal_conversion'
+  | 'reply_rate'
+  | 'open_rate'
+  | 'custom';
+
+export interface PairABRequest {
+  sibling_id: string;
+  holdback_seconds: number;
+  metric?: ABWinnerMetric;
+  min_runs_per_variant?: number;
+}
+
+export interface ABStatsResponse {
+  workflow_id: string;
+  sibling_workflow_id: string;
+  a_workflow_id: string;
+  b_workflow_id: string;
+  a_total_runs: number;
+  a_goal_runs: number;
+  a_rate: number;
+  b_total_runs: number;
+  b_goal_runs: number;
+  b_rate: number;
+  p_value: number | null;
+  winner: 'a' | 'b' | 'inconclusive';
+  holdback_until: string | null;
+  decided_at: string | null;
+  min_runs_per_variant: number;
+}
+
 
 @Injectable({ providedIn: 'root' })
 export class WorkflowsApiService {
@@ -395,6 +438,31 @@ export class WorkflowsApiService {
     payload: WorkflowImportRequest,
   ): Observable<WorkflowRead> {
     return this.http.post<WorkflowRead>(`${this.base}/import`, payload);
+  }
+
+  // --- Step 18: A/B testing ----------------------------------------
+
+  pairAB(
+    workflowId: string,
+    payload: PairABRequest,
+  ): Observable<WorkflowRead> {
+    return this.http.post<WorkflowRead>(
+      `${this.base}/${workflowId}/pair-ab`,
+      payload,
+    );
+  }
+
+  unpairAB(workflowId: string): Observable<WorkflowRead> {
+    return this.http.post<WorkflowRead>(
+      `${this.base}/${workflowId}/unpair-ab`,
+      {},
+    );
+  }
+
+  getABStats(workflowId: string): Observable<ABStatsResponse> {
+    return this.http.get<ABStatsResponse>(
+      `${this.base}/${workflowId}/ab-stats`,
+    );
   }
 
   // --- Folders ------------------------------------------------------
