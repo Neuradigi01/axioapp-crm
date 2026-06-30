@@ -16,6 +16,7 @@ The repo is in the middle of a structural migration. As of this writing:
 - **Old template still in place** (`API/`, `APP/`, `Flutter/`) — the existing app this build is reusing auth from. Step 1.1 renames `API/` → `api/`, `APP/` → `app/`, deletes the non-auth scaffolding, and drops the new layered `core/`+`packs/furniture/` skeleton in place. **`Flutter/` is left untouched** (not part of this product).
 - **`packs/furniture/` is scaffolded but parked.** Layer 2 work is deferred until Layer 1 stabilises.
 - **`tasks/` already populated** with the full 76-step plan (Phase 1 → Phase 6). Current iteration is on Phase 1/2 Core work.
+- **Three-track plan COMPLETE (2026-06-30).** The manager-locked Templates → Automation → Workflows pipeline shipped end-to-end: `core/templates/` (central library) + `core/automation/` (single-step triggers) + `core/workflows/` (multi-step visual flowcharts) are all live. The workflows track closed with Step 20 — 15 default core workflows seed into every org as drafts, and `core/email_sequences/` is absorbed (Settings tab gone, `/user/settings/email-sequences/*` redirects to `/user/workflows?category=Marketing`, scheduler tick is a no-op, enrollments shim through `workflows.engine.start_run`). Vertical-pack workflows (Furniture) remain a future workstream.
 
 ## Target repository structure (after Step 1.1)
 

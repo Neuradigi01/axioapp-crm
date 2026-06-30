@@ -83,24 +83,23 @@ _TICK_LIMIT = 200
 
 
 async def tick() -> int:
-    """One scheduler tick. Returns the count of enrollment-step rows
-    that were processed (sent, rescheduled, or skipped). Never raises
-    — per-row failures are caught + logged."""
-    due = await _pick_due_step_ids(limit=_TICK_LIMIT)
-    if not due:
-        return 0
-    processed = 0
-    for step_row_id, org_id in due:
-        try:
-            await _process_one(step_row_id=step_row_id, org_id=org_id)
-            processed += 1
-        except Exception:
-            log.exception(
-                "email_sequences.tick failed step_row=%s org=%s",
-                step_row_id,
-                org_id,
-            )
-    return processed
+    """No-op.
+
+    Step 20 of the workflows track absorbed sequence runtime into the
+    workflow engine + its Celery beat sweep. Existing enrollment-step
+    rows on ``tbl_email_sequence_enrollment_steps`` are left in place
+    (one release of read-only retention) but no longer fire — new
+    enrollments land on ``tbl_workflow_runs`` via
+    :func:`email_sequences.service.enroll` which now shims through
+    :func:`core.workflows.engine.start_run`.
+
+    The historical body (which selected due rows, sent emails, and
+    rescheduled) is preserved in helper functions below for one
+    release in case operators need a manual re-run for an in-flight
+    enrollment; the beat-driven path is dead. Returns 0 so callers /
+    log parsers that branch on the count keep working.
+    """
+    return 0
 
 
 async def _pick_due_step_ids(*, limit: int) -> list[tuple[uuid.UUID, uuid.UUID]]:

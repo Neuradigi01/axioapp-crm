@@ -1,7 +1,7 @@
 # Step 20 — Default workflow seeder + email_sequences absorption
 
 **Goal:** The closing step. Two distinct landings: (1) seed the 15 default core workflows into every existing + new org so they appear in the gallery and run on the manager's spec'd events; (2) absorb `core/email_sequences/` into workflows — the existing sequence-builder UI becomes the "linear sequence" workflow type, the Settings → Email Sequences tab is removed, the existing routes redirect to the new Workflows sidebar entry. Closes the three-track plan.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 1-19 (every other step shipped). Step 16 (gallery API). Module B's `tasks/automation-engine/` Step 5 (`user.signed_up`) + Step 6 (`lead.created`) + Step 10 (appointment events) + Step 11 (quote/invoice events) + Step 12 (time-based triggers). When automation-engine hasn't shipped, the seeder still installs workflows but they sit idle until events publish.
 
 ---

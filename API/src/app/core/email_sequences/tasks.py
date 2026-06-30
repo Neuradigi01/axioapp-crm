@@ -1,32 +1,37 @@
 """Celery task wrapper for the email-sequences scheduler.
 
-The actual business logic lives in `scheduler.tick()`. This module
-exists only so Celery beat can register `tick_email_sequences` as a
-periodic task (beat needs a `@shared_task` to drive; pure `async def`
-coroutines aren't callable as `.delay()`).
+The actual business logic USED TO live in :func:`scheduler.tick`. As
+of Step 20 of the workflows track, sequence runtime is absorbed into
+:mod:`core.workflows.engine` + its Celery beat sweep — this task is
+now a no-op that returns ``{"processed": 0, "deprecated": True}``.
 
-Convention: `@shared_task` wrapper synchronously calls
-`asyncio.run(...)` per the project's `src/celery/worker.py` engine-
-reset hooks (matches `core/subscriptions/tasks.py`, `core/email/
-tasks.py`, `core/campaigns/tasks.py`).
+The task entry is intentionally left registered so that:
+
+  * Existing Celery beat schedules / dashboards don't error out on
+    missing task names during the transition release.
+  * Operators inspecting Flower see the historical task firing as a
+    no-op, instead of disappearing without an audit trail.
+
+A follow-up release after one cycle removes both this file + the
+``email-sequences-tick`` beat entry from :mod:`src.celery.celery_config`.
 """
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 from celery import shared_task
-from src.app.core.email_sequences.scheduler import tick
 
 
 @shared_task(name="src.app.core.email_sequences.tasks.tick_email_sequences")
 def tick_email_sequences() -> dict[str, Any]:
-    """Beat-driven sweep — every 60s. Returns the count of
-    enrollment-step rows the tick processed; mostly for log /
-    observability."""
-    processed = asyncio.run(tick())
-    return {"processed": processed}
+    """No-op. Step 20 absorbed sequence-tick into the workflow engine.
+
+    Returns the shape the historical task returned so log parsers /
+    monitoring queries keep working. ``deprecated=True`` flags it for
+    the next sweep that removes the registration entirely.
+    """
+    return {"processed": 0, "deprecated": True}
 
 
 __all__ = ["tick_email_sequences"]

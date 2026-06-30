@@ -4,7 +4,6 @@ import { ActivatedRoute } from '@angular/router';
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { EmailAccountsTabComponent } from './email-accounts/email-accounts-tab.component';
-import { EmailSequencesListComponent } from './email-sequences/sequence-list.component';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { AutomationSettingsTabComponent } from './tabs/automation-settings-tab.component';
@@ -27,7 +26,6 @@ type SettingsTab =
   | 'team'
   | 'roles'
   | 'email-accounts'
-  | 'email-sequences'
   | 'notifications'
   | 'ai'
   | 'send-rules'
@@ -67,18 +65,9 @@ const TABS: ReadonlyArray<TabDef> = [
     label: 'Email Accounts',
     permission: 'email.accounts.manage',
   },
-  {
-    // tasks/template-library Step 10 — the standalone Email Templates
-    // tab moved into the central `/user/templates` library. The
-    // sequence-builder still uses email templates via the central
-    // API; the tab itself is gone.
-    // App-updates Email Step 11a — sequence library. Visible to
-    // anyone with `email.read`; Create / Edit / Delete affordances
-    // gate on `email.sequences.manage` inside the list component.
-    id: 'email-sequences',
-    label: 'Email Sequences',
-    permission: 'email.read',
-  },
+  // tasks/workflows Step 20 — the Email Sequences tab was absorbed
+  // into Workflows. The standalone tab + builder routes redirect to
+  // /user/workflows?category=Marketing (see user.routes.ts).
   { id: 'ai', label: 'AI Settings', permission: 'settings.write' },
   {
     // tasks/automation-engine Step 13 — quiet hours, frequency cap,
@@ -124,7 +113,6 @@ const TABS: ReadonlyArray<TabDef> = [
     StandardFieldsTabComponent,
     EmbedIntegrationsTabComponent,
     EmailAccountsTabComponent,
-    EmailSequencesListComponent,
   ],
   templateUrl: './settings-page.component.html',
 })

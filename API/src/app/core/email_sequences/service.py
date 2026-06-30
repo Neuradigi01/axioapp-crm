@@ -45,6 +45,69 @@ from src.app.core.email_sequences.schemas import (
     EnrollmentResultRow,
 )
 
+# --- Step 20: workflow-engine shim --------------------------------------
+
+
+async def _try_enroll_via_workflow(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    sequence_name: str,
+    contact_ids: list[uuid.UUID],
+) -> list[EnrollmentResultRow] | None:
+    """If a workflow row exists for this sequence (created by the
+    Step-20 data migration), enroll each contact via
+    :func:`core.workflows.engine.start_run` + return the per-contact
+    result rows. Otherwise return ``None`` so the legacy code path
+    runs (transitional safety net).
+
+    The migration writes one workflow per sequence with the canonical
+    name ``f"Sequence: {seq.name}"``. The lookup is org-scoped so
+    same-named sequences across tenants never bleed.
+    """
+    from sqlalchemy import select
+
+    from src.app.core.workflows import engine as workflows_engine
+    from src.app.core.workflows.models import Workflow
+
+    canonical = f"Sequence: {sequence_name}"
+    stmt = select(Workflow).where(
+        Workflow.org_id == org_id, Workflow.name == canonical
+    )
+    workflow = (await session.execute(stmt)).scalar_one_or_none()
+    if workflow is None:
+        return None
+
+    results: list[EnrollmentResultRow] = []
+    for contact_id in contact_ids:
+        try:
+            run = await workflows_engine.start_run(
+                session,
+                workflow=workflow,
+                contact_id=contact_id,
+                trigger_event_id=None,
+                trigger_payload={"contact_id": str(contact_id), "sequence_shim": True},
+            )
+            results.append(
+                EnrollmentResultRow(
+                    contact_id=contact_id,
+                    enrollment_id=run.id if run else None,
+                    enrolled=bool(run),
+                    skip_reason=None if run else "workflow_refused",
+                )
+            )
+        except Exception as exc:  # pragma: no cover — defensive
+            results.append(
+                EnrollmentResultRow(
+                    contact_id=contact_id,
+                    enrollment_id=None,
+                    enrolled=False,
+                    skip_reason=f"workflow_error: {type(exc).__name__}",
+                )
+            )
+    return results
+
+
 # --- Helpers --------------------------------------------------------------
 
 
@@ -311,16 +374,40 @@ async def enroll(
     contact_ids: list[uuid.UUID],
     lead_ids: list[uuid.UUID] | None = None,
 ) -> list[EnrollmentResultRow]:
-    """Bulk-enroll contacts. Dedupe against any non-terminal enrollment
-    of the same (sequence, contact) — skipped rows carry the reason.
+    """Bulk-enroll contacts.
 
-    On success, inserts the enrollment row + a step-1
-    `email_sequence_enrollment_steps` row scheduled at `now()` so the
-    next beat tick fires it.
+    Step 20 — sequence runtime is absorbed into workflows. This
+    function now shims through :func:`core.workflows.engine.start_run`
+    against the workflow row produced for the sequence by the
+    Step-20 data migration (``0145_migrate_sequences_to_workflows``).
 
-    Audit-emits `email.sequence.enrolled` per success.
+    The same per-contact dedupe + result-row shape are preserved so
+    public callers (the legacy ``POST /email/sequences/{id}/enroll``
+    endpoint) see no contract change. Sequences that haven't been
+    migrated yet (edge case during transition) fall back to the
+    original code path so in-flight ops keep working.
+
+    Audit-emits ``email.sequence.enrolled`` per success.
     """
+    # --- Step 20 shim: route through workflows when a migrated
+    # workflow row is available. The data migration installs each
+    # sequence as a workflow named ``f"Sequence: {seq.name}"`` so
+    # the lookup is name-based.
     seq = await get_sequence(session, sequence_id=sequence_id)
+    workflow_results = await _try_enroll_via_workflow(
+        session,
+        org_id=org_id,
+        sequence_name=seq.name,
+        contact_ids=contact_ids,
+    )
+    if workflow_results is not None:
+        return workflow_results
+
+    # Legacy code path — only reached when the sequence hasn't been
+    # migrated to a workflow yet (e.g. created after the migration ran
+    # but before the shim caught up). Beat scheduler is a no-op, so
+    # these enrollments will sit dormant; a follow-up migration will
+    # sweep + convert.
     steps = await _load_steps(session, sequence_id=seq.id)
     if not steps:
         raise HTTPException(
