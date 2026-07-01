@@ -1,5 +1,5 @@
-"""Smoke: call get_summary() directly for Ajay's Workspace + list the
-card keys returned. Verifies Step 4's 3 new followup cards land."""
+"""Smoke: verify /dashboard/summary honours the new upcoming_scope
+query param. Prints today vs next5 for Ajay's Workspace."""
 
 import asyncio
 import uuid
@@ -17,41 +17,21 @@ async def main() -> None:
     token = set_context(RequestContext(org_id=AJAY_ORG_ID, user_id=None))
     try:
         async with async_session() as session:
-            # Pick the actual User ORM row for Ajay — service reads
-            # .info + .role_id + .org_id + .legacy_uuid.
-            row = (await session.execute(
-                text(
-                    "SELECT ul.id AS login_id, om.role_id, "
-                    "       om.organization_id AS org_id "
-                    "FROM tbl_user_login ul "
-                    "JOIN tbl_organization_members om ON om.user_member_id = ul.id "
-                    "WHERE om.organization_id = :org AND om.is_active = true "
-                    "LIMIT 1"
-                ),
-                {"org": str(AJAY_ORG_ID)},
-            )).first()
-            if row is None:
-                print("No user; abort")
-                return
-
+            row = (await session.execute(text(
+                "SELECT ul.id AS login_id, om.role_id, om.organization_id AS org_id "
+                "FROM tbl_user_login ul "
+                "JOIN tbl_organization_members om ON om.user_member_id = ul.id "
+                "WHERE om.organization_id = :org AND om.is_active = true LIMIT 1"
+            ), {"org": str(AJAY_ORG_ID)})).first()
             caller = (await session.execute(select(User).where(User.id == row.login_id))).scalar_one()
-            # Monkey-patch the org/role attrs that live on
-            # tbl_organization_members (not on tbl_user_login).
             caller.__dict__["org_id"] = row.org_id
             caller.__dict__["role_id"] = row.role_id
 
-            resp = await get_summary(session, caller)
-            print(f"scope={resp.scope}")
-            print("cards:")
-            for c in resp.cards:
-                delta = ""
-                if c.delta_pct is not None:
-                    delta = f" (delta={c.delta_pct}%)"
-                print(f"  - {c.key} = {c.value} · format={c.format} · link={c.link or '-'}{delta}")
-
-            print()
-            followup_keys = [c.key for c in resp.cards if c.key.startswith("followups.")]
-            print(f"followup cards found: {followup_keys}")
+            for s in ("today", "next5"):
+                resp = await get_summary(session, caller, upcoming_scope=s)
+                print(f"\n=== upcoming_scope={s} → {len(resp.upcoming_appointments)} row(s) ===")
+                for a in resp.upcoming_appointments:
+                    print(f"  {a.starts_at.isoformat()} · {a.title} · with {a.with_contact_name or '-'}")
     finally:
         reset_context(token)
 

@@ -76,7 +76,7 @@ mirror.
 | 2 | [Backend — `/dashboard/followups` endpoint](step-2-followups-api.md) | **COMPLETED** | 4 |
 | 3 | [Frontend — Today's Follow-ups widget](step-3-followups-widget.md) | **COMPLETED** | 6 |
 | 4 | [Frontend — 3 new KPI cards + card→widget filter wiring](step-4-followup-kpi-cards.md) | **COMPLETED** | 4 |
-| 5 | [Frontend — Appointments widget "Today" filter chip](step-5-appointments-today-filter.md) | Pending | 3 |
+| 5 | [Frontend — Appointments widget "Today" filter chip](step-5-appointments-today-filter.md) | **COMPLETED** | 5 |
 | 6 | [Missed status: mark-as-missed action + nightly grooming](step-6-mark-as-missed-and-grooming.md) | Pending | 5 |
 | 7 | [Tests + smoke](step-7-tests-and-smoke.md) | Pending | 3 |
 

@@ -33,6 +33,7 @@ from src.app.core.dashboard.schemas import (
     FollowupsResponse,
     TrendMetric,
     TrendRange,
+    UpcomingScope,
 )
 from src.app.core.dashboard.service import (
     assemble_funnel,
@@ -49,10 +50,11 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 @router.get("/summary", response_model=DashboardSummary)
 async def summary_endpoint(
+    upcoming_scope: UpcomingScope = Query("today"),
     caller: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> DashboardSummary:
-    return await get_summary(session, caller)
+    return await get_summary(session, caller, upcoming_scope=upcoming_scope)
 
 
 @router.get("/trend", response_model=DashboardTrendResponse)

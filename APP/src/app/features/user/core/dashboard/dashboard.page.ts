@@ -110,6 +110,19 @@ export class DashboardPageComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly refreshing = signal(false);
 
+  /** Which slice of appointments to fetch for the Appointments widget.
+   *  Default matches the widget's default chip. Flipping this triggers
+   *  a re-fetch of `/dashboard/summary?upcoming_scope=…`. */
+  protected readonly appointmentsScope = signal<'today' | 'next5'>('today');
+
+  protected readonly appointmentChips: ReadonlyArray<{
+    readonly value: 'today' | 'next5';
+    readonly label: string;
+  }> = [
+    { value: 'today', label: 'Today' },
+    { value: 'next5', label: 'Next 5' },
+  ];
+
   // Hero strip surfaces the 4 highest-signal KPIs at the top of the
   // dashboard with period-over-period delta pills. Selection is keyed
   // by `scope` (server-decided from the caller's permission set) so
@@ -164,6 +177,16 @@ export class DashboardPageComponent {
     this.load(true);
   }
 
+  /** Flip the Appointments widget's Today ↔ Next 5 toggle. Refetches
+   *  the summary payload with the new query param so the server does
+   *  the filter — a client-side slice would truncate at 5 rows and
+   *  misreport busy days. */
+  protected setAppointmentsScope(scope: 'today' | 'next5'): void {
+    if (this.appointmentsScope() === scope) return;
+    this.appointmentsScope.set(scope);
+    this.load(true);
+  }
+
   /** Follow-up cards render as buttons (no route); every other
    *  linkless card renders as a plain informational div. */
   protected isFollowupCard(card: DashboardCard): boolean {
@@ -193,7 +216,9 @@ export class DashboardPageComponent {
     this.error.set(null);
 
     this.http
-      .get<DashboardSummary>(`${environment.apiBaseUrl}/dashboard/summary`)
+      .get<DashboardSummary>(`${environment.apiBaseUrl}/dashboard/summary`, {
+        params: { upcoming_scope: this.appointmentsScope() },
+      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (s) => {

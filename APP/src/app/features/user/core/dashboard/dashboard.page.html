@@ -164,20 +164,46 @@
   >
     <app-todays-followups />
 
-    <!-- Upcoming appointments -->
+    <!-- Appointments (tasks/dashboard-updates Step 5) — "Today" by
+         default, "Next 5" on demand. Server-side filter via the
+         `upcoming_scope` query param on /dashboard/summary. -->
     <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
-      <div class="border-b border-zinc-100 px-4 py-3 flex items-center justify-between">
-        <h2 class="text-sm font-semibold text-zinc-900">Upcoming appointments</h2>
-        <a
-          routerLink="/user/appointments"
-          class="text-xs font-medium text-zinc-500 hover:text-zinc-900"
-          >View all →</a
-        >
+      <div class="border-b border-zinc-100 px-4 py-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-zinc-900">Appointments</h2>
+          <a
+            routerLink="/user/appointments"
+            class="text-xs font-medium text-zinc-500 hover:text-zinc-900"
+            >View all →</a
+          >
+        </div>
+        <!-- Today / Next 5 chip toggle — matches the Follow-ups
+             widget's bucket-chip style so both widgets read
+             visually parallel. -->
+        <div class="mt-3 flex flex-wrap gap-2">
+          @for (chip of appointmentChips; track chip.value) {
+            <button
+              type="button"
+              (click)="setAppointmentsScope(chip.value)"
+              [class]="
+                appointmentsScope() === chip.value
+                  ? 'inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white'
+                  : 'inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2.5 py-1 text-[11px] font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-100'
+              "
+            >
+              {{ chip.label }}
+            </button>
+          }
+        </div>
       </div>
       @if (summary(); as s) {
         @if (s.upcoming_appointments.length === 0) {
           <div class="px-4 py-10 text-center text-sm text-zinc-500">
-            No upcoming appointments.
+            @if (appointmentsScope() === 'today') {
+              No appointments scheduled for today.
+            } @else {
+              No upcoming appointments.
+            }
             <a
               routerLink="/user/appointments"
               class="ml-1 font-medium text-zinc-700 hover:underline"

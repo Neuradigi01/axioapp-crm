@@ -21,6 +21,7 @@ TrendMetric = Literal["leads_created", "pipeline_value", "calls", "appointments"
 TrendRange = Literal["7d", "30d", "90d", "365d"]
 
 FollowupBucket = Literal["today", "pending", "completed_today", "overdue", "missed"]
+UpcomingScope = Literal["today", "next5"]
 
 
 DeltaDirection = Literal["up", "down", "flat"]

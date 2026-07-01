@@ -4,7 +4,7 @@
 new Follow-ups widget — a **Today / Next 5** chip toggle so both
 widgets answer "what's on my calendar today?" and "what's on deck?"
 consistently.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 3 (visual parity target — same chip style).
 
 ---

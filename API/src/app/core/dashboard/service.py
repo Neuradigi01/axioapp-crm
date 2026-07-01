@@ -45,6 +45,7 @@ from src.app.core.dashboard.schemas import (
     TrendMetric,
     TrendRange,
     UpcomingAppointment,
+    UpcomingScope,
 )
 from src.app.core.invitations.models import Invitation
 from src.app.core.leads.models import Lead, LeadStatus
@@ -825,19 +826,39 @@ async def _upcoming_appointments(
     org_id: uuid.UUID,
     user_uuid: uuid.UUID | None,
     now: datetime,
+    scope: UpcomingScope = "today",
 ) -> list[UpcomingAppointment]:
-    """Next 5 scheduled appointments. Personal scope restricts to caller."""
+    """Scheduled appointments for the dashboard's Appointments widget.
+
+    ``scope='today'`` — every scheduled appointment with
+    ``scheduled_at::date = today`` (org-local wall date, sorted
+    ascending). Not capped at 5 — an operator with 8 back-to-back
+    slots wants to see all 8.
+
+    ``scope='next5'`` — the previous default: next 5 upcoming
+    appointments regardless of day. Kept so a caller that wants "what's
+    on deck?" can still ask for it explicitly.
+    """
     stmt = (
         select(Appointment.id, Appointment.title, Appointment.scheduled_at, Contact.full_name)
         .join(Contact, Contact.id == Appointment.contact_id)
         .where(
             Appointment.org_id == org_id,
-            Appointment.scheduled_at > now,
             Appointment.status == AppointmentStatus.scheduled,
         )
-        .order_by(Appointment.scheduled_at.asc())
-        .limit(5)
     )
+    if scope == "today":
+        today = now.date()
+        stmt = stmt.where(
+            func.date(Appointment.scheduled_at) == today,
+            Appointment.scheduled_at > now,
+        ).order_by(Appointment.scheduled_at.asc())
+    else:  # next5
+        stmt = (
+            stmt.where(Appointment.scheduled_at > now)
+            .order_by(Appointment.scheduled_at.asc())
+            .limit(5)
+        )
     if user_uuid is not None:
         stmt = stmt.where(Appointment.assigned_to_id == user_uuid)
 
@@ -853,7 +874,12 @@ async def _upcoming_appointments(
     ]
 
 
-async def get_summary(session: AsyncSession, caller: User) -> DashboardSummary:
+async def get_summary(
+    session: AsyncSession,
+    caller: User,
+    *,
+    upcoming_scope: UpcomingScope = "today",
+) -> DashboardSummary:
     org_id = caller.org_id
     if org_id is None:
         # An authenticated user with no active membership is a bug
@@ -876,12 +902,16 @@ async def get_summary(session: AsyncSession, caller: User) -> DashboardSummary:
     if is_org_scope:
         cards = await _assemble_org_cards(session, org_id, now)
         recent = await _recent_activity(session, org_id, caller_uuid, personal_only=False)
-        upcoming = await _upcoming_appointments(session, org_id, None, now)
+        upcoming = await _upcoming_appointments(
+            session, org_id, None, now, scope=upcoming_scope
+        )
         scope = "org"
     else:
         cards = await _assemble_personal_cards(session, org_id, caller_uuid, now)
         recent = await _recent_activity(session, org_id, caller_uuid, personal_only=True)
-        upcoming = await _upcoming_appointments(session, org_id, caller_uuid, now)
+        upcoming = await _upcoming_appointments(
+            session, org_id, caller_uuid, now, scope=upcoming_scope
+        )
         scope = "personal"
 
     return DashboardSummary(
