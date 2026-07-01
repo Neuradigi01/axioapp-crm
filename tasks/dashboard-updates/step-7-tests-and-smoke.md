@@ -3,7 +3,7 @@
 **Goal:** Pin the follow-ups endpoint, widget behavior, mark-as-missed
 action, and nightly grooming with pytest + run the end-to-end smoke
 against Ajay's Workspace.
-**Status:** Pending
+**Status:** Completed
 **Depends on:** Steps 1-6 shipped.
 
 ---
@@ -12,7 +12,7 @@ against Ajay's Workspace.
 
 ### Pytest cases (~14)
 
-`API/tests/dashboard/test_followups.py`:
+`API/tests/test_dashboard_followups.py` (flat test-file convention):
 
 - Owner scope: endpoint returns `scope=org`, sees every task in-org.
 - Employee scope: endpoint returns `scope=personal`, filters to
@@ -20,13 +20,15 @@ against Ajay's Workspace.
   (URL-hacking guard).
 - `bucket=today` sort — earlier `due_at` first, then priority
   desc (high before medium before low).
-- `bucket=pending` — status `open`/`in_progress` only, no `done`
-  or `missed`.
-- `bucket=completed_today` — status `done` AND `completed_at::date =
-  today`. Yesterday's completed tasks don't show.
-- `bucket=overdue` — `due_at < now` AND `status IN
-  (open, in_progress)`. Today's future-due tasks don't show;
-  already-completed tasks don't show; **`missed` tasks are excluded**.
+- `bucket=pending` — status `open` only, no `done`, `missed`, or
+  `cancelled`.
+- `bucket=completed_today` — status `done` AND `updated_at::date =
+  today`. Yesterday's completed tasks don't show. (Real Task has no
+  `completed_at`; `updated_at` proxies the transition.)
+- `bucket=overdue` — `due_at < today` AND `status = 'open'`. Today's
+  future-due tasks don't show; already-completed tasks don't show;
+  **`missed` and `cancelled` tasks are excluded** (both terminal
+  closures).
 - `bucket=missed` — status `missed` AND `updated_at::date >= today -
   7d`. Older missed tasks are excluded from the widget (still visible
   on the Tasks page's Missed filter).
@@ -38,17 +40,16 @@ against Ajay's Workspace.
   legacy NULL rows treated as `other`.
 - Pagination — page 1 · page_size 5 returns 5 items, total > 5.
 
-`API/tests/tasks/test_mark_missed.py`:
+`API/tests/test_tasks_mark_missed.py`:
 
-- Happy path — assignee POSTs mark-missed on an `open` task → 200 ·
-  row's status = `'missed'` · audit entry `tasks.marked_missed`
-  created.
-- Permission — non-assignee without `tasks.manage` → 403.
+- Happy path — POST mark-missed on an `open` task → 200 · row's
+  status = `'missed'` · audit entry `tasks.marked_missed` created.
+- Permission — caller without `tasks.write` → 403.
 - Transition guard — POSTing on a `done` task → 409.
 - Transition guard — POSTing twice on the same task → second call
   409 (already `missed`).
 
-`API/tests/tasks/test_groom_stale.py`:
+`API/tests/test_tasks_groom_stale.py`:
 
 - Task with `due_at = now - 8d AND status = 'open'` → task
   auto-flips to `missed` after `groom_stale_open_tasks` runs.
@@ -110,9 +111,9 @@ Target: `ajaygogane224@gmail.com` in Ajay's Workspace (org
 
 | File | Action |
 |---|---|
-| `API/tests/dashboard/test_followups.py` | **NEW** |
-| `API/tests/tasks/test_mark_missed.py` | **NEW** |
-| `API/tests/tasks/test_groom_stale.py` | **NEW** |
+| `API/tests/test_dashboard_followups.py` | **NEW** |
+| `API/tests/test_tasks_mark_missed.py` | **NEW** |
+| `API/tests/test_tasks_groom_stale.py` | **NEW** |
 | `tasks/dashboard-updates/smoke-runbook.md` | **NEW** |
 | `tasks/dashboard-updates/README.md` | EDIT — mark step statuses COMPLETED |
 
