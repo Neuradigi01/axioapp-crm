@@ -5,4 +5,7 @@ export const environment = {
   // Settings → Embed tab to generate the install snippet. Step 5 of
   // the embeddable-widget track ships the actual bundle.
   embedWidgetHost: 'http://localhost:5173',
+  // In-app debug console overlay (@neuradigi/debug-console). OFF in prod so the
+  // console is never patched and nothing is mounted for end users.
+  enableDebugConsole: false,
 };
