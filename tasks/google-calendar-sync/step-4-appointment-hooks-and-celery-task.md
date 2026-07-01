@@ -3,7 +3,7 @@
 **Goal:** Every appointment CRUD (create, update, delete, reassign)
 enqueues a Celery task that runs `sync_appointment` for the affected
 assignee(s). Async so the CRM UX never waits on Google's API.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 3 (sync service).
 
 ---

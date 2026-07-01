@@ -186,4 +186,14 @@ beat_schedule = {
         "task": "src.app.core.workflows.tasks.refresh_workflow_cached_counters",
         "schedule": crontab(minute="*/5"),
     },
+    # tasks/google-calendar-sync Step 4b — reconciliation safety net.
+    # Every 30 min, walk future appointments whose assignees have
+    # connected Google Calendar but whose ``google_calendar_event_id``
+    # is still NULL, and fire a sync per row. Catches drift from
+    # Celery-down periods, dev restarts, or hook dispatch failures
+    # (Redis blip, task registration mismatch, etc.).
+    "google-calendar-reconcile": {
+        "task": "src.app.core.integrations.google_calendar.tasks.reconcile_pending",
+        "schedule": crontab(minute="*/30"),
+    },
 }

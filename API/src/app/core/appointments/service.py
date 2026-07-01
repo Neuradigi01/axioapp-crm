@@ -73,6 +73,58 @@ def _snapshot(a: Appointment) -> dict[str, Any]:
     return snapshot(a, fields=_SNAPSHOT_FIELDS)
 
 
+# --- Google Calendar sync dispatch ----------------------------------------
+#
+# tasks/google-calendar-sync Step 4 — every appointment CRUD enqueues one
+# (or two, on reassignment) Celery task to reconcile the assignee's Google
+# Calendar with the new state. Best-effort: any failure to dispatch is
+# logged + swallowed so a broken Redis / Celery can never prevent an
+# appointment write from succeeding. The Step-4b beat sweep
+# (``reconcile_pending``) catches drift from missed hooks.
+
+
+def _dispatch_calendar_sync(
+    appointment_id: uuid.UUID, user_id: Any
+) -> None:
+    """Enqueue one ``sync_appointment_task`` for the given
+    (appointment, user). Silently no-ops when Celery isn't installed
+    (dev shells) or Redis is down — best-effort by design."""
+    if appointment_id is None or user_id is None:
+        return
+    try:
+        # Coerce user_id to int. Appointment.assigned_to_id is declared
+        # as UUID on the ORM but real user ids are BIGINT (Step 1
+        # notes). ``int(str(...))`` handles both the numeric and
+        # zero-padded-UUID cases production data lands in.
+        try:
+            uid_int = int(str(user_id))
+        except (TypeError, ValueError):
+            # UUID case — best-effort convert; the sync task's own
+            # lookup will simply miss + no-op.
+            uid_int = int(str(user_id).replace("-", ""), 16) & (
+                (1 << 63) - 1
+            )
+        from src.app.core.integrations.google_calendar.tasks import (
+            sync_appointment_task,
+        )
+
+        sync_appointment_task.apply_async(
+            kwargs={
+                "appointment_id": str(appointment_id),
+                "user_id": uid_int,
+            }
+        )
+    except Exception:  # noqa: BLE001 — best-effort
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "appointments._dispatch_calendar_sync failed appointment=%s "
+            "user=%s",
+            appointment_id,
+            user_id,
+        )
+
+
 # --- Notification helpers --------------------------------------------------
 #
 # Three notification types fire from this module:
@@ -306,6 +358,12 @@ async def create_appointment(
     # + swallowed inside ``events.bus.publish``.
     await _publish_appointment_booked(session=session, org_id=org_id, appt=appt)
 
+    # tasks/google-calendar-sync Step 4 — enqueue a calendar-sync task
+    # so the event lands in the assignee's Google Calendar within
+    # seconds. Best-effort: any Celery / Redis failure is swallowed
+    # inside the helper; the beat sweep reconciles drift.
+    _dispatch_calendar_sync(appt.id, appt.assigned_to_id)
+
     return appt
 
 
@@ -373,7 +431,11 @@ async def update_appointment(
             if conflicts:
                 _raise_conflict_409(conflicts)
 
+    # Capture old assignee BEFORE mutation so the calendar-sync
+    # dispatch can fire a delete on the previous assignee's calendar
+    # when a reassignment happens.
     old_scheduled = appt.scheduled_at
+    old_assigned_to_id = appt.assigned_to_id
     for key, value in changes.items():
         setattr(appt, key, value)
     await session.commit()
@@ -422,6 +484,29 @@ async def update_appointment(
                 event_type="appointment.cancelled",
             )
 
+    # tasks/google-calendar-sync Step 4 — calendar-sync dispatch. Two
+    # cases:
+    #   * Reassignment (old_assigned_to_id != new assignee): fire two
+    #     tasks. The one keyed on old_assigned_to_id deletes the event
+    #     from the previous assignee's calendar; the one keyed on the
+    #     new assignee creates a fresh event on theirs (or no-ops if
+    #     they haven't connected Calendar).
+    #   * Non-reassignment field edit (title / scheduled_at / duration /
+    #     location / status): one task fires against the current
+    #     assignee — sync_service's decision tree PATCHes the existing
+    #     event (or CREATEs if never synced), or DELETEs when the
+    #     status flipped to cancelled.
+    reassigned = (
+        "assigned_to_id" in changes
+        and changes["assigned_to_id"] is not None
+        and old_assigned_to_id != appt.assigned_to_id
+    )
+    if reassigned:
+        _dispatch_calendar_sync(appt.id, old_assigned_to_id)
+        _dispatch_calendar_sync(appt.id, appt.assigned_to_id)
+    else:
+        _dispatch_calendar_sync(appt.id, appt.assigned_to_id)
+
     return appt
 
 
@@ -429,6 +514,11 @@ async def delete_appointment(session: AsyncSession, *, appointment_id: uuid.UUID
     appt = ensure_found(await get_appointment(session, appointment_id), entity="appointment")
     before = _snapshot(appt)
     appt_uuid = appt.id
+    # Capture assignee BEFORE the delete so the calendar-sync dispatch
+    # can tell the Step-3 sync service "the appointment is gone — go
+    # delete the Google-side event for user X". After ``_da.delete_
+    # appointment`` the row is unreachable, so we can't read it later.
+    deleted_assigned_to_id = appt.assigned_to_id
     await _da.delete_appointment(session, appt)
     await session.commit()
 
@@ -438,6 +528,12 @@ async def delete_appointment(session: AsyncSession, *, appointment_id: uuid.UUID
         entity_id=appt_uuid,
         before=before,
     )
+
+    # tasks/google-calendar-sync Step 4 — enqueue calendar-sync so the
+    # Google-side event is removed from the assignee's calendar. The
+    # sync task's own lookup sees the appointment is gone + hits the
+    # "if we ever synced this, delete the event" branch.
+    _dispatch_calendar_sync(appt_uuid, deleted_assigned_to_id)
 
 
 async def list_appointments(

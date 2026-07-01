@@ -21,6 +21,11 @@ celery.autodiscover_tasks(
         "src.celery.tasks",
         "src.app.core.leads.imports.tasks",
         "src.app.core.integrations.google.tasks",
+        # tasks/google-calendar-sync Step 4 — per-user Google Calendar
+        # sync tasks (hook-triggered sync_appointment_task + 30-min beat
+        # reconcile_pending sweep). Without this entry the worker can't
+        # resolve the task name enqueued by the appointment CRUD hooks.
+        "src.app.core.integrations.google_calendar.tasks",
         "src.app.core.integrations.meta.tasks",
         # Step 3.5.14 — campaign chunk sender + scheduled-campaigns beat.
         "src.app.core.campaigns.tasks",
