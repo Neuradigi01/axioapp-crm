@@ -17,6 +17,7 @@ import { DashboardDateRangeComponent } from './shared/dashboard-date-range.compo
 import { DashboardKpiTileComponent } from './shared/dashboard-kpi-tile.component';
 import { FunnelChartComponent } from './widgets/funnel-chart.component';
 import { QuickActionsComponent } from './widgets/quick-actions.component';
+import { TodaysFollowupsComponent } from './widgets/todays-followups.component';
 import { TrendChartComponent } from './widgets/trend-chart.component';
 import { WhatsAppHealthWidgetComponent } from './widgets/whatsapp-health-widget.component';
 
@@ -90,6 +91,7 @@ interface DashboardSummary {
     WhatsAppHealthWidgetComponent,
     TrendChartComponent,
     FunnelChartComponent,
+    TodaysFollowupsComponent,
   ],
   templateUrl: './dashboard.page.html',
 })

@@ -1,0 +1,292 @@
+<div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
+  <!-- Header -->
+  <div class="border-b border-zinc-100 px-4 py-3">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h2 class="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+        Today's Follow-ups
+        <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
+          {{ total() }}
+        </span>
+        @if (refreshing()) {
+          <lucide-icon
+            name="loader-2"
+            size="12"
+            class="animate-spin text-zinc-400"
+            aria-hidden="true"
+          ></lucide-icon>
+        }
+      </h2>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          (click)="toggleFilters()"
+          [class.text-zinc-900]="showFilters()"
+          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+          [attr.aria-expanded]="showFilters()"
+        >
+          <lucide-icon name="sliders-horizontal" size="12" aria-hidden="true"></lucide-icon>
+          Filters
+        </button>
+        <a routerLink="/user/tasks" class="text-xs font-medium text-zinc-500 hover:text-zinc-900"
+          >View all →</a
+        >
+      </div>
+    </div>
+
+    <!-- Bucket chip strip -->
+    <div class="mt-3 flex flex-wrap gap-2">
+      @for (chip of buckets; track chip.key) {
+        <button
+          type="button"
+          (click)="pickBucket(chip.key)"
+          [class]="
+            bucket() === chip.key
+              ? 'inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white'
+              : 'inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2.5 py-1 text-[11px] font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-100'
+          "
+        >
+          {{ chip.label }}
+          <span
+            [class]="
+              bucket() === chip.key
+                ? 'rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold'
+                : 'rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700'
+            "
+          >
+            {{ countFor(chip) }}
+          </span>
+        </button>
+      }
+    </div>
+
+    <!-- Search + advanced filters -->
+    <div class="mt-3">
+      <label class="relative block">
+        <span class="sr-only">Search follow-ups</span>
+        <lucide-icon
+          name="search"
+          size="14"
+          class="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400"
+          aria-hidden="true"
+        ></lucide-icon>
+        <input
+          type="search"
+          [value]="searchTerm()"
+          (input)="onSearchInput($event)"
+          placeholder="Search by title or contact…"
+          autocomplete="off"
+          class="block w-full rounded-md border border-zinc-300 bg-white py-1.5 pl-7 pr-3 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+      </label>
+
+      @if (showFilters()) {
+        <div
+          class="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-zinc-50 p-2 text-xs text-zinc-600 ring-1 ring-zinc-200"
+        >
+          <label class="flex items-center gap-1">
+            <span>Type</span>
+            <select
+              [ngModel]="filterType()"
+              (ngModelChange)="filterType.set($event); onFilterChanged()"
+              class="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none"
+            >
+              <option value="">Any</option>
+              <option value="call">Call</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="email">Email</option>
+              <option value="document">Document</option>
+              <option value="meeting">Meeting</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label class="flex items-center gap-1">
+            <span>Priority</span>
+            <select
+              [ngModel]="filterPriority()"
+              (ngModelChange)="filterPriority.set($event); onFilterChanged()"
+              class="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none"
+            >
+              <option value="">Any</option>
+              <option value="high">High</option>
+              <option value="med">Med</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            (click)="clearFilters()"
+            class="ml-auto text-[11px] font-medium text-zinc-500 hover:text-zinc-900"
+          >
+            Clear filters
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Body -->
+  @if (error(); as err) {
+    <div
+      class="m-4 flex items-center justify-between gap-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+    >
+      <span>{{ err }}</span>
+      <button
+        type="button"
+        (click)="refresh()"
+        class="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100"
+      >
+        Retry
+      </button>
+    </div>
+  } @else if (loading()) {
+    <div class="p-4">
+      @for (i of [1, 2, 3]; track i) {
+        <div class="mb-2 h-16 animate-pulse rounded bg-zinc-50"></div>
+      }
+    </div>
+  } @else if (items().length === 0) {
+    <div class="flex flex-col items-center justify-center px-4 py-10 text-center">
+      <lucide-icon
+        name="calendar-clock"
+        size="32"
+        class="mb-2 text-zinc-300"
+        aria-hidden="true"
+      ></lucide-icon>
+      <p class="text-sm font-medium text-zinc-700">
+        @switch (bucket()) {
+          @case ('today') {
+            No follow-ups scheduled for today.
+          }
+          @case ('pending') {
+            You're all caught up for today.
+          }
+          @case ('completed_today') {
+            No follow-ups completed today yet.
+          }
+          @case ('overdue') {
+            Nothing overdue — nicely done.
+          }
+          @case ('missed') {
+            No missed follow-ups in the last 7 days.
+          }
+        }
+      </p>
+      <button
+        type="button"
+        (click)="navigateToNewTask()"
+        class="mt-3 inline-flex items-center gap-1 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
+      >
+        <lucide-icon name="plus" size="14" aria-hidden="true"></lucide-icon>
+        Add a task
+      </button>
+    </div>
+  } @else {
+    <ul class="divide-y divide-zinc-100">
+      @for (row of items(); track trackByRow($index, row)) {
+        <li class="px-4 py-3">
+          <div class="flex flex-wrap items-start gap-3">
+            <!-- Left: due time chip -->
+            <div class="w-16 shrink-0 text-xs">
+              <div class="rounded bg-zinc-50 px-1.5 py-1 text-center font-medium text-zinc-700">
+                {{ dueTimeShort(row.due_at) }}
+              </div>
+            </div>
+
+            <!-- Middle: title + linked-entity + type -->
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="truncate text-sm font-medium text-zinc-900">{{ row.title }}</p>
+                <span
+                  [class]="
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ring-zinc-200 ' +
+                    priorityMeta(row.priority).text
+                  "
+                >
+                  <span
+                    [class]="'h-1.5 w-1.5 rounded-full ' + priorityMeta(row.priority).dot"
+                  ></span>
+                  {{ priorityMeta(row.priority).label }}
+                </span>
+              </div>
+
+              <div class="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+                <span class="inline-flex items-center gap-1">
+                  <lucide-icon
+                    [name]="typeMeta(row.followup_type).icon"
+                    size="12"
+                    aria-hidden="true"
+                  ></lucide-icon>
+                  {{ typeMeta(row.followup_type).label }}
+                </span>
+                @if (row.linked_entity; as le) {
+                  <span class="truncate">
+                    · {{ le.type }}:
+                    <a
+                      [routerLink]="openLink(row)"
+                      class="font-medium text-zinc-700 hover:underline"
+                    >
+                      {{ le.label }}
+                    </a>
+                  </span>
+                }
+                <span class="truncate">· {{ row.assigned_to.name }}</span>
+              </div>
+
+              @if (row.notes_preview) {
+                <p class="mt-1 line-clamp-2 text-xs text-zinc-500">“{{ row.notes_preview }}”</p>
+              }
+
+              @if (reschedulingId() === row.id) {
+                <div class="mt-2">
+                  <app-reschedule-inline
+                    [initialDueAt]="row.due_at"
+                    (save)="saveReschedule(row, $event)"
+                    (cancel)="cancelReschedule()"
+                  />
+                </div>
+              } @else {
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    (click)="onComplete(row)"
+                    [disabled]="row.status === 'done'"
+                    class="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <lucide-icon name="check-check" size="12" aria-hidden="true"></lucide-icon>
+                    {{ row.status === 'done' ? 'Completed' : 'Complete' }}
+                  </button>
+                  <button
+                    type="button"
+                    (click)="onReschedule(row)"
+                    [disabled]="row.status === 'done' || row.status === 'missed'"
+                    class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <lucide-icon name="clock" size="12" aria-hidden="true"></lucide-icon>
+                    Reschedule
+                  </button>
+                  <a
+                    [routerLink]="openLink(row)"
+                    class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50"
+                  >
+                    <lucide-icon name="external-link" size="12" aria-hidden="true"></lucide-icon>
+                    Open
+                  </a>
+                </div>
+              }
+            </div>
+
+            <!-- Right: status badge -->
+            <span
+              [class]="
+                'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ' +
+                statusBadge(row).classes
+              "
+            >
+              {{ statusBadge(row).label }}
+            </span>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+</div>

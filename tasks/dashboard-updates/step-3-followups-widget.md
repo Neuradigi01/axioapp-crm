@@ -2,7 +2,7 @@
 
 **Goal:** Ship the widget on `/user/dashboard` that renders Step 2's
 endpoint — list of today's follow-ups with inline actions.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 2 (endpoint live).
 
 ---

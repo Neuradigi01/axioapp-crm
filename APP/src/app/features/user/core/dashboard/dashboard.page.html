@@ -124,42 +124,10 @@
     </section>
   }
 
-  <!-- Two-column bottom: recent activity + upcoming appointments -->
+  <!-- Follow-ups + Appointments pair — "what to do" (tasks/dashboard-updates
+       Step 3) side-by-side with "what to attend" (existing). -->
   <section class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-    <!-- Recent activity -->
-    <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
-      <div class="border-b border-zinc-100 px-4 py-3">
-        <h2 class="text-sm font-semibold text-zinc-900">Recent activity</h2>
-      </div>
-      @if (summary(); as s) {
-        @if (s.recent_activity.length === 0) {
-          <div class="px-4 py-10 text-center text-sm text-zinc-500">
-            No recent activity yet — start a lead or schedule an appointment to see it here.
-          </div>
-        } @else {
-          <ul class="divide-y divide-zinc-100">
-            @for (a of s.recent_activity; track $index) {
-              <li class="flex items-start justify-between gap-3 px-4 py-2.5">
-                <div class="min-w-0">
-                  <p class="truncate text-sm text-zinc-800">
-                    <span class="font-medium">{{ a.actor_name }}</span>
-                    {{ actionLabel(a.action) }}
-                    <span class="text-zinc-500">{{ a.entity_label }}</span>
-                  </p>
-                </div>
-                <span class="shrink-0 whitespace-nowrap text-[11px] text-zinc-400">{{
-                  relativeTime(a.at)
-                }}</span>
-              </li>
-            }
-          </ul>
-        }
-      } @else {
-        @for (i of [1, 2, 3, 4]; track i) {
-          <div class="mx-4 my-2.5 h-8 animate-pulse rounded bg-zinc-50"></div>
-        }
-      }
-    </div>
+    <app-todays-followups />
 
     <!-- Upcoming appointments -->
     <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
@@ -202,6 +170,43 @@
       } @else {
         @for (i of [1, 2, 3]; track i) {
           <div class="mx-4 my-2.5 h-10 animate-pulse rounded bg-zinc-50"></div>
+        }
+      }
+    </div>
+  </section>
+
+  <!-- Recent activity — full width below the pair. -->
+  <section class="mt-6">
+    <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
+      <div class="border-b border-zinc-100 px-4 py-3">
+        <h2 class="text-sm font-semibold text-zinc-900">Recent activity</h2>
+      </div>
+      @if (summary(); as s) {
+        @if (s.recent_activity.length === 0) {
+          <div class="px-4 py-10 text-center text-sm text-zinc-500">
+            No recent activity yet — start a lead or schedule an appointment to see it here.
+          </div>
+        } @else {
+          <ul class="divide-y divide-zinc-100">
+            @for (a of s.recent_activity; track $index) {
+              <li class="flex items-start justify-between gap-3 px-4 py-2.5">
+                <div class="min-w-0">
+                  <p class="truncate text-sm text-zinc-800">
+                    <span class="font-medium">{{ a.actor_name }}</span>
+                    {{ actionLabel(a.action) }}
+                    <span class="text-zinc-500">{{ a.entity_label }}</span>
+                  </p>
+                </div>
+                <span class="shrink-0 whitespace-nowrap text-[11px] text-zinc-400">{{
+                  relativeTime(a.at)
+                }}</span>
+              </li>
+            }
+          </ul>
+        }
+      } @else {
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="mx-4 my-2.5 h-8 animate-pulse rounded bg-zinc-50"></div>
         }
       }
     </div>
