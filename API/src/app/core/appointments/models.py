@@ -27,6 +27,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     text,
 )
 from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
@@ -90,6 +91,24 @@ class Appointment(Base, TenantScoped):
     last_activity_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+    # tasks/google-calendar-sync Step 1 — per-appointment Google-side
+    # identifiers so the Step-4 sync task can PATCH / DELETE the right
+    # event on the assignee's Google Calendar. Both nullable:
+    #   * unset when the appointment hasn't been synced yet, or the
+    #     assignee never connected Google Calendar, or the sync failed
+    #     (see the assignee's ``tbl_user_google_calendar_tokens.last_error``).
+    #   * ``google_calendar_event_id`` — Google's stable event id
+    #     returned on create.
+    #   * ``google_calendar_etag`` — Google's ETag; sent as ``If-Match``
+    #     on PATCH so simultaneous edits from the Google-side raise 412
+    #     instead of silently overwriting. v1 refuses the overwrite +
+    #     surfaces the conflict on the token row's ``last_error``.
+    google_calendar_event_id: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    google_calendar_etag: Mapped[str | None] = mapped_column(
+        Text, nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -3,7 +3,7 @@
 **Goal:** Add the DB shape that stores each user's Google Calendar
 connection state. Two tables: per-user tokens + per-appointment
 Google-side identifiers so we can PATCH / DELETE the right event.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Nothing (foundation step).
 
 ---
