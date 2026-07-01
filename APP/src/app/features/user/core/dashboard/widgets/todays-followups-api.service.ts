@@ -108,4 +108,12 @@ export class TodaysFollowupsApiService {
   reschedule(taskId: string, isoDueAt: string): Observable<unknown> {
     return this.http.patch(`${this.base}/tasks/${taskId}`, { due_at: isoDueAt });
   }
+
+  /** Terminal-state transition: open → missed. Refused with 409 if
+   *  the task is already terminal (done / missed / cancelled) — the
+   *  widget should hide the button in those states, but the server
+   *  is the source of truth. */
+  markMissed(taskId: string): Observable<unknown> {
+    return this.http.post(`${this.base}/tasks/${taskId}/mark-missed`, {});
+  }
 }

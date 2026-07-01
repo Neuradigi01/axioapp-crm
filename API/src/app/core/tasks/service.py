@@ -183,6 +183,46 @@ async def update_task(
     return task
 
 
+async def mark_task_missed(
+    session: AsyncSession, *, task_id: uuid.UUID
+) -> Task:
+    """Flip a task from ``open`` → ``missed``.
+
+    Terminal-status transitions are refused with 409 so a stale click
+    on a follow-up already closed (either completed or previously
+    marked missed) doesn't overwrite history. ``cancelled`` is also
+    refused — a rep who cancelled a task shouldn't have it silently
+    re-labelled as missed by a race.
+
+    Emits ``tasks.marked_missed`` audit so the linked contact's
+    timeline records why the follow-up stopped.
+    """
+    task = ensure_found(await get_task(session, task_id), entity="task")
+
+    if task.status != TaskStatus.open:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Task is {task.status.value}; only open tasks can be marked missed."
+            ),
+        )
+
+    before = _snapshot(task)
+    task.status = TaskStatus.missed
+    task.last_activity_at = datetime.now(UTC)
+    await session.commit()
+    await session.refresh(task)
+
+    await log_entity_change(
+        action="tasks.marked_missed",
+        entity_type="task",
+        entity_id=task.id,
+        before=before,
+        after=_snapshot(task),
+    )
+    return task
+
+
 async def delete_task(session: AsyncSession, *, task_id: uuid.UUID) -> None:
     task = ensure_found(await get_task(session, task_id), entity="task")
     before = _snapshot(task)

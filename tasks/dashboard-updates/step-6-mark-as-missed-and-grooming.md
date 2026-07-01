@@ -3,7 +3,7 @@
 **Goal:** Give reps a way to explicitly close the loop on a follow-up
 they've given up on ("customer's not responding"), and auto-close
 stale-open ones so the Overdue count doesn't grow unbounded.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 1 (`missed` in the `TaskStatus` enum) + Step 3
 (widget renders the button) + Step 2 (endpoint's `missed` bucket).
 
@@ -13,7 +13,7 @@ stale-open ones so the Overdue count doesn't grow unbounded.
 
 ### Backend — `POST /api/v1/tasks/{task_id}/mark-missed`
 
-Endpoint that flips a task from `open` / `in_progress` → `missed`.
+Endpoint that flips a task from `open` → `missed`.
 Refuses when the task is already terminal (`done` or `missed`) with
 409, so a stale click can't overwrite completion history.
 
@@ -21,7 +21,7 @@ Layered:
 
 - **`router.py`** — thin: parse, call service, return.
 - **`service.py`** — permission check (assignee or `tasks.manage`),
-  status-transition guard (`open` / `in_progress` → `missed` only),
+  status-transition guard (`open` → `missed` only),
   writes an audit-log entry (`tasks.marked_missed`) so the timeline
   on the linked contact shows why the follow-up stopped.
 - **`data_access.py`** — `mark_task_missed(session, task_id, actor_id)`
@@ -37,7 +37,7 @@ without tenant context, uses raw SQL to bypass the RLS filter):
 UPDATE tbl_tasks
 SET status = 'missed',
     updated_at = now()
-WHERE status IN ('open', 'in_progress')
+WHERE status = 'open'
   AND due_at < (now() - INTERVAL '7 days')
 RETURNING id, org_id
 ```

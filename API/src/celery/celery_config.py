@@ -196,4 +196,14 @@ beat_schedule = {
         "task": "src.app.core.integrations.google_calendar.tasks.reconcile_pending",
         "schedule": crontab(minute="*/30"),
     },
+    # tasks/dashboard-updates Step 6 — daily 02:00 UTC sweep across
+    # tbl_tasks that flips ``open`` rows whose ``due_at`` is more than
+    # 7 days in the past to the terminal ``missed`` status. Bounds the
+    # dashboard's Overdue bucket and preserves the audit trail under
+    # the Missed filter. 7-day threshold means the ±14h timezone slack
+    # (org-local vs UTC) never matters.
+    "tasks-groom-stale-open": {
+        "task": "src.app.core.tasks.tasks.groom_stale_open_tasks",
+        "schedule": crontab(hour=2, minute=0),
+    },
 }

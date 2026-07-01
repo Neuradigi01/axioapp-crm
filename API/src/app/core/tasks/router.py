@@ -48,6 +48,7 @@ from src.app.core.tasks.service import (
     list_all_in_org,
     list_my_tasks,
     list_tasks_for_entity,
+    mark_task_missed,
     update_task,
 )
 from src.app.core.users.models import User
@@ -237,3 +238,17 @@ async def delete_task_endpoint(
 ) -> Response:
     await delete_task(db, task_id=task_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{task_id}/mark-missed", response_model=TaskOut)
+async def mark_task_missed_endpoint(
+    task_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("tasks.write")),
+) -> TaskOut:
+    """Flip an open task to ``missed`` (terminal). Returns the mutated
+    row so the client can update its optimistic state with the real
+    ``updated_at`` timestamp. Refuses transitions from ``done`` /
+    ``missed`` / ``cancelled`` with 409."""
+    task = await mark_task_missed(db, task_id=task_id)
+    return TaskOut.model_validate(task)

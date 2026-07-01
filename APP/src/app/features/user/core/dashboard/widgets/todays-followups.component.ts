@@ -29,15 +29,12 @@ import {
 
 /**
  * Dashboard widget — "Today's Follow-ups". Renders the caller's
- * follow-up tasks (bucketed) with inline Complete / Reschedule / Open
- * actions. Auto-polls every 60 seconds.
+ * follow-up tasks (bucketed) with inline Complete / Reschedule /
+ * Mark-as-missed / Open actions. Auto-polls every 60 seconds.
  *
  * Scope is decided server-side (`users.read` → org view, otherwise
  * personal). The widget's chip counts + list body are driven by the
  * same `GET /dashboard/followups` payload so they always agree.
- *
- * The Mark-as-missed action is Step 6's concern — deliberately not
- * rendered here so we don't ship a half-wired button.
  */
 type BucketChip = {
   readonly key: FollowupBucket;
@@ -102,12 +99,20 @@ export class TodaysFollowupsComponent {
   protected readonly reschedulingId = signal<string | null>(null);
   /** Row ids optimistically flipped to `done` so we can revert on error. */
   protected readonly optimisticallyDone = signal<ReadonlySet<string>>(new Set());
+  /** Row ids optimistically flipped to `missed`. Same revert-on-error
+   *  contract as `optimisticallyDone`. */
+  protected readonly optimisticallyMissed = signal<ReadonlySet<string>>(new Set());
 
   protected readonly items = computed<FollowupItem[]>(() => {
     const resp = this.response();
     if (!resp) return [];
     const done = this.optimisticallyDone();
-    return resp.items.map((it) => (done.has(it.id) ? { ...it, status: 'done' as const } : it));
+    const missed = this.optimisticallyMissed();
+    return resp.items.map((it) => {
+      if (done.has(it.id)) return { ...it, status: 'done' as const };
+      if (missed.has(it.id)) return { ...it, status: 'missed' as const };
+      return it;
+    });
   });
 
   protected readonly counts = computed(() => this.response()?.counts ?? null);
@@ -283,6 +288,30 @@ export class TodaysFollowupsComponent {
       });
   }
 
+  /** Only overdue-open rows are eligible for Mark-as-missed. Every
+   *  other state (done / cancelled / already-missed / future-open)
+   *  hides the button entirely. */
+  protected canMarkMissed(row: FollowupItem): boolean {
+    if (row.status !== 'open') return false;
+    if (!row.due_at) return false;
+    return new Date(row.due_at).getTime() < Date.now();
+  }
+
+  protected onMarkMissed(row: FollowupItem): void {
+    if (!this.canMarkMissed(row)) return;
+    this.setOptimisticMissed(row.id, true);
+    this.api
+      .markMissed(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => this.fetch({ silent: true }),
+        error: (err: HttpErrorResponse) => {
+          this.setOptimisticMissed(row.id, false);
+          this.error.set(extractApiError(err) ?? 'Could not mark missed.');
+        },
+      });
+  }
+
   protected refresh(): void {
     this.fetch({ silent: false });
   }
@@ -317,6 +346,7 @@ export class TodaysFollowupsComponent {
           this.loading.set(false);
           this.refreshing.set(false);
           this.optimisticallyDone.set(new Set());
+          this.optimisticallyMissed.set(new Set());
         },
         error: (err: HttpErrorResponse) => {
           this.error.set(extractApiError(err) ?? "Couldn't load follow-ups.");
@@ -328,6 +358,15 @@ export class TodaysFollowupsComponent {
 
   private setOptimisticDone(id: string, value: boolean): void {
     this.optimisticallyDone.update((prev) => {
+      const next = new Set(prev);
+      if (value) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  private setOptimisticMissed(id: string, value: boolean): void {
+    this.optimisticallyMissed.update((prev) => {
       const next = new Set(prev);
       if (value) next.add(id);
       else next.delete(id);

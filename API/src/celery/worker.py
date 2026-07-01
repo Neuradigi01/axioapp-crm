@@ -62,6 +62,10 @@ celery.autodiscover_tasks(
         # Without this entry the engine can't dispatch + parked waits
         # never resume.
         "src.app.core.workflows.tasks",
+        # tasks/dashboard-updates Step 6 — nightly grooming that flips
+        # ``open`` tasks whose ``due_at`` is > 7 days ago to ``missed``
+        # so the dashboard's Overdue bucket doesn't grow unbounded.
+        "src.app.core.tasks.tasks",
     ]
 )
 
