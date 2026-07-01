@@ -104,6 +104,28 @@ def _delta(current: float, previous: float) -> tuple[float, Literal["up", "down"
     return (pct, direction)
 
 
+def _snapshot_card(
+    *,
+    key: str,
+    label: str,
+    value: int,
+    link: str | None = None,
+) -> DashboardCard:
+    """Same-day-snapshot KPI card with no delta pill.
+
+    Use for metrics where a period-over-period comparison would be
+    misleading (e.g. "follow-ups pending today" vs "yesterday" — the
+    yesterday-count moves as tasks age into today's window, not
+    because of trend)."""
+    return DashboardCard(
+        key=key,
+        label=label,
+        value=value,
+        format="number",
+        link=link,
+    )
+
+
 def _scalar_card(
     *,
     key: str,
@@ -426,6 +448,38 @@ async def _assemble_org_cards(
             )
         )
 
+    # tasks/dashboard-updates Step 4 — three follow-up snapshot cards.
+    # Reuses the same DAL the widget uses so the card counts and the
+    # widget body always agree 1:1. link=None: click behaviour is a
+    # scroll-and-filter on the follow-ups widget, wired frontend-side.
+    followup_counts = await _da.count_followups_by_bucket(
+        session,
+        org_id=org_id,
+        today=today,
+        assignee_uuid=None,  # org scope — count every assignee
+    )
+    cards.append(
+        _snapshot_card(
+            key="followups.pending_today",
+            label="Follow-ups pending today",
+            value=followup_counts.pending_today,
+        )
+    )
+    cards.append(
+        _snapshot_card(
+            key="followups.completed_today",
+            label="Follow-ups completed today",
+            value=followup_counts.completed_today,
+        )
+    )
+    cards.append(
+        _snapshot_card(
+            key="followups.overdue",
+            label="Follow-ups overdue",
+            value=followup_counts.overdue,
+        )
+    )
+
     return cards
 
 
@@ -611,6 +665,39 @@ async def _assemble_personal_cards(
     # `contacts` has no owner/assigned column today — per the spec we
     # omit the `contacts.my_count` card rather than render a misleading
     # zero or fall back to created_by (which doesn't exist).
+
+    # tasks/dashboard-updates Step 4 — same three snapshot cards as the
+    # org assembler, scoped to the caller only (assignee_uuid=user_uuid).
+    # `pending_today` gets pulled into the personal hero (see
+    # dashboard.page.ts HERO_KEYS.personal); the other two land in the
+    # secondary grid.
+    followup_counts = await _da.count_followups_by_bucket(
+        session,
+        org_id=org_id,
+        today=today,
+        assignee_uuid=user_uuid,
+    )
+    cards.append(
+        _snapshot_card(
+            key="followups.pending_today",
+            label="Pending today",
+            value=followup_counts.pending_today,
+        )
+    )
+    cards.append(
+        _snapshot_card(
+            key="followups.completed_today",
+            label="Completed today",
+            value=followup_counts.completed_today,
+        )
+    )
+    cards.append(
+        _snapshot_card(
+            key="followups.overdue",
+            label="Overdue",
+            value=followup_counts.overdue,
+        )
+    )
 
     return cards
 

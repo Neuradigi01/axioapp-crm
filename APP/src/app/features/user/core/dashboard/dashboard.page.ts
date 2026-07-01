@@ -6,10 +6,11 @@ import {
   DestroyRef,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import { environment } from '../../../../../environments/environment';
 import { extractApiError } from '@core/services/api-error.util';
@@ -97,7 +98,12 @@ interface DashboardSummary {
 })
 export class DashboardPageComponent {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** Handle on the follow-ups widget so KPI-card clicks can drive
+   *  its bucket filter without going through router state. */
+  protected readonly followupsWidget = viewChild(TodaysFollowupsComponent);
 
   protected readonly summary = signal<DashboardSummary | null>(null);
   protected readonly loading = signal(true);
@@ -108,9 +114,32 @@ export class DashboardPageComponent {
   // dashboard with period-over-period delta pills. Selection is keyed
   // by `scope` (server-decided from the caller's permission set) so
   // there's no role-name branching anywhere on the frontend.
+  //
+  // tasks/dashboard-updates Step 4 — the personal hero swaps
+  // `conversion.my_rate` (a lagging metric) out for
+  // `followups.pending_today` (the daily-driver number). Conversion
+  // still renders in the secondary grid via the standard filter.
   private readonly HERO_KEYS: Record<'org' | 'personal', string[]> = {
     org: ['leads.pipeline_value', 'leads.new_today', 'appointments.today', 'conversion.rate'],
-    personal: ['leads.my_count', 'tasks.my_open', 'appointments.my_today', 'conversion.my_rate'],
+    personal: [
+      'tasks.my_open',
+      'followups.pending_today',
+      'appointments.my_today',
+      'leads.my_count',
+    ],
+  };
+
+  /** Mapping followup-card key → widget bucket. Every entry here is
+   *  handled via `onCardClick`'s scroll-and-filter path instead of a
+   *  route navigation, so we know which keys to special-case in the
+   *  click handler. */
+  private readonly FOLLOWUP_CARD_TO_BUCKET: Record<
+    string,
+    'pending' | 'completed_today' | 'overdue'
+  > = {
+    'followups.pending_today': 'pending',
+    'followups.completed_today': 'completed_today',
+    'followups.overdue': 'overdue',
   };
 
   protected readonly heroCards = computed<DashboardCard[]>(() => {
@@ -133,6 +162,26 @@ export class DashboardPageComponent {
 
   protected refresh(): void {
     this.load(true);
+  }
+
+  /** Follow-up cards render as buttons (no route); every other
+   *  linkless card renders as a plain informational div. */
+  protected isFollowupCard(card: DashboardCard): boolean {
+    return card.key in this.FOLLOWUP_CARD_TO_BUCKET;
+  }
+
+  /** Handle KPI-card clicks: follow-up cards jump to the widget +
+   *  apply the matching bucket filter; every other card with a
+   *  `link` navigates normally (routerLink handles that inline in
+   *  the template — this method only runs for follow-up cards). */
+  protected onCardClick(card: DashboardCard): void {
+    const bucket = this.FOLLOWUP_CARD_TO_BUCKET[card.key];
+    if (!bucket) return;
+    this.followupsWidget()?.setBucket(bucket);
+    // scrollIntoView on the anchor id set in the template.
+    document
+      .getElementById('todays-followups-widget')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   private load(isRefresh: boolean): void {

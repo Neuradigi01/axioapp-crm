@@ -218,6 +218,13 @@ export class TodaysFollowupsComponent {
     this.fetch({ silent: false });
   }
 
+  /** Public API — the dashboard page calls this when a KPI card is
+   *  clicked. Same effect as `pickBucket`, but public so parent
+   *  components can use it via a template ref. */
+  setBucket(next: FollowupBucket): void {
+    this.pickBucket(next);
+  }
+
   protected onSearchInput(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.searchTerm.set(value);

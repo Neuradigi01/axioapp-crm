@@ -3,7 +3,7 @@
 **Goal:** Add **Pending today · Completed today · Overdue** KPI
 cards to the dashboard summary; clicking any card scrolls to the
 widget and applies the matching bucket filter.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 2 (endpoint returns the 4 counts) + Step 3
 (widget exists to filter).
 
