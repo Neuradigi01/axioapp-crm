@@ -9,12 +9,17 @@ chosen metric over a chosen range — powers the trend chart widget.
 `GET /api/v1/dashboard/funnel` returns lead counts per pipeline stage
 over a chosen range — powers the funnel chart widget.
 
+`GET /api/v1/dashboard/followups` returns today's follow-ups list
+plus 5 KPI counts — powers the Today's Follow-ups widget.
+
 None of these endpoints require a permission key — every authenticated
 user gets a dashboard. The response shape adapts to the caller's
 permissions inside the service layer.
 """
 
 from __future__ import annotations
+
+import uuid
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,14 +29,18 @@ from src.app.core.dashboard.schemas import (
     DashboardFunnelResponse,
     DashboardSummary,
     DashboardTrendResponse,
+    FollowupBucket,
+    FollowupsResponse,
     TrendMetric,
     TrendRange,
 )
 from src.app.core.dashboard.service import (
     assemble_funnel,
     assemble_trend,
+    get_followups,
     get_summary,
 )
+from src.app.core.tasks.models import TaskFollowupType, TaskPriority
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -63,3 +72,28 @@ async def funnel_endpoint(
     session: AsyncSession = Depends(get_db),
 ) -> DashboardFunnelResponse:
     return await assemble_funnel(session, caller, range)
+
+
+@router.get("/followups", response_model=FollowupsResponse)
+async def followups_endpoint(
+    bucket: FollowupBucket = Query("today"),
+    assigned_to: uuid.UUID | None = Query(None),
+    followup_type: TaskFollowupType | None = Query(None),
+    priority: TaskPriority | None = Query(None),
+    q: str | None = Query(None, max_length=100),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=50),
+    caller: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> FollowupsResponse:
+    return await get_followups(
+        session,
+        caller,
+        bucket=bucket,
+        assigned_to=assigned_to,
+        followup_type=followup_type.value if followup_type else None,
+        priority=priority.value if priority else None,
+        q=q,
+        page=page,
+        page_size=page_size,
+    )

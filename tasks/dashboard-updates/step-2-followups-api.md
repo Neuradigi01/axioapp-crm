@@ -1,10 +1,10 @@
 # Step 2 — Backend: `/api/v1/dashboard/followups` endpoint
 
 **Goal:** One endpoint that returns everything the widget needs in a
-single round-trip: today's follow-up list + the 4 KPI counts
-(pending / completed today / overdue / open) + server-side filters +
-pagination.
-**Status:** Pending
+single round-trip: today's follow-up list + the 5 KPI counts
+(today_total / pending_today / completed_today / overdue /
+missed_last_7d) + server-side filters + pagination.
+**Status:** COMPLETED
 **Depends on:** Step 1 (needs `followup_type` column).
 
 ---
@@ -19,23 +19,24 @@ Query parameters (all optional):
 
 - `bucket` — `today` (default) · `pending` · `completed_today` ·
   `overdue` · `missed`. The bucket decides the base date/status
-  filter; a click on a KPI card passes this. Semantics per bucket:
-  - `today` → `due_at::date = today AND status != 'missed'` (all
-    of today's follow-ups, actionable or already done)
-  - `pending` → `due_at::date = today AND status IN
-    ('open','in_progress')`
-  - `completed_today` → `status = 'done' AND completed_at::date =
-    today`
-  - `overdue` → `due_at < today AND status IN
-    ('open','in_progress')` — excludes `missed` deliberately (missed
-    is a terminal closure, not a to-do)
-  - `missed` → `status = 'missed' AND updated_at::date >= today
-    - 7d` (last week's missed for the dashboard; older is on the
-    Tasks page's Missed filter for audit)
+  filter; a click on a KPI card passes this. Semantics per bucket
+  (real `TaskStatus` is `open · done · cancelled · missed`):
+  - `today` → `due_at::date = today AND status IN (open, done)`
+    (skips `cancelled` and `missed` — actionable + already-done view)
+  - `pending` → `due_at::date = today AND status = 'open'`
+  - `completed_today` → `status = 'done' AND updated_at::date =
+    today` (Task has no `completed_at`; `updated_at` bumps on the
+    status transition and is the closest deterministic proxy)
+  - `overdue` → `due_at < today AND status = 'open'` — `cancelled`
+    and `missed` are both terminal closures, deliberately excluded
+  - `missed` → `status = 'missed' AND updated_at::date >= today -
+    7d` (last week's missed for the dashboard; older is on the Tasks
+    page's Missed filter for audit)
 - `assigned_to` — UUID · limits to that assignee (Owner/Admin only;
   ignored for Employee scope since they're already scoped to self)
 - `followup_type` — one of the enum values
-- `priority` — `high` · `medium` · `low`
+- `priority` — `high` · `med` · `low` (matches the real
+  `TaskPriority` enum; the widget renders "Med" as "Medium")
 - `q` — free-text search on the linked contact's name / phone /
   email OR the task title
 - `page` (default 1) · `page_size` (default 20, max 50)
@@ -108,10 +109,17 @@ Follows the manager-locked Router → Service → DAL pattern:
 
 Search runs against:
 - `tbl_tasks.title` (ILIKE)
-- Linked contact's `full_name`, `email`, `phone_e164` via `LEFT JOIN
-  tbl_contacts ON tbl_tasks.contact_id = tbl_contacts.id`
-- Linked lead's `title` via `LEFT JOIN tbl_leads` if the task's
-  linked entity is a lead
+- Linked contact's `full_name`, `email`, `phone` via `LEFT JOIN
+  tbl_contacts ON tbl_tasks.related_entity_id = tbl_contacts.id AND
+  tbl_tasks.related_entity_type = 'contact'`
+- Linked lead's contact via a two-hop `LEFT JOIN tbl_leads ON
+  tbl_tasks.related_entity_id = tbl_leads.id AND
+  tbl_tasks.related_entity_type = 'lead' LEFT JOIN tbl_contacts ON
+  tbl_leads.contact_id = tbl_contacts.id`
+
+(Task has no direct `contact_id` — the polymorphic
+`related_entity_type` / `related_entity_id` pair is the link, so
+both joins are gated on the type discriminator.)
 
 Trigram-index-friendly on tables where GIN pg_trgm already exists
 (contacts have one). Tasks table gets no new index in this step;
@@ -125,9 +133,9 @@ index on `tbl_tasks.title` in a follow-up step.
 |---|---|
 | `API/src/app/core/dashboard/router.py` | EDIT — add `@router.get("/followups")` handler |
 | `API/src/app/core/dashboard/service.py` | EDIT — add `get_followups()` service function |
-| `API/src/app/core/dashboard/data_access.py` | EDIT — add list + count queries |
-| `API/src/app/core/dashboard/schemas.py` | EDIT — add `FollowupItem`, `FollowupCounts`, `FollowupsResponse` |
-| `API/tests/dashboard/test_followups.py` | **NEW** (test file — kept for Step 6) |
+| `API/src/app/core/dashboard/data_access.py` | **NEW** — first DAL file in this module; hosts the list + count queries |
+| `API/src/app/core/dashboard/schemas.py` | EDIT — add `FollowupItem`, `FollowupCounts`, `FollowupsResponse`, `FollowupBucket` |
+| `API/tests/dashboard/test_followups.py` | **NEW** (test file — deferred to Step 7) |
 
 **~5 files touched, ~350 lines.**
 

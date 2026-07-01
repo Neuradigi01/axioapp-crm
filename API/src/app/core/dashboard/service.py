@@ -27,6 +27,7 @@ from src.app.core.appointments.models import Appointment, AppointmentStatus
 from src.app.core.audit.models import AuditLog
 from src.app.core.calls.models import Call
 from src.app.core.contacts.models import Contact
+from src.app.core.dashboard import data_access as _da
 from src.app.core.dashboard.schemas import (
     ActivityItem,
     DashboardCard,
@@ -34,6 +35,11 @@ from src.app.core.dashboard.schemas import (
     DashboardSummary,
     DashboardTrendPoint,
     DashboardTrendResponse,
+    FollowupAssignedTo,
+    FollowupBucket,
+    FollowupItem,
+    FollowupLinkedEntity,
+    FollowupsResponse,
     FunnelStageBucket,
     Greeting,
     TrendMetric,
@@ -1021,4 +1027,136 @@ async def assemble_funnel(
         stages=stages,
         won_count=won_count,
         lost_count=lost_count,
+    )
+
+
+# --- Follow-ups widget --------------------------------------------------
+#
+# Same scope rule as `get_summary` — callers with `users.read` see the
+# whole org, everyone else sees only tasks assigned to themselves. The
+# widget's KPI card counts, chip counters, and list body are all derived
+# from the same shared filter set so the numbers agree 1:1.
+
+
+async def get_followups(
+    session: AsyncSession,
+    caller: User,
+    *,
+    bucket: FollowupBucket = "today",
+    assigned_to: uuid.UUID | None = None,
+    followup_type: str | None = None,
+    priority: str | None = None,
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> FollowupsResponse:
+    """Assemble the follow-ups payload for the widget: scope resolution,
+    5 KPI counts, and the paginated bucket-filtered list of Task rows.
+
+    The ``assigned_to`` query param is only honoured for org-scope
+    callers (``users.read``). Personal-scope callers are pinned to
+    their own ``legacy_uuid`` regardless — no URL-hack peek at a
+    peer's follow-ups.
+    """
+    org_id = caller.org_id
+    if org_id is None:
+        # Same defensive shape as get_summary — auth'd user with no
+        # membership is an upstream bug; return an empty but
+        # well-formed payload rather than 500.
+        empty_counts = await _da.count_followups_by_bucket(
+            session,
+            org_id=uuid.UUID(int=0),
+            today=datetime.now(UTC).date(),
+            assignee_uuid=None,
+        )
+        return FollowupsResponse(
+            scope="personal",
+            bucket=bucket,
+            counts=empty_counts,
+            page=page,
+            page_size=page_size,
+            total=0,
+            items=[],
+        )
+
+    today = datetime.now(UTC).date()
+    is_org_scope = await _has_users_read(session, caller.role_id)
+
+    if is_org_scope:
+        assignee_uuid = assigned_to  # may be None (all-in-org)
+        scope: Literal["org", "personal"] = "org"
+    else:
+        assignee_uuid = caller.legacy_uuid
+        scope = "personal"
+
+    counts = await _da.count_followups_by_bucket(
+        session,
+        org_id=org_id,
+        today=today,
+        assignee_uuid=assignee_uuid,
+        followup_type=followup_type,
+        priority=priority,
+        q=q,
+    )
+    rows, total = await _da.list_tasks_for_bucket(
+        session,
+        org_id=org_id,
+        bucket=bucket,
+        today=today,
+        assignee_uuid=assignee_uuid,
+        followup_type=followup_type,
+        priority=priority,
+        q=q,
+        page=page,
+        page_size=page_size,
+    )
+
+    items = [_row_to_followup_item(r) for r in rows]
+    return FollowupsResponse(
+        scope=scope,
+        bucket=bucket,
+        counts=counts,
+        page=page,
+        page_size=page_size,
+        total=total,
+        items=items,
+    )
+
+
+def _row_to_followup_item(row: dict) -> FollowupItem:
+    """Turn a DAL row-dict into the widget's FollowupItem shape. Handles
+    the polymorphic linked-entity flattening + the notes-preview
+    ellipsis."""
+    entity_type = row.get("entity_type")
+    entity_id = row.get("entity_id")
+    entity_label = row.get("entity_label")
+    linked: FollowupLinkedEntity | None = None
+    if entity_type and entity_id:
+        linked = FollowupLinkedEntity(
+            type=entity_type,
+            id=entity_id,
+            label=entity_label or "(no name)",
+        )
+
+    notes_preview = row.get("notes_preview")
+    # The SQL takes the first 100 chars via LEFT(); append an ellipsis
+    # when the source description was longer so the operator sees the
+    # truncation intent. We can't tell length inside SQL cheaply so we
+    # append conditionally on the trimmed length hitting 100.
+    if notes_preview and len(notes_preview) == 100:
+        notes_preview = notes_preview + "…"
+
+    return FollowupItem(
+        id=row["id"],
+        title=row["title"],
+        due_at=row["due_at"],
+        priority=row["priority"],
+        status=row["status"],
+        followup_type=row.get("followup_type"),
+        notes_preview=notes_preview,
+        assigned_to=FollowupAssignedTo(
+            id=row["assigned_to_id"],
+            name=row["assignee_name"],
+        ),
+        linked_entity=linked,
     )

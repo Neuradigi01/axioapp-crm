@@ -8,12 +8,19 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
+from src.app.core.tasks.models import (
+    TaskFollowupType,
+    TaskPriority,
+    TaskStatus,
+)
 from src.app.shared.schemas import ORMModel
 
 Format = Literal["number", "currency", "percent", "text", "leaderboard"]
 Scope = Literal["org", "personal"]
 TrendMetric = Literal["leads_created", "pipeline_value", "calls", "appointments"]
 TrendRange = Literal["7d", "30d", "90d", "365d"]
+
+FollowupBucket = Literal["today", "pending", "completed_today", "overdue", "missed"]
 
 
 DeltaDirection = Literal["up", "down", "flat"]
@@ -104,6 +111,63 @@ class FunnelStageBucket(BaseModel):
     stage_name: str
     stage_order: int
     count: int
+
+
+class FollowupCounts(BaseModel):
+    """The five KPI counts that drive the dashboard's follow-up cards
+    and the widget's chip counters. All counts are computed against
+    the caller's scope (org / personal)."""
+
+    today_total: int
+    pending_today: int
+    completed_today: int
+    overdue: int
+    missed_last_7d: int
+
+
+class FollowupAssignedTo(BaseModel):
+    """Denormalised assignee identity carried on each row so the widget
+    doesn't need a second round-trip for user lookups."""
+
+    id: uuid.UUID
+    name: str
+
+
+class FollowupLinkedEntity(BaseModel):
+    """Non-null when the task points at a contact / lead / walk-in.
+    NULL for standalone tasks ("review pipeline"). The widget renders
+    a fallback chip when this is absent."""
+
+    type: str
+    id: uuid.UUID
+    label: str
+
+
+class FollowupItem(BaseModel):
+    """One row in the follow-ups widget list."""
+
+    id: uuid.UUID
+    title: str
+    due_at: datetime | None
+    priority: TaskPriority
+    status: TaskStatus
+    followup_type: TaskFollowupType | None
+    notes_preview: str | None
+    assigned_to: FollowupAssignedTo
+    linked_entity: FollowupLinkedEntity | None
+
+
+class FollowupsResponse(BaseModel):
+    """Everything the follow-ups widget needs in one round-trip: scope
+    resolution, KPI counts, and the paginated list of matching rows."""
+
+    scope: Scope
+    bucket: FollowupBucket
+    counts: FollowupCounts
+    page: int
+    page_size: int
+    total: int
+    items: list[FollowupItem]
 
 
 class DashboardFunnelResponse(BaseModel):
