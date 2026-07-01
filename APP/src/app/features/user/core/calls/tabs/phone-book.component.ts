@@ -7,21 +7,29 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { ContactListItem, ContactsApiService } from '../../contacts/contacts-api.service';
 import { CallOutcome, CallsApiService } from '../calls-api.service';
+import { CallPickerModalComponent } from '../call-picker-modal.component';
 import { LogCallModalComponent } from '../log-call-modal.component';
 import { initials } from '@core/services/text.util';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * Phone Book tab â€” searchable contacts list with click-to-call. The
- * "Call" button does two things in sequence:
- *   1. opens `tel:<phone>` in a hidden anchor (the device handles dial)
- *   2. opens the LogCallModal pre-filled with the contact id
+ * Phone Book tab — searchable contacts list with click-to-call. The
+ * "Call" button opens a picker modal offering the free dial paths
+ * (WhatsApp / Phone Link / Copy) instead of blindly firing `tel:` —
+ * that gave users the ugly Windows "Open Pick an app?" prompt. After
+ * the user chooses a path, the LogCallModal opens pre-filled so the
+ * call still gets recorded.
  */
 @Component({
   selector: 'app-call-phone-book-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, LucideAngularModule, LogCallModalComponent],
+  imports: [
+    ReactiveFormsModule,
+    LucideAngularModule,
+    CallPickerModalComponent,
+    LogCallModalComponent,
+  ],
   templateUrl: './phone-book.component.html',
 })
 export class CallPhoneBookTabComponent {
@@ -35,6 +43,9 @@ export class CallPhoneBookTabComponent {
   protected readonly loadError = signal<string | null>(null);
 
   protected readonly outcomes = signal<CallOutcome[]>([]);
+  /** Contact currently being *picked* — modal is open showing dial options. */
+  protected readonly pickerState = signal<ContactListItem | null>(null);
+  /** Contact currently being *logged* — LogCallModal is open, user finishes the log. */
   protected readonly modalState = signal<ContactListItem | null>(null);
 
   protected readonly searchControl = new FormControl('', { nonNullable: true });
@@ -69,11 +80,23 @@ export class CallPhoneBookTabComponent {
     return palette[h % palette.length];
   }
 
+  /** Step 1 of the click-to-call flow: open the picker so the user
+   *  chooses HOW to call. The picker itself does the actual dial /
+   *  clipboard write; we just move to step 2 when it emits `picked`. */
   protected call(contact: ContactListItem): void {
-    if (contact.phone) {
-      window.location.href = `tel:${contact.phone}`;
-    }
-    this.modalState.set(contact);
+    this.pickerState.set(contact);
+  }
+
+  /** Step 2: picker emitted `picked` — close the picker and open the
+   *  LogCallModal so the user records the call outcome. */
+  protected onPicked(): void {
+    const contact = this.pickerState();
+    this.pickerState.set(null);
+    if (contact) this.modalState.set(contact);
+  }
+
+  protected closePicker(): void {
+    this.pickerState.set(null);
   }
 
   protected closeModal(): void {

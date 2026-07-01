@@ -66,6 +66,15 @@
     </ul>
   }
 
+  @if (pickerState(); as contact) {
+    <app-call-picker-modal
+      [contactName]="contact.full_name"
+      [phone]="contact.phone ?? ''"
+      (picked)="onPicked()"
+      (close)="closePicker()"
+    />
+  }
+
   @if (modalState(); as contact) {
     <app-log-call-modal
       [outcomes]="outcomes()"
