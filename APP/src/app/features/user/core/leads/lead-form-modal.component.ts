@@ -155,6 +155,9 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
         error: () => this.contactResults.set([]),
       });
 
+    // Preload the first page so the dropdown opens instantly on focus.
+    this.contactQuery$.next('');
+
     // If edit mode, fetch the contact so we can show its name in the chip.
     const existing = this._lead();
     if (existing) this.preloadEditContact(existing.contact_id);
@@ -165,6 +168,17 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     this.contactQuery.set(value);
     this.contactSearchOpen.set(true);
     this.contactQuery$.next(value);
+  }
+
+  protected onContactFocus(): void {
+    this.contactSearchOpen.set(true);
+    if (this.contactResults().length === 0) {
+      this.contactQuery$.next(this.contactQuery());
+    }
+  }
+
+  protected onContactBlur(): void {
+    setTimeout(() => this.contactSearchOpen.set(false), 150);
   }
 
   protected selectContact(c: ContactListItem): void {

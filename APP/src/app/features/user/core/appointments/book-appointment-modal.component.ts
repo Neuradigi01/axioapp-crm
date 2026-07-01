@@ -200,6 +200,10 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
         next: (resp) => this.contactResults.set(resp.items),
         error: () => this.contactResults.set([]),
       });
+
+    // Preload the first page of contacts so the dropdown is instant
+    // the moment the search field gets focus.
+    this.contactQuery$.next('');
   }
 
   protected onContactQueryInput(event: Event): void {
@@ -207,6 +211,22 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     this.contactQuery.set(value);
     this.contactSearchOpen.set(true);
     this.contactQuery$.next(value);
+  }
+
+  /** Open the dropdown on focus so the operator sees the top contacts
+   *  without having to type — mirrors how HubSpot / Pipedrive behave. */
+  protected onContactFocus(): void {
+    this.contactSearchOpen.set(true);
+    if (this.contactResults().length === 0) {
+      this.contactQuery$.next(this.contactQuery());
+    }
+  }
+
+  /** Close the dropdown when the field loses focus. Delayed so a click
+   *  on a suggestion still fires before the list is removed from the
+   *  DOM. */
+  protected onContactBlur(): void {
+    setTimeout(() => this.contactSearchOpen.set(false), 150);
   }
 
   protected selectContact(c: ContactListItem): void {

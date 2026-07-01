@@ -217,6 +217,9 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
       )
       .subscribe((resp) => this.contactResults.set(resp.items));
 
+    // Preload the first page so the dropdown opens instantly on focus.
+    this.contactQuery$.next('');
+
     // Pre-seed one empty measurement row so the user sees the shape.
     this.addMeasurement();
   }
@@ -232,6 +235,17 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
     this.contactQuery.set(value);
     this.contactSearchOpen.set(true);
     this.contactQuery$.next(value);
+  }
+
+  protected onContactFocus(): void {
+    this.contactSearchOpen.set(true);
+    if (this.contactResults().length === 0) {
+      this.contactQuery$.next(this.contactQuery());
+    }
+  }
+
+  protected onContactBlur(): void {
+    setTimeout(() => this.contactSearchOpen.set(false), 150);
   }
 
   protected selectContact(c: ContactListItem): void {

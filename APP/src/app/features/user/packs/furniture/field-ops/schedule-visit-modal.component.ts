@@ -221,6 +221,9 @@ export class ScheduleVisitModalComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((resp) => this.contactResults.set(resp.items));
+
+    // Preload the first page so the dropdown opens instantly on focus.
+    this.contactQuery$.next('');
   }
 
   protected onContactQueryInput(event: Event): void {
@@ -228,6 +231,17 @@ export class ScheduleVisitModalComponent implements OnInit {
     this.contactQuery.set(value);
     this.contactSearchOpen.set(true);
     this.contactQuery$.next(value);
+  }
+
+  protected onContactFocus(): void {
+    this.contactSearchOpen.set(true);
+    if (this.contactResults().length === 0) {
+      this.contactQuery$.next(this.contactQuery());
+    }
+  }
+
+  protected onContactBlur(): void {
+    setTimeout(() => this.contactSearchOpen.set(false), 150);
   }
 
   protected selectContact(c: ContactListItem): void {

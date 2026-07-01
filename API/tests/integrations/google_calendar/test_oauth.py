@@ -289,12 +289,6 @@ class TestGetValidAccessToken:
             access_token_expires_at=datetime.now(UTC) + timedelta(minutes=30),
         )
         da = _CapturingDA(row)
-        monkeypatch.setattr(
-            "src.app.core.integrations.google_calendar.oauth"
-            ".get_valid_access_token.__globals__",
-            oauth.__dict__,
-            raising=False,
-        )
         # Patch the DAL module the refresh helper imports.
         import src.app.core.integrations.google_calendar.data_access as _real_da
 

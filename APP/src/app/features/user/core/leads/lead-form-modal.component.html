@@ -43,6 +43,8 @@
               type="search"
               [value]="contactQuery()"
               (input)="onContactQueryInput($event)"
+              (focus)="onContactFocus()"
+              (blur)="onContactBlur()"
               placeholder="Search contacts by name, phone, or email…"
               autocomplete="off"
               class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"

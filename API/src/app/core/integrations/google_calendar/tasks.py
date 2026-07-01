@@ -288,6 +288,12 @@ async def _reconcile_pending_async() -> dict[str, Any]:
     scanned = 0
 
     async with async_session() as session:
+        # Assignee identifiers cross a schema boundary: ``tbl_appointments.
+        # assigned_to_id`` is a hyphenated UUID; the token row stores the
+        # BIGINT ``tbl_user_login.id``. Bridge via ``tbl_user_login`` —
+        # match the UUID against ``legacy_uuid`` (fast path) or against
+        # the ``'usr_' || hex-no-hyphens`` shape stored in
+        # ``tbl_user_login.user_id``.
         rows = (
             await session.execute(
                 text(
@@ -295,19 +301,16 @@ async def _reconcile_pending_async() -> dict[str, Any]:
                     SELECT a.id AS appointment_id,
                            t.user_id AS user_id
                     FROM tbl_appointments a
+                    JOIN tbl_user_login ul
+                      ON ul.legacy_uuid::text = a.assigned_to_id::text
+                      OR ul.user_id = 'usr_' || replace(a.assigned_to_id::text, '-', '')
                     JOIN tbl_user_google_calendar_tokens t
                       ON t.org_id = a.org_id
                      AND t.status = 'active'
+                     AND t.user_id = ul.id
                     WHERE a.scheduled_at > now()
                       AND a.status = 'scheduled'
                       AND a.google_calendar_event_id IS NULL
-                      AND (
-                            -- Only enqueue when the appointment's assignee
-                            -- matches the token's user (numeric compare via
-                            -- text cast — see Step 1 notes on the UUID/BIGINT
-                            -- user_id divergence).
-                            t.user_id::text = a.assigned_to_id::text
-                          )
                     ORDER BY a.scheduled_at
                     LIMIT 500
                     """

@@ -83,27 +83,53 @@ def _snapshot(a: Appointment) -> dict[str, Any]:
 # (``reconcile_pending``) catches drift from missed hooks.
 
 
-def _dispatch_calendar_sync(
-    appointment_id: uuid.UUID, user_id: Any
+async def _resolve_user_login_id(
+    session: AsyncSession, user_uuid: Any
+) -> int | None:
+    """Translate the app-wide UUID identifier (as stored on
+    ``tbl_appointments.assigned_to_id``) into the BIGINT
+    ``tbl_user_login.id`` used by the Google Calendar token row.
+
+    Two identifier shapes coexist in this codebase:
+
+    * ``tbl_user_login.user_id`` — text, ``'usr_' || hex-no-hyphens``
+    * ``tbl_user_login.legacy_uuid`` — UUID, hyphenated
+
+    The UUID passed here matches ``legacy_uuid`` directly; the ``usr_``
+    fallback covers rows where ``legacy_uuid`` is NULL. Returns ``None``
+    when no row matches (assignee has no Google Calendar connection —
+    the sync is a no-op)."""
+    from sqlalchemy import text
+
+    if user_uuid is None:
+        return None
+    uuid_str = str(user_uuid)
+    ext = "usr_" + uuid_str.replace("-", "")
+    row = await session.execute(
+        text(
+            "SELECT id FROM tbl_user_login "
+            "WHERE legacy_uuid::text = :uuid OR user_id = :ext "
+            "LIMIT 1"
+        ),
+        {"uuid": uuid_str, "ext": ext},
+    )
+    r = row.first()
+    return int(r[0]) if r else None
+
+
+async def _dispatch_calendar_sync(
+    session: AsyncSession, appointment_id: uuid.UUID, user_id: Any
 ) -> None:
     """Enqueue one ``sync_appointment_task`` for the given
     (appointment, user). Silently no-ops when Celery isn't installed
-    (dev shells) or Redis is down — best-effort by design."""
+    (dev shells), Redis is down, or the assignee has no Google
+    Calendar connection — best-effort by design."""
     if appointment_id is None or user_id is None:
         return
     try:
-        # Coerce user_id to int. Appointment.assigned_to_id is declared
-        # as UUID on the ORM but real user ids are BIGINT (Step 1
-        # notes). ``int(str(...))`` handles both the numeric and
-        # zero-padded-UUID cases production data lands in.
-        try:
-            uid_int = int(str(user_id))
-        except (TypeError, ValueError):
-            # UUID case — best-effort convert; the sync task's own
-            # lookup will simply miss + no-op.
-            uid_int = int(str(user_id).replace("-", ""), 16) & (
-                (1 << 63) - 1
-            )
+        uid_int = await _resolve_user_login_id(session, user_id)
+        if uid_int is None:
+            return
         from src.app.core.integrations.google_calendar.tasks import (
             sync_appointment_task,
         )
@@ -362,7 +388,7 @@ async def create_appointment(
     # so the event lands in the assignee's Google Calendar within
     # seconds. Best-effort: any Celery / Redis failure is swallowed
     # inside the helper; the beat sweep reconciles drift.
-    _dispatch_calendar_sync(appt.id, appt.assigned_to_id)
+    await _dispatch_calendar_sync(session, appt.id, appt.assigned_to_id)
 
     return appt
 
@@ -502,10 +528,10 @@ async def update_appointment(
         and old_assigned_to_id != appt.assigned_to_id
     )
     if reassigned:
-        _dispatch_calendar_sync(appt.id, old_assigned_to_id)
-        _dispatch_calendar_sync(appt.id, appt.assigned_to_id)
+        await _dispatch_calendar_sync(session, appt.id, old_assigned_to_id)
+        await _dispatch_calendar_sync(session, appt.id, appt.assigned_to_id)
     else:
-        _dispatch_calendar_sync(appt.id, appt.assigned_to_id)
+        await _dispatch_calendar_sync(session, appt.id, appt.assigned_to_id)
 
     return appt
 
@@ -533,7 +559,7 @@ async def delete_appointment(session: AsyncSession, *, appointment_id: uuid.UUID
     # Google-side event is removed from the assignee's calendar. The
     # sync task's own lookup sees the appointment is gone + hits the
     # "if we ever synced this, delete the event" branch.
-    _dispatch_calendar_sync(appt_uuid, deleted_assigned_to_id)
+    await _dispatch_calendar_sync(session, appt_uuid, deleted_assigned_to_id)
 
 
 async def list_appointments(

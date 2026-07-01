@@ -95,12 +95,17 @@ async def sync_appointment(
     # --- Delete-path branches -------------------------------------------
     # Appointment gone OR unassigned-relative-to-this-user OR cancelled.
     is_deleted = appointment is None
+    assignee_login_id = (
+        await _resolve_login_id(session, appointment.assigned_to_id)
+        if appointment is not None
+        else None
+    )
     is_cancelled_or_unassigned = (
         appointment is not None
         and (
             appointment.status == AppointmentStatus.cancelled
             or appointment.assigned_to_id is None
-            or _uuid_int(appointment.assigned_to_id) != user_id
+            or assignee_login_id != user_id
         )
     )
 
@@ -250,20 +255,13 @@ async def _ensure_primary_calendar_id(
     token,
     http_client: httpx.AsyncClient | None,
 ) -> str:
-    """Return the cached ``primary_calendar_id`` on the token row, or
-    fetch it from Google + persist for future calls. Stable across the
-    user's account lifetime so one call is enough."""
-    if token.primary_calendar_id:
-        return token.primary_calendar_id
-    cal_id = await _client.get_primary_calendar_id(
-        session,
-        org_id=token.org_id,
-        user_id=token.user_id,
-        http_client=http_client,
-    )
-    token.primary_calendar_id = cal_id
-    await session.commit()
-    return cal_id
+    """Return the calendar id to write into. Google exposes the alias
+    ``'primary'`` for every user's default calendar in every events
+    endpoint, so we don't need to look up + cache the numeric id — that
+    lookup requires the ``calendar.readonly`` scope which we don't
+    request. Sticking with ``'primary'`` keeps the OAuth grant minimal
+    (only ``calendar.events``)."""
+    return "primary"
 
 
 async def _delete_event_and_null_out(
@@ -357,23 +355,37 @@ def _build_event_body(
     return body
 
 
-def _uuid_int(value: Any) -> int | None:
-    """The Appointment model's ``assigned_to_id`` is declared as UUID
-    on the ORM but real user ids are BIGINT (see Step 1's notes on
-    the User model tricks). Real deployments store the numeric id
-    cast to UUID via a lossy conversion, so callers that need to
-    compare against a numeric ``user_id`` should use this helper.
+async def _resolve_login_id(
+    session: AsyncSession, user_uuid: Any
+) -> int | None:
+    """Translate the app-wide UUID identifier (as stored on
+    ``tbl_appointments.assigned_to_id``) into the BIGINT
+    ``tbl_user_login.id`` used by the token row so we can compare
+    "does this appointment's assignee match the token's user?".
 
-    Returns ``None`` when the value can't be interpreted as an int
-    (defensive — production data is always populated)."""
-    if value is None:
+    Match paths (either wins):
+
+    * ``tbl_user_login.legacy_uuid`` = UUID directly
+    * ``tbl_user_login.user_id`` = ``'usr_' || hex-no-hyphens``
+
+    Returns ``None`` when the UUID doesn't map to any login row.
+    """
+    from sqlalchemy import text
+
+    if user_uuid is None:
         return None
-    if isinstance(value, int):
-        return value
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+    uuid_str = str(user_uuid)
+    ext = "usr_" + uuid_str.replace("-", "")
+    row = await session.execute(
+        text(
+            "SELECT id FROM tbl_user_login "
+            "WHERE legacy_uuid::text = :uuid OR user_id = :ext "
+            "LIMIT 1"
+        ),
+        {"uuid": uuid_str, "ext": ext},
+    )
+    r = row.first()
+    return int(r[0]) if r else None
 
 
 def _org_id_of(
