@@ -2,7 +2,7 @@
 
 **Goal:** Translate a CRM `Appointment` into Google Calendar `Event`
 CRUD calls. Idempotent, retry-safe, timezone-correct.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 2 (OAuth flow — provides `get_valid_access_token`).
 
 ---

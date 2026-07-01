@@ -219,10 +219,66 @@ async def get_status(
     )
 
 
+# --- Step 3 helpers — called from the sync task -----------------------
+
+
+async def mark_row_error(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: int,
+    error: str,
+) -> None:
+    """Surface a per-token error on the integrations card. Called
+    from the Step-4 Celery task's outer exception handler when the
+    sync fails for a reason the sync loop hasn't already surfaced
+    (e.g. an unhandled 5xx that exhausted the retry budget).
+
+    Idempotent — if no row exists (revoked / never connected) this is
+    a no-op. Owns its own commit so the caller can call it after a
+    session rollback.
+    """
+    row = await _da.get_token_for_user(
+        session, org_id=org_id, user_id=user_id
+    )
+    if row is None:
+        return
+    await _da.mark_status(
+        session, token_id=row.id, status="error", error=error
+    )
+    await session.commit()
+
+
+async def mark_row_synced(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: int,
+) -> None:
+    """Bump ``last_synced_at`` after a successful sync + clear any
+    stale ``last_error``. Called from the Step-4 Celery task's happy
+    path so the integrations card reflects the recent activity."""
+    row = await _da.get_token_for_user(
+        session, org_id=org_id, user_id=user_id
+    )
+    if row is None:
+        return
+    await _da.touch_last_synced(
+        session, token_id=row.id, when=datetime.now(UTC)
+    )
+    if row.last_error is not None:
+        await _da.mark_status(
+            session, token_id=row.id, status="active", error=None
+        )
+    await session.commit()
+
+
 __all__ = [
     "CalendarConnectionStatus",
     "build_authorize_url",
     "complete_connection",
     "disconnect",
     "get_status",
+    "mark_row_error",
+    "mark_row_synced",
 ]
