@@ -4,7 +4,7 @@
 (a) render Call · WhatsApp · Email · Document · Meeting · Other type
 badges and (b) show + count the terminal `missed` status. Both
 changes live on `tbl_tasks` so they land in one migration.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Nothing (foundation step).
 
 ---
@@ -27,14 +27,17 @@ The widget renders `NULL` as **Other**.
 
 - New Postgres enum `task_followup_type` with the 6 values above.
 - Partial index `ix_tbl_tasks_org_due_type_pending` on
-  `(org_id, due_at, followup_type) WHERE status IN ('open',
-  'in_progress')` — the dashboard hits this exact shape (org-scoped,
-  ordered by due_at, filtered by type + open status).
+  `(org_id, due_at, followup_type) WHERE status = 'open'` — the
+  dashboard hits this exact shape (org-scoped, ordered by due_at,
+  filtered by type + open status). `TaskStatus` today is
+  `open · done · cancelled`; `cancelled` is a manual "never mind"
+  state we don't count on the widget, so the partial-index predicate
+  is a single-status compare.
 
 ### Extend `task_status` enum — add `missed`
 
-The existing `task_status` Postgres enum today has `open`,
-`in_progress`, `done`. Add a 4th terminal value:
+The existing `task_status` Postgres enum today has `open`, `done`,
+`cancelled`. Add a 4th value:
 
 - `missed` — rep gave up on the follow-up (customer non-responsive,
   cancelled, no longer relevant). Set explicitly via the widget's
@@ -42,8 +45,8 @@ The existing `task_status` Postgres enum today has `open`,
   Step 6) when a task is overdue by more than 7 days.
 
 Migration uses `ALTER TYPE task_status ADD VALUE 'missed'` — safe,
-non-blocking, no data rewrite. Existing rows at `open` / `in_progress`
-/ `done` are untouched.
+non-blocking in Postgres 12+, no data rewrite. Existing rows at
+`open` / `done` / `cancelled` are untouched.
 
 The Python `TaskStatus` enum on the ORM gets the matching member.
 
@@ -82,7 +85,7 @@ consistent.
   -- → followup_type | USER-DEFINED (task_followup_type)
 
   SELECT unnest(enum_range(NULL::task_status));
-  -- → open, in_progress, done, missed
+  -- → open, done, cancelled, missed
 
   SELECT indexname FROM pg_indexes
   WHERE tablename = 'tbl_tasks' AND indexname LIKE '%followup%';
@@ -94,7 +97,7 @@ consistent.
   before Step 6 lands).
 - Existing task create flow still works — POSTing a task without
   `followup_type` succeeds and stores `NULL`. POSTing a task with
-  `status='open'` / `'in_progress'` / `'done'` / `'missed'` all
+  `status='open'` / `'done'` / `'cancelled'` / `'missed'` all
   succeed.
 
 ---

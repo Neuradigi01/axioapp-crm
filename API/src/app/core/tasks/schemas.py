@@ -13,7 +13,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from src.app.core.tasks.models import TaskPriority, TaskStatus
+from src.app.core.tasks.models import TaskFollowupType, TaskPriority, TaskStatus
 from src.app.shared.schemas import (
     BulkDelete,
     BulkDeleteResult,
@@ -32,6 +32,7 @@ class TaskCreate(BaseModel):
     related_entity_type: str | None = Field(default=None, max_length=64)
     related_entity_id: uuid.UUID | None = None
     priority: TaskPriority = TaskPriority.med
+    followup_type: TaskFollowupType | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -53,6 +54,7 @@ class TaskUpdate(BaseModel):
     assigned_to_id: uuid.UUID | None = None
     status: TaskStatus | None = None
     priority: TaskPriority | None = None
+    followup_type: TaskFollowupType | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -67,6 +69,7 @@ class TaskOut(TimestampedOrgScopedOut):
     related_entity_id: uuid.UUID | None
     status: TaskStatus
     priority: TaskPriority
+    followup_type: TaskFollowupType | None
     last_activity_at: datetime | None
 
 

@@ -108,6 +108,7 @@ _SNAPSHOT_FIELDS = (
     "related_entity_id",
     "status",
     "priority",
+    "followup_type",
 )
 
 
@@ -136,6 +137,7 @@ async def create_task(
         related_entity_type=payload.related_entity_type,
         related_entity_id=payload.related_entity_id,
         priority=payload.priority,
+        followup_type=payload.followup_type,
         status=TaskStatus.open,
     )
     _da.insert_task(session, task)

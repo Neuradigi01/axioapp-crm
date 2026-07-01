@@ -31,12 +31,30 @@ class TaskStatus(str, enum.Enum):
     open = "open"
     done = "done"
     cancelled = "cancelled"
+    # `missed` is a terminal state distinct from `cancelled`: it means
+    # the rep tried to follow up but the customer never responded (or
+    # the nightly grooming job auto-closed a >7-day-overdue open task).
+    # Surfaced on the dashboard's Missed bucket for audit + reporting.
+    missed = "missed"
 
 
 class TaskPriority(str, enum.Enum):
     low = "low"
     med = "med"
     high = "high"
+
+
+class TaskFollowupType(str, enum.Enum):
+    """Type of customer-touch action the task represents. NULL on the
+    column = generic to-do (e.g. "review pipeline"); a non-NULL value
+    tells the dashboard widget which type badge to render."""
+
+    call = "call"
+    whatsapp = "whatsapp"
+    email = "email"
+    document = "document"
+    meeting = "meeting"
+    other = "other"
 
 
 task_status_enum = ENUM(
@@ -48,6 +66,12 @@ task_status_enum = ENUM(
 task_priority_enum = ENUM(
     TaskPriority,
     name="task_priority",
+    values_callable=lambda obj: [m.value for m in obj],
+)
+
+task_followup_type_enum = ENUM(
+    TaskFollowupType,
+    name="task_followup_type",
     values_callable=lambda obj: [m.value for m in obj],
 )
 
@@ -78,6 +102,10 @@ class Task(Base, TenantScoped):
         task_priority_enum,
         nullable=False,
         server_default=text("'med'"),
+    )
+    followup_type: Mapped[TaskFollowupType | None] = mapped_column(
+        task_followup_type_enum,
+        nullable=True,
     )
     # Denormalised "newest activity timestamp" — bumped by the
     # activities-service insert hook AND by the tasks-service write
