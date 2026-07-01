@@ -31,6 +31,9 @@ from src.app.core.integrations.google.router import router as google_router
 from src.app.core.integrations.google.webhook import (
     router as google_webhook_router,
 )
+from src.app.core.integrations.google_calendar.router import (
+    router as google_calendar_router,
+)
 from src.app.core.integrations.meta.router import router as meta_router
 from src.app.core.integrations.meta.webhook import (
     router as meta_webhook_router,
@@ -85,6 +88,11 @@ router.include_router(google_router)
 # public endpoint doesn't accidentally inherit any admin-only deps
 # someone might attach to the OAuth subrouter later.
 router.include_router(google_webhook_router)
+# tasks/google-calendar-sync Step 2 — per-user Google Calendar OAuth.
+# Full paths become /api/v1/integrations/google-calendar/*. Distinct
+# module from google_router (per-org Ads OAuth) because Calendar sync
+# is fundamentally per-user (each employee connects their own account).
+router.include_router(google_calendar_router)
 # Meta subrouter — symmetric to Google. Full paths become
 # /api/v1/integrations/meta/...
 router.include_router(meta_router)

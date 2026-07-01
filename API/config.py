@@ -175,6 +175,18 @@ GOOGLE_GMAIL_REDIRECT_URI = os.getenv(
     "GOOGLE_GMAIL_REDIRECT_URI",
     "http://localhost:8000/api/v1/email/gmail/callback",
 )
+# tasks/google-calendar-sync Step 2 — per-user Google Calendar sync.
+# Shares the same OAuth client as Ads / Gmail (one GOOGLE_OAUTH_CLIENT_ID /
+# _SECRET pair) but a distinct callback path so the callback handler is
+# unambiguous. The consent screen requests calendar.events scope + the
+# usual openid/email/profile so we can populate the token row's
+# google_email + google_user_id. Register this exact URI in Google
+# Cloud Console → Credentials → OAuth 2.0 Client → Authorized redirect
+# URIs (see manual-google-calendar-setup.md in the track folder).
+GOOGLE_CALENDAR_REDIRECT_URI = os.getenv(
+    "GOOGLE_CALENDAR_REDIRECT_URI",
+    "http://localhost:30007/api/v1/integrations/google-calendar/callback",
+)
 # Gmail push notifications — fully-qualified Pub/Sub topic name
 # (e.g. `projects/your-gcp-project/topics/gmail-events`). Optional.
 # When unset, Step 2's connect flow skips the `users.watch` call and

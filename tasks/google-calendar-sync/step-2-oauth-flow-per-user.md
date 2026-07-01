@@ -3,7 +3,7 @@
 **Goal:** The employee clicks Connect on the Integrations page →
 Google's OAuth consent → they land back on the CRM with their Calendar
 tokens stored + status "Connected".
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 1 (schema).
 
 ---
