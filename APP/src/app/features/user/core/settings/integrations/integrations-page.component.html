@@ -89,6 +89,15 @@
         (editMapping)="openMappingEditor($event.subscription, $event.formFields, $event.formLabel)"
       ></app-google-card>
 
+      <!-- tasks/google-calendar-sync Step 5 — per-user Google Calendar
+           card. Distinct row per employee; not gated on org-level
+           `settings.integrations.manage` since it's the user's own
+           connection. -->
+      <app-google-calendar-card
+        [refreshTick]="calendarRefreshTick()"
+        (changed)="onCardChanged()"
+      ></app-google-calendar-card>
+
       <app-meta-card
         [integration]="meta()"
         [subscriptions]="subscriptions()"

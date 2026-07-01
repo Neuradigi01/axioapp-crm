@@ -554,6 +554,34 @@ export class IntegrationsApiService {
   refreshWhatsAppPhoneHealth(): Observable<WhatsAppPhoneHealth> {
     return this.http.post<WhatsAppPhoneHealth>(`${this.base}/whatsapp/phone-health/refresh`, {});
   }
+
+  // --- Google Calendar per-user sync (Step 2) --------------------------
+  //
+  // Distinct surface from the per-org Google Ads OAuth above — Calendar
+  // sync is PER-USER (each employee connects their own Google account).
+  // Endpoints live under `/integrations/google-calendar/*` and are
+  // gated server-side on the CRM JWT (any authenticated user manages
+  // THEIR OWN connection). See tasks/google-calendar-sync/ for the
+  // full track spec.
+
+  /** Fetch the current user's Google Calendar connection status. */
+  getGoogleCalendarStatus(): Observable<GoogleCalendarStatus> {
+    return this.http.get<GoogleCalendarStatus>(`${this.base}/google-calendar/status`);
+  }
+
+  /** Returns `{url}` — the Google consent URL the SPA should navigate
+   *  to via `window.location.assign(...)`. Same pattern as the Ads
+   *  authorize — a top-level 302 to a JWT-gated endpoint would 401,
+   *  so we return JSON + let the SPA do the redirect. */
+  startGoogleCalendarAuthorize(): Observable<AuthorizeUrlResponse> {
+    return this.http.get<AuthorizeUrlResponse>(`${this.base}/google-calendar/authorize`);
+  }
+
+  /** Revoke the refresh token upstream + delete the row. 204 whether
+   *  or not a row existed (idempotent). */
+  disconnectGoogleCalendar(): Observable<void> {
+    return this.http.post<void>(`${this.base}/google-calendar/disconnect`, {});
+  }
 }
 
 export type WhatsAppQualityRating = 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN';
@@ -586,4 +614,23 @@ export interface WhatsAppPhoneHealth {
   is_unlimited: boolean;
   recovery_keys: string[];
   events: WhatsAppPhoneHealthEvent[];
+}
+
+// --- Google Calendar per-user sync shapes (Step 2) --------------------
+
+/** Response from `GET /integrations/google-calendar/status`. Backend
+ *  reference: `service.py:CalendarConnectionStatus`. */
+export interface GoogleCalendarStatus {
+  connected: boolean;
+  google_email: string | null;
+  /** Populated when Google returned an error on the most recent
+   *  refresh / API call. Rendered verbatim on the card so the
+   *  operator sees the exact reason. */
+  last_error: string | null;
+  /** ISO-8601 timestamp of the most recent successful sync — powers
+   *  the "Last synced: 2 minutes ago" line. */
+  last_synced_at: string | null;
+  /** The scopes Google actually granted. Diffed against the requested
+   *  set to detect scope downgrades on unusual consent flows. */
+  scopes_granted: string[];
 }

@@ -44,6 +44,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 import { DlqListComponent } from './dlq-list.component';
 import { FieldMappingEditorComponent } from './field-mapping-editor.component';
+import { GoogleCalendarCardComponent } from './google-calendar-card.component';
 import { GoogleCardComponent } from './google-card.component';
 import { IntegrationStatusComponent } from './integration-status.component';
 import { MetaCardComponent } from './meta-card.component';
@@ -61,7 +62,11 @@ type CallbackStatus =
   | 'google_error'
   | 'meta_connected'
   | 'meta_denied'
-  | 'meta_error';
+  | 'meta_error'
+  // tasks/google-calendar-sync Step 2 callback statuses (Step 5 handler).
+  | 'google_calendar_connected'
+  | 'google_calendar_denied'
+  | 'google_calendar_error';
 
 @Component({
   selector: 'app-settings-integrations-page',
@@ -69,6 +74,7 @@ type CallbackStatus =
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     GoogleCardComponent,
+    GoogleCalendarCardComponent,
     MetaCardComponent,
     WhatsAppCardComponent,
     IntegrationStatusComponent,
@@ -115,6 +121,12 @@ export class IntegrationsPageComponent {
     formFields: string[];
     formLabel: string | null;
   } | null>(null);
+
+  /** Bumped when the Google Calendar callback lands so the card
+   *  refetches its status. The card polls-while-awaiting on its own
+   *  side; this covers the case where the user clicks Connect,
+   *  completes OAuth in the same tab, and returns via the redirect. */
+  protected readonly calendarRefreshTick = signal(0);
 
   // --- derived ------------------------------------------------------
 
@@ -207,6 +219,12 @@ export class IntegrationsPageComponent {
     if (!status) return;
     const reason = params.get('reason');
     this.callbackBanner.set(this._bannerFor(status, reason));
+    // Bump the calendar card's refresh signal when the callback is a
+    // calendar one so the card refetches its status immediately (no
+    // wait for the 5s poll).
+    if (status.startsWith('google_calendar_')) {
+      this.calendarRefreshTick.update((v) => v + 1);
+    }
     // Strip the query params so a reload doesn't re-banner. Router
     // navigation preserves the path; `queryParams: {}` + `queryParamsHandling:
     // ''` clears them.
@@ -246,6 +264,26 @@ export class IntegrationsPageComponent {
         return {
           kind: 'error',
           title: 'Connect failed.',
+          detail: reason ? `Reason: ${reason}` : 'Try again, or check the backend logs.',
+        };
+      case 'google_calendar_connected':
+        return {
+          kind: 'success',
+          title: 'Google Calendar connected.',
+          detail: 'New appointments will sync to your calendar within seconds.',
+        };
+      case 'google_calendar_denied':
+        return {
+          kind: 'warn',
+          title: 'Calendar connection cancelled.',
+          detail: reason
+            ? `Reason: ${reason}`
+            : 'Re-try the Connect button on the Google Calendar card to authorise again.',
+        };
+      case 'google_calendar_error':
+        return {
+          kind: 'error',
+          title: 'Calendar connect failed.',
           detail: reason ? `Reason: ${reason}` : 'Try again, or check the backend logs.',
         };
     }

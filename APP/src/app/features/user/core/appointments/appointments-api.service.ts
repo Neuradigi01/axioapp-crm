@@ -25,6 +25,12 @@ export interface Appointment {
   assigned_to_id: string;
   custom_data: Record<string, unknown>;
   last_activity_at: string | null;
+  // tasks/google-calendar-sync Step 1 — per-appointment Google-side
+  // identifiers. Nullable: unset until Step 4's sync task mirrors the
+  // appointment into the assignee's Google Calendar (or when the
+  // assignee never connected Calendar).
+  google_calendar_event_id?: string | null;
+  google_calendar_etag?: string | null;
   created_at: string;
   updated_at: string;
 }

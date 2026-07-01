@@ -4,7 +4,7 @@
 card with a Connect button. After OAuth they land back with "Connected
 as ajay@gmail.com". Appointment detail page shows a "Synced to Google
 Calendar ✓" chip.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 2-4 (endpoints + sync backend).
 
 ---

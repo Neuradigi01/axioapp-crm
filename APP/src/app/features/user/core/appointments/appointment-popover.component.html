@@ -7,9 +7,34 @@
   >
     <header class="border-b border-zinc-200 pb-2">
       <h3 class="text-sm font-semibold text-zinc-900">{{ a.title }}</h3>
-      <p class="mt-0.5 text-[10px] uppercase tracking-wide text-zinc-500">
-        {{ a.status }}
-      </p>
+      <div class="mt-0.5 flex items-center gap-2">
+        <p class="text-[10px] uppercase tracking-wide text-zinc-500">
+          {{ a.status }}
+        </p>
+        <!-- tasks/google-calendar-sync Step 5 — per-appointment sync
+             chip. Display-only for v1; no click action. Two states:
+             synced (green) when the Step-4 task has mirrored the event
+             into the assignee's Google Calendar, sync-pending (amber)
+             when we haven't yet (either the task is still in flight
+             or the assignee hasn't connected Calendar). -->
+        @if (a.google_calendar_event_id) {
+          <span
+            class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200"
+            title="Mirrored into the assignee's Google Calendar"
+          >
+            <lucide-icon name="calendar" class="h-2.5 w-2.5" aria-hidden="true"></lucide-icon>
+            Synced
+          </span>
+        } @else {
+          <span
+            class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-600 ring-1 ring-inset ring-zinc-200"
+            title="Sync pending or the assignee hasn't connected Google Calendar"
+          >
+            <lucide-icon name="calendar" class="h-2.5 w-2.5" aria-hidden="true"></lucide-icon>
+            Sync pending
+          </span>
+        }
+      </div>
     </header>
     <div class="mt-2 grid grid-cols-1 gap-1">
       @if (canReassign()) {
