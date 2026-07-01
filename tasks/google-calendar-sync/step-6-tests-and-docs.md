@@ -2,7 +2,7 @@
 
 **Goal:** Pin the OAuth / sync surface with pytest cases + document the
 one-time Google Cloud setup + operator-facing FAQ.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 1-5 shipped.
 
 ---

@@ -57,16 +57,16 @@ and Google Calendar to see their own day. This track closes that gap:
 
 ## Track structure
 
-| Step | Title | Est. | Files |
+| Step | Title | Status | Files |
 |---|---|---|---|
-| 1 | [Schema + per-user token storage](step-1-schema-and-oauth-storage.md) | 0.5 day | 4 |
-| 2 | [Per-user OAuth flow (Google Calendar scope)](step-2-oauth-flow-per-user.md) | 0.5 day | 5 |
-| 3 | [Calendar API client + sync service](step-3-calendar-api-client-and-sync-service.md) | 0.75 day | 4 |
-| 4 | [Appointment hooks + Celery task](step-4-appointment-hooks-and-celery-task.md) | 0.5 day | 3 |
-| 5 | [Frontend Connect + badges](step-5-frontend-connect-and-badges.md) | 0.5 day | 5 |
-| 6 | [Tests + docs](step-6-tests-and-docs.md) | 0.25 day | 3 |
+| 1 | [Schema + per-user token storage](step-1-schema-and-oauth-storage.md) | **COMPLETED** | 4 |
+| 2 | [Per-user OAuth flow (Google Calendar scope)](step-2-oauth-flow-per-user.md) | **COMPLETED** | 6 |
+| 3 | [Calendar API client + sync service](step-3-calendar-api-client-and-sync-service.md) | **COMPLETED** | 4 |
+| 4 | [Appointment hooks + Celery task](step-4-appointment-hooks-and-celery-task.md) | **COMPLETED** | 4 |
+| 5 | [Frontend Connect + badges](step-5-frontend-connect-and-badges.md) | **COMPLETED** | 7 |
+| 6 | [Tests + docs](step-6-tests-and-docs.md) | **COMPLETED** | 3 |
 
-**Total: 6 steps, ~24 files, ~3 days of work.**
+**Total: 6 steps, 28 files, ~3 days of work.** ✅ **Track shipped.**
 
 ## Google Cloud setup (one-time, operator-side)
 
