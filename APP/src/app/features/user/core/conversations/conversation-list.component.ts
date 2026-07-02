@@ -74,11 +74,7 @@ const STATUS_OPTIONS: Array<{ value: ConversationStatus | ''; label: string }> =
 const CHANNEL_OPTIONS: Array<{ value: ConversationChannel | ''; label: string }> = [
   { value: '', label: 'All channels' },
   { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'facebook', label: 'Facebook' },
-  { value: 'sms', label: 'SMS' },
   { value: 'email', label: 'Email' },
-  { value: 'web', label: 'Web' },
 ];
 
 type AssigneeMode = 'all' | 'mine' | 'unassigned' | 'specific';
