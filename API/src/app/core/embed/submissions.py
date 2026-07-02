@@ -230,6 +230,15 @@ async def submit(
                 phone=payload.phone,
                 email=payload.email,
             )
+            # Split custom_data into contact vs lead buckets based on
+            # each field's `entity` in the org's widget config. Do this
+            # unconditionally so `lead_custom_data` is defined on both
+            # paths (new contact + existing contact) — otherwise the
+            # ingest_lead call below UnboundLocalErrors on repeat
+            # submissions with the same email.
+            contact_custom_data, lead_custom_data = _split_custom_data(
+                payload.custom_data or {}, document
+            )
             if existing_id is not None:
                 contact_id = existing_id
             else:
@@ -237,12 +246,6 @@ async def submit(
                 # field so we don't lose the data Step 3's widget
                 # config hasn't decided where to land yet.
                 combined_notes = _combine_notes(payload.interest, payload.notes)
-                # Split custom_data into contact vs lead buckets based
-                # on each field's `entity` in the org's widget config.
-                # Empties dropped so they don't land as "" in JSONB.
-                contact_custom_data, lead_custom_data = _split_custom_data(
-                    payload.custom_data or {}, document
-                )
                 contact = await create_contact(
                     session,
                     org_id=org_id,
