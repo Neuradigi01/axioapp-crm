@@ -17,6 +17,9 @@ export interface Call {
   outcome_id: string | null;
   notes: string | null;
   recording_url: string | null;
+  /** True when a file has been uploaded via `POST /calls/{id}/recording`.
+   *  Playback URL is derived via `recordingStreamUrl(id)`. */
+  has_recording: boolean;
   assigned_to_id: string | null;
   custom_data: Record<string, unknown>;
   created_at: string;
@@ -141,6 +144,33 @@ export class CallsApiService {
 
   deleteCall(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/calls/${id}`);
+  }
+
+  // --- Recording upload / playback ---
+
+  /** Upload a recording file (mp3/m4a/ogg/wav, max 30 MB) as
+   *  multipart/form-data. Returns the updated Call so the caller can
+   *  swap in the fresh `has_recording=true` flag optimistically. */
+  uploadRecording(id: string, file: File): Observable<Call> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return this.http.post<Call>(`${this.base}/calls/${id}/recording`, form);
+  }
+
+  /** Absolute URL the streaming endpoint lives at. Rarely used directly
+   *  — `<audio src>` can't send the JWT header, so most callers should
+   *  use `fetchRecording()` instead and wrap the bytes in a blob URL. */
+  recordingStreamUrl(id: string): string {
+    return `${this.base}/calls/${id}/recording`;
+  }
+
+  /** Fetch the recording as a Blob (JWT auto-sent by the interceptor).
+   *  The caller wraps the blob in `URL.createObjectURL` and feeds it to
+   *  the `<audio>` element. 404s when no upload exists. */
+  fetchRecording(id: string): Observable<Blob> {
+    return this.http.get(`${this.base}/calls/${id}/recording`, {
+      responseType: 'blob',
+    });
   }
 
   // --- Transcript ---

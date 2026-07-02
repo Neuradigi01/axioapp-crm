@@ -259,6 +259,127 @@ async def delete_call(session: AsyncSession, *, call_id: uuid.UUID) -> None:
     )
 
 
+# --- Recording upload ----------------------------------------------------
+#
+# Recordings are attached AFTER the call is logged — the rep drag-drops an
+# audio file into the Log Call modal. We store the raw file on disk under
+# `./storage/{org_id}/call_recordings/{uuid}.{ext}` and persist only the
+# relative path on the row. Playback is a separate streaming endpoint so
+# the file bytes are auth-gated (never a public URL).
+
+
+_ALLOWED_RECORDING_EXTS: frozenset[str] = frozenset({".mp3", ".m4a", ".ogg", ".wav"})
+_MAX_RECORDING_BYTES: int = 30 * 1024 * 1024  # 30 MB
+
+
+async def attach_recording_file(
+    session: AsyncSession,
+    *,
+    call_id: uuid.UUID,
+    filename: str,
+    data: bytes,
+    content_type: str | None,
+) -> Call:
+    """Save an uploaded audio file, update ``tbl_calls.recording_file_path``,
+    and return the mutated Call. Validates the extension + size cap up
+    front so oversized uploads fail cheaply."""
+    from pathlib import PurePosixPath
+
+    from src.app.shared.storage import get_storage
+
+    call = await get_call(session, call_id)
+
+    if len(data) > _MAX_RECORDING_BYTES:
+        raise HTTPException(
+            # `HTTP_413_CONTENT_TOO_LARGE` was renamed from
+            # `HTTP_413_REQUEST_ENTITY_TOO_LARGE` in Starlette; use the
+            # numeric code directly so we don't depend on either name.
+            status_code=413,
+            detail=(
+                f"Recording too large ({len(data) // (1024 * 1024)} MB). "
+                f"Maximum: 30 MB."
+            ),
+        )
+    ext = PurePosixPath(filename or "").suffix.lower()
+    if ext not in _ALLOWED_RECORDING_EXTS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Unsupported audio format. Allowed: "
+                + ", ".join(sorted(_ALLOWED_RECORDING_EXTS))
+                + " (video formats like .mp4 are not accepted)."
+            ),
+        )
+
+    before = _call_snapshot(call)
+    file_id = uuid.uuid4()
+    storage_path = f"{call.org_id}/call_recordings/{file_id}{ext}"
+    get_storage().put(storage_path, data, content_type=content_type)
+
+    call.recording_file_path = storage_path
+    await session.commit()
+    await session.refresh(call)
+
+    await log_entity_change(
+        action="calls.recording_uploaded",
+        entity_type="call",
+        entity_id=call_id,
+        before=before,
+        after=_call_snapshot(call),
+    )
+    return call
+
+
+async def read_recording_file(
+    session: AsyncSession, *, call_id: uuid.UUID
+) -> tuple[bytes, str]:
+    """Load an uploaded recording's bytes for streaming playback.
+
+    Returns ``(data, content_type)``. Raises 404 when the call has no
+    uploaded recording (the client should fall back to
+    ``recording_url``).
+    """
+    from pathlib import Path
+
+    call = await get_call(session, call_id)
+    if not call.recording_file_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No recording uploaded for this call.",
+        )
+
+    # Root matches ``LocalStorage.__init__`` default.
+    root = Path("./storage").resolve()
+    target = (root / call.recording_file_path).resolve()
+    if not target.is_file():
+        # Path in DB but file missing on disk — corrupted state.
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Recording file is no longer on disk.",
+        )
+    # Guardrail: prevent path traversal in case a bad row landed in DB.
+    if not str(target).startswith(str(root)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid recording path.",
+        )
+
+    data = target.read_bytes()
+    content_type = _content_type_for(call.recording_file_path)
+    return data, content_type
+
+
+def _content_type_for(path: str) -> str:
+    """Map file extension → audio MIME type for the streaming Response."""
+    ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    return {
+        "mp3": "audio/mpeg",
+        "m4a": "audio/mp4",
+        "ogg": "audio/ogg",
+        "wav": "audio/wav",
+    }.get(ext, "application/octet-stream")
+
+
 # --- Transcript -----------------------------------------------------------
 
 
@@ -372,13 +493,16 @@ def _call_snapshot(c: Call) -> dict[str, Any]:
         "duration_sec": c.duration_sec,
         "outcome_id": str(c.outcome_id) if c.outcome_id else None,
         "assigned_to_id": str(c.assigned_to_id) if c.assigned_to_id else None,
+        "has_recording_file": bool(c.recording_file_path),
     }
 
 
 __all__ = [
     "analytics",
+    "attach_recording_file",
     "create_call",
     "create_outcome",
+    "read_recording_file",
     "delete_call",
     "delete_outcome",
     "get_call",
