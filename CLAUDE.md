@@ -184,7 +184,7 @@ For every step (defined in `tasks/phase-X/step-X.Y-*.md`):
 3. **Implement** strictly within scope.
 4. **Migrations:** if a DB change is involved, write Alembic migration + verify up + down.
 5. **Tests:** add minimal tests proportional to the step.
-6. **Self-check** against the 10 rules.
+6. **Self-check — re-read, don't recall.** Before reporting done, RE-OPEN the rule sources (the 10 rules and Backend module layout above, plus the step file's own checklist) and read each one against the code you just wrote. Marking an item done means you re-read that rule and confirmed the new code satisfies it — not that you remember the rule. Emit a short self-audit block: one line per area, each `pass` / `fixed` / `N/A` (10 rules · layering · reuse · DB efficiency · tooling-clean).
 7. **Stop and report** with the template the master prompt specifies (Files changed · What you can verify · Tests added · Self-check · "Awaiting your 'proceed'").
 
 When adding seed routes, **output raw INSERT SQL** in the report so the user can paste it into the DB directly.
@@ -197,7 +197,18 @@ If anything is ambiguous, **stop and ask one concrete question** with 2–3 opti
 - Every change must be **production-ready** — no placeholders, no TODOs, no commented-out code.
 - Match existing code patterns where they're already correct; introduce new patterns only when the step requires it.
 - Remove unused imports/variables/functions in files you touch.
+- **Reuse before create.** Before adding a function/method/component, search for an existing one and extend it (add a parameter, broaden a filter) when the change is clean. Create new only when sharing would twist the abstraction — no near-duplicate methods.
+- **Query efficiency.** No N+1: never query the database inside a loop. Fold related data into one statement with joins / subqueries / batched (`IN`) reads, and eager-load relationships (`selectinload` / `joinedload`). Aim for ≈2–3 DB round-trips per request — a soft target to catch the accidental many-queries path, not a hard cap; more is fine when the logic genuinely needs it.
+- **Organization.** Keep code well-organized and in the layer it belongs to — backend follows Router → Service → DAL (above); frontend follows the `core/` / `packs/` feature layout. Don't bypass layering for convenience.
 - After completing a step, report what was done and **STOP**. Do not start the next step.
+
+## Code-quality tooling (background context)
+
+Linters and formatters run on this repo, so generated code should already match their style — but they are **not** the gate. The authoritative check is the self-recheck above (re-read the rules against your code); the tools only catch mechanical drift.
+
+- **Python (`API/`):** `ruff format` + `ruff check` (E/F/I/B/UP, line-length 100) block on the pre-commit hook and CI; `bandit` and `pyright` run advisory (CI report-only).
+- **Frontend (`APP/`):** `prettier` and `eslint` errors block (warnings advisory); `tsc --noEmit` and `jscpd` duplication run advisory.
+- `run lint` checks, `run lint-fix` auto-formats/fixes. The pre-commit hook (auto-wired by `run up`) runs the blocking subset on staged files; full enforcement is [`.github/workflows/quality.yml`](.github/workflows/quality.yml) on PRs to `dev`/`main`. Config lives in [`API/pyproject.toml`](API/pyproject.toml), [`APP/eslint.config.js`](APP/eslint.config.js), and [`APP/.prettierrc`](APP/.prettierrc). Two CI pin-tests also enforce the `tbl_` table naming and Router → Service → DAL conventions.
 
 ## Terminal (Windows)
 
