@@ -11,6 +11,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { Call, CallOutcome, CallsApiService } from '../calls-api.service';
+import { CallRecordingPlayerComponent } from '../call-recording-player.component';
 import { LogCallModalComponent } from '../log-call-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -23,7 +24,7 @@ import { extractApiError } from '@core/services/api-error.util';
   selector: 'app-call-logs-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LogCallModalComponent],
+  imports: [LogCallModalComponent, CallRecordingPlayerComponent],
   templateUrl: './logs.component.html',
 })
 export class CallLogsTabComponent {

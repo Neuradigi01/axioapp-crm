@@ -64,6 +64,63 @@
         ></textarea>
       </label>
 
+      <!-- Recording upload (optional) — drag/drop or click. Uploads
+           after the Call row is created so we have a stable id to
+           attach to. -->
+      <div class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-600">Recording (optional)</span>
+
+        @if (recordingFile(); as f) {
+          <div
+            class="mt-1 flex items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900"
+          >
+            <span class="flex items-center gap-2 truncate">
+              <lucide-icon name="mic" size="14" aria-hidden="true"></lucide-icon>
+              <span class="truncate font-medium">{{ f.name }}</span>
+              <span class="shrink-0 text-emerald-700/70">· {{ recordingSizeLabel() }}</span>
+            </span>
+            <button
+              type="button"
+              (click)="clearRecording()"
+              class="shrink-0 rounded p-0.5 text-emerald-700 hover:bg-emerald-100"
+              aria-label="Remove recording"
+            >
+              <lucide-icon name="x" size="14" aria-hidden="true"></lucide-icon>
+            </button>
+          </div>
+        } @else {
+          <label
+            (dragover)="onDragOver($event)"
+            (dragleave)="onDragLeave()"
+            (drop)="onDrop($event)"
+            [class.border-zinc-500]="dragActive()"
+            [class.bg-zinc-50]="dragActive()"
+            class="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-zinc-300 bg-white px-3 py-4 text-center text-xs text-zinc-500 transition hover:border-zinc-400 hover:bg-zinc-50"
+          >
+            <lucide-icon
+              name="upload-cloud"
+              size="18"
+              class="mb-1 text-zinc-400"
+              aria-hidden="true"
+            ></lucide-icon>
+            <span class="font-medium text-zinc-700">Drop audio file or click to upload</span>
+            <span class="mt-0.5 text-[11px] text-zinc-400">
+              mp3 · m4a · ogg · wav · max 30 MB
+            </span>
+            <input
+              type="file"
+              accept=".mp3,.m4a,.ogg,.wav,audio/*"
+              class="sr-only"
+              (change)="onRecordingPicked($event)"
+            />
+          </label>
+        }
+
+        @if (recordingError(); as err) {
+          <p class="mt-1 text-[11px] text-rose-600">{{ err }}</p>
+        }
+      </div>
+
       @if (submitError(); as err) {
         <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
           {{ err }}
@@ -83,7 +140,13 @@
           [disabled]="submitting()"
           class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
         >
-          {{ submitting() ? 'Saving…' : 'Log call' }}
+          @if (uploadingRecording()) {
+            Uploading recording…
+          } @else if (submitting()) {
+            Saving…
+          } @else {
+            Log call
+          }
         </button>
       </div>
     </form>

@@ -26,7 +26,16 @@ from __future__ import annotations
 import uuid
 from datetime import date as Date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
@@ -45,6 +54,7 @@ from src.app.core.calls.schemas import (
 )
 from src.app.core.calls.service import (
     analytics,
+    attach_recording_file,
     create_call,
     create_outcome,
     delete_call,
@@ -53,6 +63,7 @@ from src.app.core.calls.service import (
     get_transcript,
     list_calls,
     list_outcomes,
+    read_recording_file,
     update_call,
     update_outcome,
     upsert_transcript,
@@ -146,6 +157,43 @@ async def delete_call_endpoint(
 ) -> Response:
     await delete_call(db, call_id=call_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Recording upload / playback -----------------------------------------
+
+
+@calls_router.post("/{call_id}/recording", response_model=CallOut)
+async def upload_recording_endpoint(
+    call_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("calls.write")),
+) -> CallOut:
+    """Attach an audio recording file (mp3/m4a/ogg/wav, max 30 MB) to a
+    call. Refuses video / oversized uploads at the service layer with a
+    413 / 400 respectively so bad requests fail cheap."""
+    data = await file.read()
+    call = await attach_recording_file(
+        db,
+        call_id=call_id,
+        filename=file.filename or "",
+        data=data,
+        content_type=file.content_type,
+    )
+    return CallOut.model_validate(call)
+
+
+@calls_router.get("/{call_id}/recording")
+async def download_recording_endpoint(
+    call_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("calls.read")),
+) -> Response:
+    """Stream the uploaded recording bytes back to the client. 404 when
+    the call has no uploaded file — the frontend falls back to
+    ``recording_url`` in that case."""
+    data, content_type = await read_recording_file(db, call_id=call_id)
+    return Response(content=data, media_type=content_type)
 
 
 # --- Transcript -----------------------------------------------------------

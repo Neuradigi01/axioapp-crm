@@ -5,12 +5,14 @@
   EventEmitter,
   Input,
   Output,
+  computed,
   inject,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { Call, CallOutcome, CallsApiService } from './calls-api.service';
@@ -23,11 +25,15 @@ import { Call, CallOutcome, CallsApiService } from './calls-api.service';
  * `outcomes` is passed in by the parent (loaded once and shared) so we
  * don't refetch on every modal open.
  */
+/** Per-file limit (matches backend `_MAX_RECORDING_BYTES`). */
+const MAX_RECORDING_BYTES = 30 * 1024 * 1024;
+const ALLOWED_RECORDING_EXTS = ['.mp3', '.m4a', '.ogg', '.wav'] as const;
+
 @Component({
   selector: 'app-log-call-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, LucideAngularModule],
   templateUrl: './log-call-modal.component.html',
 })
 export class LogCallModalComponent {
@@ -50,6 +56,20 @@ export class LogCallModalComponent {
 
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
+
+  /** Audio file the user selected (drag-drop or click-to-pick). Uploaded
+   *  after the Call row is created so we have a stable id to attach to. */
+  protected readonly recordingFile = signal<File | null>(null);
+  protected readonly recordingError = signal<string | null>(null);
+  protected readonly dragActive = signal(false);
+  protected readonly uploadingRecording = signal(false);
+
+  protected readonly recordingSizeLabel = computed(() => {
+    const f = this.recordingFile();
+    if (!f) return '';
+    const mb = f.size / (1024 * 1024);
+    return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(f.size / 1024))} KB`;
+  });
 
   protected readonly form = this.fb.group({
     contact_id: this.fb.control<string | null>(null),
@@ -88,10 +108,7 @@ export class LogCallModalComponent {
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (call) => {
-          this.submitting.set(false);
-          this.saved.emit(call);
-        },
+        next: (call) => this.afterCreate(call),
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.submitError.set(extractApiError(err) ?? 'Could not log call.');
@@ -99,8 +116,91 @@ export class LogCallModalComponent {
       });
   }
 
+  /** After the Call row lands, upload the recording (if any) then
+   *  emit `saved`. The recording is a follow-up POST because the
+   *  create endpoint takes JSON — we don't try to shove the audio
+   *  through the same body. */
+  private afterCreate(call: Call): void {
+    const file = this.recordingFile();
+    if (!file) {
+      this.submitting.set(false);
+      this.saved.emit(call);
+      return;
+    }
+    this.uploadingRecording.set(true);
+    this.api
+      .uploadRecording(call.id, file)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.uploadingRecording.set(false);
+          this.submitting.set(false);
+          this.saved.emit(updated);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.uploadingRecording.set(false);
+          this.submitting.set(false);
+          // The Call row exists; recording failed. Surface the error
+          // but still emit `saved` so the parent closes cleanly — the
+          // rep can retry via the Edit Call flow later.
+          this.submitError.set(
+            extractApiError(err) ?? 'Call logged, but the recording upload failed.',
+          );
+          this.saved.emit(call);
+        },
+      });
+  }
+
   protected close(): void {
     this.cancel.emit();
+  }
+
+  // --- Recording file picking -----------------------------------------
+
+  protected onRecordingPicked(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) this.acceptRecording(file);
+    // Reset so re-selecting the same file still fires change.
+    input.value = '';
+  }
+
+  protected onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    this.dragActive.set(true);
+  }
+
+  protected onDragLeave(): void {
+    this.dragActive.set(false);
+  }
+
+  protected onDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.dragActive.set(false);
+    const file = event.dataTransfer?.files?.[0];
+    if (file) this.acceptRecording(file);
+  }
+
+  protected clearRecording(): void {
+    this.recordingFile.set(null);
+    this.recordingError.set(null);
+  }
+
+  private acceptRecording(file: File): void {
+    this.recordingError.set(null);
+    const ext = '.' + (file.name.split('.').pop() ?? '').toLowerCase();
+    if (!ALLOWED_RECORDING_EXTS.includes(ext as (typeof ALLOWED_RECORDING_EXTS)[number])) {
+      this.recordingError.set(
+        `Unsupported format. Allowed: ${ALLOWED_RECORDING_EXTS.join(', ')} (mp4/video is not accepted).`,
+      );
+      return;
+    }
+    if (file.size > MAX_RECORDING_BYTES) {
+      const mb = Math.round(file.size / (1024 * 1024));
+      this.recordingError.set(`File is ${mb} MB — maximum is 30 MB. Try M4A instead of WAV.`);
+      return;
+    }
+    this.recordingFile.set(file);
   }
 
   private _nowIso(): string {

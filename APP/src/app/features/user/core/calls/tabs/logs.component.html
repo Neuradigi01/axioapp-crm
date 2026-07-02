@@ -61,6 +61,11 @@
             >
               Notes
             </th>
+            <th
+              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Recording
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-100">
@@ -101,6 +106,22 @@
               <td class="max-w-md px-4 py-2 text-zinc-700">
                 @if (c.notes) {
                   <span class="line-clamp-2">{{ c.notes }}</span>
+                } @else {
+                  <span class="text-xs text-zinc-400">—</span>
+                }
+              </td>
+              <td class="px-4 py-2">
+                @if (c.has_recording) {
+                  <app-call-recording-player [callId]="c.id" />
+                } @else if (c.recording_url) {
+                  <a
+                    [href]="c.recording_url"
+                    target="_blank"
+                    rel="noopener"
+                    class="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:underline"
+                  >
+                    External link ↗
+                  </a>
                 } @else {
                   <span class="text-xs text-zinc-400">—</span>
                 }

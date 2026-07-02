@@ -107,6 +107,12 @@ class Call(Base, TenantScoped):
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     recording_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Path to an uploaded recording file, relative to the storage root.
+    # Populated when the rep drag-drops the audio into the log-call modal
+    # instead of pasting an external URL. Playback goes through the
+    # ``GET /calls/{id}/recording`` streaming endpoint. Priority: if this
+    # path exists, the UI uses it; otherwise falls back to ``recording_url``.
+    recording_file_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     assigned_to_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         nullable=True,

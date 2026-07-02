@@ -72,9 +72,23 @@ class CallOut(ORMModel):
     outcome_id: uuid.UUID | None
     notes: str | None
     recording_url: str | None
+    # `recording_file_path` is intentionally NOT exposed to the client —
+    # it's an internal filesystem path. The frontend derives whether a
+    # recording exists from `has_recording` + streams it via
+    # `GET /calls/{id}/recording`.
+    has_recording: bool = False
     assigned_to_id: uuid.UUID | None
     custom_data: dict[str, Any]
     created_at: datetime
+
+    @classmethod
+    def model_validate(cls, obj, *args, **kwargs):  # type: ignore[override]
+        # Derive `has_recording` from the private column so callers
+        # can still `CallOut.model_validate(orm_row)` unchanged.
+        has_rec = bool(getattr(obj, "recording_file_path", None))
+        instance = super().model_validate(obj, *args, **kwargs)
+        instance.has_recording = has_rec
+        return instance
 
 
 CallListResponse = PaginatedResponse[CallOut]

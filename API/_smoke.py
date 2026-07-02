@@ -1,97 +1,109 @@
-"""Smoke:
-   1. Verify /tasks/{id}/mark-missed flips open → missed for an
-      overdue task, refuses on already-missed with 409.
-   2. Verify the grooming task auto-closes a task with due_at > 7d
-      in the past.
-Uses Ajay's Workspace org.
+"""Smoke: exercise the call recording upload + retrieval round-trip.
+
+1. Seed a Call row for Ajay's Workspace.
+2. Attach a tiny fake audio file via `attach_recording_file`.
+3. Read it back via `read_recording_file` — verify bytes + MIME.
+4. Cleanup the row.
+
+Runs everything through the service layer (bypasses HTTP but exercises
+the exact same code path the router uses).
 """
 
 import asyncio
 import os
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
-
-AJAY_ORG = "41f9ede9-41b3-44ce-b489-3004566d4068"
-AJAY_UUID = "dff5c609-c88f-4219-bbda-3480ee00dec0"
-
-url = f"postgresql+asyncpg://{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}@{os.environ['DB_HOST']}:{os.environ['DB_PORT']}/{os.environ['DB_NAME']}"
+AJAY_ORG = uuid.UUID("41f9ede9-41b3-44ce-b489-3004566d4068")
 
 
 async def main() -> None:
-    now = datetime.now(UTC)
+    from sqlalchemy import text as sql_text
 
-    e = create_async_engine(url)
-    async with e.begin() as c:
-        # Seed one overdue-open task + one >7d-open task for grooming
-        overdue_id = str(uuid.uuid4())
-        stale_id = str(uuid.uuid4())
-        await c.execute(text("""
-            INSERT INTO tbl_tasks (id, org_id, title, due_at, assigned_to_id,
-                                   status, priority, created_at, updated_at)
-            VALUES (:id1, :org, '[smoke6] overdue for mark-missed', :yesterday,
-                    :assign, 'open', 'med', :now, :now),
-                   (:id2, :org, '[smoke6] >8d old for grooming', :old,
-                    :assign, 'open', 'med', :now, :now)
-        """), {
-            "id1": overdue_id, "id2": stale_id, "org": AJAY_ORG,
-            "assign": AJAY_UUID,
-            "yesterday": now - timedelta(days=1),
-            "old": now - timedelta(days=8),
-            "now": now,
-        })
-
-    # Direct service call — mimic the endpoint's contract
-    # Eagerly import ORM model modules so string-based FK references
-    # ('tbl_organizations.id') resolve at flush time.
+    # Eagerly import so string-based FK ('tbl_organizations.id') resolves.
     from src.app.core.tenants import models as _tenants  # noqa: F401
-    from src.app.core.tasks.service import mark_task_missed
-    from src.app.shared.context import RequestContext, set_context, reset_context
+    from src.app.core.calls import service as _calls_service
+    from src.app.core.calls.models import Call, CallDirection
+    from src.app.shared.context import RequestContext, reset_context, set_context
     from src.app.shared.db import async_session
-    from fastapi import HTTPException
 
-    token = set_context(RequestContext(org_id=uuid.UUID(AJAY_ORG), user_id=None))
+    tk = set_context(RequestContext(org_id=AJAY_ORG, user_id=None))
     try:
+        # 1. Seed a Call row.
+        call_id: uuid.UUID
         async with async_session() as session:
-            print("=== 1. mark_task_missed happy path ===")
-            row = await mark_task_missed(session, task_id=uuid.UUID(overdue_id))
-            print(f"  status after call: {row.status.value}  (expected: missed)")
+            c = Call(
+                org_id=AJAY_ORG,
+                direction=CallDirection.out,
+                started_at=datetime.now(UTC),
+                duration_sec=42,
+                notes="[smoke] recording round-trip",
+            )
+            session.add(c)
+            await session.commit()
+            await session.refresh(c)
+            call_id = c.id
+            print(f"created call: {call_id}")
 
+        # 2. Upload a tiny fake audio blob.
+        fake_mp3 = b"ID3\x04\x00\x00\x00" + b"\x00" * 32  # 39-byte "audio"
         async with async_session() as session:
-            print("=== 2. mark_task_missed on already-missed → 409 ===")
+            call = await _calls_service.attach_recording_file(
+                session,
+                call_id=call_id,
+                filename="smoke.mp3",
+                data=fake_mp3,
+                content_type="audio/mpeg",
+            )
+            print(f"attached: recording_file_path = {call.recording_file_path}")
+
+        # 3. Read it back.
+        async with async_session() as session:
+            data, ct = await _calls_service.read_recording_file(session, call_id=call_id)
+            print(f"read back: {len(data)} bytes · content-type={ct}")
+            assert data == fake_mp3, "byte mismatch!"
+            assert ct == "audio/mpeg", f"unexpected mime: {ct}"
+
+        # 4. Verify file lives on disk under the right path.
+        from pathlib import Path
+        expected = Path("./storage") / call.recording_file_path
+        print(f"disk path: {expected} · exists={expected.exists()}")
+
+        # 5. Test the size-cap guard.
+        oversized = b"\x00" * (31 * 1024 * 1024)  # 31 MB
+        async with async_session() as session:
             try:
-                await mark_task_missed(session, task_id=uuid.UUID(overdue_id))
-                print("  UNEXPECTED: no 409 raised")
-            except HTTPException as ex:
-                print(f"  HTTP {ex.status_code}: {ex.detail}")
+                await _calls_service.attach_recording_file(
+                    session, call_id=call_id, filename="huge.mp3",
+                    data=oversized, content_type="audio/mpeg",
+                )
+                print("ERROR: oversized upload was NOT rejected")
+            except Exception as ex:
+                print(f"size guard OK: {type(ex).__name__} · {getattr(ex, 'detail', ex)}")
+
+        # 6. Test the extension guard (mp4).
+        async with async_session() as session:
+            try:
+                await _calls_service.attach_recording_file(
+                    session, call_id=call_id, filename="clip.mp4",
+                    data=fake_mp3, content_type="video/mp4",
+                )
+                print("ERROR: .mp4 was NOT rejected")
+            except Exception as ex:
+                print(f"ext guard OK: {type(ex).__name__} · {getattr(ex, 'detail', ex)}")
+
+        # 7. Cleanup.
+        async with async_session() as session:
+            call = await _calls_service.get_call(session, call_id)
+            await session.delete(call)
+            await session.commit()
+            print("cleanup: deleted smoke call row")
+        # Also remove the file on disk.
+        if expected.exists():
+            expected.unlink()
+            print("cleanup: removed smoke audio file from disk")
     finally:
-        reset_context(token)
-
-    # 3. Grooming task — call the async coroutine directly to avoid
-    # nesting asyncio.run() inside the outer loop. Celery worker
-    # invokes it via the sync wrapper in production.
-    from src.app.core.tasks.tasks import _groom_stale_open_tasks_async
-    print()
-    print("=== 3. groom_stale_open_tasks ===")
-    result = await _groom_stale_open_tasks_async()
-    print(f"  result: {result}")
-
-    # Verify the stale row is now missed
-    async with e.connect() as c:
-        r = (await c.execute(text(
-            "SELECT status FROM tbl_tasks WHERE id = :id"
-        ), {"id": stale_id})).scalar_one()
-        print(f"  stale row status: {r}  (expected: missed)")
-
-    # Cleanup
-    async with e.begin() as c:
-        await c.execute(text(
-            "DELETE FROM tbl_tasks WHERE title LIKE '[smoke6]%'"
-        ))
-    print("\ncleanup: deleted [smoke6] rows")
-    await e.dispose()
+        reset_context(tk)
 
 
 asyncio.run(main())
