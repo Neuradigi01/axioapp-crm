@@ -3,7 +3,7 @@
 **Goal:** Ship the authenticated CRUD API surface for Property under `/api/v1/property/*` — create, list (with filters + pagination), get one, update, delete, publish, unpublish, archive, mark-sold. Register the module descriptor so it appears in the sidebar for orgs on the Real Estate pack with the right permissions.
 
 **Track:** Real Estate CRM Pack
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 2 (models + DAL).
 
 ---

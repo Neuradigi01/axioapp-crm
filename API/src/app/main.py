@@ -111,6 +111,9 @@ from src.app.packs.furniture.modules.billing.router import (
 # Import the pack's billing __init__ so its PDF renderer registers
 # itself with `core.billing.pdf_registry` at startup.
 import src.app.packs.furniture.modules.billing  # noqa: F401
+from src.app.packs.real_estate.modules.property.router import (
+    router as rp_property_router,
+)
 # tasks/workflows Step 1 — side-effect import so the five workflow
 # tables register with `Base.metadata` before the FastAPI app's
 # tables-create + Alembic autogenerate sweep run.
@@ -290,6 +293,7 @@ app.include_router(fp_field_ops_router, prefix="/api/v1")
 app.include_router(fp_field_ops_staff_portal_router, prefix="/api/v1")
 app.include_router(billing_router, prefix="/api/v1")
 app.include_router(fp_pos_router, prefix="/api/v1")
+app.include_router(rp_property_router, prefix="/api/v1")
 app.include_router(plans_router, prefix="/api/v1")
 app.include_router(stripe_webhooks_router, prefix="/api/v1")
 

@@ -184,6 +184,21 @@ async def list_property_images(
     return list((await session.execute(stmt)).scalars().all())
 
 
+async def count_property_images(
+    session: AsyncSession,
+    *,
+    property_id: uuid.UUID,
+) -> int:
+    """Cheap COUNT(*) — single round-trip aggregate used by the
+    publish-validation path (require ≥ 1 image before publish)."""
+    stmt = (
+        select(func.count())
+        .select_from(PropertyImage)
+        .where(PropertyImage.property_id == property_id)
+    )
+    return int((await session.execute(stmt)).scalar_one())
+
+
 async def get_property_image_by_id(
     session: AsyncSession,
     *,
@@ -245,6 +260,7 @@ async def bulk_update_display_orders(
 __all__ = [
     "bulk_update_display_orders",
     "count_properties_by_status",
+    "count_property_images",
     "delete_property_image_row",
     "delete_property_row",
     "get_property_by_id",
