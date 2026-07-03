@@ -3,7 +3,7 @@
 **Goal:** Ship the two public-facing Angular routes — `/properties?org=<slug>` (grid of published listings) and `/property/{token}` (single property detail). No login required; no sidebar; no user chrome; SEO-friendly meta tags.
 
 **Track:** Real Estate CRM Pack
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 5 (public backend endpoints).
 
 ---

@@ -47,6 +47,14 @@ export const appRoutes: Routes = [
       ),
   },
   {
+    // Public Real Estate pack surfaces — `/properties?org=<slug>` grid
+    // and `/property/{token}` detail. No auth guard: the backend's
+    // Fernet-token check is the only gate. Placed above `/user/*` and
+    // the `**` catchall so route ordering picks these up first.
+    path: '',
+    loadChildren: () => import('./features/public/public.routes').then((m) => m.PUBLIC_ROUTES),
+  },
+  {
     path: getRoute('user').path,
     loadChildren: () => import('./features/user/user.routes').then((m) => m.userRoutes),
     canActivate: [furnitureAuthGuard],

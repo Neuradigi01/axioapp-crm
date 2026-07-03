@@ -1,0 +1,100 @@
+<section>
+  <div class="mb-6">
+    <h1 class="text-3xl font-semibold text-zinc-900">Properties</h1>
+    <p class="mt-1 text-sm text-zinc-500">
+      Explore the latest listings and reach out to the owner directly.
+    </p>
+  </div>
+
+  @if (!orgSlug()) {
+    <div
+      class="rounded-xl border border-amber-200 bg-amber-50 px-6 py-10 text-center text-sm text-amber-900"
+    >
+      <lucide-icon name="alert-triangle" class="mx-auto mb-2 h-6 w-6 text-amber-500"></lucide-icon>
+      <div class="font-medium">This link is missing the organization identifier.</div>
+      <div class="mt-1 text-xs">Please use the shareable link provided by the property owner.</div>
+    </div>
+  } @else {
+    <div class="mb-4">
+      <div class="relative w-full max-w-md">
+        <lucide-icon
+          name="search"
+          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+        ></lucide-icon>
+        <input
+          type="search"
+          [formControl]="searchControl"
+          placeholder="Search title, city…"
+          class="w-full rounded-md border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+        />
+      </div>
+    </div>
+
+    @if (loading()) {
+      <div class="rounded-xl border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+        Loading properties…
+      </div>
+    } @else if (loadError()) {
+      <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        {{ loadError() }}
+      </div>
+    } @else if (filteredItems().length === 0) {
+      <div class="rounded-xl border border-zinc-200 bg-white px-6 py-14 text-center">
+        <lucide-icon name="home" class="mx-auto mb-2 h-8 w-8 text-zinc-300"></lucide-icon>
+        <div class="text-sm font-medium text-zinc-800">No properties listed yet.</div>
+        <div class="mt-1 text-xs text-zinc-500">
+          Check back soon — new listings appear as they are published.
+        </div>
+      </div>
+    } @else {
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        @for (card of filteredItems(); track card.public_url) {
+          <a
+            [href]="card.public_url"
+            class="group flex flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <div class="aspect-video overflow-hidden bg-zinc-100">
+              @if (card.featured_image_url) {
+                <img
+                  [src]="card.featured_image_url"
+                  [alt]="card.title"
+                  loading="lazy"
+                  class="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                />
+              } @else {
+                <div class="flex h-full items-center justify-center text-zinc-400">
+                  <lucide-icon name="image-off" class="h-8 w-8"></lucide-icon>
+                </div>
+              }
+            </div>
+            <div class="flex flex-1 flex-col gap-2 p-4">
+              <span
+                class="inline-flex w-fit items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+              >
+                {{ labelForType(card.property_type) }}
+              </span>
+              <h2 class="line-clamp-2 text-base font-semibold text-zinc-900">
+                {{ card.title }}
+              </h2>
+              <div class="text-sm font-semibold text-zinc-900">
+                {{ formatPrice(card.price, card.currency) }}
+              </div>
+              <div class="text-xs text-zinc-500">
+                {{ card.city || '—' }}
+                @if (card.state) {
+                  <span>, {{ card.state }}</span>
+                }
+              </div>
+              @if (card.short_description) {
+                <p class="line-clamp-3 text-xs text-zinc-600">
+                  {{ card.short_description }}
+                </p>
+              }
+              <div class="mt-auto pt-2 text-xs font-medium text-zinc-900">View details →</div>
+            </div>
+          </a>
+        }
+      </div>
+    }
+  }
+</section>
