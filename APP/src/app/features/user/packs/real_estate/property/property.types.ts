@@ -135,3 +135,45 @@ export const PROPERTY_TABS = [
 ] as const;
 
 export type PropertyTabKey = (typeof PROPERTY_TABS)[number]['key'];
+
+/** Human-readable option lists for the create/edit form dropdowns.
+ * Keys match the backend enums; labels stay UI-only. */
+export const PROPERTY_TYPE_OPTIONS: ReadonlyArray<{ key: PropertyTypeKey; label: string }> = [
+  { key: 'apartment', label: 'Apartment' },
+  { key: 'villa', label: 'Villa' },
+  { key: 'plot', label: 'Plot' },
+  { key: 'commercial_office', label: 'Commercial Office' },
+  { key: 'commercial_shop', label: 'Commercial Shop' },
+  { key: 'warehouse', label: 'Warehouse' },
+  { key: 'farmhouse', label: 'Farmhouse' },
+  { key: 'pg_hostel', label: 'PG / Hostel' },
+  { key: 'other', label: 'Other' },
+];
+
+export const PROPERTY_CATEGORY_OPTIONS: ReadonlyArray<{ key: PropertyCategoryKey; label: string }> =
+  [
+    { key: 'residential_sale', label: 'Residential — Sale' },
+    { key: 'residential_rent', label: 'Residential — Rent' },
+    { key: 'commercial_sale', label: 'Commercial — Sale' },
+    { key: 'commercial_rent', label: 'Commercial — Rent' },
+    { key: 'land_sale', label: 'Land — Sale' },
+  ];
+
+export const AREA_UNIT_OPTIONS: ReadonlyArray<{ key: string; label: string }> = [
+  { key: 'sqft', label: 'sqft' },
+  { key: 'sqm', label: 'sqm' },
+  { key: 'acres', label: 'acres' },
+  { key: 'cents', label: 'cents' },
+  { key: 'gaj', label: 'gaj' },
+];
+
+/** Client-side upload constraints — must match the backend validator
+ * in `shared/files/image.py` (5 MB, JPEG/PNG/WebP). Kept here so the
+ * gallery can pre-reject before hitting the multipart endpoint. */
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const ALLOWED_IMAGE_MIME: ReadonlySet<string> = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
+export const MAX_UPLOAD_BATCH = 20;

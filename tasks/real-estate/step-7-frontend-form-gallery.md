@@ -3,9 +3,9 @@
 **Goal:** Ship the property create/edit form (all fields per the requirements) and the multi-image gallery uploader (drag-select, drag-reorder, pick featured, delete).
 
 **Track:** Real Estate CRM Pack
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 4, 6 (backend image endpoints + frontend shell).
-
+  
 ---
 
 ## Scope

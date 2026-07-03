@@ -7,6 +7,13 @@
         Manage your real-estate listings — draft, publish, archive, share.
       </p>
     </div>
+    <a
+      [routerLink]="['/user/properties/new']"
+      class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-zinc-800"
+    >
+      <lucide-icon name="plus" class="h-4 w-4"></lucide-icon>
+      New Property
+    </a>
   </header>
 
   <!-- Tab bar -->
@@ -64,9 +71,15 @@
         <lucide-icon name="home" class="h-10 w-10 text-zinc-300"></lucide-icon>
         <div class="text-sm font-medium text-zinc-800">No properties yet.</div>
         <div class="max-w-sm text-xs text-zinc-500">
-          Once you create your first listing it will appear here — grouped by status across the tabs
-          above.
+          Create your first listing to see it here — grouped by status across the tabs above.
         </div>
+        <a
+          [routerLink]="['/user/properties/new']"
+          class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-zinc-800"
+        >
+          <lucide-icon name="plus" class="h-4 w-4"></lucide-icon>
+          New Property
+        </a>
       </div>
     } @else {
       <table class="min-w-full divide-y divide-zinc-200 text-sm">
@@ -82,7 +95,7 @@
         </thead>
         <tbody class="divide-y divide-zinc-100 bg-white">
           @for (p of items(); track p.id) {
-            <tr class="hover:bg-zinc-50">
+            <tr (click)="openProperty(p)" class="cursor-pointer hover:bg-zinc-50">
               <td class="px-4 py-3">
                 @if (p.featured_image_url) {
                   <img

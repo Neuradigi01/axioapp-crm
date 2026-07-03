@@ -10,6 +10,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
@@ -40,11 +41,12 @@ import { PROPERTY_TABS } from './property.types';
   selector: 'app-property-list-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule, LucideAngularModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, LucideAngularModule],
   templateUrl: './property-list.page.html',
 })
 export class PropertyListPageComponent {
   private readonly api = inject(PropertyApiService);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly TABS = PROPERTY_TABS;
@@ -143,6 +145,10 @@ export class PropertyListPageComponent {
     this.pageSize.set(size);
     this.page.set(1);
     this.reload();
+  }
+
+  protected openProperty(p: Property): void {
+    this.router.navigate(['/user/properties', p.id, 'edit']);
   }
 
   protected statusBadgeClass(status: PropertyStatus): string {

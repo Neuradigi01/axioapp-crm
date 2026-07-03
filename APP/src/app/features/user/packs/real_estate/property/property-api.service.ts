@@ -6,6 +6,7 @@ import { environment } from '../../../../../../environments/environment';
 import type {
   Property,
   PropertyCreate,
+  PropertyImage,
   PropertyListFilters,
   PropertyListResponse,
   PropertyUpdate,
@@ -93,5 +94,29 @@ export class PropertyApiService {
 
   generatePublicUrl(id: string): Observable<PublicUrlResponse> {
     return this.http.post<PublicUrlResponse>(`${this.base}/${id}/public-url`, {});
+  }
+
+  // ---------------------------------------------------------------------
+  // Gallery — multipart upload, delete, reorder, set featured.
+  // ---------------------------------------------------------------------
+
+  uploadImages(id: string, files: File[]): Observable<PropertyImage[]> {
+    const form = new FormData();
+    for (const f of files) form.append('files', f, f.name);
+    return this.http.post<PropertyImage[]>(`${this.base}/${id}/images`, form);
+  }
+
+  deleteImage(id: string, imageId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${id}/images/${imageId}`);
+  }
+
+  reorderImages(id: string, imageIds: string[]): Observable<PropertyImage[]> {
+    return this.http.patch<PropertyImage[]>(`${this.base}/${id}/images/reorder`, {
+      image_ids: imageIds,
+    });
+  }
+
+  setFeaturedImage(id: string, imageId: string): Observable<PropertyImage> {
+    return this.http.patch<PropertyImage>(`${this.base}/${id}/images/${imageId}/featured`, {});
   }
 }

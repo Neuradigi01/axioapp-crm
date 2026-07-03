@@ -594,6 +594,22 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        path: 'properties/new',
+        canActivate: [permissionGuard('property.write')],
+        loadComponent: () =>
+          import('./packs/real_estate/property/property-form.page').then(
+            (m) => m.PropertyFormPageComponent,
+          ),
+      },
+      {
+        path: 'properties/:id/edit',
+        canActivate: [permissionGuard('property.write')],
+        loadComponent: () =>
+          import('./packs/real_estate/property/property-form.page').then(
+            (m) => m.PropertyFormPageComponent,
+          ),
+      },
+      {
         path: 'access-denied',
         loadComponent: () =>
           import('./core/access-denied/access-denied.page').then(
