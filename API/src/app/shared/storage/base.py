@@ -46,3 +46,15 @@ class StorageBackend(ABC):
     @abstractmethod
     def url(self, path: str) -> str:
         """Public, server-relative URL for the object at `path`."""
+
+    @abstractmethod
+    def delete(self, path: str) -> bool:
+        """Delete the blob at `path`. Returns True if a file was removed,
+        False if there was nothing there. Must reject any path that
+        resolves outside the backend root (path-traversal guard)."""
+
+    @abstractmethod
+    def delete_directory(self, prefix: str) -> int:
+        """Recursively delete every blob under `prefix` and return the
+        number of files removed. Same path-traversal guard as
+        `delete`."""

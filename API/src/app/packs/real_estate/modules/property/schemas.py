@@ -204,9 +204,21 @@ class PropertyListFilters(BaseModel):
         return v
 
 
+class PropertyImageReorderRequest(BaseModel):
+    """Body for ``PATCH /api/v1/property/{id}/images/reorder``. The
+    order of ``image_ids`` becomes the new ``display_order``. The
+    service enforces that this list is a permutation of the property's
+    existing gallery (no add, no drop) — rejects with 400 otherwise."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    image_ids: list[uuid.UUID] = Field(min_length=1)
+
+
 __all__ = [
     "PropertyCreate",
     "PropertyImageOut",
+    "PropertyImageReorderRequest",
     "PropertyListFilters",
     "PropertyListOut",
     "PropertyOut",

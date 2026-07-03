@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
@@ -36,6 +36,8 @@ from src.app.packs.real_estate.modules.property.constants import (
 )
 from src.app.packs.real_estate.modules.property.schemas import (
     PropertyCreate,
+    PropertyImageOut,
+    PropertyImageReorderRequest,
     PropertyListFilters,
     PropertyListOut,
     PropertyOut,
@@ -45,13 +47,17 @@ from src.app.packs.real_estate.modules.property.service import (
     archive_property,
     create_property,
     delete_property,
+    delete_property_image,
     get_property,
     list_properties,
     mark_sold,
     publish_property,
+    reorder_property_images,
+    set_featured_image,
     unarchive_property,
     unpublish_property,
     update_property,
+    upload_property_images,
 )
 from src.app.shared.db import get_db
 
@@ -189,3 +195,75 @@ async def mark_sold_endpoint(
     user: User = Depends(require_permissions("property.write")),
 ) -> PropertyOut:
     return await mark_sold(db, org_id=user.org_id, property_id=property_id)
+
+
+# --- Image gallery ------------------------------------------------------
+
+
+@router.post(
+    "/{property_id}/images",
+    response_model=list[PropertyImageOut],
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_images_endpoint(
+    property_id: uuid.UUID,
+    files: list[UploadFile] = File(..., description="Multipart image files (JPEG/PNG/WebP, ≤5 MB each)"),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("property.write")),
+) -> list[PropertyImageOut]:
+    tuples = [(f.filename or "", await f.read(), f.content_type) for f in files]
+    inserted = await upload_property_images(
+        db, org_id=user.org_id, property_id=property_id, files=tuples
+    )
+    return [PropertyImageOut.model_validate(i, from_attributes=True) for i in inserted]
+
+
+@router.delete(
+    "/{property_id}/images/{image_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_image_endpoint(
+    property_id: uuid.UUID,
+    image_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("property.write")),
+) -> Response:
+    await delete_property_image(
+        db, org_id=user.org_id, property_id=property_id, image_id=image_id
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch(
+    "/{property_id}/images/reorder",
+    response_model=list[PropertyImageOut],
+)
+async def reorder_images_endpoint(
+    property_id: uuid.UUID,
+    payload: PropertyImageReorderRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("property.write")),
+) -> list[PropertyImageOut]:
+    fresh = await reorder_property_images(
+        db,
+        org_id=user.org_id,
+        property_id=property_id,
+        image_ids=payload.image_ids,
+    )
+    return [PropertyImageOut.model_validate(i, from_attributes=True) for i in fresh]
+
+
+@router.patch(
+    "/{property_id}/images/{image_id}/featured",
+    response_model=PropertyImageOut,
+)
+async def set_featured_endpoint(
+    property_id: uuid.UUID,
+    image_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("property.write")),
+) -> PropertyImageOut:
+    image = await set_featured_image(
+        db, org_id=user.org_id, property_id=property_id, image_id=image_id
+    )
+    return PropertyImageOut.model_validate(image, from_attributes=True)

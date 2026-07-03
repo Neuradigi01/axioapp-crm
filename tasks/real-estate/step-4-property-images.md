@@ -3,7 +3,7 @@
 **Goal:** Ship authenticated image endpoints for Property — upload one or many images, delete an image, reorder the gallery, set which image is featured. Files land on the filesystem under the locked `./storage/{org_id}/property/{property_id}/` layout, validated by the existing image validator, no S3.
 
 **Track:** Real Estate CRM Pack
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 3 (Property CRUD live).
 
 ---

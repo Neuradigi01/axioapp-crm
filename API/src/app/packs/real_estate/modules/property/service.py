@@ -30,7 +30,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core import audit
 from src.app.packs.real_estate.modules.property import data_access as _da
 from src.app.packs.real_estate.modules.property.constants import PropertyStatus
-from src.app.packs.real_estate.modules.property.models import Property
+from src.app.packs.real_estate.modules.property.models import Property, PropertyImage
+from src.app.shared.files.image import ImageValidationError, validate_image_upload
+from src.app.shared.storage import get_storage
 from src.app.packs.real_estate.modules.property.schemas import (
     PropertyCreate,
     PropertyImageOut,
@@ -350,14 +352,29 @@ async def delete_property(
     org_id: uuid.UUID,
     property_id: uuid.UUID,
 ) -> None:
-    """Hard delete + FK-cascade of images. Physical file cleanup in
-    Step 4 (service hook using the storage backend). The audit log
-    captures the last-known title so post-mortem trails still make
-    sense."""
+    """Hard delete + FK-cascade of image rows + storage cleanup of
+    every physical file under
+    ``./storage/{org_id}/property/{property_id}/``. The DB rows go
+    first (the cascade is transactional); the filesystem sweep is
+    best-effort and errors are swallowed to a log line so a partial
+    cleanup never turns into a 500 for the operator."""
     prop = await _fetch_owned(session, org_id=org_id, property_id=property_id)
     before = {"title": prop.title, "status": prop.status, "slug": prop.slug}
     await _da.delete_property_row(session, prop)
     await session.commit()
+
+    try:
+        get_storage().delete_directory(f"{org_id}/property/{property_id}")
+    except Exception as exc:  # noqa: BLE001 — cleanup is best-effort
+        # Not fatal — the DB rows are gone; leftover files are dead
+        # weight the ops team can sweep later. Surface via audit.
+        await audit.log(
+            "property.storage_cleanup_failed",
+            entity_type="property",
+            entity_id=property_id,
+            after={"error": str(exc)},
+        )
+
     await audit.log(
         "property.deleted",
         entity_type="property",
@@ -488,15 +505,244 @@ async def mark_sold(
     return _to_out(prop)
 
 
+# ---------------------------------------------------------------------------
+# Image gallery
+# ---------------------------------------------------------------------------
+
+# Batch upload cap. Multipart POST accepts up to this many files per
+# request; more must be split across calls. Keeps a single request's
+# memory profile bounded (5 MB × 20 files = 100 MB worst-case).
+_MAX_UPLOAD_BATCH = 20
+
+
+async def upload_property_images(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    property_id: uuid.UUID,
+    files: list[tuple[str, bytes, str | None]],
+) -> list[PropertyImage]:
+    """Validate + persist a batch of images.
+
+    ``files`` is a list of ``(filename, data, content_type)`` tuples so
+    the service is independent of FastAPI's ``UploadFile`` type (also
+    trivially testable). All bytes are validated up front — a partial
+    batch is never persisted. On any failure the DB rolls back and
+    every file already written to disk in this call is removed.
+    """
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="no files uploaded"
+        )
+    if len(files) > _MAX_UPLOAD_BATCH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"upload batch too large (max {_MAX_UPLOAD_BATCH})",
+        )
+
+    prop = await _fetch_owned(session, org_id=org_id, property_id=property_id)
+
+    # Validate every file BEFORE touching disk or the DB.
+    validated: list[tuple[uuid.UUID, bytes, str, str]] = []
+    for _, data, _client_ct in files:
+        try:
+            mime, ext = validate_image_upload(data)
+        except ImageValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from None
+        validated.append((uuid.uuid4(), data, mime, ext))
+
+    existing_count = await _da.count_property_images(session, property_id=prop.id)
+    storage = get_storage()
+
+    written_paths: list[str] = []
+    inserted: list[PropertyImage] = []
+    try:
+        for i, (image_id, data, mime, ext) in enumerate(validated):
+            path = f"{org_id}/property/{prop.id}/{image_id}.{ext}"
+            ref = storage.put(path, data, content_type=mime)
+            written_paths.append(path)
+            image = PropertyImage(
+                id=image_id,
+                org_id=org_id,
+                property_id=prop.id,
+                image_path=ref.path,
+                image_url=ref.url,
+                content_type=mime,
+                size_bytes=len(data),
+                display_order=existing_count + i,
+                is_featured=(existing_count == 0 and i == 0),
+            )
+            _da.insert_property_image(session, image)
+            inserted.append(image)
+        await session.flush()
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        for path in written_paths:
+            try:
+                storage.delete(path)
+            except Exception:  # noqa: BLE001
+                pass
+        raise
+
+    for image in inserted:
+        await session.refresh(image)
+
+    await audit.log(
+        "property.images_uploaded",
+        entity_type="property",
+        entity_id=prop.id,
+        after={"count": len(inserted), "image_ids": [str(i.id) for i in inserted]},
+    )
+    return inserted
+
+
+async def _fetch_image_owned(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    property_id: uuid.UUID,
+    image_id: uuid.UUID,
+) -> PropertyImage:
+    """Load an image that must belong to both ``property_id`` and
+    ``org_id``. 404 across every mismatch so we never leak whether
+    an id exists in a different property or a different org."""
+    image = await _da.get_property_image_by_id(session, image_id=image_id)
+    if image is None or image.org_id != org_id or image.property_id != property_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="image not found"
+        )
+    return image
+
+
+async def delete_property_image(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    property_id: uuid.UUID,
+    image_id: uuid.UUID,
+) -> None:
+    """Delete one image row + its physical file. If the deleted image
+    was the featured one, promote the surviving image with the lowest
+    ``display_order`` so the gallery still has a featured image."""
+    await _fetch_owned(session, org_id=org_id, property_id=property_id)
+    image = await _fetch_image_owned(
+        session, org_id=org_id, property_id=property_id, image_id=image_id
+    )
+    was_featured = image.is_featured
+    path = image.image_path
+
+    await _da.delete_property_image_row(session, image)
+    await session.commit()
+
+    if was_featured:
+        remaining = await _da.list_property_images(session, property_id=property_id)
+        if remaining:
+            promoted = remaining[0]  # lowest display_order (list is sorted asc)
+            promoted.is_featured = True
+            await session.commit()
+            await session.refresh(promoted)
+
+    try:
+        get_storage().delete(path)
+    except Exception as exc:  # noqa: BLE001 — best-effort
+        await audit.log(
+            "property.storage_cleanup_failed",
+            entity_type="property_image",
+            entity_id=image_id,
+            after={"error": str(exc)},
+        )
+
+    await audit.log(
+        "property.image_deleted",
+        entity_type="property_image",
+        entity_id=image_id,
+        before={"property_id": str(property_id), "was_featured": was_featured},
+    )
+
+
+async def reorder_property_images(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    property_id: uuid.UUID,
+    image_ids: list[uuid.UUID],
+) -> list[PropertyImage]:
+    """Rewrite ``display_order`` from the passed sequence. Rejects
+    with 400 when the passed ids aren't exactly the property's
+    existing gallery (no adds, no drops).
+
+    Single UPDATE via ``CASE`` — no N+1 regardless of gallery size."""
+    await _fetch_owned(session, org_id=org_id, property_id=property_id)
+    current = await _da.list_property_images(session, property_id=property_id)
+    current_ids = {i.id for i in current}
+    requested = set(image_ids)
+    if current_ids != requested or len(image_ids) != len(requested):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="reorder must contain every image id exactly once",
+        )
+    order_map = {img_id: idx for idx, img_id in enumerate(image_ids)}
+    await _da.bulk_update_display_orders(
+        session, property_id=property_id, order_by_image_id=order_map
+    )
+    await session.commit()
+    fresh = await _da.list_property_images(session, property_id=property_id)
+    await audit.log(
+        "property.images_reordered",
+        entity_type="property",
+        entity_id=property_id,
+        after={"order": [str(i.id) for i in fresh]},
+    )
+    return fresh
+
+
+async def set_featured_image(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    property_id: uuid.UUID,
+    image_id: uuid.UUID,
+) -> PropertyImage:
+    """Bulk-clear ``is_featured`` on every image of the property, then
+    set the target image to featured. Two UPDATEs, one commit; the
+    partial unique index prevents the intermediate state from being
+    visible to concurrent readers."""
+    await _fetch_owned(session, org_id=org_id, property_id=property_id)
+    image = await _fetch_image_owned(
+        session, org_id=org_id, property_id=property_id, image_id=image_id
+    )
+    if image.is_featured:
+        return image  # already featured — no-op keeps the endpoint idempotent
+    await _da.unset_featured_for_property(session, property_id=property_id)
+    image.is_featured = True
+    await session.commit()
+    await session.refresh(image)
+    await audit.log(
+        "property.image_featured",
+        entity_type="property_image",
+        entity_id=image.id,
+        after={"property_id": str(property_id)},
+    )
+    return image
+
+
 __all__ = [
     "archive_property",
     "create_property",
     "delete_property",
+    "delete_property_image",
     "get_property",
     "list_properties",
     "mark_sold",
     "publish_property",
+    "reorder_property_images",
+    "set_featured_image",
     "unarchive_property",
     "unpublish_property",
     "update_property",
+    "upload_property_images",
 ]
