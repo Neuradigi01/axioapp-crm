@@ -3,7 +3,7 @@
 **Goal:** Wire the frontend Property module into `/user/properties` with the owner dashboard shell — sidebar entry auto-registered from Step 3's module descriptor, list page with tabs (My / Draft / Published / Archived / Sold), search bar, pagination, per-row action menu placeholders.
 
 **Track:** Real Estate CRM Pack
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 3–5 (backend Property CRUD + images + public endpoints).
 
 ---

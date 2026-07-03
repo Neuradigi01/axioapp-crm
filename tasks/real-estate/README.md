@@ -64,7 +64,7 @@ All without any DB-level intervention, CLI installer step, or engineering assist
 | 3 | [Property backend: service, router, module descriptor (CRUD)](step-3-property-service-router.md) | COMPLETED | ~1 day |
 | 4 | [Property backend: multi-image gallery (upload, delete, reorder, featured)](step-4-property-images.md) | COMPLETED | ~1 day |
 | 5 | [Property backend: public endpoints + Fernet token](step-5-public-endpoints-token.md) | COMPLETED | ~½ day |
-| 6 | [Property frontend: shell + list page + owner tabs](step-6-frontend-list-shell.md) | Pending | ~1 day |
+| 6 | [Property frontend: shell + list page + owner tabs](step-6-frontend-list-shell.md) | COMPLETED | ~1 day |
 | 7 | [Property frontend: create/edit form + image gallery UI](step-7-frontend-form-gallery.md) | Pending | ~1 day |
 | 8 | [Property frontend: actions (publish, archive, delete, copy URL, preview)](step-8-frontend-actions.md) | Pending | ~½ day |
 | 9 | [Public listing page + public detail page (no-auth routes)](step-9-public-pages.md) | Pending | ~1 day |

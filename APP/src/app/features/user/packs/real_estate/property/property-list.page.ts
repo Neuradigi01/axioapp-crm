@@ -1,0 +1,178 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { HttpErrorResponse } from '@angular/common/http';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { LucideAngularModule } from 'lucide-angular';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+
+import { extractApiError } from '@core/services/api-error.util';
+
+import { PropertyApiService } from './property-api.service';
+import type { Property, PropertyStatus, PropertyTabKey } from './property.types';
+import { PROPERTY_TABS } from './property.types';
+
+/**
+ * Owner-dashboard list page for the Property module.
+ *
+ * Layer 2 (Real Estate pack). Sidebar entry is auto-registered by the
+ * backend `ModuleDescriptor` — this component only owns the page body.
+ *
+ * Scope for Step 6:
+ *   - Tab bar (All / Draft / Published / Unpublished / Archived / Sold) with count badges.
+ *   - Debounced search input, refetches on 300ms idle.
+ *   - Server-side pagination (page / page_size).
+ *   - Table columns: featured thumb, title + slug, status badge, price, city, updated_at.
+ *
+ * Out of scope until later steps:
+ *   - Row click → detail/edit route (Step 7).
+ *   - "New Property" CTA + create modal (Step 7).
+ *   - Actions column (publish / archive / delete / copy URL) (Step 8).
+ */
+@Component({
+  selector: 'app-property-list-page',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CommonModule, ReactiveFormsModule, LucideAngularModule],
+  templateUrl: './property-list.page.html',
+})
+export class PropertyListPageComponent {
+  private readonly api = inject(PropertyApiService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  protected readonly TABS = PROPERTY_TABS;
+
+  protected readonly items = signal<Property[]>([]);
+  protected readonly total = signal(0);
+  protected readonly page = signal(1);
+  protected readonly pageSize = signal(20);
+  protected readonly statusCounts = signal<Partial<Record<PropertyStatus, number>>>({});
+  protected readonly loading = signal(false);
+  protected readonly loadError = signal<string | null>(null);
+
+  protected readonly activeTab = signal<PropertyTabKey>('all');
+  protected readonly searchControl = new FormControl('', { nonNullable: true });
+
+  protected readonly totalPages = computed(() =>
+    Math.max(1, Math.ceil(this.total() / this.pageSize())),
+  );
+
+  /** Total across every status — displayed on the "All" tab. */
+  protected readonly allCount = computed(() =>
+    Object.values(this.statusCounts()).reduce<number>((a, b) => a + (b ?? 0), 0),
+  );
+
+  constructor() {
+    this.reload();
+
+    this.searchControl.valueChanges
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.page.set(1);
+        this.reload();
+      });
+  }
+
+  protected selectTab(tab: PropertyTabKey): void {
+    if (this.activeTab() === tab) return;
+    this.activeTab.set(tab);
+    this.page.set(1);
+    this.reload();
+  }
+
+  protected countForTab(tab: PropertyTabKey): number {
+    if (tab === 'all') return this.allCount();
+    return this.statusCounts()[tab] ?? 0;
+  }
+
+  protected reload(): void {
+    const tab = this.activeTab();
+    const statuses = tab === 'all' ? undefined : [tab as PropertyStatus];
+    const search = this.searchControl.value.trim();
+
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.api
+      .list(
+        {
+          statuses,
+          search: search || undefined,
+          sort_by: 'created_at',
+          sort_desc: true,
+        },
+        this.page(),
+        this.pageSize(),
+      )
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resp) => {
+          this.items.set(resp.items);
+          this.total.set(resp.total);
+          this.statusCounts.set(resp.status_counts);
+          this.loading.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loadError.set(extractApiError(err) ?? 'Failed to load properties.');
+          this.loading.set(false);
+        },
+      });
+  }
+
+  protected nextPage(): void {
+    if (this.page() >= this.totalPages()) return;
+    this.page.update((p) => p + 1);
+    this.reload();
+  }
+
+  protected prevPage(): void {
+    if (this.page() <= 1) return;
+    this.page.update((p) => p - 1);
+    this.reload();
+  }
+
+  protected onPageSizeChange(event: Event): void {
+    const size = Number((event.target as HTMLSelectElement).value);
+    if (!Number.isFinite(size) || size < 1) return;
+    this.pageSize.set(size);
+    this.page.set(1);
+    this.reload();
+  }
+
+  protected statusBadgeClass(status: PropertyStatus): string {
+    switch (status) {
+      case 'published':
+        return 'bg-emerald-100 text-emerald-700 ring-emerald-200';
+      case 'unpublished':
+        return 'bg-amber-100 text-amber-700 ring-amber-200';
+      case 'archived':
+        return 'bg-zinc-200 text-zinc-700 ring-zinc-300';
+      case 'sold':
+        return 'bg-blue-100 text-blue-700 ring-blue-200';
+      case 'draft':
+      default:
+        return 'bg-zinc-100 text-zinc-600 ring-zinc-200';
+    }
+  }
+
+  protected formatPrice(price: string | number | null, currency: string): string {
+    if (price === null || price === undefined) return '—';
+    const num = typeof price === 'string' ? Number(price) : price;
+    if (!Number.isFinite(num)) return '—';
+    try {
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: currency || 'INR',
+        maximumFractionDigits: 0,
+      }).format(num);
+    } catch {
+      return `${currency} ${num}`;
+    }
+  }
+}

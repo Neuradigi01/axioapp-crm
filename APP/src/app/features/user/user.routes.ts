@@ -586,6 +586,14 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        path: 'properties',
+        canActivate: [permissionGuard('property.read')],
+        loadComponent: () =>
+          import('./packs/real_estate/property/property-list.page').then(
+            (m) => m.PropertyListPageComponent,
+          ),
+      },
+      {
         path: 'access-denied',
         loadComponent: () =>
           import('./core/access-denied/access-denied.page').then(
