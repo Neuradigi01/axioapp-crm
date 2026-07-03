@@ -301,29 +301,47 @@
         </div>
       }
 
-      <!-- Sticky footer -->
+      <!-- Sticky footer with status pill + row action menu (edit only) -->
       <div
-        class="sticky bottom-4 flex items-center justify-end gap-2 rounded-xl border border-zinc-200 bg-white/95 p-3 shadow-lg backdrop-blur"
+        class="sticky bottom-4 flex items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-white/95 p-3 shadow-lg backdrop-blur"
       >
-        <a
-          [routerLink]="['/user/properties']"
-          class="inline-flex items-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-        >
-          Cancel
-        </a>
-        <button
-          type="submit"
-          [disabled]="saving()"
-          class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          @if (saving()) {
-            <lucide-icon name="loader-2" class="h-4 w-4 animate-spin"></lucide-icon>
-            Saving…
-          } @else {
-            <lucide-icon name="save" class="h-4 w-4"></lucide-icon>
-            {{ isEdit() ? 'Save changes' : 'Save as draft' }}
+        <div class="flex items-center gap-3">
+          @if (currentProperty(); as p) {
+            <span class="text-xs uppercase tracking-wider text-zinc-400">Status</span>
+            <span
+              class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+            >
+              {{ p.status }}
+            </span>
+            <app-property-row-menu
+              [property]="p"
+              (refresh)="onToolbarRefresh()"
+              (optimisticStatus)="onToolbarOptimistic($event)"
+              (removed)="onToolbarRemoved()"
+            />
           }
-        </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <a
+            [routerLink]="['/user/properties']"
+            class="inline-flex items-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            Cancel
+          </a>
+          <button
+            type="submit"
+            [disabled]="saving()"
+            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            @if (saving()) {
+              <lucide-icon name="loader-2" class="h-4 w-4 animate-spin"></lucide-icon>
+              Saving…
+            } @else {
+              <lucide-icon name="save" class="h-4 w-4"></lucide-icon>
+              {{ isEdit() ? 'Save changes' : 'Save as draft' }}
+            }
+          </button>
+        </div>
       </div>
     </form>
   }

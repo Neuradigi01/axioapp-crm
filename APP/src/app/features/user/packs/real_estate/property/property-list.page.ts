@@ -17,6 +17,7 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { PropertyApiService } from './property-api.service';
+import { PropertyRowMenuComponent } from './property-row-menu.component';
 import type { Property, PropertyStatus, PropertyTabKey } from './property.types';
 import { PROPERTY_TABS } from './property.types';
 
@@ -41,7 +42,13 @@ import { PROPERTY_TABS } from './property.types';
   selector: 'app-property-list-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, LucideAngularModule],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    RouterLink,
+    LucideAngularModule,
+    PropertyRowMenuComponent,
+  ],
   templateUrl: './property-list.page.html',
 })
 export class PropertyListPageComponent {
@@ -149,6 +156,24 @@ export class PropertyListPageComponent {
 
   protected openProperty(p: Property): void {
     this.router.navigate(['/user/properties', p.id, 'edit']);
+  }
+
+  /** Optimistic status update — the row menu emits this before the
+   * server confirms. On error, the menu emits again with the previous
+   * status; on success we still refetch to update tab counts. */
+  protected applyOptimistic(event: { id: string; status: PropertyStatus }): void {
+    this.items.update((all) =>
+      all.map((p) => (p.id === event.id ? { ...p, status: event.status } : p)),
+    );
+  }
+
+  /** Row disappeared (delete). Drop it and adjust the total; the next
+   * refetch confirms tab counts. */
+  protected removeRow(id: string): void {
+    this.items.update((all) => all.filter((p) => p.id !== id));
+    this.total.update((t) => Math.max(0, t - 1));
+    // Refetch in background so tab counts reflect the deletion.
+    this.reload();
   }
 
   protected statusBadgeClass(status: PropertyStatus): string {

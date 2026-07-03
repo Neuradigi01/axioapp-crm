@@ -25,6 +25,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { AmenitiesInputComponent } from './amenities-input.component';
 import { PropertyApiService } from './property-api.service';
 import { PropertyGalleryComponent } from './property-gallery.component';
+import { PropertyRowMenuComponent } from './property-row-menu.component';
 import {
   AREA_UNIT_OPTIONS,
   PROPERTY_CATEGORY_OPTIONS,
@@ -84,6 +85,7 @@ interface PropertyFormControls {
     RouterLink,
     AmenitiesInputComponent,
     PropertyGalleryComponent,
+    PropertyRowMenuComponent,
   ],
   templateUrl: './property-form.page.html',
 })
@@ -105,6 +107,9 @@ export class PropertyFormPageComponent {
   protected readonly loadError = signal<string | null>(null);
   protected readonly submitError = signal<string | null>(null);
   protected readonly initialImages = signal<PropertyImage[]>([]);
+  /** Loaded property row — powers the sticky-footer action menu. Null
+   * in create mode until the first save gives us an id. */
+  protected readonly currentProperty = signal<Property | null>(null);
 
   protected readonly isEdit = computed(() => this.propertyId() !== null);
   protected readonly title = computed(() => (this.isEdit() ? 'Edit Property' : 'New Property'));
@@ -175,6 +180,7 @@ export class PropertyFormPageComponent {
         next: (p) => {
           this.hydrateForm(p);
           this.initialImages.set(p.images ?? []);
+          this.currentProperty.set(p);
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
@@ -182,6 +188,20 @@ export class PropertyFormPageComponent {
           this.loading.set(false);
         },
       });
+  }
+
+  /** Toolbar row-menu handlers. */
+  protected onToolbarRefresh(): void {
+    const id = this.propertyId();
+    if (id) this.loadForEdit(id);
+  }
+
+  protected onToolbarOptimistic(event: { id: string; status: Property['status'] }): void {
+    this.currentProperty.update((p) => (p ? { ...p, status: event.status } : p));
+  }
+
+  protected onToolbarRemoved(): void {
+    this.router.navigate(['/user/properties']);
   }
 
   private hydrateForm(p: Property): void {
@@ -246,6 +266,7 @@ export class PropertyFormPageComponent {
           next: (updated) => {
             this.saving.set(false);
             this.hydrateForm(updated);
+            this.currentProperty.set(updated);
             this.snackBar.open('Property saved.', 'Dismiss', { duration: 2500 });
           },
           error: (err: HttpErrorResponse) => this.handleError(err, 'Could not save property'),

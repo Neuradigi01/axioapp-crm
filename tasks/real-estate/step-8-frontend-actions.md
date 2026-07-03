@@ -3,7 +3,7 @@
 **Goal:** Wire the action buttons on the list rows and the property detail toolbar — Publish, Unpublish, Archive, Mark Sold, Delete, Edit, Copy Public URL, Preview Public.
 
 **Track:** Real Estate CRM Pack
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 3, 5, 6, 7.
 
 ---
