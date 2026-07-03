@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
@@ -42,12 +42,14 @@ from src.app.packs.real_estate.modules.property.schemas import (
     PropertyListOut,
     PropertyOut,
     PropertyUpdate,
+    PublicUrlOut,
 )
 from src.app.packs.real_estate.modules.property.service import (
     archive_property,
     create_property,
     delete_property,
     delete_property_image,
+    generate_public_link,
     get_property,
     list_properties,
     mark_sold,
@@ -267,3 +269,27 @@ async def set_featured_endpoint(
         db, org_id=user.org_id, property_id=property_id, image_id=image_id
     )
     return PropertyImageOut.model_validate(image, from_attributes=True)
+
+
+# --- Public URL generation (still authenticated) ------------------------
+
+
+@router.post(
+    "/{property_id}/public-url",
+    response_model=PublicUrlOut,
+)
+async def generate_public_url_endpoint(
+    property_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("property.read")),
+) -> PublicUrlOut:
+    """Mint the shareable public URL for a published property.
+
+    Host is derived from the request (scheme + host header) so the URL
+    is deploy-agnostic — production, staging, and dev all mint URLs
+    against their own domain automatically."""
+    host = f"{request.url.scheme}://{request.url.netloc}"
+    return await generate_public_link(
+        db, org_id=user.org_id, property_id=property_id, host=host
+    )

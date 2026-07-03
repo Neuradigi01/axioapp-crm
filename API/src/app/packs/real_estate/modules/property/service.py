@@ -29,8 +29,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.packs.real_estate.modules.property import data_access as _da
+from src.app.packs.real_estate.modules.property import link_token as _lt
 from src.app.packs.real_estate.modules.property.constants import PropertyStatus
 from src.app.packs.real_estate.modules.property.models import Property, PropertyImage
+from src.app.packs.real_estate.modules.property.schemas import (
+    PublicPropertyCardOut,
+    PublicPropertyDetailOut,
+    PublicPropertyImageOut,
+    PublicUrlOut,
+)
 from src.app.shared.files.image import ImageValidationError, validate_image_upload
 from src.app.shared.storage import get_storage
 from src.app.packs.real_estate.modules.property.schemas import (
@@ -730,13 +737,186 @@ async def set_featured_image(
     return image
 
 
+# ---------------------------------------------------------------------------
+# Public sharing — Fernet-tokened URLs
+# ---------------------------------------------------------------------------
+
+# Short-description cap used on the public grid card.
+_SHORT_DESC_LEN = 200
+
+
+def _short_description(text: str | None) -> str | None:
+    if not text:
+        return None
+    trimmed = text.strip()
+    if len(trimmed) <= _SHORT_DESC_LEN:
+        return trimmed
+    return trimmed[: _SHORT_DESC_LEN - 1].rstrip() + "…"
+
+
+def _public_url_for(host: str, token: str) -> str:
+    """Assemble the shareable URL. ``host`` is host+scheme
+    (``https://example.com``); the caller strips a trailing slash."""
+    return f"{host.rstrip('/')}/property/{token}"
+
+
+async def generate_public_link(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    property_id: uuid.UUID,
+    host: str,
+) -> PublicUrlOut:
+    """Owner-side: mint the shareable link for a published property.
+
+    Rejects with 409 if the property isn't ``published`` — links only
+    exist for content the viewer can actually see."""
+    prop = await _fetch_owned(session, org_id=org_id, property_id=property_id)
+    if prop.status != PropertyStatus.published.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"only published properties get a shareable link (current: '{prop.status}')",
+        )
+    try:
+        token = _lt.encode_property_token(prop.id, prop.org_id)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from None
+    return PublicUrlOut(url=_public_url_for(host, token), token=token)
+
+
+def _public_card(prop: Property) -> PublicPropertyCardOut:
+    """Trim a Property to the public grid card shape (no UUIDs).
+    Requires ``prop.images`` eager-loaded — caller uses
+    ``selectinload(Property.images)``."""
+    images = list(prop.images) if "images" in prop.__dict__ else []
+    featured = next((i for i in images if i.is_featured), None)
+    if featured is None and images:
+        featured = images[0]
+    # Token is minted once per card render — cheap (~sub-ms).
+    try:
+        token = _lt.encode_property_token(prop.id, prop.org_id)
+    except RuntimeError:
+        # Key not configured — surface no card at all rather than
+        # returning a broken URL. Public listing endpoint filters
+        # these out before returning.
+        raise
+    return PublicPropertyCardOut(
+        title=prop.title,
+        property_type=prop.property_type,
+        category=prop.category,
+        price=prop.price,
+        currency=prop.currency,
+        city=prop.city,
+        state=prop.state,
+        short_description=_short_description(prop.description),
+        featured_image_url=featured.image_url if featured else None,
+        public_url=f"/property/{token}",
+    )
+
+
+async def list_public_properties(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> list[PublicPropertyCardOut]:
+    """Public grid: every ``published`` listing for one org, ordered
+    by ``published_at`` descending (freshest first)."""
+    try:
+        _lt.encode_property_token(uuid.UUID(int=0), uuid.UUID(int=0))
+    except RuntimeError as exc:
+        # Fail fast with 503 rather than returning an empty grid the
+        # viewer would mistake for "no listings".
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from None
+    rows, _total = await _da.list_properties(
+        session,
+        statuses=[PropertyStatus.published.value],
+        sort_by="published_at",
+        sort_desc=True,
+        page=1,
+        size=200,  # generous soft cap; per-org public volumes are small
+        with_images=True,
+    )
+    # Extra defensive filter — the RLS-scoped session should already
+    # be pinned to org_id, but check anyway.
+    rows = [r for r in rows if r.org_id == org_id]
+    return [_public_card(r) for r in rows]
+
+
+def _public_detail(prop: Property) -> PublicPropertyDetailOut:
+    images = list(prop.images) if "images" in prop.__dict__ else []
+    featured = next((i for i in images if i.is_featured), None)
+    if featured is None and images:
+        featured = images[0]
+    return PublicPropertyDetailOut(
+        title=prop.title,
+        description=prop.description,
+        property_type=prop.property_type,
+        category=prop.category,
+        price=prop.price,
+        currency=prop.currency,
+        address_line=prop.address_line,
+        city=prop.city,
+        state=prop.state,
+        country=prop.country,
+        pincode=prop.pincode,
+        bedrooms=prop.bedrooms,
+        bathrooms=prop.bathrooms,
+        area_value=prop.area_value,
+        area_unit=prop.area_unit,
+        amenities=list(prop.amenities or []),
+        contact_person=prop.contact_person,
+        contact_phone=prop.contact_phone,
+        contact_email=prop.contact_email,
+        images=[
+            PublicPropertyImageOut(
+                image_url=i.image_url,
+                display_order=i.display_order,
+                is_featured=i.is_featured,
+            )
+            for i in images
+        ],
+        featured_image_url=featured.image_url if featured else None,
+    )
+
+
+async def get_public_property(
+    session: AsyncSession,
+    *,
+    token: str,
+) -> PublicPropertyDetailOut | None:
+    """Decrypt ``token`` and return the property detail if it exists
+    AND is currently ``published``. Returns ``None`` for every failure
+    mode (bad token, wrong key, tampered, missing, non-published,
+    archived, sold) — the router turns that into a uniform 404 with
+    no side channel."""
+    decoded = _lt.decode_property_token(token)
+    if decoded is None:
+        return None
+    property_id, expected_org_id = decoded
+    prop = await _da.get_property_by_id(
+        session, property_id=property_id, with_images=True
+    )
+    if prop is None or prop.org_id != expected_org_id:
+        return None
+    if prop.status != PropertyStatus.published.value:
+        return None
+    return _public_detail(prop)
+
+
 __all__ = [
     "archive_property",
     "create_property",
     "delete_property",
     "delete_property_image",
+    "generate_public_link",
     "get_property",
+    "get_public_property",
     "list_properties",
+    "list_public_properties",
     "mark_sold",
     "publish_property",
     "reorder_property_images",

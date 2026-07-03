@@ -215,6 +215,80 @@ class PropertyImageReorderRequest(BaseModel):
     image_ids: list[uuid.UUID] = Field(min_length=1)
 
 
+# ---------------------------------------------------------------------------
+# Public (unauthenticated) shapes
+#
+# These shapes never carry the property UUID or the owner UUID — the
+# public URL uses a Fernet token in place of the id, so leaking either
+# would defeat the purpose. Public callers get the token they came in
+# with, and no round-trip back to it.
+# ---------------------------------------------------------------------------
+
+
+class PublicPropertyImageOut(BaseModel):
+    """One image in the public gallery. No ``id``, no
+    ``property_id`` — the public URL is the only identifier a viewer
+    should ever see."""
+
+    image_url: str | None = None
+    display_order: int
+    is_featured: bool
+
+
+class PublicPropertyCardOut(BaseModel):
+    """Grid card for ``GET /api/public/properties``.
+
+    Trimmed: title / price / location / type / short description /
+    featured image + the shareable URL. No UUIDs, no timestamps, no
+    contact fields (viewers use the detail URL to reveal contact
+    info, which we can rate-limit separately later)."""
+
+    title: str
+    property_type: str
+    category: str
+    price: Decimal | None = None
+    currency: str
+    city: str | None = None
+    state: str | None = None
+    short_description: str | None = None
+    featured_image_url: str | None = None
+    public_url: str
+
+
+class PublicPropertyDetailOut(BaseModel):
+    """Detail page for ``GET /api/public/property/{token}``. Full
+    viewer-safe field set + ordered gallery. Still no UUIDs."""
+
+    title: str
+    description: str | None = None
+    property_type: str
+    category: str
+    price: Decimal | None = None
+    currency: str
+    address_line: str | None = None
+    city: str | None = None
+    state: str | None = None
+    country: str | None = None
+    pincode: str | None = None
+    bedrooms: int | None = None
+    bathrooms: int | None = None
+    area_value: Decimal | None = None
+    area_unit: str | None = None
+    amenities: list[str] = Field(default_factory=list)
+    contact_person: str | None = None
+    contact_phone: str | None = None
+    contact_email: str | None = None
+    images: list[PublicPropertyImageOut] = Field(default_factory=list)
+    featured_image_url: str | None = None
+
+
+class PublicUrlOut(BaseModel):
+    """Response for the owner-side "get shareable URL" endpoint."""
+
+    url: str
+    token: str
+
+
 __all__ = [
     "PropertyCreate",
     "PropertyImageOut",
@@ -223,4 +297,8 @@ __all__ = [
     "PropertyListOut",
     "PropertyOut",
     "PropertyUpdate",
+    "PublicPropertyCardOut",
+    "PublicPropertyDetailOut",
+    "PublicPropertyImageOut",
+    "PublicUrlOut",
 ]

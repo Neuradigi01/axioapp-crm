@@ -3,7 +3,7 @@
 **Goal:** Ship the two unauthenticated public endpoints — `GET /api/public/properties` (grid of published listings) and `GET /api/public/property/{token}` (single property detail via encrypted opaque token). Introduce a Property-domain Fernet helper (`link_token.py`) that hides the property UUID behind a symmetric-encrypted, URL-safe token so the public URL never leaks internal IDs.
 
 **Track:** Real Estate CRM Pack
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 2–4 (Property models + CRUD + images).
 
 ---

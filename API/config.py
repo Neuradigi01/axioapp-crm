@@ -156,6 +156,15 @@ WHATSAPP_WEB_INBOUND_HMAC_SECRET = os.getenv(
 # clear RuntimeError at startup if the key is missing or malformed.
 INTEGRATIONS_ENCRYPTION_KEY = os.getenv("INTEGRATIONS_ENCRYPTION_KEY", "")
 
+# Fernet key for Real Estate pack's public property-link tokens
+# (`packs/real_estate/modules/property/link_token.py`). Generate via
+#   docker exec crm-api-1 python -c \
+#     "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# then add to secrets.enc.env via `run secrets-edit`. Lazy-built at
+# first use; the app boots without it but public-URL endpoints fail
+# with a clear "not configured" message until the key is set.
+PROPERTY_LINK_ENCRYPTION_KEY = os.getenv("PROPERTY_LINK_ENCRYPTION_KEY", "")
+
 # Google Ads OAuth — Track 4 Step 2.
 # Provision these from Google Cloud Console; see
 # tasks/ad-integrations/manual-google-oauth-setup.md for full walkthrough.
