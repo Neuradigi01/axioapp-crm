@@ -78,7 +78,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
           @if (priceHeadline(); as price) {
             <div class="mt-2 flex items-baseline gap-1.5">
               <span class="text-3xl font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
-                {{ '$' + price.amount }}
+                ₹{{ formatINR(price.amount) }}
               </span>
               <span class="text-sm text-zinc-500 dark:text-slate-400">
                 {{ '/' + price.cycleLabel }}
@@ -193,9 +193,15 @@ export class CurrentPlanCardComponent {
   });
 
   private cyclePrice(sub: SubscriptionCurrent): number {
+    // India-first CRM → INR. Future currency toggle will pick USD when
+    // the user is a global customer.
     return sub.billing_cycle === 'annual'
-      ? sub.plan.annual_bundle_usd
-      : sub.plan.monthly_bundle_usd;
+      ? sub.plan.annual_bundle_inr
+      : sub.plan.monthly_bundle_inr;
+  }
+
+  protected formatINR(amount: number): string {
+    return amount.toLocaleString('en-IN');
   }
 }
 

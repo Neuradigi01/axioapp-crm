@@ -82,15 +82,17 @@ export class UpgradeModalComponent {
   protected readonly minSeats = computed<number>(() => 1);
 
   /** Best-effort estimate matching Step 9's preview math — Stripe's
-   *  proration may differ by a few cents (documented in the spec). */
+   *  proration may differ by a few cents/paise (documented in the spec).
+   *  Displays INR by default (India-first CRM); a future currency toggle
+   *  will switch this to USD via a signal-based selector. */
   protected readonly estimateToday = computed<number>(() => {
     const plan = this.selectedPlanEntry();
     if (plan === null) return 0;
     const cycle = this.selectedCycle();
     const bundle =
-      cycle === 'annual' ? plan.pricing.annual_bundle_usd : plan.pricing.monthly_bundle_usd;
+      cycle === 'annual' ? plan.pricing.annual_bundle_inr : plan.pricing.monthly_bundle_inr;
     const extraSeatCost =
-      cycle === 'annual' ? plan.pricing.extra_seat_annual_usd : plan.pricing.extra_seat_monthly_usd;
+      cycle === 'annual' ? plan.pricing.extra_seat_annual_inr : plan.pricing.extra_seat_monthly_inr;
     const extras = Math.max(0, this.selectedSeats() - plan.pricing.included_seats);
     return bundle + extras * extraSeatCost;
   });
@@ -177,10 +179,18 @@ export class UpgradeModalComponent {
   }
 
   protected planPriceFor(plan: PlanCatalogEntry): number {
+    // Displayed on each plan card. India-first CRM → INR.
+    // Annual → per-month equivalent so the compare stays like-for-like.
     if (this.selectedCycle() === 'annual') {
-      return Math.floor(plan.pricing.annual_bundle_usd / 12);
+      return Math.floor(plan.pricing.annual_bundle_inr / 12);
     }
-    return plan.pricing.monthly_bundle_usd;
+    return plan.pricing.monthly_bundle_inr;
+  }
+
+  /** Indian-locale formatted string for the plan card headline —
+   *  ₹4,999 / ₹47,999 with the correct group separators. */
+  protected formatINR(amount: number): string {
+    return amount.toLocaleString('en-IN');
   }
 
   protected continueToPayment(): void {

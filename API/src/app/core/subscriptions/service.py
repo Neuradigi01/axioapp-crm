@@ -576,6 +576,7 @@ async def create_direct_checkout(
         seats=seats,
         success_url=success_url,
         cancel_url=cancel_url,
+        currency=plans.currency(),
     )
 
     await _da.update_subscription_pending_checkout(
@@ -631,6 +632,7 @@ async def attach_checkout_to_needs_payment(
         seats=response.preview.seats,
         success_url=success_url,
         cancel_url=cancel_url,
+        currency=plans.currency(),
     )
     await _da.update_subscription_pending_checkout(
         session, sub_id=sub.id, session_id=checkout.session_id
@@ -676,6 +678,7 @@ async def attach_checkout_to_seats_needs_payment(
         seats=response.preview.to_seats,
         success_url=success_url,
         cancel_url=cancel_url,
+        currency=plans.currency(),
     )
     await _da.update_subscription_pending_checkout(
         session, sub_id=sub.id, session_id=checkout.session_id

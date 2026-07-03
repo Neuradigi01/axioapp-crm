@@ -21,8 +21,12 @@ export interface PlanShort {
   name: string;
   monthly_bundle_usd: number;
   annual_bundle_usd: number;
+  monthly_bundle_inr: number;
+  annual_bundle_inr: number;
   extra_seat_monthly_usd: number;
   extra_seat_annual_usd: number;
+  extra_seat_monthly_inr: number;
+  extra_seat_annual_inr: number;
   included_seats: number;
 }
 
@@ -68,9 +72,13 @@ export interface PlanCatalogEntry {
   pricing: {
     monthly_bundle_usd: number;
     annual_bundle_usd: number;
+    monthly_bundle_inr: number;
+    annual_bundle_inr: number;
     included_seats: number;
     extra_seat_monthly_usd: number;
     extra_seat_annual_usd: number;
+    extra_seat_monthly_inr: number;
+    extra_seat_annual_inr: number;
   };
   caps: Record<string, number>;
   features: Record<string, boolean>;

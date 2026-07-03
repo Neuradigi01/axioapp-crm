@@ -100,13 +100,43 @@ class StripeProvider:
         self,
         plan_code: str,
         billing_cycle: str,
+        currency: str = "USD",
     ) -> str:
+        """Resolve the Stripe Price ID for (plan · cycle · currency).
+
+        The price map is nested one level deeper than the legacy layout
+        (per-plan → per-currency → per-cycle). We support both shapes so
+        older price maps continue to work; new deployments should adopt
+        the nested layout to enable INR alongside USD.
+        """
+        currency = currency.upper()
         plan_entry = self._price_map.get(plan_code) or {}
-        price_id = plan_entry.get(billing_cycle)
-        if not price_id or price_id.startswith("REPLACE_ME_"):
+
+        # New shape: plan → currency → cycle.
+        currency_entry = plan_entry.get(currency)
+        if isinstance(currency_entry, dict):
+            price_id = currency_entry.get(billing_cycle)
+        else:
+            # Legacy shape: plan → cycle. Only valid when currency = USD;
+            # any INR request against a legacy map should fail loud so the
+            # operator knows to migrate the file.
+            if currency != "USD":
+                raise StripePriceMapMissing(
+                    f"Legacy stripe_price_map.yaml has no {currency} prices. "
+                    "Migrate the file to the nested `plan → currency → cycle` "
+                    "layout (see the file header for the schema)."
+                )
+            price_id = plan_entry.get(billing_cycle)
+
+        if (
+            not price_id
+            or price_id.startswith("REPLACE_ME_")
+            or price_id.startswith("PASTE_")
+        ):
             raise StripePriceMapMissing(
-                f"No Stripe Price configured for {plan_code}/{billing_cycle}. "
-                f"Re-run the seed script to populate."
+                f"No Stripe Price configured for {plan_code}/{billing_cycle}"
+                f"/{currency}. Create the price in Stripe Dashboard and paste "
+                "the ID into stripe_price_map.yaml."
             )
         return price_id
 
@@ -135,14 +165,21 @@ class StripeProvider:
         seats: int,
         success_url: str,
         cancel_url: str,
+        currency: str = "USD",
     ) -> CheckoutSessionResult:
-        price_id = self._resolve_price_id(plan_code, billing_cycle)
+        """Open a Stripe Checkout session.
+
+        ``currency`` picks the Price ID variant to bill in. Caller (the
+        subscriptions service) decides currency: INR for Indian orgs,
+        USD for everyone else, with an optional UI-driven override.
+        """
+        price_id = self._resolve_price_id(plan_code, billing_cycle, currency)
         kwargs: dict[str, Any] = {
             "mode": "subscription",
             "line_items": [{"price": price_id, "quantity": seats}],
             "success_url": success_url,
             "cancel_url": cancel_url,
-            # All four keys land on the webhook event so Step 13 can
+            # All keys land on the webhook event so Step 13 can
             # reconcile the local subscription row without a separate
             # state-lookup round-trip.
             "metadata": {
@@ -150,6 +187,7 @@ class StripeProvider:
                 "plan_code": plan_code,
                 "billing_cycle": billing_cycle,
                 "seats": str(seats),
+                "currency": currency.upper(),
             },
         }
         if customer_id is not None:

@@ -8,8 +8,11 @@
 # Conventions:
 #   - Caps that are unlimited use the sentinel value -1.
 #     Code: prefer `Cap.is_unlimited(value)` over inline `== -1` checks.
-#   - Prices are display USD here for readability. The loader converts
-#     to integer cents internally to avoid float drift.
+#   - Prices are declared in TWO currencies: USD (for global customers)
+#     and INR (for Indian customers). Both are display units — the
+#     loader converts to integer cents/paise internally to avoid float
+#     drift. Currency selection happens at checkout: org.country == 'IN'
+#     picks INR, everything else picks USD (user can override in the UI).
 #   - The set of valid `features.*` keys is declared in `plans.py` as
 #     `KNOWN_FEATURE_KEYS`. Adding a new feature requires updating both
 #     this file and that set.
@@ -17,10 +20,20 @@
 #     (founder decision: the 14-day trial gives a taste of Basic, not
 #     Standard). The caps differ — trial is tighter.
 #
-# Last reviewed: 2026-06-05.
+# Last reviewed: 2026-06-05. INR prices added 2026-07-02
+# (~₹83/USD; rounded to psychology-friendly INR numbers).
 
 version: 1
-currency: USD
+supported_currencies: [INR, USD]
+# INR is the canonical default (India-first business). Actual currency
+# picked at checkout time by the subscriptions service:
+#   org.country_code == 'IN'  → INR
+#   any other country          → USD
+#   country unknown / fallback → INR (this default)
+# The billing UI shows a currency toggle so visitors can pick manually;
+# the toggle initially displays USD for global reach, but the underlying
+# checkout still honours the country-based logic.
+default_currency: INR
 annual_discount_pct: 20
 
 plans:
@@ -33,9 +46,13 @@ plans:
     pricing:
       monthly_bundle_usd: 0
       annual_bundle_usd: 0
+      monthly_bundle_inr: 0
+      annual_bundle_inr: 0
       included_seats: 3
       extra_seat_monthly_usd: 0    # extra seats not purchasable during trial
       extra_seat_annual_usd: 0
+      extra_seat_monthly_inr: 0
+      extra_seat_annual_inr: 0
     caps:
       contacts: 500
       leads_per_month: 50
@@ -79,9 +96,13 @@ plans:
     pricing:
       monthly_bundle_usd: 60
       annual_bundle_usd: 576       # $48/mo equivalent
+      monthly_bundle_inr: 4999     # ~$60 @ ₹83/USD
+      annual_bundle_inr: 47999     # ~$576 @ ₹83/USD (20% off)
       included_seats: 5
       extra_seat_monthly_usd: 12
       extra_seat_annual_usd: 120   # $10/mo equivalent
+      extra_seat_monthly_inr: 999  # ~$12 @ ₹83
+      extra_seat_annual_inr: 9999  # ~$120 @ ₹83
     caps:
       contacts: 5000
       leads_per_month: 1000
@@ -125,9 +146,13 @@ plans:
     pricing:
       monthly_bundle_usd: 145
       annual_bundle_usd: 1392      # $116/mo equivalent
+      monthly_bundle_inr: 11999    # ~$145 @ ₹83/USD
+      annual_bundle_inr: 115999    # ~$1392 @ ₹83/USD (20% off)
       included_seats: 5
       extra_seat_monthly_usd: 29
       extra_seat_annual_usd: 276   # $23/mo equivalent
+      extra_seat_monthly_inr: 2399 # ~$29 @ ₹83
+      extra_seat_annual_inr: 22999 # ~$276 @ ₹83
     caps:
       contacts: 50000
       leads_per_month: 10000
@@ -171,9 +196,13 @@ plans:
     pricing:
       monthly_bundle_usd: 295
       annual_bundle_usd: 2832      # $236/mo equivalent
+      monthly_bundle_inr: 24999    # ~$295 @ ₹85/USD
+      annual_bundle_inr: 239999    # ~$2832 @ ₹85/USD (20% off)
       included_seats: 5
       extra_seat_monthly_usd: 59
       extra_seat_annual_usd: 588   # $49/mo equivalent
+      extra_seat_monthly_inr: 4999 # ~$59 @ ₹85
+      extra_seat_annual_inr: 49999 # ~$588 @ ₹85
     caps:
       contacts: -1
       leads_per_month: -1

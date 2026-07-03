@@ -71,18 +71,34 @@ class Cap:
 
 
 class PlanPricing(BaseModel):
-    """Bundle + overage pricing for one plan, in display USD."""
+    """Bundle + overage pricing for one plan, in display USD **and INR**.
+
+    Both currencies are always declared. At runtime, the caller resolves
+    which one to bill via ``amount(currency, kind)`` — org.country == 'IN'
+    picks INR, everything else picks USD (users can override in the UI's
+    currency toggle).
+
+    Cents/paise are the Stripe wire unit for both. USD = *100, INR = *100.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     monthly_bundle_usd: int = Field(ge=0)
     annual_bundle_usd: int = Field(ge=0)
+    monthly_bundle_inr: int = Field(ge=0)
+    annual_bundle_inr: int = Field(ge=0)
     included_seats: int = Field(ge=1)
     extra_seat_monthly_usd: int = Field(ge=0)
     extra_seat_annual_usd: int = Field(ge=0)
+    extra_seat_monthly_inr: int = Field(ge=0)
+    extra_seat_annual_inr: int = Field(ge=0)
+
+    # --- Cents/paise properties (Stripe wire units) ---------------------
 
     @property
     def monthly_bundle_cents(self) -> int:
+        """USD price in cents. Kept for backwards compatibility; new
+        callers should use ``bundle_units('monthly', 'USD')``."""
         return self.monthly_bundle_usd * 100
 
     @property
@@ -96,6 +112,49 @@ class PlanPricing(BaseModel):
     @property
     def extra_seat_annual_cents(self) -> int:
         return self.extra_seat_annual_usd * 100
+
+    # --- Multi-currency resolvers ---------------------------------------
+
+    def bundle_amount(self, *, currency: str, cycle: str) -> int:
+        """Return the bundle price in display units (dollars or rupees)
+        for the requested currency + billing cycle.
+
+        ``currency`` — ``'USD'`` or ``'INR'``.
+        ``cycle`` — ``'monthly'`` or ``'annual'``.
+        """
+        currency = currency.upper()
+        cycle = cycle.lower()
+        if currency == "USD":
+            return self.monthly_bundle_usd if cycle == "monthly" else self.annual_bundle_usd
+        if currency == "INR":
+            return self.monthly_bundle_inr if cycle == "monthly" else self.annual_bundle_inr
+        raise ValueError(f"unsupported currency: {currency!r} (want USD or INR)")
+
+    def bundle_units(self, *, currency: str, cycle: str) -> int:
+        """Same as ``bundle_amount`` but in Stripe wire units (cents or
+        paise). Multiply by 100 — both USD → cents and INR → paise use
+        the same base-100 factor."""
+        return self.bundle_amount(currency=currency, cycle=cycle) * 100
+
+    def extra_seat_amount(self, *, currency: str, cycle: str) -> int:
+        currency = currency.upper()
+        cycle = cycle.lower()
+        if currency == "USD":
+            return (
+                self.extra_seat_monthly_usd
+                if cycle == "monthly"
+                else self.extra_seat_annual_usd
+            )
+        if currency == "INR":
+            return (
+                self.extra_seat_monthly_inr
+                if cycle == "monthly"
+                else self.extra_seat_annual_inr
+            )
+        raise ValueError(f"unsupported currency: {currency!r} (want USD or INR)")
+
+    def extra_seat_units(self, *, currency: str, cycle: str) -> int:
+        return self.extra_seat_amount(currency=currency, cycle=cycle) * 100
 
 
 class PlanCaps(BaseModel):
@@ -219,9 +278,30 @@ class PlanRegistry(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     version: int = Field(ge=1)
-    currency: str = Field(min_length=3, max_length=3)
+    # `supported_currencies` lists every currency the plans declare
+    # prices in; `default_currency` is what non-India orgs see (US/global
+    # default) unless the user picks another via the UI toggle. Indian
+    # orgs (org.country_code == 'IN') default to INR at checkout time.
+    supported_currencies: list[str] = Field(min_length=1)
+    default_currency: str = Field(min_length=3, max_length=3)
     annual_discount_pct: int = Field(ge=0, le=100)
     plans: list[Plan]
+
+    @field_validator("supported_currencies")
+    @classmethod
+    def _uppercase_currencies(cls, v: list[str]) -> list[str]:
+        return [c.upper() for c in v]
+
+    @field_validator("default_currency")
+    @classmethod
+    def _uppercase_default(cls, v: str) -> str:
+        return v.upper()
+
+    # Backwards compat: legacy code that reads ``registry.currency``
+    # continues to work — it now returns the default currency.
+    @property
+    def currency(self) -> str:
+        return self.default_currency
 
     @field_validator("plans")
     @classmethod

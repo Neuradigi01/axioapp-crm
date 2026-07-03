@@ -1,9 +1,41 @@
+# Stripe price IDs per plan + billing cycle + currency.
+#
+# Each plan needs 4 price IDs: USD monthly + USD annual + INR monthly +
+# INR annual. Create Products in Stripe Dashboard with 2 prices each
+# (one USD, one INR — Stripe supports multi-currency prices per product),
+# copy the price IDs here, and restart the API.
+#
+# NOTE: The INR price IDs below are TODO placeholders. Fill them in
+# after creating INR prices in your Stripe India account.
+#
+# To create INR prices:
+#   1. Stripe Dashboard → Products → open a product (e.g. Basic)
+#   2. Add another price → Currency: INR → set the amount from
+#      plans.yaml (`monthly_bundle_inr` × 100 = paise)
+#   3. Copy the new `price_...` ID and paste under this plan's `INR` block
+#   4. Restart the API — validation will fail if any INR field is empty
+#      when Indian orgs try to check out.
+
 basic:
-  annual: price_1Tg219BR2LaczJ5CChuoCWJr
-  monthly: price_1Tg1x9BR2LaczJ5CFEYsrfjd
-enterprise:
-  annual: price_1Tg21EBR2LaczJ5CurJPTHRc
-  monthly: price_1Tg21DBR2LaczJ5CVWXPbwMI
+  USD:
+    monthly: price_1Tg1x9BR2LaczJ5CFEYsrfjd
+    annual: price_1Tg219BR2LaczJ5CChuoCWJr
+  INR:
+    monthly: price_1Tp3ozBR2LaczJ5CpwaOncdS
+    annual: price_1Tp3tOBR2LaczJ5C7iOAfcZh
+
 standard:
-  annual: price_1Tg21BBR2LaczJ5CvSU1Zo8k
-  monthly: price_1Tg21BBR2LaczJ5CKP0OO1X6
+  USD:
+    monthly: price_1Tg21BBR2LaczJ5CKP0OO1X6
+    annual: price_1Tg21BBR2LaczJ5CvSU1Zo8k
+  INR:
+    monthly: price_1Tp3urBR2LaczJ5CWnTODKNq
+    annual: price_1Tp43fBR2LaczJ5CoclcvJrS
+
+enterprise:
+  USD:
+    monthly: price_1Tg21DBR2LaczJ5CVWXPbwMI
+    annual: price_1Tg21EBR2LaczJ5CurJPTHRc
+  INR:
+    monthly: price_1Tp453BR2LaczJ5CQGhrpLHx
+    annual: price_1Tp47OBR2LaczJ5CiQABjsg0
