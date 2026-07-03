@@ -59,7 +59,7 @@ All without any DB-level intervention, CLI installer step, or engineering assist
 
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
-| 1 | [Real Estate pack manifest + activate onboarding tile](step-1-pack-manifest-activation.md) | Pending | ~½ day |
+| 1 | [Real Estate pack manifest + activate onboarding tile](step-1-pack-manifest-activation.md) | COMPLETED | ~½ day |
 | 2 | [Property backend: models, migration, RLS, DAL](step-2-property-models-dal.md) | Pending | ~1 day |
 | 3 | [Property backend: service, router, module descriptor (CRUD)](step-3-property-service-router.md) | Pending | ~1 day |
 | 4 | [Property backend: multi-image gallery (upload, delete, reorder, featured)](step-4-property-images.md) | Pending | ~1 day |

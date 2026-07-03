@@ -1,0 +1,316 @@
+# Real Estate CRM — vertical pack manifest.
+#
+# Source of truth (rule 7) for every real-estate-specific default a
+# tenant org receives at onboarding when they pick the "Real Estate
+# CRM" tile. Run via:
+#
+#   python -m src.app.scripts.install_pack --org <slug> --pack real_estate
+#
+# Re-running is a no-op — the installer is idempotent. Editing this
+# file and re-running adds new rows but leaves admin-customised rows
+# alone (e.g. renamed pipeline stages, edited org_settings fields).
+
+template_id: real_estate
+version: 1.0.0
+display_name: Real Estate CRM Pack
+
+# ---------------------------------------------------------------------------
+# Pipelines. Only the universal Leads board is defined here, with
+# real-estate-flavored stages (New → Contacted → Site Visit → Negotiating
+# → Booked / Lost). The Property module (`packs/real_estate/modules/property`)
+# tracks its own state on the `tbl_rp_properties.status` column
+# (draft/published/unpublished/archived/sold); it does NOT use a kanban
+# pipeline. Site-visit and channel-partner pipelines are deferred to
+# Real Estate Phase 2.
+# ---------------------------------------------------------------------------
+pipelines:
+  - key: leads
+    name: Leads
+    stages:
+      - {key: new,                  name: New,                  color: '#3b82f6', display_order: 0}
+      - {key: contacted,            name: Contacted,            color: '#0ea5e9', display_order: 1}
+      - {key: site_visit_scheduled, name: Site Visit Scheduled, color: '#8b5cf6', display_order: 2}
+      - {key: negotiating,          name: Negotiating,          color: '#f59e0b', display_order: 3}
+      - {key: booked,               name: Booked,               color: '#10b981', display_order: 4, is_won: true}
+      - {key: lost,                 name: Lost,                 color: '#ef4444', display_order: 5, is_lost: true}
+
+# ---------------------------------------------------------------------------
+# Custom fields for Contacts and Leads. Property gets its own
+# structured columns (Step 2 onwards); pack-level custom fields on the
+# `property` entity_type will land in a later step once the
+# custom-fields registry accepts it.
+# ---------------------------------------------------------------------------
+custom_fields:
+  # Contact-level enrichment
+  - entity_type: contact
+    field_key: budget_range
+    field_label: Budget Range
+    field_type: select
+    options: ['Below ₹25L', '₹25L–₹50L', '₹50L–₹1Cr', '₹1Cr–₹3Cr', '₹3Cr–₹5Cr', '₹5Cr+']
+    display_order: 10
+
+  - entity_type: contact
+    field_key: preferred_locality
+    field_label: Preferred Locality
+    field_type: text
+    display_order: 20
+
+  - entity_type: contact
+    field_key: property_type_interest
+    field_label: Property Type Interest
+    field_type: select
+    options: ['Apartment', 'Villa', 'Plot', 'Commercial Office', 'Commercial Shop', 'Warehouse', 'Farmhouse', 'PG/Hostel']
+    display_order: 30
+
+  - entity_type: contact
+    field_key: purchase_intent
+    field_label: Purchase Intent
+    field_type: select
+    options: ['Self-use', 'Investment', 'Rental income', 'Undecided']
+    display_order: 40
+
+  # Lead-level — drives the Leads kanban / detail page
+  - entity_type: lead
+    field_key: budget_range
+    field_label: Budget Range
+    field_type: select
+    options: ['Below ₹25L', '₹25L–₹50L', '₹50L–₹1Cr', '₹1Cr–₹3Cr', '₹3Cr–₹5Cr', '₹5Cr+']
+    is_required: true
+    display_order: 10
+
+  - entity_type: lead
+    field_key: purchase_timeline
+    field_label: Purchase Timeline
+    field_type: select
+    options: ['Immediate', 'Within 1 month', 'Within 3 months', 'Within 6 months', '6+ months']
+    display_order: 20
+
+  - entity_type: lead
+    field_key: financing_preference
+    field_label: Financing Preference
+    field_type: select
+    options: ['Cash purchase', 'Home loan pre-approved', 'Home loan pending', 'Undecided']
+    display_order: 30
+
+  - entity_type: lead
+    field_key: property_type_interest
+    field_label: Property Type Interest
+    field_type: select
+    options: ['Apartment', 'Villa', 'Plot', 'Commercial Office', 'Commercial Shop', 'Warehouse', 'Farmhouse', 'PG/Hostel']
+    display_order: 40
+
+  - entity_type: lead
+    field_key: preferred_locality
+    field_label: Preferred Locality
+    field_type: text
+    display_order: 50
+
+# ---------------------------------------------------------------------------
+# Roles curated for a typical Indian real-estate brokerage / developer.
+# Each role's `permissions` list expands via `module_permissions`
+# (`<module>.*` shorthand). Owner gets `<all>` (every module's keys).
+# ---------------------------------------------------------------------------
+roles:
+  - key: owner
+    name: Owner
+    permissions:
+      - users.read
+      - users.write
+      - roles.read
+      - roles.write
+      - audit.read
+      - custom_fields.read
+      - custom_fields.write
+      - contacts.*
+      - activities.*
+      - tasks.*
+      - pipelines.*
+      - leads.*
+      - appointments.*
+      - walk_ins.*
+      - catalog.*
+      - staff.*
+      - attendance.*
+      - conversations.*
+      - calls.*
+      - reviews.*
+      - campaigns.*
+      - settings.*
+      - billing.*
+      - property.*
+
+  - key: broker
+    name: Broker
+    permissions:
+      - users.read
+      - audit.read
+      - custom_fields.read
+      - contacts.*
+      - activities.*
+      - tasks.*
+      - pipelines.*
+      - leads.*
+      - appointments.*
+      - walk_ins.*
+      - conversations.*
+      - calls.*
+      - reviews.*
+      - campaigns.read
+      - campaigns.write
+      - settings.read
+      - billing.*
+      - property.*
+
+  - key: manager
+    name: Manager
+    permissions:
+      - users.read
+      - audit.read
+      - contacts.*
+      - activities.*
+      - tasks.*
+      - pipelines.read
+      - pipelines.write
+      - leads.*
+      - appointments.*
+      - walk_ins.*
+      - conversations.*
+      - calls.*
+      - reviews.*
+      - campaigns.read
+      - campaigns.write
+      - settings.read
+      - property.*
+
+  - key: agent
+    name: Agent
+    permissions:
+      - contacts.*
+      - activities.*
+      - tasks.*
+      - pipelines.read
+      - leads.*
+      - appointments.*
+      - walk_ins.*
+      - conversations.*
+      - calls.*
+      - reviews.read
+      - property.read
+      - property.write
+
+  - key: coordinator
+    name: Coordinator
+    permissions:
+      - contacts.read
+      - contacts.write
+      - activities.read
+      - activities.write
+      - tasks.*
+      - appointments.*
+      - conversations.read
+      - conversations.write
+      - calls.read
+      - property.read
+
+# ---------------------------------------------------------------------------
+# Lead sources — top-of-funnel attribution. Portal names use
+# alphanumeric slugs (regex requires a leading lowercase letter);
+# display labels carry the marketing spelling.
+# ---------------------------------------------------------------------------
+lead_sources:
+  - {key: whatsapp,       label: WhatsApp,       display_order: 10}
+  - {key: instagram,      label: Instagram,      display_order: 20}
+  - {key: facebook,       label: Facebook,       display_order: 30}
+  - {key: website,        label: Website,        display_order: 40}
+  - {key: walk-in,        label: Walk-in,        display_order: 50}
+  - {key: reference,      label: Reference,      display_order: 60}
+  - {key: acres99,        label: 99acres,        display_order: 70}
+  - {key: magicbricks,    label: MagicBricks,    display_order: 80}
+  - {key: commonfloor,    label: CommonFloor,    display_order: 90}
+  - {key: broker_network, label: Broker Network, display_order: 100}
+
+# ---------------------------------------------------------------------------
+# Call outcomes — what an agent picks at the end of a call.
+# ---------------------------------------------------------------------------
+call_outcomes:
+  - {key: site_visit_booked,     label: Site Visit Booked,     color: '#10b981', display_order: 10}
+  - {key: budget_qualified,      label: Budget Qualified,      color: '#0ea5e9', display_order: 20}
+  - {key: document_requested,    label: Document Requested,    color: '#8b5cf6', display_order: 30}
+  - {key: financing_discussion,  label: Financing Discussion,  color: '#f59e0b', display_order: 40}
+  - {key: callback_requested,    label: Callback Requested,    color: '#ec4899', display_order: 50}
+  - {key: not_interested,        label: Not Interested,        color: '#6b7280', display_order: 60}
+  - {key: wrong_number,          label: Wrong Number,          color: '#ef4444', display_order: 70}
+
+# ---------------------------------------------------------------------------
+# Org-wide defaults. Applied only when the field is still at its
+# migration default (or null) — the installer NEVER overwrites an
+# admin's manual edit on org_settings.
+# ---------------------------------------------------------------------------
+defaults:
+  currency: INR
+  tax_rate: 5.00
+  timezone: Asia/Kolkata
+  locale: en-IN
+  review_source: google
+  ai_personality: |
+    A helpful, professional real-estate advisor in India. Speaks
+    confidently about locality trends, ready-to-move vs under-construction
+    trade-offs, home-loan pre-approval, and RERA compliance. Always
+    suggests a site visit for shortlisted properties, mentions
+    registration + stamp-duty as separate from the quoted price, and
+    offers WhatsApp for document sharing. Concise replies (3–4 sentences
+    max), uses ₹ for prices.
+  ai_welcome_message: |
+    Hi! 👋 Looking to buy, rent, or invest in property? Share your
+    preferred locality, budget range, and whether you need
+    ready-to-move or under-construction — I'll shortlist matches and
+    schedule site visits for you.
+
+# ---------------------------------------------------------------------------
+# Follow-up schedule — Phase 5 reads this to drip-feed a fresh lead
+# with templated WhatsApp messages on day 1, 3, 7 after creation.
+# ---------------------------------------------------------------------------
+follow_up_schedule:
+  - day_offset: 1
+    channel: whatsapp
+    template: |
+      Hi {{full_name}}, following up on your property enquiry yesterday.
+      Would this weekend work for a site visit? I can share 2–3
+      matching options along your preferred locality.
+  - day_offset: 3
+    channel: whatsapp
+    template: |
+      Hi {{full_name}}, sharing 3 shortlisted properties within your
+      budget range. Reply INTERESTED to book a site visit or ask for
+      floor-plans and neighbourhood details. — Team Real Estate
+  - day_offset: 7
+    channel: whatsapp
+    template: |
+      Hi {{full_name}}, gentle nudge — the pre-launch price we
+      discussed is valid till Friday, after which the developer moves
+      to launch price. Want me to hold a unit for you with a token?
+
+# ---------------------------------------------------------------------------
+# module → permission key map. Lets roles use `<module>.*` shorthand
+# above to grant every key a module declares. `property` is the new
+# vertical-specific entry; the rest are the Core CRM modules that
+# every stack (including Real Estate) inherits.
+# ---------------------------------------------------------------------------
+module_permissions:
+  contacts:      [contacts.read, contacts.write]
+  activities:    [activities.read, activities.write]
+  tasks:         [tasks.read, tasks.write]
+  pipelines:     [pipelines.read, pipelines.write]
+  leads:         [leads.read, leads.write]
+  appointments:  [appointments.read, appointments.write]
+  walk_ins:      [walk_ins.read, walk_ins.write]
+  catalog:       [catalog.read, catalog.write]
+  staff:         [staff.read, staff.write, attendance.write]
+  attendance:    [attendance.write]
+  conversations: [conversations.read, conversations.write]
+  calls:         [calls.read, calls.write, calls.outcomes.manage]
+  reviews:       [reviews.read, reviews.write]
+  campaigns:     [campaigns.read, campaigns.write, campaigns.send]
+  settings:      [settings.read, settings.write]
+  billing:       [billing.read, billing.write, billing.refund]
+  property:      [property.read, property.write, property.publish, property.archive, property.delete]

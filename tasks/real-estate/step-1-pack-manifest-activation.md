@@ -1,9 +1,9 @@
 # Step 1 — Real Estate pack manifest + activate onboarding tile
 
-**Goal:** Create `api/src/app/packs/real_estate/pack.yaml` with the full pack contract (pipelines, roles, custom fields, defaults, lead sources, call outcomes, module_permissions), scaffold the `packs/real_estate/` package layout, and remove the Real Estate entry from `PLACEHOLDER_PACKS` so the onboarding tile flips from "Coming soon" to selectable.
+**Goal:** Create `api/src/app/packs/real_estate/pack.yaml` with the full pack contract (pipelines, roles, custom fields, defaults, lead sources, call outcomes, module_permissions) and scaffold the `packs/real_estate/` package layout. The onboarding catalog auto-flips the Real Estate tile from `coming_soon` → `available` because [core/packs/service.py:34-55](../../API/src/app/core/packs/service.py#L34-L55) scans `packs/*/pack.yaml` at startup — no edit to `catalog_config.py` needed.
 
 **Track:** Real Estate CRM Pack
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** `phase-4-furniture-pack/` pack.yaml schema (installed and proven) — Done. `onboarding-setup/` catalog endpoint — Done.
 
 ---
@@ -37,10 +37,9 @@
    - **Defaults** — `currency: INR`, `tax_rate: 5.00` (property registration standard rate), `timezone: Asia/Kolkata`, `locale: en-IN`, `review_source: google`, AI personality + welcome message tailored to real estate.
    - **Follow-up schedule** — day 1 / day 3 / day 7 WhatsApp templates for a fresh property enquiry.
    - **module_permissions** — add `property: [property.read, property.write, property.publish, property.archive, property.delete]` to the existing map. Include the standard Core CRM module_permissions block (contacts, activities, tasks, pipelines, leads, appointments, walk_ins, catalog, staff, conversations, calls, reviews, campaigns, settings, billing) — the pack manifest declares the permission surface it grants.
-3. Modify [core/packs/catalog_config.py](../../API/src/app/core/packs/catalog_config.py):
-   - Remove the `real_estate` entry from `PLACEHOLDER_PACKS`.
-   - The pack auto-discovery reads `packs/real_estate/pack.yaml` at startup and merges it into the catalog as `status: "available"`.
-4. Add a minimal pytest verifying that `parse_pack_yaml("real_estate")` loads without errors and that the onboarding catalog endpoint returns Real Estate with `status: "available"`.
+3. **No `catalog_config.py` edit needed.** [service.get_catalog()](../../API/src/app/core/packs/service.py) already discovers on-disk packs and flips their tile status. The tile's static metadata (name, description, icon, `default_currency`, `default_tax_rate`, `modules_preview`, `display_order`) lives in [catalog_config.py:71-84](../../API/src/app/core/packs/catalog_config.py#L71-L84) and stays unchanged for Step 1.
+4. Update [tests/test_packs_catalog.py](../../API/tests/test_packs_catalog.py) — remove `real_estate` from the `coming_soon` assertion list, add it to the `available` assertion. The pre-existing test asserted the old behavior; it would fail otherwise.
+5. Add [tests/test_real_estate_pack_manifest.py](../../API/tests/test_real_estate_pack_manifest.py) verifying manifest parses, declares `property.*` permissions, has a `won` stage on the leads pipeline, seeds the 5 curated roles, and the catalog reports `status="available"`.
 
 **OUT:**
 
@@ -54,12 +53,12 @@
 | File | Change |
 |---|---|
 | `api/src/app/packs/real_estate/__init__.py` | New (empty). |
-| `api/src/app/packs/real_estate/pack.yaml` | New (~250 lines). |
 | `api/src/app/packs/real_estate/modules/__init__.py` | New (empty). |
-| `api/src/app/core/packs/catalog_config.py` | Delete the `real_estate` dict from `PLACEHOLDER_PACKS`. |
-| `api/tests/packs/test_real_estate_manifest.py` | New (~40 lines): parses pack.yaml, asserts required top-level keys, asserts catalog endpoint marks it available. |
+| `api/src/app/packs/real_estate/pack.yaml` | New (~225 lines). |
+| `api/tests/test_real_estate_pack_manifest.py` | New (~90 lines): parses manifest, asserts property permission surface, leads pipeline shape, roles, catalog `available`. |
+| `api/tests/test_packs_catalog.py` | Modified — real_estate moved from `coming_soon` list to `available` assertions. |
 
-**5 files, ~300 lines.** Well within Rule 8.
+**5 files touched, ~315 lines net new.** Well within Rule 8.
 
 ## Verification checklist
 

@@ -36,6 +36,9 @@ async def test_catalog_includes_real_packs_as_available(layered_client):
     # Furniture pack ships with the repo (`packs/furniture/pack.yaml`).
     assert "furniture" in by_id
     assert by_id["furniture"]["status"] == "available"
+    # Real Estate pack ships with the repo (`packs/real_estate/pack.yaml`).
+    assert "real_estate" in by_id
+    assert by_id["real_estate"]["status"] == "available"
     # The "Core CRM" tile is keyed by `base` because that is the on-disk
     # template_id at `packs/base/pack.yaml`. Display name is "Core CRM".
     assert "base" in by_id
@@ -48,7 +51,6 @@ async def test_catalog_marks_placeholders_coming_soon(layered_client):
     resp = await layered_client.get("/api/v1/packs/catalog")
     by_id = {t["template_id"]: t for t in resp.json()["packs"]}
     for placeholder_id in (
-        "real_estate",
         "clinic",
         "sales",
         "automotive",
