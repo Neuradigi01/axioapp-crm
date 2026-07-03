@@ -3,7 +3,7 @@
 **Goal:** Create the two Property tables (`tbl_rp_properties`, `tbl_rp_property_images`) with `org_id`, RLS policies, all fields per the requirements doc, plus the module folder skeleton and a pure-CRUD `data_access.py`.
 
 **Track:** Real Estate CRM Pack
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 1 (pack manifest active).
 
 ---
