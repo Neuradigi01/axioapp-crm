@@ -194,6 +194,11 @@ async def send_outbound(
         send_kwargs["interactive"] = interactive
     if reply_to_wamid is not None:
         send_kwargs["reply_to_channel_message_id"] = reply_to_wamid
+    # Messenger + Instagram adapters need the Page ID / IG Business
+    # Account ID (stored on `conv.received_via_phone_id` — overloaded
+    # for channel-endpoint id) to resolve the right Page-access token.
+    if conv.channel in (ConversationChannel.facebook, ConversationChannel.instagram):
+        send_kwargs["received_via_phone_id"] = conv.received_via_phone_id
     ref = await adapter.send(**send_kwargs)
     now = datetime.now(UTC)
     sent_at = ref.sent_at or now
