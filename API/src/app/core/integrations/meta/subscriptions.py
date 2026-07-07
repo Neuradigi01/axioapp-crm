@@ -262,14 +262,105 @@ async def find_page_token(
     return None
 
 
+# --- Messenger + Instagram messaging subscriptions ------------------------
+
+
+_MESSAGING_FIELDS = (
+    "messages,messaging_postbacks,message_reactions,message_reads,message_echoes"
+)
+
+
+async def subscribe_page_messaging(
+    client: MetaGraphClient,
+    *,
+    page_id: str,
+    page_token: str,
+) -> bool:
+    """Extend an already-subscribed Page's ``subscribed_fields`` to
+    include the Messenger + IG messaging events.
+
+    POST ``/{page_id}/subscribed_apps`` with the combined
+    ``subscribed_fields`` list (Meta's endpoint is additive — passing
+    only the new fields would drop ``leadgen``). Returns True on
+    Meta's ``{"success": true}``. Idempotent: re-subscribing the same
+    fields is a no-op on Meta's side.
+    """
+    body = await client.post(
+        f"/{page_id}/subscribed_apps",
+        params={"subscribed_fields": f"leadgen,{_MESSAGING_FIELDS}"},
+        access_token=page_token,
+    )
+    return bool(body.get("success"))
+
+
+async def unsubscribe_page_messaging(
+    client: MetaGraphClient,
+    *,
+    page_id: str,
+    page_token: str,
+) -> bool:
+    """Narrow the Page's subscription back to ``leadgen`` only. Meta
+    doesn't offer a way to remove individual fields; the workaround is
+    POST-with-just-leadgen (which replaces the list)."""
+    body = await client.post(
+        f"/{page_id}/subscribed_apps",
+        params={"subscribed_fields": "leadgen"},
+        access_token=page_token,
+    )
+    return bool(body.get("success"))
+
+
+@dataclass(frozen=True, slots=True)
+class InstagramBusinessAccount:
+    """The IG Business Account linked to a Facebook Page. Populated
+    from ``GET /{page_id}?fields=instagram_business_account{id,name}``.
+    ``None`` when no IG account is linked."""
+
+    ig_business_id: str
+    username: str | None
+
+
+async def get_linked_instagram_account(
+    client: MetaGraphClient,
+    *,
+    page_id: str,
+    page_token: str,
+) -> InstagramBusinessAccount | None:
+    """Return the IG Business Account linked to this Facebook Page, if
+    any. Callers use the ``ig_business_id`` as a lookup key when
+    persisting a second ``tbl_meta_page_tokens`` row so incoming IG
+    webhook events (which arrive with ``entry.id = ig_business_id``)
+    can find the same Page token.
+    """
+    body = await client.get(
+        f"/{page_id}",
+        params={"fields": "instagram_business_account{id,username}"},
+        access_token=page_token,
+    )
+    account = body.get("instagram_business_account")
+    if not isinstance(account, dict):
+        return None
+    ig_id = account.get("id")
+    if not ig_id:
+        return None
+    return InstagramBusinessAccount(
+        ig_business_id=str(ig_id),
+        username=(str(account["username"]) if account.get("username") else None),
+    )
+
+
 __all__ = [
+    "InstagramBusinessAccount",
     "MetaLeadForm",
     "MetaPage",
     "delete_page_token",
     "find_page_token",
+    "get_linked_instagram_account",
     "list_lead_forms_for_page",
     "list_pages",
     "subscribe_page",
+    "subscribe_page_messaging",
     "unsubscribe_page",
+    "unsubscribe_page_messaging",
     "upsert_page_token",
 ]

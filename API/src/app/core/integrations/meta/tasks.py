@@ -741,6 +741,102 @@ def _utc_now():
     return _dt.now(UTC)
 
 
+# --- Messenger + Instagram Direct DMs (Meta Messaging Platform) --------
+
+
+@_shared_task(
+    bind=True,
+    name="src.app.core.integrations.meta.tasks.process_meta_message",
+    autoretry_for=(ConnectionError, TimeoutError),
+    max_retries=5,
+    retry_backoff=5,
+    retry_backoff_max=3600,
+    retry_jitter=True,
+)
+def process_meta_message(self, payload: dict[str, Any]) -> dict[str, Any]:
+    """Sync entrypoint for Messenger + IG Direct inbound events.
+
+    `payload` shape (built by the webhook receiver):
+      ``{"channel": "facebook" | "instagram",
+         "endpoint_id": "<page_id or ig_business_id>",
+         "event": <meta messaging event object>}``
+    """
+    try:
+        return asyncio.run(process_meta_message_async(payload=payload))
+    except (ConnectionError, TimeoutError) as exc:
+        if HAS_CELERY:
+            raise self.retry(exc=exc) from exc
+        raise
+
+
+async def process_meta_message_async(
+    *,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Resolve endpoint_id → (org_id, page_token), push tenant context,
+    and hand the event to the conversations engine.
+
+    The Facebook + Instagram adapters share the exact same envelope
+    shape (Meta's Messaging Platform is unified), so both channels
+    route through the same lookup path — the adapter parses the event
+    into an :class:`InboundMessage` and the conversations service
+    persists it.
+    """
+    channel_name = payload.get("channel")
+    endpoint_id = payload.get("endpoint_id")
+    event = payload.get("event")
+
+    if channel_name not in ("facebook", "instagram") or not endpoint_id or not isinstance(event, dict):
+        logger.warning("process_meta_message: malformed payload %r", payload)
+        return {"status": "dlq", "reason": "malformed_payload"}
+
+    async with async_session() as session:
+        mapping = await _load_page_token_unscoped(session, str(endpoint_id))
+    if mapping is None:
+        # No cached token for this endpoint — either the Page was
+        # unsubscribed after Meta queued the delivery, or the IG
+        # Business Account isn't linked to any of our tracked Pages.
+        logger.warning(
+            "process_meta_message: no cached token for endpoint=%s (channel=%s)",
+            endpoint_id,
+            channel_name,
+        )
+        return {"status": "dlq", "reason": "no_page_token"}
+
+    org_id, _integration_id, _page_token = mapping
+
+    from src.app.core.conversations.models import ConversationChannel
+    from src.app.core.conversations.service import receive_webhook
+
+    channel = (
+        ConversationChannel.instagram
+        if channel_name == "instagram"
+        else ConversationChannel.facebook
+    )
+
+    ctx_token = set_context(RequestContext(org_id=org_id, user_id=None))
+    try:
+        async with async_session() as session:
+            # `received_via_phone_id` is repurposed here as
+            # "channel-side inbox endpoint id" — for Messenger this is
+            # the Page ID, for Instagram the IG Business Account ID.
+            # The FB/IG adapters read it back on send() to look up the
+            # right Page-access token.
+            msg = await receive_webhook(
+                session,
+                channel=channel,
+                payload=event,
+                received_via_phone_id=str(endpoint_id),
+            )
+    finally:
+        reset_context(ctx_token)
+
+    return {
+        "status": "created" if msg is not None else "reaction_or_noop",
+        "message_id": str(msg.id) if msg is not None else None,
+    }
+
+
 __all__ = [
     "HAS_CELERY",
     "delete_meta_user_data",
@@ -748,4 +844,6 @@ __all__ = [
     "delete_meta_user_data_async_task",
     "process_meta_lead",
     "process_meta_lead_async",
+    "process_meta_message",
+    "process_meta_message_async",
 ]

@@ -132,14 +132,21 @@ async def meta_webhook(request: Request) -> JSONResponse:
             content={"error": "malformed JSON body"},
         )
 
-    enqueued = _enqueue_leadgen_changes(payload)
+    enqueued_leads = _enqueue_leadgen_changes(payload)
+    enqueued_msgs = _enqueue_messaging_events(payload)
     logger.info(
-        "meta webhook: signature ok, enqueued %d leadgen task(s)",
-        enqueued,
+        "meta webhook: signature ok, enqueued %d leadgen + %d messaging task(s)",
+        enqueued_leads,
+        enqueued_msgs,
     )
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"status": "accepted", "enqueued": enqueued},
+        content={
+            "status": "accepted",
+            "enqueued": enqueued_leads + enqueued_msgs,
+            "leadgen": enqueued_leads,
+            "messaging": enqueued_msgs,
+        },
     )
 
 
@@ -173,10 +180,10 @@ def _enqueue_leadgen_changes(payload: Any) -> int:
     bundles unrelated changes in the same envelope."""
     if not isinstance(payload, dict):
         return 0
-    if payload.get("object") not in (None, "page"):
-        # Not a page-level webhook (e.g. an Instagram webhook would
-        # carry object="instagram" but ride a different subscription
-        # field). Skip without enqueueing.
+    if payload.get("object") != "page":
+        # Leadgen only rides on the "page" object. Instagram DMs come
+        # in on object="instagram" and are handled by the messaging
+        # fan-out below.
         return 0
     entries = payload.get("entry") or []
     if not isinstance(entries, list):
@@ -239,6 +246,80 @@ def _enqueue_leadgen_changes(payload: Any) -> int:
                     logger.exception(
                         "meta webhook: inline async processing failed for leadgen_id=%s",
                         task_payload.get("leadgen_id"),
+                    )
+                    continue
+            count += 1
+    return count
+
+
+def _enqueue_messaging_events(payload: Any) -> int:
+    """Walk Meta's `entry[].messaging[]` tree, enqueue one
+    `process_meta_message` task per inbound message.
+
+    Both Messenger (`object="page"`) and Instagram Direct
+    (`object="instagram"`) use the same envelope: entries carry a
+    `messaging` array, each entry has `sender.id`, `recipient.id`,
+    and either `message` (normal), `postback` (button tap), or
+    `reaction`. Delivery/read receipts are skipped for now — v1
+    doesn't reflect Messenger read state back into the inbox.
+    """
+    if not isinstance(payload, dict):
+        return 0
+    obj = payload.get("object")
+    if obj not in ("page", "instagram"):
+        return 0
+    entries = payload.get("entry") or []
+    if not isinstance(entries, list):
+        return 0
+    channel = "instagram" if obj == "instagram" else "facebook"
+
+    from src.app.core.integrations.meta.tasks import (
+        HAS_CELERY,
+        process_meta_message,
+        process_meta_message_async,
+    )
+
+    count = 0
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        endpoint_id = entry.get("id")  # Page ID or IG Business Account ID
+        messaging = entry.get("messaging") or []
+        if not isinstance(messaging, list):
+            continue
+        for event in messaging:
+            if not isinstance(event, dict):
+                continue
+            if event.get("message") is None and event.get("postback") is None:
+                # Delivery / read / echo events — skip for v1.
+                continue
+            if event.get("message", {}).get("is_echo"):
+                # Meta echoes back our own outbound as an inbound
+                # event; skip to avoid double-persisting.
+                continue
+            task_payload = {
+                "channel": channel,
+                "endpoint_id": endpoint_id,
+                "event": event,
+            }
+            if HAS_CELERY:
+                try:
+                    process_meta_message.delay(task_payload)
+                except Exception:
+                    logger.exception(
+                        "meta webhook: failed to enqueue messaging task for endpoint=%s",
+                        endpoint_id,
+                    )
+                    continue
+            else:
+                import asyncio
+
+                try:
+                    asyncio.create_task(process_meta_message_async(payload=task_payload))
+                except Exception:
+                    logger.exception(
+                        "meta webhook: inline messaging task failed for endpoint=%s",
+                        endpoint_id,
                     )
                     continue
             count += 1

@@ -63,8 +63,11 @@ _AUTHORIZE_URL = "https://www.facebook.com/{ver}/dialog/oauth"
 _TOKEN_URL = "https://graph.facebook.com/{ver}/oauth/access_token"
 _USERINFO_URL = "https://graph.facebook.com/{ver}/me"
 
-# Five scopes — the spec'd v1 set. Don't add scopes opportunistically;
-# every scope added widens the App Review surface area at Meta.
+# Meta scopes for lead ads (v1 set) + Messenger/Instagram DMs (v2).
+# Messenger/IG scopes require App Review before non-tester users can
+# grant them; App Testers on the app dashboard can grant them
+# immediately in dev mode. Don't add scopes opportunistically; every
+# scope added widens the App Review surface area at Meta.
 _SCOPES = [
     "pages_show_list",
     "pages_read_engagement",
@@ -72,6 +75,11 @@ _SCOPES = [
     "pages_manage_ads",
     "leads_retrieval",
     "business_management",
+    # Messenger + Instagram Direct DMs — required for reading + sending
+    # customer chats through Meta's Messaging Platform.
+    "pages_messaging",
+    "instagram_basic",
+    "instagram_manage_messages",
 ]
 
 # State TTL — same 10-min window as Google. The OAuth dance never

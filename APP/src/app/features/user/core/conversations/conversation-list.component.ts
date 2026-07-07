@@ -75,6 +75,8 @@ const CHANNEL_OPTIONS: Array<{ value: ConversationChannel | ''; label: string }>
   { value: '', label: 'All channels' },
   { value: 'whatsapp', label: 'WhatsApp' },
   { value: 'email', label: 'Email' },
+  { value: 'facebook', label: 'Messenger' },
+  { value: 'instagram', label: 'Instagram' },
 ];
 
 type AssigneeMode = 'all' | 'mine' | 'unassigned' | 'specific';

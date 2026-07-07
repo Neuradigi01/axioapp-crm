@@ -212,6 +212,32 @@ async def subscribe_page_endpoint(
         ok = await subscriptions.subscribe_page(
             client, page_id=page_id, page_token=page.access_token
         )
+        # Extend the subscription to include Messenger + IG DMs so
+        # inbound chats land in the conversations inbox alongside
+        # lead-form submissions. Meta's endpoint is additive
+        # ("subscribed_fields" REPLACES the list), so this call passes
+        # both leadgen + messaging fields together.
+        try:
+            await subscriptions.subscribe_page_messaging(
+                client, page_id=page_id, page_token=page.access_token
+            )
+        except MetaTokenExpiredError:
+            raise
+        except Exception:
+            # Messaging subscription failure shouldn't block the
+            # leadgen path — the messaging scopes need App Review for
+            # non-tester users. Log and continue.
+            import logging as _logging
+
+            _logging.getLogger(__name__).warning(
+                "meta: leadgen subscribed for page=%s but messaging subscription failed "
+                "(likely App Review pending for messaging scopes)",
+                page_id,
+            )
+
+        linked_ig = await subscriptions.get_linked_instagram_account(
+            client, page_id=page_id, page_token=page.access_token
+        )
     except MetaTokenExpiredError:
         raise HTTPException(
             status_code=401,
@@ -233,7 +259,25 @@ async def subscribe_page_endpoint(
         page_name=page.name,
         page_token=page.access_token,
     )
-    return {"status": "subscribed", "page_id": page_id}
+    # If an Instagram Business Account is linked to this Page, cache a
+    # second token row keyed on the IG Business ID. Incoming IG webhook
+    # events arrive with entry.id = ig_business_id (not the Page ID),
+    # so the ``_load_page_token_unscoped`` lookup needs a row keyed on
+    # that identifier to route the event to the right org.
+    if linked_ig is not None:
+        await subscriptions.upsert_page_token(
+            db,
+            org_id=integration.org_id,
+            integration_id=integration.id,
+            page_id=linked_ig.ig_business_id,
+            page_name=(f"Instagram: @{linked_ig.username}" if linked_ig.username else "Instagram"),
+            page_token=page.access_token,
+        )
+    return {
+        "status": "subscribed",
+        "page_id": page_id,
+        "instagram_business_id": (linked_ig.ig_business_id if linked_ig else None),
+    }
 
 
 @router.post("/pages/{page_id}/unsubscribe")
