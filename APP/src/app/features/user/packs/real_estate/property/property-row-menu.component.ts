@@ -367,19 +367,29 @@ export class PropertyRowMenuComponent {
     this.snackBar.open(extractApiError(err) ?? fallback, 'Dismiss', { duration: 4000 });
   }
 
+  /** Assemble the public URL from the browser's own origin + the
+   * Fernet token the backend returned. Backend can't know the
+   * frontend's host (backend is on port 30007 / a different domain);
+   * always mint client-side so the URL points at the app the user
+   * is actually looking at. */
+  private publicUrlFromToken(token: string): string {
+    return `${window.location.origin}/property/${token}`;
+  }
+
   private copyPublicUrl(): void {
     this.api
       .generatePublicUrl(this.property().id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: async (resp) => {
+          const url = this.publicUrlFromToken(resp.token);
           try {
-            await navigator.clipboard.writeText(resp.url);
+            await navigator.clipboard.writeText(url);
             this.snackBar.open('Public URL copied to clipboard.', 'Dismiss', { duration: 2500 });
           } catch {
             // Older browser / permission blocked — reveal a fallback
             // modal with the URL in a read-only field.
-            this.clipboardFallbackUrl.set(resp.url);
+            this.clipboardFallbackUrl.set(url);
           }
         },
         error: (err: HttpErrorResponse) => this.showError(err, 'Could not generate public URL'),
@@ -392,7 +402,8 @@ export class PropertyRowMenuComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
-          window.open(resp.url, '_blank', 'noopener');
+          const url = this.publicUrlFromToken(resp.token);
+          window.open(url, '_blank', 'noopener');
         },
         error: (err: HttpErrorResponse) => this.showError(err, 'Could not open preview'),
       });

@@ -4,6 +4,11 @@
 x-dev-env: &dev-env
   IS_DEVELOPMENT: "true"
   DB_NULL_POOL: "1"
+  # Dev-only Fernet key for the Real Estate pack's public property
+  # links. Prod deployment should read this from secrets.enc.env via
+  # SOPS (declared in docker-compose.yml secret-vars). Regenerate with:
+  #   docker exec crm-api-1 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+  PROPERTY_LINK_ENCRYPTION_KEY: "MlQ8eZQ-Avj_QejfxzPts2JVuQ3CU1sGiDltuoDOU6Q="
 
 services:
   api:
