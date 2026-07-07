@@ -1,9 +1,14 @@
 # Step 10 — Real Estate pack smoke test + demo seed
 
-**Goal:** Install the Real Estate pack into a demo org, seed 5 sample properties (2 draft, 3 published, one with a full image gallery), run the end-to-end smoke test covering signup → onboarding pick → sidebar → CRUD → publish → public URL → public page → tamper-detect.
+**Goal:** Install the Real Estate pack into a demo org, seed 5 sample properties (2 draft, 3 published, one with a full image gallery), run the end-to 
+
+
+
+
+-end smoke test covering signup → onboarding pick → sidebar → CRUD → publish → public URL → public page → tamper-detect.
 
 **Track:** Real Estate CRM Pack
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 1–9.
 
 ---

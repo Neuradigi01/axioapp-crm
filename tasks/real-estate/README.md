@@ -68,7 +68,7 @@ All without any DB-level intervention, CLI installer step, or engineering assist
 | 7 | [Property frontend: create/edit form + image gallery UI](step-7-frontend-form-gallery.md) | COMPLETED | ~1 day |
 | 8 | [Property frontend: actions (publish, archive, delete, copy URL, preview)](step-8-frontend-actions.md) | COMPLETED | ~½ day |
 | 9 | [Public listing page + public detail page (no-auth routes)](step-9-public-pages.md) | COMPLETED | ~1 day |
-| 10 | [Real Estate pack smoke test + demo seed](step-10-smoke-and-seed.md) | Pending | ~½ day |
+| 10 | [Real Estate pack smoke test + demo seed](step-10-smoke-and-seed.md) | COMPLETED | ~½ day |
 
 **Total: ~8 working days.** Each step independently verifiable in under 30 minutes; stop-and-report after every step per rule 9.
 
