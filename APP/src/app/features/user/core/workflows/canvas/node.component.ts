@@ -1,27 +1,20 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
-import { CanvasNode, CanvasStateService } from './canvas-state.service';
+import { CanvasNode } from './canvas-state.service';
 import { getNodeType, WorkflowNodeType } from './node-type-registry';
 
 /**
  * Single canvas node — type-agnostic. Renders the rounded card with
  * input port (top edge) and output ports (bottom edge). Click → select;
- * drag → move; "Delete" / "Duplicate" / "Disconnect" exposed via the
- * top-right menu.
+ * drag → move. Right-click (or the top-right kebab) raises a
+ * `nodeContextMenu` event; the canvas page owns the actual
+ * Edit / Duplicate / Copy / Disconnect / Delete menu so it renders in
+ * screen space rather than inside the zoom/pan SVG group.
  *
- * Pure presentation — every mutation routes through
- * `CanvasStateService` so undo / redo / dirty / auto-save stay in
- * sync.
+ * Pure presentation — every mutation routes through the canvas page /
+ * `CanvasStateService` so undo / redo / dirty / auto-save stay in sync.
  *
  * Edge-creation drag starts from an output port (mousedown on a port
  * circle) — the canvas page listens for `outputPortDown`, tracks the
@@ -47,6 +40,7 @@ export const NODE_HEADER = 30;
       class="select-none"
       (mousedown)="onCardMouseDown($event)"
       (click)="onCardClick($event)"
+      (contextmenu)="onCardContextMenu($event)"
     >
       @if (selected()) {
         <svg:rect
@@ -117,37 +111,6 @@ export const NODE_HEADER = 30;
         </button>
       </svg:foreignObject>
 
-      @if (menuOpen()) {
-        <svg:foreignObject [attr.x]="WIDTH - 130" [attr.y]="28" width="130" height="100">
-          <div
-            class="bg-white border border-zinc-200 rounded-lg shadow-lg overflow-hidden text-xs"
-            (mousedown)="$event.stopPropagation()"
-          >
-            <button
-              type="button"
-              class="block w-full text-left px-3 py-2 hover:bg-zinc-50"
-              (click)="onDuplicate($event)"
-            >
-              Duplicate
-            </button>
-            <button
-              type="button"
-              class="block w-full text-left px-3 py-2 hover:bg-zinc-50"
-              (click)="onDisconnect($event)"
-            >
-              Disconnect
-            </button>
-            <button
-              type="button"
-              class="block w-full text-left px-3 py-2 text-rose-600 hover:bg-rose-50"
-              (click)="onDelete($event)"
-            >
-              Delete
-            </button>
-          </div>
-        </svg:foreignObject>
-      }
-
       @if (hasInputPort()) {
         <svg:circle
           [attr.cx]="WIDTH / 2"
@@ -196,9 +159,7 @@ export class WorkflowNodeComponent {
   readonly inputPortUp = output<{ nodeId: string; event: MouseEvent }>();
   readonly cardMouseDown = output<{ nodeId: string; event: MouseEvent }>();
   readonly selectNode = output<string>();
-
-  private readonly state = inject(CanvasStateService);
-  readonly menuOpen = signal(false);
+  readonly nodeContextMenu = output<{ nodeId: string; x: number; y: number }>();
 
   readonly nodeType = computed<WorkflowNodeType | undefined>(() => getNodeType(this.node().type));
 
@@ -233,7 +194,6 @@ export class WorkflowNodeComponent {
 
   onCardMouseDown(event: MouseEvent): void {
     if (event.button !== 0) return;
-    this.menuOpen.set(false);
     this.cardMouseDown.emit({ nodeId: this.node().id, event });
   }
 
@@ -242,35 +202,29 @@ export class WorkflowNodeComponent {
     this.selectNode.emit(this.node().id);
   }
 
+  onCardContextMenu(event: MouseEvent): void {
+    // Right-click anywhere on the card raises the screen-space menu at
+    // the cursor. Suppress the native browser menu + canvas pan.
+    event.preventDefault();
+    event.stopPropagation();
+    this.nodeContextMenu.emit({
+      nodeId: this.node().id,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }
+
   onMenuClick(event: MouseEvent): void {
+    // The kebab is an explicit affordance for the same menu — anchor it
+    // just below the button so it doesn't cover the node header.
+    event.preventDefault();
     event.stopPropagation();
-    this.menuOpen.update((v) => !v);
-  }
-
-  onDuplicate(event: MouseEvent): void {
-    event.stopPropagation();
-    this.menuOpen.set(false);
-    this.state.duplicateNode(this.node().id);
-  }
-
-  onDisconnect(event: MouseEvent): void {
-    event.stopPropagation();
-    this.menuOpen.set(false);
-    const id = this.node().id;
-    const edges = this.state.edges();
-    for (const e of edges) {
-      if (e.source === id || e.target === id) {
-        this.state.deleteEdge(e.id);
-      }
-    }
-  }
-
-  onDelete(event: MouseEvent): void {
-    event.stopPropagation();
-    this.menuOpen.set(false);
-    if (confirm('Delete this node and its connections?')) {
-      this.state.deleteNode(this.node().id);
-    }
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.nodeContextMenu.emit({
+      nodeId: this.node().id,
+      x: rect.right,
+      y: rect.bottom + 4,
+    });
   }
 
   onOutputDown(event: MouseEvent, portLabel: string | null): void {

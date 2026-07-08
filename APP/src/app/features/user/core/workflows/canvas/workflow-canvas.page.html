@@ -196,6 +196,7 @@
           class="absolute inset-0 w-full h-full bg-zinc-100"
           (mousedown)="onCanvasMouseDown($event)"
           (wheel)="onWheel($event)"
+          (contextmenu)="onCanvasContextMenu($event)"
         >
           <defs>
             <pattern id="workflow-grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -247,6 +248,7 @@
                 [selected]="state.selectedNodeId() === node.id"
                 (cardMouseDown)="onNodeMouseDown($event)"
                 (selectNode)="onNodeSelect($event)"
+                (nodeContextMenu)="onNodeContextMenu($event)"
                 (outputPortDown)="onOutputPortDown($event)"
                 (inputPortUp)="onInputPortUp($event)"
               ></g>
@@ -366,6 +368,17 @@
       }
     </aside>
   </div>
+
+  <!-- Right-click context menu (nodes + empty canvas) -->
+  @if (contextMenu(); as ctx) {
+    <app-context-menu
+      [x]="ctx.x"
+      [y]="ctx.y"
+      [items]="contextMenuItems()"
+      (menuSelect)="onContextMenuSelect($event)"
+      (menuClose)="closeContextMenu()"
+    />
+  }
 
   <!-- Step 17 — save-change-note modal -->
   <app-save-change-note-modal

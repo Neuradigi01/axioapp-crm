@@ -19,6 +19,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { CanvasNode, CanvasStateService } from './canvas-state.service';
+import { ContextMenuComponent, ContextMenuItem } from './context-menu.component';
 import { WorkflowEdgeComponent } from './edge.component';
 import { ImportModalComponent } from './import-modal.component';
 import { NodeEditorComponent } from './node-editor.component';
@@ -82,6 +83,7 @@ const AUTOSAVE_INTERVAL_MS = 30_000;
     FormsModule,
     RouterLink,
     LucideAngularModule,
+    ContextMenuComponent,
     ImportModalComponent,
     NodeEditorComponent,
     NodePaletteComponent,
@@ -559,6 +561,128 @@ export class WorkflowCanvasPageComponent {
 
   onNodeSelect(nodeId: string): void {
     this.state.selectNode(nodeId);
+  }
+
+  // --- Right-click context menu ---------------------------------------
+
+  // Open menu descriptor. `nodeId` null → the empty-canvas menu.
+  // `canvas` is the click point in canvas coords (used for Paste).
+  readonly contextMenu = signal<{
+    x: number;
+    y: number;
+    nodeId: string | null;
+    canvas: CursorPoint;
+  } | null>(null);
+
+  // Single-node clipboard (type + config) shared by Copy → Paste.
+  private readonly clipboard = signal<{ type: string; config: Record<string, unknown> } | null>(
+    null,
+  );
+
+  readonly contextMenuItems = computed<ContextMenuItem[]>(() => {
+    const ctx = this.contextMenu();
+    if (!ctx) return [];
+    if (ctx.nodeId) {
+      const hasEdges = this.state
+        .edges()
+        .some((e) => e.source === ctx.nodeId || e.target === ctx.nodeId);
+      return [
+        { id: 'edit', label: 'Edit', icon: 'Pencil' },
+        { id: 'duplicate', label: 'Duplicate', icon: 'Files' },
+        { id: 'copy', label: 'Copy', icon: 'Copy' },
+        { id: 'disconnect', label: 'Disconnect', icon: 'Scissors', disabled: !hasEdges },
+        { id: 'delete', label: 'Delete', icon: 'Trash2', danger: true, separatorBefore: true },
+      ];
+    }
+    return [
+      { id: 'paste', label: 'Paste', icon: 'ClipboardPaste', disabled: this.clipboard() === null },
+      { id: 'fit', label: 'Fit to view', icon: 'Maximize2', separatorBefore: true },
+      { id: 'reset', label: 'Reset zoom', icon: 'RotateCcw' },
+      { id: 'autolayout', label: 'Auto-layout', icon: 'LayoutGrid' },
+    ];
+  });
+
+  onNodeContextMenu(payload: { nodeId: string; x: number; y: number }): void {
+    const node = this.nodeById().get(payload.nodeId);
+    this.state.selectNode(payload.nodeId);
+    this.contextMenu.set({
+      x: payload.x,
+      y: payload.y,
+      nodeId: payload.nodeId,
+      canvas: { ...(node?.position ?? { x: 0, y: 0 }) },
+    });
+  }
+
+  onCanvasContextMenu(event: MouseEvent): void {
+    event.preventDefault();
+    this.state.selectNode(null);
+    this.contextMenu.set({
+      x: event.clientX,
+      y: event.clientY,
+      nodeId: null,
+      canvas: this.toCanvasCoords(event),
+    });
+  }
+
+  closeContextMenu(): void {
+    this.contextMenu.set(null);
+  }
+
+  onContextMenuSelect(actionId: string): void {
+    const ctx = this.contextMenu();
+    if (!ctx) return;
+    const nodeId = ctx.nodeId;
+    switch (actionId) {
+      case 'edit':
+        if (nodeId) this.state.selectNode(nodeId);
+        break;
+      case 'duplicate':
+        if (nodeId) this.state.duplicateNode(nodeId);
+        break;
+      case 'copy':
+        if (nodeId) {
+          const node = this.nodeById().get(nodeId);
+          if (node) {
+            this.clipboard.set({
+              type: node.type,
+              config: { ...((node.config as Record<string, unknown>) ?? {}) },
+            });
+          }
+        }
+        break;
+      case 'disconnect':
+        if (nodeId) {
+          for (const e of this.state.edges()) {
+            if (e.source === nodeId || e.target === nodeId) this.state.deleteEdge(e.id);
+          }
+        }
+        break;
+      case 'delete':
+        if (nodeId && confirm('Delete this node and its connections?')) {
+          this.state.deleteNode(nodeId);
+        }
+        break;
+      case 'paste': {
+        const clip = this.clipboard();
+        if (clip) {
+          this.state.addNode(
+            clip.type,
+            { x: ctx.canvas.x - NODE_WIDTH / 2, y: ctx.canvas.y - NODE_HEIGHT / 2 },
+            { config: clip.config },
+          );
+        }
+        break;
+      }
+      case 'fit':
+        this.fitToView();
+        break;
+      case 'reset':
+        this.resetZoom();
+        break;
+      case 'autolayout':
+        this.autoLayout();
+        break;
+    }
   }
 
   // --- Edge drag (connect) --------------------------------------------
