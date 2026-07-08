@@ -73,7 +73,10 @@ APP_DIR="../APP"
 
 # Idempotently point git at the committed hooks (check-then-set). Relative
 # core.hooksPath resolves to the working-tree root, so this works from anywhere.
+# No-op when not inside a git work tree (e.g. a deploy target without .git) so
+# it never aborts the stack under `set -e`.
 ensure_hooks() {
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
     if [ "$(git config core.hooksPath 2>/dev/null)" != ".githooks" ]; then
         git config core.hooksPath .githooks && echo "Git hooks enabled (core.hooksPath -> .githooks)."
     fi
