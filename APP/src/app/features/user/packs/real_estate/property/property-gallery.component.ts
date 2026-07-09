@@ -16,6 +16,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { assetUrl } from './asset-url.util';
 import { PropertyApiService } from './property-api.service';
 import {
   ALLOWED_IMAGE_MIME,
@@ -55,6 +56,10 @@ export class PropertyGalleryComponent {
   protected readonly uploading = signal(false);
   protected readonly dragOver = signal(false);
   protected readonly pendingDeleteId = signal<string | null>(null);
+
+  protected imgSrc(img: PropertyImage): string {
+    return assetUrl(img.image_url);
+  }
 
   constructor() {
     // Hydrate from parent's `initialImages` on first render, and

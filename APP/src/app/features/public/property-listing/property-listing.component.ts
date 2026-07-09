@@ -15,6 +15,7 @@ import { Meta, Title } from '@angular/platform-browser';
 import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
+import { assetUrl } from '../shared/asset-url.util';
 import {
   PublicPropertyApiService,
   type PublicPropertyCard,
@@ -124,5 +125,9 @@ export class PublicPropertyListingComponent {
       .split('_')
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ');
+  }
+
+  protected imgSrc(url: string | null | undefined): string {
+    return assetUrl(url);
   }
 }

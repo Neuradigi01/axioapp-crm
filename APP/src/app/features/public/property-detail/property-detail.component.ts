@@ -13,6 +13,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { assetUrl } from '../shared/asset-url.util';
 import {
   PublicPropertyApiService,
   type PublicPropertyDetail,
@@ -166,5 +167,9 @@ export class PublicPropertyDetailComponent {
     const d = this.detail();
     if (!d?.contact_phone) return null;
     return `tel:${d.contact_phone.replace(/\s+/g, '')}`;
+  }
+
+  protected imgSrc(url: string | null | undefined): string {
+    return assetUrl(url);
   }
 }

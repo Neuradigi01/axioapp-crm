@@ -16,6 +16,7 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { assetUrl } from './asset-url.util';
 import { PropertyApiService } from './property-api.service';
 import { PropertyRowMenuComponent } from './property-row-menu.component';
 import type { Property, PropertyStatus, PropertyTabKey } from './property.types';
@@ -156,6 +157,10 @@ export class PropertyListPageComponent {
 
   protected openProperty(p: Property): void {
     this.router.navigate(['/user/properties', p.id, 'edit']);
+  }
+
+  protected imgSrc(p: Property): string {
+    return assetUrl(p.featured_image_url);
   }
 
   /** Optimistic status update — the row menu emits this before the

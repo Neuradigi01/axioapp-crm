@@ -56,7 +56,7 @@
             <div class="aspect-video overflow-hidden bg-zinc-100">
               @if (card.featured_image_url) {
                 <img
-                  [src]="card.featured_image_url"
+                  [src]="imgSrc(card.featured_image_url)"
                   [alt]="card.title"
                   loading="lazy"
                   class="h-full w-full object-cover transition duration-300 group-hover:scale-105"

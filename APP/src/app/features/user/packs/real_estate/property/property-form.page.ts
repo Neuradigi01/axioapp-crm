@@ -263,11 +263,12 @@ export class PropertyFormPageComponent {
         .update(id, payload as PropertyUpdate)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
-          next: (updated) => {
+          next: (_updated) => {
             this.saving.set(false);
-            this.hydrateForm(updated);
-            this.currentProperty.set(updated);
             this.snackBar.open('Property saved.', 'Dismiss', { duration: 2500 });
+            // Close edit mode → back to list. Owners save + move on; if
+            // they want to keep editing they click the row again.
+            this.router.navigate(['/user/properties']);
           },
           error: (err: HttpErrorResponse) => this.handleError(err, 'Could not save property'),
         });
