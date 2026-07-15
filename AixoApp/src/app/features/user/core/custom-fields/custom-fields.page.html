@@ -1,0 +1,132 @@
+<section class="space-y-4">
+  <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-zinc-900">Custom fields</h2>
+      <p class="mt-1 text-xs text-zinc-500">
+        Add fields to an entity, rename labels, mark required, hide, or reorder by dragging. System
+        and Pack fields can be relabelled / hidden / reordered but not deleted.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <label for="entity-type" class="text-xs text-zinc-700">Entity</label>
+      <select
+        id="entity-type"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        [value]="entityType()"
+        (change)="onEntityChange($any($event.target).value)"
+      >
+        @for (e of entityTypes; track e.value) {
+          <option [value]="e.value">{{ e.label }}</option>
+        }
+      </select>
+      <button
+        type="button"
+        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+        (click)="openCreate()"
+      >
+        Add field
+      </button>
+    </div>
+  </header>
+
+  @if (loadError()) {
+    <div class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+      {{ loadError() }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div
+      class="rounded-md border border-dashed border-zinc-300 px-3 py-12 text-center text-sm text-zinc-500"
+    >
+      Loading fields…
+    </div>
+  } @else if (fields().length === 0) {
+    <div
+      class="rounded-md border border-dashed border-zinc-300 px-3 py-12 text-center text-sm text-zinc-500"
+    >
+      No fields defined for this entity yet.
+    </div>
+  } @else {
+    <div class="overflow-hidden rounded-md ring-1 ring-zinc-200">
+      <div
+        class="grid grid-cols-12 gap-2 border-b border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-500"
+      >
+        <div class="col-span-1"></div>
+        <div class="col-span-3">Key</div>
+        <div class="col-span-4">Label</div>
+        <div class="col-span-1">Type</div>
+        <div class="col-span-1">Source</div>
+        <div class="col-span-1 text-right">Required</div>
+        <div class="col-span-1 text-right">Actions</div>
+      </div>
+      <ul cdkDropList class="divide-y divide-zinc-100" (cdkDropListDropped)="onDrop($event)">
+        @for (field of fields(); track field.id) {
+          <li
+            cdkDrag
+            class="grid grid-cols-12 items-center gap-2 bg-white px-3 py-2 text-sm text-zinc-900"
+          >
+            <span
+              cdkDragHandle
+              class="col-span-1 cursor-grab text-zinc-400 hover:text-zinc-700"
+              aria-label="Drag to reorder"
+              title="Drag to reorder"
+            >
+              ☰
+            </span>
+            <span class="col-span-3 truncate font-mono text-xs text-zinc-600">{{
+              field.field_key
+            }}</span>
+            <span class="col-span-4 truncate" [class.text-zinc-400]="field.is_hidden">
+              {{ field.field_label }}
+              @if (field.is_hidden) {
+                <span class="ml-2 text-xs text-zinc-400">(hidden)</span>
+              }
+            </span>
+            <span class="col-span-1 text-xs text-zinc-600">{{ field.field_type }}</span>
+            <span class="col-span-1">
+              <span
+                class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1"
+                [class]="badgeClass(field.source)"
+              >
+                {{ badgeLabel(field.source) }}
+              </span>
+            </span>
+            <span class="col-span-1 text-right text-xs text-zinc-600">
+              {{ field.is_required ? 'Yes' : '—' }}
+            </span>
+            <span class="col-span-1 flex justify-end gap-2">
+              <button
+                type="button"
+                class="text-xs font-medium text-zinc-700 hover:text-zinc-900"
+                (click)="openEdit(field)"
+              >
+                Edit
+              </button>
+              @if (field.source === 'user') {
+                <button
+                  type="button"
+                  class="text-xs font-medium text-red-600 hover:text-red-800"
+                  (click)="onDelete(field)"
+                >
+                  Delete
+                </button>
+              }
+            </span>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+</section>
+
+@if (formOpen()) {
+  <app-field-form
+    [field]="editingField()"
+    [entityType]="entityType()"
+    [submitting]="submitting()"
+    [submitError]="formError()"
+    (save)="onSave($event)"
+    (cancel)="closeForm()"
+  ></app-field-form>
+}

@@ -1,0 +1,221 @@
+<div class="flex min-h-[calc(100vh-4rem)] flex-col bg-zinc-50">
+  <header class="border-b border-zinc-200 bg-white px-6 py-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-semibold text-zinc-900">Automations</h1>
+        <p class="text-xs text-zinc-500">
+          Single-event triggers — "when X happens, send template Y over channel Z". Two are seeded
+          by default: a Welcome email on signup and a Lead Confirmation email when a lead arrives
+          from any source.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        @if (canWrite()) {
+          <a
+            routerLink="/user/automations/new"
+            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800"
+          >
+            <lucide-icon name="plus" size="14" />
+            New Automation
+          </a>
+        }
+      </div>
+    </div>
+
+    @if (loadError(); as err) {
+      <div
+        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+      >
+        {{ err }}
+      </div>
+    }
+  </header>
+
+  <section class="border-b border-zinc-200 bg-white px-6 py-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="relative">
+        <lucide-icon
+          name="search"
+          size="14"
+          class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400"
+        />
+        <input
+          type="search"
+          [value]="searchQuery()"
+          (input)="onSearchInput($any($event.target).value)"
+          placeholder="Search name or event…"
+          class="w-64 rounded-md border border-zinc-300 bg-white py-1.5 pl-8 pr-3 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none"
+        />
+      </div>
+
+      <select
+        [value]="eventFilter()"
+        (change)="onEventChange($any($event.target).value)"
+        class="rounded-md border border-zinc-300 bg-white py-1.5 px-2 text-sm text-zinc-700"
+      >
+        <option value="">All events</option>
+        @for (entry of eventCatalog(); track entry.event_type) {
+          <option [value]="entry.event_type">{{ entry.label }}</option>
+        }
+      </select>
+
+      <select
+        [value]="channelFilter()"
+        (change)="onChannelChange($any($event.target).value)"
+        class="rounded-md border border-zinc-300 bg-white py-1.5 px-2 text-sm text-zinc-700"
+      >
+        @for (opt of CHANNEL_OPTIONS; track opt.value) {
+          <option [value]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+
+      <select
+        [value]="enabledFilter()"
+        (change)="onEnabledChange($any($event.target).value)"
+        class="rounded-md border border-zinc-300 bg-white py-1.5 px-2 text-sm text-zinc-700"
+      >
+        @for (opt of ENABLED_OPTIONS; track opt.value) {
+          <option [value]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+
+      @if (eventFilter() || channelFilter() || enabledFilter() || searchQuery()) {
+        <button
+          type="button"
+          (click)="clearFilters()"
+          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-50"
+        >
+          <lucide-icon name="x" size="10" />
+          Clear filters
+        </button>
+      }
+    </div>
+  </section>
+
+  <section class="flex-1 px-6 py-4">
+    @if (loading() && items().length === 0) {
+      <div
+        class="rounded-md border border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500"
+      >
+        Loading automations…
+      </div>
+    } @else if (items().length === 0) {
+      <div class="rounded-md border border-dashed border-zinc-300 bg-white px-6 py-10 text-center">
+        <lucide-icon name="workflow" size="28" class="mx-auto mb-2 text-zinc-400" />
+        <p class="text-sm font-medium text-zinc-700">No automations match your filters.</p>
+        <p class="mt-1 text-xs text-zinc-500">
+          The Welcome and Lead Confirmation triggers are seeded by default — clear filters above to
+          see them.
+        </p>
+      </div>
+    } @else {
+      <div class="overflow-hidden rounded-md border border-zinc-200 bg-white">
+        <table class="min-w-full divide-y divide-zinc-200 text-sm">
+          <thead class="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500">
+            <tr>
+              <th class="px-4 py-2 font-medium">Name</th>
+              <th class="px-4 py-2 font-medium">Event</th>
+              <th class="px-4 py-2 font-medium">Channel</th>
+              <th class="px-4 py-2 font-medium">Delay</th>
+              <th class="px-4 py-2 font-medium">Updated</th>
+              <th class="px-4 py-2 font-medium text-center">Enabled</th>
+              <th class="px-4 py-2 font-medium text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100">
+            @for (row of items(); track trackById($index, row)) {
+              <tr class="hover:bg-zinc-50">
+                <td class="px-4 py-2.5">
+                  <a
+                    [routerLink]="['/user/automations', row.id]"
+                    class="font-medium text-zinc-900 hover:underline"
+                  >
+                    {{ row.name }}
+                  </a>
+                </td>
+                <td class="px-4 py-2.5">
+                  <app-event-type-chip [eventType]="row.event_type" />
+                </td>
+                <td class="px-4 py-2.5">
+                  <app-channel-chip [channel]="$any(row.channel)" />
+                </td>
+                <td class="px-4 py-2.5 text-zinc-600 text-xs">
+                  @if (row.delay_seconds === 0) {
+                    Immediate
+                  } @else if (row.delay_seconds < 60) {
+                    {{ row.delay_seconds }}s
+                  } @else if (row.delay_seconds < 3600) {
+                    {{ (row.delay_seconds / 60).toFixed(0) }}m
+                  } @else if (row.delay_seconds < 86400) {
+                    {{ (row.delay_seconds / 3600).toFixed(0) }}h
+                  } @else {
+                    {{ (row.delay_seconds / 86400).toFixed(0) }}d
+                  }
+                </td>
+                <td class="px-4 py-2.5 text-zinc-600 text-xs">
+                  {{ row.updated_at | date: 'mediumDate' }}
+                </td>
+                <td class="px-4 py-2.5 text-center">
+                  <label class="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      class="peer sr-only"
+                      [checked]="row.enabled"
+                      [disabled]="!canWrite() || isToggling(row.id)"
+                      (change)="onToggleEnabled(row)"
+                    />
+                    <span
+                      class="h-5 w-9 rounded-full bg-zinc-300 transition-colors peer-checked:bg-emerald-500 peer-disabled:opacity-50"
+                    ></span>
+                    <span
+                      class="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4"
+                    ></span>
+                  </label>
+                </td>
+                <td class="px-4 py-2.5 text-right">
+                  <a
+                    [routerLink]="['/user/automations', row.id]"
+                    class="inline-flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-900"
+                    title="Edit"
+                  >
+                    <lucide-icon name="pencil" size="12" />
+                    Edit
+                  </a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (totalPages() > 1) {
+        <div class="mt-3 flex items-center justify-between text-xs text-zinc-600">
+          <span>
+            Showing {{ items().length }} of {{ total() }} • Page {{ pageIndex() + 1 }} /
+            {{ totalPages() }}
+          </span>
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              (click)="prevPage()"
+              [disabled]="!hasPrev()"
+              class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 hover:bg-zinc-50 disabled:opacity-40"
+            >
+              <lucide-icon name="chevron-left" size="12" />
+              Prev
+            </button>
+            <button
+              type="button"
+              (click)="nextPage()"
+              [disabled]="!hasNext()"
+              class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 hover:bg-zinc-50 disabled:opacity-40"
+            >
+              Next
+              <lucide-icon name="chevron-right" size="12" />
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </section>
+</div>

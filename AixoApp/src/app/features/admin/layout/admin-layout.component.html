@@ -1,0 +1,140 @@
+<mat-sidenav-container class="layout">
+  <mat-sidenav
+    #sidenav
+    [mode]="isMobile() ? 'over' : 'side'"
+    [opened]="sidenavOpened()"
+    (openedChange)="sidenavOpened.set($event)"
+    class="layout__sidenav"
+    [fixedInViewport]="isMobile()"
+    fixedTopGap="0">
+
+    <div class="layout__brand">
+      <img src="images/Logo.svg" alt="Logo" class="layout__logo">
+    </div>
+
+    <nav class="layout__nav">
+      @for (item of menuItems(); track item.route.id) {
+        @if (item.children.length > 0) {
+          <button
+            class="layout__nav-item layout__nav-item--parent"
+            [class.layout__nav-item--expanded]="isExpanded(item.route.id)"
+            (click)="toggleExpanded(item.route.id)">
+            <div class="layout__nav-item-content">
+              <mat-icon class="layout__nav-icon">{{ item.route.mat_icon || 'folder' }}</mat-icon>
+              <span class="layout__nav-label">{{ item.route.name }}</span>
+            </div>
+            <mat-icon class="layout__nav-chevron">expand_more</mat-icon>
+          </button>
+          <div class="layout__nav-children" [class.layout__nav-children--open]="isExpanded(item.route.id)">
+            @for (child of item.children; track child.route.id) {
+              <a
+                class="layout__nav-item layout__nav-item--child"
+                [routerLink]="getMenuUrl(child)"
+                routerLinkActive="layout__nav-item--active"
+                (click)="onMenuClick()">
+                <div class="layout__nav-item-content">
+                  <mat-icon class="layout__nav-icon layout__nav-icon--child">{{ child.route.mat_icon || 'chevron_right' }}</mat-icon>
+                  <span class="layout__nav-label">{{ child.route.name }}</span>
+                </div>
+              </a>
+            }
+          </div>
+        } @else {
+          <a
+            class="layout__nav-item"
+            [routerLink]="getMenuUrl(item)"
+            routerLinkActive="layout__nav-item--active"
+            (click)="onMenuClick()">
+            <div class="layout__nav-item-content">
+              <mat-icon class="layout__nav-icon">{{ item.route.mat_icon || 'circle' }}</mat-icon>
+              <span class="layout__nav-label">{{ item.route.name }}</span>
+            </div>
+          </a>
+        }
+      }
+    </nav>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="layout__content">
+    <header class="layout__toolbar">
+      <button
+        mat-icon-button
+        (click)="toggleSidenav()"
+        matTooltip="Toggle menu"
+        aria-label="Toggle menu"
+        class="layout__toolbar-btn">
+        <mat-icon>{{ sidenavOpened() ? 'menu_open' : 'menu' }}</mat-icon>
+      </button>
+
+      <span class="layout__spacer"></span>
+
+      <div class="layout__toolbar-actions">
+        <app-notification-bell />
+
+        <button
+          mat-icon-button
+          (click)="theme.toggle()"
+          [matTooltip]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+          aria-label="Toggle theme"
+          class="layout__toolbar-btn">
+          <mat-icon>{{ theme.isDark() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+        </button>
+
+        <button
+          class="layout__user-pill"
+          [matMenuTriggerFor]="userMenu"
+          aria-label="Admin menu">
+          <div class="layout__user-avatar">
+            @if (profileImageUrl()) {
+              <img [src]="profileImageUrl()" alt="Avatar" class="layout__user-avatar-img" />
+            } @else {
+              <span>{{ adminInitial() }}</span>
+            }
+          </div>
+          <span class="layout__user-name">{{ adminName() }}</span>
+          <mat-icon class="layout__user-chevron">expand_more</mat-icon>
+        </button>
+
+        <mat-menu #userMenu="matMenu" xPosition="before" class="user-menu-panel">
+          <div class="user-menu__header" (click)="$event.stopPropagation()">
+            <div class="user-menu__avatar">
+              @if (profileImageUrl()) {
+                <img [src]="profileImageUrl()" alt="Avatar" class="user-menu__avatar-img" />
+              } @else {
+                <span>{{ adminInitial() }}</span>
+              }
+            </div>
+            <div class="user-menu__info">
+              <span class="user-menu__name">{{ adminName() }}</span>
+              <span class="user-menu__role">{{ roleLabel }}</span>
+            </div>
+          </div>
+          <mat-divider></mat-divider>
+          <a mat-menu-item [routerLink]="profileUrl">
+            <mat-icon>person</mat-icon>
+            <span>Profile</span>
+          </a>
+          <a mat-menu-item [routerLink]="changePasswordUrl">
+            <mat-icon>lock</mat-icon>
+            <span>Change Password</span>
+          </a>
+          <a mat-menu-item [routerLink]="securityUrl">
+            <mat-icon>security</mat-icon>
+            <span>Security</span>
+          </a>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="logout()" class="user-menu__logout">
+            <mat-icon>logout</mat-icon>
+            <span>Logout</span>
+          </button>
+        </mat-menu>
+      </div>
+    </header>
+
+    <main class="layout__page">
+      <router-outlet />
+    </main>
+
+    <app-footer />
+  </mat-sidenav-content>
+</mat-sidenav-container>

@@ -1,0 +1,89 @@
+<div class="page-layout">
+  <!-- Filter Card -->
+  @if (showFilters()) {
+    <app-form-card [title]="pageTitle()" [subtitle]="pageSubtitle()">
+      <form [formGroup]="formGroup()" (ngSubmit)="onSubmit()" class="page-layout__filters">
+        <div class="page-layout__filter-fields">
+          @if (requiredFiltersTemplate()) {
+            <ng-container *ngTemplateOutlet="requiredFiltersTemplate()!" />
+          }
+          @if (filtersTemplate()) {
+            <ng-container *ngTemplateOutlet="filtersTemplate()!" />
+          }
+        </div>
+        <div class="page-layout__filter-actions">
+          <button mat-flat-button color="primary" type="submit">
+            <mat-icon>search</mat-icon>
+            Search
+          </button>
+          @if (isFiltered()) {
+            <button mat-stroked-button type="button" (click)="onClear()">
+              <mat-icon>clear</mat-icon>
+              Clear
+            </button>
+          }
+        </div>
+      </form>
+    </app-form-card>
+  }
+
+  <!-- Table Card -->
+  <div class="page-layout__table-card">
+    <div class="page-layout__table-toolbar">
+      <div class="page-layout__table-info">
+        @if (!showFilters()) {
+          <h2 class="page-layout__table-title">{{ pageTitle() }}</h2>
+        }
+        <span class="page-layout__record-count">{{ dataCount() }} record(s)</span>
+      </div>
+      <div class="page-layout__table-actions">
+        <button
+          mat-icon-button
+          (click)="toggleFilters()"
+          [attr.aria-label]="showFilters() ? 'Hide filters' : 'Show filters'"
+        >
+          <mat-icon>{{ showFilters() ? 'filter_list_off' : 'filter_list' }}</mat-icon>
+        </button>
+        @if (showExport()) {
+          <button mat-icon-button (click)="onExport()" aria-label="Export to CSV">
+            <mat-icon>download</mat-icon>
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="page-layout__table-wrapper">
+      <table [id]="tableId()" class="page-layout__table">
+        @if (tableHeaderTemplate()) {
+          <thead>
+            <ng-container *ngTemplateOutlet="tableHeaderTemplate()!" />
+          </thead>
+        }
+        <tbody>
+          @for (item of data(); track $index) {
+            <ng-container
+              *ngTemplateOutlet="
+                tableBodyTemplate()!;
+                context: { $implicit: item, srNo: getSrNo($index) }
+              "
+            />
+          } @empty {
+            <tr>
+              <td colspan="999" class="page-layout__empty">No records found</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (dataCount() > 0) {
+      <mat-paginator
+        [length]="dataCount()"
+        [pageSize]="pageSize()"
+        [pageSizeOptions]="pageSizeOptions()"
+        (page)="onPageChange($event)"
+        showFirstLastButtons
+      />
+    }
+  </div>
+</div>

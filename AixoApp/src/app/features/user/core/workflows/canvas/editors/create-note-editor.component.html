@@ -1,0 +1,26 @@
+<div class="space-y-3">
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Attach to</label>
+    <select
+      [ngModel]="entity()"
+      (ngModelChange)="onEntityChange($event)"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+    >
+      <option value="contact">Contact</option>
+      <option value="lead">Lead</option>
+    </select>
+  </div>
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Body</label>
+    <textarea
+      rows="4"
+      [ngModel]="body()"
+      (ngModelChange)="onBodyChange($event)"
+      placeholder="Note text — visible on the timeline, supports {{ '{{var}}' }} variables"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+    ></textarea>
+    @if (!body().trim()) {
+      <p class="text-[10px] text-rose-600 mt-1">Body is required.</p>
+    }
+  </div>
+</div>

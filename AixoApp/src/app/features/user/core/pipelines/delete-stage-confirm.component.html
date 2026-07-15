@@ -1,0 +1,60 @@
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 px-4"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-label]="'Delete stage ' + stage().name"
+  (click)="onCancel()"
+>
+  <div
+    class="w-full max-w-md overflow-hidden rounded-md border border-zinc-200 bg-white shadow-xl"
+    (click)="$event.stopPropagation()"
+  >
+    <header class="border-b border-zinc-200 px-4 py-3">
+      <h3 class="text-sm font-semibold text-zinc-900">Delete &ldquo;{{ stage().name }}&rdquo;?</h3>
+    </header>
+
+    <div class="space-y-3 px-4 py-4">
+      <div class="flex items-start gap-2 rounded bg-amber-50 px-3 py-2 ring-1 ring-amber-200">
+        <span class="text-base leading-none text-amber-700">⚠</span>
+        <p class="text-xs text-amber-800">
+          {{ cardsInStage() }} {{ cardsInStage() === 1 ? 'lead is' : 'leads are' }} currently in
+          this stage. Move {{ cardsInStage() === 1 ? 'it' : 'them' }} to:
+        </p>
+      </div>
+
+      <label class="block">
+        <select
+          [value]="moveLeadsTo()"
+          (change)="onTargetChange($any($event.target).value)"
+          class="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none"
+        >
+          @for (s of orderedCandidates(); track s.id) {
+            <option [value]="s.key">{{ s.name }}</option>
+          }
+        </select>
+      </label>
+
+      <p class="text-[11px] text-zinc-500">This cannot be undone.</p>
+    </div>
+
+    <footer
+      class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-4 py-2"
+    >
+      <button
+        type="button"
+        (click)="onCancel()"
+        class="rounded border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        (click)="onConfirm()"
+        [disabled]="!canConfirm()"
+        class="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Delete stage
+      </button>
+    </footer>
+  </div>
+</div>

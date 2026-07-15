@@ -1,0 +1,103 @@
+<h2 mat-dialog-title class="action-verify__title">
+  <mat-icon>verified_user</mat-icon>
+  Verify Your Identity
+</h2>
+
+<mat-dialog-content class="action-verify__content">
+  <p class="action-verify__subtitle">
+    Enter the verification code from your <strong>{{ methodLabel }}</strong>
+  </p>
+
+  <!-- Digit Inputs -->
+  <div class="action-verify__digits" (paste)="onDigitPaste($event)">
+    @for (digit of digits(); track $index) {
+      <input
+        #digitInput
+        type="text"
+        inputmode="numeric"
+        maxlength="1"
+        class="action-verify__digit-input"
+        [value]="digit"
+        [disabled]="isLoading()"
+        (input)="onDigitInput($index, $event)"
+        (keydown)="onDigitKeydown($index, $event)"
+        autocomplete="one-time-code"
+      />
+    }
+  </div>
+
+  <!-- Error Message -->
+  @if (errorMessage()) {
+    <p class="action-verify__error">{{ errorMessage() }}</p>
+  }
+
+  <!-- Loading Indicator -->
+  @if (isLoading()) {
+    <div class="action-verify__loading">
+      <mat-spinner diameter="24"></mat-spinner>
+      <span>Verifying...</span>
+    </div>
+  }
+
+  <!-- Resend Button (email/sms only) -->
+  @if (isOtpMethod) {
+    <div class="action-verify__resend">
+      <button
+        mat-button
+        type="button"
+        [disabled]="resendCooldown() > 0 || isLoading()"
+        (click)="resendCode()"
+      >
+        @if (resendCooldown() > 0) {
+          Resend code in {{ resendCooldown() }}s
+        } @else {
+          Resend code
+        }
+      </button>
+    </div>
+  }
+
+  <!-- Try Another Way -->
+  @if (alternativeMethods.length > 0) {
+    <div class="action-verify__try-another">
+      <button
+        mat-button
+        type="button"
+        class="action-verify__try-another-toggle"
+        (click)="toggleMethodOptions()"
+        [disabled]="isLoading()"
+      >
+        Try another way
+      </button>
+
+      @if (showMethodOptions()) {
+        <div class="action-verify__method-options">
+          @for (m of alternativeMethods; track m) {
+            <button
+              mat-stroked-button
+              type="button"
+              class="action-verify__method-btn"
+              [disabled]="isLoading()"
+              (click)="selectMethod(m)"
+            >
+              <mat-icon>
+                {{ m === 'authenticator' ? 'phonelink_lock' : m === 'email' ? 'email' : 'sms' }}
+              </mat-icon>
+              {{
+                m === 'authenticator'
+                  ? 'Authenticator App'
+                  : m === 'email'
+                    ? 'Email OTP'
+                    : 'SMS OTP'
+              }}
+            </button>
+          }
+        </div>
+      }
+    </div>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions class="action-verify__actions" align="end">
+  <button mat-button type="button" (click)="onCancel()" [disabled]="isLoading()">Cancel</button>
+</mat-dialog-actions>

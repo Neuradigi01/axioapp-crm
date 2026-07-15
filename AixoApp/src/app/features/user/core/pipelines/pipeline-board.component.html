@@ -1,0 +1,154 @@
+@if (loadError(); as err) {
+  <p class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+    {{ err }}
+  </p>
+} @else if (loading()) {
+  <div class="flex gap-3 overflow-x-auto animate-pulse">
+    @for (i of [0, 1, 2, 3]; track i) {
+      <div class="h-48 w-64 shrink-0 rounded-lg bg-zinc-100"></div>
+    }
+  </div>
+} @else if (stages().length === 0) {
+  <p
+    class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+  >
+    This pipeline has no stages defined.
+  </p>
+} @else {
+  <div cdkDropListGroup class="flex items-start gap-3 overflow-x-auto pb-2">
+    @for (stage of stages(); track stage.key) {
+      <section
+        class="relative flex w-72 shrink-0 flex-col overflow-visible rounded-lg bg-zinc-50 ring-1 ring-zinc-200"
+      >
+        <header
+          class="flex items-center justify-between border-b border-zinc-200 bg-white px-3 py-2"
+        >
+          <div class="flex min-w-0 items-center gap-2">
+            <span
+              class="h-2.5 w-2.5 shrink-0 rounded-full"
+              [style]="colorBarStyle(stage)"
+              aria-hidden="true"
+            ></span>
+            <h3 class="truncate text-sm font-semibold text-zinc-900">
+              {{ stage.name }}
+            </h3>
+            @if (stage.is_won) {
+              <span
+                class="ml-1 inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+              >
+                won
+              </span>
+            } @else if (stage.is_lost) {
+              <span
+                class="ml-1 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-red-200"
+              >
+                lost
+              </span>
+            }
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span
+              class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700"
+            >
+              {{ bucket(stage.key).length }}
+            </span>
+            @if (canManage()) {
+              <button
+                type="button"
+                (click)="openEditor(stage)"
+                [attr.aria-label]="'Edit stage ' + stage.name"
+                class="rounded p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+              >
+                ✎
+              </button>
+            }
+          </div>
+        </header>
+
+        @if (editingStage()?.id === stage.id) {
+          <div class="absolute right-0 top-11 z-30">
+            <app-stage-editor-popover
+              [stage]="stage"
+              [pipelineKey]="pipelineKey()"
+              [siblingCount]="stages().length"
+              (saved)="onStageSaved()"
+              (deleted)="onStageDeleted()"
+              (deleteBlocked)="onDeleteBlocked($event)"
+              (closed)="onEditorClosed()"
+            />
+          </div>
+        }
+
+        <div
+          [id]="dropListIdFor(stage.key)"
+          [cdkDropListData]="bucket(stage.key)"
+          [cdkDropListConnectedTo]="dropListIds()"
+          (cdkDropListDropped)="onDrop($event, stage.key)"
+          cdkDropList
+          class="flex-1 min-h-[24rem] space-y-2 p-2"
+        >
+          @for (item of bucket(stage.key); track item.id) {
+            <div
+              cdkDrag
+              class="cursor-grab rounded-md bg-white p-2 shadow-sm ring-1 ring-zinc-200 transition hover:ring-zinc-300 active:cursor-grabbing"
+            >
+              @if (itemTemplate(); as tpl) {
+                <ng-container
+                  [ngTemplateOutlet]="tpl"
+                  [ngTemplateOutletContext]="{ $implicit: item }"
+                />
+              } @else {
+                <span class="text-xs text-zinc-500"> Item {{ item.id }} </span>
+              }
+            </div>
+          } @empty {
+            <p
+              class="rounded-md border border-dashed border-zinc-200 px-3 py-4 text-center text-[11px] text-zinc-400"
+            >
+              No items
+            </p>
+          }
+        </div>
+      </section>
+    }
+
+    @if (canManage()) {
+      <div class="relative shrink-0">
+        <button
+          type="button"
+          (click)="openAdd()"
+          class="flex h-10 w-40 items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-white text-xs font-medium text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-800"
+        >
+          + Add stage
+        </button>
+        @if (addingPopoverOpen()) {
+          <div class="absolute right-0 top-full z-30 mt-1">
+            <app-add-stage-popover
+              [pipelineKey]="pipelineKey()"
+              [stages]="stages()"
+              (created)="onStageCreated()"
+              (closed)="onAddClosed()"
+            />
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  @if (deleteConfirm(); as ctx) {
+    <app-delete-stage-confirm
+      [stage]="ctx.stage"
+      [cardsInStage]="ctx.cardsInStage"
+      [candidateStages]="deleteCandidates()"
+      (confirmed)="onDeleteConfirmed($event)"
+      (cancelled)="onDeleteCancelled()"
+    />
+    @if (deleteError(); as err) {
+      <p
+        class="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-md bg-red-600 px-3 py-2 text-xs text-white shadow-lg"
+      >
+        {{ err }}
+      </p>
+    }
+  }
+}

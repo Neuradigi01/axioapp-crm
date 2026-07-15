@@ -1,0 +1,139 @@
+<div>
+  <div class="mb-3 flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-zinc-900">Recent calls</h2>
+      <p class="text-xs text-zinc-500">
+        {{ items().length }} {{ items().length === 1 ? 'call' : 'calls' }} logged
+      </p>
+    </div>
+    <button
+      type="button"
+      (click)="openModal()"
+      class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+    >
+      Log call
+    </button>
+  </div>
+
+  @if (loadError(); as err) {
+    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      {{ err }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+      Loading…
+    </div>
+  } @else if (items().length === 0) {
+    <div
+      class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+    >
+      No calls logged yet. Click "Log call" to record one.
+    </div>
+  } @else {
+    <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <table class="min-w-full divide-y divide-zinc-200 text-sm">
+        <thead class="bg-zinc-50">
+          <tr>
+            <th
+              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Started
+            </th>
+            <th
+              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Direction
+            </th>
+            <th
+              class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Duration
+            </th>
+            <th
+              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Outcome
+            </th>
+            <th
+              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Notes
+            </th>
+            <th
+              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Recording
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-100">
+          @for (c of items(); track c.id) {
+            <tr>
+              <td class="whitespace-nowrap px-4 py-2 text-zinc-700">
+                {{ formatTimestamp(c.started_at) }}
+              </td>
+              <td class="px-4 py-2">
+                <span
+                  [class]="
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ' +
+                    (c.direction === 'out'
+                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                      : 'bg-sky-50 text-sky-700 ring-sky-200')
+                  "
+                >
+                  {{ c.direction === 'out' ? '↗ Outgoing' : '↘ Incoming' }}
+                </span>
+              </td>
+              <td class="whitespace-nowrap px-4 py-2 text-right font-medium text-zinc-900">
+                {{ formatDuration(c.duration_sec) }}
+              </td>
+              <td class="px-4 py-2">
+                @let outcome = outcomeFor(c);
+                @if (outcome) {
+                  <span
+                    [style.background-color]="outcome.color + '20'"
+                    [style.color]="outcome.color"
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-zinc-200"
+                  >
+                    {{ outcome.label }}
+                  </span>
+                } @else {
+                  <span class="text-xs text-zinc-400">—</span>
+                }
+              </td>
+              <td class="max-w-md px-4 py-2 text-zinc-700">
+                @if (c.notes) {
+                  <span class="line-clamp-2">{{ c.notes }}</span>
+                } @else {
+                  <span class="text-xs text-zinc-400">—</span>
+                }
+              </td>
+              <td class="px-4 py-2">
+                @if (c.has_recording) {
+                  <app-call-recording-player [callId]="c.id" />
+                } @else if (c.recording_url) {
+                  <a
+                    [href]="c.recording_url"
+                    target="_blank"
+                    rel="noopener"
+                    class="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:underline"
+                  >
+                    External link ↗
+                  </a>
+                } @else {
+                  <span class="text-xs text-zinc-400">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (modalOpen()) {
+    <app-log-call-modal [outcomes]="outcomes()" (saved)="onSaved()" (cancel)="onCancel()" />
+  }
+</div>

@@ -1,0 +1,45 @@
+<form [formGroup]="form()" class="flex flex-col gap-3">
+  <label class="block">
+    <span class="text-xs font-medium text-zinc-700">Language</span>
+    <select
+      formControlName="language"
+      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+    >
+      @for (lang of LANGUAGE_OPTIONS; track lang.value) {
+        <option [value]="lang.value">{{ lang.label }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="block">
+    <span class="text-xs font-medium text-zinc-700">
+      Body
+      <span class="text-zinc-400">(WhatsApp templates allow up to 1024 characters)</span>
+    </span>
+    <textarea
+      formControlName="body_text"
+      maxlength="1024"
+      rows="10"
+      (focus)="onFocus($event)"
+      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+      placeholder="Hi {{ '{' + '{' + 'contact.first_name' + '}' + '}' }}, …"
+    ></textarea>
+    <div class="mt-1 flex items-center justify-between text-[10px] text-zinc-400">
+      <span>
+        Variables like
+        <code class="rounded bg-zinc-100 px-1 py-0.5 font-mono">{{
+          '{' + '{' + 'contact.first_name' + '}' + '}'
+        }}</code>
+        resolve at send time.
+      </span>
+      <span>{{ form().controls.body_text.value.length }} / 1024</span>
+    </div>
+  </label>
+
+  <p class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+    <strong>Note:</strong> Meta-specific WhatsApp template fields (header / footer / buttons /
+    category) ship alongside the Meta- submission flow in a later step. This editor saves the body +
+    name to the central library; full WhatsApp Meta submission stays in the existing WhatsApp
+    Templates page for now.
+  </p>
+</form>

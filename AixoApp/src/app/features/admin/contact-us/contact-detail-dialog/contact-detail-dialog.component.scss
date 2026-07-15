@@ -1,0 +1,44 @@
+.contact-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 400px;
+
+  &__row {
+    display: flex;
+    gap: 12px;
+
+    &--message {
+      flex-direction: column;
+    }
+  }
+
+  &__label {
+    font-weight: 600;
+    min-width: 80px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  &__value {
+    color: var(--text-primary);
+  }
+
+  &__badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  &__message {
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    background-color: var(--surface-variant);
+  }
+}

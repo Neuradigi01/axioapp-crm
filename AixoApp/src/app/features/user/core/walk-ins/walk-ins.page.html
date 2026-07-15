@@ -1,0 +1,489 @@
+<div class="mx-auto max-w-7xl p-6 space-y-5" [appUrlFilterState]="urlState">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="text-lg font-semibold text-zinc-900">Walk-in Customers</h1>
+      <p class="mt-0.5 text-xs text-zinc-500">Reception desk — Log &amp; track every visitor</p>
+    </div>
+    <button
+      type="button"
+      (click)="openRegister()"
+      class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+    >
+      <lucide-icon name="plus" class="h-4 w-4" />
+      Register Walk-in
+    </button>
+  </header>
+
+  <!-- KPI cards -->
+  <section class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Today's Walk-ins</p>
+      <p class="mt-2 text-2xl font-semibold text-zinc-900">{{ todayCount() }}</p>
+    </div>
+    <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Converted</p>
+      <p class="mt-2 text-2xl font-semibold text-emerald-600">{{ convertedTodayCount() }}</p>
+    </div>
+    <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        Interested / Follow-up
+      </p>
+      <p class="mt-2 text-2xl font-semibold text-amber-600">{{ interestedOrFollowUpCount() }}</p>
+    </div>
+    <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Conversion Rate</p>
+      <p class="mt-2 text-2xl font-semibold text-zinc-900">
+        @if (conversionRate() === null) {
+          —%
+        } @else {
+          {{ conversionRate() }}%
+        }
+      </p>
+    </div>
+    <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Avg Visit Duration</p>
+      <p class="mt-2 text-2xl font-semibold text-zinc-900">
+        @if (avgVisitDuration() === null) {
+          —
+        } @else {
+          {{ avgVisitDuration() }} min
+        }
+      </p>
+    </div>
+  </section>
+
+  <!-- Filter chip strip: status · date · scope · sort -->
+  <section class="flex flex-wrap items-center gap-2 text-xs">
+    @for (chip of chips; track chip.id) {
+      <button
+        type="button"
+        (click)="setFilter(chip.id)"
+        class="rounded-full px-3 py-1 font-medium ring-1 transition"
+        [class.bg-zinc-900]="statusFilter() === chip.id"
+        [class.text-white]="statusFilter() === chip.id"
+        [class.ring-zinc-900]="statusFilter() === chip.id"
+        [class.bg-white]="statusFilter() !== chip.id"
+        [class.text-zinc-700]="statusFilter() !== chip.id"
+        [class.ring-zinc-300]="statusFilter() !== chip.id"
+        [class.hover:bg-zinc-50]="statusFilter() !== chip.id"
+      >
+        {{ chip.label }}
+      </button>
+    }
+
+    <!-- Date chips: today / this week / this month -->
+    <div class="inline-flex overflow-hidden rounded-full ring-1 ring-zinc-200 bg-white">
+      @for (
+        d of [
+          { v: '', label: 'All time' },
+          { v: 'today', label: 'Today' },
+          { v: 'week', label: 'Week' },
+          { v: 'month', label: 'Month' },
+        ];
+        track d.v
+      ) {
+        <button
+          type="button"
+          (click)="setDateChip(d.v)"
+          class="px-2.5 py-1 transition"
+          [class.bg-zinc-900]="dateChip() === d.v"
+          [class.text-white]="dateChip() === d.v"
+          [class.text-zinc-700]="dateChip() !== d.v"
+          [class.hover:bg-zinc-50]="dateChip() !== d.v"
+        >
+          {{ d.label }}
+        </button>
+      }
+    </div>
+
+    <!-- Scope toggle (admin/owner/manager only) -->
+    @if (canChangeScope()) {
+      <div class="inline-flex overflow-hidden rounded-full ring-1 ring-zinc-200 bg-white">
+        @for (
+          sc of [
+            { v: 'mine', label: 'Mine' },
+            { v: 'team', label: 'Team' },
+            { v: 'all', label: 'All' },
+          ];
+          track sc.v
+        ) {
+          <button
+            type="button"
+            (click)="setScope(sc.v)"
+            class="px-2.5 py-1 transition"
+            [class.bg-zinc-900]="scope() === sc.v"
+            [class.text-white]="scope() === sc.v"
+            [class.text-zinc-700]="scope() !== sc.v"
+            [class.hover:bg-zinc-50]="scope() !== sc.v"
+          >
+            {{ sc.label }}
+          </button>
+        }
+      </div>
+    }
+
+    <!-- Sort dropdown -->
+    <select
+      [value]="sortKey() + ':' + sortOrder()"
+      (change)="setSort($any($event.target).value)"
+      class="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      aria-label="Sort"
+    >
+      <option value="time_in:desc">Newest visit</option>
+      <option value="time_in:asc">Oldest visit</option>
+      <option value="last_activity_at:desc">Recent activity</option>
+      <option value="last_activity_at:asc">Stale (oldest activity)</option>
+      <option value="created_at:desc">Newest created</option>
+      <option value="created_at:asc">Oldest created</option>
+    </select>
+
+    <!-- Owner dropdown -->
+    <select
+      [formControl]="assigneeControl"
+      class="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      aria-label="Owner"
+    >
+      <option value="">All owners</option>
+      <option value="me">Me</option>
+      @for (u of users(); track u.id) {
+        <option [value]="u.id">{{ u.full_name }}</option>
+      }
+    </select>
+  </section>
+
+  <!-- Body -->
+  <section class="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-zinc-200">
+    @if (state.loadError(); as err) {
+      <div class="px-6 py-4 text-sm text-red-700">{{ err }}</div>
+    } @else if (state.loading() && visible().length === 0) {
+      <div class="divide-y divide-zinc-200">
+        @for (i of [0, 1, 2, 3, 4]; track i) {
+          <div class="flex items-center gap-4 px-6 py-4">
+            <div class="h-9 w-9 animate-pulse rounded-full bg-zinc-200"></div>
+            <div class="flex-1">
+              <div class="h-3 w-40 animate-pulse rounded bg-zinc-200"></div>
+              <div class="mt-2 h-3 w-24 animate-pulse rounded bg-zinc-100"></div>
+            </div>
+          </div>
+        }
+      </div>
+    } @else if (visible().length === 0) {
+      <div class="px-6 py-10 text-center text-sm text-zinc-500">
+        No walk-ins yet.
+        <span class="block text-xs text-zinc-400">Click "Register Walk-in" to start.</span>
+      </div>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-zinc-200">
+          <thead class="bg-zinc-50">
+            <tr>
+              <th class="w-10 px-3 py-2.5"></th>
+              <th
+                class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              >
+                Time
+              </th>
+              <th
+                class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              >
+                Customer
+              </th>
+              <th
+                class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              >
+                Phone
+              </th>
+              <th
+                class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              >
+                Requirement
+              </th>
+              <th
+                class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              >
+                Budget
+              </th>
+              <th
+                class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              >
+                Owner
+              </th>
+              <th
+                class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              >
+                Duration
+              </th>
+              <th
+                class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              >
+                Status
+              </th>
+              <th
+                class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500"
+              >
+                Last activity
+              </th>
+              <th
+                class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              >
+                Date
+              </th>
+              <th
+                class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500"
+              >
+                Action
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100 bg-white">
+            @for (w of visible(); track w.id) {
+              @let contact = contactFor(w.contact_id);
+              <tr class="hover:bg-zinc-50" [class.bg-zinc-50]="isSelected(w.id)">
+                <td class="w-10 px-3 py-3" (click)="$event.stopPropagation()">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                    [checked]="isSelected(w.id)"
+                    (click)="toggleRow(w.id, $event)"
+                    [attr.aria-label]="'Select walk-in ' + (contact?.full_name ?? w.id)"
+                  />
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
+                  {{ formatTime(w.time_in) }}
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  <div class="flex items-center gap-2.5">
+                    <span
+                      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700"
+                    >
+                      {{ initials(contact?.full_name) }}
+                    </span>
+                    <div class="min-w-0">
+                      <div class="truncate text-sm font-medium text-zinc-900">
+                        {{ contact?.full_name ?? 'Loading…' }}
+                      </div>
+                      @if (w.linked_lead_id) {
+                        <span
+                          class="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+                          title="Linked to a lead"
+                        >
+                          <lucide-icon name="users" class="h-3 w-3" />
+                          Lead
+                        </span>
+                      }
+                    </div>
+                  </div>
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
+                  @if (contact?.phone; as phone) {
+                    <div class="inline-flex items-center gap-2">
+                      <a
+                        [appPhoneLink]="phone"
+                        class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                      >
+                        {{ phone }}
+                      </a>
+                      <a [appWhatsappLink]="phone" class="text-emerald-600 hover:text-emerald-800">
+                        <lucide-icon name="message-circle" class="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="px-4 py-3 text-sm text-zinc-600">
+                  <span class="block max-w-xs truncate">{{ w.requirement ?? '—' }}</span>
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
+                  {{ w.budget | formatINR: true }}
+                </td>
+                <td
+                  class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600"
+                  (click)="$event.stopPropagation()"
+                >
+                  <div class="inline-flex items-center gap-1.5">
+                    @if (w.assigned_to_id) {
+                      <span>{{ ownerLabel(w.assigned_to_id) }}</span>
+                    } @else {
+                      <span class="text-zinc-400">Unassigned</span>
+                    }
+                    @if (canReassign()) {
+                      <button
+                        type="button"
+                        (click)="openSingleReassign(w)"
+                        class="rounded p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                        title="Reassign owner"
+                        [attr.aria-label]="'Reassign walk-in ' + w.id"
+                      >
+                        <lucide-icon name="pencil" class="h-3 w-3" />
+                      </button>
+                    }
+                  </div>
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
+                  {{ formatDuration(w.duration_min) }}
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  <span
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
+                    [class]="statusClass(w.status)"
+                  >
+                    {{ w.status }}
+                  </span>
+                </td>
+                <td
+                  class="whitespace-nowrap px-4 py-3 text-right text-sm text-zinc-600 tabular-nums"
+                >
+                  {{ w.last_activity_at | relativeTime }}
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-600">
+                  {{ formatDate(w.time_in) }}
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-right text-sm">
+                  <div class="flex items-center justify-end gap-1">
+                    <!-- Row-level status transitions, mirror of the
+                         backend state-machine. Buttons hidden when the
+                         transition isn't allowed from the current state. -->
+                    @for (target of allowedTransitions[w.status]; track target) {
+                      <button
+                        type="button"
+                        (click)="advanceStatus(w, target)"
+                        class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50"
+                        [title]="'Mark as ' + target"
+                      >
+                        @switch (target) {
+                          @case ('interested') {
+                            <lucide-icon name="user-check" class="h-3 w-3" /> Interested
+                          }
+                          @case ('follow_up') {
+                            <lucide-icon name="refresh-cw" class="h-3 w-3" /> Follow-up
+                          }
+                          @case ('converted') {
+                            <lucide-icon name="check-circle-2" class="h-3 w-3" /> Converted
+                          }
+                          @case ('left') {
+                            <lucide-icon name="log-out" class="h-3 w-3" /> Left
+                          }
+                          @case ('browsing') {
+                            <lucide-icon name="refresh-cw" class="h-3 w-3" /> Re-engage
+                          }
+                        }
+                      </button>
+                    }
+                    @if (w.time_out === null) {
+                      <button
+                        type="button"
+                        (click)="onCheckout(w)"
+                        class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50"
+                        title="Check out"
+                      >
+                        <lucide-icon name="log-out" class="h-3 w-3" />
+                        Check out
+                      </button>
+                    }
+                    @if (canConvert() && !w.linked_lead_id) {
+                      <button
+                        type="button"
+                        (click)="openConvert(w)"
+                        class="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100"
+                        title="Convert this walk-in to a lead"
+                      >
+                        <lucide-icon name="arrow-right-circle" class="h-3 w-3" />
+                        Convert
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</div>
+
+@if (modalOpen()) {
+  <app-register-walkin-modal (registered)="onRegistered($event)" (cancel)="closeRegister()" />
+}
+
+<!-- Bulk action bar — visible whenever rows are selected. -->
+<app-bulk-action-bar
+  [selectedCount]="state.selectedCount()"
+  [actions]="state.bulkActions()"
+  (action)="onBulkAction($event)"
+  (clear)="clearSelection()"
+/>
+
+<!-- Bulk reassign modal. -->
+@if (state.bulkModal() === 'reassign') {
+  <app-reassign-modal
+    [entityLabel]="'walk-in'"
+    [count]="state.selectedCount()"
+    [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
+    (confirm)="onBulkReassign($event)"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Bulk check-out confirm. -->
+@if (state.bulkModal() === 'checkout') {
+  <app-confirm-dialog
+    [title]="
+      'Check out ' +
+      state.selectedCount() +
+      ' walk-in' +
+      (state.selectedCount() === 1 ? '' : 's') +
+      '?'
+    "
+    [body]="'Already-checked-out visits will be skipped.'"
+    [confirmLabel]="'Check out'"
+    [submitting]="state.bulkSubmitting()"
+    (confirm)="onBulkCheckout()"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Bulk delete confirm. -->
+@if (state.bulkModal() === 'delete') {
+  <app-confirm-dialog
+    [title]="
+      'Delete ' +
+      state.selectedCount() +
+      ' walk-in' +
+      (state.selectedCount() === 1 ? '' : 's') +
+      '?'
+    "
+    [body]="'This cannot be undone. Contacts and activities linked to these visits remain in their timelines.'"
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    [submitting]="state.bulkSubmitting()"
+    (confirm)="onBulkDelete()"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Single-row reassign (programmatic — pencil/menu added later). -->
+@if (singleReassignWalkIn(); as walkIn) {
+  <app-reassign-modal
+    [entityLabel]="'walk-in'"
+    [count]="1"
+    [currentOwnerId]="walkIn.assigned_to_id"
+    [submitting]="singleReassignSubmitting()"
+    [error]="singleReassignError()"
+    (confirm)="onSingleReassign($event)"
+    (cancel)="closeSingleReassign()"
+  />
+}
+
+<!-- Convert-to-Lead modal. -->
+@if (convertWalkIn(); as walkIn) {
+  <app-walkin-convert-modal
+    [walkIn]="walkIn"
+    [submitting]="convertSubmitting()"
+    [error]="convertError()"
+    (confirm)="onConvertConfirm($event)"
+    (cancel)="closeConvert()"
+  />
+}

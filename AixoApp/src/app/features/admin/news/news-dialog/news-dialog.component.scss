@@ -1,0 +1,18 @@
+.news-dialog {
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    min-width: 400px;
+    padding-top: var(--spacing-sm);
+  }
+
+  &__row {
+    display: flex;
+    gap: var(--spacing-md);
+
+    mat-form-field {
+      flex: 1;
+    }
+  }
+}

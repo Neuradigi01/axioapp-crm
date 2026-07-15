@@ -1,0 +1,76 @@
+@if (open()) {
+  <div
+    class="absolute right-0 top-full z-20 mt-1 w-96 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+    role="dialog"
+    aria-label="Notifications"
+  >
+    <header class="flex items-center justify-between border-b border-zinc-200 px-3 py-2">
+      <h3 class="text-sm font-semibold text-zinc-900">Notifications</h3>
+      <div class="flex items-center gap-2">
+        <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+          {{ unreadCount() }} unread
+        </span>
+        @if (hasUnread()) {
+          <button
+            type="button"
+            (click)="onMarkAllRead()"
+            class="text-xs font-medium text-zinc-700 underline hover:text-zinc-900"
+          >
+            Mark all read
+          </button>
+        }
+      </div>
+    </header>
+
+    <div class="max-h-96 overflow-y-auto">
+      @if (loadError(); as err) {
+        <p class="px-3 py-4 text-xs text-red-600">{{ err }}</p>
+      } @else if (loading() && items().length === 0) {
+        <div class="space-y-2 px-3 py-3 animate-pulse">
+          <div class="h-3 w-40 rounded bg-zinc-200"></div>
+          <div class="h-10 w-full rounded bg-zinc-100"></div>
+          <div class="h-10 w-full rounded bg-zinc-100"></div>
+        </div>
+      } @else if (items().length === 0) {
+        <p class="px-3 py-6 text-center text-xs text-zinc-500">You're all caught up.</p>
+      } @else {
+        <ul class="divide-y divide-zinc-100">
+          @for (n of items(); track n.id) {
+            <li>
+              <button
+                type="button"
+                (click)="onItemClick(n)"
+                class="block w-full px-3 py-2.5 text-left transition hover:bg-zinc-50"
+                [class.bg-sky-50]="n.read_at === null"
+              >
+                <div class="flex items-start gap-2">
+                  @if (n.read_at === null) {
+                    <span
+                      class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-sky-500"
+                      aria-label="unread"
+                    ></span>
+                  } @else {
+                    <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-transparent"></span>
+                  }
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-xs font-medium text-zinc-900">
+                      {{ n.title }}
+                    </p>
+                    @if (n.body) {
+                      <p class="mt-0.5 line-clamp-2 text-[11px] text-zinc-600">
+                        {{ n.body }}
+                      </p>
+                    }
+                    <p class="mt-0.5 text-[10px] text-zinc-500">
+                      {{ n.type }} · {{ n.created_at | relativeTime }}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </div>
+}

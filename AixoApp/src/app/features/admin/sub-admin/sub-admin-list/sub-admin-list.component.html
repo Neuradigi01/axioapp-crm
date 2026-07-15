@@ -1,0 +1,82 @@
+<div class="sub-admin-list">
+  <div class="sub-admin-list__actions-bar">
+    <button mat-flat-button color="primary" (click)="navigateToAdd()">
+      <mat-icon>person_add</mat-icon>
+      Add New Admin
+    </button>
+  </div>
+
+  <app-page-layout
+    [formGroup]="searchForm"
+    [data]="data()"
+    [dataCount]="dataCount()"
+    [isFiltered]="isFiltered()"
+    [pageTitle]="'Sub-Admin Management'"
+    [pageSubtitle]="'Manage sub-admin accounts and access rights'"
+    [tableId]="'tblSubAdmins'"
+    [showExport]="true"
+    (submitEvent)="onSubmit()"
+    (clearEvent)="clearFilters()"
+    (pageEvent)="onPageChange($event)"
+    (exportEvent)="exportToCSV()">
+
+    <ng-template #requiredFilters>
+      <mat-form-field appearance="outline">
+        <mat-label>Search</mat-label>
+        <input matInput formControlName="search" placeholder="Admin ID, Name, Email" />
+      </mat-form-field>
+    </ng-template>
+
+    <ng-template #filters>
+      <mat-form-field appearance="outline">
+        <mat-label>Status</mat-label>
+        <mat-select formControlName="status">
+          <mat-option value="all">All</mat-option>
+          <mat-option value="active">Active</mat-option>
+          <mat-option value="inactive">Inactive</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </ng-template>
+
+    <ng-template #tableHeader>
+      <tr>
+        <th>SR#</th>
+        <th>Admin ID</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Status</th>
+        <th>Routes</th>
+        <th>Created</th>
+        <th class="sub-admin-list__actions-col">Actions</th>
+      </tr>
+    </ng-template>
+
+    <ng-template #tableBody let-d let-srNo="srNo">
+      <tr>
+        <td>{{ srNo }}</td>
+        <td>{{ d.admin_user_id }}</td>
+        <td>{{ d.name }}</td>
+        <td>{{ d.email || '—' }}</td>
+        <td>
+          @let badge = getStatusBadge(d.is_active);
+          <span class="sub-admin-list__badge" [style.color]="badge.color" [style.background-color]="badge.bgVar">
+            {{ badge.label }}
+          </span>
+        </td>
+        <td>{{ d.route_count }}</td>
+        <td>{{ d.created_at | date:'mediumDate' }}</td>
+        <td class="sub-admin-list__actions-col">
+          <button mat-icon-button matTooltip="Edit" (click)="navigateToEdit(d.admin_user_id)">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button mat-icon-button matTooltip="Access Rights" (click)="navigateToAccessRights(d.admin_user_id)">
+            <mat-icon>admin_panel_settings</mat-icon>
+          </button>
+          <button mat-icon-button [matTooltip]="d.is_active ? 'Deactivate' : 'Activate'" (click)="toggleStatus(d)">
+            <mat-icon>{{ d.is_active ? 'block' : 'check_circle' }}</mat-icon>
+          </button>
+        </td>
+      </tr>
+    </ng-template>
+  </app-page-layout>
+</div>

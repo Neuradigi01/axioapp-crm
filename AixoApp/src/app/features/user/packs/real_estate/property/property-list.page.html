@@ -1,0 +1,193 @@
+<section class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+  <!-- Header -->
+  <header class="mb-6 flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-zinc-900">Properties</h1>
+      <p class="mt-1 text-sm text-zinc-500">
+        Manage your real-estate listings — draft, publish, archive, share.
+      </p>
+    </div>
+    <a
+      [routerLink]="['/user/properties/new']"
+      class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-zinc-800"
+    >
+      <lucide-icon name="plus" class="h-4 w-4"></lucide-icon>
+      New Property
+    </a>
+  </header>
+
+  <!-- Tab bar -->
+  <nav class="mb-4 flex items-center gap-1 border-b border-zinc-200">
+    @for (tab of TABS; track tab.key) {
+      <button
+        type="button"
+        (click)="selectTab(tab.key)"
+        [class.text-zinc-900]="activeTab() === tab.key"
+        [class.border-zinc-900]="activeTab() === tab.key"
+        [class.text-zinc-500]="activeTab() !== tab.key"
+        [class.border-transparent]="activeTab() !== tab.key"
+        class="-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition hover:text-zinc-900"
+      >
+        <span>{{ tab.label }}</span>
+        <span
+          class="inline-flex min-w-5 items-center justify-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-xs font-semibold text-zinc-600"
+        >
+          {{ countForTab(tab.key) }}
+        </span>
+      </button>
+    }
+  </nav>
+
+  <!-- Search bar -->
+  <div class="mb-4 flex items-center gap-3">
+    <div class="relative w-full max-w-md">
+      <lucide-icon
+        name="search"
+        class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+      ></lucide-icon>
+      <input
+        type="search"
+        [formControl]="searchControl"
+        placeholder="Search title or city…"
+        class="w-full rounded-md border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+      />
+    </div>
+    @if (loading()) {
+      <span class="text-xs text-zinc-500">Loading…</span>
+    }
+  </div>
+
+  <!-- Error banner -->
+  @if (loadError()) {
+    <div class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      {{ loadError() }}
+    </div>
+  }
+
+  <!-- Table -->
+  <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+    @if (items().length === 0 && !loading()) {
+      <div class="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+        <lucide-icon name="home" class="h-10 w-10 text-zinc-300"></lucide-icon>
+        <div class="text-sm font-medium text-zinc-800">No properties yet.</div>
+        <div class="max-w-sm text-xs text-zinc-500">
+          Create your first listing to see it here — grouped by status across the tabs above.
+        </div>
+        <a
+          [routerLink]="['/user/properties/new']"
+          class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-zinc-800"
+        >
+          <lucide-icon name="plus" class="h-4 w-4"></lucide-icon>
+          New Property
+        </a>
+      </div>
+    } @else {
+      <table class="min-w-full divide-y divide-zinc-200 text-sm">
+        <thead class="bg-zinc-50">
+          <tr class="text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+            <th class="w-14 px-4 py-3"></th>
+            <th class="px-3 py-3">Title</th>
+            <th class="px-3 py-3">Status</th>
+            <th class="px-3 py-3">Price</th>
+            <th class="px-3 py-3">Location</th>
+            <th class="px-3 py-3">Updated</th>
+            <th class="w-14 px-3 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-100 bg-white">
+          @for (p of items(); track p.id) {
+            <tr (click)="openProperty(p)" class="cursor-pointer hover:bg-zinc-50">
+              <td class="px-4 py-3">
+                @if (p.featured_image_url) {
+                  <img
+                    [src]="imgSrc(p)"
+                    [alt]="p.title"
+                    class="h-10 w-10 rounded-md object-cover ring-1 ring-zinc-200"
+                  />
+                } @else {
+                  <div
+                    class="flex h-10 w-10 items-center justify-center rounded-md bg-zinc-100 text-zinc-400 ring-1 ring-zinc-200"
+                  >
+                    <lucide-icon name="image-off" class="h-4 w-4"></lucide-icon>
+                  </div>
+                }
+              </td>
+              <td class="px-3 py-3">
+                <div class="font-medium text-zinc-900">{{ p.title }}</div>
+                <div class="text-xs text-zinc-400">{{ p.slug }}</div>
+              </td>
+              <td class="px-3 py-3">
+                <span
+                  [class]="statusBadgeClass(p.status)"
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1"
+                >
+                  {{ p.status }}
+                </span>
+              </td>
+              <td class="px-3 py-3 text-zinc-800">
+                {{ formatPrice(p.price, p.currency) }}
+              </td>
+              <td class="px-3 py-3 text-zinc-600">
+                {{ p.city || '—' }}
+                @if (p.state) {
+                  <span class="text-zinc-400">, {{ p.state }}</span>
+                }
+              </td>
+              <td class="px-3 py-3 text-zinc-500">
+                {{ p.updated_at | date: 'mediumDate' }}
+              </td>
+              <td class="px-3 py-3 text-right" (click)="$event.stopPropagation()">
+                <app-property-row-menu
+                  [property]="p"
+                  (refresh)="reload()"
+                  (optimisticStatus)="applyOptimistic($event)"
+                  (removed)="removeRow($event)"
+                />
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+
+  <!-- Pagination -->
+  @if (items().length > 0) {
+    <div class="mt-4 flex items-center justify-between text-sm text-zinc-600">
+      <div class="flex items-center gap-2">
+        <span>Rows per page</span>
+        <select
+          [value]="pageSize()"
+          (change)="onPageSizeChange($event)"
+          class="rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none"
+        >
+          <option [value]="10">10</option>
+          <option [value]="20">20</option>
+          <option [value]="50">50</option>
+          <option [value]="100">100</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <span>Page {{ page() }} of {{ totalPages() }} · {{ total() }} total</span>
+        <button
+          type="button"
+          (click)="prevPage()"
+          [disabled]="page() <= 1"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Previous page"
+        >
+          <lucide-icon name="chevron-left" class="h-4 w-4"></lucide-icon>
+        </button>
+        <button
+          type="button"
+          (click)="nextPage()"
+          [disabled]="page() >= totalPages()"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Next page"
+        >
+          <lucide-icon name="chevron-right" class="h-4 w-4"></lucide-icon>
+        </button>
+      </div>
+    </div>
+  }
+</section>

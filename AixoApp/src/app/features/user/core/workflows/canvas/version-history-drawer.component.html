@@ -1,0 +1,101 @@
+<div class="flex flex-col h-full bg-white">
+  <header class="px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
+    <div>
+      <h3 class="text-sm font-semibold text-zinc-800">Version history</h3>
+      @if (total() > 0) {
+        <p class="text-[11px] text-zinc-500">{{ versions().length }} of {{ total() }} versions</p>
+      }
+    </div>
+    <button
+      type="button"
+      class="text-zinc-400 hover:text-zinc-700"
+      (click)="close.emit()"
+      title="Close"
+    >
+      <lucide-icon name="X" class="w-4 h-4"></lucide-icon>
+    </button>
+  </header>
+
+  @if (viewingVersion() !== null) {
+    <div
+      class="mx-4 my-3 px-3 py-2 text-[11px] rounded bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-between"
+    >
+      <span>
+        Viewing version <strong>v{{ viewingVersion() }}</strong> — read-only.
+      </span>
+      <button
+        type="button"
+        class="px-2 py-0.5 rounded bg-white border border-amber-300 text-amber-900 hover:bg-amber-100"
+        (click)="backToCurrent.emit()"
+      >
+        Back to current
+      </button>
+    </div>
+  }
+
+  @if (error()) {
+    <div
+      class="mx-4 my-3 px-3 py-2 text-xs rounded bg-rose-50 border border-rose-200 text-rose-800"
+    >
+      {{ error() }}
+    </div>
+  }
+
+  <div class="flex-1 overflow-y-auto px-4 py-3">
+    @if (loading()) {
+      <p class="text-xs text-zinc-500 italic">Loading versions…</p>
+    } @else if (versions().length === 0) {
+      <p class="text-xs text-zinc-500 italic">
+        No saved versions yet — versions land each time you save a graph change.
+      </p>
+    } @else {
+      <ol class="space-y-2">
+        @for (entry of versions(); track entry.id) {
+          <li
+            class="border border-zinc-200 rounded p-3"
+            [class.bg-amber-50]="viewingVersion() === entry.version"
+            [class.border-amber-300]="viewingVersion() === entry.version"
+          >
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono font-semibold text-zinc-700">
+                v{{ entry.version }}
+              </span>
+              <span class="text-[10px] text-zinc-500">
+                {{ entry.created_at | date: 'medium' }}
+              </span>
+              <div class="flex-1"></div>
+              <button
+                type="button"
+                class="text-[11px] px-2 py-0.5 rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+                [disabled]="fetchingDetail() !== null || viewingVersion() === entry.version"
+                (click)="onView(entry.version)"
+              >
+                @if (fetchingDetail() === entry.version) {
+                  Loading…
+                } @else if (viewingVersion() === entry.version) {
+                  Viewing
+                } @else {
+                  View
+                }
+              </button>
+              <button
+                type="button"
+                class="text-[11px] px-2 py-0.5 rounded bg-zinc-900 text-white hover:bg-zinc-800"
+                (click)="onRestore(entry.version)"
+              >
+                Restore
+              </button>
+            </div>
+            @if (entry.change_note) {
+              <p class="mt-1 text-xs text-zinc-700">
+                {{ entry.change_note }}
+              </p>
+            } @else {
+              <p class="mt-1 text-[11px] text-zinc-400 italic">No change note recorded.</p>
+            }
+          </li>
+        }
+      </ol>
+    }
+  </div>
+</div>

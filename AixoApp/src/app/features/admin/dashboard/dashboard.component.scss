@@ -1,0 +1,48 @@
+.admin-dashboard {
+  &__table-card {
+    margin-top: var(--spacing-xl);
+    background-color: var(--surface-1);
+    border-color: var(--border-color);
+  }
+
+  &__table-wrapper {
+    overflow-x: auto;
+  }
+
+  &__table {
+    width: 100%;
+
+    th {
+      font-weight: 600;
+      color: var(--page-text-secondary);
+      font-size: var(--font-size-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      color: var(--page-text);
+      font-size: var(--font-size-sm);
+    }
+  }
+
+  app-dashboard-news {
+    display: block;
+    margin-top: var(--spacing-xl);
+  }
+
+  &__empty {
+    text-align: center;
+    color: var(--page-text-secondary);
+    padding: var(--spacing-xl) 0;
+    font-size: var(--font-size-sm);
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-dashboard {
+    &__table-card {
+      margin-top: var(--spacing-lg);
+    }
+  }
+}
