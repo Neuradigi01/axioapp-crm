@@ -22,7 +22,7 @@ Track finishes when both channels work end-to-end and pass a real customer send.
 | 04 | [Email HTML composer](step-04-email-html-composer.md) — `body_html` column + rich editor + merge-tag inserter + inbox preview | Email | Create Email Template | COMPLETED |
 | 05 | [Email dispatch wiring](step-05-email-dispatch-wiring.md) — call `adapter.send_email()` + funnel columns + tracking | Email | Campaign Report | COMPLETED |
 | 06 | [Email unsubscribe + opt-out](step-06-email-unsubscribe-optout.md) — auto-appended footer + `email_opt_in_status` on Contact | Email | Contact detail · Wizard exclusions · public `/unsubscribe/{token}` | COMPLETED |
-| 07 | [Email Sender Setup page](step-07-email-sender-setup-page.md) — SPF/DKIM/DMARC verification + bounce suppression pre-flight | Email | New Sender Setup page · Wizard pre-flight | 07a COMPLETED · 07b deferred |
+| 07 | [Email Sender Setup page](step-07-email-sender-setup-page.md) — SPF/DKIM/DMARC verification + bounce suppression pre-flight | Email | Settings → Sender Setup tab · Wizard pre-flight | COMPLETED |
 
 **Ship gates:**
 

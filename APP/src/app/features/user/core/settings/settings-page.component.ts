@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { EmailAccountsTabComponent } from './email-accounts/email-accounts-tab.component';
+import { SenderSetupTabComponent } from './sender-setup/sender-setup-tab.component';
 import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { AutomationSettingsTabComponent } from './tabs/automation-settings-tab.component';
@@ -26,6 +27,7 @@ type SettingsTab =
   | 'team'
   | 'roles'
   | 'email-accounts'
+  | 'sender-setup'
   | 'notifications'
   | 'ai'
   | 'send-rules'
@@ -64,6 +66,15 @@ const TABS: ReadonlyArray<TabDef> = [
     id: 'email-accounts',
     label: 'Email Accounts',
     permission: 'email.accounts.manage',
+  },
+  {
+    // Campaigns v1 Step 07b — verifies sender domains (SPF / DKIM /
+    // DMARC) so Email campaigns land in the inbox instead of the
+    // promotions tab. Owner + Admin only via `email.accounts.admin`
+    // (the same key that gates the backend module's endpoints).
+    id: 'sender-setup',
+    label: 'Sender Setup',
+    permission: 'email.accounts.admin',
   },
   // tasks/workflows Step 20 — the Email Sequences tab was absorbed
   // into Workflows. The standalone tab + builder routes redirect to
@@ -113,6 +124,7 @@ const TABS: ReadonlyArray<TabDef> = [
     StandardFieldsTabComponent,
     EmbedIntegrationsTabComponent,
     EmailAccountsTabComponent,
+    SenderSetupTabComponent,
   ],
   templateUrl: './settings-page.component.html',
 })
