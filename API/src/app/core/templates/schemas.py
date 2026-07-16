@@ -42,16 +42,45 @@ class TemplateCreate(BaseModel):
     channel: ConversationChannel
     category: TemplateCategory = TemplateCategory.marketing
     language: str = Field(default="en", min_length=2, max_length=16)
-    body_text: str = Field(min_length=1, max_length=65535)
+    # Campaigns v1 Step 04 — Email templates can carry an HTML body
+    # instead of / alongside the plain text. Non-Email channels keep
+    # body_text as the source of truth (validator enforces below).
+    body_text: str | None = Field(default=None, max_length=65535)
+    body_html: str | None = Field(default=None, max_length=200_000)
+    body_text_fallback_auto: bool = True
     subject: str | None = Field(default=None, max_length=998)
     preview_text: str | None = Field(default=None, max_length=190)
 
     @model_validator(mode="after")
-    def _email_subject_required(self) -> TemplateCreate:
+    def _email_channel_body_and_subject(self) -> TemplateCreate:
+        """Channel-branched invariants:
+
+        * Email — at least one of ``body_text`` / ``body_html`` non-empty,
+          ``subject`` required, ``preview_text`` allowed.
+        * Non-Email — ``body_text`` non-empty required, ``body_html``
+          must be null, ``subject`` + ``preview_text`` must be null.
+
+        The service layer sanitises ``body_html`` and, when
+        ``body_text_fallback_auto`` is true and ``body_text`` was
+        omitted, derives it from the sanitised HTML before persisting.
+        """
+        has_text = bool(self.body_text and self.body_text.strip())
+        has_html = bool(self.body_html and self.body_html.strip())
         if self.channel == ConversationChannel.email:
+            if not has_text and not has_html:
+                raise ValueError(
+                    "email templates require body_text or body_html (or both)"
+                )
             if not self.subject or not self.subject.strip():
                 raise ValueError("subject is required for email templates")
         else:
+            if not has_text:
+                raise ValueError("body_text is required for non-email templates")
+            if self.body_html is not None:
+                raise ValueError(
+                    "body_html is only valid for email templates; "
+                    f"got channel={self.channel.value}"
+                )
             if self.subject is not None:
                 raise ValueError(
                     f"subject is only valid for email templates; got channel={self.channel.value}"
@@ -79,6 +108,12 @@ class TemplateUpdate(BaseModel):
     category: TemplateCategory | None = None
     language: str | None = Field(default=None, min_length=2, max_length=16)
     body_text: str | None = Field(default=None, min_length=1, max_length=65535)
+    # Campaigns v1 Step 04 — HTML body edits. Setting to an empty
+    # string is not "clear" — the service treats it as an intentional
+    # no-op edit; use PATCH with an omitted key to leave the current
+    # HTML in place, or PATCH with a non-empty string to replace.
+    body_html: str | None = Field(default=None, max_length=200_000)
+    body_text_fallback_auto: bool | None = None
     subject: str | None = Field(default=None, max_length=998)
     preview_text: str | None = Field(default=None, max_length=190)
     change_note: str | None = Field(default=None, max_length=2000)
@@ -95,6 +130,10 @@ class TemplateRead(ORMModel):
     category: TemplateCategory
     language: str
     body_text: str
+    # Campaigns v1 Step 04 — Email HTML body + auto-derive flag.
+    # ``body_html`` is None for non-Email rows.
+    body_html: str | None = None
+    body_text_fallback_auto: bool = True
     subject: str | None
     preview_text: str | None
     variables: list[Any]

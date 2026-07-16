@@ -46,6 +46,7 @@ import {
   TemplatesApiService,
 } from '../templates/templates-api.service';
 import { TemplateStatusBadgeComponent } from '../templates/template-status-badge.component';
+import { HtmlComposerComponent } from '../templates/editor/html-composer.component';
 
 /**
  * Step 15 — local picker row. Both the WhatsApp and non-WhatsApp
@@ -140,6 +141,7 @@ const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<Conversatio
     SendFromPickerComponent,
     AbTestSectionComponent,
     TemplateStatusBadgeComponent,
+    HtmlComposerComponent,
   ],
   templateUrl: './create-campaign-modal.component.html',
 })
@@ -361,6 +363,11 @@ export class CreateCampaignModalComponent {
     reply_to: this.fb.control<string | null>(null, [Validators.email, Validators.maxLength(320)]),
     subject: this.fb.control<string | null>(null, [Validators.maxLength(998)]),
     preheader: this.fb.control<string | null>(null, [Validators.maxLength(200)]),
+    // Campaigns v1 Step 04 — inline HTML body for Email campaigns that
+    // don't reference a template. Mutually exclusive with `template`
+    // and the picker; the save handler picks one source of truth
+    // before calling the API.
+    body_html: this.fb.control<string>('', [Validators.maxLength(200000)]),
   });
 
   protected readonly isWhatsApp = computed(
@@ -399,6 +406,9 @@ export class CreateCampaignModalComponent {
             reply_to: null,
             subject: null,
             preheader: null,
+            // Campaigns v1 Step 04 — HTML body is Email-only; drop any
+            // stale HTML when the operator flips away.
+            body_html: '',
           });
         }
       });
@@ -478,6 +488,14 @@ export class CreateCampaignModalComponent {
     const current = ctrl.value ?? '';
     ctrl.setValue(current + token);
     ctrl.markAsDirty();
+  }
+
+  /** Bridge for the <app-html-composer>'s (valueChange) — the composer
+   *  is a plain input/output component (no ControlValueAccessor) so the
+   *  modal owns the form-control writes. */
+  protected onEmailBodyHtmlChange(html: string): void {
+    this.form.controls.body_html.setValue(html);
+    this.form.controls.body_html.markAsDirty();
   }
 
   /** True when the Email branch is missing any of its required fields.
@@ -769,6 +787,13 @@ export class CreateCampaignModalComponent {
     // a selected template_id sends through the central library; the
     // free-text fallback fires only when no template is picked.
     const useTemplatePicker = this.selectedTemplateId() !== null;
+    // Campaigns v1 Step 04 — inline HTML body is Email-only and
+    // mutually exclusive with the picker + free-text textarea. If the
+    // operator authored HTML, that's the source of truth; we clear the
+    // plain `template` value in the payload below so the backend's
+    // exactly-one-source guard is satisfied.
+    const emailInlineHtml = v.channel === 'email' ? (v.body_html?.trim() ?? '') : '';
+    const useInlineHtml = emailInlineHtml.length > 0;
 
     if (useTemplatePicker) {
       // WA's positional `{{n}}` placeholders require operator-supplied
@@ -783,7 +808,7 @@ export class CreateCampaignModalComponent {
           return;
         }
       }
-    } else if (!v.template.trim()) {
+    } else if (!useInlineHtml && !v.template.trim()) {
       this.submitError.set('Provide a message body or pick a template.');
       return;
     }
@@ -809,7 +834,10 @@ export class CreateCampaignModalComponent {
         name: v.name,
         channel: v.channel,
         audience_filter: audience,
-        template: useTemplatePicker ? null : v.template,
+        // Backend's exactly-one-source guard requires exactly one of
+        // template / template_id / body_html — pick per the resolved
+        // mode above.
+        template: useTemplatePicker || useInlineHtml ? null : v.template,
         template_id: useTemplatePicker ? this.selectedTemplateId() : null,
         template_variables: useTemplatePicker ? this.variables() : null,
         schedule_at: v.schedule_at ? new Date(v.schedule_at).toISOString() : null,
@@ -833,6 +861,11 @@ export class CreateCampaignModalComponent {
         reply_to: v.channel === 'email' ? (v.reply_to ?? null) : null,
         subject: v.channel === 'email' ? (v.subject ?? null) : null,
         preheader: v.channel === 'email' ? (v.preheader ?? null) : null,
+        // Campaigns v1 Step 04 — inline HTML body. Only sent when the
+        // operator authored HTML for an Email campaign; every other
+        // combination stays null so the exactly-one-source guard is
+        // satisfied.
+        body_html: useInlineHtml ? emailInlineHtml : null,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({

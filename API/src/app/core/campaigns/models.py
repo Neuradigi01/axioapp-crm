@@ -35,6 +35,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
 )
 from sqlalchemy import text as sql_text
 from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
@@ -143,6 +144,12 @@ class Campaign(Base, TenantScoped):
     reply_to: Mapped[str | None] = mapped_column(String(320), nullable=True)
     subject: Mapped[str | None] = mapped_column(String(998), nullable=True)
     preheader: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Campaigns v1 Step 04 — inline HTML body for Email campaigns that
+    # don't reference a template. Mutually exclusive with ``template``
+    # and ``template_id`` — enforced by ``_exactly_one_template_source``
+    # in ``schemas.py``. Sanitised by
+    # :mod:`core.templates.sanitizer` on every write.
+    body_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     # whatsapp-platform-upgrade Step 29 — A/B testing.
     # ``is_ab_test`` is the master gate; when False every other
     # A/B column is ignored. When True the dispatcher assigns each

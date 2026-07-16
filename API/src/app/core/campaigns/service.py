@@ -48,6 +48,7 @@ from src.app.core.contacts.models import Contact
 from src.app.core.conversations.adapters import ChannelMessageRef
 from src.app.core.email import data_access as email_da
 from src.app.core.email.models import EmailAccount, EmailAccountSyncState
+from src.app.core.templates.sanitizer import sanitize_email_html
 from src.app.core.conversations.adapters.whatsapp import (
     WhatsAppNotConnected,
     WhatsAppRateLimited,
@@ -222,6 +223,13 @@ async def create_campaign(
         reply_to=str(payload.reply_to) if payload.reply_to is not None else None,
         subject=payload.subject,
         preheader=payload.preheader,
+        # Campaigns v1 Step 04 — inline HTML body for Email campaigns
+        # authored in the create modal (not linked to a template).
+        # Sanitised before persist; schema validator already rejected
+        # non-Email payloads that supplied it.
+        body_html=(
+            sanitize_email_html(payload.body_html) if payload.body_html is not None else None
+        ),
         # Step 29 — A/B test config. Server defaults take over for
         # non-A/B campaigns (is_ab_test=false, split_ratio=50, etc.).
         is_ab_test=bool(payload.is_ab_test),
@@ -314,6 +322,15 @@ async def update_campaign(
     if payload.preheader is not None:
         campaign.preheader = payload.preheader
         changed = True
+    # Campaigns v1 Step 04 — inline HTML body edits. Only meaningful
+    # for Email campaigns; the schema validator on CampaignUpdate
+    # accepts it for any channel but the create-time validator has
+    # already gated the source-of-truth invariant on the row.
+    if payload.body_html is not None:
+        new_html = sanitize_email_html(payload.body_html)
+        if new_html != campaign.body_html:
+            campaign.body_html = new_html
+            changed = True
     if changed:
         await session.commit()
         await session.refresh(campaign)

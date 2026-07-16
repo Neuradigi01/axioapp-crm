@@ -47,6 +47,10 @@ export interface Campaign {
   reply_to: string | null;
   subject: string | null;
   preheader: string | null;
+  /** Campaigns v1 Step 04 — inline HTML body for Email campaigns
+   *  that don't reference a template. Null for template-backed and
+   *  non-Email campaigns. Sanitised server-side on every write. */
+  body_html: string | null;
   status: CampaignStatus;
   created_by_id: string | null;
   created_at: string;
@@ -90,6 +94,11 @@ export interface CampaignCreate {
   reply_to?: string | null;
   subject?: string | null;
   preheader?: string | null;
+  /** Campaigns v1 Step 04 — inline HTML body for Email campaigns
+   *  that don't reference a template. Mutually exclusive with
+   *  `template` / `template_id`; backend enforces the exactly-one
+   *  invariant. */
+  body_html?: string | null;
 }
 
 export type CampaignUpdate = Partial<{
@@ -106,6 +115,8 @@ export type CampaignUpdate = Partial<{
   reply_to: string | null;
   subject: string | null;
   preheader: string | null;
+  /** Campaigns v1 Step 04 — inline HTML body edit for Email drafts. */
+  body_html: string | null;
 }>;
 
 export interface CampaignStartResponse {

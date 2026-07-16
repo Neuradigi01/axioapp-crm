@@ -67,6 +67,8 @@ describe('TemplatesPageComponent', () => {
           category: 'marketing' as const,
           language: 'en',
           body_text: 'body',
+          body_html: null,
+          body_text_fallback_auto: true,
           subject: 'subj',
           preview_text: null,
           variables: [],

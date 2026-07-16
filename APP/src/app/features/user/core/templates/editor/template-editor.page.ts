@@ -380,6 +380,9 @@ export class TemplateEditorPageComponent {
               subject: row.subject ?? '',
               preview_text: row.preview_text ?? '',
               body_text: row.body_text,
+              // Campaigns v1 Step 04 — hydrate HTML body + fallback flag.
+              body_html: row.body_html ?? '',
+              body_text_fallback_auto: row.body_text_fallback_auto,
             });
             this.emailForm.set(f);
           } else if (row.channel === 'sms') {
@@ -519,11 +522,17 @@ export class TemplateEditorPageComponent {
     }
     // Email.
     const f = this.emailForm();
+    const emailHtml = (f?.controls.body_html.value ?? '').trim();
     return {
       name: this.headerForm.controls.name.value,
       channel: 'email' as const,
       language: 'en',
       body_text: f?.controls.body_text.value ?? '',
+      // Campaigns v1 Step 04 — Email HTML body + fallback flag.
+      // Empty string → null so the backend validator treats it as
+      // "not provided" (min_length=1 semantics for the schema).
+      body_html: emailHtml.length > 0 ? emailHtml : null,
+      body_text_fallback_auto: f?.controls.body_text_fallback_auto.value ?? true,
       subject: f?.controls.subject.value ?? '',
       preview_text: f?.controls.preview_text.value || null,
     };

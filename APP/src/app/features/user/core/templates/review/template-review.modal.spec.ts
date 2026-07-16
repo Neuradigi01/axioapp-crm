@@ -15,6 +15,8 @@ function makeTemplate(): TemplateRead {
     category: 'transactional',
     language: 'en',
     body_text: 'Hi',
+    body_html: null,
+    body_text_fallback_auto: true,
     subject: 'Welcome',
     preview_text: null,
     variables: [],

@@ -86,24 +86,51 @@ class CampaignCreate(BaseModel):
     reply_to: EmailStr | None = None
     subject: str | None = Field(default=None, min_length=1, max_length=998)
     preheader: str | None = Field(default=None, max_length=200)
+    # Campaigns v1 Step 04 — inline HTML body for Email campaigns that
+    # don't reference a template. Mutually exclusive with ``template``
+    # and ``template_id`` for Email (see the validator below); a WA
+    # / SMS / etc campaign that sends this field is a schema error.
+    body_html: str | None = Field(default=None, max_length=200_000)
 
     @model_validator(mode="after")
     def _exactly_one_template_source(self) -> CampaignCreate:
-        """Either free-text body or an approved-template reference —
-        not both, not neither. Mixing the two would make dispatch's
+        """Either free-text body, an inline HTML body, or a template —
+        exactly one of the three. Mixing them would make dispatch's
         text-vs-template branch (Step 3.5.6) ambiguous.
 
         Step 29 — A/B campaigns skip this check because they pin
         templates via ``variant_a_template_id`` / ``variant_b_template_id``
-        instead of ``template`` / ``template_id``."""
+        instead of ``template`` / ``template_id``.
+
+        Campaigns v1 Step 04 — ``body_html`` is allowed only for Email
+        channels; it counts as a third source alongside ``template``
+        and ``template_id``."""
         if self.is_ab_test:
             return self
-        if self.template is None and self.template_id is None:
+        if self.body_html is not None and self.channel != ConversationChannel.email:
             raise ValueError(
-                "Provide either 'template' (free text) or 'template_id' (approved Meta template)."
+                "body_html is only valid for email campaigns; "
+                f"got channel={self.channel.value}"
             )
-        if self.template is not None and self.template_id is not None:
-            raise ValueError("Use 'template' OR 'template_id', not both.")
+        sources = [
+            src
+            for src, value in (
+                ("template", self.template),
+                ("template_id", self.template_id),
+                ("body_html", self.body_html),
+            )
+            if value is not None
+        ]
+        if not sources:
+            raise ValueError(
+                "Provide 'template' (free text), 'template_id' "
+                "(approved template), or 'body_html' (Email only)."
+            )
+        if len(sources) > 1:
+            raise ValueError(
+                "Use exactly one of 'template', 'template_id', or 'body_html'; "
+                f"got {', '.join(sources)}."
+            )
         if self.template_id is not None and self.template_variables is None:
             # No variables for a 0-variable template is fine, but make
             # the field explicitly `{}` so dispatch doesn't see None.
@@ -172,6 +199,8 @@ class CampaignUpdate(BaseModel):
     reply_to: EmailStr | None = None
     subject: str | None = Field(default=None, min_length=1, max_length=998)
     preheader: str | None = Field(default=None, max_length=200)
+    # Campaigns v1 Step 04 — inline HTML body edits for Email drafts.
+    body_html: str | None = Field(default=None, max_length=200_000)
 
 
 class CampaignOut(ORMModel):
@@ -191,6 +220,10 @@ class CampaignOut(ORMModel):
     reply_to: str | None = None
     subject: str | None = None
     preheader: str | None = None
+    # Campaigns v1 Step 04 — inline HTML body for Email campaigns
+    # that don't reference a template. NULL for template-backed and
+    # non-Email campaigns.
+    body_html: str | None = None
     status: CampaignStatus
     created_by_id: uuid.UUID | None
     created_at: datetime

@@ -501,6 +501,26 @@
         ></textarea>
       </label>
 
+      <!-- Campaigns v1 Step 04 — inline HTML composer. Only shown when
+           the operator picked the Email channel and hasn't referenced
+           a template; the picker's HTML body would otherwise be the
+           source of truth. Filling this clears `template` at submit. -->
+      @if (isEmailChannel() && !selectedTemplateId()) {
+        <div class="block">
+          <div class="mb-1 flex items-center justify-between text-xs">
+            <span class="font-medium text-zinc-600">Or write HTML instead</span>
+            <span class="text-[10px] text-zinc-400">
+              Sanitised server-side · Angular sanitises the preview too
+            </span>
+          </div>
+          <app-html-composer
+            label="HTML source"
+            [value]="form.controls.body_html.value"
+            (valueChange)="onEmailBodyHtmlChange($event)"
+          />
+        </div>
+      }
+
       <label class="block text-sm">
         <span class="block text-xs font-medium text-zinc-600">
           Schedule (optional — leave blank to send when you click Start)

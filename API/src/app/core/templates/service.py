@@ -58,6 +58,7 @@ from src.app.core.templates.models import (
     TemplateExternalStatus,
     TemplateInternalStatus,
 )
+from src.app.core.templates.sanitizer import derive_plain_text, sanitize_email_html
 from src.app.core.templates.schemas import TemplateCreate, TemplateUpdate
 from src.app.core.templates.variables import (
     extract_variable_paths,
@@ -175,6 +176,29 @@ async def get_version(
 # --- writes -------------------------------------------------------------
 
 
+def _resolve_body_text(
+    *,
+    provided_text: str | None,
+    body_html: str | None,
+    fallback_auto: bool,
+) -> str:
+    """Pick the ``body_text`` that lands on the row.
+
+    Returns the operator's explicit text when they supplied it. Falls
+    back to the plain-text derivation of ``body_html`` when the operator
+    left ``body_text`` empty and enabled ``body_text_fallback_auto``.
+    Returns the empty string otherwise — the schema validator has
+    already rejected the "neither supplied" case, so this branch only
+    fires when the operator explicitly wanted an HTML-only template
+    with fallback disabled (rare, but supported).
+    """
+    if provided_text and provided_text.strip():
+        return provided_text
+    if body_html and fallback_auto:
+        return derive_plain_text(body_html)
+    return provided_text or ""
+
+
 async def create_template(
     session: AsyncSession,
     *,
@@ -190,8 +214,25 @@ async def create_template(
     on ``(org_id, lower(name), channel)`` rejects the insert (router
     surfaces as 409).
     """
-    reject_jinja_statements(payload.body_text)
-    variables = extract_variable_paths(payload.body_text)
+    # Campaigns v1 Step 04 — sanitise HTML and resolve the body_text
+    # that will land on the row. body_html only accepted for Email
+    # (schema validator already rejected it for other channels).
+    body_html = sanitize_email_html(payload.body_html) if payload.body_html else None
+    body_text = _resolve_body_text(
+        provided_text=payload.body_text,
+        body_html=body_html,
+        fallback_auto=payload.body_text_fallback_auto,
+    )
+
+    reject_jinja_statements(body_text)
+    variables = extract_variable_paths(body_text)
+    if body_html:
+        # HTML placeholders are strings to the parser too; extending the
+        # variable list keeps the manifest complete for anything that
+        # only appears in the HTML branch (rare in practice).
+        for path in extract_variable_paths(body_html):
+            if path not in variables:
+                variables.append(path)
 
     template = data_access.add_template(
         session,
@@ -201,7 +242,9 @@ async def create_template(
             name=payload.name,
             category=payload.category,
             language=payload.language,
-            body_text=payload.body_text,
+            body_text=body_text,
+            body_html=body_html,
+            body_text_fallback_auto=payload.body_text_fallback_auto,
             subject=payload.subject,
             preview_text=payload.preview_text,
             variables=variables,
@@ -224,7 +267,8 @@ async def create_template(
             org_id=org_id,
             template_id=template.id,
             version=1,
-            body_text=payload.body_text,
+            body_text=body_text,
+            body_html=body_html,
             subject=payload.subject,
             variables=variables,
             changed_by_user_id=user_id,
@@ -264,7 +308,7 @@ async def update_template(
     if template.internal_status in _EDIT_LOCKED_STATUSES:
         raise TemplateLocked(template.internal_status.value)
 
-    # Coherence: subject + preview_text only valid for email.
+    # Coherence: subject + preview_text + body_html only valid for email.
     if template.channel != ConversationChannel.email:
         if payload.subject is not None:
             raise ValueError(
@@ -274,6 +318,11 @@ async def update_template(
         if payload.preview_text is not None:
             raise ValueError(
                 f"preview_text is only valid for email templates; "
+                f"this template's channel is {template.channel.value}"
+            )
+        if payload.body_html is not None:
+            raise ValueError(
+                f"body_html is only valid for email templates; "
                 f"this template's channel is {template.channel.value}"
             )
 
@@ -287,17 +336,57 @@ async def update_template(
     if payload.language is not None and payload.language != template.language:
         template.language = payload.language
         changed = True
+
+    # Campaigns v1 Step 04 — body_html edit, sanitised before persist.
+    if payload.body_html is not None:
+        new_html = sanitize_email_html(payload.body_html)
+        if new_html != template.body_html:
+            template.body_html = new_html
+            changed = True
+    if (
+        payload.body_text_fallback_auto is not None
+        and payload.body_text_fallback_auto != template.body_text_fallback_auto
+    ):
+        template.body_text_fallback_auto = payload.body_text_fallback_auto
+        changed = True
+
     if payload.body_text is not None and payload.body_text != template.body_text:
         reject_jinja_statements(payload.body_text)
         template.body_text = payload.body_text
-        template.variables = extract_variable_paths(payload.body_text)
         changed = True
+    elif (
+        payload.body_text is None
+        and payload.body_html is not None
+        and template.body_html is not None
+        and (template.body_text_fallback_auto if payload.body_text_fallback_auto is None
+             else payload.body_text_fallback_auto)
+    ):
+        # HTML was edited without an explicit text override — auto-derive
+        # the plain-text fallback so dispatch's multipart branch has a
+        # coherent pair.
+        derived = derive_plain_text(template.body_html or "")
+        if derived and derived != template.body_text:
+            reject_jinja_statements(derived)
+            template.body_text = derived
+            changed = True
+
     if payload.subject is not None and payload.subject != template.subject:
         template.subject = payload.subject
         changed = True
     if payload.preview_text is not None and payload.preview_text != template.preview_text:
         template.preview_text = payload.preview_text
         changed = True
+
+    # Rebuild the variable manifest across both bodies if anything body-
+    # related changed. Cheap; keeps the manifest coherent with either
+    # side of the edit.
+    if changed:
+        merged: list[str] = list(extract_variable_paths(template.body_text or ""))
+        if template.body_html:
+            for path in extract_variable_paths(template.body_html):
+                if path not in merged:
+                    merged.append(path)
+        template.variables = merged
 
     if not changed:
         return template
@@ -314,6 +403,7 @@ async def update_template(
             template_id=template.id,
             version=new_version,
             body_text=template.body_text,
+            body_html=template.body_html,
             subject=template.subject,
             variables=template.variables,
             changed_by_user_id=user_id,

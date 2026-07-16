@@ -27,6 +27,8 @@ function makeTemplate(overrides: Partial<TemplateRead> = {}): TemplateRead {
     category: 'marketing',
     language: 'en',
     body_text: 'Hi {{1}}',
+    body_html: null,
+    body_text_fallback_auto: true,
     subject: null,
     preview_text: null,
     variables: [],
@@ -464,6 +466,7 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
           sender_name: { setValue: (v: string | null) => void; value: string | null };
           subject: { setValue: (v: string | null) => void; value: string | null };
           preheader: { setValue: (v: string | null) => void; value: string | null };
+          body_html: { setValue: (v: string) => void; value: string };
         };
       };
     };
@@ -472,6 +475,7 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     cmp.form.controls.sender_name.setValue('Your Shop');
     cmp.form.controls.subject.setValue('July deals');
     cmp.form.controls.preheader.setValue('This month picks');
+    cmp.form.controls.body_html.setValue('<p>Hi</p>');
 
     cmp.form.controls.channel.setValue('whatsapp');
     fixture.detectChanges();
@@ -480,5 +484,85 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     expect(cmp.form.controls.sender_name.value).toBeNull();
     expect(cmp.form.controls.subject.value).toBeNull();
     expect(cmp.form.controls.preheader.value).toBeNull();
+    expect(cmp.form.controls.body_html.value).toBe('');
+  });
+
+  // --- Campaigns v1 Step 04 — inline HTML composer + payload routing ---
+
+  it('renders the HTML composer only when Email is picked and no template is selected', () => {
+    const fixture = makeFixture([], [makeEmailAccount()]);
+    const cmp = fixture.componentInstance as unknown as {
+      form: { controls: { channel: { setValue: (v: string) => void } } };
+      selectedTemplateId: { set: (v: string | null) => void };
+    };
+    // WhatsApp default — no composer.
+    expect(fixture.nativeElement.querySelector('app-html-composer')).toBeNull();
+
+    cmp.form.controls.channel.setValue('email');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-html-composer')).not.toBeNull();
+
+    // Selecting a template hides the composer — the template's HTML
+    // becomes the source of truth.
+    cmp.selectedTemplateId.set('tpl-1');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-html-composer')).toBeNull();
+  });
+
+  it('routes the payload through body_html when the operator authored inline HTML', () => {
+    const fixture = makeFixture([], [makeEmailAccount()]);
+    const cmp = fixture.componentInstance as unknown as {
+      form: {
+        controls: {
+          channel: { setValue: (v: string) => void };
+          name: { setValue: (v: string) => void };
+          email_account_id: { setValue: (v: string | null) => void };
+          sender_name: { setValue: (v: string | null) => void };
+          subject: { setValue: (v: string | null) => void };
+          body_html: { setValue: (v: string) => void };
+          template: { setValue: (v: string) => void };
+        };
+      };
+      save: () => void;
+    };
+    campaignsSpy.create.and.returnValue(
+      of({
+        id: 'c1',
+        org_id: 'org-1',
+        name: 'July newsletter',
+        channel: 'email',
+        audience_filter: {},
+        template: null,
+        template_id: null,
+        template_variables: null,
+        schedule_at: null,
+        email_account_id: 'acc-1',
+        sender_name: 'Your Shop',
+        reply_to: null,
+        subject: 'July deals',
+        preheader: null,
+        body_html: '<p>Hi</p>',
+        status: 'draft',
+        created_by_id: null,
+        created_at: '2026-07-16T00:00:00Z',
+      } as never),
+    );
+    cmp.form.controls.channel.setValue('email');
+    cmp.form.controls.name.setValue('July newsletter');
+    cmp.form.controls.email_account_id.setValue('acc-1');
+    cmp.form.controls.sender_name.setValue('Your Shop');
+    cmp.form.controls.subject.setValue('July deals');
+    cmp.form.controls.body_html.setValue('<p>Hi {{first_name}}</p>');
+    // The free-text `template` also has a value — the composer's
+    // HTML wins per the exactly-one-source guard on the backend.
+    cmp.form.controls.template.setValue('Fallback plain text');
+    fixture.detectChanges();
+
+    cmp.save();
+    expect(campaignsSpy.create).toHaveBeenCalled();
+    const payload = campaignsSpy.create.calls.mostRecent().args[0];
+    expect(payload.body_html).toBe('<p>Hi {{first_name}}</p>');
+    expect(payload.template).toBeNull();
+    expect(payload.template_id).toBeNull();
   });
 });

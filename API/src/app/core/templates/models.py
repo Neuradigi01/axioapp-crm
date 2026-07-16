@@ -33,6 +33,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     Index,
@@ -184,6 +185,20 @@ class MessageTemplate(Base, TenantScoped):
         server_default=sql_text("'en'"),
     )
     body_text: Mapped[str] = mapped_column(Text, nullable=False)
+    # Campaigns v1 Step 04 — HTML body for Email templates. Sanitised
+    # by :mod:`core.templates.sanitizer` on every write. NULL for
+    # non-Email channels; kept nullable on Email too so a text-only
+    # template still round-trips through the schema layer.
+    body_html: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # When true, dispatch (Step 05) auto-derives ``body_text`` from
+    # ``body_html`` for the Gmail multipart fallback when the user
+    # left ``body_text`` empty. When false, the operator explicitly
+    # authored both halves and dispatch uses them verbatim.
+    body_text_fallback_auto: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=sql_text("true"),
+    )
     # Email-only — null for every other channel. Push title repurposes
     # this column with a UI label of "Title" (decided in Step 13). The
     # 998-char ceiling matches RFC 5322 subject-line max; push truncates
@@ -253,6 +268,10 @@ class MessageTemplateVersion(Base, TenantScoped):
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     body_text: Mapped[str] = mapped_column(Text, nullable=False)
+    # Campaigns v1 Step 04 — HTML body snapshot per version (mirrors
+    # the parent's ``body_html``). NULL for non-Email + for legacy
+    # rows created before the migration.
+    body_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     subject: Mapped[str | None] = mapped_column(String(998), nullable=True)
     variables: Mapped[list[Any]] = mapped_column(
         JSONB, nullable=False, server_default=sql_text("'[]'::jsonb")

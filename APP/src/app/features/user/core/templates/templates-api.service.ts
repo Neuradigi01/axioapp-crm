@@ -33,6 +33,13 @@ export interface TemplateRead {
   category: TemplateCategory;
   language: string;
   body_text: string;
+  /** Campaigns v1 Step 04 — HTML body for Email templates. Null for
+   *  every other channel and for Email templates that only ship
+   *  plain text. Sanitised server-side on every write. */
+  body_html: string | null;
+  /** When true, dispatch (Step 05) derives the plain-text fallback
+   *  from ``body_html`` if ``body_text`` was left empty. */
+  body_text_fallback_auto: boolean;
   subject: string | null;
   preview_text: string | null;
   variables: string[];
@@ -96,7 +103,14 @@ export interface TemplateCreatePayload {
   channel: TemplateChannel;
   category?: TemplateCategory;
   language?: string;
-  body_text: string;
+  /** Optional when `channel === 'email'` AND `body_html` is provided —
+   *  the backend derives the plain-text fallback via
+   *  ``body_text_fallback_auto``. Required for every other channel. */
+  body_text?: string | null;
+  /** Campaigns v1 Step 04 — HTML body for Email templates. Only
+   *  accepted when `channel === 'email'`. Sanitised on the server. */
+  body_html?: string | null;
+  body_text_fallback_auto?: boolean;
   subject?: string | null;
   preview_text?: string | null;
 }
@@ -106,6 +120,10 @@ export interface TemplateUpdatePayload {
   category?: TemplateCategory;
   language?: string;
   body_text?: string;
+  /** Campaigns v1 Step 04 — HTML body edit; only meaningful when the
+   *  underlying template is on the Email channel. */
+  body_html?: string | null;
+  body_text_fallback_auto?: boolean | null;
   subject?: string | null;
   preview_text?: string | null;
   change_note?: string | null;
