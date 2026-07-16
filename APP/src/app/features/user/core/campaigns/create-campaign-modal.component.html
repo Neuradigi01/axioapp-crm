@@ -227,6 +227,31 @@
            reset when the operator switches away, so nothing leaks onto
            a WhatsApp payload. -->
       @if (isEmailChannel()) {
+        @if (orgAddressMissing()) {
+          <div
+            class="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"
+          >
+            <lucide-icon
+              name="alert-triangle"
+              size="14"
+              class="mt-0.5 shrink-0"
+              aria-hidden="true"
+            ></lucide-icon>
+            <span class="flex-1">
+              Your organisation has no physical address configured. CAN-SPAM and DPDP require it on
+              every marketing email — <strong>Start will fail</strong> until you add one.
+              <a
+                routerLink="/user/settings"
+                [queryParams]="{ tab: 'store' }"
+                class="font-medium underline"
+              >
+                Open Settings → Store Profile
+              </a>
+              to fix.
+            </span>
+          </div>
+        }
+
         <fieldset class="rounded-md border border-zinc-200 p-3 space-y-3">
           <legend class="px-1 text-xs font-medium text-zinc-600">Email sender identity</legend>
 

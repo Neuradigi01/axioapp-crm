@@ -284,6 +284,194 @@ async def _suppress_bounced_contacts(
     return keep, excluded
 
 
+async def check_readiness(
+    session: AsyncSession,
+    *,
+    campaign_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Campaigns v1 Step 07c — pre-flight readiness inspector.
+
+    Returns a structured report the wizard + list-page Start button
+    surface BEFORE calling ``enqueue``, so the operator learns about
+    the "org has no postal address" / "audience has 0 eligible
+    contacts" gaps up-front instead of watching every queued message
+    fail during dispatch.
+
+    Shape::
+
+        {
+            "campaign_id": ...,
+            "channel": "whatsapp" | "email",
+            "audience_size": N,
+            "eligible_count": N,       # audience minus opt-out / bounced / no-email
+            "excluded_opted_out": N,
+            "excluded_no_email": N,    # Email only
+            "excluded_bounced": N,     # Email only, hard/complaint bounces
+            "blockers": [{"code": ..., "message": ...}],
+            "warnings": [{"code": ..., "message": ...}],
+        }
+
+    A non-empty ``blockers`` list means ``enqueue`` will 400; the
+    wizard uses this to disable the Start button + link the user to
+    the fix (Settings → Store Profile / Sender Setup / Email Accounts).
+    """
+    from sqlalchemy import select
+
+    from src.app.core.email.tracking import footer as tracking_footer
+    from src.app.core.settings.models import OrgSettings
+
+    campaign = await get_campaign(session, campaign_id)
+    is_email = campaign.channel == ConversationChannel.email
+
+    blockers: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
+
+    # Audience resolution — same call ``enqueue`` uses, so the count
+    # the wizard shows matches what the start endpoint acts on.
+    contact_ids = await resolve_audience(
+        session, audience_filter=campaign.audience_filter
+    )
+    audience_size = len(contact_ids)
+
+    excluded_opted_out = 0
+    excluded_no_email = 0
+    excluded_bounced = 0
+    eligible = audience_size
+
+    if audience_size == 0:
+        blockers.append(
+            {
+                "code": "empty_audience",
+                "message": (
+                    "The audience filter resolves to zero contacts. "
+                    "Widen the filter or pick a different saved group."
+                ),
+            }
+        )
+
+    if is_email:
+        # --- Store Profile postal address (CAN-SPAM) ---------------
+        org_settings = (
+            await session.execute(
+                select(OrgSettings).where(OrgSettings.org_id == campaign.org_id)
+            )
+        ).scalar_one_or_none()
+        if not tracking_footer.has_required_address(org_settings):
+            blockers.append(
+                {
+                    "code": "missing_postal_address",
+                    "message": (
+                        "Your organisation has no physical address configured. "
+                        "Add one in Settings → Store Profile before sending — "
+                        "CAN-SPAM and DPDP both require it on every marketing "
+                        "email."
+                    ),
+                }
+            )
+
+        # --- Mailbox + domain readiness ----------------------------
+        # ``_check_email_sender_readiness`` raises for hard blockers and
+        # returns warnings for soft degradations. Wrap the raise into a
+        # structured blocker instead so the endpoint stays 200.
+        try:
+            email_warnings = await _check_email_sender_readiness(
+                session, campaign=campaign
+            )
+            for note in email_warnings:
+                warnings.append({"code": "email_sender_degraded", "message": note})
+        except HTTPException as exc:  # already 400 with a friendly detail
+            blockers.append(
+                {
+                    "code": "email_sender_block",
+                    "message": str(exc.detail),
+                }
+            )
+
+        # --- Audience eligibility (opt-out / no email / bounces) ----
+        if audience_size:
+            from src.app.core.campaigns.send_guard import evaluate_email_contact
+
+            contacts_rows = (
+                await session.execute(
+                    select(
+                        Contact.id,
+                        Contact.email,
+                        Contact.email_opt_out,
+                        Contact.email_opt_in_status,
+                    ).where(Contact.id.in_(contact_ids))
+                )
+            ).all()
+
+            allowed_ids: list[uuid.UUID] = []
+            for row in contacts_rows:
+                _cid, email, opt_out, opt_status = row
+                if not email:
+                    excluded_no_email += 1
+                    continue
+                # Mirror dispatch's ``allow_implicit=True`` so the count
+                # matches what dispatch would keep.
+
+                class _StubContact:
+                    email_opt_out = opt_out
+                    email_opt_in_status = opt_status
+
+                decision = evaluate_email_contact(
+                    _StubContact(), allow_implicit=True
+                )
+                if decision.verdict == "block":
+                    excluded_opted_out += 1
+                else:
+                    allowed_ids.append(_cid)
+
+            # Bounce suppression, same helper enqueue calls. Cheap: one
+            # bulk `IN(...)` query against the hard-bounce set.
+            _, excluded_bounced = await _suppress_bounced_contacts(
+                session, campaign=campaign, contact_ids=allowed_ids
+            )
+            eligible = audience_size - excluded_no_email - excluded_opted_out - excluded_bounced
+
+            if eligible == 0 and audience_size > 0:
+                blockers.append(
+                    {
+                        "code": "no_eligible_contacts",
+                        "message": (
+                            f"None of the {audience_size} audience contacts "
+                            "can receive this email — every recipient is "
+                            "opted-out, missing an email address, or on the "
+                            "bounce list. Fix the filter or opt-in state "
+                            "before sending."
+                        ),
+                    }
+                )
+
+    # A/B minimum-audience guard mirrors the enqueue check so the
+    # wizard warns the operator before Start.
+    if campaign.is_ab_test and eligible < 50:
+        blockers.append(
+            {
+                "code": "ab_audience_too_small",
+                "message": (
+                    f"A/B campaigns need at least 50 eligible recipients "
+                    f"to keep the winner metric meaningful. This audience "
+                    f"has {eligible}. Reduce the A/B toggle or widen "
+                    "the filter."
+                ),
+            }
+        )
+
+    return {
+        "campaign_id": campaign.id,
+        "channel": campaign.channel.value,
+        "audience_size": audience_size,
+        "eligible_count": max(0, eligible),
+        "excluded_opted_out": excluded_opted_out,
+        "excluded_no_email": excluded_no_email,
+        "excluded_bounced": excluded_bounced,
+        "blockers": blockers,
+        "warnings": warnings,
+    }
+
+
 async def _validate_template_channel_match(
     session: AsyncSession,
     *,
@@ -598,9 +786,34 @@ async def enqueue(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str,
     # ``_resolve_email_sender``); here we cross-check the mailbox's
     # domain against the sender-setup registry so an unverified
     # domain either warns (default) or hard-blocks (per-org flag).
-    email_warnings: list[str] = []
+    # Campaigns v1 Step 07c — additionally block on missing postal
+    # address (CAN-SPAM) so the operator sees one clear error before
+    # every message fails inside ``send_email``.
     if campaign.channel == ConversationChannel.email:
-        email_warnings = await _check_email_sender_readiness(session, campaign=campaign)
+        from sqlalchemy import select as _select
+
+        from src.app.core.email.tracking import footer as tracking_footer
+        from src.app.core.settings.models import OrgSettings
+
+        # Raise-only pre-flight — the returned warnings list stays
+        # unused here (dispatch surfaces them per-message today; the
+        # readiness endpoint is the structured surface).
+        await _check_email_sender_readiness(session, campaign=campaign)
+        org_settings = (
+            await session.execute(
+                _select(OrgSettings).where(OrgSettings.org_id == campaign.org_id)
+            )
+        ).scalar_one_or_none()
+        if not tracking_footer.has_required_address(org_settings):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Your organisation has no physical address configured. "
+                    "Add one in Settings → Store Profile before sending — "
+                    "CAN-SPAM and DPDP both require it on every marketing "
+                    "email."
+                ),
+            )
 
     contact_ids = await resolve_audience(session, audience_filter=campaign.audience_filter)
 

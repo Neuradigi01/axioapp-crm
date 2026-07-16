@@ -31,6 +31,7 @@ import {
   WhatsAppCapacity,
 } from '../settings/integrations/integrations-api.service';
 import { EmailAccount, EmailAccountsApiService } from '../services/email-accounts-api.service';
+import { OrgSettings, SettingsApiService } from '../settings/settings-api.service';
 import {
   AudienceFilter,
   Campaign,
@@ -152,6 +153,7 @@ export class CreateCampaignModalComponent {
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly groupsApi = inject(ContactGroupsApiService);
   private readonly emailAccountsApi = inject(EmailAccountsApiService);
+  private readonly settingsApi = inject(SettingsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   @Output() readonly created = new EventEmitter<Campaign>();
@@ -268,6 +270,19 @@ export class CreateCampaignModalComponent {
    *  empty-state banner in the template). */
   protected readonly emailAccounts = signal<EmailAccount[] | null>(null);
   protected readonly emailAccountsLoading = signal(false);
+
+  /** Campaigns v1 Step 07c — proactive CAN-SPAM check. Populated on
+   *  first Email-channel flip; ``false`` here means the operator hasn't
+   *  set Store Profile → address_line1, which will hard-block Start.
+   *  Rendered as a red banner with a link to Settings → Store Profile
+   *  so they can fix it without reading a raw 400 later. */
+  protected readonly orgSettings = signal<OrgSettings | null>(null);
+  protected readonly orgSettingsLoading = signal(false);
+  protected readonly orgAddressMissing = computed<boolean>(() => {
+    const s = this.orgSettings();
+    if (s === null) return false; // unknown → don't scare the user
+    return !(s.address_line1 && s.address_line1.trim().length > 0);
+  });
 
   /** Merge tags the operator can insert into the Subject line via the
    *  "Insert variable ▾" affordance. Named-variable syntax matching the
@@ -392,6 +407,9 @@ export class CreateCampaignModalComponent {
         if (channel === 'email') {
           if (this.emailAccounts() === null) {
             this._loadEmailAccounts();
+          }
+          if (this.orgSettings() === null) {
+            this._loadOrgSettings();
           }
           // A/B testing + Send-From are WhatsApp-only knobs. Clear any
           // toggle the operator left on before flipping to Email so the
@@ -531,6 +549,20 @@ export class CreateCampaignModalComponent {
       .subscribe((rows) => {
         this.emailAccounts.set(rows);
         this.emailAccountsLoading.set(false);
+      });
+  }
+
+  private _loadOrgSettings(): void {
+    this.orgSettingsLoading.set(true);
+    this.settingsApi
+      .get()
+      .pipe(
+        catchError(() => of<OrgSettings | null>(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((row) => {
+        this.orgSettings.set(row);
+        this.orgSettingsLoading.set(false);
       });
   }
 

@@ -27,11 +27,13 @@ from src.app.core.campaigns.schemas import (
     CampaignListResponse,
     CampaignMessageOut,
     CampaignOut,
+    CampaignReadinessOut,
     CampaignStartResponse,
     CampaignStatsOut,
     CampaignUpdate,
 )
 from src.app.core.campaigns.service import (
+    check_readiness,
     create_campaign,
     delete_campaign,
     enqueue,
@@ -115,6 +117,25 @@ async def start_endpoint(
 ) -> CampaignStartResponse:
     result = await enqueue(db, campaign_id=campaign_id)
     return CampaignStartResponse(**result)
+
+
+@router.get("/{campaign_id}/readiness", response_model=CampaignReadinessOut)
+async def readiness_endpoint(
+    campaign_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("campaigns.read")),
+) -> CampaignReadinessOut:
+    """Campaigns v1 Step 07c — pre-flight the Start action.
+
+    Side-effect-free inspection of everything ``enqueue`` would 400 on
+    (missing postal address, disconnected mailbox, unverified domain
+    with strict flag, zero eligible contacts) plus a count of contacts
+    dispatch will skip (opted-out, no email, hard-bounced). The wizard
+    disables Save-and-Start when ``blockers`` is non-empty; the list
+    page renders the first blocker in a toast.
+    """
+    result = await check_readiness(db, campaign_id=campaign_id)
+    return CampaignReadinessOut(**result)
 
 
 @router.get("/{campaign_id}/stats", response_model=CampaignStatsOut)

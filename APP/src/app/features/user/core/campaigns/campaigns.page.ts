@@ -233,18 +233,40 @@ export class CampaignsPageComponent {
   }
 
   protected start(c: Campaign): void {
+    // Campaigns v1 Step 07c — run the readiness pre-flight before
+    // firing the actual start. Non-empty ``blockers`` means the backend
+    // ``enqueue`` will 400 anyway; surface the first blocker as a clear
+    // banner + link the user at Store Profile / Sender Setup rather
+    // than dumping the raw 400 detail on them.
     this.busyId.set(c.id);
+    this.loadError.set(null);
     this.api
-      .start(c.id)
+      .readiness(c.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
-          this.busyId.set(null);
-          this.reload();
+        next: (readiness) => {
+          if (readiness.blockers.length > 0) {
+            this.busyId.set(null);
+            this.loadError.set(readiness.blockers[0].message);
+            return;
+          }
+          this.api
+            .start(c.id)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+              next: () => {
+                this.busyId.set(null);
+                this.reload();
+              },
+              error: (err: HttpErrorResponse) => {
+                this.busyId.set(null);
+                this.loadError.set(extractApiError(err) ?? 'Could not start campaign.');
+              },
+            });
         },
         error: (err: HttpErrorResponse) => {
           this.busyId.set(null);
-          this.loadError.set(extractApiError(err) ?? 'Could not start campaign.');
+          this.loadError.set(extractApiError(err) ?? 'Could not check readiness.');
         },
       });
   }

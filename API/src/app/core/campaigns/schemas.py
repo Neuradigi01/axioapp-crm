@@ -274,3 +274,26 @@ class CampaignStartResponse(BaseModel):
     audience_size: int
     chunks_enqueued: int
     scheduled_at: datetime | None
+
+
+class CampaignReadinessItem(BaseModel):
+    """One blocker or warning surfaced by the readiness pre-flight."""
+
+    code: str
+    message: str
+
+
+class CampaignReadinessOut(BaseModel):
+    """Campaigns v1 Step 07c — structured pre-flight for the Start
+    button. The wizard + list-page consume this to render red / amber
+    banners with fix-links before firing the actual ``/start`` call."""
+
+    campaign_id: uuid.UUID
+    channel: str
+    audience_size: int
+    eligible_count: int
+    excluded_opted_out: int = 0
+    excluded_no_email: int = 0
+    excluded_bounced: int = 0
+    blockers: list[CampaignReadinessItem] = []
+    warnings: list[CampaignReadinessItem] = []

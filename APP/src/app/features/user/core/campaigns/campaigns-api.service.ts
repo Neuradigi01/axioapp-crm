@@ -134,6 +134,28 @@ export interface CampaignStartResponse {
   scheduled_at: string | null;
 }
 
+/** One blocker / warning surfaced by the readiness pre-flight. */
+export interface CampaignReadinessItem {
+  code: string;
+  message: string;
+}
+
+/** Campaigns v1 Step 07c — structured pre-flight for the Start button.
+ *  Blockers = the same set of errors ``POST /start`` would 400 with;
+ *  warnings = soft degradations (unverified DKIM etc.) the operator
+ *  can still Start through. */
+export interface CampaignReadiness {
+  campaign_id: string;
+  channel: string;
+  audience_size: number;
+  eligible_count: number;
+  excluded_opted_out: number;
+  excluded_no_email: number;
+  excluded_bounced: number;
+  blockers: CampaignReadinessItem[];
+  warnings: CampaignReadinessItem[];
+}
+
 export interface CampaignStats {
   campaign_id: string;
   status: CampaignStatus;
@@ -192,6 +214,10 @@ export class CampaignsApiService extends BaseCrudApiService<
 
   start(id: string): Observable<CampaignStartResponse> {
     return this.http.post<CampaignStartResponse>(`${this.base}/${id}/start`, {});
+  }
+
+  readiness(id: string): Observable<CampaignReadiness> {
+    return this.http.get<CampaignReadiness>(`${this.base}/${id}/readiness`);
   }
 
   stats(id: string): Observable<CampaignStats> {
