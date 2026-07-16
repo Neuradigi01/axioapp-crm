@@ -66,6 +66,41 @@ _opt_in_source_enum = ENUM(
     create_type=False,
 )
 
+# Campaigns v1 Step 06 — Email opt-in mirror of the WA state machine.
+# GDPR requires an explicit consent record so we distinguish
+# never_contacted (silent default) from implicit (first inbound-derived)
+# from opted_in (explicit affirmative capture). Sources include the
+# WA-side surfaces plus ``email_unsubscribe_link`` (footer clicks) +
+# ``bounce_hard`` (auto-suppression) + ``manual_override`` (CRM-side
+# toggle by an operator).
+EMAIL_OPT_IN_STATUSES: tuple[str, ...] = (
+    "never_contacted",
+    "implicit",
+    "opted_in",
+    "opted_out",
+)
+EMAIL_OPT_IN_SOURCES: tuple[str, ...] = (
+    "form_widget",
+    "bulk_import",
+    "manual_entry",
+    "inbound_first_message",
+    "explicit_opt_in_link",
+    "email_unsubscribe_link",
+    "bounce_hard",
+    "manual_override",
+)
+
+_email_opt_in_status_enum = ENUM(
+    *EMAIL_OPT_IN_STATUSES,
+    name="email_opt_in_status",
+    create_type=False,
+)
+_email_opt_in_source_enum = ENUM(
+    *EMAIL_OPT_IN_SOURCES,
+    name="email_opt_in_source",
+    create_type=False,
+)
+
 
 class Contact(Base, TenantScoped):
     __tablename__ = "tbl_contacts"
@@ -125,6 +160,25 @@ class Contact(Base, TenantScoped):
         server_default=text("false"),
     )
     email_opt_out_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    # Campaigns v1 Step 06 — GDPR-aligned Email opt-in tri-state. The
+    # legacy `email_opt_out` boolean stays as a fast-path shortcut for
+    # `send_email` (already-installed OptedOut gate); ``email_opt_in_status``
+    # is the audit-friendly source of truth that campaigns' send guard
+    # + the Contact-detail badge read from. Migration 0154 seeds
+    # ``opted_out`` for every legacy `email_opt_out=true` row.
+    email_opt_in_status: Mapped[str] = mapped_column(
+        _email_opt_in_status_enum,
+        nullable=False,
+        server_default=text("'never_contacted'"),
+    )
+    email_opt_in_source: Mapped[str | None] = mapped_column(
+        _email_opt_in_source_enum,
+        nullable=True,
+    )
+    email_opt_in_recorded_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

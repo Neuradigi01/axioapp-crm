@@ -215,7 +215,15 @@
                 </div>
                 <div class="flex justify-between gap-3">
                   <dt class="text-zinc-500">Email</dt>
-                  <dd class="text-zinc-900">{{ c.email ?? '—' }}</dd>
+                  <dd class="flex items-center gap-2 text-zinc-900">
+                    <span>{{ c.email ?? '—' }}</span>
+                    <!-- Campaigns v1 Step 06 — Email opt-in badge. Same
+                         chip component as the WA one so palette + a11y
+                         stay identical; only the tooltip changes. -->
+                    @if (c.email && c.email_opt_in_status) {
+                      <app-opt-in-chip [status]="c.email_opt_in_status" channel="email" />
+                    }
+                  </dd>
                 </div>
                 <div class="flex justify-between gap-3">
                   <dt class="text-zinc-500">Source</dt>

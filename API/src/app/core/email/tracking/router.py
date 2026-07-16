@@ -246,6 +246,17 @@ async def _opt_out_contact(
                 now = datetime.now(UTC)
                 contact.email_opt_out = True
                 contact.email_opt_out_at = now
+                # Campaigns v1 Step 06 — flip the tri-state opt-in
+                # alongside the legacy boolean so the Contact-detail
+                # badge + the campaign send guard both see the change
+                # immediately. Set-once source stamp so a re-hit of
+                # the endpoint doesn't overwrite the original
+                # attribution (e.g. later manual override).
+                contact.email_opt_in_status = "opted_out"
+                if contact.email_opt_in_recorded_at is None:
+                    contact.email_opt_in_recorded_at = now
+                if contact.email_opt_in_source is None:
+                    contact.email_opt_in_source = "email_unsubscribe_link"
 
                 # Cancel active or paused-on-reply enrollments for this
                 # contact. Manual-paused enrollments are NOT auto-
@@ -413,6 +424,39 @@ async def unsubscribe_endpoint(token: str, request: Request) -> HTMLResponse:
     if not success:
         return HTMLResponse(content=_UNSUB_INVALID, status_code=200)
     return HTMLResponse(content=_UNSUB_OK, status_code=200)
+
+
+@router.post("/unsubscribe/{token}")
+async def unsubscribe_one_click_endpoint(token: str, request: Request) -> Response:
+    """Campaigns v1 Step 06 — RFC 8058 one-click unsubscribe.
+
+    Gmail's ``List-Unsubscribe-Post: List-Unsubscribe=One-Click`` header
+    tells the receiving mail client it can POST to the unsubscribe URL
+    (with an empty body) to opt out — the recipient never leaves the
+    inbox, and the sender is required to honour the request without any
+    further interaction. Same DB flip as the GET handler; response is an
+    empty 200 per the RFC (Gmail ignores the body).
+    """
+    _check_rate_limit(request)
+    payload = decode(token)
+    if payload is None or payload.get("kind") != "u":
+        # RFC 8058 §2: any response other than 2xx is a signal that
+        # the request failed, and Gmail will re-surface the ordinary
+        # unsubscribe button. 200 empty on a bad token would falsely
+        # confirm — 404 is the honest signal.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not found.",
+        )
+    message_id = payload["message_id"]
+    assert isinstance(message_id, uuid.UUID)
+    success, _contact_id = await _opt_out_contact(request, message_id=message_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not found.",
+        )
+    return Response(status_code=status.HTTP_200_OK)
 
 
 __all__ = ["router"]

@@ -880,7 +880,30 @@ async def dispatch_chunk(
             assert email_account is not None  # noqa: S101 — pre-loaded above
             from fastapi import HTTPException as _HTTPExc
 
+            from src.app.core.campaigns.send_guard import (
+                block_reason as _block_reason,
+            )
+            from src.app.core.campaigns.send_guard import (
+                evaluate_email_contact,
+            )
             from src.app.core.conversations.adapters.email import send_email
+
+            # Campaigns v1 Step 06 — Email opt-in guard, mirroring the
+            # WA-side check. ``allow_implicit=True`` matches the WA
+            # behaviour (the modal collected the operator's
+            # confirmation flag; we default the same way here until a
+            # dedicated Email consent toggle ships). Opted-out contacts
+            # are always blocked regardless.
+            email_decision = evaluate_email_contact(contact, allow_implicit=True)
+            if email_decision.should_block:
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error=_block_reason(email_decision),
+                )
+                continue
 
             # Resolve the subject + both body halves, substituting merge
             # tags per contact. Template-backed campaigns use the

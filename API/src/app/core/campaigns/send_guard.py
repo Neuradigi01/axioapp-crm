@@ -117,6 +117,61 @@ def evaluate_contact(
     return SendDecision(verdict="allow", status=status_value, reason=None)
 
 
+def evaluate_email_contact(
+    contact: Any,
+    *,
+    allow_implicit: bool = False,
+) -> SendDecision:
+    """Campaigns v1 Step 06 — Email opt-in check.
+
+    Mirrors :func:`evaluate_contact` but reads ``email_opt_in_status``
+    instead of ``whatsapp_opt_in_status``. Same DPDP-conservative
+    semantics: ``opted_out`` blocks everything (marketing AND
+    transactional), ``never_contacted`` blocks unless the operator
+    confirmed ``allow_implicit`` on the modal, ``implicit`` warns +
+    proceeds when explicitly allowed, ``opted_in`` sails through.
+
+    The legacy ``email_opt_out`` boolean is honoured as a shortcut:
+    a true value short-circuits to a block regardless of the enum
+    value (defence-in-depth for the pre-Step-06 rows that never
+    ran through migration 0154).
+    """
+    if getattr(contact, "email_opt_out", False):
+        return SendDecision(
+            verdict="block",
+            status="opted_out",
+            reason="contact has opted out of Email",
+        )
+
+    status_value = getattr(contact, "email_opt_in_status", None) or "never_contacted"
+
+    if status_value == "opted_out":
+        return SendDecision(
+            verdict="block",
+            status=status_value,
+            reason="contact has opted out of Email",
+        )
+
+    if status_value == "never_contacted":
+        if allow_implicit:
+            return SendDecision(verdict="allow", status=status_value, reason=None)
+        return SendDecision(
+            verdict="block",
+            status=status_value,
+            reason="contact has no Email opt-in record",
+        )
+
+    if status_value == "implicit":
+        return SendDecision(
+            verdict="warn" if not allow_implicit else "allow",
+            status=status_value,
+            reason=None,
+        )
+
+    # opted_in — clean.
+    return SendDecision(verdict="allow", status=status_value, reason=None)
+
+
 def block_reason(decision: SendDecision) -> str:
     """Friendly error string for the failed-message row. Matches
     Step 21's failure classifier so the dashboard bucket is
@@ -124,4 +179,10 @@ def block_reason(decision: SendDecision) -> str:
     return decision.reason or f"send blocked: contact status={decision.status}"
 
 
-__all__ = ["SendDecision", "SendVerdict", "block_reason", "evaluate_contact"]
+__all__ = [
+    "SendDecision",
+    "SendVerdict",
+    "block_reason",
+    "evaluate_contact",
+    "evaluate_email_contact",
+]
