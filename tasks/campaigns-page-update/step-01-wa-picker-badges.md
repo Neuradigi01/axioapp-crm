@@ -2,7 +2,7 @@
 
 **Goal:** In the campaign create modal's template picker, every WhatsApp row shows an inline approval-status badge, its category (Marketing / Utility / Authentication), and its language. Non-approved rows are visually disabled and cannot be selected.
 **Track:** Campaigns page update — WhatsApp UX
-**Status:** Pending
+**Status:** COMPLETED — modal picker rebuilt as a stacked listbox; every row renders name + `<template-status-badge>` (WA only) + `Category · lang · body preview` subtitle; non-approved WA rows are DOM-disabled + a11y-marked; A/B section auto-refilters to approved-only. Prettier + eslint + `tsc --noEmit` clean. Spec updated (three new tests: three-status render, click no-op for pending/rejected, non-WA no badge). Browser smoke on Ajay's Workspace still pending human eyeball.
 **Depends on:** none (backend fields already exist)
 
 Screen reference: **Screen 3 · Create Campaign — WhatsApp** in [`preview.html`](preview.html) — the picker with per-row `● Approved` / `● Pending review` / `● Rejected` badges plus `Marketing · en_US` labels underneath the template name.

@@ -37,11 +37,14 @@ import {
   TemplateVariableBinding,
 } from './campaigns-api.service';
 import {
+  TemplateCategory,
   TemplateChannel,
+  TemplateExternalStatus,
   TemplateListQuery,
   TemplateRead,
   TemplatesApiService,
 } from '../templates/templates-api.service';
+import { TemplateStatusBadgeComponent } from '../templates/template-status-badge.component';
 
 /**
  * Step 15 — local picker row. Both the WhatsApp and non-WhatsApp
@@ -49,6 +52,10 @@ import {
  * unchanged after the central-library swap. Body lives on `body`
  * (mapped from the central row's ``body_text``); WA's ``{{n}}``
  * positional placeholders are detected from this same field.
+ *
+ * Campaigns v1 Step 01 — carry `category`, `language`, and
+ * `externalStatus` so the picker can render badges + a subtitle line
+ * and disable non-approved WA rows without another lookup.
  */
 interface PickerRow {
   id: string;
@@ -56,6 +63,9 @@ interface PickerRow {
   body: string;
   channel: ConversationChannel;
   subject: string | null;
+  category: TemplateCategory;
+  language: string;
+  externalStatus: TemplateExternalStatus;
 }
 
 function toPickerRow(row: TemplateRead): PickerRow {
@@ -65,8 +75,17 @@ function toPickerRow(row: TemplateRead): PickerRow {
     body: row.body_text,
     channel: row.channel as ConversationChannel,
     subject: row.subject,
+    category: row.category,
+    language: row.language,
+    externalStatus: row.external_status,
   };
 }
+
+const CATEGORY_LABEL: Record<TemplateCategory, string> = {
+  marketing: 'Marketing',
+  transactional: 'Transactional',
+  service: 'Service',
+};
 
 /** Step 15 — the campaign channel set includes ``'web'`` for the
  *  embedded web widget; the central template library doesn't carry
@@ -114,6 +133,7 @@ const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<Conversatio
     LucideAngularModule,
     SendFromPickerComponent,
     AbTestSectionComponent,
+    TemplateStatusBadgeComponent,
   ],
   templateUrl: './create-campaign-modal.component.html',
 })
@@ -172,12 +192,43 @@ export class CreateCampaignModalComponent {
    *  only if the modal is re-mounted. */
   private readonly templatesCache = new Map<ConversationChannel, PickerRow[]>();
 
-  /** Slim id+name projection for the A/B section's template dropdowns. */
+  /** Slim id+name projection for the A/B section's template dropdowns.
+   *  WhatsApp: only offer approved templates. Since Step 01 broadened
+   *  the picker query to include pending/rejected rows (so users see
+   *  status inline), the A/B dropdowns must re-filter — the server
+   *  would reject a pending/rejected variant anyway. */
   protected approvedTemplatesForPicker(): Array<{
     id: string;
     name: string;
   }> {
-    return this.templates().map((t) => ({ id: t.id, name: t.name }));
+    return this.templates()
+      .filter((t) => (t.channel === 'whatsapp' ? t.externalStatus === 'approved' : true))
+      .map((t) => ({ id: t.id, name: t.name }));
+  }
+
+  /** WA picker row is selectable only when Meta has approved it.
+   *  Non-WA channels have no external review — every published row
+   *  is selectable. */
+  protected isRowSelectable(row: PickerRow): boolean {
+    if (row.channel !== 'whatsapp') return true;
+    return row.externalStatus === 'approved';
+  }
+
+  /** Subtitle line under the template name: `Category · lang · body preview`.
+   *  Body clipped to ~80 chars so long templates don't blow the row height. */
+  protected rowSubtitle(row: PickerRow): string {
+    const category = CATEGORY_LABEL[row.category] ?? row.category;
+    const preview = (row.body ?? '').replace(/\s+/g, ' ').trim();
+    const clipped = preview.length > 80 ? preview.slice(0, 77) + '…' : preview;
+    const language = row.language || '—';
+    return clipped ? `${category} · ${language} · ${clipped}` : `${category} · ${language}`;
+  }
+
+  /** Click handler for a picker row. Non-selectable rows (pending /
+   *  rejected WA) are a hard no-op — no selection change, no error. */
+  protected onRowClick(row: PickerRow): void {
+    if (!this.isRowSelectable(row)) return;
+    this.selectedTemplateId.set(row.id);
   }
   protected readonly templatesLoading = signal(false);
   protected readonly templatesLoaded = signal(false);
@@ -454,10 +505,13 @@ export class CreateCampaignModalComponent {
     });
   }
 
-  /** Step 15 — channel-aware central-library load. WhatsApp templates
-   *  also filter on `external_status=approved` so Meta-rejected /
-   *  pending rows don't show up; every other channel only checks
-   *  `internal_status=published` (no external approval pipeline). */
+  /** Step 15 — channel-aware central-library load. Campaigns v1 Step 01
+   *  broadened the WhatsApp query: instead of pre-filtering to
+   *  `external_status=approved`, we now fetch every published WA
+   *  template (approved, pending, rejected) so the picker can show
+   *  status + rejection reason inline and the operator understands
+   *  why a template can't be selected. Non-approved rows render
+   *  disabled — see `isRowSelectable`. */
   private _loadTemplates(channel: ConversationChannel): void {
     const cached = this.templatesCache.get(channel);
     if (cached) {
@@ -484,9 +538,6 @@ export class CreateCampaignModalComponent {
       internal_status: 'published',
       limit: 200,
     };
-    if (channel === 'whatsapp') {
-      filter.external_status = 'approved';
-    }
     this.templatesApi
       .list(filter)
       .pipe(takeUntilDestroyed(this.destroyRef))

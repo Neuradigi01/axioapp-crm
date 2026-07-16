@@ -223,7 +223,11 @@
       </fieldset>
 
       @if (templates().length > 0) {
-        <!-- Step 15 — central library picker (every channel) -->
+        <!-- Step 15 — central library picker (every channel).
+             Campaigns v1 Step 01 — replaced the plain <select> with a
+             stacked row list so WhatsApp templates can render approval
+             status + category + language + preview inline. Non-approved
+             WA rows are visibly disabled and can't be selected. -->
         <div class="rounded-md border border-zinc-200 p-3 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-medium text-zinc-600"> Template </span>
@@ -231,16 +235,43 @@
               From your template library · /user/templates
             </span>
           </div>
-          <select
-            [value]="selectedTemplateId() ?? ''"
-            (change)="onTemplateChange($any($event.target).value)"
-            class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+
+          <div
+            role="listbox"
+            aria-label="Template"
+            class="max-h-64 divide-y divide-zinc-100 overflow-y-auto rounded-md border border-zinc-200 bg-white"
           >
-            <option value="">— Pick a template (or use free text below) —</option>
             @for (t of templates(); track t.id) {
-              <option [value]="t.id">{{ t.name }}</option>
+              <button
+                type="button"
+                role="option"
+                [attr.aria-selected]="selectedTemplateId() === t.id"
+                [disabled]="!isRowSelectable(t)"
+                (click)="onRowClick(t)"
+                class="flex w-full items-start justify-between gap-3 px-3 py-2 text-left transition"
+                [class.bg-zinc-50]="selectedTemplateId() === t.id"
+                [class.ring-1]="selectedTemplateId() === t.id"
+                [class.ring-zinc-900]="selectedTemplateId() === t.id"
+                [class.hover:bg-zinc-50]="isRowSelectable(t) && selectedTemplateId() !== t.id"
+                [class.cursor-not-allowed]="!isRowSelectable(t)"
+                [class.opacity-60]="!isRowSelectable(t)"
+              >
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-medium text-zinc-900">
+                    {{ t.name }}
+                  </span>
+                  <span class="mt-0.5 block truncate text-[11px] text-zinc-500">
+                    {{ rowSubtitle(t) }}
+                  </span>
+                </span>
+                @if (t.channel === 'whatsapp') {
+                  <span class="shrink-0 pt-0.5">
+                    <app-template-status-badge [external]="t.externalStatus" />
+                  </span>
+                }
+              </button>
             }
-          </select>
+          </div>
 
           @if (selectedTemplate(); as t) {
             <!-- Preview -->
@@ -308,10 +339,11 @@
           class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
         >
           @if (isWhatsAppChannel()) {
-            No WhatsApp templates approved by Meta yet. Create one in
+            No WhatsApp templates yet. Create one in
             <a routerLink="/user/templates" class="underline">/user/templates</a>, publish it, then
-            click "Submit to Meta" — once Meta approves it'll appear here. Or use the free-text
-            fallback below.
+            click "Submit to Meta" — approved templates can be sent immediately, pending / rejected
+            templates appear in this list too but stay disabled with their status shown. Or use the
+            free-text fallback below.
           } @else {
             No published templates for this channel yet. Create one in
             <a routerLink="/user/templates" class="underline">/user/templates</a>

@@ -47,9 +47,18 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
   let campaignsSpy: jasmine.SpyObj<CampaignsApiService>;
   let groupsSpy: jasmine.SpyObj<ContactGroupsApiService>;
 
-  function makeFixture(): ComponentFixture<CreateCampaignModalComponent> {
+  function makeFixture(
+    initialTemplates: TemplateRead[] = [],
+  ): ComponentFixture<CreateCampaignModalComponent> {
     templatesSpy = jasmine.createSpyObj<TemplatesApiService>('TemplatesApiService', ['list']);
-    templatesSpy.list.and.returnValue(of({ items: [], total: 0, limit: 200, offset: 0 }));
+    templatesSpy.list.and.returnValue(
+      of({
+        items: initialTemplates,
+        total: initialTemplates.length,
+        limit: 200,
+        offset: 0,
+      }),
+    );
     integrationsSpy = jasmine.createSpyObj<IntegrationsApiService>('IntegrationsApiService', [
       'getWhatsAppCapacity',
       'listWhatsAppTemplates',
@@ -90,15 +99,19 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     return fixture;
   }
 
-  it('loads WA templates filtered by internal_status=published AND external_status=approved', () => {
+  it('loads WA templates filtered by internal_status=published without an external_status filter', () => {
+    // Campaigns v1 Step 01 — the WA branch used to pre-filter to
+    // approved-only. Now the picker fetches every published WA
+    // template (approved, pending, rejected) so the user can see
+    // status inline. Non-approved rows render disabled — see the
+    // "picker row disabled state" tests below.
     const fixture = makeFixture();
     void fixture;
-    // Initial load fires for the default channel (whatsapp).
     expect(templatesSpy.list).toHaveBeenCalled();
     const args = templatesSpy.list.calls.mostRecent().args[0];
     expect(args?.channel).toBe('whatsapp');
     expect(args?.internal_status).toBe('published');
-    expect(args?.external_status).toBe('approved');
+    expect(args?.external_status).toBeUndefined();
   });
 
   it('loads non-WA templates filtered by internal_status=published only', () => {
@@ -132,6 +145,130 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     cmp.form.controls.channel.setValue('email');
     fixture.detectChanges();
     expect(cmp.selectedTemplateId()).toBeNull();
+  });
+
+  it('renders every WA template row (approved / pending / rejected) with its status badge + subtitle', () => {
+    // Campaigns v1 Step 01 — three template variants must all appear
+    // in the picker so the user can see status inline. Pending +
+    // rejected rows exist but are visibly disabled.
+    const fixture = makeFixture([
+      makeTemplate({
+        id: 'wa-approved',
+        name: 'welcome_offer',
+        body_text: 'Hi {{1}}, welcome!',
+        external_status: 'approved',
+      }),
+      makeTemplate({
+        id: 'wa-pending',
+        name: 'abandoned_cart',
+        category: 'transactional',
+        body_text: 'Hi {{1}}, forgot something?',
+        external_status: 'pending',
+      }),
+      makeTemplate({
+        id: 'wa-rejected',
+        name: 'discount_promo',
+        body_text: 'FREE OFFER for {{1}}!',
+        external_status: 'rejected',
+      }),
+    ]);
+    fixture.detectChanges();
+
+    const text: string = fixture.nativeElement.textContent ?? '';
+    expect(text).toContain('welcome_offer');
+    expect(text).toContain('abandoned_cart');
+    expect(text).toContain('discount_promo');
+    // Category + language + preview subtitle rendered for every row.
+    expect(text).toContain('Marketing · en · Hi {{1}}, welcome!');
+    expect(text).toContain('Transactional · en · Hi {{1}}, forgot something?');
+    expect(text).toContain('Marketing · en · FREE OFFER for {{1}}!');
+
+    // Non-approved rows are disabled at the DOM level so keyboard +
+    // click both no-op cleanly.
+    const buttons = fixture.nativeElement.querySelectorAll(
+      'button[role="option"]',
+    ) as NodeListOf<HTMLButtonElement>;
+    expect(buttons.length).toBe(3);
+    const [approvedBtn, pendingBtn, rejectedBtn] = Array.from(buttons);
+    expect(approvedBtn.disabled).toBeFalse();
+    expect(pendingBtn.disabled).toBeTrue();
+    expect(rejectedBtn.disabled).toBeTrue();
+  });
+
+  it('selects an approved WA row on click; pending/rejected rows are a no-op', () => {
+    const fixture = makeFixture([
+      makeTemplate({ id: 'wa-approved', external_status: 'approved' }),
+      makeTemplate({ id: 'wa-pending', external_status: 'pending' }),
+      makeTemplate({ id: 'wa-rejected', external_status: 'rejected' }),
+    ]);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance as unknown as {
+      selectedTemplateId: () => string | null;
+    };
+
+    const buttons = fixture.nativeElement.querySelectorAll(
+      'button[role="option"]',
+    ) as NodeListOf<HTMLButtonElement>;
+    const [approvedBtn, pendingBtn, rejectedBtn] = Array.from(buttons);
+
+    approvedBtn.click();
+    fixture.detectChanges();
+    expect(cmp.selectedTemplateId()).toBe('wa-approved');
+
+    // Programmatic click on a disabled button doesn't fire the handler
+    // — but even if the operator managed to trigger it (e.g. via a
+    // custom accessibility path), the guard in `onRowClick` still
+    // leaves the selection unchanged.
+    pendingBtn.click();
+    fixture.detectChanges();
+    expect(cmp.selectedTemplateId()).toBe('wa-approved');
+
+    rejectedBtn.click();
+    fixture.detectChanges();
+    expect(cmp.selectedTemplateId()).toBe('wa-approved');
+  });
+
+  it('non-WhatsApp channels render rows without the status badge and every row is selectable', () => {
+    const fixture = makeFixture();
+    // Prime the spy with an email template ready for the channel switch.
+    templatesSpy.list.and.returnValue(
+      of({
+        items: [
+          makeTemplate({
+            id: 'em-1',
+            channel: 'email',
+            name: 'monthly_newsletter',
+            body_text: 'Hi {{contact.first_name}}, this month…',
+            external_status: 'n_a',
+            subject: 'July deals',
+          }),
+        ],
+        total: 1,
+        limit: 200,
+        offset: 0,
+      }),
+    );
+    const cmp = fixture.componentInstance as unknown as {
+      form: { controls: { channel: { setValue: (v: string) => void } } };
+    };
+    cmp.form.controls.channel.setValue('email');
+    fixture.detectChanges();
+
+    // No badge is rendered for non-WA channels — the badge label from
+    // TemplateStatusBadgeComponent (e.g. "Provider approved") never
+    // appears in the picker text.
+    const text: string = fixture.nativeElement.textContent ?? '';
+    expect(text).toContain('monthly_newsletter');
+    expect(text).toContain('Marketing · en · Hi {{contact.first_name}}, this month…');
+    expect(text).not.toContain('Provider approved');
+    expect(text).not.toContain('Provider rejected');
+    expect(text).not.toContain('Pending review');
+
+    const buttons = fixture.nativeElement.querySelectorAll(
+      'button[role="option"]',
+    ) as NodeListOf<HTMLButtonElement>;
+    expect(buttons.length).toBe(1);
+    expect(buttons[0].disabled).toBeFalse();
   });
 
   it('hides the positional variable panel for non-WA templates', () => {
