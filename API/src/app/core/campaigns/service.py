@@ -137,6 +137,153 @@ async def _resolve_email_sender(
     return account
 
 
+async def _check_email_sender_readiness(
+    session: AsyncSession,
+    *,
+    campaign: Campaign,
+) -> list[str]:
+    """Campaigns v1 Step 07 — sender-readiness pre-flight for Email
+    campaigns. Reads the ``require_full_domain_verification`` flag on
+    ``OrgSettings``; a fully-verified domain sails through, a partially-
+    verified one warns (returned as a list the caller can attach to the
+    audit event / campaign warnings) unless the strict flag is set, in
+    which case we hard-block with a 400.
+
+    Domains that haven't been registered in Email Sender Setup at all
+    are treated the same as unverified — a fresh install has no
+    domains yet, so the default behaviour must be "warn, not block"
+    or we'd trap the user's very first campaign.
+    """
+    from sqlalchemy import select
+
+    from src.app.core.email_sender_setup.service import get_domain_for_email
+    from src.app.core.settings.models import OrgSettings
+
+    if campaign.email_account_id is None:
+        return []
+
+    account = await email_da.get_account_by_id(
+        session, account_id=campaign.email_account_id
+    )
+    if account is None:
+        # Step 03's _resolve_email_sender already rejected this case at
+        # create time. If it survived until enqueue it means the mailbox
+        # was deleted between save and start; surface as a hard block.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sender mailbox no longer exists.",
+        )
+    if account.sync_state != EmailAccountSyncState.live:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Selected mailbox is not connected — reconnect it in "
+                "Email Sender Setup and retry."
+            ),
+        )
+
+    org_settings = (
+        await session.execute(
+            select(OrgSettings).where(OrgSettings.org_id == campaign.org_id)
+        )
+    ).scalar_one_or_none()
+    strict = bool(
+        org_settings is not None and org_settings.require_full_domain_verification
+    )
+
+    sender_domain = await get_domain_for_email(
+        session, org_id=campaign.org_id, email_address=account.email_address
+    )
+    warnings: list[str] = []
+    if sender_domain is None:
+        note = (
+            f"Sender domain of {account.email_address} isn't set up in "
+            "Email Sender Setup — deliverability may suffer."
+        )
+    elif not sender_domain.fully_verified:
+        missing = [
+            k
+            for k, v in (
+                ("SPF", sender_domain.spf_verified),
+                ("DKIM", sender_domain.dkim_verified),
+                ("DMARC", sender_domain.dmarc_verified),
+            )
+            if not v
+        ]
+        note = (
+            f"Sender domain {sender_domain.domain} is missing: "
+            f"{', '.join(missing)}. Deliverability may suffer."
+        )
+    else:
+        return []
+
+    if strict:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                note + " Complete DKIM / SPF / DMARC in Email Sender "
+                "Setup or disable ``require_full_domain_verification`` "
+                "in Settings."
+            ),
+        )
+    warnings.append(note)
+    return warnings
+
+
+async def _suppress_bounced_contacts(
+    session: AsyncSession,
+    *,
+    campaign: Campaign,
+    contact_ids: list[uuid.UUID],
+) -> tuple[list[uuid.UUID], int]:
+    """Filter ``contact_ids`` to exclude any whose email address has
+    a hard-bounce / spam-complaint record on file.
+
+    Two queries: one to fetch (contact_id, email) for the campaign's
+    audience, and one to load the org's hard-bounce email set. Cheap
+    even at 10k contacts because the join predicate stays on indexed
+    ``contact.email`` + the bounce table's ``email_address`` column."""
+    from sqlalchemy import select
+
+    from src.app.core.automation.models import EmailBounceEvent
+    from src.app.core.contacts.models import Contact
+
+    if not contact_ids:
+        return contact_ids, 0
+
+    contacts_rows = (
+        await session.execute(
+            select(Contact.id, Contact.email).where(Contact.id.in_(contact_ids))
+        )
+    ).all()
+    email_by_contact = {
+        row[0]: (row[1] or "").lower() for row in contacts_rows if row[1]
+    }
+
+    bounced_emails = {
+        row[0].lower()
+        for row in (
+            await session.execute(
+                select(EmailBounceEvent.email_address).where(
+                    EmailBounceEvent.org_id == campaign.org_id,
+                    EmailBounceEvent.bounce_type.in_(["hard", "complaint"]),
+                )
+            )
+        ).all()
+        if row[0]
+    }
+
+    keep: list[uuid.UUID] = []
+    excluded = 0
+    for cid in contact_ids:
+        email = email_by_contact.get(cid)
+        if email and email in bounced_emails:
+            excluded += 1
+        else:
+            keep.append(cid)
+    return keep, excluded
+
+
 async def _validate_template_channel_match(
     session: AsyncSession,
     *,
@@ -446,7 +593,28 @@ async def enqueue(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str,
             detail=str(exc),
         ) from exc
 
+    # Campaigns v1 Step 07 — Email sender-readiness pre-flight. The
+    # mailbox lookup already happened at create time (Step 03's
+    # ``_resolve_email_sender``); here we cross-check the mailbox's
+    # domain against the sender-setup registry so an unverified
+    # domain either warns (default) or hard-blocks (per-org flag).
+    email_warnings: list[str] = []
+    if campaign.channel == ConversationChannel.email:
+        email_warnings = await _check_email_sender_readiness(session, campaign=campaign)
+
     contact_ids = await resolve_audience(session, audience_filter=campaign.audience_filter)
+
+    # Campaigns v1 Step 07 — Email bounce suppression. Contacts on the
+    # org's hard-bounce / spam-complaint list are silently excluded
+    # from the audience; the delta lands on ``excluded_bounced_count``
+    # so the campaign detail page can render "N excluded" honestly.
+    if campaign.channel == ConversationChannel.email and contact_ids:
+        contact_ids, bounced_excluded = await _suppress_bounced_contacts(
+            session, campaign=campaign, contact_ids=contact_ids
+        )
+        if bounced_excluded:
+            campaign.excluded_bounced_count = int(bounced_excluded)
+            await session.commit()
 
     # whatsapp-platform-upgrade Step 29 — minimum-audience guard.
     # A/B requires ≥ 50 recipients to keep the winner metric out

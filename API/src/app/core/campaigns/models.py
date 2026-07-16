@@ -156,6 +156,15 @@ class Campaign(Base, TenantScoped):
     # in ``schemas.py``. Sanitised by
     # :mod:`core.templates.sanitizer` on every write.
     body_html: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Campaigns v1 Step 07 — bounce-suppression counter. Populated by
+    # ``enqueue`` when the audience is intersected with the org's
+    # hard-bounce list; the campaign detail page renders it in the
+    # "N excluded" summary alongside the opted-out count from Step 06.
+    excluded_bounced_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=sql_text("0"),
+    )
     # whatsapp-platform-upgrade Step 29 — A/B testing.
     # ``is_ab_test`` is the master gate; when False every other
     # A/B column is ignored. When True the dispatcher assigns each

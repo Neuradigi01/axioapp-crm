@@ -72,6 +72,15 @@ class OrgSettings(Base, TenantScoped):
         String(16), nullable=False, server_default=sql_text("'en-IN'")
     )
 
+    # Campaigns v1 Step 07 — Email sender-readiness feature flag.
+    # False (default): campaigns whose sender domain isn't fully
+    # SPF/DKIM/DMARC-verified emit a warning at start but proceed.
+    # True: unverified-domain campaigns hard-block at ``enqueue`` with
+    # a clear message pointing to Email Sender Setup.
+    require_full_domain_verification: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("false")
+    )
+
     # --- AI ---
     ai_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sql_text("false")

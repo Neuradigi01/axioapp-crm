@@ -224,6 +224,10 @@ class CampaignOut(ORMModel):
     # that don't reference a template. NULL for template-backed and
     # non-Email campaigns.
     body_html: str | None = None
+    # Campaigns v1 Step 07 — how many audience contacts were dropped
+    # by the hard-bounce suppression pre-flight. 0 for WA campaigns
+    # + Email campaigns whose audience had no bounced contacts.
+    excluded_bounced_count: int = 0
     status: CampaignStatus
     created_by_id: uuid.UUID | None
     created_at: datetime
