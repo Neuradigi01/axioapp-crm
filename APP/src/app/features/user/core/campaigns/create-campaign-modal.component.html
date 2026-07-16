@@ -532,34 +532,37 @@
         />
       </label>
 
-      <!-- Step 27b — multi-number Send-From picker. Self-hides when
-           the org has < 2 connected phones; otherwise the operator
-           picks which number this campaign dispatches from. -->
-      <div class="mt-1">
-        <app-wa-send-from-picker
-          [value]="form.controls.send_from_phone_id.value"
-          (valueChange)="form.controls.send_from_phone_id.setValue($event)"
-        />
-      </div>
+      @if (isWhatsAppChannel()) {
+        <!-- Step 27b — multi-number Send-From picker. Self-hides when
+             the org has < 2 connected phones; otherwise the operator
+             picks which number this campaign dispatches from. WA-only:
+             other channels don't own multi-number identities. -->
+        <div class="mt-1">
+          <app-wa-send-from-picker
+            [value]="form.controls.send_from_phone_id.value"
+            (valueChange)="form.controls.send_from_phone_id.setValue($event)"
+          />
+        </div>
 
-      <!-- Step 29 — A/B test toggle + configuration. The section
-           component renders only when the operator turns the
-           toggle on; minimum-audience enforcement (≥ 50) lives
-           server-side on the start endpoint. -->
-      <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs">
-        <label class="flex cursor-pointer items-center gap-2">
-          <input type="checkbox" formControlName="is_ab_test" />
-          <span class="font-medium text-zinc-800">Run as an A/B test</span>
-          <span class="text-zinc-500">
-            — split the audience between two templates and let the CRM pick the winner.
-          </span>
-        </label>
-        @if (form.controls.is_ab_test.value) {
-          <div class="mt-2">
-            <app-ab-test-section [form]="form" [templates]="approvedTemplatesForPicker()" />
-          </div>
-        }
-      </div>
+        <!-- Step 29 — A/B test toggle + configuration. Currently
+             WA-only (per project memory) — Email A/B lands in a
+             follow-up. Hide the toggle entirely on non-WA channels so
+             users can't enable something the backend would reject. -->
+        <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs">
+          <label class="flex cursor-pointer items-center gap-2">
+            <input type="checkbox" formControlName="is_ab_test" />
+            <span class="font-medium text-zinc-800">Run as an A/B test</span>
+            <span class="text-zinc-500">
+              — split the audience between two templates and let the CRM pick the winner.
+            </span>
+          </label>
+          @if (form.controls.is_ab_test.value) {
+            <div class="mt-2">
+              <app-ab-test-section [form]="form" [templates]="approvedTemplatesForPicker()" />
+            </div>
+          }
+        </div>
+      }
 
       @if (submitError(); as err) {
         <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">

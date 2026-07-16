@@ -307,16 +307,16 @@ export class CreateCampaignModalComponent {
   protected readonly templatePlaceholder =
     'Hi {{full_name}} — our Diwali sale is live! 20% off everything this week.';
 
+  /** Campaigns v1 scope locked to WhatsApp + Email (memory
+   *  ``project_campaigns_scope.md``). Legacy campaigns on other
+   *  channels still render on the list page; the create flow just
+   *  doesn't offer them so a user can't start a broken one. */
   protected readonly channels: ReadonlyArray<{
     value: ConversationChannel;
     label: string;
   }> = [
     { value: 'whatsapp', label: 'WhatsApp' },
-    { value: 'sms', label: 'SMS' },
     { value: 'email', label: 'Email' },
-    { value: 'facebook', label: 'Facebook' },
-    { value: 'instagram', label: 'Instagram' },
-    { value: 'web', label: 'Web' },
   ];
 
   protected readonly form = this.fb.group({
@@ -370,12 +370,6 @@ export class CreateCampaignModalComponent {
     body_html: this.fb.control<string>('', [Validators.maxLength(200000)]),
   });
 
-  protected readonly isWhatsApp = computed(
-    () =>
-      // computed reads channel via valueChanges — track manually
-      false,
-  );
-
   constructor() {
     // Step 15 — load templates whenever the channel changes. Each
     // channel's published templates come from the central library;
@@ -399,6 +393,17 @@ export class CreateCampaignModalComponent {
           if (this.emailAccounts() === null) {
             this._loadEmailAccounts();
           }
+          // A/B testing + Send-From are WhatsApp-only knobs. Clear any
+          // toggle the operator left on before flipping to Email so the
+          // payload doesn't carry `is_ab_test: true` into an Email
+          // campaign that has no variant selector rendered.
+          this.form.patchValue({
+            send_from_phone_id: null,
+            is_ab_test: false,
+            variant_a_template_id: null,
+            variant_b_template_id: null,
+            winner_metric: null,
+          });
         } else {
           this.form.patchValue({
             email_account_id: null,
@@ -468,8 +473,12 @@ export class CreateCampaignModalComponent {
     });
   }
 
+  /** WhatsApp branch gate. Reads through ``channelSignal`` so the
+   *  ``@if (isWhatsAppChannel())`` guards + capacity banner re-render
+   *  the moment the operator flips the channel — matches the
+   *  Email-side pattern below. */
   protected isWhatsAppChannel(): boolean {
-    return this.form.controls.channel.value === 'whatsapp';
+    return this.channelSignal() === 'whatsapp';
   }
 
   /** Campaigns v1 Step 03 — Email branch gate for the modal's
