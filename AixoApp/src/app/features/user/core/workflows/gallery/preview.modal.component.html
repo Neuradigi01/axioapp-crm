@@ -1,0 +1,88 @@
+<div
+  class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-6"
+  (click)="close.emit()"
+>
+  <div
+    class="bg-white rounded-xl border border-zinc-200 shadow-xl flex flex-col w-full max-w-4xl h-[80vh]"
+    (click)="$event.stopPropagation()"
+  >
+    <header class="px-5 py-3 border-b border-zinc-200 flex items-center gap-3">
+      <div class="flex-1 min-w-0">
+        <h2 class="text-sm font-semibold text-zinc-800 truncate">
+          {{ entry().name }}
+        </h2>
+        <p class="text-[11px] text-zinc-500 truncate">
+          {{ entry().description }}
+        </p>
+      </div>
+      <button type="button" class="text-zinc-400 hover:text-zinc-700" (click)="close.emit()">
+        <lucide-icon name="X" class="w-4 h-4"></lucide-icon>
+      </button>
+    </header>
+
+    <div class="flex-1 min-h-0 bg-zinc-100 relative overflow-hidden">
+      <svg
+        class="absolute inset-0 w-full h-full"
+        [attr.viewBox]="viewBox()"
+        preserveAspectRatio="xMidYMid meet"
+      >
+        <defs>
+          <pattern id="gallery-preview-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="1" class="fill-zinc-300" />
+          </pattern>
+          <marker
+            id="workflow-arrow"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerUnits="strokeWidth"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="rgb(148 163 184)" />
+          </marker>
+        </defs>
+        <rect
+          x="-10000"
+          y="-10000"
+          width="20000"
+          height="20000"
+          fill="url(#gallery-preview-grid)"
+        />
+
+        @for (edge of state.edges(); track edge.id) {
+          @if (nodeById().get(edge.source); as src) {
+            @if (nodeById().get(edge.target); as tgt) {
+              <g appWorkflowEdge [edge]="edge" [source]="src" [target]="tgt"></g>
+            }
+          }
+        }
+        @for (node of state.nodes(); track node.id) {
+          <g appWorkflowNode [node]="node" [selected]="false"></g>
+        }
+      </svg>
+    </div>
+
+    <footer class="px-5 py-3 border-t border-zinc-200 flex items-center gap-2">
+      <span class="text-[11px] text-zinc-500">
+        Read-only preview. Cloning gives you an editable draft.
+      </span>
+      <div class="flex-1"></div>
+      <button
+        type="button"
+        class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+        (click)="close.emit()"
+      >
+        Close
+      </button>
+      <button
+        type="button"
+        class="px-3 py-1.5 text-xs rounded bg-zinc-900 text-white hover:bg-zinc-800"
+        (click)="use.emit()"
+      >
+        Use this template
+      </button>
+    </footer>
+  </div>
+</div>

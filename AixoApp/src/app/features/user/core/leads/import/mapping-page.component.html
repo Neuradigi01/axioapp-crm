@@ -1,0 +1,255 @@
+<div class="mx-auto max-w-6xl p-6 space-y-5">
+  <header class="space-y-1">
+    <nav class="flex items-center gap-1 text-xs text-zinc-500">
+      <a routerLink="/user/leads" class="hover:text-zinc-700">Leads</a>
+      <lucide-icon name="chevron-right" class="h-3 w-3" />
+      <a routerLink="/user/leads/import" class="hover:text-zinc-700">Import</a>
+      <lucide-icon name="chevron-right" class="h-3 w-3" />
+      <span class="text-zinc-700">Map columns</span>
+    </nav>
+    <h1 class="text-lg font-semibold text-zinc-900">Map columns</h1>
+    @if (importRow(); as row) {
+      <p class="text-xs text-zinc-500">
+        {{ row.original_filename }} · {{ row.row_count_estimate }} rows · source:
+        {{ row.source_platform }}
+      </p>
+    }
+  </header>
+
+  <!-- Mobile / small viewport notice (mapping needs real-estate). -->
+  <div
+    class="md:hidden rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700"
+  >
+    Column mapping is easier on a desktop. Please open this page on a larger screen.
+  </div>
+
+  @if (loading()) {
+    <p class="text-sm text-zinc-500">Loading import…</p>
+  } @else if (loadError(); as err) {
+    <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ err }}
+    </p>
+  } @else if (importRow(); as row) {
+    <!-- Required-field warning -->
+    @if (missingRequired().length > 0) {
+      <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p class="font-medium">Required field(s) not mapped:</p>
+        <ul class="mt-1 list-disc list-inside">
+          @for (t of missingRequired(); track t.key) {
+            <li>
+              {{ t.label }} <span class="text-amber-600">({{ t.key }})</span>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+    @if (duplicateTargets().size > 0) {
+      <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        Two or more columns are mapped to the same CRM field. Each field can only receive one
+        column.
+      </div>
+    }
+
+    <!-- Mapping table -->
+    <div class="hidden md:block overflow-hidden rounded-md border border-zinc-200 bg-white">
+      <table class="min-w-full text-sm">
+        <thead class="bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500">
+          <tr>
+            <th class="w-1/3 px-4 py-2 text-left">CSV column</th>
+            <th class="w-1/3 px-4 py-2 text-left">Sample (row 1)</th>
+            <th class="px-4 py-2 text-left">Map to CRM field</th>
+            <th class="w-12 px-4 py-2"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-100">
+          @for (col of preview()?.columns ?? []; track $index) {
+            <tr>
+              <td class="px-4 py-3 font-medium text-zinc-900 align-top">{{ col }}</td>
+              <td class="px-4 py-3 text-xs text-zinc-600 align-top">
+                {{ sampleValue(col) ?? '—' }}
+              </td>
+              <td class="px-4 py-3 align-top">
+                <select
+                  [value]="mapping()[col] ?? ''"
+                  (change)="onMappingChange(col, $event)"
+                  class="block w-full max-w-md rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                >
+                  <option value="">— Ignore —</option>
+                  @if (targetGroups().contact.length > 0) {
+                    <optgroup label="Standard contact">
+                      @for (t of targetGroups().contact; track t.key) {
+                        <option [value]="t.key">{{ t.label }}{{ t.required ? ' *' : '' }}</option>
+                      }
+                    </optgroup>
+                  }
+                  @if (targetGroups().lead.length > 0) {
+                    <optgroup label="Standard lead">
+                      @for (t of targetGroups().lead; track t.key) {
+                        <option [value]="t.key">{{ t.label }}{{ t.required ? ' *' : '' }}</option>
+                      }
+                    </optgroup>
+                  }
+                  @if (targetGroups().custom.length > 0) {
+                    <optgroup label="Custom fields">
+                      @for (t of targetGroups().custom; track t.key) {
+                        <option [value]="t.key">{{ t.label }}{{ t.required ? ' *' : '' }}</option>
+                      }
+                    </optgroup>
+                  }
+                </select>
+              </td>
+              <td class="px-4 py-3 text-center">
+                @switch (statusFor(col)) {
+                  @case ('unmapped') {
+                    <lucide-icon
+                      name="circle-dashed"
+                      class="h-4 w-4 text-zinc-400"
+                      title="Not mapped"
+                    />
+                  }
+                  @case ('mapped') {
+                    <lucide-icon
+                      name="check-circle-2"
+                      class="h-4 w-4 text-emerald-500"
+                      title="Mapped"
+                    />
+                  }
+                  @case ('duplicate') {
+                    <lucide-icon
+                      name="alert-triangle"
+                      class="h-4 w-4 text-red-500"
+                      title="Mapped to the same field as another column"
+                    />
+                  }
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-zinc-500">
+      Auto-mapping is a best-effort suggestion based on column names — review every row.
+    </p>
+
+    <!-- Preview pane -->
+    @if (preview() && (preview()?.rows ?? []).length > 0) {
+      <div>
+        <h2 class="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+          Preview · how the first {{ (preview()?.rows ?? []).length }} rows will land
+        </h2>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          @for (row of previewMapped(); track $index) {
+            <div class="rounded-md border border-zinc-200 bg-white p-3 text-sm">
+              <p class="text-xs text-zinc-500">Row {{ $index + 1 }}</p>
+              <dl class="mt-1 space-y-0.5">
+                @if (row['contact.full_name']) {
+                  <div class="font-medium text-zinc-900">{{ row['contact.full_name'] }}</div>
+                }
+                @if (row['contact.phone']) {
+                  <div class="text-zinc-700">{{ row['contact.phone'] }}</div>
+                }
+                @if (row['contact.email']) {
+                  <div class="text-zinc-700">{{ row['contact.email'] }}</div>
+                }
+                @if (row['lead.budget']) {
+                  <div class="text-zinc-700">Budget: {{ row['lead.budget'] }}</div>
+                }
+                @if (row['lead.pipeline_stage']) {
+                  <div class="text-zinc-700">Stage: {{ row['lead.pipeline_stage'] }}</div>
+                }
+                @if (!row['contact.full_name']) {
+                  <div class="text-xs text-amber-600">No name mapped — this row will fail.</div>
+                }
+              </dl>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (actionError(); as err) {
+      <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ err }}
+      </div>
+    }
+
+    <!-- Actions -->
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4">
+      <button
+        type="button"
+        (click)="openSavePreset()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+      >
+        Save as preset
+      </button>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          (click)="cancelImport()"
+          [disabled]="cancelling()"
+          class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+        >
+          {{ cancelling() ? 'Cancelling…' : 'Cancel import' }}
+        </button>
+        <button
+          type="button"
+          [disabled]="!canCommit()"
+          (click)="commit()"
+          class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          @if (committing()) {
+            <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
+            Importing…
+          } @else {
+            <lucide-icon name="check" class="h-4 w-4" />
+            Commit
+          }
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Save-preset modal -->
+  @if (savePresetOpen()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+      <div class="w-full max-w-md rounded-md bg-white p-5 shadow-xl">
+        <h2 class="text-base font-semibold text-zinc-900">Save mapping as preset</h2>
+        <p class="mt-1 text-xs text-zinc-500">
+          Reuse this mapping on future imports from the same platform.
+        </p>
+        <label for="preset-name" class="mt-4 block text-xs font-medium text-zinc-700">
+          Preset name <span class="font-normal text-zinc-400">(optional)</span>
+        </label>
+        <input
+          id="preset-name"
+          type="text"
+          [value]="presetName()"
+          (input)="onPresetNameInput($event)"
+          placeholder="Auto-named '<platform> vN' if blank"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+        @if (savePresetError(); as err) {
+          <p class="mt-2 text-xs text-red-600">{{ err }}</p>
+        }
+        <div class="mt-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            (click)="closeSavePreset()"
+            class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            [disabled]="saving()"
+            (click)="saveAsPreset()"
+            class="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          >
+            {{ saving() ? 'Saving…' : 'Save preset' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

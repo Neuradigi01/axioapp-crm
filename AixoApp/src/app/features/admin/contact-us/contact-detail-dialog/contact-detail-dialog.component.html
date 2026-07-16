@@ -1,0 +1,44 @@
+<h2 mat-dialog-title>Contact Details</h2>
+
+<mat-dialog-content>
+  <div class="contact-detail">
+    <div class="contact-detail__row">
+      <span class="contact-detail__label">Name</span>
+      <span class="contact-detail__value">{{ data.name }}</span>
+    </div>
+
+    <div class="contact-detail__row">
+      <span class="contact-detail__label">Email</span>
+      <span class="contact-detail__value">{{ data.email }}</span>
+    </div>
+
+    <div class="contact-detail__row">
+      <span class="contact-detail__label">Type</span>
+      <span class="contact-detail__value">
+        @let badge = getTypeBadge(data.type);
+        <span class="contact-detail__badge" [style.color]="badge.color" [style.background-color]="badge.bgVar">
+          {{ data.type }}
+        </span>
+      </span>
+    </div>
+
+    <div class="contact-detail__row">
+      <span class="contact-detail__label">Subject</span>
+      <span class="contact-detail__value">{{ data.subject }}</span>
+    </div>
+
+    <div class="contact-detail__row">
+      <span class="contact-detail__label">Date</span>
+      <span class="contact-detail__value">{{ data.created_at | date:'medium' }}</span>
+    </div>
+
+    <div class="contact-detail__row contact-detail__row--message">
+      <span class="contact-detail__label">Message</span>
+      <span class="contact-detail__value contact-detail__message">{{ data.message }}</span>
+    </div>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-flat-button mat-dialog-close>Close</button>
+</mat-dialog-actions>

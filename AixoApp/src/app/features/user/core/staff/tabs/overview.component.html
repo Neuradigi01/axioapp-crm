@@ -1,0 +1,101 @@
+@if (sortedRows().length === 0) {
+  <div
+    class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+  >
+    No staff members yet.
+  </div>
+} @else {
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+    @for (row of sortedRows(); track row.staff.id) {
+      <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+        <div class="flex items-start justify-between">
+          <div class="flex items-center gap-3">
+            <div
+              [class]="
+                'flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ' +
+                avatarBg(row.staff.id)
+              "
+            >
+              {{ initials(row.staff.full_name) }}
+            </div>
+            <div class="min-w-0">
+              <p class="truncate text-sm font-semibold text-zinc-900">
+                {{ row.staff.full_name }}
+              </p>
+              <p class="truncate text-xs text-zinc-500">
+                {{ row.staff.email }}
+              </p>
+            </div>
+          </div>
+          @let badge = statusBadge(row.staff.employment_status);
+          <span
+            [class]="
+              'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ' +
+              badge.cls
+            "
+          >
+            {{ badge.label }}
+          </span>
+        </div>
+
+        <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <dt class="text-xs text-zinc-500">Leads converted</dt>
+            <dd class="font-medium text-zinc-900">
+              {{ row.performance.leads_converted }} /
+              {{ row.performance.leads_converted + row.performance.leads_active }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-zinc-500">Active leads</dt>
+            <dd class="font-medium text-zinc-900">{{ row.performance.leads_active }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-zinc-500">Monthly target</dt>
+            <dd class="font-medium text-zinc-900">
+              {{ row.performance.monthly_target | formatINR: true }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-zinc-500">Sales (MTD)</dt>
+            <dd class="font-medium text-zinc-900">
+              {{ row.performance.sales | formatINR: true }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-zinc-500">Rating</dt>
+            <dd class="font-medium text-zinc-900">
+              {{ row.performance.rating }}
+              <span class="ml-1 text-amber-500">★</span>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-zinc-500">Commission</dt>
+            <dd class="font-medium text-zinc-900">{{ row.performance.commission_rate }}%</dd>
+          </div>
+        </dl>
+
+        <div class="mt-4">
+          <div class="mb-1 flex justify-between text-xs text-zinc-500">
+            <span>Target progress</span>
+            <span class="font-medium text-zinc-700">
+              {{ row.performance.target_progress_pct ?? 0 }}%
+            </span>
+          </div>
+          <div class="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+            <div
+              class="h-full bg-emerald-500"
+              [style.width.%]="
+                row.performance.target_progress_pct === null
+                  ? 0
+                  : row.performance.target_progress_pct > 100
+                    ? 100
+                    : row.performance.target_progress_pct
+              "
+            ></div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+}

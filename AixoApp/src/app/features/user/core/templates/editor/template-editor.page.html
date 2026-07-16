@@ -1,0 +1,338 @@
+<div class="flex min-h-[calc(100vh-4rem)] flex-col bg-zinc-50">
+  <header class="border-b border-zinc-200 bg-white px-6 py-4">
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <a
+          routerLink="/user/templates"
+          class="inline-flex items-center gap-1 rounded text-xs text-zinc-500 hover:text-zinc-900"
+        >
+          <lucide-icon name="arrow-left" size="12" />
+          Back to list
+        </a>
+        <span class="text-zinc-300">·</span>
+        <h1 class="text-lg font-semibold text-zinc-900">
+          @if (template(); as t) {
+            {{ t.name }}
+          } @else {
+            New template
+          }
+        </h1>
+        @if (template(); as t) {
+          <app-template-status-badge [internal]="t.internal_status" />
+          <app-template-status-badge [external]="t.external_status" />
+        }
+      </div>
+
+      <div class="flex items-center gap-2">
+        @if (toast(); as msg) {
+          <div
+            class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-700"
+          >
+            <lucide-icon name="check" size="12" class="mr-1 inline" />
+            {{ msg }}
+            <button
+              type="button"
+              (click)="dismissToast()"
+              class="ml-2 text-zinc-500 hover:text-zinc-700"
+              aria-label="Dismiss"
+            >
+              <lucide-icon name="x" size="10" />
+            </button>
+          </div>
+        }
+        @if (showVersionsButton()) {
+          <button
+            type="button"
+            (click)="openVersionsDrawer()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <lucide-icon name="history" size="12" />
+            Versions
+          </button>
+        }
+        @if (showTestSendButton()) {
+          <button
+            type="button"
+            (click)="openTestSendModal()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <lucide-icon name="send" size="12" />
+            Test send
+          </button>
+        }
+        @if (showSubmitButton()) {
+          <button
+            type="button"
+            (click)="submitForReview()"
+            [disabled]="transitioning() !== null"
+            class="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+          >
+            @if (transitioning() === 'submit') {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+            } @else {
+              <lucide-icon name="eye" size="12" />
+            }
+            Submit for review
+          </button>
+        }
+        @if (showReviewButton()) {
+          <button
+            type="button"
+            (click)="openReviewModal()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+          >
+            <lucide-icon name="check" size="12" />
+            Review
+          </button>
+        }
+        @if (showPublishButton()) {
+          <button
+            type="button"
+            (click)="publishTemplate()"
+            [disabled]="transitioning() !== null"
+            class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            @if (transitioning() === 'publish') {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+            } @else {
+              <lucide-icon name="upload-cloud" size="12" />
+            }
+            Publish
+          </button>
+        }
+        @if (showSubmitExternalButton()) {
+          <button
+            type="button"
+            (click)="submitToMeta()"
+            [disabled]="transitioning() !== null"
+            class="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50"
+            title="Submit this template to Meta for WhatsApp Business approval"
+          >
+            @if (transitioning() === 'submit_external') {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+            } @else {
+              <lucide-icon name="send" size="12" />
+            }
+            Submit to Meta
+          </button>
+        }
+        @if (showRefreshExternalButton()) {
+          <button
+            type="button"
+            (click)="refreshExternalStatus()"
+            [disabled]="transitioning() !== null"
+            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+            title="Re-check Meta for the live status — same call the hourly sweep makes"
+          >
+            @if (transitioning() === 'sync_external') {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+            } @else {
+              <lucide-icon name="refresh-cw" size="12" />
+            }
+            Refresh status
+          </button>
+        }
+        @if (showResubmitButton()) {
+          <button
+            type="button"
+            (click)="resubmitTemplate()"
+            [disabled]="transitioning() !== null"
+            class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-800 hover:bg-rose-100 disabled:opacity-50"
+            title="Move back to draft so you can edit + re-submit to Meta"
+          >
+            @if (transitioning() === 'resubmit') {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+            } @else {
+              <lucide-icon name="rotate-ccw" size="12" />
+            }
+            Resubmit
+          </button>
+        }
+        @if (showArchiveButton()) {
+          <button
+            type="button"
+            (click)="archiveTemplate()"
+            [disabled]="transitioning() !== null"
+            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          >
+            @if (transitioning() === 'archive') {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+            } @else {
+              <lucide-icon name="trash-2" size="12" />
+            }
+            Archive
+          </button>
+        }
+        @if (!locked() && canWrite()) {
+          <button
+            type="button"
+            (click)="save()"
+            [disabled]="saving()"
+            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          >
+            @if (saving()) {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+              Saving…
+            } @else {
+              <lucide-icon name="check" size="12" />
+              Save draft
+            }
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (locked()) {
+      <div
+        class="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+      >
+        <strong>Locked for review.</strong>
+        This template is in
+        <code class="font-mono">{{ template()?.internal_status }}</code>
+        — to edit, a reviewer must move it back to draft via Reject / Request changes (Step 8
+        modal). Use Duplicate to fork an editable copy.
+      </div>
+    }
+    @if (template()?.external_status === 'rejected') {
+      <div
+        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800"
+      >
+        <strong>Meta rejected this template.</strong>
+        @if (rejectionReason(); as reason) {
+          Reason: <span class="italic">{{ reason }}</span>
+        } @else {
+          No reason was supplied by Meta. Click Refresh status to re-check.
+        }
+        <div class="mt-1 text-xs text-rose-700">
+          Click <strong>Resubmit</strong> to reset to draft, fix the issue, and submit again.
+        </div>
+      </div>
+    }
+
+    @if (loadError(); as err) {
+      <div
+        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+      >
+        {{ err }}
+      </div>
+    }
+    @if (saveError(); as err) {
+      <div
+        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+      >
+        {{ err }}
+      </div>
+    }
+  </header>
+
+  <section class="flex-1 px-6 py-6">
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px_360px]">
+      <!-- left: header form + sub-form -->
+      <div class="flex flex-col gap-4">
+        <form
+          [formGroup]="headerForm"
+          class="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4"
+        >
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-700">Template name</span>
+            <input
+              type="text"
+              formControlName="name"
+              maxlength="120"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+              placeholder="e.g. Welcome lead"
+            />
+          </label>
+
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-700">Channel</span>
+            <select
+              formControlName="channel"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+            >
+              <option value="">— Pick a channel —</option>
+              <option value="email">Email</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="sms">SMS</option>
+              <option value="facebook">Facebook Messenger</option>
+              <option value="instagram">Instagram Direct</option>
+              <option value="push">Push notification</option>
+            </select>
+            @if (template()) {
+              <p class="mt-1 text-[10px] text-zinc-400">
+                Channel is locked after the first save — fork a new template to switch.
+              </p>
+            }
+          </label>
+        </form>
+
+        @if (channel() === 'whatsapp' && waForm(); as f) {
+          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+            <app-wa-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
+          </div>
+        } @else if (channel() === 'email' && emailForm(); as f) {
+          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+            <app-email-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
+          </div>
+        } @else if (channel() === 'sms' && smsForm(); as f) {
+          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+            <app-sms-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
+          </div>
+        } @else if ((channel() === 'facebook' || channel() === 'instagram') && fbForm(); as f) {
+          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+            <app-fb-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
+          </div>
+        } @else if (channel() === 'push' && pushForm(); as f) {
+          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+            <app-push-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
+          </div>
+        } @else {
+          <div
+            class="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-500"
+          >
+            Pick a channel above to start editing the template body.
+          </div>
+        }
+      </div>
+
+      <!-- middle: variable picker -->
+      @if (channel(); as c) {
+        <aside
+          class="sticky top-4 max-h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-zinc-200 bg-white"
+        >
+          <app-variable-picker [channel]="c" (insert)="onInsertVariable($event)" />
+        </aside>
+      }
+
+      <!-- right: live preview -->
+      @if (channel(); as c) {
+        <aside class="sticky top-4">
+          <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+            <app-channel-chip [channel]="c" />
+          </p>
+          <app-preview-pane [channel]="c" [subject]="currentSubject()" [body]="currentBody()" />
+        </aside>
+      }
+    </div>
+  </section>
+</div>
+
+<!-- Step 8 modals + drawer — mounted only when their open-signal is true
+     AND a saved template exists (each requires a template id). -->
+@if (reviewModalOpen() && template(); as t) {
+  <app-template-review-modal
+    [template]="t"
+    (closed)="closeReviewModal()"
+    (updated)="onReviewSucceeded($event)"
+  />
+}
+@if (testSendModalOpen() && template(); as t) {
+  <app-test-send-modal [template]="t" (closed)="closeTestSendModal()" />
+}
+@if (versionsDrawerOpen() && template(); as t) {
+  <app-versions-drawer
+    [template]="t"
+    (closed)="closeVersionsDrawer()"
+    (updated)="onRestoredFromVersion($event)"
+  />
+}

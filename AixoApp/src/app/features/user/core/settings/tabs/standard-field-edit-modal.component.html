@@ -1,0 +1,227 @@
+<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-2xl rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
+    @if (_field(); as f) {
+      <header class="border-b border-zinc-200 px-6 py-4">
+        <h2 class="text-base font-semibold text-zinc-900">Edit "{{ f.label }}"</h2>
+        <p class="mt-1 text-xs text-zinc-500">
+          <code class="font-mono">{{ f.entity }}.{{ f.field_key }}</code>
+          &middot; type: <span class="font-medium">{{ f.field_type }}</span>
+        </p>
+        @if (hidingLockedWarning()) {
+          <p
+            class="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200"
+          >
+            ⚠ This field is enforced by the backend (NOT NULL). The system won't let you hide it —
+            that knob is locked.
+          </p>
+        }
+        @if (f.is_hidden && !f.backend_required) {
+          <p
+            class="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200"
+          >
+            ⚠ Hidden today. Integrations that don't supply a value will see the field default to
+            null on create.
+          </p>
+        }
+      </header>
+
+      <form
+        [formGroup]="form"
+        (ngSubmit)="onSubmit()"
+        class="max-h-[70vh] overflow-y-auto px-6 py-5"
+      >
+        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <!-- Label -->
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-medium text-zinc-700" for="sfe_label">
+              Label
+              @if (!canEdit()?.label) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
+            </label>
+            <input
+              id="sfe_label"
+              type="text"
+              formControlName="label"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-500"
+            />
+          </div>
+
+          <!-- Placeholder -->
+          <div>
+            <label class="block text-xs font-medium text-zinc-700" for="sfe_placeholder">
+              Placeholder
+              @if (!canEdit()?.placeholder) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
+            </label>
+            <input
+              id="sfe_placeholder"
+              type="text"
+              formControlName="placeholder"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-500"
+            />
+          </div>
+
+          <!-- Display order -->
+          <div>
+            <label class="block text-xs font-medium text-zinc-700" for="sfe_order">
+              Display order
+              @if (!canEdit()?.display_order) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
+            </label>
+            <input
+              id="sfe_order"
+              type="number"
+              min="0"
+              max="999"
+              formControlName="display_order"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-500"
+            />
+          </div>
+
+          <!-- Help text -->
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-medium text-zinc-700" for="sfe_help">
+              Help text
+              @if (!canEdit()?.help_text) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
+            </label>
+            <textarea
+              id="sfe_help"
+              rows="2"
+              formControlName="help_text"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-500"
+            ></textarea>
+          </div>
+
+          <!-- Required / Hidden -->
+          <div class="flex items-center gap-2">
+            <input
+              id="sfe_required"
+              type="checkbox"
+              formControlName="is_required"
+              class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <label for="sfe_required" class="text-sm text-zinc-700">
+              Required
+              @if (!canEdit()?.is_required) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
+            </label>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <input
+              id="sfe_hidden"
+              type="checkbox"
+              formControlName="is_hidden"
+              class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <label for="sfe_hidden" class="text-sm text-zinc-700">
+              Hidden
+              @if (!canEdit()?.is_hidden) {
+                <span class="ml-1" title="Locked by registry">🔒</span>
+              }
+            </label>
+          </div>
+
+          <!-- Numeric knobs -->
+          @if (canEdit()?.min_value || canEdit()?.max_value || canEdit()?.step_value) {
+            <div class="sm:col-span-2 border-t border-zinc-200 pt-4">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Numeric bounds
+              </h3>
+              <div class="mt-3 grid grid-cols-3 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-zinc-700" for="sfe_min">Min</label>
+                  <input
+                    id="sfe_min"
+                    type="number"
+                    step="any"
+                    formControlName="min_value"
+                    class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100"
+                  />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-zinc-700" for="sfe_max">Max</label>
+                  <input
+                    id="sfe_max"
+                    type="number"
+                    step="any"
+                    formControlName="max_value"
+                    class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100"
+                  />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-zinc-700" for="sfe_step">Step</label>
+                  <input
+                    id="sfe_step"
+                    type="number"
+                    step="any"
+                    formControlName="step_value"
+                    class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100"
+                  />
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Backend hints -->
+          @if (f.backend_validators.length > 0) {
+            <div class="sm:col-span-2 rounded-md bg-zinc-50 px-3 py-2 ring-1 ring-zinc-200">
+              <p class="text-xs font-medium text-zinc-700">Backend enforces:</p>
+              <ul class="mt-1 list-disc pl-5 text-xs text-zinc-600">
+                @for (v of f.backend_validators; track v) {
+                  <li>{{ v }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </section>
+
+        @if (submitError(); as err) {
+          <div class="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+            {{ err }}
+          </div>
+        }
+      </form>
+
+      <footer
+        class="flex items-center justify-between gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg"
+      >
+        <div>
+          @if (canReset()) {
+            <button
+              type="button"
+              [disabled]="resetting() || saving()"
+              (click)="onReset()"
+              class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+            >
+              {{ resetting() ? 'Resetting…' : 'Reset to defaults' }}
+            </button>
+          }
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            (click)="cancel.emit()"
+            class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            [disabled]="saving() || form.invalid"
+            (click)="onSubmit()"
+            class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+          >
+            {{ saving() ? 'Saving…' : 'Save changes' }}
+          </button>
+        </div>
+      </footer>
+    }
+  </div>
+</div>

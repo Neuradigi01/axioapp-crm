@@ -1,0 +1,121 @@
+<div
+  class="w-72 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+  role="dialog"
+  aria-label="Edit stage"
+>
+  <header class="border-b border-zinc-200 px-3 py-2">
+    <h3 class="text-sm font-semibold text-zinc-900">Edit stage</h3>
+  </header>
+
+  <div class="space-y-3 px-3 py-3">
+    <label class="block">
+      <span class="text-xs font-medium text-zinc-700">Name</span>
+      <input
+        type="text"
+        [value]="nameValue()"
+        (input)="onNameInput($any($event.target).value)"
+        maxlength="128"
+        class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none"
+      />
+      @if (!nameValid()) {
+        <p class="mt-1 text-[11px] text-red-600">Name is required (1–128 chars).</p>
+      }
+    </label>
+
+    <div>
+      <span class="text-xs font-medium text-zinc-700">Colour</span>
+      <div class="mt-1 flex items-center gap-2">
+        <div class="flex items-center gap-1.5">
+          @for (preset of presetColors; track preset) {
+            <button
+              type="button"
+              (click)="onSelectPreset(preset)"
+              [attr.aria-label]="'Use colour ' + preset"
+              [attr.aria-pressed]="colorValue() === preset"
+              class="h-5 w-5 rounded-full ring-2 ring-transparent transition hover:ring-zinc-300"
+              [class.ring-zinc-900]="colorValue() === preset"
+              [style.background-color]="preset"
+            ></button>
+          }
+        </div>
+        <input
+          type="text"
+          [value]="colorValue() ?? ''"
+          (input)="onColorInput($any($event.target).value)"
+          placeholder="#a855f7"
+          maxlength="9"
+          class="w-24 rounded border border-zinc-300 px-2 py-1 text-xs font-mono text-zinc-900 focus:border-zinc-500 focus:outline-none"
+        />
+      </div>
+      @if (!colorValid()) {
+        <p class="mt-1 text-[11px] text-red-600">Colour must be a hex like #a855f7.</p>
+      }
+    </div>
+
+    @if (isTerminal()) {
+      <p class="rounded bg-zinc-50 px-2 py-1.5 text-[11px] text-zinc-600">
+        ⓘ This stage marks leads as won/lost — name and colour only.
+      </p>
+    } @else {
+      <div>
+        <span class="text-xs font-medium text-zinc-700">Position</span>
+        <div class="mt-1 flex items-center gap-2">
+          <button
+            type="button"
+            (click)="onMoveLeft()"
+            [disabled]="!canMoveLeft()"
+            aria-label="Move stage left"
+            class="rounded border border-zinc-300 px-2 py-1 text-sm text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            (click)="onMoveRight()"
+            [disabled]="!canMoveRight()"
+            aria-label="Move stage right"
+            class="rounded border border-zinc-300 px-2 py-1 text-sm text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            →
+          </button>
+          <span class="text-[11px] text-zinc-500">slot {{ displayOrderValue() + 1 }}</span>
+        </div>
+      </div>
+
+      <div class="border-t border-zinc-200 pt-2">
+        <button
+          type="button"
+          (click)="onDelete()"
+          [disabled]="deleting()"
+          class="text-xs font-medium text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          🗑 Delete this stage
+        </button>
+        @if (deleteError(); as err) {
+          <p class="mt-1 text-[11px] text-red-600">{{ err }}</p>
+        }
+      </div>
+    }
+  </div>
+
+  <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-3 py-2">
+    @if (saveError(); as err) {
+      <p class="mr-auto text-[11px] text-red-600">{{ err }}</p>
+    }
+    <button
+      type="button"
+      (click)="onCancel()"
+      class="rounded border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50"
+    >
+      Cancel
+    </button>
+    <button
+      type="button"
+      (click)="onSave()"
+      [disabled]="!canSave()"
+      class="rounded bg-zinc-900 px-3 py-1 text-xs font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      Save
+    </button>
+  </footer>
+</div>

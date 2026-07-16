@@ -1,0 +1,47 @@
+<app-form-card title="Edit Sub-Admin" subtitle="Update sub-admin account details" icon="edit" [showBackButton]="true" (backClicked)="goBack()">
+  @if (isLoading()) {
+    <div class="edit-sub-admin__loading">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  } @else {
+    <form [formGroup]="editForm" (ngSubmit)="onSubmit()" class="edit-sub-admin__form">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Admin User ID</mat-label>
+        <input matInput formControlName="admin_user_id" />
+        <mat-icon matPrefix>badge</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Name</mat-label>
+        <input matInput formControlName="name" />
+        <mat-icon matPrefix>person</mat-icon>
+        <mat-error><app-validation-message [control]="editForm.controls['name']" label="Name" /></mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Email</mat-label>
+        <input matInput formControlName="email" type="email" />
+        <mat-icon matPrefix>email</mat-icon>
+        <mat-error><app-validation-message [control]="editForm.controls['email']" label="Email" /></mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Mobile No</mat-label>
+        <input matInput formControlName="mobile_no" type="tel" />
+        <mat-icon matPrefix>phone</mat-icon>
+      </mat-form-field>
+
+      <button
+        mat-flat-button
+        type="submit"
+        class="edit-sub-admin__submit"
+        [disabled]="isSaving()">
+        @if (isSaving()) {
+          <mat-spinner diameter="20"></mat-spinner>
+        } @else {
+          Save Changes
+        }
+      </button>
+    </form>
+  }
+</app-form-card>

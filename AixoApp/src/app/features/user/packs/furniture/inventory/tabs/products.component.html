@@ -1,0 +1,196 @@
+<div>
+  <!-- Top action bar -->
+  <div class="mb-3 flex items-center justify-end">
+    <button
+      type="button"
+      (click)="openAddModal()"
+      class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+    >
+      + Add product
+    </button>
+  </div>
+
+  <!-- Filter strip -->
+  <div class="mb-4 flex flex-wrap items-center gap-3">
+    <div class="relative max-w-md flex-1 min-w-[16rem]">
+      <lucide-icon
+        name="search"
+        class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+      ></lucide-icon>
+      <input
+        type="search"
+        [formControl]="searchControl"
+        placeholder="Search SKU or product name"
+        class="block w-full rounded-md border border-zinc-300 bg-white py-1.5 pl-8 pr-3 text-sm placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      />
+    </div>
+
+    <select
+      (change)="onWarehouseChange($event)"
+      class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+    >
+      <option value="">All warehouses</option>
+      @for (w of warehouses(); track w.id) {
+        <option [value]="w.id">{{ w.name }}</option>
+      }
+    </select>
+
+    <label class="flex items-center gap-2 text-sm text-zinc-700">
+      <input
+        type="checkbox"
+        [checked]="activeOnly()"
+        (change)="toggleActiveOnly()"
+        class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+      />
+      Active only
+    </label>
+
+    <div class="ml-auto flex items-center gap-2">
+      <span class="text-xs text-zinc-500"
+        >{{ total() }} {{ total() === 1 ? 'item' : 'items' }}</span
+      >
+      <div class="inline-flex overflow-hidden rounded-md border border-zinc-300">
+        <button
+          type="button"
+          (click)="setViewMode('grid')"
+          [class]="
+            'px-3 py-1.5 text-xs font-medium ' +
+            (viewMode() === 'grid'
+              ? 'bg-zinc-900 text-white'
+              : 'bg-white text-zinc-700 hover:bg-zinc-50')
+          "
+        >
+          Grid
+        </button>
+        <button
+          type="button"
+          (click)="setViewMode('list')"
+          [class]="
+            'px-3 py-1.5 text-xs font-medium ' +
+            (viewMode() === 'list'
+              ? 'bg-zinc-900 text-white'
+              : 'bg-white text-zinc-700 hover:bg-zinc-50')
+          "
+        >
+          List
+        </button>
+      </div>
+    </div>
+  </div>
+
+  @if (loadError(); as err) {
+    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      {{ err }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+      Loading…
+    </div>
+  } @else if (items().length === 0) {
+    <div
+      class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+    >
+      No inventory items match these filters yet.
+    </div>
+  } @else if (viewMode() === 'grid') {
+    <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      @for (item of items(); track item.id) {
+        <li>
+          <app-fp-product-card [item]="item" [warehouseLabel]="warehouseLabelFor(item)" />
+        </li>
+      }
+    </ul>
+  } @else {
+    <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <table class="min-w-full divide-y divide-zinc-200 text-sm">
+        <thead class="bg-zinc-50">
+          <tr>
+            <th
+              class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+            >
+              SKU
+            </th>
+            <th
+              class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Material
+            </th>
+            <th
+              class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Color
+            </th>
+            <th
+              class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Warehouse
+            </th>
+            <th
+              class="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+            >
+              On Hand
+            </th>
+            <th
+              class="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Reorder
+            </th>
+            <th
+              class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Status
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-100">
+          @for (item of items(); track item.id) {
+            @let badge = statusFor(item);
+            <tr>
+              <td class="whitespace-nowrap px-3 py-2 font-mono text-xs text-zinc-900">
+                {{ item.sku }}
+              </td>
+              <td class="whitespace-nowrap px-3 py-2 text-zinc-700">{{ item.material || '—' }}</td>
+              <td class="whitespace-nowrap px-3 py-2 text-zinc-700">{{ item.color || '—' }}</td>
+              <td class="whitespace-nowrap px-3 py-2 text-zinc-700">
+                {{ warehouseLabelFor(item) ?? '—' }}
+              </td>
+              <td class="whitespace-nowrap px-3 py-2 text-right font-medium text-zinc-900">
+                {{ item.qty_on_hand }}
+              </td>
+              <td class="whitespace-nowrap px-3 py-2 text-right text-zinc-700">
+                {{ item.reorder_level }}
+              </td>
+              <td class="whitespace-nowrap px-3 py-2">
+                <span
+                  [class]="
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ' +
+                    badge.cls
+                  "
+                >
+                  {{ badge.label }}
+                </span>
+                @if (item.is_best_seller) {
+                  <span
+                    class="ml-1 inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700 ring-1 ring-violet-200"
+                  >
+                    ★
+                  </span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (modalOpen()) {
+    <app-fp-add-product-modal
+      [warehouses]="warehouses()"
+      (created)="onProductCreated($event)"
+      (cancel)="onAddCancel()"
+    />
+  }
+</div>

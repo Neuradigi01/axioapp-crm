@@ -1,0 +1,82 @@
+<div class="space-y-2">
+  @if (rules().length === 0) {
+    <p class="text-xs text-zinc-500 italic">
+      No conditions — this trigger fires on every matching event.
+    </p>
+  }
+
+  <datalist id="field-suggestions-condition-builder">
+    @for (path of fieldSuggestions(); track path) {
+      <option [value]="path"></option>
+    }
+  </datalist>
+
+  @for (rule of rules(); track $index; let i = $index; let last = $last) {
+    <div class="flex items-center gap-2">
+      <input
+        type="text"
+        list="field-suggestions-condition-builder"
+        [value]="rule.field"
+        (input)="onFieldChange(i, $any($event.target).value)"
+        [disabled]="disabled()"
+        placeholder="e.g. contact.email"
+        class="flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-mono focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+      />
+      <select
+        [value]="rule.op"
+        (change)="onOpChange(i, $any($event.target).value)"
+        [disabled]="disabled()"
+        class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+      >
+        @for (op of OP_OPTIONS; track op.value) {
+          <option [value]="op.value">{{ op.label }}</option>
+        }
+      </select>
+      @if (opNeedsValue(rule.op)) {
+        <input
+          type="text"
+          [value]="rule.value"
+          (input)="onValueChange(i, $any($event.target).value)"
+          [disabled]="disabled()"
+          placeholder="value"
+          class="flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+        />
+      } @else {
+        <span class="flex-1 px-2 py-1 text-xs text-zinc-400 italic"> (no value needed) </span>
+      }
+      <button
+        type="button"
+        (click)="removeRule(i)"
+        [disabled]="disabled()"
+        class="rounded-md border border-zinc-300 bg-white p-1 text-zinc-500 hover:bg-zinc-50 disabled:opacity-50"
+        aria-label="Remove rule"
+      >
+        <lucide-icon name="x" size="12" />
+      </button>
+    </div>
+    @if (!last) {
+      <div class="ml-1 flex items-center gap-2 text-[10px] uppercase tracking-wider text-zinc-400">
+        <span class="h-px flex-1 bg-zinc-200"></span>
+        <button
+          type="button"
+          (click)="toggleConjunction()"
+          [disabled]="disabled()"
+          class="rounded bg-zinc-100 px-1.5 py-0.5 font-semibold text-zinc-600 hover:bg-zinc-200 disabled:opacity-50"
+        >
+          {{ conjunction() === 'all' ? 'AND' : 'OR' }} · click to switch
+        </button>
+        <span class="h-px flex-1 bg-zinc-200"></span>
+      </div>
+    }
+  }
+
+  <button
+    type="button"
+    (click)="addRule()"
+    [disabled]="disabled()"
+    class="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+  >
+    <lucide-icon name="plus" size="12" />
+    Add condition
+  </button>
+</div>

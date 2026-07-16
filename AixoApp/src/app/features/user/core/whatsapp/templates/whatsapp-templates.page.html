@@ -1,0 +1,294 @@
+<div class="flex min-h-[calc(100vh-4rem)] flex-col bg-zinc-50">
+  <!-- tasks/template-library Step 9 — central-library migration banner.
+       The legacy WA wizard below still works; the new central library
+       is the preferred surface for new templates (all channels in one
+       place + a unified review workflow). Removed in a follow-up
+       cleanup PR once operators have switched. -->
+  <div class="border-b border-blue-200 bg-blue-50 px-6 py-2 text-xs text-blue-900">
+    <a
+      [routerLink]="['/user/templates']"
+      [queryParams]="{ channel: 'whatsapp' }"
+      class="inline-flex items-center gap-1 font-medium hover:underline"
+    >
+      <lucide-icon name="arrow-right" size="12" />
+      Open in the new central template library
+    </a>
+    <span class="ml-2 text-blue-700">
+      — all channels (WhatsApp, Email, SMS, …) live there now. This page is kept around for one
+      release.
+    </span>
+  </div>
+
+  <header class="border-b border-zinc-200 bg-white px-6 py-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-semibold text-zinc-900">WhatsApp templates</h1>
+        <p class="text-xs text-zinc-500">
+          Author, submit and manage your Meta-approved message templates without leaving Core CRM.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          (click)="reload()"
+          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          <lucide-icon name="refresh-cw" size="14" />
+          Refresh
+        </button>
+        @if (canWrite()) {
+          <button
+            type="button"
+            (click)="openCreate()"
+            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800"
+          >
+            <lucide-icon name="plus" size="14" />
+            Create template
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (toast(); as msg) {
+      <div
+        class="mt-3 flex items-start justify-between gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700"
+      >
+        <span class="flex-1">{{ msg }}</span>
+        <button
+          type="button"
+          (click)="dismissToast()"
+          class="text-zinc-500 hover:text-zinc-700"
+          aria-label="Dismiss"
+        >
+          <lucide-icon name="x" size="12" />
+        </button>
+      </div>
+    }
+    @if (loadError(); as err) {
+      <div
+        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+      >
+        {{ err }}
+      </div>
+    }
+  </header>
+
+  @if (viewingPerformance(); as perfRow) {
+    <section class="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
+      <div class="mb-4 flex items-center gap-2 text-xs text-zinc-500">
+        <button
+          type="button"
+          (click)="closePerformance()"
+          class="inline-flex items-center gap-1 rounded text-zinc-600 hover:text-zinc-900"
+        >
+          <lucide-icon name="arrow-left" size="12" />
+          Back to list
+        </button>
+        <span>·</span>
+        <span class="font-medium text-zinc-700">Performance</span>
+      </div>
+      <app-template-performance [template]="perfRow" />
+    </section>
+  } @else if (wizardMode() !== null) {
+    <section class="mx-auto w-full max-w-5xl flex-1 px-6 py-6">
+      <div class="mb-4 flex items-center gap-2 text-xs text-zinc-500">
+        <button
+          type="button"
+          (click)="closeWizard()"
+          class="inline-flex items-center gap-1 rounded text-zinc-600 hover:text-zinc-900"
+        >
+          <lucide-icon name="arrow-left" size="12" />
+          Back to list
+        </button>
+        <span>·</span>
+        <span class="font-medium text-zinc-700">
+          {{ wizardMode() === 'edit' ? 'Edit template' : 'New template' }}
+        </span>
+      </div>
+      <app-template-wizard
+        [initialTemplate]="editingTemplate()"
+        [submitting]="wizardSubmitting()"
+        [serverError]="wizardError()"
+        (submit)="onWizardSubmit($event)"
+        (cancel)="closeWizard()"
+      />
+    </section>
+  } @else {
+    <section class="flex-1 px-6 py-4">
+      <!-- Filters + search -->
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-1">
+          @for (tab of FILTER_TABS; track tab.key) {
+            <button
+              type="button"
+              (click)="setFilter(tab.key)"
+              [class]="
+                'rounded-full px-3 py-1 text-xs font-medium ring-1 ' +
+                (activeFilter() === tab.key
+                  ? 'bg-zinc-900 text-white ring-zinc-900'
+                  : 'bg-white text-zinc-700 ring-zinc-200 hover:bg-zinc-50')
+              "
+            >
+              {{ tab.label }}
+            </button>
+          }
+        </div>
+        <div class="relative">
+          <lucide-icon
+            name="search"
+            class="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400"
+          />
+          <input
+            type="search"
+            [ngModel]="searchQuery()"
+            (ngModelChange)="onSearchChange($event)"
+            placeholder="Search by name…"
+            class="w-64 rounded-md border border-zinc-300 bg-white py-1.5 pl-7 pr-3 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        @if (loading()) {
+          <div class="px-6 py-8 text-center text-sm text-zinc-500">Loading…</div>
+        } @else if (filteredItems().length === 0) {
+          <div class="px-6 py-12 text-center">
+            <p class="text-sm font-medium text-zinc-700">
+              @if (items().length === 0) {
+                No templates yet.
+              } @else {
+                No templates match the current filter.
+              }
+            </p>
+            @if (items().length === 0 && canWrite()) {
+              <button
+                type="button"
+                (click)="openCreate()"
+                class="mt-3 inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800"
+              >
+                <lucide-icon name="plus" size="14" />
+                Create your first template
+              </button>
+            }
+          </div>
+        } @else {
+          <table class="w-full text-sm">
+            <thead
+              class="bg-zinc-50 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500"
+            >
+              <tr>
+                <th class="px-4 py-2">Name</th>
+                <th class="px-4 py-2">Category</th>
+                <th class="px-4 py-2">Language</th>
+                <th class="px-4 py-2">Status</th>
+                <th class="px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of filteredItems(); track row.id) {
+                <tr class="border-t border-zinc-100 hover:bg-zinc-50">
+                  <td class="px-4 py-3">
+                    <p class="font-mono text-xs font-medium text-zinc-900">
+                      {{ row.name }}
+                    </p>
+                    <p class="line-clamp-1 text-[11px] text-zinc-500">
+                      {{ row.body }}
+                    </p>
+                    @if (row.submission_status === 'rejected' && row.rejection_reason) {
+                      <p
+                        class="mt-1 inline-flex items-center gap-1 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700"
+                      >
+                        <lucide-icon name="alert-triangle" size="10" />
+                        {{ row.rejection_reason }}
+                      </p>
+                    }
+                  </td>
+                  <td class="px-4 py-3 text-xs text-zinc-700">{{ row.category }}</td>
+                  <td class="px-4 py-3 text-xs text-zinc-700">{{ row.language }}</td>
+                  <td class="px-4 py-3">
+                    <span
+                      [class]="
+                        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ' +
+                        STATUS_BADGE[row.submission_status].classes
+                      "
+                    >
+                      {{ STATUS_BADGE[row.submission_status].label }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-right text-xs">
+                    <div class="inline-flex items-center gap-1">
+                      @if (row.submission_status === 'approved') {
+                        <button
+                          type="button"
+                          (click)="openPerformance(row)"
+                          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                          title="Performance"
+                          aria-label="Performance"
+                        >
+                          <lucide-icon name="trending-up" size="12" />
+                          Metrics
+                        </button>
+                      }
+                      @if (
+                        (row.submission_status === 'draft' ||
+                          row.submission_status === 'rejected') &&
+                        canSubmit()
+                      ) {
+                        <button
+                          type="button"
+                          (click)="submitToMeta(row)"
+                          [disabled]="busyRowId() === row.id"
+                          class="rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          {{ row.submission_status === 'rejected' ? 'Resubmit' : 'Submit' }}
+                        </button>
+                      }
+                      @if (
+                        (row.submission_status === 'draft' ||
+                          row.submission_status === 'rejected') &&
+                        canWrite()
+                      ) {
+                        <button
+                          type="button"
+                          (click)="openEdit(row)"
+                          class="rounded p-1 text-zinc-500 hover:bg-zinc-100"
+                          title="Edit"
+                          aria-label="Edit"
+                        >
+                          <lucide-icon name="pencil" size="14" />
+                        </button>
+                      }
+                      @if (canWrite()) {
+                        <button
+                          type="button"
+                          (click)="duplicate(row)"
+                          [disabled]="busyRowId() === row.id"
+                          class="rounded p-1 text-zinc-500 hover:bg-zinc-100 disabled:opacity-50"
+                          title="Duplicate"
+                          aria-label="Duplicate"
+                        >
+                          <lucide-icon name="copy" size="14" />
+                        </button>
+                        <button
+                          type="button"
+                          (click)="confirmDelete(row)"
+                          [disabled]="busyRowId() === row.id"
+                          class="rounded p-1 text-rose-500 hover:bg-rose-50 disabled:opacity-50"
+                          title="Delete"
+                          aria-label="Delete"
+                        >
+                          <lucide-icon name="trash-2" size="14" />
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    </section>
+  }
+</div>

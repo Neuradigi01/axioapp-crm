@@ -1,0 +1,83 @@
+<div class="space-y-3">
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">
+      Template (email channel, published)
+    </label>
+    <input
+      type="text"
+      [ngModel]="state().templateId"
+      (ngModelChange)="onTemplateChange($event)"
+      placeholder="template UUID — pick via Step 16 gallery"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500 font-mono"
+    />
+    @if (!state().templateId) {
+      <p class="text-[10px] text-rose-600 mt-1">Template is required.</p>
+    }
+  </div>
+
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Recipient</label>
+    <select
+      [ngModel]="state().recipient"
+      (ngModelChange)="onRecipientChange($event)"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+    >
+      <option value="">— pick a recipient —</option>
+      @for (r of recipientOptions; track r.value) {
+        <option [value]="r.value">{{ r.label }}</option>
+      }
+    </select>
+    @if (state().recipient === 'custom') {
+      <input
+        type="text"
+        [ngModel]="state().customRecipient"
+        (ngModelChange)="onCustomChange($event)"
+        placeholder="dotted path (e.g. lead.assigned_to.email) or literal email"
+        class="mt-1 w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+      />
+    }
+    @if (
+      !state().recipient || (state().recipient === 'custom' && !state().customRecipient.trim())
+    ) {
+      <p class="text-[10px] text-rose-600 mt-1">Recipient is required.</p>
+    }
+  </div>
+
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Category</label>
+    <select
+      [ngModel]="state().category"
+      (ngModelChange)="onCategoryChange($event)"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+    >
+      @for (c of categoryOptions; track c.value) {
+        <option [value]="c.value">{{ c.label }}</option>
+      }
+    </select>
+    @for (c of categoryOptions; track c.value) {
+      @if (c.value === state().category) {
+        <p class="text-[10px] text-zinc-500 mt-1">{{ c.description }}</p>
+      }
+    }
+  </div>
+
+  <fieldset class="border border-zinc-200 rounded p-2">
+    <legend class="text-[10px] uppercase tracking-wider text-zinc-500 px-1">Tracking</legend>
+    <label class="flex items-center gap-2 text-xs">
+      <input
+        type="checkbox"
+        [ngModel]="trackOpens()"
+        (ngModelChange)="onTrackOpensChange($event)"
+      />
+      Track opens
+    </label>
+    <label class="flex items-center gap-2 text-xs mt-1">
+      <input
+        type="checkbox"
+        [ngModel]="trackClicks()"
+        (ngModelChange)="onTrackClicksChange($event)"
+      />
+      Track clicks
+    </label>
+  </fieldset>
+</div>

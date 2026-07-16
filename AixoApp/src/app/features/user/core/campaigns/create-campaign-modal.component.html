@@ -1,0 +1,414 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 px-4">
+  <div class="w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl max-h-[90vh] overflow-y-auto">
+    <header class="mb-4">
+      <h2 class="text-lg font-semibold text-zinc-900">New campaign</h2>
+      <p class="mt-1 text-xs text-zinc-500">
+        Save as draft. Click <span class="font-medium">Start</span> from the list when you're ready
+        to send.
+      </p>
+    </header>
+
+    <form [formGroup]="form" (ngSubmit)="save()" class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <label class="block text-sm">
+          <span class="block text-xs font-medium text-zinc-600">Name</span>
+          <input
+            type="text"
+            formControlName="name"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+        </label>
+        <label class="block text-sm">
+          <span class="block text-xs font-medium text-zinc-600">Channel</span>
+          <select
+            formControlName="channel"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          >
+            @for (c of channels; track c.value) {
+              <option [value]="c.value">{{ c.label }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      <!-- WhatsApp send-capacity banner — Step 3.5.16 -->
+      @if (isWhatsAppChannel() && capacity(); as c) {
+        <div
+          class="rounded-md border p-3 text-xs"
+          [class.border-emerald-200]="capacityBand() === 'green'"
+          [class.bg-emerald-50]="capacityBand() === 'green'"
+          [class.border-amber-200]="capacityBand() === 'amber'"
+          [class.bg-amber-50]="capacityBand() === 'amber'"
+          [class.border-rose-200]="capacityBand() === 'red'"
+          [class.bg-rose-50]="capacityBand() === 'red'"
+          [class.border-zinc-200]="capacityBand() === null"
+          [class.bg-zinc-50]="capacityBand() === null"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 space-y-1">
+              <div class="font-medium text-zinc-800">WhatsApp quota: {{ c.tier_label }}</div>
+              @if (c.is_unlimited) {
+                <div class="text-zinc-600">Unlimited messages today.</div>
+              } @else {
+                <div class="text-zinc-700">
+                  {{ c.used_today.toLocaleString() }} used ·
+                  <span class="font-semibold">
+                    {{ c.remaining.toLocaleString() }} remaining today
+                  </span>
+                </div>
+                <div class="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200">
+                  <div
+                    class="h-full transition-all"
+                    [class.bg-emerald-500]="capacityBand() === 'green'"
+                    [class.bg-amber-500]="capacityBand() === 'amber'"
+                    [class.bg-rose-500]="capacityBand() === 'red'"
+                    [style.width.%]="c.usage_percent"
+                  ></div>
+                </div>
+                <div class="text-[10px] text-zinc-500">
+                  Resets at 5:30 AM IST (00:00 UTC). {{ c.usage_percent }}% used.
+                </div>
+              }
+            </div>
+            <button
+              type="button"
+              (click)="refreshCapacity()"
+              [disabled]="capacityLoading()"
+              class="shrink-0 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+            >
+              {{ capacityLoading() ? 'Refreshing…' : 'Refresh' }}
+            </button>
+          </div>
+        </div>
+      }
+
+      <fieldset class="rounded-md border border-zinc-200 p-3 space-y-3">
+        <legend class="px-1 text-xs font-medium text-zinc-600">Audience</legend>
+        <!-- 3-mode radio toggle (Step 3.5.9) -->
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <button
+            type="button"
+            class="rounded-md border p-2 text-left transition"
+            [class.border-zinc-700]="audienceMode() === 'everyone'"
+            [class.bg-zinc-100]="audienceMode() === 'everyone'"
+            [class.border-zinc-300]="audienceMode() !== 'everyone'"
+            (click)="onAudienceModeChange('everyone')"
+          >
+            <span class="font-medium text-zinc-900">Everyone</span>
+            <p class="mt-0.5 text-[10px] text-zinc-500">All contacts in the org</p>
+          </button>
+          <button
+            type="button"
+            class="rounded-md border p-2 text-left transition"
+            [class.border-zinc-700]="audienceMode() === 'group'"
+            [class.bg-zinc-100]="audienceMode() === 'group'"
+            [class.border-zinc-300]="audienceMode() !== 'group'"
+            (click)="onAudienceModeChange('group')"
+          >
+            <span class="font-medium text-zinc-900">Saved group</span>
+            <p class="mt-0.5 text-[10px] text-zinc-500">Pick a contact group</p>
+          </button>
+          <button
+            type="button"
+            class="rounded-md border p-2 text-left transition"
+            [class.border-zinc-700]="audienceMode() === 'filter'"
+            [class.bg-zinc-100]="audienceMode() === 'filter'"
+            [class.border-zinc-300]="audienceMode() !== 'filter'"
+            (click)="onAudienceModeChange('filter')"
+          >
+            <span class="font-medium text-zinc-900">Custom filter</span>
+            <p class="mt-0.5 text-[10px] text-zinc-500">q / source / tag</p>
+          </button>
+        </div>
+
+        @if (audienceMode() === 'group') {
+          @if (groups().length === 0 && groupsLoaded()) {
+            <div
+              class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800"
+            >
+              No saved groups yet.
+              <a routerLink="/user/contacts/groups/new" class="font-medium underline">
+                Create one
+              </a>
+              first, then pick it here.
+            </div>
+          } @else {
+            <select
+              [value]="selectedGroupId() ?? ''"
+              (change)="onSelectedGroupChange($any($event.target).value)"
+              class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            >
+              <option value="">— Pick a saved group —</option>
+              @for (g of groups(); track g.id) {
+                <option [value]="g.id">
+                  {{ g.name }} ({{ g.is_dynamic ? 'Dynamic' : 'Static'
+                  }}{{ g.member_count !== null ? ' · ' + g.member_count + ' members' : '' }})
+                </option>
+              }
+            </select>
+          }
+        }
+
+        @if (audienceMode() === 'filter') {
+          <div class="grid grid-cols-3 gap-2">
+            <label class="block text-sm">
+              <span class="block text-[10px] text-zinc-500">Search (q)</span>
+              <input
+                type="text"
+                formControlName="audience_q"
+                placeholder="name / phone / email"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+            </label>
+            <label class="block text-sm">
+              <span class="block text-[10px] text-zinc-500">Source</span>
+              <input
+                type="text"
+                formControlName="audience_source"
+                placeholder="walk-in"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+            </label>
+            <label class="block text-sm">
+              <span class="block text-[10px] text-zinc-500">Tag</span>
+              <input
+                type="text"
+                formControlName="audience_tag"
+                placeholder="vip"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+            </label>
+          </div>
+        }
+
+        <!-- Live count preview -->
+        <div
+          class="flex items-center gap-2 rounded-md bg-zinc-50 px-2 py-1.5 text-xs text-zinc-700"
+        >
+          <lucide-icon name="users" class="h-3 w-3 text-zinc-500" />
+          @if (audienceCountLoading()) {
+            <span class="text-zinc-500">Counting…</span>
+          } @else if (audienceCount() !== null) {
+            <span>
+              <span class="font-medium">{{ audienceCount() }}</span>
+              {{ audienceCount() === 1 ? 'contact' : 'contacts' }} will receive this campaign.
+            </span>
+          } @else if (audienceMode() === 'everyone') {
+            <span class="text-zinc-500"> All contacts in the org. Counts shown after save. </span>
+          } @else {
+            <span class="text-zinc-500">
+              @if (audienceMode() === 'group') {
+                Pick a group to see the count.
+              } @else {
+                Add a filter to see the count.
+              }
+            </span>
+          }
+        </div>
+
+        <!-- Audience vs. WhatsApp quota cross-check — Step 3.5.16 -->
+        @if (audienceQuotaWarning(); as w) {
+          <div
+            class="rounded-md border px-2 py-1.5 text-xs"
+            [class.border-rose-200]="w.kind === 'error'"
+            [class.bg-rose-50]="w.kind === 'error'"
+            [class.text-rose-700]="w.kind === 'error'"
+            [class.border-amber-200]="w.kind === 'warning'"
+            [class.bg-amber-50]="w.kind === 'warning'"
+            [class.text-amber-800]="w.kind === 'warning'"
+          >
+            {{ w.message }}
+          </div>
+        }
+      </fieldset>
+
+      @if (templates().length > 0) {
+        <!-- Step 15 — central library picker (every channel) -->
+        <div class="rounded-md border border-zinc-200 p-3 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-zinc-600"> Template </span>
+            <span class="text-[10px] text-zinc-400">
+              From your template library · /user/templates
+            </span>
+          </div>
+          <select
+            [value]="selectedTemplateId() ?? ''"
+            (change)="onTemplateChange($any($event.target).value)"
+            class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          >
+            <option value="">— Pick a template (or use free text below) —</option>
+            @for (t of templates(); track t.id) {
+              <option [value]="t.id">{{ t.name }}</option>
+            }
+          </select>
+
+          @if (selectedTemplate(); as t) {
+            <!-- Preview -->
+            <div
+              class="rounded-md bg-zinc-50 p-3 text-sm text-zinc-700 whitespace-pre-wrap font-mono text-xs"
+            >
+              @if (t.subject) {
+                <div class="font-semibold mb-1">{{ t.subject }}</div>
+              }
+              {{ t.body }}
+            </div>
+
+            <!-- Variable bindings — WA-positional only.
+                 Other channels use named `{{contact.first_name}}`
+                 variables that resolve from the contact row at send
+                 time, so there's nothing for the operator to bind. -->
+            @if (templateVariableNumbers().length > 0) {
+              <div class="space-y-2">
+                <span class="text-xs font-medium text-zinc-600"> Variable bindings </span>
+                @for (n of templateVariableNumbers(); track n) {
+                  <div class="grid grid-cols-12 gap-2 items-start">
+                    <div class="col-span-2 text-xs text-zinc-700 font-mono pt-1.5">
+                      {{ '{{' + n + '}}' }}
+                    </div>
+                    <select
+                      [value]="variables()[n.toString()]?.kind ?? 'static'"
+                      (change)="onVariableKindChange(n, $any($event.target).value)"
+                      class="col-span-3 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                    >
+                      <option value="static">Static text</option>
+                      <option value="field">Contact field</option>
+                    </select>
+                    @if (variables()[n.toString()]?.kind === 'field') {
+                      <select
+                        [value]="variables()[n.toString()]?.value ?? ''"
+                        (change)="onVariableValueChange(n, $any($event.target).value)"
+                        class="col-span-7 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                      >
+                        <option value="">— Select field —</option>
+                        @for (f of contactFieldOptions; track f.value) {
+                          <option [value]="f.value">{{ f.label }}</option>
+                        }
+                      </select>
+                    } @else {
+                      <input
+                        type="text"
+                        [value]="variables()[n.toString()]?.value ?? ''"
+                        (input)="onVariableValueChange(n, $any($event.target).value)"
+                        placeholder="e.g. 30%"
+                        class="col-span-7 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                      />
+                    }
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="text-[10px] text-zinc-500">
+                Variables resolve from each contact's data at send time.
+              </p>
+            }
+          }
+        </div>
+      } @else if (templatesLoaded() && templates().length === 0) {
+        <div
+          class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+        >
+          @if (isWhatsAppChannel()) {
+            No WhatsApp templates approved by Meta yet. Create one in
+            <a routerLink="/user/templates" class="underline">/user/templates</a>, publish it, then
+            click "Submit to Meta" — once Meta approves it'll appear here. Or use the free-text
+            fallback below.
+          } @else {
+            No published templates for this channel yet. Create one in
+            <a routerLink="/user/templates" class="underline">/user/templates</a>
+            and publish it, or use the free-text fallback below.
+          }
+        </div>
+      } @else if (templatesLoading()) {
+        <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+          Loading templates…
+        </div>
+      }
+
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-600">
+          @if (selectedTemplateId()) {
+            Free-text fallback body (ignored — template selected above)
+          } @else {
+            Message body
+            <span class="ml-1 text-[10px] text-zinc-400">
+              Use <code>{{ varFullName }}</code> · <code>{{ varPhone }}</code> for personalisation
+            </span>
+          }
+        </span>
+        <textarea
+          rows="4"
+          formControlName="template"
+          [placeholder]="templatePlaceholder"
+          [class.opacity-50]="selectedTemplateId()"
+          class="mt-1 block w-full resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        ></textarea>
+      </label>
+
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-600">
+          Schedule (optional — leave blank to send when you click Start)
+        </span>
+        <input
+          type="datetime-local"
+          formControlName="schedule_at"
+          class="mt-1 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+      </label>
+
+      <!-- Step 27b — multi-number Send-From picker. Self-hides when
+           the org has < 2 connected phones; otherwise the operator
+           picks which number this campaign dispatches from. -->
+      <div class="mt-1">
+        <app-wa-send-from-picker
+          [value]="form.controls.send_from_phone_id.value"
+          (valueChange)="form.controls.send_from_phone_id.setValue($event)"
+        />
+      </div>
+
+      <!-- Step 29 — A/B test toggle + configuration. The section
+           component renders only when the operator turns the
+           toggle on; minimum-audience enforcement (≥ 50) lives
+           server-side on the start endpoint. -->
+      <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs">
+        <label class="flex cursor-pointer items-center gap-2">
+          <input type="checkbox" formControlName="is_ab_test" />
+          <span class="font-medium text-zinc-800">Run as an A/B test</span>
+          <span class="text-zinc-500">
+            — split the audience between two templates and let the CRM pick the winner.
+          </span>
+        </label>
+        @if (form.controls.is_ab_test.value) {
+          <div class="mt-2">
+            <app-ab-test-section [form]="form" [templates]="approvedTemplatesForPicker()" />
+          </div>
+        }
+      </div>
+
+      @if (submitError(); as err) {
+        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {{ err }}
+        </div>
+      }
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button
+          type="button"
+          (click)="close()"
+          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          [disabled]="submitting() || quotaBlocksSubmit()"
+          [title]="
+            quotaBlocksSubmit() ? 'WhatsApp daily quota reached. Resets at 5:30 AM IST.' : ''
+          "
+          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+        >
+          {{ submitting() ? 'Saving…' : 'Save draft' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

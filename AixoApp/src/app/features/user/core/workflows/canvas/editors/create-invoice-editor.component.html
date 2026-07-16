@@ -1,0 +1,38 @@
+<div class="space-y-3">
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Invoice template</label>
+    <input
+      type="text"
+      [ngModel]="templateId()"
+      (ngModelChange)="onTemplateChange($event)"
+      placeholder="template UUID"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500 font-mono"
+    />
+    @if (!templateId()) {
+      <p class="text-[10px] text-rose-600 mt-1">Template is required.</p>
+    }
+  </div>
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Amount</label>
+    <input
+      type="text"
+      [ngModel]="amount()"
+      (ngModelChange)="onAmountChange($event)"
+      placeholder="literal number or dotted path"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+    />
+    @if (!amount().trim()) {
+      <p class="text-[10px] text-rose-600 mt-1">Amount is required.</p>
+    }
+  </div>
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Due in (days)</label>
+    <input
+      type="number"
+      min="0"
+      [ngModel]="dueInDays()"
+      (ngModelChange)="onDueChange($event)"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+    />
+  </div>
+</div>

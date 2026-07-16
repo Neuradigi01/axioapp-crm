@@ -1,0 +1,396 @@
+<div class="flex min-h-0 flex-1 flex-col">
+  <!-- Header -->
+  <div class="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
+    <div class="min-w-0">
+      <p class="truncate text-sm font-semibold text-zinc-900">
+        {{ conversation.external_id }}
+      </p>
+      <p class="flex items-center gap-2 text-xs text-zinc-500 capitalize">
+        <span>{{ conversation.channel }} · {{ conversation.status }}</span>
+        <!-- Step 24 — attribution chip. Hidden for organic. -->
+        @if (conversation.acquisition_source === 'ad') {
+          <app-attribution-chip [conversationId]="conversation.id" />
+        }
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      @let ownerHeader = staffColorFor(conversation.assigned_to_id);
+      @if (canReassign()) {
+        <button
+          type="button"
+          (click)="reassign.emit()"
+          [class]="
+            'inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-xs font-medium ring-1 transition hover:opacity-90 ' +
+            ownerHeader.bg +
+            ' ' +
+            ownerHeader.text +
+            ' ' +
+            ownerHeader.ring
+          "
+          [title]="'Reassign — ' + staffNameFor(conversation.assigned_to_id)"
+        >
+          <span
+            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/50 text-[10px] font-semibold"
+          >
+            {{ staffInitialsFor(conversation.assigned_to_id) }}
+          </span>
+          {{ staffNameFor(conversation.assigned_to_id) }}
+        </button>
+      } @else {
+        <span
+          [class]="
+            'inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-xs font-medium ring-1 ' +
+            ownerHeader.bg +
+            ' ' +
+            ownerHeader.text +
+            ' ' +
+            ownerHeader.ring
+          "
+          [title]="staffNameFor(conversation.assigned_to_id)"
+        >
+          <span
+            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/50 text-[10px] font-semibold"
+          >
+            {{ staffInitialsFor(conversation.assigned_to_id) }}
+          </span>
+          {{ staffNameFor(conversation.assigned_to_id) }}
+        </span>
+      }
+      <!-- Step 14 — Tags button with chip-row preview + manager dropdown -->
+      <div class="relative">
+        <button
+          type="button"
+          (click)="toggleTagManager(); $event.stopPropagation()"
+          class="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          aria-label="Tags"
+        >
+          <lucide-icon name="tag" class="h-3 w-3" />
+          @if (conversation.tags && conversation.tags.length > 0) {
+            <span>{{ conversation.tags.length }}</span>
+          } @else {
+            <span>Tags</span>
+          }
+        </button>
+        @if (tagManagerOpen()) {
+          <app-tag-manager
+            [conversationId]="conversation.id"
+            [assignedTags]="conversation.tags || []"
+            (tagsChanged)="onTagsChanged($event)"
+            (close)="closeTagManager()"
+          />
+        }
+      </div>
+      <button
+        type="button"
+        (click)="toggle()"
+        [class]="
+          'rounded-full px-3 py-1 text-xs font-medium transition ' +
+          (conversation.ai_handling
+            ? 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+            : 'bg-amber-50 text-amber-700 hover:bg-amber-100')
+        "
+      >
+        {{ conversation.ai_handling ? 'AI Handled' : 'Needs Human' }}
+      </button>
+      <!-- Step 23 — DPDP transcript export + DND block action. -->
+      <app-conversation-export-button [conversationId]="conversation.id" />
+      @if (conversation.channel === 'whatsapp') {
+        <app-conversation-block-number-action [phoneNumber]="conversation.external_id" />
+      }
+    </div>
+  </div>
+
+  @if (conversation.tags && conversation.tags.length > 0) {
+    <div class="border-b border-zinc-100 bg-white px-4 py-2">
+      <div class="flex flex-wrap gap-1">
+        @for (t of conversation.tags; track t.id) {
+          <app-tag-chip [tag]="t" />
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Step 15 — WhatsApp 24-hour session window banner. Renders
+       nothing for non-WhatsApp conversations (the input is null). -->
+  <app-session-window-banner
+    [state]="detail?.whatsapp_session_state ?? null"
+    (pickTemplate)="pickTemplate.emit()"
+  />
+
+  <!-- Messages -->
+  <div #scrollHost class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-zinc-50 px-4 py-4">
+    @if (loading) {
+      <div class="py-6 text-center text-sm text-zinc-500">Loading thread…</div>
+    } @else if (!detail || detail.messages.length === 0) {
+      <div class="py-6 text-center text-sm text-zinc-500">
+        No messages yet — type something below to start the conversation.
+      </div>
+    } @else {
+      @for (m of detail.messages; track m.id) {
+        @let senderColor = staffColorFor(m.sender_user_id);
+        @if (m.is_internal) {
+          <!-- Step 13 — internal note bubble. Yellow border + label,
+               never sent to the customer. Notes use the out direction
+               internally but render centered with the operator's name. -->
+          <div class="flex justify-center">
+            <div
+              class="max-w-[85%] rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 shadow-sm"
+            >
+              <p
+                class="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700"
+              >
+                <lucide-icon name="sticky-note" size="10" />
+                Internal note
+                <span class="font-normal text-amber-600">
+                  · {{ staffNameFor(m.sender_user_id) }} ·
+                  {{ formatTime(m.sent_at || m.created_at) }}
+                </span>
+              </p>
+              <p class="whitespace-pre-wrap break-words">{{ m.text }}</p>
+              @if (m.mentioned_user_ids && m.mentioned_user_ids.length > 0) {
+                <p class="mt-1 text-[10px] text-amber-700">
+                  Mentioned: {{ m.mentioned_user_ids.length }}
+                  {{ m.mentioned_user_ids.length === 1 ? 'person' : 'people' }}
+                </p>
+              }
+            </div>
+          </div>
+        } @else {
+          <div
+            [class]="
+              'group relative flex ' + (m.direction === 'out' ? 'justify-end' : 'justify-start')
+            "
+          >
+            <!-- Hover action bar (Step 7). Anchored above the bubble;
+               visible on hover for pointer devices. -->
+            <div
+              [class]="
+                'pointer-events-none absolute -top-7 z-10 hidden gap-0.5 rounded-full border border-zinc-200 bg-white p-0.5 shadow-sm transition group-hover:flex group-hover:pointer-events-auto ' +
+                (m.direction === 'out' ? 'right-2' : 'left-2')
+              "
+            >
+              <button
+                type="button"
+                (click)="onReplyClick(m)"
+                class="inline-flex h-6 w-6 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100"
+                aria-label="Reply"
+                title="Reply"
+              >
+                <lucide-icon name="corner-up-left" class="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                (click)="openPicker(m.id)"
+                class="inline-flex h-6 w-6 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100"
+                aria-label="React"
+                title="React"
+              >
+                <lucide-icon name="smile" class="h-3.5 w-3.5" />
+              </button>
+              @if (m.text) {
+                <button
+                  type="button"
+                  (click)="copyText(m)"
+                  class="inline-flex h-6 w-6 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100"
+                  aria-label="Copy"
+                  title="Copy"
+                >
+                  <lucide-icon name="copy" class="h-3.5 w-3.5" />
+                </button>
+              }
+            </div>
+
+            @if (pickerOpenFor() === m.id) {
+              <div
+                [class]="'absolute -top-14 z-20 ' + (m.direction === 'out' ? 'right-2' : 'left-2')"
+              >
+                <app-reaction-picker
+                  [existing]="myReaction(m)"
+                  (pick)="pickReaction(m.id, $event)"
+                />
+              </div>
+            }
+
+            <div
+              [class]="
+                'relative max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ' +
+                (m.direction === 'out'
+                  ? 'bg-zinc-900 text-white'
+                  : 'bg-white text-zinc-900 ring-1 ring-zinc-200') +
+                (isPending(m) ? ' opacity-60' : '')
+              "
+            >
+              @if (m.reply_to_message_id) {
+                <div
+                  [class]="
+                    'mb-1 rounded-md border-l-2 px-2 py-1 text-[11px] leading-tight ' +
+                    (m.direction === 'out'
+                      ? 'border-zinc-300 bg-white/10 text-zinc-200'
+                      : 'border-zinc-400 bg-zinc-50 text-zinc-600')
+                  "
+                >
+                  <p class="truncate font-medium opacity-90">
+                    {{ quotedPreview(quotedMessage(m)) }}
+                  </p>
+                </div>
+              }
+              @if (m.direction === 'out') {
+                <span
+                  [class]="
+                    'absolute -bottom-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-semibold ring-2 ring-white ' +
+                    senderColor.bg +
+                    ' ' +
+                    senderColor.text
+                  "
+                  [title]="
+                    staffNameFor(m.sender_user_id) + ' · ' + formatTime(m.sent_at || m.created_at)
+                  "
+                >
+                  @if (m.sender_user_id) {
+                    {{ staffInitialsFor(m.sender_user_id) }}
+                  } @else {
+                    <lucide-icon name="bot" class="h-3 w-3" aria-label="Bot" />
+                  }
+                </span>
+              }
+              @if (replyAttribution(m); as attr) {
+                <p
+                  class="mb-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-[10px] font-medium text-zinc-600"
+                >
+                  ↳ Reply to: {{ attr.title }}
+                </p>
+              }
+              @if (m.text) {
+                <p class="whitespace-pre-wrap break-words">{{ m.text }}</p>
+              }
+              @switch (interactiveKind(m)) {
+                @case ('reply_buttons') {
+                  <div class="mt-2 space-y-1">
+                    @for (b of interactiveButtons(m); track b.id) {
+                      <div
+                        class="rounded border border-white/20 bg-white/10 px-2 py-1 text-center text-xs font-medium text-white"
+                      >
+                        {{ b.title }}
+                      </div>
+                    }
+                  </div>
+                }
+                @case ('cta_url') {
+                  @if (interactiveCta(m); as cta) {
+                    <a
+                      [href]="cta.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="mt-2 block rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-center text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                    >
+                      {{ cta.button_text }}
+                    </a>
+                  }
+                }
+                @case ('list') {
+                  <div class="mt-2 space-y-1 rounded border border-white/20 bg-white/10 p-2">
+                    @for (s of interactiveListSections(m); track s.title) {
+                      <p class="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+                        {{ s.title }}
+                      </p>
+                      @for (r of s.rows; track r.id) {
+                        <div class="rounded bg-white/10 px-2 py-1 text-xs">
+                          <span class="font-medium">{{ r.title }}</span>
+                          @if (r.description) {
+                            <span class="ml-1 text-[10px] opacity-80"> — {{ r.description }} </span>
+                          }
+                        </div>
+                      }
+                    }
+                  </div>
+                }
+              }
+              <!-- Step 28 — edge inbound types. Each renders distinctly
+                 in the thread; falls through to the generic
+                 "N attachment(s)" pill for media types. -->
+              @if (locationAttachment(m); as loc) {
+                <div class="mt-2">
+                  <app-location-bubble [location]="loc" />
+                </div>
+              }
+              @if (vcardAttachment(m); as vc) {
+                <div class="mt-2">
+                  <app-vcard-bubble [vcard]="vc" />
+                </div>
+              }
+              @if (stickerAttachment(m); as st) {
+                <div class="mt-2">
+                  <app-sticker-bubble [sticker]="st" />
+                </div>
+              }
+              @if (mediaAttachmentCount(m) > 0) {
+                <p class="mt-1 text-[10px] uppercase tracking-wide opacity-70">
+                  {{ mediaAttachmentCount(m) }} attachment(s)
+                </p>
+              }
+              @if (groupedReactions(m); as reactions) {
+                @if (reactions.length > 0) {
+                  <div
+                    [class]="
+                      'mt-1 flex flex-wrap items-center gap-1 ' +
+                      (m.direction === 'out' ? 'justify-end' : 'justify-start')
+                    "
+                  >
+                    @for (r of reactions; track r.emoji) {
+                      <span
+                        class="inline-flex items-center gap-0.5 rounded-full bg-white px-1.5 py-0.5 text-[11px] text-zinc-700 shadow-sm ring-1 ring-zinc-200"
+                      >
+                        <span>{{ r.emoji }}</span>
+                        @if (r.count > 1) {
+                          <span class="text-[10px] font-medium text-zinc-500">
+                            {{ r.count }}
+                          </span>
+                        }
+                      </span>
+                    }
+                  </div>
+                }
+              }
+              <p
+                [class]="
+                  'mt-1 flex items-center justify-end gap-1 text-[10px] ' +
+                  (m.direction === 'out' ? 'text-zinc-300' : 'text-zinc-500')
+                "
+              >
+                @if (m.direction === 'out' && m.is_ai) {
+                  <span
+                    class="mr-1 inline-flex items-center gap-0.5 rounded-full bg-violet-500/30 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-100 ring-1 ring-violet-300/40"
+                    title="AI-generated reply"
+                  >
+                    🤖 AI
+                  </span>
+                }
+                <span>{{ formatTime(m.sent_at || m.created_at) }}</span>
+                @if (m.direction === 'out') {
+                  @switch (tickState(m)) {
+                    @case ('read') {
+                      <lucide-icon
+                        name="check-check"
+                        class="h-3 w-3 text-sky-300"
+                        aria-label="Read"
+                      />
+                    }
+                    @case ('delivered') {
+                      <lucide-icon name="check-check" class="h-3 w-3" aria-label="Delivered" />
+                    }
+                    @case ('sent') {
+                      <lucide-icon name="check" class="h-3 w-3" aria-label="Sent" />
+                    }
+                    @case ('pending') {
+                      <lucide-icon name="clock" class="h-3 w-3" aria-label="Pending" />
+                    }
+                  }
+                }
+              </p>
+            </div>
+          </div>
+        }
+      }
+    }
+  </div>
+</div>

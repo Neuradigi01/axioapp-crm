@@ -1,0 +1,27 @@
+.route-dialog {
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    min-width: 500px;
+    padding-top: var(--spacing-sm);
+  }
+
+  &__row {
+    display: flex;
+    gap: var(--spacing-md);
+
+    mat-form-field {
+      flex: 1;
+    }
+  }
+
+  &__checkboxes {
+    display: flex;
+    gap: var(--spacing-lg);
+  }
+
+  &__spacer {
+    flex: 1;
+  }
+}

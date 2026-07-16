@@ -1,0 +1,279 @@
+<div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
+  <!-- LEFT: product grid -->
+  <section class="space-y-3">
+    <div class="relative">
+      <lucide-icon
+        name="search"
+        class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+      />
+      <input
+        type="search"
+        [formControl]="searchControl"
+        placeholder="Search products by SKU or name…"
+        class="block w-full rounded-md border border-zinc-300 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      />
+    </div>
+
+    @if (loadingItems() && items().length === 0) {
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 animate-pulse">
+        @for (i of [0, 1, 2, 3, 4, 5]; track i) {
+          <div class="h-24 rounded-md bg-zinc-100"></div>
+        }
+      </div>
+    } @else if (items().length === 0) {
+      <p
+        class="rounded-md border border-dashed border-zinc-300 bg-white py-12 text-center text-sm text-zinc-500"
+      >
+        No sellable items found. Make sure items have stock and a linked catalog row.
+      </p>
+    } @else {
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3">
+        @for (it of items(); track it.id) {
+          <button
+            type="button"
+            (click)="addToCart(it)"
+            class="group flex flex-col items-start gap-1 rounded-md border border-zinc-200 bg-white p-3 text-left shadow-sm transition hover:border-zinc-400 hover:shadow"
+          >
+            <div class="flex w-full items-start justify-between gap-2">
+              <p class="truncate text-sm font-semibold text-zinc-900">{{ it.sku }}</p>
+              <span
+                class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700"
+              >
+                {{ it.qty_on_hand }} in stock
+              </span>
+            </div>
+            <p class="truncate text-[11px] text-zinc-500">
+              {{ it.material || '—' }}
+              @if (it.color) {
+                · {{ it.color }}
+              }
+            </p>
+            <p class="mt-1 text-sm font-semibold text-zinc-900">
+              {{ resolveUnitPrice(it) | formatINR }}
+            </p>
+          </button>
+        }
+      </div>
+    }
+  </section>
+
+  <!-- RIGHT: cart + customer + payment -->
+  <aside class="space-y-3">
+    <!-- Cart -->
+    <section class="rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <header class="flex items-center justify-between border-b border-zinc-200 px-4 py-2">
+        <h2 class="text-sm font-semibold text-zinc-900">Cart</h2>
+        @if (cart().length > 0) {
+          <button
+            type="button"
+            (click)="clearCart()"
+            class="text-[11px] text-zinc-500 hover:text-red-600"
+          >
+            Clear
+          </button>
+        }
+      </header>
+      @if (cart().length === 0) {
+        <p class="px-4 py-6 text-center text-xs text-zinc-500">
+          Click a product to add it to the cart.
+        </p>
+      } @else {
+        <ul class="divide-y divide-zinc-100">
+          @for (l of cart(); track l.inv_id) {
+            <li class="px-4 py-2 text-xs">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate font-medium text-zinc-900">{{ l.display_name }}</p>
+                  <p class="text-zinc-500">
+                    {{ l.unit_price | formatINR }} ·
+                    <span class="font-medium text-zinc-700">
+                      {{ l.unit_price * l.qty | formatINR }}
+                    </span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  (click)="removeLine(l.inv_id)"
+                  class="text-zinc-400 hover:text-red-600"
+                  aria-label="Remove line"
+                >
+                  <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div class="mt-1 inline-flex items-center gap-1 rounded-md ring-1 ring-zinc-300">
+                <button
+                  type="button"
+                  (click)="changeQty(l.inv_id, -1)"
+                  [disabled]="l.qty <= 1"
+                  class="rounded-l-md px-2 py-0.5 text-xs hover:bg-zinc-100 disabled:opacity-40"
+                  aria-label="Decrease quantity"
+                >
+                  <lucide-icon name="minus" class="h-3 w-3" />
+                </button>
+                <span class="min-w-[2ch] px-1 text-center text-xs font-medium">{{ l.qty }}</span>
+                <button
+                  type="button"
+                  (click)="changeQty(l.inv_id, +1)"
+                  [disabled]="l.qty >= l.qty_on_hand"
+                  class="rounded-r-md px-2 py-0.5 text-xs hover:bg-zinc-100 disabled:opacity-40"
+                  aria-label="Increase quantity"
+                >
+                  <lucide-icon name="plus" class="h-3 w-3" />
+                </button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    <!-- Customer -->
+    <section class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <h2 class="text-sm font-semibold text-zinc-900">Customer</h2>
+      <p class="mt-0.5 text-[11px] text-zinc-500">
+        We auto-fill the name if the phone matches an existing contact.
+      </p>
+      <div class="mt-2 space-y-2">
+        <div>
+          <label class="block text-[11px] font-medium text-zinc-700">Phone</label>
+          <input
+            type="tel"
+            [formControl]="phoneControl"
+            placeholder="+91XXXXXXXXXX"
+            class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-zinc-700">Name</label>
+          <input
+            type="text"
+            [formControl]="nameControl"
+            placeholder="Customer name"
+            class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+        </div>
+        @if (matchedContact(); as c) {
+          <p class="text-[11px] text-emerald-700">
+            Matched existing contact: <span class="font-medium">{{ c.full_name }}</span>
+          </p>
+        } @else if (phoneControl.value.trim().length >= 3) {
+          <p class="text-[11px] text-zinc-500">New contact — will be created on checkout.</p>
+        }
+      </div>
+    </section>
+
+    <!-- Discount -->
+    <section class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-zinc-900">Discount</h2>
+        <div class="inline-flex overflow-hidden rounded-md ring-1 ring-zinc-300">
+          <button
+            type="button"
+            (click)="setDiscountMode('flat')"
+            class="px-2 py-0.5 text-[11px] font-medium transition"
+            [class.bg-zinc-900]="discountMode() === 'flat'"
+            [class.text-white]="discountMode() === 'flat'"
+            [class.text-zinc-700]="discountMode() !== 'flat'"
+            [class.bg-white]="discountMode() !== 'flat'"
+          >
+            Flat ₹
+          </button>
+          <button
+            type="button"
+            (click)="setDiscountMode('percent')"
+            class="px-2 py-0.5 text-[11px] font-medium transition"
+            [class.bg-zinc-900]="discountMode() === 'percent'"
+            [class.text-white]="discountMode() === 'percent'"
+            [class.text-zinc-700]="discountMode() !== 'percent'"
+            [class.bg-white]="discountMode() !== 'percent'"
+          >
+            %
+          </button>
+        </div>
+      </div>
+      <input
+        type="text"
+        inputmode="decimal"
+        [formControl]="discountValueControl"
+        [placeholder]="discountMode() === 'flat' ? '0.00' : '0–100'"
+        class="mt-2 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      />
+      <p class="mt-1 text-[11px] text-zinc-500">
+        Applied as flat: -{{ discountAmount() | formatINR }}
+      </p>
+    </section>
+
+    <!-- Payment method -->
+    <section class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <h2 class="text-sm font-semibold text-zinc-900">Payment method</h2>
+      <div class="mt-2 grid grid-cols-3 gap-2">
+        @for (m of paymentMethods; track m.id) {
+          <button
+            type="button"
+            (click)="setPaymentMethod(m.id)"
+            [class]="
+              'flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-[11px] font-medium transition ' +
+              (paymentMethod() === m.id
+                ? 'border-zinc-900 bg-zinc-900 text-white'
+                : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+            "
+          >
+            <lucide-icon [name]="m.icon" class="h-4 w-4" />
+            {{ m.label }}
+          </button>
+        }
+      </div>
+    </section>
+
+    <!-- Bill summary -->
+    <section class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <h2 class="text-sm font-semibold text-zinc-900">Bill summary</h2>
+      <dl class="mt-2 grid grid-cols-2 gap-y-1 text-sm">
+        <dt class="text-zinc-500">Subtotal</dt>
+        <dd class="text-right text-zinc-900">{{ cartSubtotal() | formatINR }}</dd>
+        <dt class="text-zinc-500">Discount</dt>
+        <dd class="text-right text-amber-700">- {{ discountAmount() | formatINR }}</dd>
+        <dt class="text-zinc-500">Tax (est. 18%)</dt>
+        <dd class="text-right text-zinc-700">{{ taxEstimate() | formatINR }}</dd>
+        <dt class="border-t border-zinc-200 pt-1 font-semibold text-zinc-900">Estimated total</dt>
+        <dd class="border-t border-zinc-200 pt-1 text-right text-lg font-semibold text-zinc-900">
+          {{ grandEstimate() | formatINR }}
+        </dd>
+      </dl>
+      <p class="mt-2 text-[10px] text-zinc-400">
+        Tax is recomputed server-side from your org settings at issue time.
+      </p>
+    </section>
+
+    @if (submitError(); as err) {
+      <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+        {{ err }}
+      </p>
+    }
+    @if (lastInvoiceNumber(); as n) {
+      <p
+        class="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200"
+      >
+        Last sale: <span class="font-semibold">INV-{{ n.toString().padStart(4, '0') }}</span>
+        — receipt opened in a new tab.
+      </p>
+    }
+
+    <button
+      type="button"
+      (click)="pay()"
+      [disabled]="!canCheckout()"
+      class="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+    >
+      @if (submitting()) {
+        <span
+          class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"
+        ></span>
+        Processing…
+      } @else {
+        <lucide-icon name="printer" class="h-4 w-4" />
+        Pay &amp; Print
+      }
+    </button>
+  </aside>
+</div>

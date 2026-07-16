@@ -1,0 +1,164 @@
+<div class="min-h-[calc(100vh-3.5rem)] bg-zinc-50">
+  <header class="h-14 flex items-center gap-3 px-6 bg-white border-b border-zinc-200">
+    @if (detail(); as d) {
+      <a
+        [routerLink]="['/user/workflows', d.workflow_id]"
+        class="p-1.5 rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
+        title="Back to workflow"
+      >
+        <lucide-icon name="ArrowLeft" class="w-4 h-4"></lucide-icon>
+      </a>
+      <h1 class="text-base font-semibold text-zinc-800">
+        Run <span class="text-zinc-500 font-mono">{{ runId().slice(0, 8) }}…</span>
+      </h1>
+      <span class="text-xs text-zinc-500">— {{ d.workflow_name }}</span>
+    } @else {
+      <a routerLink="/user/workflows" class="p-1.5 rounded text-zinc-500 hover:text-zinc-900">
+        <lucide-icon name="ArrowLeft" class="w-4 h-4"></lucide-icon>
+      </a>
+      <h1 class="text-base font-semibold text-zinc-800">Run detail</h1>
+    }
+    <div class="flex-1"></div>
+    @if (detail(); as d) {
+      <span
+        class="px-2 py-0.5 text-[11px] font-semibold rounded"
+        [ngClass]="statusClasses(d.run.status)"
+      >
+        {{ d.run.status }}
+      </span>
+    }
+  </header>
+
+  @if (loading()) {
+    <div class="px-6 py-12 text-center text-sm text-zinc-500">Loading run timeline…</div>
+  } @else if (error()) {
+    <div class="px-6 py-12 text-center text-sm text-rose-700">{{ error() }}</div>
+  } @else if (detail(); as d) {
+    <!-- Header card -->
+    <section class="px-6 py-4">
+      <div class="bg-white rounded-lg border border-zinc-200 px-4 py-3">
+        <dl class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div>
+            <dt class="text-zinc-500">Started</dt>
+            <dd class="text-zinc-800">
+              {{ d.run.started_at | date: 'medium' }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-zinc-500">Completed</dt>
+            <dd class="text-zinc-800">
+              {{ d.run.completed_at ? (d.run.completed_at | date: 'medium') : '—' }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-zinc-500">Outcome</dt>
+            <dd class="text-zinc-800">{{ d.run.outcome ?? '—' }}</dd>
+          </div>
+          <div>
+            <dt class="text-zinc-500">Contact</dt>
+            <dd>
+              @if (d.run.contact_id) {
+                <a
+                  [routerLink]="['/user/contacts', d.run.contact_id]"
+                  class="text-sky-700 hover:underline"
+                >
+                  {{ d.run.contact_id.slice(0, 8) }}…
+                </a>
+              } @else {
+                <span class="text-zinc-500">no contact (system event)</span>
+              }
+            </dd>
+          </div>
+        </dl>
+        @if (d.run.error) {
+          <p class="mt-3 text-xs text-rose-700">Run error: {{ d.run.error }}</p>
+        }
+      </div>
+    </section>
+
+    <!-- Step timeline -->
+    <section class="px-6 py-2 pb-6">
+      <div class="bg-white rounded-lg border border-zinc-200">
+        <header class="px-4 py-3 border-b border-zinc-200">
+          <h3 class="text-sm font-semibold text-zinc-800">Step timeline</h3>
+          <p class="text-[11px] text-zinc-500">
+            {{ d.steps.length }} step{{ d.steps.length === 1 ? '' : 's' }} executed.
+          </p>
+        </header>
+        <ol class="divide-y divide-zinc-100">
+          @for (step of d.steps; track step.id) {
+            <li>
+              <button
+                type="button"
+                class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-50"
+                (click)="toggleStep(step.id)"
+              >
+                <span class="font-mono text-[10px] text-zinc-400 w-7 text-right">
+                  #{{ step.step_index }}
+                </span>
+                <span
+                  class="px-2 py-0.5 text-[10px] font-semibold rounded"
+                  [ngClass]="statusClasses(step.status)"
+                >
+                  {{ step.status }}
+                </span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-zinc-800 truncate">
+                    {{ step.node_label }}
+                  </div>
+                  <div class="text-[11px] text-zinc-500 truncate">
+                    {{ step.node_type }}
+                    @if (step.output_edge_label) {
+                      · → {{ step.output_edge_label }}
+                    }
+                    @if (step.skip_reason) {
+                      · <span class="text-amber-700">{{ step.skip_reason }}</span>
+                    }
+                  </div>
+                </div>
+                <div class="text-right text-[11px] text-zinc-500">
+                  <div>{{ step.started_at | date: 'mediumTime' }}</div>
+                  <div>{{ durationLabel(step) }}</div>
+                </div>
+                <lucide-icon
+                  [name]="expandedStep() === step.id ? 'ChevronUp' : 'ChevronDown'"
+                  class="w-4 h-4 text-zinc-400"
+                ></lucide-icon>
+              </button>
+              @if (expandedStep() === step.id) {
+                <div class="px-4 pb-3 border-t border-zinc-100">
+                  @if (step.error) {
+                    <div class="mt-3">
+                      <h4 class="text-[10px] uppercase tracking-wide text-rose-600 mb-1">Error</h4>
+                      <p class="text-xs text-rose-800 font-mono">{{ step.error }}</p>
+                    </div>
+                  }
+                  @if (step.skip_reason) {
+                    <div class="mt-3">
+                      <h4 class="text-[10px] uppercase tracking-wide text-amber-700 mb-1">
+                        Why was this skipped?
+                      </h4>
+                      <p class="text-xs text-amber-900">
+                        Skip reason:
+                        <span class="font-mono">{{ step.skip_reason }}</span>
+                      </p>
+                    </div>
+                  }
+                  <div class="mt-3">
+                    <h4 class="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">Payload</h4>
+                    <pre
+                      class="text-[10px] bg-zinc-50 border border-zinc-200 rounded p-2 overflow-x-auto"
+                      >{{ step.payload | json }}</pre
+                    >
+                  </div>
+                </div>
+              }
+            </li>
+          } @empty {
+            <li class="px-4 py-3 text-xs text-zinc-500">No steps recorded.</li>
+          }
+        </ol>
+      </div>
+    </section>
+  }
+</div>

@@ -1,0 +1,68 @@
+<div
+  class="fixed inset-0 z-40 flex items-start justify-center bg-zinc-900/40 px-4 py-12"
+  (click)="onClose()"
+>
+  <div
+    class="w-full max-w-md rounded-lg border border-zinc-200 bg-white shadow-xl"
+    (click)="$event.stopPropagation()"
+  >
+    <header class="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
+      <h2 class="text-sm font-semibold text-zinc-900">Retry this run?</h2>
+      <button
+        type="button"
+        (click)="onClose()"
+        class="rounded-md border border-zinc-300 bg-white p-1 text-zinc-500 hover:bg-zinc-50"
+        aria-label="Close"
+      >
+        <lucide-icon name="x" size="14" />
+      </button>
+    </header>
+
+    <div class="px-4 py-3 text-sm text-zinc-700">
+      <p>
+        We'll re-queue this run with the same payload. The send happens through the same channel
+        adapter — if the failure was transient (network blip, rate limit), the retry should succeed.
+        If the cause was structural (invalid template variable, suppressed recipient), it'll fail
+        again with the same error.
+      </p>
+      <div
+        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+      >
+        <p class="font-semibold">Original error</p>
+        <p class="mt-1">{{ run().error ?? '(no error message recorded)' }}</p>
+      </div>
+      @if (submitError(); as err) {
+        <div
+          class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+        >
+          {{ err }}
+        </div>
+      }
+    </div>
+
+    <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 px-4 py-3">
+      <button
+        type="button"
+        (click)="onClose()"
+        [disabled]="submitting()"
+        class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        (click)="onConfirm()"
+        [disabled]="submitting()"
+        class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+      >
+        @if (submitting()) {
+          <lucide-icon name="loader-2" size="12" class="animate-spin" />
+          Retrying…
+        } @else {
+          <lucide-icon name="refresh-cw" size="12" />
+          Retry now
+        }
+      </button>
+    </footer>
+  </div>
+</div>

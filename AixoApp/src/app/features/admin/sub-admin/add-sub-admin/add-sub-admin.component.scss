@@ -1,0 +1,71 @@
+:host {
+  display: block;
+}
+
+.add-sub-admin {
+  &__loading {
+    display: flex;
+    justify-content: center;
+    padding: var(--spacing-xl);
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  &__routes-section {
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--divider-color);
+  }
+
+  &__routes-title {
+    margin: 0 0 var(--spacing-xs);
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--page-text);
+  }
+
+  &__routes-note {
+    margin: 0 0 var(--spacing-md);
+    font-size: var(--font-size-sm);
+    color: var(--page-text-secondary);
+  }
+
+  &__routes-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+  }
+
+  &__route-tree {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  &__route-parent {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__route-children {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    padding-left: var(--spacing-xl);
+    margin-top: var(--spacing-xs);
+  }
+
+  &__submit {
+    margin-top: var(--spacing-sm);
+    height: 44px;
+    min-width: 160px;
+    font-size: var(--font-size-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

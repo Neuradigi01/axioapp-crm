@@ -1,0 +1,404 @@
+<div class="h-[calc(100vh-3.5rem)] flex flex-col bg-zinc-50">
+  <!-- Header bar -->
+  <header class="h-14 flex items-center gap-3 px-4 bg-white border-b border-zinc-200 shrink-0">
+    <a
+      routerLink="/user/workflows"
+      class="p-1.5 rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
+      title="Back to workflows"
+    >
+      <lucide-icon name="ArrowLeft" class="w-4 h-4"></lucide-icon>
+    </a>
+
+    <input
+      type="text"
+      class="flex-1 max-w-md text-base font-medium bg-transparent text-zinc-800 focus:outline-none focus:border-b focus:border-zinc-400 px-1"
+      [ngModel]="state.name()"
+      (ngModelChange)="state.setName($event)"
+      placeholder="Untitled workflow"
+    />
+
+    <app-workflow-status-badge [status]="state.status()" />
+
+    @if (state.dirty()) {
+      <span class="text-[11px] text-amber-600 font-medium">• Unsaved</span>
+    }
+    @if (saving()) {
+      <span class="text-[11px] text-zinc-500">Saving…</span>
+    }
+
+    <div class="flex-1"></div>
+
+    <button
+      type="button"
+      class="px-3 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      [disabled]="!state.canUndo()"
+      (click)="state.undo()"
+      title="Undo (Ctrl+Z)"
+    >
+      <lucide-icon name="Undo2" class="w-4 h-4"></lucide-icon>
+    </button>
+    <button
+      type="button"
+      class="px-3 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      [disabled]="!state.canRedo()"
+      (click)="state.redo()"
+      title="Redo (Ctrl+Y)"
+    >
+      <lucide-icon name="Redo2" class="w-4 h-4"></lucide-icon>
+    </button>
+
+    <button
+      type="button"
+      class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+      (click)="discard()"
+      [disabled]="!state.dirty() || saving()"
+    >
+      Discard
+    </button>
+
+    <!-- Step 17 — version drawer + export + import -->
+    @if (state.workflowId(); as wfId) {
+      <a
+        [routerLink]="['/user/workflows', wfId, 'analytics']"
+        class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+        title="Analytics dashboard"
+      >
+        <lucide-icon name="BarChart3" class="w-4 h-4"></lucide-icon>
+      </a>
+    }
+    <button
+      type="button"
+      class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      [disabled]="!state.workflowId()"
+      (click)="toggleVersionDrawer()"
+      title="Version history"
+    >
+      <lucide-icon name="History" class="w-4 h-4"></lucide-icon>
+    </button>
+    <button
+      type="button"
+      class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      [disabled]="!state.workflowId()"
+      (click)="exportWorkflow()"
+      title="Export JSON"
+    >
+      <lucide-icon name="Download" class="w-4 h-4"></lucide-icon>
+    </button>
+    <button
+      type="button"
+      class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      (click)="openImportModal()"
+      title="Import JSON"
+    >
+      <lucide-icon name="Upload" class="w-4 h-4"></lucide-icon>
+    </button>
+
+    <button
+      type="button"
+      class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+      (click)="testFire()"
+      [disabled]="!state.workflowId() || testFireBusy()"
+    >
+      @if (testFireBusy()) {
+        Firing…
+      } @else {
+        Test fire
+      }
+    </button>
+
+    @if (state.workflowId() && !isABPaired()) {
+      <button
+        type="button"
+        class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50 inline-flex items-center gap-1.5"
+        (click)="openPairModal()"
+        title="Run an A/B test against a sibling draft"
+      >
+        <lucide-icon name="Beaker" class="w-3.5 h-3.5"></lucide-icon>
+        Run A/B test
+      </button>
+    }
+
+    @if (state.status() === 'active') {
+      <button
+        type="button"
+        class="px-3 py-1.5 text-xs rounded bg-amber-600 text-white hover:bg-amber-700"
+        (click)="pause()"
+      >
+        Pause
+      </button>
+    } @else if (state.status() === 'paused' || state.status() === 'draft') {
+      <button
+        type="button"
+        class="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700"
+        (click)="activate()"
+      >
+        Activate
+      </button>
+    }
+
+    <button
+      type="button"
+      class="px-3 py-1.5 text-xs rounded bg-zinc-900 text-white hover:bg-zinc-800"
+      (click)="save()"
+      [disabled]="!state.dirty() || saving() || viewingVersion() !== null"
+      [title]="viewingVersion() !== null ? 'Exit version preview to save' : 'Save draft'"
+    >
+      Save draft
+    </button>
+  </header>
+
+  @if (viewingVersion() !== null) {
+    <div
+      class="px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-900 text-xs flex items-center gap-2"
+    >
+      <lucide-icon name="History" class="w-3.5 h-3.5"></lucide-icon>
+      Previewing version <strong>v{{ viewingVersion() }}</strong> — read-only.
+      <button
+        type="button"
+        class="ml-2 px-2 py-0.5 rounded bg-white border border-amber-300 text-amber-900 hover:bg-amber-100"
+        (click)="backToCurrentFromVersion()"
+      >
+        Back to current
+      </button>
+    </div>
+  }
+
+  @if (error()) {
+    <div class="px-4 py-2 bg-rose-50 border-b border-rose-200 text-rose-800 text-xs">
+      {{ error() }}
+    </div>
+  }
+
+  @if (isABPaired() && state.workflowId(); as wfId) {
+    <app-ab-stats-banner [workflowId]="wfId" (unpair)="unpairAB()" />
+  }
+
+  <!-- Main 3-column layout -->
+  <div class="flex-1 flex min-h-0">
+    <!-- Left palette -->
+    <aside class="w-[300px] shrink-0">
+      <app-node-palette />
+    </aside>
+
+    <!-- Canvas -->
+    <main
+      class="flex-1 relative overflow-hidden"
+      (dragover)="onDragOver($event)"
+      (drop)="onDrop($event)"
+    >
+      @if (loading()) {
+        <div class="absolute inset-0 flex items-center justify-center text-zinc-500 text-sm">
+          Loading workflow…
+        </div>
+      } @else {
+        <svg
+          #canvasRoot
+          class="absolute inset-0 w-full h-full bg-zinc-100"
+          (mousedown)="onCanvasMouseDown($event)"
+          (wheel)="onWheel($event)"
+          (contextmenu)="onCanvasContextMenu($event)"
+        >
+          <defs>
+            <pattern id="workflow-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <circle cx="2" cy="2" r="1" class="fill-zinc-300" />
+            </pattern>
+            <marker
+              id="workflow-arrow"
+              viewBox="0 0 10 10"
+              refX="9"
+              refY="5"
+              markerUnits="strokeWidth"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="rgb(148 163 184)" />
+            </marker>
+          </defs>
+
+          <rect id="workflow-bg" width="100%" height="100%" fill="url(#workflow-grid)" />
+
+          <g [attr.transform]="transform()">
+            <!-- Edges -->
+            @for (edge of state.edges(); track edge.id) {
+              @if (nodeById().get(edge.source); as src) {
+                @if (nodeById().get(edge.target); as tgt) {
+                  <g appWorkflowEdge [edge]="edge" [source]="src" [target]="tgt"></g>
+                }
+              }
+            }
+
+            <!-- Pending edge (during drag) -->
+            @if (pendingEdgePath()) {
+              <path
+                [attr.d]="pendingEdgePath()"
+                stroke="rgb(99 102 241)"
+                stroke-width="2"
+                stroke-dasharray="4 3"
+                fill="none"
+                pointer-events="none"
+              />
+            }
+
+            <!-- Nodes -->
+            @for (node of state.nodes(); track node.id) {
+              <g
+                appWorkflowNode
+                [node]="node"
+                [selected]="state.selectedNodeId() === node.id"
+                (cardMouseDown)="onNodeMouseDown($event)"
+                (selectNode)="onNodeSelect($event)"
+                (nodeContextMenu)="onNodeContextMenu($event)"
+                (outputPortDown)="onOutputPortDown($event)"
+                (inputPortUp)="onInputPortUp($event)"
+              ></g>
+            }
+          </g>
+        </svg>
+
+        <!-- Floating control panel (bottom-right) -->
+        <div
+          class="absolute bottom-4 right-4 flex items-center gap-1 bg-white border border-zinc-200 rounded-lg shadow-sm px-2 py-1.5"
+        >
+          <button
+            type="button"
+            class="px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 rounded"
+            (click)="state.setZoom(state.zoom() / 1.2)"
+            title="Zoom out"
+          >
+            <lucide-icon name="ZoomOut" class="w-4 h-4"></lucide-icon>
+          </button>
+          <span class="text-[11px] text-zinc-600 w-10 text-center"> {{ zoomPercent() }}% </span>
+          <button
+            type="button"
+            class="px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 rounded"
+            (click)="state.setZoom(state.zoom() * 1.2)"
+            title="Zoom in"
+          >
+            <lucide-icon name="ZoomIn" class="w-4 h-4"></lucide-icon>
+          </button>
+          <div class="w-px h-5 bg-zinc-200 mx-1"></div>
+          <button
+            type="button"
+            class="px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 rounded"
+            (click)="fitToView()"
+            title="Fit to view"
+          >
+            <lucide-icon name="Maximize2" class="w-4 h-4"></lucide-icon>
+          </button>
+          <button
+            type="button"
+            class="px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 rounded"
+            (click)="resetZoom()"
+            title="Reset zoom"
+          >
+            <lucide-icon name="RotateCcw" class="w-4 h-4"></lucide-icon>
+          </button>
+          <button
+            type="button"
+            class="px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 rounded"
+            (click)="autoLayout()"
+            title="Auto-layout"
+          >
+            <lucide-icon name="LayoutGrid" class="w-4 h-4"></lucide-icon>
+          </button>
+        </div>
+      }
+    </main>
+
+    <!-- Right drawer — version history (Step 17) / typed node editor (Step 15) / test-fire trace -->
+    <aside class="w-[440px] shrink-0 bg-white border-l border-zinc-200 flex flex-col">
+      @if (showVersionDrawer() && state.workflowId(); as wfId) {
+        <app-version-history-drawer
+          [workflowId]="wfId"
+          [viewingVersion]="viewingVersion()"
+          (close)="closeVersionDrawer()"
+          (viewVersion)="viewHistoricalVersion($event)"
+          (backToCurrent)="backToCurrentFromVersion()"
+          (restoreVersion)="rollbackToVersion($event)"
+        />
+      } @else if (selectedNode(); as node) {
+        <app-node-editor [node]="node" (close)="state.selectNode(null)" />
+      } @else {
+        <header class="px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-zinc-700">
+            @if (testFireTrace()) {
+              Test fire trace
+            } @else {
+              Inspector
+            }
+          </h3>
+        </header>
+        <div class="flex-1 overflow-y-auto px-4 py-4 text-sm text-zinc-700">
+          @if (testFireTrace(); as trace) {
+            <div class="space-y-2">
+              <p class="text-[11px] text-zinc-500">
+                Synthetic trace — no real sends were performed.
+              </p>
+              @for (hop of trace.steps; track $index) {
+                <div class="border border-zinc-200 rounded p-2 text-xs flex items-center gap-2">
+                  <span class="font-mono text-[10px] text-zinc-500 w-5">{{ $index + 1 }}.</span>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-medium text-zinc-800 truncate">
+                      {{ hop.node_type }}
+                    </div>
+                    @if (hop.skip_reason) {
+                      <div class="text-rose-600 text-[10px]">skipped: {{ hop.skip_reason }}</div>
+                    } @else {
+                      <div class="text-emerald-700 text-[10px]">
+                        would execute
+                        @if (hop.edge_label) {
+                          — next: {{ hop.edge_label }}
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+              <div class="text-[11px] text-zinc-500 pt-2">
+                Outcome: <strong>{{ trace.outcome }}</strong>
+              </div>
+            </div>
+          } @else {
+            <p class="text-xs text-zinc-500">
+              Select a node to configure it, or click <em>Test fire</em> to dry-run the workflow.
+            </p>
+          }
+        </div>
+      }
+    </aside>
+  </div>
+
+  <!-- Right-click context menu (nodes + empty canvas) -->
+  @if (contextMenu(); as ctx) {
+    <app-context-menu
+      [x]="ctx.x"
+      [y]="ctx.y"
+      [items]="contextMenuItems()"
+      (menuSelect)="onContextMenuSelect($event)"
+      (menuClose)="closeContextMenu()"
+    />
+  }
+
+  <!-- Step 17 — save-change-note modal -->
+  <app-save-change-note-modal
+    [open]="showChangeNoteModal()"
+    [busy]="saving()"
+    (cancel)="cancelChangeNote()"
+    (confirm)="confirmChangeNote($event)"
+  />
+
+  <!-- Step 17 — import JSON modal -->
+  @if (showImportModal()) {
+    <app-import-modal (cancel)="cancelImport()" (confirm)="confirmImport($event)" />
+  }
+
+  <!-- Step 18 — A/B pair modal -->
+  @if (showPairModal() && loadedWorkflow(); as primary) {
+    <app-ab-pair-modal
+      [primary]="primary"
+      (cancel)="cancelPair()"
+      (confirm)="confirmPair($event)"
+    />
+  }
+</div>
