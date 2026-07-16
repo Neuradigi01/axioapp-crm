@@ -119,8 +119,12 @@ async def list_templates(
     q: str | None = None,
     limit: int = 50,
     offset: int = 0,
-) -> tuple[list[MessageTemplate], int]:
-    """Filterable + paginated list. Returns ``(rows, total)``."""
+) -> tuple[list[tuple[MessageTemplate, str | None]], int]:
+    """Filterable + paginated list. Returns ``(rows, total)`` where each
+    row is ``(MessageTemplate, external_rejection_reason)`` — the reason
+    is the WhatsApp extension's rejection text (Step 02 of
+    ``tasks/campaigns-page-update``); ``None`` for non-WA rows or
+    unrejected WA rows."""
     return await data_access.list_templates(
         session,
         org_id=org_id,

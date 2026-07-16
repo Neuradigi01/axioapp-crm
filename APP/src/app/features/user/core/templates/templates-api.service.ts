@@ -38,6 +38,11 @@ export interface TemplateRead {
   variables: string[];
   internal_status: TemplateInternalStatus;
   external_status: TemplateExternalStatus;
+  /** Campaigns v1 Step 02 — Meta rejection reason surfaced by the list
+   *  endpoint (LEFT OUTER JOIN onto the WhatsApp extension). Populated
+   *  for rejected WA rows; `null` for every other case. Drives the
+   *  library + campaign picker tooltip on the status badge. */
+  external_rejection_reason: string | null;
   external_provider_id: string | null;
   current_version: number;
   created_by_user_id: string | null;

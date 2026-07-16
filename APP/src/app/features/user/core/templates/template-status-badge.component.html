@@ -1,8 +1,46 @@
 @if (descriptor(); as d) {
-  <span
-    class="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
-    [class]="d.classes"
-  >
-    {{ d.label }}
-  </span>
+  @if (showRejectionTooltip()) {
+    <!-- Campaigns v1 Step 02 — hover reveals Meta's rejection reason.
+         Pure Tailwind `group-hover:` — no JS positioning library.
+         The badge is NOT wrapped in an extra `<button>` / `tabindex`
+         because it renders inside the picker's parent `<button>` in
+         Screen 3 (nested interactive elements are invalid HTML). The
+         `title` attribute is the keyboard + screen-reader fallback so
+         users who can't hover still see the rejection reason. -->
+    <span
+      class="group relative inline-flex"
+      [title]="'Meta rejection reason: ' + rejectionReason()"
+    >
+      <span
+        class="inline-flex cursor-help items-center rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+        [class]="d.classes"
+      >
+        {{ d.label }}
+      </span>
+      <span
+        role="tooltip"
+        aria-live="polite"
+        class="pointer-events-none invisible absolute bottom-full left-1/2 z-10 mb-2 w-60 -translate-x-1/2 rounded-md bg-zinc-900 px-3 py-2 text-left text-[11px] leading-snug text-white opacity-0 shadow-lg transition-opacity duration-100 group-hover:visible group-hover:opacity-100"
+      >
+        <span class="mb-1 block font-semibold">Meta rejection reason</span>
+        <span class="block whitespace-normal break-words text-white/90">
+          {{ rejectionReason() }}
+        </span>
+        <span class="mt-1 block text-[10px] text-white/60">
+          Update the template and resubmit.
+        </span>
+        <span
+          class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-zinc-900"
+          aria-hidden="true"
+        ></span>
+      </span>
+    </span>
+  } @else {
+    <span
+      class="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+      [class]="d.classes"
+    >
+      {{ d.label }}
+    </span>
+  }
 }

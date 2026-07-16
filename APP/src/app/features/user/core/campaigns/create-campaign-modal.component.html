@@ -266,7 +266,10 @@
                 </span>
                 @if (t.channel === 'whatsapp') {
                   <span class="shrink-0 pt-0.5">
-                    <app-template-status-badge [external]="t.externalStatus" />
+                    <app-template-status-badge
+                      [external]="t.externalStatus"
+                      [rejectionReason]="t.externalRejectionReason"
+                    />
                   </span>
                 }
               </button>

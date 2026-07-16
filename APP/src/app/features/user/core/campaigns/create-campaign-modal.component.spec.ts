@@ -31,6 +31,7 @@ function makeTemplate(overrides: Partial<TemplateRead> = {}): TemplateRead {
     variables: [],
     internal_status: 'published',
     external_status: 'approved',
+    external_rejection_reason: null,
     external_provider_id: null,
     current_version: 1,
     created_by_user_id: null,

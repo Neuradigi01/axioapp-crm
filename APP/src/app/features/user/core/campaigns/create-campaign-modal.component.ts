@@ -66,6 +66,10 @@ interface PickerRow {
   category: TemplateCategory;
   language: string;
   externalStatus: TemplateExternalStatus;
+  /** Campaigns v1 Step 02 — Meta's rejection text on WhatsApp rows,
+   *  fed into the status badge's hover tooltip so the operator sees
+   *  why a template can't be selected without leaving the CRM. */
+  externalRejectionReason: string | null;
 }
 
 function toPickerRow(row: TemplateRead): PickerRow {
@@ -78,6 +82,7 @@ function toPickerRow(row: TemplateRead): PickerRow {
     category: row.category,
     language: row.language,
     externalStatus: row.external_status,
+    externalRejectionReason: row.external_rejection_reason,
   };
 }
 

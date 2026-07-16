@@ -20,6 +20,7 @@ function makeTemplate(): TemplateRead {
     variables: [],
     internal_status: 'in_review',
     external_status: 'n_a',
+    external_rejection_reason: null,
     external_provider_id: null,
     current_version: 1,
     created_by_user_id: null,

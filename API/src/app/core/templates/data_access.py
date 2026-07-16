@@ -25,6 +25,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.conversations.models import ConversationChannel
+from src.app.core.integrations.whatsapp.models import WhatsAppTemplate
 from src.app.core.templates.models import (
     MessageTemplate,
     MessageTemplateVersion,
@@ -110,9 +111,13 @@ async def list_templates(
     q: str | None = None,
     limit: int = 50,
     offset: int = 0,
-) -> tuple[list[MessageTemplate], int]:
+) -> tuple[list[tuple[MessageTemplate, str | None]], int]:
     """Filterable + paginated list. ``q`` matches against ``name`` or
-    ``body_text`` (case-insensitive). Returns ``(rows, total)``."""
+    ``body_text`` (case-insensitive). Returns ``(rows, total)`` where
+    each row is ``(MessageTemplate, external_rejection_reason)`` — the
+    reason is a LEFT OUTER JOIN onto the WhatsApp extension so
+    Meta-rejected rows carry their reason without an N+1 fetch. Non-WA
+    rows always come back with reason=None."""
     base = select(MessageTemplate).where(MessageTemplate.org_id == org_id)
 
     if channel is not None:
@@ -132,16 +137,39 @@ async def list_templates(
 
     total = (await session.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
 
-    rows = (
-        (
-            await session.execute(
-                base.order_by(MessageTemplate.updated_at.desc()).offset(offset).limit(limit)
+    # Attach the WhatsApp extension's rejection_reason via LEFT OUTER JOIN.
+    # message_template_id is the reciprocal FK back to tbl_message_templates,
+    # one-to-one for WA rows and NULL for every other channel.
+    listing = (
+        select(MessageTemplate, WhatsAppTemplate.rejection_reason)
+        .outerjoin(
+            WhatsAppTemplate,
+            WhatsAppTemplate.message_template_id == MessageTemplate.id,
+        )
+        .where(MessageTemplate.org_id == org_id)
+    )
+    if channel is not None:
+        listing = listing.where(MessageTemplate.channel == channel)
+    if internal_status is not None:
+        listing = listing.where(MessageTemplate.internal_status == internal_status)
+    if external_status is not None:
+        listing = listing.where(MessageTemplate.external_status == external_status)
+    if q:
+        pattern = f"%{q.lower()}%"
+        listing = listing.where(
+            or_(
+                func.lower(MessageTemplate.name).like(pattern),
+                func.lower(MessageTemplate.body_text).like(pattern),
             )
         )
-        .scalars()
-        .all()
+
+    result = await session.execute(
+        listing.order_by(MessageTemplate.updated_at.desc()).offset(offset).limit(limit)
     )
-    return list(rows), int(total)
+    rows: list[tuple[MessageTemplate, str | None]] = [
+        (row[0], row[1]) for row in result.all()
+    ]
+    return rows, int(total)
 
 
 # --- tbl_message_template_versions --------------------------------------

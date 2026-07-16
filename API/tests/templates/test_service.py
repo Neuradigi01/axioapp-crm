@@ -308,7 +308,12 @@ async def test_list_filters_and_paginates(test_db, two_orgs):
             channel=ConversationChannel.email,
         )
         assert total == 4
-        assert all(r.channel == ConversationChannel.email for r in rows)
+        # Campaigns v1 Step 02 — DAL now returns
+        # ``(MessageTemplate, external_rejection_reason)`` tuples so the
+        # library list + campaign picker can render Meta's rejection
+        # reason inline. Non-WA rows always come back with None.
+        assert all(tpl.channel == ConversationChannel.email for tpl, _ in rows)
+        assert all(reason is None for _, reason in rows)
 
         page, page_total = await templates_service.list_templates(
             test_db,
@@ -327,7 +332,7 @@ async def test_list_filters_and_paginates(test_db, two_orgs):
             q="email 1",
         )
         assert hits_total == 1
-        assert hits[0].name == "Email 1"
+        assert hits[0][0].name == "Email 1"
     finally:
         reset_context(token)
 

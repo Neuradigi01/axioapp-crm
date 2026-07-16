@@ -72,6 +72,7 @@ describe('TemplatesPageComponent', () => {
           variables: [],
           internal_status: 'draft' as const,
           external_status: 'n_a' as const,
+          external_rejection_reason: null,
           external_provider_id: null,
           current_version: 1,
           created_by_user_id: null,

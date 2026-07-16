@@ -17,7 +17,7 @@ Track finishes when both channels work end-to-end and pass a real customer send.
 | # | Step | Track | Screens affected | Status |
 |---|---|---|---|---|
 | 01 | [WA picker badges](step-01-wa-picker-badges.md) — approval + category + language in campaign template picker | WhatsApp | New Campaign wizard | COMPLETED |
-| 02 | [WA rejection reason tooltip](step-02-wa-rejection-tooltip.md) — library list + picker | WhatsApp | WA Templates list · New Campaign wizard | Pending |
+| 02 | [WA rejection reason tooltip](step-02-wa-rejection-tooltip.md) — library list + picker | WhatsApp | WA Templates list · New Campaign wizard | COMPLETED |
 | 03 | [Email sender identity](step-03-email-sender-identity.md) — mailbox + reply-to + subject + preheader on Campaign | Email | Create Email Template · New Campaign wizard | Pending |
 | 04 | [Email HTML composer](step-04-email-html-composer.md) — `body_html` column + rich editor + merge-tag inserter + inbox preview | Email | Create Email Template | Pending |
 | 05 | [Email dispatch wiring](step-05-email-dispatch-wiring.md) — call `adapter.send_email()` + funnel columns + tracking | Email | Campaign Report | Pending |

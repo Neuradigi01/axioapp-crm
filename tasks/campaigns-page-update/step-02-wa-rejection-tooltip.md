@@ -2,7 +2,7 @@
 
 **Goal:** Wherever a WhatsApp template badge shows "Rejected", hovering the badge surfaces Meta's rejection reason inline in the CRM. Users never need to open Meta Business Manager to know why a template can't be sent.
 **Track:** Campaigns page update — WhatsApp UX
-**Status:** Pending
+**Status:** COMPLETED — backend list endpoint now LEFT OUTER JOINs onto `tbl_whatsapp_templates.rejection_reason` and surfaces it as `TemplateRead.external_rejection_reason`; `<template-status-badge>` grew a `rejectionReason` input + pure-CSS group-hover tooltip (dark zinc-900 card w/ arrow, "Update and resubmit" footer) + native `title` fallback for keyboard/screen-reader users; library list + campaign picker wired. New spec `template-status-badge.component.spec.ts` covers approved/pending/rejected/no-reason/empty-reason/internal-status. `tsc` + `prettier` + `eslint` clean (one pre-existing warning). `ruff` deferred — docker container unavailable in this session; pre-commit hook will catch. Backend pytest deferred to human eyeball per memory (~12 min). Browser smoke on Ajay's Workspace still pending human eyeball. **Ship gate: WhatsApp v1 UX complete after this step.**
 **Depends on:** Step 01 (picker rows already render the badge)
 
 Screen references in [`preview.html`](preview.html):

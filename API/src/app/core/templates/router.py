@@ -166,8 +166,16 @@ async def list_endpoint(
         limit=limit,
         offset=offset,
     )
+    # Campaigns v1 Step 02 — each row is (MessageTemplate, rejection_reason);
+    # attach the reason to the response schema so the frontend picker +
+    # library list can show it inline on hover.
+    items: list[TemplateRead] = []
+    for template, rejection_reason in rows:
+        payload = TemplateRead.model_validate(template)
+        payload.external_rejection_reason = rejection_reason
+        items.append(payload)
     return TemplateListResponse(
-        items=[TemplateRead.model_validate(r) for r in rows],
+        items=items,
         total=total,
         limit=limit,
         offset=offset,

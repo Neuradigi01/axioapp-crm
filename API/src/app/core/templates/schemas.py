@@ -100,6 +100,12 @@ class TemplateRead(ORMModel):
     variables: list[Any]
     internal_status: TemplateInternalStatus
     external_status: TemplateExternalStatus
+    # Campaigns v1 Step 02 — Meta rejection reason surfaced inline in
+    # the CRM library + campaign picker. Populated by the list endpoint
+    # via a LEFT OUTER JOIN onto the WhatsApp extension row; single-
+    # template read endpoints keep it at None (they don't drive the
+    # rejection-tooltip UX).
+    external_rejection_reason: str | None = None
     external_provider_id: str | None
     current_version: int
     created_by_user_id: uuid.UUID | None

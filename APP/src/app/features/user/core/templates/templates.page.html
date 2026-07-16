@@ -156,7 +156,10 @@
                   <app-template-status-badge [internal]="row.internal_status" />
                 </td>
                 <td class="px-4 py-3">
-                  <app-template-status-badge [external]="row.external_status" />
+                  <app-template-status-badge
+                    [external]="row.external_status"
+                    [rejectionReason]="row.external_rejection_reason"
+                  />
                 </td>
                 <td class="px-4 py-3 text-xs text-zinc-500">
                   {{ row.updated_at | date: 'mediumDate' }}
