@@ -1,19 +1,71 @@
-<div class="px-6 py-6">
-  <header class="mb-6 flex items-start justify-between">
+<div class="px-8 py-6">
+  <!-- ================= Header ================= -->
+  <header class="mb-6 flex items-start justify-between gap-3">
     <div>
-      <h1 class="text-2xl font-semibold text-zinc-900">Campaigns</h1>
-      <p class="mt-1 text-sm text-zinc-500">
-        Schedule WhatsApp, SMS &amp; email broadcasts to filtered contact segments
+      <h1 class="text-xl font-semibold text-zinc-900">Campaigns</h1>
+      <p class="mt-1 text-[13px] text-zinc-500">
+        Broadcast to your contacts on WhatsApp &amp; Email
       </p>
     </div>
-    <button
-      type="button"
-      (click)="openModal()"
-      class="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-    >
-      + New campaign
-    </button>
+    <div class="flex items-center gap-2">
+      <!-- Split "Download CSV" button, mirroring preview.html -->
+      <div class="inline-flex overflow-hidden rounded-md border border-zinc-300">
+        <button
+          type="button"
+          class="border-r border-zinc-300 bg-white px-3 py-1.5 text-[13px] text-zinc-800 hover:bg-zinc-50"
+        >
+          ↓ Download CSV
+        </button>
+        <button
+          type="button"
+          class="bg-white px-2 py-1.5 text-zinc-500 hover:bg-zinc-50"
+          aria-label="More options"
+        >
+          ▾
+        </button>
+      </div>
+      <button
+        type="button"
+        (click)="openModal()"
+        class="rounded-md bg-zinc-900 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-zinc-800"
+      >
+        + New Campaign
+      </button>
+    </div>
   </header>
+
+  <!-- ================= Stat cards ================= -->
+  @let s = stats();
+  <div class="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <div class="rounded-xl border border-zinc-200 bg-white px-5 py-4">
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+        Sent this month
+      </div>
+      <div class="mt-1 text-[26px] font-bold leading-tight text-zinc-900">{{ s.thisMonth }}</div>
+      <div class="mt-1 text-[11px] text-zinc-400">campaigns created this month</div>
+    </div>
+    <div class="rounded-xl border border-zinc-200 bg-white px-5 py-4">
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+        Delivery rate
+      </div>
+      <div class="mt-1 text-[26px] font-bold leading-tight text-zinc-900">—</div>
+      <div class="mt-1 text-[11px] text-zinc-400">Analytics endpoint coming soon</div>
+    </div>
+    <div class="rounded-xl border border-zinc-200 bg-white px-5 py-4">
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+        Read / open rate
+      </div>
+      <div class="mt-1 text-[26px] font-bold leading-tight text-zinc-900">—</div>
+      <div class="mt-1 text-[11px] text-zinc-400">Analytics endpoint coming soon</div>
+    </div>
+    <div class="rounded-xl border border-zinc-200 bg-white px-5 py-4">
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+        Est. cost this month
+      </div>
+      <div class="mt-1 text-[26px] font-bold leading-tight text-zinc-900">—</div>
+      <div class="mt-1 text-[11px] text-zinc-400">Wallet balance coming soon</div>
+    </div>
+  </div>
 
   @if (loadError(); as err) {
     <div class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -21,91 +73,331 @@
     </div>
   }
 
-  @if (loading()) {
-    <div class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
-      Loading…
+  <!-- ================= Table card ================= -->
+  <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+    <!-- Bulk-action bar — replaces the toolbar's visual weight when
+         any row is selected so the operator's focus stays on what
+         they can do next. -->
+    @if (selectedCount() > 0) {
+      <div
+        class="flex flex-wrap items-center gap-3 border-b border-zinc-200 bg-zinc-900 px-4 py-2.5 text-white"
+      >
+        <span class="text-[12px] font-medium"> {{ selectedCount() }} selected </span>
+        <span class="text-zinc-400">·</span>
+        <button
+          type="button"
+          (click)="clearSelection()"
+          class="text-[12px] font-medium text-zinc-300 hover:text-white"
+        >
+          Clear
+        </button>
+        <div class="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            (click)="bulkDelete()"
+            [disabled]="bulkBusy()"
+            class="rounded-md bg-rose-600 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+          >
+            {{ bulkBusy() ? 'Deleting…' : 'Delete selected' }}
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Toolbar: chips | grow | search | Channel ▾ | Filters -->
+    <div class="flex flex-wrap items-center gap-3 border-b border-zinc-200 px-4 py-3">
+      <div class="flex flex-wrap items-center gap-1.5">
+        @for (chip of statusChips; track chip.value) {
+          <button
+            type="button"
+            (click)="statusFilter.set(chip.value)"
+            [class]="
+              'rounded-full border px-3 py-1 text-[12px] font-medium transition ' +
+              (statusFilter() === chip.value
+                ? 'border-zinc-900 bg-zinc-900 text-white'
+                : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+            "
+          >
+            {{ chip.label }}
+          </button>
+        }
+      </div>
+
+      <div class="ml-auto flex items-center gap-2">
+        <label
+          class="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            class="text-zinc-400"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            [value]="search()"
+            (input)="onSearchInput($event)"
+            placeholder="Search campaigns…"
+            class="w-52 border-0 bg-transparent p-0 text-[12px] focus:outline-none focus:ring-0"
+          />
+        </label>
+
+        <!-- Channel dropdown -->
+        <div class="relative">
+          <button
+            type="button"
+            (click)="toggleChannelMenu()"
+            [class]="
+              'rounded-md border px-3 py-1.5 text-[12px] font-medium ' +
+              (channelFilter() === 'all'
+                ? 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50'
+                : 'border-zinc-900 bg-zinc-900 text-white')
+            "
+          >
+            {{ channelFilterLabel() }} ▾
+          </button>
+          @if (channelMenuOpen()) {
+            <div
+              class="absolute right-0 top-full z-10 mt-1 w-44 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+            >
+              @for (opt of channelOptions; track opt.value) {
+                <button
+                  type="button"
+                  (click)="pickChannel(opt.value)"
+                  [class]="
+                    'block w-full px-3 py-1.5 text-left text-[12px] ' +
+                    (channelFilter() === opt.value
+                      ? 'bg-zinc-900 text-white'
+                      : 'text-zinc-700 hover:bg-zinc-50')
+                  "
+                >
+                  {{ opt.label }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+
+        @if (hasActiveFilters()) {
+          <button
+            type="button"
+            (click)="clearFilters()"
+            class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            Clear
+          </button>
+        }
+      </div>
     </div>
-  } @else if (items().length === 0) {
-    <div
-      class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
-    >
-      No campaigns yet. Click <span class="font-medium">New campaign</span> to create your first
-      one.
-    </div>
-  } @else {
-    <ul class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      @for (c of items(); track c.id) {
-        @let cs = channelStyle(c.channel);
-        @let ss = statusStyle(c.status);
-        <li class="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-          <div class="flex items-start justify-between gap-2">
-            <a
-              [routerLink]="['/user/campaigns', c.id]"
-              class="min-w-0 flex-1 text-sm font-semibold text-zinc-900 hover:underline"
-            >
-              {{ c.name }}
-            </a>
-            <span
-              [class]="
-                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ' +
-                ss.cls
-              "
-            >
-              {{ ss.label }}
-            </span>
-          </div>
 
-          <div class="flex items-center gap-2 text-xs">
-            <span
-              [class]="
-                'inline-flex items-center rounded-full px-2 py-0.5 font-medium ring-1 ' + cs.cls
-              "
+    <!-- Table / empty state / loading -->
+    @if (loading()) {
+      <div class="p-10 text-center text-sm text-zinc-500">Loading…</div>
+    } @else if (items().length === 0) {
+      <div class="p-14 text-center text-sm text-zinc-500">
+        No campaigns yet. Click
+        <span class="font-medium text-zinc-700">+ New Campaign</span> to create your first one.
+      </div>
+    } @else if (filteredItems().length === 0) {
+      <div class="p-14 text-center text-sm text-zinc-500">
+        No campaigns match the current filters.
+        <button
+          type="button"
+          (click)="clearFilters()"
+          class="ml-1 font-medium text-zinc-700 underline hover:text-zinc-900"
+        >
+          Clear filters
+        </button>
+      </div>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="w-full text-[13px]">
+          <thead>
+            <tr
+              class="border-b border-zinc-200 bg-zinc-50 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-500"
             >
-              {{ cs.label }}
-            </span>
-            <span class="text-zinc-500">·</span>
-            <span class="truncate text-zinc-600">{{ audiencePreview(c) }}</span>
-          </div>
-
-          <div class="line-clamp-2 text-xs text-zinc-500 italic">"{{ c.template }}"</div>
-
-          <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-zinc-500">
-            <dt>Schedule</dt>
-            <dd class="text-right text-zinc-700">{{ formatDate(c.schedule_at) }}</dd>
-            <dt>Created</dt>
-            <dd class="text-right text-zinc-700">{{ formatDate(c.created_at) }}</dd>
-          </dl>
-
-          <div class="mt-1 flex items-center justify-end gap-2">
-            <a
-              [routerLink]="['/user/campaigns', c.id]"
-              class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-            >
-              View
-            </a>
-            @if (c.status === 'draft' || c.status === 'failed') {
-              <button
-                type="button"
-                (click)="start(c)"
-                [disabled]="busyId() === c.id"
-                class="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {{ busyId() === c.id ? 'Starting…' : 'Start' }}
-              </button>
-              <button
-                type="button"
-                (click)="remove(c)"
-                [disabled]="busyId() === c.id"
-                class="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-              >
-                Delete
-              </button>
+              <th class="w-8 px-4 py-3">
+                <input
+                  type="checkbox"
+                  [checked]="allVisibleSelected()"
+                  [indeterminate]="someVisibleSelected()"
+                  (change)="toggleAll()"
+                  class="h-3.5 w-3.5 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                  aria-label="Select all visible campaigns"
+                />
+              </th>
+              <th class="px-4 py-3">Name</th>
+              <th class="w-16 px-4 py-3">Channel</th>
+              <th class="px-4 py-3">Template</th>
+              <th class="px-4 py-3">Audience</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3">Scheduled</th>
+              <th class="whitespace-nowrap px-4 py-3">Sent / Delivered / Read</th>
+              <th class="px-4 py-3">Created&nbsp;by</th>
+              <th class="w-8 px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100">
+            @for (c of filteredItems(); track c.id) {
+              @let cs = channelStyle(c.channel);
+              @let ss = statusStyle(c.status);
+              <tr class="hover:bg-zinc-50/60">
+                <td class="px-4 py-3.5 align-top">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected(c.id)"
+                    (change)="toggleRow(c.id)"
+                    class="mt-1 h-3.5 w-3.5 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                    [attr.aria-label]="'Select ' + c.name"
+                  />
+                </td>
+                <td class="px-4 py-3.5 align-top">
+                  <a
+                    [routerLink]="['/user/campaigns', c.id]"
+                    class="text-[13px] font-semibold text-zinc-900 hover:underline"
+                  >
+                    {{ c.name }}
+                  </a>
+                  <div class="mt-0.5 text-[11px] text-zinc-500">
+                    Created {{ relativeDate(c.created_at) }}
+                  </div>
+                </td>
+                <td class="px-4 py-3.5 align-top">
+                  <span
+                    [class]="
+                      'inline-flex h-6 w-6 items-center justify-center rounded-md text-[13px] ' +
+                      cs.cls
+                    "
+                    [attr.title]="cs.label"
+                    [attr.aria-label]="cs.label"
+                  >
+                    {{ cs.icon }}
+                  </span>
+                </td>
+                <td class="max-w-[220px] px-4 py-4 align-top">
+                  <span class="line-clamp-2 text-[12px] text-zinc-700">
+                    {{ templatePreview(c) }}
+                  </span>
+                </td>
+                <td class="px-4 py-4 align-top text-[12px] text-zinc-600">
+                  {{ audiencePreview(c) }}
+                </td>
+                <td class="px-4 py-3.5 align-top">
+                  <span
+                    [class]="
+                      'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ' +
+                      ss.cls
+                    "
+                  >
+                    <span aria-hidden="true" [class]="'text-[8px] ' + ss.dot">●</span>
+                    {{ ss.label }}
+                  </span>
+                </td>
+                <td class="px-4 py-4 align-top text-[12px] text-zinc-700">
+                  {{ formatSchedule(c.schedule_at, c.status) }}
+                </td>
+                <td class="px-4 py-4 align-top text-[12px] text-zinc-500">
+                  <!-- Per-row stats fetch lands in a follow-up. Drafts /
+                       Scheduled: dash. Others: link into the detail
+                       page's funnel. -->
+                  @if (c.status === 'draft' || c.status === 'scheduled') {
+                    <span class="text-zinc-400">—</span>
+                  } @else {
+                    <a
+                      [routerLink]="['/user/campaigns', c.id]"
+                      class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                    >
+                      View funnel →
+                    </a>
+                  }
+                </td>
+                <td class="px-4 py-3.5 align-top">
+                  <div class="flex items-center gap-2">
+                    <span
+                      [class]="
+                        'inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ' +
+                        createdByBg(c)
+                      "
+                      [attr.title]="c.created_by_id ?? 'System'"
+                    >
+                      {{ createdByInitial(c) }}
+                    </span>
+                    <span class="text-[12px] text-zinc-700">{{ createdByName(c) }}</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3.5 align-top">
+                  @if (c.status === 'draft' || c.status === 'failed') {
+                    <div class="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        (click)="start(c)"
+                        [disabled]="busyId() === c.id"
+                        class="rounded bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        title="Start"
+                      >
+                        {{ busyId() === c.id ? '…' : 'Start' }}
+                      </button>
+                      <button
+                        type="button"
+                        (click)="remove(c)"
+                        [disabled]="busyId() === c.id"
+                        class="rounded p-1 text-rose-500 hover:bg-rose-50 disabled:opacity-50"
+                        title="Delete"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  } @else {
+                    <a
+                      [routerLink]="['/user/campaigns', c.id]"
+                      class="flex justify-end text-zinc-400 hover:text-zinc-700"
+                      title="More"
+                      >⋯</a
+                    >
+                  }
+                </td>
+              </tr>
             }
-          </div>
-        </li>
-      }
-    </ul>
-  }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer pagination summary -->
+      <div
+        class="flex items-center justify-between border-t border-zinc-100 bg-zinc-50 px-4 py-2 text-[11px] text-zinc-500"
+      >
+        <span>
+          Showing {{ filteredItems().length }}
+          @if (filteredItems().length !== items().length) {
+            of {{ items().length }}
+          }
+          {{ filteredItems().length === 1 ? 'campaign' : 'campaigns' }}
+        </span>
+        <div class="flex items-center gap-1">
+          <button
+            type="button"
+            disabled
+            class="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[11px] text-zinc-400"
+          >
+            ‹ Prev
+          </button>
+          <button
+            type="button"
+            disabled
+            class="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[11px] text-zinc-400"
+          >
+            Next ›
+          </button>
+        </div>
+      </div>
+    }
+  </div>
 
   @if (modalOpen()) {
     <app-create-campaign-modal (created)="onCreated($event)" (cancel)="onCancel()" />

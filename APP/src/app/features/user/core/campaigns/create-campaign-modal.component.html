@@ -515,7 +515,7 @@
           </div>
           <app-html-composer
             label="HTML source"
-            [value]="form.controls.body_html.value"
+            [value]="form.controls.body_html.value ?? ''"
             (valueChange)="onEmailBodyHtmlChange($event)"
           />
         </div>
