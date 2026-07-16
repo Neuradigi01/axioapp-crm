@@ -255,6 +255,13 @@ class CampaignStatsOut(BaseModel):
     delivered: int
     read: int
     failed: int
+    # Campaigns v1 Step 05 — Email tracking. Always present in the
+    # response (0 for WA campaigns) so the frontend can decide whether
+    # to render the Email funnel without a separate lookup.
+    opened: int = 0
+    clicked: int = 0
+    bounced: int = 0
+    unsubscribed: int = 0
 
 
 class CampaignStartResponse(BaseModel):

@@ -264,6 +264,37 @@ async def stats_by_status(
     return [(r[0], int(r[1])) for r in rows]
 
 
+async def email_tracking_counts(
+    session: AsyncSession, *, campaign_id: uuid.UUID
+) -> dict[str, int]:
+    """Campaigns v1 Step 05 — per-classifier counts for the Email
+    funnel. ``bounced`` counts rows with a non-null ``bounced_at``,
+    ``unsubscribed`` counts rows with a non-null ``unsubscribed_at``.
+    Both live in dedicated timestamp columns (migration 0153) rather
+    than status-enum values so a single row can carry both flags
+    (a contact might click, then bounce, then unsubscribe)."""
+    bounced_count = (
+        await session.execute(
+            select(func.count(CampaignMessage.id)).where(
+                CampaignMessage.campaign_id == campaign_id,
+                CampaignMessage.bounced_at.is_not(None),
+            )
+        )
+    ).scalar_one()
+    unsub_count = (
+        await session.execute(
+            select(func.count(CampaignMessage.id)).where(
+                CampaignMessage.campaign_id == campaign_id,
+                CampaignMessage.unsubscribed_at.is_not(None),
+            )
+        )
+    ).scalar_one()
+    return {
+        "bounced": int(bounced_count or 0),
+        "unsubscribed": int(unsub_count or 0),
+    }
+
+
 # --- conversation + inbox message rows ----------------------------------
 #
 # Campaigns reach into `conversations` to append outbound messages so
@@ -319,4 +350,5 @@ __all__ = [
     "list_contact_ids_for_audience",
     "list_messages_page",
     "stats_by_status",
+    "email_tracking_counts",
 ]

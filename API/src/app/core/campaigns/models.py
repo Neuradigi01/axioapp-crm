@@ -62,6 +62,12 @@ class CampaignMessageStatus(str, enum.Enum):
     sent = "sent"
     delivered = "delivered"
     read = "read"
+    # Campaigns v1 Step 05 — Email lifecycle. ``opened`` fires when the
+    # tracking pixel is hit; ``clicked`` when a tracked link is followed.
+    # WA-only campaigns never reach these; forward-only status flow so
+    # a delayed ``delivered`` event never downgrades an ``opened`` row.
+    opened = "opened"
+    clicked = "clicked"
     failed = "failed"
 
 
@@ -256,6 +262,23 @@ class CampaignMessage(Base, TenantScoped):
     # (✓ sent / ✓✓ delivered / ✓✓ blue read) per message.
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Campaigns v1 Step 05 — Email tracking timestamps. Set-once so a
+    # duplicate webhook / sync event is a no-op. ``bounce_type`` mirrors
+    # the ``EmailBounce.bounce_type`` classifier (hard / soft /
+    # spam_complaint / unsubscribe) so the UI can distinguish a hard
+    # bounce (permanent-suppress) from a soft one (retry-able).
+    opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    first_click_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    bounced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    bounce_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Step 06 will populate this via the per-contact unsubscribe token
+    # in the email footer; column lands here so we avoid a second
+    # migration touching the same table.
+    unsubscribed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # whatsapp-platform-upgrade Step 29 — A/B test variant marker.
     # ``'A'`` / ``'B'`` for recipients dispatched during the A/B
     # hold-out window; ``NULL`` for non-A/B campaigns + recipients

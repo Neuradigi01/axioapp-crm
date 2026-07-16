@@ -46,9 +46,16 @@ from src.app.core.campaigns.schemas import (
 from src.app.core.contacts import service as contacts_service
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations.adapters import ChannelMessageRef
+from src.app.core.campaigns.utils import (
+    render_body,
+    render_subject,
+)
 from src.app.core.email import data_access as email_da
 from src.app.core.email.models import EmailAccount, EmailAccountSyncState
-from src.app.core.templates.sanitizer import sanitize_email_html
+from src.app.core.templates.sanitizer import (
+    derive_plain_text,
+    sanitize_email_html,
+)
 from src.app.core.conversations.adapters.whatsapp import (
     WhatsAppNotConnected,
     WhatsAppRateLimited,
@@ -704,9 +711,92 @@ async def dispatch_chunk(
         evaluate_contact,
     )
 
+    # Campaigns v1 Step 05 — Email dispatch preload. The mailbox
+    # owns the `user_id` used as `sender_user_id` in send_email; the
+    # template's HTML + text land the body when the campaign references
+    # one. Both loads are once-per-chunk (not once-per-contact).
+    email_account: EmailAccount | None = None
+    email_template_body_html: str | None = None
+    email_template_body_text: str | None = None
+    email_template_subject: str | None = None
+    if campaign.channel == ConversationChannel.email:
+        if campaign.email_account_id is None:
+            for cid in contact_ids:
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error="email campaign has no sender mailbox",
+                )
+            return
+        email_account = await email_da.get_account_by_id(
+            session, account_id=campaign.email_account_id
+        )
+        if email_account is None or email_account.org_id != campaign.org_id:
+            for cid in contact_ids:
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error="sender mailbox not found or belongs to another org",
+                )
+            return
+        if email_account.sync_state != EmailAccountSyncState.live:
+            for cid in contact_ids:
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error="sender mailbox is not connected — reconnect it",
+                )
+            return
+        if campaign.template_id is not None:
+            from src.app.core.templates import service as templates_service
+
+            tpl = await templates_service.find_template(
+                session, org_id=campaign.org_id, template_id=campaign.template_id
+            )
+            if tpl is None:
+                for cid in contact_ids:
+                    await _mark_message(
+                        session,
+                        campaign_id=campaign_id,
+                        contact_id=cid,
+                        new_status=CampaignMessageStatus.failed,
+                        error="email template no longer exists in this org",
+                    )
+                return
+            email_template_body_html = tpl.body_html
+            email_template_body_text = tpl.body_text
+            email_template_subject = tpl.subject or campaign.subject
+
     for cid in contact_ids:
         contact = await contacts_service.get_contact(session, cid)
-        if contact is None or not contact.phone:
+        if contact is None:
+            await _mark_message(
+                session,
+                campaign_id=campaign_id,
+                contact_id=cid,
+                new_status=CampaignMessageStatus.failed,
+                error="contact not found",
+            )
+            continue
+        # Channel-scoped external-id check. Non-Email channels write to
+        # ``contact.phone``; Email requires an email address on file.
+        if campaign.channel == ConversationChannel.email:
+            if not contact.email:
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error="contact has no email for this channel",
+                )
+                continue
+        elif not contact.phone:
             await _mark_message(
                 session,
                 campaign_id=campaign_id,
@@ -781,6 +871,89 @@ async def dispatch_chunk(
                     ),
                 )
                 continue
+
+        # Campaigns v1 Step 05 — Email dispatch path. Bypasses the WA
+        # rate-limit + conversation-find flow entirely: send_email owns
+        # its own account resolution, MIME composition, threading, and
+        # inbox-message persistence.
+        if campaign.channel == ConversationChannel.email:
+            assert email_account is not None  # noqa: S101 — pre-loaded above
+            from fastapi import HTTPException as _HTTPExc
+
+            from src.app.core.conversations.adapters.email import send_email
+
+            # Resolve the subject + both body halves, substituting merge
+            # tags per contact. Template-backed campaigns use the
+            # template's body; inline-compose campaigns use the
+            # campaign's body_html (Step 04 lands the field).
+            eff_subject = email_template_subject if campaign.template_id else campaign.subject
+            if campaign.template_id is not None:
+                eff_html = email_template_body_html
+                eff_text = email_template_body_text or ""
+            else:
+                eff_html = campaign.body_html
+                # No explicit inline plain-text field on the modal yet —
+                # derive from HTML so Gmail's multipart fallback lands
+                # readable content, not blank.
+                eff_text = (
+                    derive_plain_text(campaign.body_html)
+                    if campaign.body_html
+                    else (campaign.template or "")
+                )
+
+            rendered_subject = render_subject(eff_subject, contact)
+            rendered_html = render_body(eff_html, contact) if eff_html else None
+            rendered_text = render_body(eff_text, contact) if eff_text else ""
+
+            try:
+                result = await send_email(
+                    session,
+                    org_id=campaign.org_id,
+                    sender_user_id=email_account.user_id,
+                    account_id=email_account.id,
+                    contact_id=contact.id,
+                    subject=rendered_subject,
+                    body_text=rendered_text,
+                    body_html=rendered_html,
+                )
+            except _HTTPExc as exc:
+                logger.info(
+                    "campaign email send rejected", extra={"contact_id": str(cid)}
+                )
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error=str(exc.detail or "email send failed")[:512],
+                )
+                continue
+            except Exception as exc:  # provider-side transient failure
+                logger.exception(
+                    "campaign email send failed", extra={"contact_id": str(cid)}
+                )
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error=str(exc)[:512],
+                )
+                continue
+
+            # send_email already persisted the Message row + logged the
+            # activity + updated the conversation.last_message_at. All
+            # we own is the CampaignMessage flip so stats + funnel land.
+            await _mark_message(
+                session,
+                campaign_id=campaign_id,
+                contact_id=cid,
+                new_status=CampaignMessageStatus.sent,
+                channel_message_id=result.provider_message_id
+                or str(result.message.id),
+                sent_at=result.message.sent_at or datetime.now(UTC),
+            )
+            continue
 
         # Find / create the (channel, external_id) conversation so the
         # outbound message also appears in the inbox.
@@ -1160,6 +1333,103 @@ async def apply_meta_status(
     return changed
 
 
+# --- Campaigns v1 Step 05: Email tracking status callbacks ---------------
+
+
+# Map Email tracking events → the target CampaignMessage.status +
+# timestamp column. ``delivered`` uses the existing WA-side column so
+# both channels can be aggregated with a single query. ``opened`` +
+# ``clicked`` are Email-only states added in migration 0153.
+_EMAIL_STATUS_TO_LOCAL: dict[str, tuple[CampaignMessageStatus | None, str | None]] = {
+    "delivered": (CampaignMessageStatus.delivered, "delivered_at"),
+    "opened": (CampaignMessageStatus.opened, "opened_at"),
+    "clicked": (CampaignMessageStatus.clicked, "first_click_at"),
+    "bounced": (CampaignMessageStatus.failed, "bounced_at"),
+    "unsubscribed": (None, "unsubscribed_at"),
+}
+
+
+_EMAIL_STATUS_ORDER: dict[CampaignMessageStatus, int] = {
+    CampaignMessageStatus.queued: 0,
+    CampaignMessageStatus.sent: 1,
+    CampaignMessageStatus.delivered: 2,
+    CampaignMessageStatus.opened: 3,
+    CampaignMessageStatus.clicked: 4,
+    CampaignMessageStatus.read: 3,  # WA-only, ranked alongside opened
+    CampaignMessageStatus.failed: 99,
+}
+
+
+async def apply_email_status(
+    session: AsyncSession,
+    *,
+    channel_message_id: str,
+    email_status: str,
+    timestamp: datetime,
+    bounce_type: str | None = None,
+    error: str | None = None,
+) -> bool:
+    """Update the ``CampaignMessage`` row keyed by the outbound email's
+    provider message id to reflect a lifecycle event.
+
+    ``email_status`` is one of ``delivered`` / ``opened`` / ``clicked`` /
+    ``bounced`` / ``unsubscribed``. Status is forward-only + set-once
+    (the same webhook / sync event arriving twice is a no-op). Bounces
+    move the row to ``failed`` with the ``bounce_type`` classifier
+    (``hard`` / ``soft`` / ``spam_complaint``) stored alongside the
+    timestamp so the UI can distinguish permanent-suppress bounces from
+    retry-able soft ones. ``unsubscribed`` only stamps the timestamp —
+    Step 06 will populate this via the campaign footer link handler.
+
+    Returns True when a row was actually updated; False otherwise
+    (unknown message id, unknown status, or the event was already
+    recorded).
+    """
+    if not channel_message_id:
+        return False
+    mapping = _EMAIL_STATUS_TO_LOCAL.get(email_status)
+    if mapping is None:
+        return False
+
+    row = await campaigns_da.get_campaign_message_by_channel_id(session, channel_message_id)
+    if row is None:
+        return False
+
+    # `failed` is terminal for the status flip — but bounce events on
+    # an already-failed row still stamp bounced_at + bounce_type so the
+    # UI can show why (e.g. the send succeeded then bounced back).
+    is_bounce = email_status == "bounced"
+    if row.status == CampaignMessageStatus.failed and not is_bounce and email_status != "unsubscribed":
+        return False
+
+    new_status, ts_column = mapping
+    changed = False
+
+    if new_status is not None and _EMAIL_STATUS_ORDER.get(
+        new_status, 0
+    ) > _EMAIL_STATUS_ORDER.get(row.status, 0):
+        row.status = new_status
+        changed = True
+
+    if ts_column is not None and getattr(row, ts_column) is None:
+        setattr(row, ts_column, timestamp)
+        changed = True
+
+    if is_bounce:
+        if row.bounce_type is None and bounce_type:
+            row.bounce_type = bounce_type
+            changed = True
+        if row.error is None:
+            row.error = (
+                error or f"email bounced ({bounce_type or 'hard'})"
+            )[:512]
+            changed = True
+
+    if changed:
+        await session.commit()
+    return changed
+
+
 def _preview_template_body(template_row: WhatsAppTemplate, variables: dict[int, str]) -> str:
     """Substitute resolved variables into the template body for the
     inbox Message row's `text`. Meta renders the final message
@@ -1241,6 +1511,12 @@ async def stats(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str, A
     rows = await campaigns_da.stats_by_status(session, campaign_id=campaign_id)
     by_status: dict[str, int] = {r[0].value: r[1] for r in rows}
     audience_size = sum(by_status.values())
+    # Campaigns v1 Step 05 — Email tracking counters. ``bounced`` +
+    # ``unsubscribed`` don't live in the status enum (they're
+    # ``failed`` rows with a bounce_type / unsubscribed_at set); we
+    # count them via dedicated column-presence tallies so the funnel
+    # can render the classifier split without a second endpoint.
+    tracking = await campaigns_da.email_tracking_counts(session, campaign_id=campaign_id)
     return {
         "campaign_id": campaign.id,
         "status": campaign.status,
@@ -1250,6 +1526,10 @@ async def stats(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str, A
         "delivered": by_status.get("delivered", 0),
         "read": by_status.get("read", 0),
         "failed": by_status.get("failed", 0),
+        "opened": by_status.get("opened", 0),
+        "clicked": by_status.get("clicked", 0),
+        "bounced": tracking.get("bounced", 0),
+        "unsubscribed": tracking.get("unsubscribed", 0),
     }
 
 

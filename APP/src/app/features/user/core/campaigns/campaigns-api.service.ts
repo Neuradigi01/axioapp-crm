@@ -8,7 +8,14 @@ import { buildHttpParams } from '../shared/services/query-builder';
 
 export type CampaignStatus = 'draft' | 'scheduled' | 'running' | 'done' | 'failed';
 
-export type CampaignMessageStatus = 'queued' | 'sent' | 'delivered' | 'read' | 'failed';
+export type CampaignMessageStatus =
+  | 'queued'
+  | 'sent'
+  | 'delivered'
+  | 'read'
+  | 'opened'
+  | 'clicked'
+  | 'failed';
 
 export interface AudienceFilter {
   q?: string;
@@ -136,6 +143,13 @@ export interface CampaignStats {
   delivered: number;
   read: number;
   failed: number;
+  /** Campaigns v1 Step 05 — Email tracking counters. Always present
+   *  on the response (0 for WA campaigns) so the frontend can render
+   *  the Email funnel without a second endpoint. */
+  opened: number;
+  clicked: number;
+  bounced: number;
+  unsubscribed: number;
 }
 
 export interface CampaignMessage {
@@ -151,6 +165,15 @@ export interface CampaignMessage {
   delivered_at: string | null;
   /** Step 3.5.12 — stamped when Meta reports `status='read'`. */
   read_at: string | null;
+  /** Campaigns v1 Step 05 — Email tracking timestamps. `opened_at`
+   *  fires on the first pixel hit; `first_click_at` on the first
+   *  tracked link click; `bounced_at` when the bounce classifier
+   *  flips the row failed. `unsubscribed_at` lands in Step 06. */
+  opened_at: string | null;
+  first_click_at: string | null;
+  bounced_at: string | null;
+  bounce_type: string | null;
+  unsubscribed_at: string | null;
   created_at: string;
 }
 
