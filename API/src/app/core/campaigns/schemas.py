@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from src.app.core.campaigns.models import CampaignMessageStatus, CampaignStatus
 from src.app.core.conversations.models import ConversationChannel
@@ -77,6 +77,15 @@ class CampaignCreate(BaseModel):
     split_ratio: int = Field(default=50, ge=0, le=100)
     winner_metric: Literal["reply_rate", "read_rate", "click_rate"] | None = None
     winner_holdback_hours: int = Field(default=24, ge=1, le=168)
+    # Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+    # Required-when-Email is enforced by _email_channel_requires_sender_and_subject
+    # below; the schema keeps the fields nullable so WhatsApp / SMS / etc
+    # campaign creates don't have to send them at all.
+    email_account_id: uuid.UUID | None = None
+    sender_name: str | None = Field(default=None, min_length=1, max_length=120)
+    reply_to: EmailStr | None = None
+    subject: str | None = Field(default=None, min_length=1, max_length=998)
+    preheader: str | None = Field(default=None, max_length=200)
 
     @model_validator(mode="after")
     def _exactly_one_template_source(self) -> CampaignCreate:
@@ -99,6 +108,30 @@ class CampaignCreate(BaseModel):
             # No variables for a 0-variable template is fine, but make
             # the field explicitly `{}` so dispatch doesn't see None.
             self.template_variables = {}
+        return self
+
+    @model_validator(mode="after")
+    def _email_channel_requires_sender_and_subject(self) -> CampaignCreate:
+        """Campaigns v1 Step 03 — Email dispatch has no way to compose
+        a real message without a mailbox, sender name, and subject.
+        Reply-to + preheader stay optional (reply-to falls back to the
+        mailbox address; preheader falls back to the first ~90 chars
+        of the body). WA / SMS / etc campaigns skip the check."""
+        if self.channel != ConversationChannel.email:
+            return self
+        missing = [
+            name
+            for name, value in {
+                "email_account_id": self.email_account_id,
+                "sender_name": self.sender_name,
+                "subject": self.subject,
+            }.items()
+            if not value
+        ]
+        if missing:
+            raise ValueError(
+                "Email campaigns require: " + ", ".join(missing),
+            )
         return self
 
     @model_validator(mode="after")
@@ -129,6 +162,16 @@ class CampaignUpdate(BaseModel):
     template_id: uuid.UUID | None = None
     template_variables: dict[str, TemplateVariableBinding] | None = None
     schedule_at: datetime | None = None
+    # Campaigns v1 Step 03 — Email fields can be edited on a Draft
+    # Email campaign (the channel itself is immutable post-create; see
+    # ``update_campaign`` in service.py). No required-when-Email check
+    # here because the create-time validator already enforced the
+    # invariant on the row.
+    email_account_id: uuid.UUID | None = None
+    sender_name: str | None = Field(default=None, min_length=1, max_length=120)
+    reply_to: EmailStr | None = None
+    subject: str | None = Field(default=None, min_length=1, max_length=998)
+    preheader: str | None = Field(default=None, max_length=200)
 
 
 class CampaignOut(ORMModel):
@@ -141,6 +184,13 @@ class CampaignOut(ORMModel):
     template_id: uuid.UUID | None
     template_variables: dict[str, Any] | None
     schedule_at: datetime | None
+    # Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+    # NULL for non-Email campaigns.
+    email_account_id: uuid.UUID | None = None
+    sender_name: str | None = None
+    reply_to: str | None = None
+    subject: str | None = None
+    preheader: str | None = None
     status: CampaignStatus
     created_by_id: uuid.UUID | None
     created_at: datetime

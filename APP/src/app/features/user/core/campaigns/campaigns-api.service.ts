@@ -37,6 +37,16 @@ export interface Campaign {
   template_id: string | null;
   template_variables: Record<string, TemplateVariableBinding> | null;
   schedule_at: string | null;
+  /** Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+   *  NULL for non-Email campaigns. Required-when-Email is enforced by
+   *  the backend `_email_channel_requires_sender_and_subject` model
+   *  validator; the frontend mirrors the same requirement via the
+   *  create modal's disabled-submit gate. */
+  email_account_id: string | null;
+  sender_name: string | null;
+  reply_to: string | null;
+  subject: string | null;
+  preheader: string | null;
   status: CampaignStatus;
   created_by_id: string | null;
   created_at: string;
@@ -71,6 +81,15 @@ export interface CampaignCreate {
   split_ratio?: number;
   winner_metric?: 'reply_rate' | 'read_rate' | 'click_rate' | null;
   winner_holdback_hours?: number;
+  /** Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+   *  Required when `channel === 'email'`; ignored for every other
+   *  channel. Backend rejects with 422 if any required field is
+   *  missing on an Email payload. */
+  email_account_id?: string | null;
+  sender_name?: string | null;
+  reply_to?: string | null;
+  subject?: string | null;
+  preheader?: string | null;
 }
 
 export type CampaignUpdate = Partial<{
@@ -80,6 +99,13 @@ export type CampaignUpdate = Partial<{
   template_id: string | null;
   template_variables: Record<string, TemplateVariableBinding> | null;
   schedule_at: string | null;
+  /** Campaigns v1 Step 03 — Email fields editable on Draft campaigns.
+   *  Channel itself stays immutable post-create. */
+  email_account_id: string | null;
+  sender_name: string | null;
+  reply_to: string | null;
+  subject: string | null;
+  preheader: string | null;
 }>;
 
 export interface CampaignStartResponse {

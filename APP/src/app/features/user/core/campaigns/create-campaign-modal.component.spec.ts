@@ -8,6 +8,7 @@ import { CreateCampaignModalComponent } from './create-campaign-modal.component'
 import { CampaignsApiService } from './campaigns-api.service';
 import { ContactGroupsApiService } from '../contacts/groups/groups-api.service';
 import { IntegrationsApiService } from '../settings/integrations/integrations-api.service';
+import { EmailAccount, EmailAccountsApiService } from '../services/email-accounts-api.service';
 import { TemplateRead, TemplatesApiService } from '../templates/templates-api.service';
 
 /**
@@ -47,9 +48,11 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
   let integrationsSpy: jasmine.SpyObj<IntegrationsApiService>;
   let campaignsSpy: jasmine.SpyObj<CampaignsApiService>;
   let groupsSpy: jasmine.SpyObj<ContactGroupsApiService>;
+  let emailAccountsSpy: jasmine.SpyObj<EmailAccountsApiService>;
 
   function makeFixture(
     initialTemplates: TemplateRead[] = [],
+    initialEmailAccounts: EmailAccount[] = [],
   ): ComponentFixture<CreateCampaignModalComponent> {
     templatesSpy = jasmine.createSpyObj<TemplatesApiService>('TemplatesApiService', ['list']);
     templatesSpy.list.and.returnValue(
@@ -81,6 +84,14 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     ]);
     groupsSpy.list.and.returnValue(of({ items: [], total: 0, page: 1, size: 0 }));
     groupsSpy.previewSize.and.returnValue(of({ count: 0 }));
+    emailAccountsSpy = jasmine.createSpyObj<EmailAccountsApiService>('EmailAccountsApiService', [
+      'listVerified',
+      'list',
+      'authorizeGmail',
+      'authorizeMicrosoft',
+      'disconnect',
+    ]);
+    emailAccountsSpy.listVerified.and.returnValue(of(initialEmailAccounts));
 
     TestBed.configureTestingModule({
       imports: [CreateCampaignModalComponent],
@@ -92,12 +103,36 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
         { provide: IntegrationsApiService, useValue: integrationsSpy },
         { provide: CampaignsApiService, useValue: campaignsSpy },
         { provide: ContactGroupsApiService, useValue: groupsSpy },
+        { provide: EmailAccountsApiService, useValue: emailAccountsSpy },
       ],
     });
 
     const fixture = TestBed.createComponent(CreateCampaignModalComponent);
     fixture.detectChanges();
     return fixture;
+  }
+
+  function makeEmailAccount(overrides: Partial<EmailAccount> = {}): EmailAccount {
+    return {
+      id: 'acc-1',
+      org_id: 'org-1',
+      user_id: 'user-1',
+      provider: 'gmail',
+      external_account_id: 'ext-1',
+      email_address: 'sales@yourshop.com',
+      display_name: 'Your Shop',
+      token_expires_at: null,
+      scopes_granted: [],
+      sync_state: 'live',
+      last_sync_at: null,
+      last_sync_error: null,
+      daily_sent_count: 0,
+      daily_sent_reset_at: '2026-07-01T00:00:00Z',
+      connected_at: '2026-07-01T00:00:00Z',
+      disconnected_at: null,
+      disconnected_by: null,
+      ...overrides,
+    };
   }
 
   it('loads WA templates filtered by internal_status=published without an external_status filter', () => {
@@ -305,5 +340,145 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     const text: string = fixture.nativeElement.textContent ?? '';
     expect(text).not.toContain('Variable bindings');
     expect(text).toContain('Variables resolve from each contact');
+  });
+
+  // --- Campaigns v1 Step 03 — Email sender identity + subject + preheader ---
+
+  it('renders the Email sender identity fieldset only when channel = email', () => {
+    const fixture = makeFixture([], [makeEmailAccount()]);
+    const cmp = fixture.componentInstance as unknown as {
+      form: { controls: { channel: { setValue: (v: string) => void } } };
+    };
+
+    // WhatsApp default — the Email fieldset stays hidden.
+    let text: string = fixture.nativeElement.textContent ?? '';
+    expect(text).not.toContain('Email sender identity');
+
+    cmp.form.controls.channel.setValue('email');
+    fixture.detectChanges();
+    text = fixture.nativeElement.textContent ?? '';
+    expect(text).toContain('Email sender identity');
+    expect(text).toContain('Send from mailbox');
+    expect(text).toContain('Sender name');
+    expect(text).toContain('Reply-to (optional)');
+    expect(text).toContain('Subject');
+    expect(text).toContain('Preheader (optional)');
+
+    // Switching back to WhatsApp hides the Email block again.
+    cmp.form.controls.channel.setValue('whatsapp');
+    fixture.detectChanges();
+    text = fixture.nativeElement.textContent ?? '';
+    expect(text).not.toContain('Email sender identity');
+  });
+
+  it('shows the empty-state banner when the org has no verified mailboxes', () => {
+    const fixture = makeFixture([], []);
+    const cmp = fixture.componentInstance as unknown as {
+      form: { controls: { channel: { setValue: (v: string) => void } } };
+    };
+    cmp.form.controls.channel.setValue('email');
+    fixture.detectChanges();
+
+    const text: string = fixture.nativeElement.textContent ?? '';
+    expect(text).toContain('No verified sender mailbox');
+    expect(text).toContain('Settings → Email');
+  });
+
+  it('lazy-fetches verified mailboxes only when the operator picks Email', () => {
+    const fixture = makeFixture([], [makeEmailAccount()]);
+    // Default channel is whatsapp — no fetch yet.
+    expect(emailAccountsSpy.listVerified).not.toHaveBeenCalled();
+
+    const cmp = fixture.componentInstance as unknown as {
+      form: { controls: { channel: { setValue: (v: string) => void } } };
+    };
+    cmp.form.controls.channel.setValue('email');
+    fixture.detectChanges();
+    expect(emailAccountsSpy.listVerified).toHaveBeenCalledTimes(1);
+
+    // Switching back and forth doesn't refetch — the accounts signal
+    // is cached for the lifetime of the modal.
+    cmp.form.controls.channel.setValue('whatsapp');
+    cmp.form.controls.channel.setValue('email');
+    fixture.detectChanges();
+    expect(emailAccountsSpy.listVerified).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables the submit button until every required Email field is filled', () => {
+    const fixture = makeFixture([], [makeEmailAccount()]);
+    const cmp = fixture.componentInstance as unknown as {
+      form: {
+        controls: {
+          channel: { setValue: (v: string) => void };
+          name: { setValue: (v: string) => void };
+          email_account_id: { setValue: (v: string | null) => void };
+          sender_name: { setValue: (v: string | null) => void };
+          subject: { setValue: (v: string | null) => void };
+        };
+      };
+      emailBranchIncomplete: () => boolean;
+    };
+    cmp.form.controls.channel.setValue('email');
+    cmp.form.controls.name.setValue('July newsletter');
+    fixture.detectChanges();
+    expect(cmp.emailBranchIncomplete()).toBeTrue();
+
+    cmp.form.controls.email_account_id.setValue('acc-1');
+    fixture.detectChanges();
+    expect(cmp.emailBranchIncomplete()).toBeTrue();
+
+    cmp.form.controls.sender_name.setValue('Your Shop');
+    fixture.detectChanges();
+    expect(cmp.emailBranchIncomplete()).toBeTrue();
+
+    cmp.form.controls.subject.setValue('July deals');
+    fixture.detectChanges();
+    expect(cmp.emailBranchIncomplete()).toBeFalse();
+  });
+
+  it('appends merge tags to the subject via onInsertSubjectTag', () => {
+    const fixture = makeFixture([], [makeEmailAccount()]);
+    const cmp = fixture.componentInstance as unknown as {
+      form: {
+        controls: {
+          channel: { setValue: (v: string) => void };
+          subject: { setValue: (v: string | null) => void; value: string | null };
+        };
+      };
+      onInsertSubjectTag: (t: string) => void;
+    };
+    cmp.form.controls.channel.setValue('email');
+    fixture.detectChanges();
+    cmp.form.controls.subject.setValue('July deals for ');
+    cmp.onInsertSubjectTag('{{first_name}}');
+    expect(cmp.form.controls.subject.value).toBe('July deals for {{first_name}}');
+  });
+
+  it('clears the Email fields when switching back to WhatsApp', () => {
+    const fixture = makeFixture([], [makeEmailAccount()]);
+    const cmp = fixture.componentInstance as unknown as {
+      form: {
+        controls: {
+          channel: { setValue: (v: string) => void };
+          email_account_id: { setValue: (v: string | null) => void; value: string | null };
+          sender_name: { setValue: (v: string | null) => void; value: string | null };
+          subject: { setValue: (v: string | null) => void; value: string | null };
+          preheader: { setValue: (v: string | null) => void; value: string | null };
+        };
+      };
+    };
+    cmp.form.controls.channel.setValue('email');
+    cmp.form.controls.email_account_id.setValue('acc-1');
+    cmp.form.controls.sender_name.setValue('Your Shop');
+    cmp.form.controls.subject.setValue('July deals');
+    cmp.form.controls.preheader.setValue('This month picks');
+
+    cmp.form.controls.channel.setValue('whatsapp');
+    fixture.detectChanges();
+
+    expect(cmp.form.controls.email_account_id.value).toBeNull();
+    expect(cmp.form.controls.sender_name.value).toBeNull();
+    expect(cmp.form.controls.subject.value).toBeNull();
+    expect(cmp.form.controls.preheader.value).toBeNull();
   });
 });

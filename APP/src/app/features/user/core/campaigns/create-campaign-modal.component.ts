@@ -30,6 +30,7 @@ import {
   IntegrationsApiService,
   WhatsAppCapacity,
 } from '../settings/integrations/integrations-api.service';
+import { EmailAccount, EmailAccountsApiService } from '../services/email-accounts-api.service';
 import {
   AudienceFilter,
   Campaign,
@@ -148,6 +149,7 @@ export class CreateCampaignModalComponent {
   private readonly integrationsApi = inject(IntegrationsApiService);
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly groupsApi = inject(ContactGroupsApiService);
+  private readonly emailAccountsApi = inject(EmailAccountsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   @Output() readonly created = new EventEmitter<Campaign>();
@@ -255,6 +257,29 @@ export class CreateCampaignModalComponent {
     { value: 'email', label: 'Contact email' },
   ];
 
+  // --- Campaigns v1 Step 03 — Email sender identity state -----------
+
+  /** Verified (`sync_state === 'live'`) mailboxes the org has connected.
+   *  Fetched lazily the first time the channel switches to Email so
+   *  WhatsApp-only orgs never pay the roundtrip. `null` = not fetched
+   *  yet; `[]` = fetched and org has zero verified accounts (drives the
+   *  empty-state banner in the template). */
+  protected readonly emailAccounts = signal<EmailAccount[] | null>(null);
+  protected readonly emailAccountsLoading = signal(false);
+
+  /** Merge tags the operator can insert into the Subject line via the
+   *  "Insert variable ▾" affordance. Named-variable syntax matching the
+   *  dispatcher's per-contact resolution path. */
+  protected readonly subjectMergeTags: ReadonlyArray<{ value: string; label: string }> = [
+    { value: '{{first_name}}', label: 'First name' },
+    { value: '{{full_name}}', label: 'Full name' },
+    { value: '{{email}}', label: 'Email' },
+  ];
+  /** Bound as a component property because Angular's template parser
+   *  would otherwise mis-interpret the ``{{`` in the placeholder as a
+   *  binding expression. */
+  protected readonly subjectPlaceholder = 'Your monthly deals, {{first_name}} 🎁';
+
   protected readonly selectedTemplate = computed<PickerRow | null>(
     () => this.templates().find((t) => t.id === this.selectedTemplateId()) ?? null,
   );
@@ -327,6 +352,15 @@ export class CreateCampaignModalComponent {
     winner_holdback_hours: this.fb.control<number>(24, {
       nonNullable: true,
     }),
+    // Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+    // Every control below is nullable so WhatsApp submits stay clean.
+    // Required-when-Email is enforced in `save()` before we hit the
+    // API, and the backend echoes the same check with a 422.
+    email_account_id: this.fb.control<string | null>(null),
+    sender_name: this.fb.control<string | null>(null, [Validators.maxLength(120)]),
+    reply_to: this.fb.control<string | null>(null, [Validators.email, Validators.maxLength(320)]),
+    subject: this.fb.control<string | null>(null, [Validators.maxLength(998)]),
+    preheader: this.fb.control<string | null>(null, [Validators.maxLength(200)]),
   });
 
   protected readonly isWhatsApp = computed(
@@ -349,6 +383,23 @@ export class CreateCampaignModalComponent {
         this._loadTemplates(channel);
         if (channel === 'whatsapp' && this.capacity() === null) {
           this._loadCapacity();
+        }
+        // Campaigns v1 Step 03 — lazy-fetch verified mailboxes the
+        // first time the operator picks Email. When they switch away,
+        // clear the mailbox selection so the payload never carries a
+        // stale email_account_id on a WA campaign.
+        if (channel === 'email') {
+          if (this.emailAccounts() === null) {
+            this._loadEmailAccounts();
+          }
+        } else {
+          this.form.patchValue({
+            email_account_id: null,
+            sender_name: null,
+            reply_to: null,
+            subject: null,
+            preheader: null,
+          });
         }
       });
 
@@ -409,6 +460,51 @@ export class CreateCampaignModalComponent {
 
   protected isWhatsAppChannel(): boolean {
     return this.form.controls.channel.value === 'whatsapp';
+  }
+
+  /** Campaigns v1 Step 03 — Email branch gate for the modal's
+   *  conditional field render + submit disable. Mirrors the
+   *  `channel === 'email'` check but reads through channelSignal so
+   *  computed()s can subscribe. */
+  protected isEmailChannel(): boolean {
+    return this.channelSignal() === 'email';
+  }
+
+  /** Insert a merge tag at the end of the subject value. A future
+   *  polish step could preserve caret position; end-of-string is the
+   *  standard fallback most builders offer. */
+  protected onInsertSubjectTag(token: string): void {
+    const ctrl = this.form.controls.subject;
+    const current = ctrl.value ?? '';
+    ctrl.setValue(current + token);
+    ctrl.markAsDirty();
+  }
+
+  /** True when the Email branch is missing any of its required fields.
+   *  Drives the disabled state on the submit button so the operator
+   *  can't send a payload the backend would 422. */
+  protected readonly emailBranchIncomplete = computed<boolean>(() => {
+    if (!this.isEmailChannel()) return false;
+    const v = this.form.getRawValue();
+    return (
+      !v.email_account_id ||
+      !(v.sender_name && v.sender_name.trim()) ||
+      !(v.subject && v.subject.trim())
+    );
+  });
+
+  private _loadEmailAccounts(): void {
+    this.emailAccountsLoading.set(true);
+    this.emailAccountsApi
+      .listVerified()
+      .pipe(
+        catchError(() => of<EmailAccount[]>([])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((rows) => {
+        this.emailAccounts.set(rows);
+        this.emailAccountsLoading.set(false);
+      });
   }
 
   protected onAudienceModeChange(mode: 'everyone' | 'group' | 'filter'): void {
@@ -692,6 +788,20 @@ export class CreateCampaignModalComponent {
       return;
     }
 
+    // Campaigns v1 Step 03 — Email required-field guard. Backend
+    // enforces the same invariant; catching it client-side keeps the
+    // error inline instead of round-tripping a 422.
+    if (v.channel === 'email') {
+      const missing: string[] = [];
+      if (!v.email_account_id) missing.push('a sender mailbox');
+      if (!(v.sender_name && v.sender_name.trim())) missing.push('a sender name');
+      if (!(v.subject && v.subject.trim())) missing.push('a subject');
+      if (missing.length) {
+        this.submitError.set(`Email campaigns need ${missing.join(', ')}.`);
+        return;
+      }
+    }
+
     this.submitting.set(true);
     this.submitError.set(null);
     this.api
@@ -716,6 +826,13 @@ export class CreateCampaignModalComponent {
         split_ratio: v.split_ratio ?? 50,
         winner_metric: v.is_ab_test ? (v.winner_metric ?? null) : null,
         winner_holdback_hours: v.winner_holdback_hours ?? 24,
+        // Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+        // Null on non-Email channels so backend + DB row stay clean.
+        email_account_id: v.channel === 'email' ? (v.email_account_id ?? null) : null,
+        sender_name: v.channel === 'email' ? (v.sender_name ?? null) : null,
+        reply_to: v.channel === 'email' ? (v.reply_to ?? null) : null,
+        subject: v.channel === 'email' ? (v.subject ?? null) : null,
+        preheader: v.channel === 'email' ? (v.preheader ?? null) : null,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({

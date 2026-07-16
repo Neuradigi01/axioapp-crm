@@ -128,6 +128,21 @@ class Campaign(Base, TenantScoped):
     # config instead of the org's default phone. NULL preserves
     # the original behaviour for every existing campaign row.
     send_from_phone_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+    # Every column below is NULL for non-Email campaigns; the schema
+    # layer (CampaignCreate) enforces required-when-Email so we don't
+    # have to break existing WA rows with NOT NULL constraints. See
+    # migration 0151_campaign_email_fields.
+    email_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_email_accounts.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    sender_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    reply_to: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    subject: Mapped[str | None] = mapped_column(String(998), nullable=True)
+    preheader: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # whatsapp-platform-upgrade Step 29 — A/B testing.
     # ``is_ab_test`` is the master gate; when False every other
     # A/B column is ignored. When True the dispatcher assigns each

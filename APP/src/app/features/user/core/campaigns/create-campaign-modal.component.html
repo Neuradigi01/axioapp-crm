@@ -222,6 +222,128 @@
         }
       </fieldset>
 
+      <!-- Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+           Fieldset only renders when channel === 'email'. All controls
+           reset when the operator switches away, so nothing leaks onto
+           a WhatsApp payload. -->
+      @if (isEmailChannel()) {
+        <fieldset class="rounded-md border border-zinc-200 p-3 space-y-3">
+          <legend class="px-1 text-xs font-medium text-zinc-600">Email sender identity</legend>
+
+          @if (emailAccountsLoading()) {
+            <div class="rounded-md bg-zinc-50 px-2 py-1.5 text-xs text-zinc-500">
+              Loading connected mailboxes…
+            </div>
+          } @else if (emailAccounts() !== null && emailAccounts()!.length === 0) {
+            <div
+              class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800"
+            >
+              No verified sender mailbox. Connect one in
+              <a routerLink="/user/settings/email" class="font-medium underline">
+                Settings → Email
+              </a>
+              first, then come back to send an Email campaign.
+            </div>
+          } @else {
+            <div class="grid grid-cols-2 gap-3">
+              <label class="block text-sm">
+                <span class="block text-xs font-medium text-zinc-600">
+                  Send from mailbox
+                  <span class="ml-1 text-rose-500">*</span>
+                </span>
+                <select
+                  formControlName="email_account_id"
+                  class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                >
+                  <option [ngValue]="null">— Pick a mailbox —</option>
+                  @for (a of emailAccounts() ?? []; track a.id) {
+                    <option [ngValue]="a.id">
+                      {{ a.email_address }}{{ a.display_name ? ' · ' + a.display_name : '' }}
+                    </option>
+                  }
+                </select>
+              </label>
+              <label class="block text-sm">
+                <span class="block text-xs font-medium text-zinc-600">
+                  Sender name
+                  <span class="ml-1 text-rose-500">*</span>
+                </span>
+                <input
+                  type="text"
+                  formControlName="sender_name"
+                  maxlength="120"
+                  placeholder="Your Shop"
+                  class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                />
+                <span class="mt-0.5 block text-[10px] text-zinc-500">
+                  Shown in inbox before the address.
+                </span>
+              </label>
+            </div>
+
+            <label class="block text-sm">
+              <span class="block text-xs font-medium text-zinc-600"> Reply-to (optional) </span>
+              <input
+                type="email"
+                formControlName="reply_to"
+                maxlength="320"
+                placeholder="hello@yourshop.com"
+                class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+              <span class="mt-0.5 block text-[10px] text-zinc-500">
+                Where replies land. Defaults to the mailbox address at send time.
+              </span>
+            </label>
+
+            <label class="block text-sm">
+              <span class="mb-1 flex items-center justify-between">
+                <span class="text-xs font-medium text-zinc-600">
+                  Subject
+                  <span class="ml-1 text-rose-500">*</span>
+                </span>
+                <span class="text-[10px] text-zinc-500">
+                  {{ (form.controls.subject.value ?? '').length }} / 998
+                </span>
+              </span>
+              <input
+                type="text"
+                formControlName="subject"
+                maxlength="998"
+                [placeholder]="subjectPlaceholder"
+                class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+              <span class="mt-1 flex items-center gap-2 text-[10px] text-zinc-500">
+                Insert variable:
+                @for (tag of subjectMergeTags; track tag.value) {
+                  <button
+                    type="button"
+                    (click)="onInsertSubjectTag(tag.value)"
+                    class="rounded border border-zinc-300 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50"
+                  >
+                    {{ tag.label }}
+                  </button>
+                }
+              </span>
+            </label>
+
+            <label class="block text-sm">
+              <span class="block text-xs font-medium text-zinc-600"> Preheader (optional) </span>
+              <input
+                type="text"
+                formControlName="preheader"
+                maxlength="200"
+                placeholder="Five picks for you, expires Sunday"
+                class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+              <span class="mt-0.5 block text-[10px] text-zinc-500">
+                Preview snippet shown next to the subject in the inbox · ~90 chars for Gmail / Apple
+                Mail.
+              </span>
+            </label>
+          }
+        </fieldset>
+      }
+
       @if (templates().length > 0) {
         <!-- Step 15 — central library picker (every channel).
              Campaigns v1 Step 01 — replaced the plain <select> with a
@@ -435,9 +557,13 @@
         </button>
         <button
           type="submit"
-          [disabled]="submitting() || quotaBlocksSubmit()"
+          [disabled]="submitting() || quotaBlocksSubmit() || emailBranchIncomplete()"
           [title]="
-            quotaBlocksSubmit() ? 'WhatsApp daily quota reached. Resets at 5:30 AM IST.' : ''
+            quotaBlocksSubmit()
+              ? 'WhatsApp daily quota reached. Resets at 5:30 AM IST.'
+              : emailBranchIncomplete()
+                ? 'Pick a mailbox, sender name, and subject to send an Email campaign.'
+                : ''
           "
           class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
         >

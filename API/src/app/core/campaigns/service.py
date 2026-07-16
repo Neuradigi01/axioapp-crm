@@ -46,6 +46,8 @@ from src.app.core.campaigns.schemas import (
 from src.app.core.contacts import service as contacts_service
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations.adapters import ChannelMessageRef
+from src.app.core.email import data_access as email_da
+from src.app.core.email.models import EmailAccount, EmailAccountSyncState
 from src.app.core.conversations.adapters.whatsapp import (
     WhatsAppNotConnected,
     WhatsAppRateLimited,
@@ -89,6 +91,42 @@ async def get_campaign(session: AsyncSession, campaign_id: uuid.UUID) -> Campaig
 
 
 # --- writes --------------------------------------------------------------
+
+
+async def _resolve_email_sender(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    account_id: uuid.UUID,
+) -> EmailAccount:
+    """Campaigns v1 Step 03 — verify the requested Email mailbox exists
+    in this org and is currently connected. The lookup goes through
+    the email module's DAL (a plain read, no business rule beyond the
+    tenant filter), and this function owns the availability check +
+    error mapping. Called from ``create_campaign`` / ``update_campaign``
+    when either ``channel == email`` at create time or the caller is
+    swapping the mailbox on a Draft.
+
+    Returns the row so the caller can persist it directly; raises 400
+    when the mailbox isn't visible in this org (RLS hides cross-tenant
+    rows and the DAL returns None) or when it isn't in the ``live``
+    sync state (a disconnected / erroring mailbox can't dispatch).
+    """
+    account = await email_da.get_account_by_id(session, account_id=account_id)
+    if account is None or account.org_id != org_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email account not found or belongs to another org.",
+        )
+    if account.sync_state != EmailAccountSyncState.live:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Selected mailbox is not connected — reconnect it in "
+                "Email Sender Setup and try again."
+            ),
+        )
+    return account
 
 
 async def _validate_template_channel_match(
@@ -146,6 +184,16 @@ async def create_campaign(
             campaign_channel=payload.channel,
             template_ids=template_ids_to_check,
         )
+    # Campaigns v1 Step 03 — verify the referenced mailbox exists +
+    # is connected. The schema layer already enforced
+    # required-when-Email; here we do the cross-module read + status
+    # gate that only the service layer can own.
+    if payload.channel == ConversationChannel.email and payload.email_account_id is not None:
+        await _resolve_email_sender(
+            session,
+            org_id=org_id,
+            account_id=payload.email_account_id,
+        )
     campaign = Campaign(
         org_id=org_id,
         name=payload.name,
@@ -163,6 +211,17 @@ async def create_campaign(
         # when the operator chose one on the create modal. NULL
         # preserves the legacy "use org default" behaviour.
         send_from_phone_id=payload.send_from_phone_id,
+        # Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+        # Persisted verbatim for Email campaigns; NULL on non-Email rows
+        # even if the payload happened to send them (the schema validator
+        # already rejected any Email-specific value on a WA payload via
+        # the required-when-Email check, and non-Email payloads simply
+        # default these to None).
+        email_account_id=payload.email_account_id,
+        sender_name=payload.sender_name,
+        reply_to=str(payload.reply_to) if payload.reply_to is not None else None,
+        subject=payload.subject,
+        preheader=payload.preheader,
         # Step 29 — A/B test config. Server defaults take over for
         # non-A/B campaigns (is_ab_test=false, split_ratio=50, etc.).
         is_ab_test=bool(payload.is_ab_test),
@@ -225,6 +284,35 @@ async def update_campaign(
         changed = True
     if payload.schedule_at is not None:
         campaign.schedule_at = payload.schedule_at
+        changed = True
+    # Campaigns v1 Step 03 — Email sender identity + subject + preheader
+    # can be edited on a Draft Email campaign. Channel itself is
+    # immutable post-create, so we don't have to re-run the
+    # required-when-Email check — any missing required field just stays
+    # at whatever the create-time payload set. Swapping the mailbox
+    # re-triggers the connection check.
+    if (
+        payload.email_account_id is not None
+        and payload.email_account_id != campaign.email_account_id
+    ):
+        await _resolve_email_sender(
+            session,
+            org_id=campaign.org_id,
+            account_id=payload.email_account_id,
+        )
+        campaign.email_account_id = payload.email_account_id
+        changed = True
+    if payload.sender_name is not None:
+        campaign.sender_name = payload.sender_name
+        changed = True
+    if payload.reply_to is not None:
+        campaign.reply_to = str(payload.reply_to)
+        changed = True
+    if payload.subject is not None:
+        campaign.subject = payload.subject
+        changed = True
+    if payload.preheader is not None:
+        campaign.preheader = payload.preheader
         changed = True
     if changed:
         await session.commit()
