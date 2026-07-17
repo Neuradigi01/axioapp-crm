@@ -24,6 +24,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { environment } from '../../../../../environments/environment';
 
@@ -69,6 +70,15 @@ export class EmailAccountsApiService {
    *  back. */
   list(): Observable<EmailAccount[]> {
     return this.http.get<EmailAccount[]>(`${this.base}/accounts`);
+  }
+
+  /** Campaigns v1 Step 03 — mailbox picker in the create-campaign
+   *  modal only offers accounts that are actively syncing. The
+   *  backend list endpoint doesn't accept a status filter yet, so
+   *  we sift on the client. Cheap: orgs typically connect < 5
+   *  mailboxes. */
+  listVerified(): Observable<EmailAccount[]> {
+    return this.list().pipe(map((rows) => rows.filter((r) => r.sync_state === 'live')));
   }
 
   /** Returns the Google OAuth consent URL. The SPA navigates to it

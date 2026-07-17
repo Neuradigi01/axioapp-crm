@@ -12,6 +12,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
+import { switchMap } from 'rxjs/operators';
 
 import { ActivityTimelineComponent } from '../activities/activity-timeline.component';
 import { AddNoteComponent } from '../activities/add-note.component';
@@ -208,20 +209,27 @@ export class LeadDetailPageComponent implements OnInit {
     if (!event.update || !l) return;
     this.submitting.set(true);
     this.formError.set(null);
-    this.api
-      .update(l.id, event.update)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (updated) => {
-          this.lead.set(updated);
-          this.submitting.set(false);
-          this.closeModal();
-        },
-        error: (err: HttpErrorResponse) => {
-          this.submitting.set(false);
-          this.formError.set(extractApiError(err) ?? 'Could not save lead.');
-        },
-      });
+    // ``pipeline_stage`` transitions never flow through the plain
+    // PATCH — the backend `LeadUpdate` schema deliberately omits it
+    // so kanban moves go through `move-stage` (which stamps activity
+    // + audit + status sync). Mirror the leads-list page pattern:
+    // apply the field-level update, then chain the stage move when
+    // the modal reported one.
+    const update$ = this.api.update(l.id, event.update);
+    const final$ = event.moveStageTo
+      ? update$.pipe(switchMap(() => this.api.moveStage(l.id, event.moveStageTo!)))
+      : update$;
+    final$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (updated) => {
+        this.lead.set(updated);
+        this.submitting.set(false);
+        this.closeModal();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.submitting.set(false);
+        this.formError.set(extractApiError(err) ?? 'Could not save lead.');
+      },
+    });
   }
 
   protected onDelete(): void {

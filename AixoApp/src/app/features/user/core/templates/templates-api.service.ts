@@ -25,6 +25,38 @@ export type TemplateExternalStatus = 'n_a' | 'pending' | 'approved' | 'rejected'
 
 export type TemplateCategory = 'marketing' | 'transactional' | 'service';
 
+export type WaButtonType = 'url' | 'phone_number' | 'quick_reply';
+export type WaHeaderType = 'text' | 'image' | 'video' | 'document';
+
+export interface WhatsAppTemplateButton {
+  type: WaButtonType;
+  text: string;
+  url?: string | null;
+  phone_number?: string | null;
+}
+
+export type WaCategory = 'marketing' | 'utility' | 'authentication';
+
+export interface WhatsAppExtensionPayload {
+  /** Meta's WA category (marketing / utility / authentication) — a
+   *  DIFFERENT taxonomy from TemplateCategory (marketing / transactional
+   *  / service). Store both: the central column drives the CRM's send
+   *  guard, this one drives Meta's review track. */
+  category?: WaCategory | null;
+  header_type?: WaHeaderType | null;
+  header_text?: string | null;
+  footer_text?: string | null;
+  buttons?: WhatsAppTemplateButton[] | null;
+}
+
+export interface WhatsAppExtensionRead {
+  category: WaCategory | null;
+  header_type: WaHeaderType | null;
+  header_text: string | null;
+  footer_text: string | null;
+  buttons: WhatsAppTemplateButton[] | null;
+}
+
 export interface TemplateRead {
   id: string;
   org_id: string;
@@ -33,17 +65,33 @@ export interface TemplateRead {
   category: TemplateCategory;
   language: string;
   body_text: string;
+  /** Campaigns v1 Step 04 — HTML body for Email templates. Null for
+   *  every other channel and for Email templates that only ship
+   *  plain text. Sanitised server-side on every write. */
+  body_html: string | null;
+  /** When true, dispatch (Step 05) derives the plain-text fallback
+   *  from ``body_html`` if ``body_text`` was left empty. */
+  body_text_fallback_auto: boolean;
   subject: string | null;
   preview_text: string | null;
   variables: string[];
   internal_status: TemplateInternalStatus;
   external_status: TemplateExternalStatus;
+  /** Campaigns v1 Step 02 — Meta rejection reason surfaced by the list
+   *  endpoint (LEFT OUTER JOIN onto the WhatsApp extension). Populated
+   *  for rejected WA rows; `null` for every other case. Drives the
+   *  library + campaign picker tooltip on the status badge. */
+  external_rejection_reason: string | null;
   external_provider_id: string | null;
   current_version: number;
   created_by_user_id: string | null;
   updated_by_user_id: string | null;
   created_at: string;
   updated_at: string;
+  /** Populated by the backend for WhatsApp templates that have a
+   *  matching row in `tbl_whatsapp_templates`. Null on non-WA channels
+   *  and on legacy WA rows created before the extension write path. */
+  whatsapp?: WhatsAppExtensionRead | null;
 }
 
 export interface TemplateVersionRead {
@@ -91,9 +139,19 @@ export interface TemplateCreatePayload {
   channel: TemplateChannel;
   category?: TemplateCategory;
   language?: string;
-  body_text: string;
+  /** Optional when `channel === 'email'` AND `body_html` is provided —
+   *  the backend derives the plain-text fallback via
+   *  ``body_text_fallback_auto``. Required for every other channel. */
+  body_text?: string | null;
+  /** Campaigns v1 Step 04 — HTML body for Email templates. Only
+   *  accepted when `channel === 'email'`. Sanitised on the server. */
+  body_html?: string | null;
+  body_text_fallback_auto?: boolean;
   subject?: string | null;
   preview_text?: string | null;
+  /** Meta-specific extras. Only accepted when `channel === 'whatsapp'`;
+   *  the backend upserts the tbl_whatsapp_templates extension row. */
+  whatsapp?: WhatsAppExtensionPayload | null;
 }
 
 export interface TemplateUpdatePayload {
@@ -101,9 +159,15 @@ export interface TemplateUpdatePayload {
   category?: TemplateCategory;
   language?: string;
   body_text?: string;
+  /** Campaigns v1 Step 04 — HTML body edit; only meaningful when the
+   *  underlying template is on the Email channel. */
+  body_html?: string | null;
+  body_text_fallback_auto?: boolean | null;
   subject?: string | null;
   preview_text?: string | null;
   change_note?: string | null;
+  /** Meta-specific extras. See TemplateCreatePayload. */
+  whatsapp?: WhatsAppExtensionPayload | null;
 }
 
 export interface TemplateListQuery {

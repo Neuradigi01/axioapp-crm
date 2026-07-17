@@ -64,6 +64,11 @@ export class CampaignDetailPageComponent {
   protected readonly loadError = signal<string | null>(null);
   protected readonly retryingId = signal<string | null>(null);
 
+  /** Campaigns v1 Step 05 — funnel branches on channel. Email
+   *  campaigns render Opened / Clicked / Bounced boxes; WA campaigns
+   *  keep the existing Read box. */
+  protected readonly isEmailCampaign = computed(() => this.campaign()?.channel === 'email');
+
   protected readonly statusBadge = computed(() => {
     const c = this.campaign();
     if (!c) return null;
@@ -207,6 +212,11 @@ export class CampaignDetailPageComponent {
       case 'delivered':
       case 'read':
         return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+      // Campaigns v1 Step 05 — Email tracking states share the WA
+      // "read" palette because both mean "recipient engaged".
+      case 'opened':
+      case 'clicked':
+        return 'bg-violet-50 text-violet-700 ring-violet-200';
       case 'queued':
         return 'bg-amber-50 text-amber-700 ring-amber-200';
       case 'failed':

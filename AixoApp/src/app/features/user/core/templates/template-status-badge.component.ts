@@ -69,11 +69,26 @@ export class TemplateStatusBadgeComponent {
   readonly internal = input<TemplateInternalStatus | null>(null);
   readonly external = input<TemplateExternalStatus | null>(null);
 
+  /** Campaigns v1 Step 02 — Meta's rejection text, shown as a tooltip
+   *  on hover / keyboard focus of a rejected badge. When null (or the
+   *  status isn't ``rejected``), the badge renders as before — a
+   *  plain non-interactive `<span>` with no tooltip and no aria noise. */
+  readonly rejectionReason = input<string | null>(null);
+
   protected readonly descriptor = computed<BadgeDescriptor | null>(() => {
     const internal = this.internal();
     if (internal) return INTERNAL[internal] ?? null;
     const external = this.external();
     if (external) return EXTERNAL[external];
     return null;
+  });
+
+  /** True when the badge should offer a hover-tooltip. Only fires for
+   *  externally-rejected rows that carry a non-empty reason string —
+   *  everything else keeps the plain badge markup. */
+  protected readonly showRejectionTooltip = computed<boolean>(() => {
+    if (this.external() !== 'rejected') return false;
+    const reason = this.rejectionReason();
+    return !!reason && reason.trim().length > 0;
   });
 }

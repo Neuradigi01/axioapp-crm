@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
-import { WhatsAppOptInStatus } from '../contacts-api.service';
+import { EmailOptInStatus, WhatsAppOptInStatus } from '../contacts-api.service';
 
 /**
  * Status chip for the contacts list + detail header (Step 22).
@@ -29,7 +29,13 @@ import { WhatsAppOptInStatus } from '../contacts-api.service';
   `,
 })
 export class OptInChipComponent {
-  readonly status = input<WhatsAppOptInStatus | null | undefined>('never_contacted');
+  readonly status = input<WhatsAppOptInStatus | EmailOptInStatus | null | undefined>(
+    'never_contacted',
+  );
+  /** Campaigns v1 Step 06 — same chip drives the Email opt-in badge.
+   *  Only the tooltip mentions the channel; palette + labels stay
+   *  identical because the state machines mirror each other. */
+  readonly channel = input<'whatsapp' | 'email'>('whatsapp');
 
   protected readonly label = computed(() => {
     switch (this.status()) {
@@ -58,15 +64,16 @@ export class OptInChipComponent {
   });
 
   protected readonly title = computed(() => {
+    const channelLabel = this.channel() === 'email' ? 'Email' : 'WhatsApp';
     switch (this.status()) {
       case 'opted_in':
-        return 'Explicit consent captured — campaign sends proceed.';
+        return `Explicit ${channelLabel} consent captured — campaign sends proceed.`;
       case 'opted_out':
-        return 'Opted out — every campaign send is blocked.';
+        return `Opted out of ${channelLabel} — every campaign send is blocked.`;
       case 'implicit':
-        return 'No explicit consent record — campaigns show a warning.';
+        return `No explicit ${channelLabel} consent record — campaigns show a warning.`;
       default:
-        return 'Never contacted on WhatsApp.';
+        return `Never contacted on ${channelLabel}.`;
     }
   });
 }

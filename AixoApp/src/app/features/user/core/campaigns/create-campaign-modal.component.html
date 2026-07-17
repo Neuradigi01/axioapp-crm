@@ -179,6 +179,124 @@
               />
             </label>
           </div>
+
+          <!-- Live matching-contacts preview (Custom filter mode only) -->
+          <div class="mt-2 rounded-md border border-zinc-200 bg-white">
+            <div
+              class="flex items-center justify-between gap-2 border-b border-zinc-200 px-2 py-1 text-[10px] uppercase tracking-wide text-zinc-500"
+              [class.border-b-0]="audiencePreviewCollapsed()"
+            >
+              <span>Matching contacts</span>
+              <div class="flex items-center gap-2 normal-case tracking-normal">
+                @if (audiencePreviewLoading()) {
+                  <span>Loading…</span>
+                } @else if (
+                  audienceCount() !== null && audienceCount()! > audiencePreviewRows().length
+                ) {
+                  <span>Showing {{ audiencePreviewRows().length }} of {{ audienceCount() }}</span>
+                } @else if (audiencePreviewRows().length > 0) {
+                  <span>{{ audiencePreviewRows().length }} shown</span>
+                }
+                @if (audiencePreviewRows().length > 0 && !audiencePreviewCollapsed()) {
+                  <button
+                    type="button"
+                    (click)="selectAllShown()"
+                    class="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50"
+                  >
+                    Select all shown
+                  </button>
+                }
+                @if (selectedContactMap().size > 0 && !audiencePreviewCollapsed()) {
+                  <button
+                    type="button"
+                    (click)="clearSelection()"
+                    class="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50"
+                  >
+                    Clear
+                  </button>
+                }
+                <button
+                  type="button"
+                  (click)="toggleAudiencePreviewCollapsed()"
+                  [attr.aria-expanded]="!audiencePreviewCollapsed()"
+                  [attr.aria-label]="audiencePreviewCollapsed() ? 'Show matches' : 'Hide matches'"
+                  class="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50"
+                >
+                  {{ audiencePreviewCollapsed() ? 'Show' : 'Hide' }}
+                </button>
+              </div>
+            </div>
+            @if (audiencePreviewCollapsed()) {
+              <!-- Collapsed: body hidden. Chip strip below still shows the selection. -->
+            } @else if (audiencePreviewRows().length === 0 && !audiencePreviewLoading()) {
+              <p class="px-2 py-2 text-xs text-zinc-500">
+                Add a search / source / tag above to preview matching contacts.
+              </p>
+            } @else {
+              <ul class="max-h-48 divide-y divide-zinc-100 overflow-y-auto">
+                @for (c of audiencePreviewRows(); track c.id) {
+                  <li>
+                    <label
+                      class="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs hover:bg-zinc-50"
+                    >
+                      <input
+                        type="checkbox"
+                        [checked]="isContactSelected(c.id)"
+                        (change)="toggleContactSelected(c)"
+                        class="h-3.5 w-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                      />
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate font-medium text-zinc-900">
+                          {{ c.full_name }}
+                        </span>
+                        <span class="block truncate text-[10px] text-zinc-500">
+                          {{ c.phone ?? '—' }} · {{ c.email ?? '—' }}
+                        </span>
+                      </span>
+                    </label>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        }
+
+        <!-- Selected contacts chip strip (Custom filter mode, non-empty) -->
+        @if (selectedContactMap().size > 0) {
+          <div class="rounded-md border border-zinc-200 bg-white p-2">
+            <div
+              class="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wide text-zinc-500"
+            >
+              <span>Selected contacts ({{ selectedContactMap().size }})</span>
+              <button
+                type="button"
+                (click)="clearSelection()"
+                class="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-zinc-700 hover:bg-zinc-50"
+              >
+                Clear all
+              </button>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              @for (c of selectedContactList(); track c.id) {
+                <span
+                  class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-700"
+                >
+                  <span class="truncate max-w-[10rem]">
+                    {{ c.full_name }}
+                    <span class="text-zinc-500">· {{ c.phone ?? c.email ?? '—' }}</span>
+                  </span>
+                  <button
+                    type="button"
+                    (click)="removeSelectedContact(c.id)"
+                    aria-label="Remove"
+                    class="ml-0.5 rounded-full text-zinc-500 hover:text-zinc-800"
+                  >
+                    ×
+                  </button>
+                </span>
+              }
+            </div>
+          </div>
         }
 
         <!-- Live count preview -->
@@ -186,7 +304,14 @@
           class="flex items-center gap-2 rounded-md bg-zinc-50 px-2 py-1.5 text-xs text-zinc-700"
         >
           <lucide-icon name="users" class="h-3 w-3 text-zinc-500" />
-          @if (audienceCountLoading()) {
+          @if (selectedContactMap().size > 0) {
+            <span>
+              <span class="font-medium">{{ selectedContactMap().size }}</span>
+              hand-picked
+              {{ selectedContactMap().size === 1 ? 'contact' : 'contacts' }} will receive this
+              campaign.
+            </span>
+          } @else if (audienceCountLoading()) {
             <span class="text-zinc-500">Counting…</span>
           } @else if (audienceCount() !== null) {
             <span>
@@ -222,8 +347,159 @@
         }
       </fieldset>
 
+      <!-- Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+           Fieldset only renders when channel === 'email'. All controls
+           reset when the operator switches away, so nothing leaks onto
+           a WhatsApp payload. -->
+      @if (isEmailChannel()) {
+        @if (orgAddressMissing()) {
+          <div
+            class="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"
+          >
+            <lucide-icon
+              name="alert-triangle"
+              size="14"
+              class="mt-0.5 shrink-0"
+              aria-hidden="true"
+            ></lucide-icon>
+            <span class="flex-1">
+              Your organisation has no physical address configured. CAN-SPAM and DPDP require it on
+              every marketing email — <strong>Start will fail</strong> until you add one.
+              <a
+                routerLink="/user/settings"
+                [queryParams]="{ tab: 'store' }"
+                class="font-medium underline"
+              >
+                Open Settings → Store Profile
+              </a>
+              to fix.
+            </span>
+          </div>
+        }
+
+        <fieldset class="rounded-md border border-zinc-200 p-3 space-y-3">
+          <legend class="px-1 text-xs font-medium text-zinc-600">Email sender identity</legend>
+
+          @if (emailAccountsLoading()) {
+            <div class="rounded-md bg-zinc-50 px-2 py-1.5 text-xs text-zinc-500">
+              Loading connected mailboxes…
+            </div>
+          } @else if (emailAccounts() !== null && emailAccounts()!.length === 0) {
+            <div
+              class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800"
+            >
+              No verified sender mailbox. Connect one in
+              <a routerLink="/user/settings/email" class="font-medium underline">
+                Settings → Email
+              </a>
+              first, then come back to send an Email campaign.
+            </div>
+          } @else {
+            <div class="grid grid-cols-2 gap-3">
+              <label class="block text-sm">
+                <span class="block text-xs font-medium text-zinc-600">
+                  Send from mailbox
+                  <span class="ml-1 text-rose-500">*</span>
+                </span>
+                <select
+                  formControlName="email_account_id"
+                  class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                >
+                  <option [ngValue]="null">— Pick a mailbox —</option>
+                  @for (a of emailAccounts() ?? []; track a.id) {
+                    <option [ngValue]="a.id">
+                      {{ a.email_address }}{{ a.display_name ? ' · ' + a.display_name : '' }}
+                    </option>
+                  }
+                </select>
+              </label>
+              <label class="block text-sm">
+                <span class="block text-xs font-medium text-zinc-600">
+                  Sender name
+                  <span class="ml-1 text-rose-500">*</span>
+                </span>
+                <input
+                  type="text"
+                  formControlName="sender_name"
+                  maxlength="120"
+                  placeholder="Your Shop"
+                  class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                />
+                <span class="mt-0.5 block text-[10px] text-zinc-500">
+                  Shown in inbox before the address.
+                </span>
+              </label>
+            </div>
+
+            <label class="block text-sm">
+              <span class="block text-xs font-medium text-zinc-600"> Reply-to (optional) </span>
+              <input
+                type="email"
+                formControlName="reply_to"
+                maxlength="320"
+                placeholder="hello@yourshop.com"
+                class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+              <span class="mt-0.5 block text-[10px] text-zinc-500">
+                Where replies land. Defaults to the mailbox address at send time.
+              </span>
+            </label>
+
+            <label class="block text-sm">
+              <span class="mb-1 flex items-center justify-between">
+                <span class="text-xs font-medium text-zinc-600">
+                  Subject
+                  <span class="ml-1 text-rose-500">*</span>
+                </span>
+                <span class="text-[10px] text-zinc-500">
+                  {{ (form.controls.subject.value ?? '').length }} / 998
+                </span>
+              </span>
+              <input
+                type="text"
+                formControlName="subject"
+                maxlength="998"
+                [placeholder]="subjectPlaceholder"
+                class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+              <span class="mt-1 flex items-center gap-2 text-[10px] text-zinc-500">
+                Insert variable:
+                @for (tag of subjectMergeTags; track tag.value) {
+                  <button
+                    type="button"
+                    (click)="onInsertSubjectTag(tag.value)"
+                    class="rounded border border-zinc-300 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50"
+                  >
+                    {{ tag.label }}
+                  </button>
+                }
+              </span>
+            </label>
+
+            <label class="block text-sm">
+              <span class="block text-xs font-medium text-zinc-600"> Preheader (optional) </span>
+              <input
+                type="text"
+                formControlName="preheader"
+                maxlength="200"
+                placeholder="Five picks for you, expires Sunday"
+                class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+              <span class="mt-0.5 block text-[10px] text-zinc-500">
+                Preview snippet shown next to the subject in the inbox · ~90 chars for Gmail / Apple
+                Mail.
+              </span>
+            </label>
+          }
+        </fieldset>
+      }
+
       @if (templates().length > 0) {
-        <!-- Step 15 — central library picker (every channel) -->
+        <!-- Step 15 — central library picker (every channel).
+             Campaigns v1 Step 01 — replaced the plain <select> with a
+             stacked row list so WhatsApp templates can render approval
+             status + category + language + preview inline. Non-approved
+             WA rows are visibly disabled and can't be selected. -->
         <div class="rounded-md border border-zinc-200 p-3 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-medium text-zinc-600"> Template </span>
@@ -231,26 +507,69 @@
               From your template library · /user/templates
             </span>
           </div>
-          <select
-            [value]="selectedTemplateId() ?? ''"
-            (change)="onTemplateChange($any($event.target).value)"
-            class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+
+          <div
+            role="listbox"
+            aria-label="Template"
+            class="max-h-64 divide-y divide-zinc-100 overflow-y-auto rounded-md border border-zinc-200 bg-white"
           >
-            <option value="">— Pick a template (or use free text below) —</option>
             @for (t of templates(); track t.id) {
-              <option [value]="t.id">{{ t.name }}</option>
+              <button
+                type="button"
+                role="option"
+                [attr.aria-selected]="selectedTemplateId() === t.id"
+                [disabled]="!isRowSelectable(t)"
+                (click)="onRowClick(t)"
+                class="relative flex w-full items-start justify-between gap-3 border-l-4 px-3 py-2 text-left transition"
+                [class.bg-emerald-50]="selectedTemplateId() === t.id"
+                [class.border-emerald-600]="selectedTemplateId() === t.id"
+                [class.border-transparent]="selectedTemplateId() !== t.id"
+                [class.hover:bg-zinc-50]="isRowSelectable(t) && selectedTemplateId() !== t.id"
+                [class.cursor-not-allowed]="!isRowSelectable(t)"
+                [class.opacity-60]="!isRowSelectable(t)"
+              >
+                <span class="min-w-0 flex-1">
+                  <span class="flex items-center gap-2">
+                    <span class="block truncate text-sm font-medium text-zinc-900">
+                      {{ t.name }}
+                    </span>
+                    @if (selectedTemplateId() === t.id) {
+                      <span
+                        class="shrink-0 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
+                      >
+                        Selected
+                      </span>
+                    }
+                  </span>
+                  <span class="mt-0.5 block truncate text-[11px] text-zinc-500">
+                    {{ rowSubtitle(t) }}
+                  </span>
+                </span>
+                @if (t.channel === 'whatsapp') {
+                  <span class="shrink-0 pt-0.5">
+                    <app-template-status-badge
+                      [external]="t.externalStatus"
+                      [rejectionReason]="t.externalRejectionReason"
+                    />
+                  </span>
+                }
+              </button>
             }
-          </select>
+          </div>
 
           @if (selectedTemplate(); as t) {
             <!-- Preview -->
-            <div
-              class="rounded-md bg-zinc-50 p-3 text-sm text-zinc-700 whitespace-pre-wrap font-mono text-xs"
-            >
+            <div class="rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
+              <div
+                class="mb-1.5 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-emerald-800"
+              >
+                <span>Selected template preview</span>
+                <span class="normal-case tracking-normal text-emerald-700">{{ t.name }}</span>
+              </div>
               @if (t.subject) {
-                <div class="font-semibold mb-1">{{ t.subject }}</div>
+                <div class="mb-1 text-sm font-semibold text-zinc-900">{{ t.subject }}</div>
               }
-              {{ t.body }}
+              <div class="whitespace-pre-wrap font-mono text-xs text-zinc-700">{{ t.body }}</div>
             </div>
 
             <!-- Variable bindings — WA-positional only.
@@ -308,10 +627,11 @@
           class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
         >
           @if (isWhatsAppChannel()) {
-            No WhatsApp templates approved by Meta yet. Create one in
+            No WhatsApp templates yet. Create one in
             <a routerLink="/user/templates" class="underline">/user/templates</a>, publish it, then
-            click "Submit to Meta" — once Meta approves it'll appear here. Or use the free-text
-            fallback below.
+            click "Submit to Meta" — approved templates can be sent immediately, pending / rejected
+            templates appear in this list too but stay disabled with their status shown. Or use the
+            free-text fallback below.
           } @else {
             No published templates for this channel yet. Create one in
             <a routerLink="/user/templates" class="underline">/user/templates</a>
@@ -344,6 +664,26 @@
         ></textarea>
       </label>
 
+      <!-- Campaigns v1 Step 04 — inline HTML composer. Only shown when
+           the operator picked the Email channel and hasn't referenced
+           a template; the picker's HTML body would otherwise be the
+           source of truth. Filling this clears `template` at submit. -->
+      @if (isEmailChannel() && !selectedTemplateId()) {
+        <div class="block">
+          <div class="mb-1 flex items-center justify-between text-xs">
+            <span class="font-medium text-zinc-600">Or write HTML instead</span>
+            <span class="text-[10px] text-zinc-400">
+              Sanitised server-side · Angular sanitises the preview too
+            </span>
+          </div>
+          <app-html-composer
+            label="HTML source"
+            [value]="form.controls.body_html.value ?? ''"
+            (valueChange)="onEmailBodyHtmlChange($event)"
+          />
+        </div>
+      }
+
       <label class="block text-sm">
         <span class="block text-xs font-medium text-zinc-600">
           Schedule (optional — leave blank to send when you click Start)
@@ -355,34 +695,37 @@
         />
       </label>
 
-      <!-- Step 27b — multi-number Send-From picker. Self-hides when
-           the org has < 2 connected phones; otherwise the operator
-           picks which number this campaign dispatches from. -->
-      <div class="mt-1">
-        <app-wa-send-from-picker
-          [value]="form.controls.send_from_phone_id.value"
-          (valueChange)="form.controls.send_from_phone_id.setValue($event)"
-        />
-      </div>
+      @if (isWhatsAppChannel()) {
+        <!-- Step 27b — multi-number Send-From picker. Self-hides when
+             the org has < 2 connected phones; otherwise the operator
+             picks which number this campaign dispatches from. WA-only:
+             other channels don't own multi-number identities. -->
+        <div class="mt-1">
+          <app-wa-send-from-picker
+            [value]="form.controls.send_from_phone_id.value"
+            (valueChange)="form.controls.send_from_phone_id.setValue($event)"
+          />
+        </div>
 
-      <!-- Step 29 — A/B test toggle + configuration. The section
-           component renders only when the operator turns the
-           toggle on; minimum-audience enforcement (≥ 50) lives
-           server-side on the start endpoint. -->
-      <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs">
-        <label class="flex cursor-pointer items-center gap-2">
-          <input type="checkbox" formControlName="is_ab_test" />
-          <span class="font-medium text-zinc-800">Run as an A/B test</span>
-          <span class="text-zinc-500">
-            — split the audience between two templates and let the CRM pick the winner.
-          </span>
-        </label>
-        @if (form.controls.is_ab_test.value) {
-          <div class="mt-2">
-            <app-ab-test-section [form]="form" [templates]="approvedTemplatesForPicker()" />
-          </div>
-        }
-      </div>
+        <!-- Step 29 — A/B test toggle + configuration. Currently
+             WA-only (per project memory) — Email A/B lands in a
+             follow-up. Hide the toggle entirely on non-WA channels so
+             users can't enable something the backend would reject. -->
+        <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs">
+          <label class="flex cursor-pointer items-center gap-2">
+            <input type="checkbox" formControlName="is_ab_test" />
+            <span class="font-medium text-zinc-800">Run as an A/B test</span>
+            <span class="text-zinc-500">
+              — split the audience between two templates and let the CRM pick the winner.
+            </span>
+          </label>
+          @if (form.controls.is_ab_test.value) {
+            <div class="mt-2">
+              <app-ab-test-section [form]="form" [templates]="approvedTemplatesForPicker()" />
+            </div>
+          }
+        </div>
+      }
 
       @if (submitError(); as err) {
         <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
@@ -400,9 +743,13 @@
         </button>
         <button
           type="submit"
-          [disabled]="submitting() || quotaBlocksSubmit()"
+          [disabled]="submitting() || quotaBlocksSubmit() || emailBranchIncomplete()"
           [title]="
-            quotaBlocksSubmit() ? 'WhatsApp daily quota reached. Resets at 5:30 AM IST.' : ''
+            quotaBlocksSubmit()
+              ? 'WhatsApp daily quota reached. Resets at 5:30 AM IST.'
+              : emailBranchIncomplete()
+                ? 'Pick a mailbox, sender name, and subject to send an Email campaign.'
+                : ''
           "
           class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
         >

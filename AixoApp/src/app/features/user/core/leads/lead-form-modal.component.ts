@@ -10,9 +10,9 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-import { Observable, Subject } from 'rxjs';
-import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Observable, of } from 'rxjs';
+import { catchError, map, switchMap } from 'rxjs/operators';
 
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
@@ -23,25 +23,26 @@ import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators } from '../shared/validators';
 import { Lead, LeadCreate, LeadUpdate, LeadsApiService } from './leads-api.service';
 import { nullableTrim } from '@core/services/form.util';
+import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * Modal that creates or edits a `Lead`. Splits the form into:
+ * Modal that creates or edits a `Lead`.
  *
- *   - Contact picker â€” debounced search through the contacts API.
- *     Selected contact becomes the lead's `contact_id`. "Create new
- *     contact" intentionally redirects users to the Contacts page
- *     instead of inlining a second dynamic form (which would have to
- *     re-implement the entire required-custom-fields flow).
- *   - Standard fields â€” pipeline_stage (from the pipeline engine),
- *     budget, expected_close_date.
- *   - Custom fields â€” `<app-dynamic-form>` fed by the lead-scoped
- *     `/custom-fields/lead/render` endpoint.
+ * Create mode collects the primary contact's name / phone / email
+ * inline (there is no separate contact picker) and, on submit, either
+ * re-uses an existing contact matched by phone/email or creates a new
+ * one before writing the lead. Standard + custom fields work the same
+ * way as the other entity modals.
+ *
+ * Edit mode shows the linked contact read-only. The modal only edits
+ * lead columns; changing which contact a lead points at is deliberately
+ * out of scope for this UI.
  */
 @Component({
   selector: 'app-lead-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, DynamicFormComponent],
+  imports: [ReactiveFormsModule, DynamicFormComponent],
   templateUrl: './lead-form-modal.component.html',
 })
 export class LeadFormModalComponent extends BaseFormModalComponent {
@@ -67,14 +68,21 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
 
   protected readonly pipeline = signal<Pipeline | null>(null);
 
+  /** Populated in edit mode so the linked contact's name / phone / email
+   * can be surfaced read-only. Never used in create mode. */
   protected readonly selectedContact = signal<ContactListItem | null>(null);
-  protected readonly contactQuery = signal('');
-  protected readonly contactResults = signal<ContactListItem[]>([]);
-  protected readonly contactSearchOpen = signal(false);
-
-  private readonly contactQuery$ = new Subject<string>();
 
   readonly isEdit = computed(() => this._lead() !== null);
+
+  /** Contact basics captured inline in create mode. On submit these are
+   * either matched against an existing contact (via the duplicate-check
+   * endpoint) or written as a new contact — the resulting id becomes
+   * the lead's `contact_id`. */
+  readonly contactBasics = this.fb.group({
+    full_name: this.fb.control<string>('', { nonNullable: true }),
+    phone: this.fb.control<string>('', { nonNullable: true }),
+    email: this.fb.control<string>('', { nonNullable: true }),
+  });
 
   readonly standard = this.fb.group({
     pipeline_stage: this.fb.control<string>('', { nonNullable: true }),
@@ -97,13 +105,11 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     const budgetRow = map['budget'];
     const closeRow = map['expected_close_date'];
 
-    // pipeline_stage — always required.
     this.standard.controls.pipeline_stage.setValidators([commonValidators.required]);
     this.standard.controls.pipeline_stage.updateValueAndValidity({
       emitEvent: false,
     });
 
-    // budget — required if override says so; min/max if numeric bounds set.
     const budgetValidators: ValidatorFn[] = [];
     if (budgetRow?.is_required) budgetValidators.push(commonValidators.required);
     if (budgetRow?.min_value !== null && budgetRow?.min_value !== undefined) {
@@ -115,7 +121,6 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     this.standard.controls.budget.setValidators(budgetValidators);
     this.standard.controls.budget.updateValueAndValidity({ emitEvent: false });
 
-    // expected_close_date — required if override says so.
     const closeValidators: ValidatorFn[] = [];
     if (closeRow?.is_required) closeValidators.push(commonValidators.required);
     this.standard.controls.expected_close_date.setValidators(closeValidators);
@@ -127,7 +132,25 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
   override ngOnInit(): void {
     super.ngOnInit();
 
-    // pipeline stages (drives the stage dropdown)
+    if (!this.isEdit()) {
+      this.contactBasics.controls.full_name.setValidators([
+        commonValidators.required,
+        commonValidators.maxLength(255),
+      ]);
+      this.contactBasics.controls.phone.setValidators([
+        commonValidators.required,
+        commonValidators.maxLength(32),
+      ]);
+      this.contactBasics.controls.email.setValidators([
+        commonValidators.required,
+        commonValidators.email,
+        commonValidators.maxLength(255),
+      ]);
+      this.contactBasics.controls.full_name.updateValueAndValidity({ emitEvent: false });
+      this.contactBasics.controls.phone.updateValueAndValidity({ emitEvent: false });
+      this.contactBasics.controls.email.updateValueAndValidity({ emitEvent: false });
+    }
+
     this.pipelinesApi
       .getByKey('leads')
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -142,58 +165,8 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
         error: () => this.pipeline.set(null),
       });
 
-    // contact search stream
-    this.contactQuery$
-      .pipe(
-        debounceTime(200),
-        distinctUntilChanged(),
-        switchMap((q) => this.contactsApi.list({ q: q || undefined, size: 8 })),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe({
-        next: (resp) => this.contactResults.set(resp.items),
-        error: () => this.contactResults.set([]),
-      });
-
-    // Preload the first page so the dropdown opens instantly on focus.
-    this.contactQuery$.next('');
-
-    // If edit mode, fetch the contact so we can show its name in the chip.
     const existing = this._lead();
     if (existing) this.preloadEditContact(existing.contact_id);
-  }
-
-  protected onContactQueryInput(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    this.contactQuery.set(value);
-    this.contactSearchOpen.set(true);
-    this.contactQuery$.next(value);
-  }
-
-  protected onContactFocus(): void {
-    this.contactSearchOpen.set(true);
-    if (this.contactResults().length === 0) {
-      this.contactQuery$.next(this.contactQuery());
-    }
-  }
-
-  protected onContactBlur(): void {
-    setTimeout(() => this.contactSearchOpen.set(false), 150);
-  }
-
-  protected selectContact(c: ContactListItem): void {
-    this.selectedContact.set(c);
-    this.contactSearchOpen.set(false);
-    this.contactQuery.set('');
-    this.contactResults.set([]);
-    this._submitError.set(null);
-  }
-
-  protected clearContact(): void {
-    this.selectedContact.set(null);
-    this.contactQuery.set('');
-    this.contactResults.set([]);
-    this.contactSearchOpen.set(true);
   }
 
   protected onCustomValueChange(v: FormValue): void {
@@ -213,40 +186,87 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
       this._submitError.set('Please fix the highlighted custom fields.');
       return;
     }
-    const contact = this.selectedContact();
-    if (!contact && !this.isEdit()) {
-      this._submitError.set('Please pick a contact.');
+
+    if (this.isEdit()) {
+      this.emitUpdate();
+      return;
+    }
+
+    if (this.contactBasics.invalid) {
+      this.contactBasics.markAllAsTouched();
+      this._submitError.set('Please fill the contact details.');
       return;
     }
     this._submitError.set(null);
+    this.resolveContactThenEmit();
+  }
 
+  private emitUpdate(): void {
     const raw = this.standard.getRawValue();
-    const payload: LeadCreate = {
-      contact_id: contact ? contact.id : this._lead()!.contact_id,
-      pipeline_stage: raw.pipeline_stage || null,
+    const existing = this._lead()!;
+    const update: LeadUpdate = {
       budget: nullableTrim(raw.budget),
       expected_close_date: nullableTrim(raw.expected_close_date),
       custom_data: this.customValue() as Record<string, unknown>,
     };
+    const moveStageTo =
+      raw.pipeline_stage && raw.pipeline_stage !== existing.pipeline_stage
+        ? raw.pipeline_stage
+        : undefined;
+    this.save.emit({ update, moveStageTo });
+  }
 
-    if (this.isEdit()) {
-      const existing = this._lead()!;
-      const update: LeadUpdate = {
-        budget: payload.budget,
-        expected_close_date: payload.expected_close_date,
-        custom_data: payload.custom_data,
-      };
-      if (contact && contact.id !== existing.contact_id) {
-        update.contact_id = contact.id;
-      }
-      const moveStageTo =
-        raw.pipeline_stage && raw.pipeline_stage !== existing.pipeline_stage
-          ? raw.pipeline_stage
-          : undefined;
-      this.save.emit({ update, moveStageTo });
-    } else {
-      this.save.emit({ create: payload });
-    }
+  /** Find-or-create the contact from the inline basics, then emit the
+   * lead create. Uses `checkDuplicate` to match on phone/email before
+   * writing a new row so re-entering an existing customer's details
+   * links to the same contact rather than piling up dupes.
+   *
+   * When a match's phone or email is empty and the operator typed a
+   * value, PATCH the existing contact so the data the operator entered
+   * lands rather than being silently discarded (option (a) — enrich
+   * rather than overwrite; existing non-empty values are never
+   * clobbered). */
+  private resolveContactThenEmit(): void {
+    const basics = this.contactBasics.getRawValue();
+    const full_name = basics.full_name.trim();
+    const phone = basics.phone.trim() || null;
+    const email = basics.email.trim() || null;
+
+    this._submitting.set(true);
+    this.contactsApi
+      .checkDuplicate({ phone, email })
+      .pipe(
+        switchMap((resp) => {
+          const match = resp.matches[0];
+          if (match) {
+            const patch: Record<string, string> = {};
+            if (!match.phone && phone) patch['phone'] = phone;
+            if (!match.email && email) patch['email'] = email;
+            if (Object.keys(patch).length === 0) return of(match.id);
+            return this.contactsApi.update(match.id, patch).pipe(map((c) => c.id));
+          }
+          return this.contactsApi.createStub({ full_name, phone, email }).pipe(map((c) => c.id));
+        }),
+        catchError((err: HttpErrorResponse) => {
+          this._submitting.set(false);
+          this._submitError.set(extractApiError(err) ?? 'Could not create contact.');
+          return of(null);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((contactId) => {
+        this._submitting.set(false);
+        if (!contactId) return;
+        const raw = this.standard.getRawValue();
+        const payload: LeadCreate = {
+          contact_id: contactId,
+          pipeline_stage: raw.pipeline_stage || null,
+          budget: nullableTrim(raw.budget),
+          expected_close_date: nullableTrim(raw.expected_close_date),
+          custom_data: this.customValue() as Record<string, unknown>,
+        };
+        this.save.emit({ create: payload });
+      });
   }
 
   private resetForm(lead: Lead): void {
@@ -276,7 +296,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
             created_at: c.created_at,
           }),
         error: () => {
-          /* leave selectedContact null â€” the user can re-pick */
+          /* leave selectedContact null — the contact chip just won't render */
         },
       });
   }

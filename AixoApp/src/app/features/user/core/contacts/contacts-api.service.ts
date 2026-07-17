@@ -44,6 +44,13 @@ export interface Contact {
   whatsapp_opt_in_recorded_by_user_id?: string | null;
   whatsapp_opt_out_recorded_at?: string | null;
   whatsapp_opt_out_reason?: string | null;
+  /** Campaigns v1 Step 06 — Email opt-in mirror of the WA state
+   *  machine. The tracking unsubscribe endpoint + the campaign send
+   *  guard read from ``email_opt_in_status``; the legacy
+   *  ``email_opt_out`` boolean stays as a fast-path shortcut. */
+  email_opt_in_status?: EmailOptInStatus;
+  email_opt_in_source?: EmailOptInSource | null;
+  email_opt_in_recorded_at?: string | null;
 }
 
 /** Step 22 — DPDP opt-in state machine. Mirrored from the backend
@@ -57,6 +64,19 @@ export type WhatsAppOptInSource =
   | 'inbound_first_message'
   | 'explicit_opt_in_link'
   | 'stop_keyword';
+
+/** Campaigns v1 Step 06 — Email opt-in state machine (mirror of WA). */
+export type EmailOptInStatus = 'never_contacted' | 'implicit' | 'opted_in' | 'opted_out';
+
+export type EmailOptInSource =
+  | 'form_widget'
+  | 'bulk_import'
+  | 'manual_entry'
+  | 'inbound_first_message'
+  | 'explicit_opt_in_link'
+  | 'email_unsubscribe_link'
+  | 'bounce_hard'
+  | 'manual_override';
 
 export interface ConsentEvent {
   id: string;
@@ -257,6 +277,16 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
   /** Render-shape custom field defs for the contact dynamic form. */
   renderFields(): Observable<FieldDef[]> {
     return this.http.get<FieldDef[]>(this.renderUrl);
+  }
+
+  /** Create a contact from an indirect entry point (e.g. the lead-form
+   * auto-create) where the operator can't reasonably fill required
+   * custom fields. Backend skips the required-custom-field check, same
+   * as widget / webhook ingest paths. */
+  createStub(payload: ContactCreate): Observable<Contact> {
+    return this.http.post<Contact>(this.base, payload, {
+      params: { stub: 'true' },
+    });
   }
 
   /** Step 22 — DPDP opt-in surface. Read returns current state +

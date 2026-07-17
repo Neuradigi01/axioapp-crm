@@ -1096,14 +1096,28 @@ export class LeadsPageComponent {
   private submitCreate(payload: LeadCreate): void {
     this.submitting.set(true);
     this.formError.set(null);
+    // Use the header-aware create so we can tell the operator when
+    // their form submission MERGED into an existing open lead
+    // (touchpoint added to timeline) versus creating a fresh row —
+    // otherwise the list "not growing" reads as a silent failure.
     this.api
-      .create(payload)
+      .createWithAction(payload)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: ({ action }) => {
           this.submitting.set(false);
-          this.closeModal();
-          this.reload();
+          if (action === 'merged') {
+            // Leave the modal OPEN so the operator sees the message
+            // and understands why the list didn't grow. They can hit
+            // Cancel to dismiss and jump to the existing lead.
+            this.formError.set(
+              'This contact already has an open lead — a new touchpoint was added to that lead instead of creating a duplicate.',
+            );
+            this.reload();
+          } else {
+            this.closeModal();
+            this.reload();
+          }
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);

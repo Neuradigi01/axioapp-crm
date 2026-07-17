@@ -9,8 +9,14 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -58,6 +64,19 @@ import { WaFormComponent, WaFormGroup } from './wa-form.component';
 type ChannelOption = '' | 'whatsapp' | 'email' | 'sms' | 'facebook' | 'instagram' | 'push';
 
 const LOCKED_STATUSES = new Set(['in_review', 'approved', 'published']);
+
+/** Meta's WA template-name regex. Anything else is rejected as
+ *  "Invalid parameter" (code 100) at ``/message_templates`` submission,
+ *  so we enforce it client-side too — an operator hitting Submit-to-
+ *  Meta with a title-cased name would otherwise waste a Meta round-trip
+ *  and get a cryptic error banner instead of a fix hint. */
+const WA_NAME_RE = /^[a-z0-9_]+$/;
+
+function waNameValidator(control: AbstractControl): { waName: true } | null {
+  const v = (control.value as string | null) ?? '';
+  if (!v) return null;
+  return WA_NAME_RE.test(v) ? null : { waName: true };
+}
 
 @Component({
   selector: 'app-template-editor-page',
@@ -121,17 +140,66 @@ export class TemplateEditorPageComponent {
   protected readonly toast = signal<string | null>(null);
   protected readonly saving = signal<boolean>(false);
 
+  /** Reactive mirror of the channel form control. Form controls aren't
+   *  signals on their own, so a plain ``computed`` reading
+   *  ``headerForm.controls.channel.value`` never re-evaluates when the
+   *  user picks a channel — the effect below wouldn't fire, no sub-form
+   *  would be built, and the "Pick a channel above" fallback would
+   *  stay rendered forever. ``toSignal`` bridges the form's
+   *  ``valueChanges`` stream into a signal so the rest of the reactive
+   *  graph updates on selection. */
+  private readonly channelValueSignal = toSignal(this.headerForm.controls.channel.valueChanges, {
+    initialValue: this.headerForm.controls.channel.value,
+  });
+
   protected readonly channel = computed<TemplateChannel | null>(() => {
     const t = this.template();
     if (t) return t.channel;
-    const c = this.headerForm.controls.channel.value;
+    const c = this.channelValueSignal();
     return c === '' ? null : (c as TemplateChannel);
   });
 
   protected readonly locked = computed(() => {
     const t = this.template();
-    return t !== null && LOCKED_STATUSES.has(t.internal_status);
+    if (t === null) return false;
+    // Meta-immutable states — editing a Meta-approved or pending-review
+    // template breaks the external contract. Never unlock these.
+    if (t.external_status === 'approved' || t.external_status === 'pending') {
+      return true;
+    }
+    // Internal review lock — junior roles stay locked as before, but
+    // holders of ``templates.publish`` (Owner + Admin) can edit through
+    // in_review / approved / published states directly. That matches
+    // the workflow bypass we already applied for the Approve / Publish
+    // transitions — no more "duplicate to fork" friction for solo
+    // operators.
+    if (!LOCKED_STATUSES.has(t.internal_status)) return false;
+    return !this.canPublish();
   });
+
+  /** ``true`` when channel = whatsapp and the current name value fails
+   *  Meta's snake_case regex. Drives the red hint text + the "Fix to
+   *  snake_case" button in the header row. */
+  protected readonly waNameInvalid = computed<boolean>(() => {
+    if (this.channel() !== 'whatsapp') return false;
+    const v = this.headerForm.controls.name.value ?? '';
+    if (!v) return false;
+    return !WA_NAME_RE.test(v);
+  });
+
+  /** One-click transform: "Diwali Sale" → "diwali_sale". Lowercases,
+   *  replaces runs of non-alphanumerics with a single underscore,
+   *  trims leading/trailing underscores. */
+  protected normaliseWaName(): void {
+    const raw = this.headerForm.controls.name.value ?? '';
+    const clean = raw
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (clean && clean !== raw) {
+      this.headerForm.controls.name.setValue(clean);
+    }
+  }
 
   protected readonly canWrite = computed(() => this.auth.hasPermission('templates.write'));
   protected readonly canReview = computed(() => this.auth.hasPermission('templates.review'));
@@ -208,6 +276,21 @@ export class TemplateEditorPageComponent {
   protected readonly currentBody = signal<string>('');
   protected readonly currentSubject = signal<string | null>(null);
 
+  // WhatsApp preview extras — updated from the wa-form valueChanges
+  // subscription below so the preview bubble renders the operator's
+  // header / footer / buttons live as they type.
+  protected readonly currentWaHeaderType = signal<'' | 'text' | 'image' | 'video' | 'document'>('');
+  protected readonly currentWaHeaderText = signal<string>('');
+  protected readonly currentWaFooter = signal<string>('');
+  protected readonly currentWaButtons = signal<
+    Array<{
+      type: 'url' | 'phone_number' | 'quick_reply';
+      text: string;
+      url: string | null;
+      phone_number: string | null;
+    }>
+  >([]);
+
   // The textarea / input the variable-picker click should insert into.
   private focusedField: HTMLTextAreaElement | HTMLInputElement | null = null;
   protected readonly trackFocus = (el: HTMLTextAreaElement | HTMLInputElement): void => {
@@ -223,6 +306,16 @@ export class TemplateEditorPageComponent {
     // doesn't exist yet, clear the unused one.
     effect(() => {
       const channel = this.channel();
+      // Meta requires WA template names to match `[a-z0-9_]+` — attach
+      // that validator when the channel is WhatsApp, drop it otherwise.
+      const nameCtrl = this.headerForm.controls.name;
+      const baseValidators = [Validators.required, Validators.maxLength(120)];
+      if (channel === 'whatsapp') {
+        nameCtrl.setValidators([...baseValidators, waNameValidator]);
+      } else {
+        nameCtrl.setValidators(baseValidators);
+      }
+      nameCtrl.updateValueAndValidity({ emitEvent: false });
       if (channel === 'whatsapp' && this.waForm() === null) {
         this.waForm.set(WaFormComponent.build());
       }
@@ -247,15 +340,39 @@ export class TemplateEditorPageComponent {
       if (channel === 'whatsapp') {
         const f = this.waForm();
         if (!f) return;
+        const syncWaExtras = (): void => {
+          this.currentWaHeaderType.set(f.controls.header_type.value);
+          this.currentWaHeaderText.set(f.controls.header_text.value ?? '');
+          this.currentWaFooter.set(f.controls.footer_text.value ?? '');
+          this.currentWaButtons.set(
+            f.controls.buttons.controls.map((b) => ({
+              type: b.controls.type.value,
+              text: b.controls.text.value ?? '',
+              url: (b.controls.url.value ?? '').trim() || null,
+              phone_number: (b.controls.phone_number.value ?? '').trim() || null,
+            })),
+          );
+        };
         const sub = f.controls.body_text.valueChanges
           .pipe(takeUntilDestroyed(this.destroyRef))
           .subscribe((v) => {
             this.currentBody.set(v ?? '');
             this.scheduleAutoSave();
           });
+        // Every WA-form value change (header type/text, footer,
+        // any button field) re-derives the preview extras + fires
+        // the auto-save timer.
+        const subWa = f.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+          syncWaExtras();
+          this.scheduleAutoSave();
+        });
         this.currentBody.set(f.controls.body_text.value);
         this.currentSubject.set(null);
-        onCleanup(() => sub.unsubscribe());
+        syncWaExtras();
+        onCleanup(() => {
+          sub.unsubscribe();
+          subWa.unsubscribe();
+        });
       } else if (channel === 'email') {
         const f = this.emailForm();
         if (!f) return;
@@ -372,7 +489,37 @@ export class TemplateEditorPageComponent {
             f.patchValue({
               body_text: row.body_text,
               language: row.language,
+              category: (row.whatsapp?.category ?? 'marketing') as
+                | 'marketing'
+                | 'utility'
+                | 'authentication',
+              header_type: (row.whatsapp?.header_type ?? '') as
+                | ''
+                | 'text'
+                | 'image'
+                | 'video'
+                | 'document',
+              header_text: row.whatsapp?.header_text ?? '',
+              footer_text: row.whatsapp?.footer_text ?? '',
             });
+            // Rebuild the buttons FormArray from the loaded row —
+            // patchValue can't add FormGroups to a FormArray.
+            f.controls.buttons.clear({ emitEvent: false });
+            for (const b of row.whatsapp?.buttons ?? []) {
+              const group = WaFormComponent.buildButton({
+                type: b.type,
+                text: b.text,
+                url: b.url ?? '',
+                phone_number: b.phone_number ?? '',
+              });
+              // Wire the sibling-clear subscription for buttons loaded
+              // from the server — new-add via `addButton` in the child
+              // component wires it too. Without this, a hydrated URL
+              // button whose type is switched to Phone keeps the URL
+              // field populated and the payload ends up mixed.
+              WaFormComponent.wireSiblingClear(group);
+              f.controls.buttons.push(group);
+            }
             this.waForm.set(f);
           } else if (row.channel === 'email') {
             const f = this.emailForm() ?? EmailFormComponent.build();
@@ -380,6 +527,9 @@ export class TemplateEditorPageComponent {
               subject: row.subject ?? '',
               preview_text: row.preview_text ?? '',
               body_text: row.body_text,
+              // Campaigns v1 Step 04 — hydrate HTML body + fallback flag.
+              body_html: row.body_html ?? '',
+              body_text_fallback_auto: row.body_text_fallback_auto,
             });
             this.emailForm.set(f);
           } else if (row.channel === 'sms') {
@@ -480,11 +630,46 @@ export class TemplateEditorPageComponent {
     const channel = this.channel();
     if (channel === 'whatsapp') {
       const f = this.waForm();
-      const base = {
+      // Serialise the WA extension fields — omit anything the operator
+      // didn't fill so the backend's ``whatsapp`` sub-payload only
+      // carries meaningful values. Empty strings map to nulls so
+      // Pydantic's `str_strip_whitespace + None` normalises cleanly.
+      const headerType = (f?.controls.header_type.value ?? '') as string;
+      const headerText = (f?.controls.header_text.value ?? '').trim();
+      const footerText = (f?.controls.footer_text.value ?? '').trim();
+      const buttons = (f?.controls.buttons.controls ?? [])
+        .map((b) => ({
+          type: b.controls.type.value,
+          text: (b.controls.text.value ?? '').trim(),
+          url: (b.controls.url.value ?? '').trim() || null,
+          phone_number: (b.controls.phone_number.value ?? '').trim() || null,
+        }))
+        .filter((b) => b.text.length > 0);
+      const waPayload: {
+        category?: 'marketing' | 'utility' | 'authentication' | null;
+        header_type?: 'text' | 'image' | 'video' | 'document' | null;
+        header_text?: string | null;
+        footer_text?: string | null;
+        buttons?: typeof buttons | null;
+      } = {};
+      // Always send the WA category — the extension row's category is
+      // NOT NULL and the backend defaults to marketing if absent.
+      waPayload.category = f?.controls.category.value ?? 'marketing';
+      if (headerType) waPayload.header_type = headerType as 'text' | 'image' | 'video' | 'document';
+      if (headerText) waPayload.header_text = headerText;
+      if (footerText) waPayload.footer_text = footerText;
+      if (buttons.length > 0) waPayload.buttons = buttons;
+      const base: TemplateCreatePayload = {
         name: this.headerForm.controls.name.value,
         channel: 'whatsapp' as const,
+        // Central `category` uses the send-guard taxonomy (marketing /
+        // transactional / service) which is different from Meta's WA
+        // taxonomy. Default to marketing here; the WA-specific value
+        // rides on the whatsapp sub-payload.
+        category: 'marketing',
         language: f?.controls.language.value ?? 'en',
         body_text: f?.controls.body_text.value ?? '',
+        whatsapp: waPayload,
       };
       return base;
     }
@@ -519,11 +704,17 @@ export class TemplateEditorPageComponent {
     }
     // Email.
     const f = this.emailForm();
+    const emailHtml = (f?.controls.body_html.value ?? '').trim();
     return {
       name: this.headerForm.controls.name.value,
       channel: 'email' as const,
       language: 'en',
       body_text: f?.controls.body_text.value ?? '',
+      // Campaigns v1 Step 04 — Email HTML body + fallback flag.
+      // Empty string → null so the backend validator treats it as
+      // "not provided" (min_length=1 semantics for the schema).
+      body_html: emailHtml.length > 0 ? emailHtml : null,
+      body_text_fallback_auto: f?.controls.body_text_fallback_auto.value ?? true,
       subject: f?.controls.subject.value ?? '',
       preview_text: f?.controls.preview_text.value || null,
     };
@@ -572,8 +763,19 @@ export class TemplateEditorPageComponent {
     const existing = this.template();
     const payload = this.buildPayload();
 
+    // `channel` is immutable after first save — TemplateUpdate schema
+    // rejects it with "Extra inputs are not permitted" via
+    // ``extra=forbid``. buildPayload() always emits channel because
+    // it's required on create; strip it before firing the PATCH.
+    let updatePayload: TemplateUpdatePayload | null = null;
+    if (existing) {
+      const cloned = { ...(payload as TemplateCreatePayload) } as Record<string, unknown>;
+      delete cloned['channel'];
+      updatePayload = cloned as TemplateUpdatePayload;
+    }
+
     const obs = existing
-      ? this.api.update(existing.id, payload as TemplateUpdatePayload)
+      ? this.api.update(existing.id, updatePayload as TemplateUpdatePayload)
       : this.api.create(payload as TemplateCreatePayload);
 
     obs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({

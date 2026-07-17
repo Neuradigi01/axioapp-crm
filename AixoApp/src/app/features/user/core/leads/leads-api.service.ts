@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { environment } from '../../../../../environments/environment';
 import { FieldDef } from '../shared/dynamic-form/types';
@@ -233,6 +234,22 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
   /** Field defs for `entity_type='lead'` — feeds the dynamic form. */
   renderFields(): Observable<FieldDef[]> {
     return this.http.get<FieldDef[]>(this.renderUrl);
+  }
+
+  /** Manual create that surfaces the ingest action alongside the
+   *  lead. ``action='merged'`` means the picked contact already had
+   *  an open lead — no new row was inserted and the returned lead is
+   *  the pre-existing one with a touchpoint activity appended. The
+   *  UI uses this to switch its success toast from "New lead
+   *  created" to "Existing lead updated with a new touchpoint". */
+  createWithAction(payload: LeadCreate): Observable<{ lead: Lead; action: 'created' | 'merged' }> {
+    return this.http.post<Lead>(this.base, payload, { observe: 'response' }).pipe(
+      map((resp) => {
+        const raw = (resp.headers.get('X-Lead-Ingest-Action') || 'created').toLowerCase();
+        const action: 'created' | 'merged' = raw === 'merged' ? 'merged' : 'created';
+        return { lead: resp.body as Lead, action };
+      }),
+    );
   }
 
   // --- Lead scoring rules (Step 7 admin UI) ------------------------------

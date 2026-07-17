@@ -69,7 +69,7 @@
       <app-campaign-analytics-tab [campaignId]="id" />
     } @else {
       @if (stats(); as s) {
-        <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
           <div class="rounded-lg border border-zinc-200 bg-white p-3 text-center">
             <div class="text-[10px] uppercase tracking-wide text-zinc-500">Audience</div>
             <div class="mt-1 text-xl font-semibold text-zinc-900">{{ s.audience_size }}</div>
@@ -89,20 +89,49 @@
               <div class="text-[10px] text-emerald-700">{{ deliveryRate() }}% of sent</div>
             }
           </div>
-          <div class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
-            <div class="text-[10px] uppercase tracking-wide text-violet-700">Read</div>
-            <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.read }}</div>
-            @if (readRate() !== null) {
-              <div class="text-[10px] text-violet-700">{{ readRate() }}% of delivered</div>
-            }
-          </div>
-          <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-center">
-            <div class="text-[10px] uppercase tracking-wide text-rose-700">Failed</div>
-            <div class="mt-1 text-xl font-semibold text-rose-900">{{ s.failed }}</div>
-            @if (failureRate() !== null) {
-              <div class="text-[10px] text-rose-700">{{ failureRate() }}% of attempts</div>
-            }
-          </div>
+          <!-- Campaigns v1 Step 05 — WA campaigns show Read; Email campaigns
+               swap it for Opened + Clicked + Bounced. -->
+          @if (isEmailCampaign()) {
+            <div class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-violet-700">Opened</div>
+              <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.opened }}</div>
+              <div class="text-[10px] text-violet-700">pixel</div>
+            </div>
+            <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-indigo-700">Clicked</div>
+              <div class="mt-1 text-xl font-semibold text-indigo-900">{{ s.clicked }}</div>
+              <div class="text-[10px] text-indigo-700">first click</div>
+            </div>
+            <div class="rounded-lg border border-orange-200 bg-orange-50 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-orange-700">Bounced</div>
+              <div class="mt-1 text-xl font-semibold text-orange-900">{{ s.bounced }}</div>
+              <div class="text-[10px] text-orange-700">hard / soft</div>
+            </div>
+          } @else {
+            <div class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-violet-700">Read</div>
+              <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.read }}</div>
+              @if (readRate() !== null) {
+                <div class="text-[10px] text-violet-700">{{ readRate() }}% of delivered</div>
+              }
+            </div>
+            <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-rose-700">Failed</div>
+              <div class="mt-1 text-xl font-semibold text-rose-900">{{ s.failed }}</div>
+              @if (failureRate() !== null) {
+                <div class="text-[10px] text-rose-700">{{ failureRate() }}% of attempts</div>
+              }
+            </div>
+          }
+          @if (isEmailCampaign()) {
+            <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-rose-700">Failed</div>
+              <div class="mt-1 text-xl font-semibold text-rose-900">{{ s.failed }}</div>
+              @if (failureRate() !== null) {
+                <div class="text-[10px] text-rose-700">{{ failureRate() }}% of attempts</div>
+              }
+            </div>
+          }
         </div>
       }
 

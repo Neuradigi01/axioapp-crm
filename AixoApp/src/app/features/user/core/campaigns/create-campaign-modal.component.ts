@@ -26,10 +26,13 @@ import {
   ContactGroupsApiService,
   GroupFilter,
 } from '../contacts/groups/groups-api.service';
+import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import {
   IntegrationsApiService,
   WhatsAppCapacity,
 } from '../settings/integrations/integrations-api.service';
+import { EmailAccount, EmailAccountsApiService } from '../services/email-accounts-api.service';
+import { OrgSettings, SettingsApiService } from '../settings/settings-api.service';
 import {
   AudienceFilter,
   Campaign,
@@ -37,11 +40,15 @@ import {
   TemplateVariableBinding,
 } from './campaigns-api.service';
 import {
+  TemplateCategory,
   TemplateChannel,
+  TemplateExternalStatus,
   TemplateListQuery,
   TemplateRead,
   TemplatesApiService,
 } from '../templates/templates-api.service';
+import { TemplateStatusBadgeComponent } from '../templates/template-status-badge.component';
+import { HtmlComposerComponent } from '../templates/editor/html-composer.component';
 
 /**
  * Step 15 — local picker row. Both the WhatsApp and non-WhatsApp
@@ -49,6 +56,10 @@ import {
  * unchanged after the central-library swap. Body lives on `body`
  * (mapped from the central row's ``body_text``); WA's ``{{n}}``
  * positional placeholders are detected from this same field.
+ *
+ * Campaigns v1 Step 01 — carry `category`, `language`, and
+ * `externalStatus` so the picker can render badges + a subtitle line
+ * and disable non-approved WA rows without another lookup.
  */
 interface PickerRow {
   id: string;
@@ -56,6 +67,13 @@ interface PickerRow {
   body: string;
   channel: ConversationChannel;
   subject: string | null;
+  category: TemplateCategory;
+  language: string;
+  externalStatus: TemplateExternalStatus;
+  /** Campaigns v1 Step 02 — Meta's rejection text on WhatsApp rows,
+   *  fed into the status badge's hover tooltip so the operator sees
+   *  why a template can't be selected without leaving the CRM. */
+  externalRejectionReason: string | null;
 }
 
 function toPickerRow(row: TemplateRead): PickerRow {
@@ -65,8 +83,18 @@ function toPickerRow(row: TemplateRead): PickerRow {
     body: row.body_text,
     channel: row.channel as ConversationChannel,
     subject: row.subject,
+    category: row.category,
+    language: row.language,
+    externalStatus: row.external_status,
+    externalRejectionReason: row.external_rejection_reason,
   };
 }
+
+const CATEGORY_LABEL: Record<TemplateCategory, string> = {
+  marketing: 'Marketing',
+  transactional: 'Transactional',
+  service: 'Service',
+};
 
 /** Step 15 — the campaign channel set includes ``'web'`` for the
  *  embedded web widget; the central template library doesn't carry
@@ -114,6 +142,8 @@ const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<Conversatio
     LucideAngularModule,
     SendFromPickerComponent,
     AbTestSectionComponent,
+    TemplateStatusBadgeComponent,
+    HtmlComposerComponent,
   ],
   templateUrl: './create-campaign-modal.component.html',
 })
@@ -123,6 +153,9 @@ export class CreateCampaignModalComponent {
   private readonly integrationsApi = inject(IntegrationsApiService);
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly groupsApi = inject(ContactGroupsApiService);
+  private readonly contactsApi = inject(ContactsApiService);
+  private readonly emailAccountsApi = inject(EmailAccountsApiService);
+  private readonly settingsApi = inject(SettingsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   @Output() readonly created = new EventEmitter<Campaign>();
@@ -144,6 +177,69 @@ export class CreateCampaignModalComponent {
   protected readonly audienceCount = signal<number | null>(null);
   protected readonly audienceCountLoading = signal(false);
   private readonly audiencePreview$ = new Subject<void>();
+
+  /** Live preview of the first page of contacts matching the current
+   *  Custom-filter inputs. Populated only in filter mode so the
+   *  operator can visually confirm who they're targeting before
+   *  scheduling. */
+  protected readonly audiencePreviewRows = signal<ContactListItem[]>([]);
+  protected readonly audiencePreviewLoading = signal(false);
+  /** Preview page size. Kept small — the list is a visual sanity
+   *  check, not a full paginated table. */
+  private readonly AUDIENCE_PREVIEW_LIMIT = 20;
+
+  /** Collapsed state for the Matching-contacts panel. Once the
+   *  operator has finished picking contacts they can click "Hide" to
+   *  free up vertical space — the selected chip strip stays visible
+   *  so the choice is still obvious. Manual-only toggle: typing a
+   *  new search doesn't force it back open, mirroring the shopping-
+   *  cart pattern (checkout continues to work with the drawer closed). */
+  protected readonly audiencePreviewCollapsed = signal(false);
+
+  protected toggleAudiencePreviewCollapsed(): void {
+    this.audiencePreviewCollapsed.update((v) => !v);
+  }
+
+  /** Contacts the operator has hand-picked from the preview list.
+   *  Stored as a Map (id → ContactListItem) so the chip strip can
+   *  render each picked contact's name even after the preview
+   *  refreshes with a different search. Non-empty = the campaign is
+   *  scoped to exactly these ids at save time (overrides q/source/tag).
+   *  Empty = "use the filter as-is", i.e. dynamic resolution at
+   *  dispatch. */
+  protected readonly selectedContactMap = signal<Map<string, ContactListItem>>(new Map());
+
+  /** Derived: array view of the selection for template iteration. */
+  protected readonly selectedContactList = computed<ContactListItem[]>(() =>
+    Array.from(this.selectedContactMap().values()),
+  );
+
+  protected isContactSelected(id: string): boolean {
+    return this.selectedContactMap().has(id);
+  }
+
+  protected toggleContactSelected(c: ContactListItem): void {
+    const next = new Map(this.selectedContactMap());
+    if (next.has(c.id)) next.delete(c.id);
+    else next.set(c.id, c);
+    this.selectedContactMap.set(next);
+  }
+
+  protected removeSelectedContact(id: string): void {
+    const next = new Map(this.selectedContactMap());
+    next.delete(id);
+    this.selectedContactMap.set(next);
+  }
+
+  protected selectAllShown(): void {
+    const next = new Map(this.selectedContactMap());
+    for (const c of this.audiencePreviewRows()) next.set(c.id, c);
+    this.selectedContactMap.set(next);
+  }
+
+  protected clearSelection(): void {
+    this.selectedContactMap.set(new Map());
+  }
 
   // --- WhatsApp send capacity state (Step 3.5.16) --------------------
 
@@ -172,12 +268,43 @@ export class CreateCampaignModalComponent {
    *  only if the modal is re-mounted. */
   private readonly templatesCache = new Map<ConversationChannel, PickerRow[]>();
 
-  /** Slim id+name projection for the A/B section's template dropdowns. */
+  /** Slim id+name projection for the A/B section's template dropdowns.
+   *  WhatsApp: only offer approved templates. Since Step 01 broadened
+   *  the picker query to include pending/rejected rows (so users see
+   *  status inline), the A/B dropdowns must re-filter — the server
+   *  would reject a pending/rejected variant anyway. */
   protected approvedTemplatesForPicker(): Array<{
     id: string;
     name: string;
   }> {
-    return this.templates().map((t) => ({ id: t.id, name: t.name }));
+    return this.templates()
+      .filter((t) => (t.channel === 'whatsapp' ? t.externalStatus === 'approved' : true))
+      .map((t) => ({ id: t.id, name: t.name }));
+  }
+
+  /** WA picker row is selectable only when Meta has approved it.
+   *  Non-WA channels have no external review — every published row
+   *  is selectable. */
+  protected isRowSelectable(row: PickerRow): boolean {
+    if (row.channel !== 'whatsapp') return true;
+    return row.externalStatus === 'approved';
+  }
+
+  /** Subtitle line under the template name: `Category · lang · body preview`.
+   *  Body clipped to ~80 chars so long templates don't blow the row height. */
+  protected rowSubtitle(row: PickerRow): string {
+    const category = CATEGORY_LABEL[row.category] ?? row.category;
+    const preview = (row.body ?? '').replace(/\s+/g, ' ').trim();
+    const clipped = preview.length > 80 ? preview.slice(0, 77) + '…' : preview;
+    const language = row.language || '—';
+    return clipped ? `${category} · ${language} · ${clipped}` : `${category} · ${language}`;
+  }
+
+  /** Click handler for a picker row. Non-selectable rows (pending /
+   *  rejected WA) are a hard no-op — no selection change, no error. */
+  protected onRowClick(row: PickerRow): void {
+    if (!this.isRowSelectable(row)) return;
+    this.selectedTemplateId.set(row.id);
   }
   protected readonly templatesLoading = signal(false);
   protected readonly templatesLoaded = signal(false);
@@ -198,6 +325,42 @@ export class CreateCampaignModalComponent {
     { value: 'phone', label: 'Contact phone' },
     { value: 'email', label: 'Contact email' },
   ];
+
+  // --- Campaigns v1 Step 03 — Email sender identity state -----------
+
+  /** Verified (`sync_state === 'live'`) mailboxes the org has connected.
+   *  Fetched lazily the first time the channel switches to Email so
+   *  WhatsApp-only orgs never pay the roundtrip. `null` = not fetched
+   *  yet; `[]` = fetched and org has zero verified accounts (drives the
+   *  empty-state banner in the template). */
+  protected readonly emailAccounts = signal<EmailAccount[] | null>(null);
+  protected readonly emailAccountsLoading = signal(false);
+
+  /** Campaigns v1 Step 07c — proactive CAN-SPAM check. Populated on
+   *  first Email-channel flip; ``false`` here means the operator hasn't
+   *  set Store Profile → address_line1, which will hard-block Start.
+   *  Rendered as a red banner with a link to Settings → Store Profile
+   *  so they can fix it without reading a raw 400 later. */
+  protected readonly orgSettings = signal<OrgSettings | null>(null);
+  protected readonly orgSettingsLoading = signal(false);
+  protected readonly orgAddressMissing = computed<boolean>(() => {
+    const s = this.orgSettings();
+    if (s === null) return false; // unknown → don't scare the user
+    return !(s.address_line1 && s.address_line1.trim().length > 0);
+  });
+
+  /** Merge tags the operator can insert into the Subject line via the
+   *  "Insert variable ▾" affordance. Named-variable syntax matching the
+   *  dispatcher's per-contact resolution path. */
+  protected readonly subjectMergeTags: ReadonlyArray<{ value: string; label: string }> = [
+    { value: '{{first_name}}', label: 'First name' },
+    { value: '{{full_name}}', label: 'Full name' },
+    { value: '{{email}}', label: 'Email' },
+  ];
+  /** Bound as a component property because Angular's template parser
+   *  would otherwise mis-interpret the ``{{`` in the placeholder as a
+   *  binding expression. */
+  protected readonly subjectPlaceholder = 'Your monthly deals, {{first_name}} 🎁';
 
   protected readonly selectedTemplate = computed<PickerRow | null>(
     () => this.templates().find((t) => t.id === this.selectedTemplateId()) ?? null,
@@ -224,16 +387,16 @@ export class CreateCampaignModalComponent {
   protected readonly templatePlaceholder =
     'Hi {{full_name}} — our Diwali sale is live! 20% off everything this week.';
 
+  /** Campaigns v1 scope locked to WhatsApp + Email (memory
+   *  ``project_campaigns_scope.md``). Legacy campaigns on other
+   *  channels still render on the list page; the create flow just
+   *  doesn't offer them so a user can't start a broken one. */
   protected readonly channels: ReadonlyArray<{
     value: ConversationChannel;
     label: string;
   }> = [
     { value: 'whatsapp', label: 'WhatsApp' },
-    { value: 'sms', label: 'SMS' },
     { value: 'email', label: 'Email' },
-    { value: 'facebook', label: 'Facebook' },
-    { value: 'instagram', label: 'Instagram' },
-    { value: 'web', label: 'Web' },
   ];
 
   protected readonly form = this.fb.group({
@@ -271,13 +434,21 @@ export class CreateCampaignModalComponent {
     winner_holdback_hours: this.fb.control<number>(24, {
       nonNullable: true,
     }),
+    // Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+    // Every control below is nullable so WhatsApp submits stay clean.
+    // Required-when-Email is enforced in `save()` before we hit the
+    // API, and the backend echoes the same check with a 422.
+    email_account_id: this.fb.control<string | null>(null),
+    sender_name: this.fb.control<string | null>(null, [Validators.maxLength(120)]),
+    reply_to: this.fb.control<string | null>(null, [Validators.email, Validators.maxLength(320)]),
+    subject: this.fb.control<string | null>(null, [Validators.maxLength(998)]),
+    preheader: this.fb.control<string | null>(null, [Validators.maxLength(200)]),
+    // Campaigns v1 Step 04 — inline HTML body for Email campaigns that
+    // don't reference a template. Mutually exclusive with `template`
+    // and the picker; the save handler picks one source of truth
+    // before calling the API.
+    body_html: this.fb.control<string>('', [Validators.maxLength(200000)]),
   });
-
-  protected readonly isWhatsApp = computed(
-    () =>
-      // computed reads channel via valueChanges — track manually
-      false,
-  );
 
   constructor() {
     // Step 15 — load templates whenever the channel changes. Each
@@ -293,6 +464,40 @@ export class CreateCampaignModalComponent {
         this._loadTemplates(channel);
         if (channel === 'whatsapp' && this.capacity() === null) {
           this._loadCapacity();
+        }
+        // Campaigns v1 Step 03 — lazy-fetch verified mailboxes the
+        // first time the operator picks Email. When they switch away,
+        // clear the mailbox selection so the payload never carries a
+        // stale email_account_id on a WA campaign.
+        if (channel === 'email') {
+          if (this.emailAccounts() === null) {
+            this._loadEmailAccounts();
+          }
+          if (this.orgSettings() === null) {
+            this._loadOrgSettings();
+          }
+          // A/B testing + Send-From are WhatsApp-only knobs. Clear any
+          // toggle the operator left on before flipping to Email so the
+          // payload doesn't carry `is_ab_test: true` into an Email
+          // campaign that has no variant selector rendered.
+          this.form.patchValue({
+            send_from_phone_id: null,
+            is_ab_test: false,
+            variant_a_template_id: null,
+            variant_b_template_id: null,
+            winner_metric: null,
+          });
+        } else {
+          this.form.patchValue({
+            email_account_id: null,
+            sender_name: null,
+            reply_to: null,
+            subject: null,
+            preheader: null,
+            // Campaigns v1 Step 04 — HTML body is Email-only; drop any
+            // stale HTML when the operator flips away.
+            body_html: '',
+          });
         }
       });
 
@@ -315,6 +520,19 @@ export class CreateCampaignModalComponent {
       .subscribe((count) => {
         this.audienceCount.set(count);
         this.audienceCountLoading.set(false);
+      });
+
+    // Contact-row preview — same debounced trigger, populated only
+    // in Custom-filter mode so the operator can eyeball the target set.
+    this.audiencePreview$
+      .pipe(
+        debounceTime(300),
+        switchMap(() => this._currentAudiencePreviewRowsObservable()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((rows) => {
+        this.audiencePreviewRows.set(rows);
+        this.audiencePreviewLoading.set(false);
       });
 
     // Recompute audience preview whenever any of the audience inputs
@@ -351,8 +569,79 @@ export class CreateCampaignModalComponent {
     });
   }
 
+  /** WhatsApp branch gate. Reads through ``channelSignal`` so the
+   *  ``@if (isWhatsAppChannel())`` guards + capacity banner re-render
+   *  the moment the operator flips the channel — matches the
+   *  Email-side pattern below. */
   protected isWhatsAppChannel(): boolean {
-    return this.form.controls.channel.value === 'whatsapp';
+    return this.channelSignal() === 'whatsapp';
+  }
+
+  /** Campaigns v1 Step 03 — Email branch gate for the modal's
+   *  conditional field render + submit disable. Mirrors the
+   *  `channel === 'email'` check but reads through channelSignal so
+   *  computed()s can subscribe. */
+  protected isEmailChannel(): boolean {
+    return this.channelSignal() === 'email';
+  }
+
+  /** Insert a merge tag at the end of the subject value. A future
+   *  polish step could preserve caret position; end-of-string is the
+   *  standard fallback most builders offer. */
+  protected onInsertSubjectTag(token: string): void {
+    const ctrl = this.form.controls.subject;
+    const current = ctrl.value ?? '';
+    ctrl.setValue(current + token);
+    ctrl.markAsDirty();
+  }
+
+  /** Bridge for the <app-html-composer>'s (valueChange) — the composer
+   *  is a plain input/output component (no ControlValueAccessor) so the
+   *  modal owns the form-control writes. */
+  protected onEmailBodyHtmlChange(html: string): void {
+    this.form.controls.body_html.setValue(html);
+    this.form.controls.body_html.markAsDirty();
+  }
+
+  /** True when the Email branch is missing any of its required fields.
+   *  Drives the disabled state on the submit button so the operator
+   *  can't send a payload the backend would 422. */
+  protected readonly emailBranchIncomplete = computed<boolean>(() => {
+    if (!this.isEmailChannel()) return false;
+    const v = this.form.getRawValue();
+    return (
+      !v.email_account_id ||
+      !(v.sender_name && v.sender_name.trim()) ||
+      !(v.subject && v.subject.trim())
+    );
+  });
+
+  private _loadEmailAccounts(): void {
+    this.emailAccountsLoading.set(true);
+    this.emailAccountsApi
+      .listVerified()
+      .pipe(
+        catchError(() => of<EmailAccount[]>([])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((rows) => {
+        this.emailAccounts.set(rows);
+        this.emailAccountsLoading.set(false);
+      });
+  }
+
+  private _loadOrgSettings(): void {
+    this.orgSettingsLoading.set(true);
+    this.settingsApi
+      .get()
+      .pipe(
+        catchError(() => of<OrgSettings | null>(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((row) => {
+        this.orgSettings.set(row);
+        this.orgSettingsLoading.set(false);
+      });
   }
 
   protected onAudienceModeChange(mode: 'everyone' | 'group' | 'filter'): void {
@@ -366,6 +655,7 @@ export class CreateCampaignModalComponent {
         audience_source: null,
         audience_tag: null,
       });
+      this.clearSelection();
     }
   }
 
@@ -426,6 +716,33 @@ export class CreateCampaignModalComponent {
     );
   }
 
+  /** Rows companion to the count observable. Only Custom-filter mode
+   *  fetches — Everyone and Saved-group modes clear the list.
+   *  Sends q/source/tag through the contacts list endpoint (same
+   *  filters the audience count uses) and takes a small page. */
+  private _currentAudiencePreviewRowsObservable() {
+    const mode = this.audienceMode();
+    if (mode !== 'filter') {
+      this.audiencePreviewLoading.set(false);
+      return of<ContactListItem[]>([]);
+    }
+    const v = this.form.getRawValue();
+    const q = v.audience_q?.trim() || undefined;
+    const source = v.audience_source?.trim() || undefined;
+    const tag = v.audience_tag?.trim() || undefined;
+    if (!q && !source && !tag) {
+      this.audiencePreviewLoading.set(false);
+      return of<ContactListItem[]>([]);
+    }
+    this.audiencePreviewLoading.set(true);
+    return this.contactsApi
+      .list({ q, source, tag, page: 1, size: this.AUDIENCE_PREVIEW_LIMIT })
+      .pipe(
+        switchMap((resp) => of(resp.items)),
+        catchError(() => of<ContactListItem[]>([])),
+      );
+  }
+
   protected onTemplateChange(templateId: string): void {
     this.selectedTemplateId.set(templateId || null);
   }
@@ -454,10 +771,13 @@ export class CreateCampaignModalComponent {
     });
   }
 
-  /** Step 15 — channel-aware central-library load. WhatsApp templates
-   *  also filter on `external_status=approved` so Meta-rejected /
-   *  pending rows don't show up; every other channel only checks
-   *  `internal_status=published` (no external approval pipeline). */
+  /** Step 15 — channel-aware central-library load. Campaigns v1 Step 01
+   *  broadened the WhatsApp query: instead of pre-filtering to
+   *  `external_status=approved`, we now fetch every published WA
+   *  template (approved, pending, rejected) so the picker can show
+   *  status + rejection reason inline and the operator understands
+   *  why a template can't be selected. Non-approved rows render
+   *  disabled — see `isRowSelectable`. */
   private _loadTemplates(channel: ConversationChannel): void {
     const cached = this.templatesCache.get(channel);
     if (cached) {
@@ -484,9 +804,6 @@ export class CreateCampaignModalComponent {
       internal_status: 'published',
       limit: 200,
     };
-    if (channel === 'whatsapp') {
-      filter.external_status = 'approved';
-    }
     this.templatesApi
       .list(filter)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -555,7 +872,8 @@ export class CreateCampaignModalComponent {
     const c = this.capacity();
     if (!c || c.is_unlimited) return null;
     if (this.channelSignal() !== 'whatsapp') return null;
-    const count = this.audienceCount();
+    const pickedSize = this.selectedContactMap().size;
+    const count = pickedSize > 0 ? pickedSize : this.audienceCount();
     if (count === null || count <= 0) return null;
     if (count > c.remaining) {
       const skipped = count - c.remaining;
@@ -606,9 +924,16 @@ export class CreateCampaignModalComponent {
       }
       audience.group_id = gid;
     } else if (mode === 'filter') {
-      if (v.audience_q?.trim()) audience.q = v.audience_q.trim();
-      if (v.audience_source?.trim()) audience.source = v.audience_source.trim();
-      if (v.audience_tag?.trim()) audience.tag = v.audience_tag.trim();
+      const picked = Array.from(this.selectedContactMap().keys());
+      if (picked.length > 0) {
+        // Explicit selection wins over q/source/tag — send goes to
+        // exactly the ticked contacts.
+        audience.contact_ids = picked;
+      } else {
+        if (v.audience_q?.trim()) audience.q = v.audience_q.trim();
+        if (v.audience_source?.trim()) audience.source = v.audience_source.trim();
+        if (v.audience_tag?.trim()) audience.tag = v.audience_tag.trim();
+      }
     }
     // 'everyone' mode leaves `audience` as {} — backend treats as
     // "all org contacts" (already the existing default behaviour).
@@ -617,6 +942,13 @@ export class CreateCampaignModalComponent {
     // a selected template_id sends through the central library; the
     // free-text fallback fires only when no template is picked.
     const useTemplatePicker = this.selectedTemplateId() !== null;
+    // Campaigns v1 Step 04 — inline HTML body is Email-only and
+    // mutually exclusive with the picker + free-text textarea. If the
+    // operator authored HTML, that's the source of truth; we clear the
+    // plain `template` value in the payload below so the backend's
+    // exactly-one-source guard is satisfied.
+    const emailInlineHtml = v.channel === 'email' ? (v.body_html?.trim() ?? '') : '';
+    const useInlineHtml = emailInlineHtml.length > 0;
 
     if (useTemplatePicker) {
       // WA's positional `{{n}}` placeholders require operator-supplied
@@ -631,9 +963,23 @@ export class CreateCampaignModalComponent {
           return;
         }
       }
-    } else if (!v.template.trim()) {
+    } else if (!useInlineHtml && !v.template.trim()) {
       this.submitError.set('Provide a message body or pick a template.');
       return;
+    }
+
+    // Campaigns v1 Step 03 — Email required-field guard. Backend
+    // enforces the same invariant; catching it client-side keeps the
+    // error inline instead of round-tripping a 422.
+    if (v.channel === 'email') {
+      const missing: string[] = [];
+      if (!v.email_account_id) missing.push('a sender mailbox');
+      if (!(v.sender_name && v.sender_name.trim())) missing.push('a sender name');
+      if (!(v.subject && v.subject.trim())) missing.push('a subject');
+      if (missing.length) {
+        this.submitError.set(`Email campaigns need ${missing.join(', ')}.`);
+        return;
+      }
     }
 
     this.submitting.set(true);
@@ -643,7 +989,10 @@ export class CreateCampaignModalComponent {
         name: v.name,
         channel: v.channel,
         audience_filter: audience,
-        template: useTemplatePicker ? null : v.template,
+        // Backend's exactly-one-source guard requires exactly one of
+        // template / template_id / body_html — pick per the resolved
+        // mode above.
+        template: useTemplatePicker || useInlineHtml ? null : v.template,
         template_id: useTemplatePicker ? this.selectedTemplateId() : null,
         template_variables: useTemplatePicker ? this.variables() : null,
         schedule_at: v.schedule_at ? new Date(v.schedule_at).toISOString() : null,
@@ -660,6 +1009,18 @@ export class CreateCampaignModalComponent {
         split_ratio: v.split_ratio ?? 50,
         winner_metric: v.is_ab_test ? (v.winner_metric ?? null) : null,
         winner_holdback_hours: v.winner_holdback_hours ?? 24,
+        // Campaigns v1 Step 03 — Email sender identity + subject + preheader.
+        // Null on non-Email channels so backend + DB row stay clean.
+        email_account_id: v.channel === 'email' ? (v.email_account_id ?? null) : null,
+        sender_name: v.channel === 'email' ? (v.sender_name ?? null) : null,
+        reply_to: v.channel === 'email' ? (v.reply_to ?? null) : null,
+        subject: v.channel === 'email' ? (v.subject ?? null) : null,
+        preheader: v.channel === 'email' ? (v.preheader ?? null) : null,
+        // Campaigns v1 Step 04 — inline HTML body. Only sent when the
+        // operator authored HTML for an Email campaign; every other
+        // combination stays null so the exactly-one-source guard is
+        // satisfied.
+        body_html: useInlineHtml ? emailInlineHtml : null,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({

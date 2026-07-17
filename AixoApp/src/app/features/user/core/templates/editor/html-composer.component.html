@@ -1,0 +1,48 @@
+<div class="rounded-md border border-zinc-200 bg-white">
+  <div
+    class="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 bg-zinc-50 px-3 py-2 text-xs"
+  >
+    <span class="font-medium text-zinc-700">{{ label() }}</span>
+    <div class="flex items-center gap-2">
+      <label class="text-[10px] text-zinc-500">
+        Insert variable:
+        <select
+          (change)="onInsertTag($any($event.target).value); $any($event.target).value = ''"
+          class="ml-1 rounded-md border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        >
+          <option value="">— pick —</option>
+          @for (tag of mergeTags(); track tag.value) {
+            <option [value]="tag.value">{{ tag.label }}</option>
+          }
+        </select>
+      </label>
+      <span class="text-[10px] text-zinc-500">{{ charCount() }} chars</span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 divide-x divide-zinc-100">
+    <label class="block">
+      <span class="sr-only">HTML source</span>
+      <textarea
+        #sourceEl
+        rows="16"
+        [value]="value()"
+        (input)="onSourceInput($event)"
+        [placeholder]="placeholder()"
+        spellcheck="false"
+        class="block h-full w-full resize-y rounded-none border-0 bg-white px-3 py-2 font-mono text-[12px] leading-relaxed text-zinc-800 focus:outline-none"
+      ></textarea>
+    </label>
+    <div class="min-h-40 overflow-auto bg-zinc-50 p-3">
+      <div class="mb-2 text-[10px] uppercase tracking-wide text-zinc-500">Live preview</div>
+      <div
+        class="rounded-md border border-zinc-200 bg-white p-3 text-sm text-zinc-800"
+        [innerHTML]="value()"
+      ></div>
+      <div class="mt-2 text-[10px] text-zinc-500">
+        Angular sanitises this preview automatically. The server re-sanitises with bleach before
+        saving, so any XSS attempt is dropped.
+      </div>
+    </div>
+  </div>
+</div>
