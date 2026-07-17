@@ -9,7 +9,7 @@
   />
 
   <div class="flex min-w-0 flex-1 flex-col">
-    <header class="border-b border-zinc-200 bg-white px-6 py-4">
+    <header class="border-b border-zinc-200 bg-white px-4 py-4">
       <div class="flex items-center justify-between gap-4">
         <div class="min-w-0 flex-1">
           <h1 class="text-xl font-semibold text-zinc-900">Workflows</h1>
@@ -55,7 +55,7 @@
       }
     </header>
 
-    <section class="border-b border-zinc-200 bg-white px-6 py-3">
+    <section class="border-b border-zinc-200 bg-white px-4 py-3">
       <div class="flex flex-wrap items-center gap-2">
         <div class="relative">
           <lucide-icon
@@ -160,7 +160,7 @@
       }
     </section>
 
-    <section class="flex-1 px-6 py-6" (click)="closeMenu()">
+    <section class="flex-1 px-4 py-4" (click)="closeMenu()">
       @if (loading()) {
         <div class="flex items-center gap-2 text-sm text-zinc-500">
           <lucide-icon name="loader-2" size="14" class="animate-spin" />
@@ -206,12 +206,12 @@
           }
         </div>
       } @else {
-        <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white">
-          <table class="w-full text-sm">
+        <div class="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+          <table class="w-full min-w-[760px] table-fixed text-sm">
             <thead class="bg-zinc-50 text-xs text-zinc-500">
               <tr>
                 @if (canActivate()) {
-                  <th class="w-8 px-3 py-2">
+                  <th class="w-9 px-2 py-2">
                     <input
                       type="checkbox"
                       [checked]="isAllSelected"
@@ -220,19 +220,19 @@
                     />
                   </th>
                 }
-                <th class="px-4 py-2 text-left font-medium">Name</th>
-                <th class="px-4 py-2 text-left font-medium">Status</th>
-                <th class="px-4 py-2 text-left font-medium">Category</th>
-                <th class="px-4 py-2 text-left font-medium">Channel</th>
-                <th class="px-4 py-2 text-left font-medium">Updated</th>
-                <th class="w-8 px-3 py-2"></th>
+                <th class="px-3 py-2 text-left font-medium">Name</th>
+                <th class="w-24 px-3 py-2 text-left font-medium">Status</th>
+                <th class="w-24 px-3 py-2 text-left font-medium">Category</th>
+                <th class="w-24 px-3 py-2 text-left font-medium">Channel</th>
+                <th class="w-28 px-3 py-2 text-left font-medium">Updated</th>
+                <th class="w-10 px-2 py-2"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-zinc-100">
               @for (row of items(); track trackById($index, row)) {
                 <tr class="hover:bg-zinc-50">
                   @if (canActivate()) {
-                    <td class="px-3 py-3">
+                    <td class="px-2 py-3">
                       <input
                         type="checkbox"
                         [checked]="isSelected(row.id)"
@@ -242,10 +242,11 @@
                       />
                     </td>
                   }
-                  <td class="px-4 py-3">
+                  <td class="px-3 py-3">
                     <a
                       [routerLink]="['/user/workflows', row.id]"
-                      class="font-medium text-zinc-900 hover:text-zinc-700"
+                      class="block truncate font-medium text-zinc-900 hover:text-zinc-700"
+                      [title]="row.name"
                     >
                       {{ row.name }}
                     </a>
@@ -254,7 +255,7 @@
                         {{ row.description }}
                       </div>
                     }
-                    <div class="mt-1 flex items-center gap-2 text-[11px] text-zinc-500">
+                    <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
                       <span title="Open runs">
                         <lucide-icon name="play" size="10" class="inline-block" />
                         v{{ row.current_version }}
@@ -297,17 +298,17 @@
                       }
                     </div>
                   </td>
-                  <td class="px-4 py-3">
+                  <td class="px-3 py-3">
                     <app-workflow-status-badge [status]="row.status" />
                   </td>
-                  <td class="px-4 py-3">
+                  <td class="px-3 py-3">
                     <span
                       class="inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-700 ring-1 ring-inset ring-zinc-200"
                     >
                       {{ row.category }}
                     </span>
                   </td>
-                  <td class="px-4 py-3 text-xs text-zinc-500">
+                  <td class="px-3 py-3 text-xs text-zinc-500">
                     @if (channelOf(row); as ch) {
                       <span
                         class="inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-700 ring-1 ring-inset ring-zinc-200"
@@ -318,10 +319,10 @@
                       <span class="text-zinc-400">—</span>
                     }
                   </td>
-                  <td class="px-4 py-3 text-xs text-zinc-500">
+                  <td class="px-3 py-3 text-xs text-zinc-500">
                     {{ row.updated_at | date: 'mediumDate' }}
                   </td>
-                  <td class="px-3 py-3 text-right">
+                  <td class="px-2 py-3 text-right">
                     <div class="relative inline-block">
                       <button
                         type="button"
