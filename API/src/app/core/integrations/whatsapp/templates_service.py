@@ -156,19 +156,166 @@ def _components_from_record(row: WhatsAppTemplate) -> list[dict[str, Any]]:
     representation is populated. ``body_components`` is preferred (it's
     what the operator built); the legacy ``body / header_* / footer_*``
     columns are the fallback for old sync rows that haven't been
-    re-built yet."""
-    if isinstance(row.body_components, list) and row.body_components:
-        return list(row.body_components)
+    re-built yet.
 
-    components: list[dict[str, Any]] = []
-    if row.header_type == "TEXT" and row.header_text:
-        components.append({"type": "HEADER", "format": "TEXT", "text": row.header_text})
-    elif row.header_type in ("IMAGE", "VIDEO", "DOCUMENT"):
-        components.append({"type": "HEADER", "format": row.header_type})
-    components.append({"type": "BODY", "text": row.body})
-    if row.footer_text:
-        components.append({"type": "FOOTER", "text": row.footer_text})
-    return components
+    The final step normalises named CRM variables
+    (``{{contact.first_name}}``) into Meta's positional placeholders
+    (``{{1}}`` / ``{{2}}``) and attaches ``example`` blocks so Meta's
+    reviewer sees real sample text. Without this, Meta rejects the
+    submission with ``INVALID_FORMAT`` — dot-scoped names aren't valid
+    Meta syntax.
+    """
+    from src.app.core.integrations.whatsapp.meta_variables import (
+        convert_all_components,
+    )
+
+    if isinstance(row.body_components, list) and row.body_components:
+        raw = list(row.body_components)
+    else:
+        raw = []
+        if row.header_type == "TEXT" and row.header_text:
+            raw.append({"type": "HEADER", "format": "TEXT", "text": row.header_text})
+        elif row.header_type in ("IMAGE", "VIDEO", "DOCUMENT"):
+            raw.append({"type": "HEADER", "format": row.header_type})
+        raw.append({"type": "BODY", "text": row.body})
+        if row.footer_text:
+            raw.append({"type": "FOOTER", "text": row.footer_text})
+
+    converted, _mapping = convert_all_components(raw)
+    return converted
+
+
+# --- Meta payload adaptation -----------------------------------------
+
+
+# Sample fallback values for Meta's `example.*` blocks — Meta reviewers
+# use these to preview the template with realistic content. Keys are
+# the CRM's dot-namespaced variable paths; values are the string to
+# ship. Anything not listed falls back to the generic "Sample" so
+# review can still proceed.
+_META_EXAMPLE_DEFAULTS: dict[str, str] = {
+    "contact.first_name": "Ajay",
+    "contact.last_name": "Kumar",
+    "contact.full_name": "Ajay Kumar",
+    "contact.name": "Ajay Kumar",
+    "contact.email": "ajay@example.com",
+    "contact.phone": "+91 98765 43210",
+    "contact.company": "Neuradigi",
+    "org.name": "Neuradigi",
+    "org.support_email": "hello@neuradigi.com",
+    "org.support_phone": "+91 98765 43210",
+    "org.address": "42 MG Road, Bengaluru",
+    "org.website": "https://neuradigi.com",
+    "user.full_name": "Ajay Kumar",
+    "user.email": "ajay@example.com",
+    "user.role": "Owner",
+    "sender.name": "Ajay Kumar",
+    "sender.email": "ajay@example.com",
+    "sender.role": "Owner",
+    "sender.signature": "Ajay · Neuradigi",
+    "appointment.scheduled_at": "Mon, 15 Jul · 11:00 AM",
+    "appointment.location": "Bengaluru Showroom",
+    "appointment.notes": "Bring fabric swatches",
+    "invoice.id": "INV-2026-0421",
+    "invoice.total_amount": "₹45,000",
+    "invoice.currency": "INR",
+    "invoice.due_date": "30 Jul 2026",
+    "invoice.pdf_url": "https://neuradigi.com/invoices/0421.pdf",
+    "quote.id": "Q-2026-1042",
+    "quote.total_amount": "₹45,000",
+    "quote.currency": "INR",
+    "quote.expires_at": "12 Jul 2026",
+    "quote.pdf_url": "https://neuradigi.com/quotes/1042.pdf",
+    "lead.source": "Website",
+    "lead.status": "Qualified",
+    "lead.score": "78",
+    "lead.estimated_value": "₹45,000",
+    "lead.owner_name": "Ajay Kumar",
+}
+
+_NAMED_VAR_RE = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*\}\}")
+
+
+def _example_for(name: str) -> str:
+    """Best-effort sample value for the given CRM variable name.
+    Falls back to a generic string so Meta review always has something
+    to render — an empty example causes another Invalid parameter."""
+    return _META_EXAMPLE_DEFAULTS.get(name, f"Sample {name.split('.')[-1]}")
+
+
+def _convert_text_to_meta(text: str, mapping: dict[str, int]) -> str:
+    """Replace every ``{{name.path}}`` with ``{{N}}`` where N is the
+    variable's position in ``mapping``. Duplicates reuse the same
+    number so the operator doesn't burn a positional slot per repeat.
+    """
+
+    def _sub(match: re.Match[str]) -> str:
+        name = match.group(1)
+        # Numeric-only names are already positional — leave alone so
+        # legacy templates authored with `{{1}}` still work.
+        if name.isdigit():
+            return match.group(0)
+        pos = mapping.get(name)
+        if pos is None:
+            # New name discovered during substitution — append it to
+            # the mapping so we stay one-pass.
+            pos = len(mapping) + 1
+            mapping[name] = pos
+        return f"{{{{{pos}}}}}"
+
+    return _NAMED_VAR_RE.sub(_sub, text)
+
+
+def convert_components_for_meta(
+    components: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Transform a CRM-authored components list into the exact shape
+    Meta's ``/{waba_id}/message_templates`` endpoint expects.
+
+    Two operations per component:
+
+    1. Rewrite named variables (``{{contact.first_name}}``) into
+       positional (``{{1}}``, ``{{2}}``, ...). Duplicates reuse the
+       same position; numbers already in position form pass through.
+    2. Attach an ``example`` block with sensible sample values so
+       Meta's content reviewer can render the template. Missing
+       samples cause an ``INVALID_FORMAT`` rejection just as bad as
+       a missing variable.
+
+    Body and header text pull from independent position mappings —
+    Meta scopes ``example.body_text`` and ``example.header_text``
+    separately.
+    """
+    out: list[dict[str, Any]] = []
+    for original in components:
+        comp = dict(original)  # shallow copy so we don't mutate the DB row
+        ctype = comp.get("type")
+
+        if ctype == "BODY" and comp.get("text"):
+            mapping: dict[str, int] = {}
+            comp["text"] = _convert_text_to_meta(comp["text"], mapping)
+            if mapping:
+                ordered = sorted(mapping.items(), key=lambda kv: kv[1])
+                # Meta expects a nested list — the outer list is a
+                # "sample set" (they only look at the first), the
+                # inner list is one value per positional variable.
+                comp["example"] = {"body_text": [[_example_for(n) for n, _ in ordered]]}
+
+        elif ctype == "HEADER" and comp.get("format") == "TEXT" and comp.get("text"):
+            mapping = {}
+            comp["text"] = _convert_text_to_meta(comp["text"], mapping)
+            if mapping:
+                ordered = sorted(mapping.items(), key=lambda kv: kv[1])
+                comp["example"] = {"header_text": [_example_for(n) for n, _ in ordered]}
+
+        # Footer text does not support variables per Meta's spec —
+        # left untouched. Buttons: URL button URLs can contain a
+        # single trailing variable per Meta, but that pattern isn't
+        # widely used by CRM operators, so leave as-is until
+        # requested.
+
+        out.append(comp)
+    return out
 
 
 async def _resolve_active_bundle(session: AsyncSession):
@@ -472,7 +619,11 @@ async def submit_for_approval(
         client_kwargs["http_client_factory"] = http_client_factory
     client = MetaGraphClient(**client_kwargs)
 
-    components = _components_from_record(row)
+    # Adapt to Meta's exact shape: named vars → positional, attach
+    # example blocks. Stored components stay in CRM-readable form
+    # (so the editor + preview keep resolving human-readable names);
+    # only the outbound Meta payload gets the transformation.
+    components = convert_components_for_meta(_components_from_record(row))
     try:
         meta_body = await client.submit_template(
             waba_id=config.waba_id,
