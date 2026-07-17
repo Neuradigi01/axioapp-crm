@@ -294,6 +294,13 @@ async def _upsert_wa_extension(
         )
         session.add(row)
     else:
+        # Propagate the central row's identity fields onto the
+        # extension too — otherwise Meta submission uses stale values
+        # (e.g. sent to Meta with "Diwali Sale" when the operator
+        # renamed the central row to "diwali_sale" to pass Meta's
+        # snake_case rule). Same for language + body.
+        existing.name = template.name
+        existing.language = template.language
         existing.category = wa_category
         existing.header_type = payload.header_type
         existing.header_text = payload.header_text
@@ -474,10 +481,16 @@ async def update_template(
     template_id: uuid.UUID,
     user_id: uuid.UUID | None,
     payload: TemplateUpdate,
+    caller_can_publish: bool = False,
 ) -> MessageTemplate:
     """Edit the draft template. Bumps ``current_version`` and writes
     a new version row. Raises :class:`TemplateLocked` when the
-    template's ``internal_status`` is not ``draft``.
+    template's ``internal_status`` is not ``draft`` — except when the
+    caller holds ``templates.publish`` (Owner / Admin), in which case
+    edits are allowed through in_review / approved / published so the
+    solo-operator flow doesn't force a duplicate-to-fork dance.
+    Meta-immutable states (external_status = approved or pending) stay
+    locked regardless, because editing there breaks the Meta contract.
 
     Subject / preview_text coherence with channel is checked here
     (the Pydantic validator on ``TemplateCreate`` doesn't see the
@@ -485,7 +498,14 @@ async def update_template(
     """
     template = await get_template(session, org_id=org_id, template_id=template_id)
 
-    if template.internal_status in _EDIT_LOCKED_STATUSES:
+    meta_immutable = template.external_status in (
+        TemplateExternalStatus.approved,
+        TemplateExternalStatus.pending,
+    )
+    if meta_immutable:
+        raise TemplateLocked(template.internal_status.value)
+
+    if template.internal_status in _EDIT_LOCKED_STATUSES and not caller_can_publish:
         raise TemplateLocked(template.internal_status.value)
 
     # Coherence: subject + preview_text + body_html only valid for email.

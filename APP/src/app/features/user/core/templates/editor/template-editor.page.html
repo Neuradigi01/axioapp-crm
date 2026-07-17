@@ -240,8 +240,29 @@
               formControlName="name"
               maxlength="120"
               class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
-              placeholder="e.g. Welcome lead"
+              [class.border-rose-400]="waNameInvalid()"
+              placeholder="e.g. welcome_lead"
             />
+            @if (channel() === 'whatsapp') {
+              <p class="mt-1 text-[10px] text-zinc-500">
+                Meta requires lowercase letters, digits, and underscores only — no spaces or
+                capitals.
+              </p>
+            }
+            @if (waNameInvalid()) {
+              <div class="mt-1 flex items-center gap-2">
+                <p class="text-[11px] text-rose-600">
+                  Meta will reject this name. Use lowercase + underscores only.
+                </p>
+                <button
+                  type="button"
+                  (click)="normaliseWaName()"
+                  class="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50"
+                >
+                  Fix to snake_case
+                </button>
+              </div>
+            }
           </label>
 
           <label class="block">

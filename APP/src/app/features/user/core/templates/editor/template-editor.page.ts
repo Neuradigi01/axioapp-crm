@@ -10,7 +10,13 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -58,6 +64,19 @@ import { WaFormComponent, WaFormGroup } from './wa-form.component';
 type ChannelOption = '' | 'whatsapp' | 'email' | 'sms' | 'facebook' | 'instagram' | 'push';
 
 const LOCKED_STATUSES = new Set(['in_review', 'approved', 'published']);
+
+/** Meta's WA template-name regex. Anything else is rejected as
+ *  "Invalid parameter" (code 100) at ``/message_templates`` submission,
+ *  so we enforce it client-side too — an operator hitting Submit-to-
+ *  Meta with a title-cased name would otherwise waste a Meta round-trip
+ *  and get a cryptic error banner instead of a fix hint. */
+const WA_NAME_RE = /^[a-z0-9_]+$/;
+
+function waNameValidator(control: AbstractControl): { waName: true } | null {
+  const v = (control.value as string | null) ?? '';
+  if (!v) return null;
+  return WA_NAME_RE.test(v) ? null : { waName: true };
+}
 
 @Component({
   selector: 'app-template-editor-page',
@@ -142,8 +161,45 @@ export class TemplateEditorPageComponent {
 
   protected readonly locked = computed(() => {
     const t = this.template();
-    return t !== null && LOCKED_STATUSES.has(t.internal_status);
+    if (t === null) return false;
+    // Meta-immutable states — editing a Meta-approved or pending-review
+    // template breaks the external contract. Never unlock these.
+    if (t.external_status === 'approved' || t.external_status === 'pending') {
+      return true;
+    }
+    // Internal review lock — junior roles stay locked as before, but
+    // holders of ``templates.publish`` (Owner + Admin) can edit through
+    // in_review / approved / published states directly. That matches
+    // the workflow bypass we already applied for the Approve / Publish
+    // transitions — no more "duplicate to fork" friction for solo
+    // operators.
+    if (!LOCKED_STATUSES.has(t.internal_status)) return false;
+    return !this.canPublish();
   });
+
+  /** ``true`` when channel = whatsapp and the current name value fails
+   *  Meta's snake_case regex. Drives the red hint text + the "Fix to
+   *  snake_case" button in the header row. */
+  protected readonly waNameInvalid = computed<boolean>(() => {
+    if (this.channel() !== 'whatsapp') return false;
+    const v = this.headerForm.controls.name.value ?? '';
+    if (!v) return false;
+    return !WA_NAME_RE.test(v);
+  });
+
+  /** One-click transform: "Diwali Sale" → "diwali_sale". Lowercases,
+   *  replaces runs of non-alphanumerics with a single underscore,
+   *  trims leading/trailing underscores. */
+  protected normaliseWaName(): void {
+    const raw = this.headerForm.controls.name.value ?? '';
+    const clean = raw
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (clean && clean !== raw) {
+      this.headerForm.controls.name.setValue(clean);
+    }
+  }
 
   protected readonly canWrite = computed(() => this.auth.hasPermission('templates.write'));
   protected readonly canReview = computed(() => this.auth.hasPermission('templates.review'));
@@ -250,6 +306,16 @@ export class TemplateEditorPageComponent {
     // doesn't exist yet, clear the unused one.
     effect(() => {
       const channel = this.channel();
+      // Meta requires WA template names to match `[a-z0-9_]+` — attach
+      // that validator when the channel is WhatsApp, drop it otherwise.
+      const nameCtrl = this.headerForm.controls.name;
+      const baseValidators = [Validators.required, Validators.maxLength(120)];
+      if (channel === 'whatsapp') {
+        nameCtrl.setValidators([...baseValidators, waNameValidator]);
+      } else {
+        nameCtrl.setValidators(baseValidators);
+      }
+      nameCtrl.updateValueAndValidity({ emitEvent: false });
       if (channel === 'whatsapp' && this.waForm() === null) {
         this.waForm.set(WaFormComponent.build());
       }
@@ -440,14 +506,19 @@ export class TemplateEditorPageComponent {
             // patchValue can't add FormGroups to a FormArray.
             f.controls.buttons.clear({ emitEvent: false });
             for (const b of row.whatsapp?.buttons ?? []) {
-              f.controls.buttons.push(
-                WaFormComponent.buildButton({
-                  type: b.type,
-                  text: b.text,
-                  url: b.url ?? '',
-                  phone_number: b.phone_number ?? '',
-                }),
-              );
+              const group = WaFormComponent.buildButton({
+                type: b.type,
+                text: b.text,
+                url: b.url ?? '',
+                phone_number: b.phone_number ?? '',
+              });
+              // Wire the sibling-clear subscription for buttons loaded
+              // from the server — new-add via `addButton` in the child
+              // component wires it too. Without this, a hydrated URL
+              // button whose type is switched to Phone keeps the URL
+              // field populated and the payload ends up mixed.
+              WaFormComponent.wireSiblingClear(group);
+              f.controls.buttons.push(group);
             }
             this.waForm.set(f);
           } else if (row.channel === 'email') {
@@ -692,8 +763,19 @@ export class TemplateEditorPageComponent {
     const existing = this.template();
     const payload = this.buildPayload();
 
+    // `channel` is immutable after first save — TemplateUpdate schema
+    // rejects it with "Extra inputs are not permitted" via
+    // ``extra=forbid``. buildPayload() always emits channel because
+    // it's required on create; strip it before firing the PATCH.
+    let updatePayload: TemplateUpdatePayload | null = null;
+    if (existing) {
+      const cloned = { ...(payload as TemplateCreatePayload) } as Record<string, unknown>;
+      delete cloned['channel'];
+      updatePayload = cloned as TemplateUpdatePayload;
+    }
+
     const obs = existing
-      ? this.api.update(existing.id, payload as TemplateUpdatePayload)
+      ? this.api.update(existing.id, updatePayload as TemplateUpdatePayload)
       : this.api.create(payload as TemplateCreatePayload);
 
     obs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({

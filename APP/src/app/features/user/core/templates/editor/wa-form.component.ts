@@ -113,7 +113,9 @@ export class WaFormComponent {
 
   protected addButton(type: WaButtonType = 'url'): void {
     if (this.disabled() || !this.canAddButton()) return;
-    this.form().controls.buttons.push(WaFormComponent.buildButton({ type }));
+    const group = WaFormComponent.buildButton({ type });
+    WaFormComponent.wireSiblingClear(group);
+    this.form().controls.buttons.push(group);
   }
 
   protected removeButton(index: number): void {
@@ -121,19 +123,24 @@ export class WaFormComponent {
     this.form().controls.buttons.removeAt(index);
   }
 
-  protected onButtonTypeChange(index: number, type: WaButtonType): void {
-    const btn = this.form().controls.buttons.at(index);
-    btn.controls.type.setValue(type);
-    // Clear the sibling field so a URL button doesn't carry a stray
-    // phone_number into the payload (backend validator enforces).
-    if (type === 'url') {
-      btn.controls.phone_number.setValue('');
-    } else if (type === 'phone_number') {
-      btn.controls.url.setValue('');
-    } else {
-      btn.controls.url.setValue('');
-      btn.controls.phone_number.setValue('');
-    }
+  /** Static wiring — clears whichever sibling field doesn't belong
+   *  to the active button type. The subscription is not tied to any
+   *  component's lifecycle; instead we rely on the parent FormGroup /
+   *  FormArray being GC'd when the page destroys, which detaches every
+   *  observer on its controls automatically. Called from both
+   *  ``addButton`` (new-add) and the parent template-editor's hydrate
+   *  path (loaded from server). */
+  static wireSiblingClear(group: WaButtonFormGroup): void {
+    group.controls.type.valueChanges.subscribe((newType) => {
+      if (newType === 'url') {
+        group.controls.phone_number.setValue('', { emitEvent: false });
+      } else if (newType === 'phone_number') {
+        group.controls.url.setValue('', { emitEvent: false });
+      } else {
+        group.controls.url.setValue('', { emitEvent: false });
+        group.controls.phone_number.setValue('', { emitEvent: false });
+      }
+    });
   }
 
   static buildButton(init?: {

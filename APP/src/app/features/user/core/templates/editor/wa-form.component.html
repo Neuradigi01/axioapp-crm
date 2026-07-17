@@ -153,8 +153,7 @@
           <label class="block">
             <span class="text-[10px] font-medium text-zinc-500">Type</span>
             <select
-              [value]="btn.controls.type.value"
-              (change)="onButtonTypeChange($index, $any($event.target).value)"
+              formControlName="type"
               class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs focus:border-zinc-500 focus:outline-none"
             >
               <option value="url">URL</option>

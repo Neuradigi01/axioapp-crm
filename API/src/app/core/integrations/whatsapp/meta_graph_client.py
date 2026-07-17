@@ -174,12 +174,25 @@ def _classify(
             raw=raw,
         )
 
+    # Meta wraps the actual "why" inside error_user_msg /
+    # error_data.details / error_user_title. Surface all of them at
+    # WARNING so operator diagnostics don't require a debugger.
+    user_msg = raw.get("error_user_msg") if isinstance(raw, dict) else None
+    user_title = raw.get("error_user_title") if isinstance(raw, dict) else None
+    err_data = raw.get("error_data") if isinstance(raw, dict) else None
+    details = None
+    if isinstance(err_data, dict):
+        details = err_data.get("details") or err_data.get("blame_field_specs")
     logger.warning(
-        "meta_graph_error stage=%s status=%s code=%s message=%s",
+        "meta_graph_error stage=%s status=%s code=%s message=%s "
+        "user_title=%s user_msg=%s details=%s",
         stage,
         status,
         code,
         message,
+        user_title,
+        user_msg,
+        details,
     )
     return MetaGraphError(
         http_status=502,

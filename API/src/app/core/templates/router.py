@@ -246,6 +246,14 @@ async def update_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions(PERM_WRITE)),
 ) -> TemplateRead:
+    # Owner + Admin bypass — if the caller also holds
+    # ``templates.publish`` they can edit through in_review / approved /
+    # published states. Junior roles keep the "draft only" rule so a
+    # rep can't retroactively rewrite a template a manager just
+    # approved. Meta-immutable states (external_status pending/approved)
+    # stay locked for everyone — that's a hard constraint from Meta.
+    caller_keys = {p.key for p in await list_permissions_for_role(db, user.role_id)}
+    caller_can_publish = PERM_PUBLISH in caller_keys
     try:
         template = await templates_service.update_template(
             db,
@@ -253,6 +261,7 @@ async def update_endpoint(
             template_id=template_id,
             user_id=user.legacy_uuid,
             payload=payload,
+            caller_can_publish=caller_can_publish,
         )
     except TemplateNotFound as exc:
         raise HTTPException(
