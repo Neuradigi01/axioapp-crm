@@ -88,7 +88,7 @@ _LIMIT_DEFAULT = 50
 
 _LEAD_ENTITY = "lead"
 _LEADS_PIPELINE_KEY = "leads"
-_LEADS_CARD_TABLE = "leads"
+_LEADS_CARD_TABLE = "tbl_leads"
 
 
 _SNAPSHOT_FIELDS = (
@@ -222,6 +222,20 @@ async def create_lead(
     # Score the freshly inserted row before the commit so the persisted
     # value matches what the caller will see when they next GET the lead.
     await scoring.recompute_lead(session, lead=lead)
+    # Bump the linked contact's ``last_activity_at`` so the contacts
+    # list (sorted by activity) surfaces the just-touched customer at
+    # the top — matches the standard CRM expectation of "new activity
+    # brings the record forward". Also nudges ``updated_at`` via the
+    # ORM's ``onupdate`` clause.
+    from datetime import UTC, datetime
+
+    from src.app.core.contacts.models import Contact
+
+    await session.execute(
+        Contact.__table__.update()
+        .where(Contact.id == payload.contact_id)
+        .values(last_activity_at=datetime.now(UTC))
+    )
     await session.commit()
     await session.refresh(lead)
 
@@ -707,8 +721,17 @@ async def move_stage_for_lead(
     lost_reason: str | None = None,
     lost_reason_other: str | None = None,
 ) -> Lead:
-    """Move a lead to a new stage and keep `status` in sync."""
+    """Move a lead to a new stage and keep `status` in sync.
+
+    Publishes ``lead.status_changed`` on every actual transition so
+    automations / workflows can subscribe. No-op moves (target stage
+    equals current stage) skip the publish.
+    """
     lead = ensure_found(await get_lead(session, lead_id), entity="lead")
+    from_stage = lead.pipeline_stage
+    from_status = (
+        lead.status.value if hasattr(lead.status, "value") else str(lead.status)
+    )
 
     pipeline = await get_pipeline_by_key(session, key=_LEADS_PIPELINE_KEY)
     new_stage = (
@@ -767,7 +790,114 @@ async def move_stage_for_lead(
     if needs_commit:
         await session.commit()
         await session.refresh(lead)
+
+    # Only publish on a real transition — a same-stage "move" is a
+    # UI no-op and should not fan out to subscribers.
+    if from_stage != lead.pipeline_stage:
+        await _publish_lead_status_changed(
+            session,
+            org_id=lead.org_id,
+            lead=lead,
+            from_stage=from_stage,
+            from_status=from_status,
+        )
     return lead
+
+
+async def _publish_lead_status_changed(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    lead: Lead,
+    from_stage: str,
+    from_status: str,
+) -> None:
+    """Emit the ``lead.status_changed`` envelope. Mirrors the
+    ``lead.created`` publisher's contact + org snapshotting so
+    automation / workflow handlers have everything without a
+    per-handler DB hit. Failures are swallowed + logged — an event-bus
+    hiccup must never bubble back to the operator who just moved a
+    kanban card.
+    """
+    try:
+        from sqlalchemy import select
+
+        from src.app.core.contacts.models import Contact
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        contact = (
+            await session.execute(select(Contact).where(Contact.id == lead.contact_id))
+        ).scalar_one_or_none()
+        org = (
+            await session.execute(select(Organization).where(Organization.id == org_id))
+        ).scalar_one_or_none()
+
+        to_stage = lead.pipeline_stage
+        to_status = (
+            lead.status.value if hasattr(lead.status, "value") else str(lead.status)
+        )
+
+        payload: dict = {
+            "lead_id": str(lead.id),
+            "contact_id": str(lead.contact_id),
+            "from_stage": from_stage,
+            "to_stage": to_stage,
+            "from_status": from_status,
+            "to_status": to_status,
+            "lead": {
+                "id": str(lead.id),
+                "pipeline_stage": to_stage,
+                "status": to_status,
+                "source": str(lead.source) if lead.source else None,
+                "assigned_to_id": (
+                    str(lead.assigned_to_id) if lead.assigned_to_id else None
+                ),
+                "budget": float(lead.budget) if lead.budget is not None else None,
+                "lost_reason": lead.lost_reason,
+            },
+        }
+        if contact is not None:
+            # Derive first / last name from ``full_name`` so templates
+            # using ``{{contact.first_name}}`` render out of the box.
+            full = contact.full_name or ""
+            parts = full.split(None, 1) if full else []
+            first = parts[0] if parts else ""
+            last = parts[1] if len(parts) > 1 else ""
+            payload["contact"] = {
+                "id": str(contact.id),
+                "first_name": first,
+                "last_name": last,
+                "full_name": full,
+                "email": contact.email,
+                "phone": contact.phone,
+            }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+                "support_email": getattr(org, "support_email", "") or "",
+            }
+
+        await events_publish(
+            "lead.status_changed",
+            payload,
+            org_id=org_id,
+            # Include both stages so consecutive fires on the same
+            # lead land as distinct event_ids — otherwise dedup would
+            # collapse the second transition into a replay.
+            event_id=f"lead_status_changed:{lead.id}:{from_stage}->{to_stage}:"
+            f"{lead.updated_at.isoformat() if lead.updated_at else ''}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "leads.move_stage publish_lead_status_changed_failed org=%s lead=%s",
+            org_id,
+            lead.id,
+        )
 
 
 # --- Reassign / bulk actions -------------------------------------------------

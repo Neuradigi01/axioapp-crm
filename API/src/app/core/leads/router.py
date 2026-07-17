@@ -177,6 +177,7 @@ async def list_leads_endpoint(
 @router.post("", response_model=LeadOut, status_code=status.HTTP_201_CREATED)
 async def create_lead_endpoint(
     payload: LeadCreate,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("leads.write")),
 ) -> LeadOut:
@@ -185,10 +186,12 @@ async def create_lead_endpoint(
     inbound channel ingestion (bulk import, widget, Google, Meta).
 
     If the picked contact already has an OPEN lead, the existing lead's
-    timeline gets a "Touchpoint via manual" activity and we 200 back
-    its id — no second lead is created. The caller can distinguish
-    by inspecting the returned lead's `created_at` (rep can move
-    rep-side state accordingly).
+    timeline gets a "Touchpoint via manual" activity and we 201 back
+    its id — no second lead is created. The response carries
+    ``X-Lead-Ingest-Action: merged|created`` so the UI can show a
+    contextual "existing lead updated" toast instead of the generic
+    "new lead created" one; ``Access-Control-Expose-Headers`` opts
+    the header into browser-side visibility past the CORS boundary.
     """
     result = await ingest_lead(
         db,
@@ -199,6 +202,8 @@ async def create_lead_endpoint(
         actor_user_id=user.legacy_uuid,
     )
     lead = await get_lead(db, result.lead_id)
+    response.headers["X-Lead-Ingest-Action"] = result.action
+    response.headers["Access-Control-Expose-Headers"] = "X-Lead-Ingest-Action"
     return LeadOut.model_validate(lead)
 
 

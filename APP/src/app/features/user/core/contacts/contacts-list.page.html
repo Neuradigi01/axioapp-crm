@@ -110,7 +110,7 @@
   </div>
 
   <!-- Body -->
-  <div class="mt-6 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-zinc-200">
+  <div class="mt-6 overflow-x-auto rounded-lg bg-white shadow-sm ring-1 ring-zinc-200">
     @if (state.loadError(); as err) {
       <div class="px-6 py-4 text-sm text-red-700">{{ err }}</div>
     } @else if (state.loading()) {
@@ -132,7 +132,7 @@
         <span class="block text-xs text-zinc-400">Try a different search or clear filters.</span>
       </div>
     } @else {
-      <table class="min-w-full divide-y divide-zinc-200">
+      <table class="w-full min-w-[1100px] divide-y divide-zinc-200">
         <thead class="bg-zinc-50">
           <tr>
             <th scope="col" class="w-10 px-3 py-2.5 text-left">

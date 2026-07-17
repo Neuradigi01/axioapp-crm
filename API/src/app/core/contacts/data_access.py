@@ -139,8 +139,13 @@ def build_contact_list_query(
         primary = (
             sort_column.asc().nulls_last() if order == "asc" else sort_column.desc().nulls_last()
         )
-    else:
-        primary = sort_column.asc() if order == "asc" else sort_column.desc()
+        # Rows with no activity yet fall back to newest-created — the
+        # standard CRM "recency wins" ordering that the frontend list
+        # relies on to surface just-added contacts near the top even
+        # before their first touch. ``Contact.id`` stays as a final
+        # deterministic tie for absolute stability.
+        return base.order_by(primary, Contact.created_at.desc(), Contact.id.desc())
+    primary = sort_column.asc() if order == "asc" else sort_column.desc()
     return base.order_by(primary, Contact.id.desc())
 
 

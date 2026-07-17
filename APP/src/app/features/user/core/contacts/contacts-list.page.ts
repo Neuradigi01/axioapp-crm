@@ -85,8 +85,12 @@ export class ContactsListPageComponent {
   /** Assignee filter. Empty = all, `'me'` resolves to current user, or a user UUID. */
   readonly assigneeControl = new FormControl<string>('', { nonNullable: true });
 
-  /** Sort state. Defaults match the backend (`created_at desc`). */
-  readonly sortKey = signal<ContactSortKey>('created_at');
+  /** Sort state. Defaults to ``last_activity_at desc`` so contacts the
+   *  operator just touched (via a fresh lead / new contact / edit)
+   *  surface at the top — matches the standard CRM "recency wins"
+   *  expectation. Falls back to ``created_at desc`` as a secondary
+   *  ordering on the backend for rows with no activity yet. */
+  readonly sortKey = signal<ContactSortKey>('last_activity_at');
   readonly sortOrder = signal<SortOrder>('desc');
 
   /** Cached list of users for the assignee dropdown. */
@@ -169,7 +173,7 @@ export class ContactsListPageComponent {
         }
       },
       queryKey: 'sort',
-      defaultValue: 'created_at',
+      defaultValue: 'last_activity_at',
     },
     order: {
       read: () => this.sortOrder(),

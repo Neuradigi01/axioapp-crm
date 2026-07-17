@@ -142,6 +142,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
         commonValidators.maxLength(32),
       ]);
       this.contactBasics.controls.email.setValidators([
+        commonValidators.required,
         commonValidators.email,
         commonValidators.maxLength(255),
       ]);
@@ -218,7 +219,13 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
   /** Find-or-create the contact from the inline basics, then emit the
    * lead create. Uses `checkDuplicate` to match on phone/email before
    * writing a new row so re-entering an existing customer's details
-   * silently links to the same contact rather than piling up dupes. */
+   * links to the same contact rather than piling up dupes.
+   *
+   * When a match's phone or email is empty and the operator typed a
+   * value, PATCH the existing contact so the data the operator entered
+   * lands rather than being silently discarded (option (a) — enrich
+   * rather than overwrite; existing non-empty values are never
+   * clobbered). */
   private resolveContactThenEmit(): void {
     const basics = this.contactBasics.getRawValue();
     const full_name = basics.full_name.trim();
@@ -231,7 +238,13 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
       .pipe(
         switchMap((resp) => {
           const match = resp.matches[0];
-          if (match) return of(match.id);
+          if (match) {
+            const patch: Record<string, string> = {};
+            if (!match.phone && phone) patch['phone'] = phone;
+            if (!match.email && email) patch['email'] = email;
+            if (Object.keys(patch).length === 0) return of(match.id);
+            return this.contactsApi.update(match.id, patch).pipe(map((c) => c.id));
+          }
           return this.contactsApi.createStub({ full_name, phone, email }).pipe(map((c) => c.id));
         }),
         catchError((err: HttpErrorResponse) => {

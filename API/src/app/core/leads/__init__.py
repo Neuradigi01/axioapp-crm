@@ -21,7 +21,7 @@ from src.app.core.leads.service import (
 )
 from src.app.core.pipelines import register_pipeline_table
 
-register_pipeline_table("leads")
+register_pipeline_table("tbl_leads")
 
 
 __all__ = [
