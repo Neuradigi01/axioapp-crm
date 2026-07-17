@@ -279,6 +279,16 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
     return this.http.get<FieldDef[]>(this.renderUrl);
   }
 
+  /** Create a contact from an indirect entry point (e.g. the lead-form
+   * auto-create) where the operator can't reasonably fill required
+   * custom fields. Backend skips the required-custom-field check, same
+   * as widget / webhook ingest paths. */
+  createStub(payload: ContactCreate): Observable<Contact> {
+    return this.http.post<Contact>(this.base, payload, {
+      params: { stub: 'true' },
+    });
+  }
+
   /** Step 22 — DPDP opt-in surface. Read returns current state +
    *  immutable consent-log history for the contact-detail panel.
    *  Read gates on `contacts.read`; writes gate on

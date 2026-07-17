@@ -179,6 +179,40 @@
               />
             </label>
           </div>
+
+          <!-- Live matching-contacts preview (Custom filter mode only) -->
+          <div class="mt-2 rounded-md border border-zinc-200 bg-white">
+            <div
+              class="flex items-center justify-between border-b border-zinc-200 px-2 py-1 text-[10px] uppercase tracking-wide text-zinc-500"
+            >
+              <span>Matching contacts</span>
+              @if (audiencePreviewLoading()) {
+                <span>Loading…</span>
+              } @else if (
+                audienceCount() !== null && audienceCount()! > audiencePreviewRows().length
+              ) {
+                <span> Showing {{ audiencePreviewRows().length }} of {{ audienceCount() }} </span>
+              } @else if (audiencePreviewRows().length > 0) {
+                <span>{{ audiencePreviewRows().length }} shown</span>
+              }
+            </div>
+            @if (audiencePreviewRows().length === 0 && !audiencePreviewLoading()) {
+              <p class="px-2 py-2 text-xs text-zinc-500">
+                Add a search / source / tag above to preview matching contacts.
+              </p>
+            } @else {
+              <ul class="max-h-48 divide-y divide-zinc-100 overflow-y-auto">
+                @for (c of audiencePreviewRows(); track c.id) {
+                  <li class="px-2 py-1.5 text-xs">
+                    <div class="truncate font-medium text-zinc-900">{{ c.full_name }}</div>
+                    <div class="truncate text-[10px] text-zinc-500">
+                      {{ c.phone ?? '—' }} · {{ c.email ?? '—' }}
+                    </div>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
         }
 
         <!-- Live count preview -->

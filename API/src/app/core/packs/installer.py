@@ -242,6 +242,15 @@ async def _install_custom_fields(
             report.custom_fields_skipped += 1
             continue
 
+        # Pack manifests carry `options` as a flat YAML list for
+        # readability; the CustomFieldDefinition JSONB column stores it
+        # as `{"choices": [...]}` (contract shared with user-created
+        # fields and the render schema). Wrap here so downstream reads
+        # don't have to branch on shape.
+        options_value: dict[str, Any] | None = (
+            {"choices": list(cf.options)} if cf.options is not None else None
+        )
+
         session.add(
             CustomFieldDefinition(
                 org_id=org_id,
@@ -249,7 +258,7 @@ async def _install_custom_fields(
                 field_key=cf.field_key,
                 field_label=cf.field_label,
                 field_type=field_type,
-                options=cf.options,
+                options=options_value,
                 is_required=cf.is_required,
                 is_hidden=cf.is_hidden,
                 display_order=cf.display_order,

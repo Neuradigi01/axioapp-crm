@@ -123,10 +123,24 @@ async def list_contacts_endpoint(
 @router.post("", response_model=ContactOut, status_code=status.HTTP_201_CREATED)
 async def create_contact_endpoint(
     payload: ContactCreate,
+    stub: bool = Query(
+        default=False,
+        description=(
+            "Skip required-custom-field validation. Set from indirect "
+            "create paths (e.g. the lead-form auto-create) where the "
+            "operator can't reasonably know the contact's custom-field "
+            "schema. Behaves the same as the widget / webhook ingest paths."
+        ),
+    ),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("contacts.write")),
 ) -> ContactOut:
-    contact = await create_contact(db, org_id=user.org_id, payload=payload)
+    contact = await create_contact(
+        db,
+        org_id=user.org_id,
+        payload=payload,
+        require_all_required=not stub,
+    )
     return ContactOut.model_validate(contact)
 
 

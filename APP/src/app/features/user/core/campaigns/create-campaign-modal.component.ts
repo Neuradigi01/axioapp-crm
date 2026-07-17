@@ -26,6 +26,7 @@ import {
   ContactGroupsApiService,
   GroupFilter,
 } from '../contacts/groups/groups-api.service';
+import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import {
   IntegrationsApiService,
   WhatsAppCapacity,
@@ -152,6 +153,7 @@ export class CreateCampaignModalComponent {
   private readonly integrationsApi = inject(IntegrationsApiService);
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly groupsApi = inject(ContactGroupsApiService);
+  private readonly contactsApi = inject(ContactsApiService);
   private readonly emailAccountsApi = inject(EmailAccountsApiService);
   private readonly settingsApi = inject(SettingsApiService);
   private readonly destroyRef = inject(DestroyRef);
@@ -175,6 +177,16 @@ export class CreateCampaignModalComponent {
   protected readonly audienceCount = signal<number | null>(null);
   protected readonly audienceCountLoading = signal(false);
   private readonly audiencePreview$ = new Subject<void>();
+
+  /** Live preview of the first page of contacts matching the current
+   *  Custom-filter inputs. Populated only in filter mode so the
+   *  operator can visually confirm who they're targeting before
+   *  scheduling. */
+  protected readonly audiencePreviewRows = signal<ContactListItem[]>([]);
+  protected readonly audiencePreviewLoading = signal(false);
+  /** Preview page size. Kept small — the list is a visual sanity
+   *  check, not a full paginated table. */
+  private readonly AUDIENCE_PREVIEW_LIMIT = 20;
 
   // --- WhatsApp send capacity state (Step 3.5.16) --------------------
 
@@ -457,6 +469,19 @@ export class CreateCampaignModalComponent {
         this.audienceCountLoading.set(false);
       });
 
+    // Contact-row preview — same debounced trigger, populated only
+    // in Custom-filter mode so the operator can eyeball the target set.
+    this.audiencePreview$
+      .pipe(
+        debounceTime(300),
+        switchMap(() => this._currentAudiencePreviewRowsObservable()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((rows) => {
+        this.audiencePreviewRows.set(rows);
+        this.audiencePreviewLoading.set(false);
+      });
+
     // Recompute audience preview whenever any of the audience inputs
     // change. The mode signal + filter form controls all feed in.
     effect(() => {
@@ -635,6 +660,33 @@ export class CreateCampaignModalComponent {
       switchMap((r) => of(r.count)),
       catchError(() => of(null)),
     );
+  }
+
+  /** Rows companion to the count observable. Only Custom-filter mode
+   *  fetches — Everyone and Saved-group modes clear the list.
+   *  Sends q/source/tag through the contacts list endpoint (same
+   *  filters the audience count uses) and takes a small page. */
+  private _currentAudiencePreviewRowsObservable() {
+    const mode = this.audienceMode();
+    if (mode !== 'filter') {
+      this.audiencePreviewLoading.set(false);
+      return of<ContactListItem[]>([]);
+    }
+    const v = this.form.getRawValue();
+    const q = v.audience_q?.trim() || undefined;
+    const source = v.audience_source?.trim() || undefined;
+    const tag = v.audience_tag?.trim() || undefined;
+    if (!q && !source && !tag) {
+      this.audiencePreviewLoading.set(false);
+      return of<ContactListItem[]>([]);
+    }
+    this.audiencePreviewLoading.set(true);
+    return this.contactsApi
+      .list({ q, source, tag, page: 1, size: this.AUDIENCE_PREVIEW_LIMIT })
+      .pipe(
+        switchMap((resp) => of(resp.items)),
+        catchError(() => of<ContactListItem[]>([])),
+      );
   }
 
   protected onTemplateChange(templateId: string): void {
