@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.conversations.models import ConversationChannel
+from src.app.core.permissions.service import list_permissions_for_role
 from src.app.core.templates import external_submission as templates_external
 from src.app.core.templates import service as templates_service
 from src.app.core.templates import sync as templates_sync
@@ -388,6 +389,12 @@ async def approve_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions(PERM_REVIEW)),
 ) -> TemplateRead:
+    # Owner + Admin bypass — if the reviewer also holds
+    # ``templates.publish`` they're a senior role and separation-of-
+    # duties against their own draft is waived. Junior reviewers who
+    # only have ``templates.review`` still block on self-approve.
+    caller_keys = {p.key for p in await list_permissions_for_role(db, user.role_id)}
+    caller_can_publish = PERM_PUBLISH in caller_keys
     try:
         template = await templates_workflow.approve(
             db,
@@ -395,6 +402,7 @@ async def approve_endpoint(
             template_id=template_id,
             reviewer_user_id=user.legacy_uuid,
             note=payload.note,
+            caller_can_publish=caller_can_publish,
         )
     except TemplateError as exc:
         raise _workflow_http_map(exc) from exc
@@ -465,6 +473,11 @@ async def publish_endpoint(
             template_id=template_id,
             user_id=user.legacy_uuid,
             note=payload.note,
+            # By definition anyone reaching this endpoint holds
+            # ``templates.publish`` (the require_permissions guard). Pass
+            # through so ``publish()`` skips the mandatory-review gate
+            # for Owner + Admin.
+            caller_can_publish=True,
         )
     except TemplateError as exc:
         raise _workflow_http_map(exc) from exc

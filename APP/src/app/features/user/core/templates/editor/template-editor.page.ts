@@ -9,7 +9,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
@@ -121,10 +121,22 @@ export class TemplateEditorPageComponent {
   protected readonly toast = signal<string | null>(null);
   protected readonly saving = signal<boolean>(false);
 
+  /** Reactive mirror of the channel form control. Form controls aren't
+   *  signals on their own, so a plain ``computed`` reading
+   *  ``headerForm.controls.channel.value`` never re-evaluates when the
+   *  user picks a channel — the effect below wouldn't fire, no sub-form
+   *  would be built, and the "Pick a channel above" fallback would
+   *  stay rendered forever. ``toSignal`` bridges the form's
+   *  ``valueChanges`` stream into a signal so the rest of the reactive
+   *  graph updates on selection. */
+  private readonly channelValueSignal = toSignal(this.headerForm.controls.channel.valueChanges, {
+    initialValue: this.headerForm.controls.channel.value,
+  });
+
   protected readonly channel = computed<TemplateChannel | null>(() => {
     const t = this.template();
     if (t) return t.channel;
-    const c = this.headerForm.controls.channel.value;
+    const c = this.channelValueSignal();
     return c === '' ? null : (c as TemplateChannel);
   });
 

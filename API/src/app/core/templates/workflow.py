@@ -179,9 +179,13 @@ async def approve(
     template_id: uuid.UUID,
     reviewer_user_id: uuid.UUID | None,
     note: str | None = None,
+    caller_can_publish: bool = False,
 ) -> MessageTemplate:
     """``in_review → approved``. Reviewer ≠ author unless the org
-    setting ``template_review_self_approve_allowed`` is ``True``."""
+    setting ``template_review_self_approve_allowed`` is ``True`` OR the
+    caller holds ``templates.publish`` (Owner / Admin tier). Junior
+    reviewers without publish rights still enforce separation-of-duties
+    against their own drafts."""
     template = await get_template(session, org_id=org_id, template_id=template_id)
     if template.internal_status != TemplateInternalStatus.in_review:
         raise InvalidWorkflowTransition(current=template.internal_status.value, action="approve")
@@ -189,6 +193,7 @@ async def approve(
     _, self_approve_allowed = await _get_org_review_settings(session, org_id=org_id)
     if (
         not self_approve_allowed
+        and not caller_can_publish
         and reviewer_user_id is not None
         and template.created_by_user_id == reviewer_user_id
     ):
@@ -263,13 +268,17 @@ async def publish(
     template_id: uuid.UUID,
     user_id: uuid.UUID | None,
     note: str | None = None,
+    caller_can_publish: bool = False,
 ) -> MessageTemplate:
     """Move to ``published``. Two start states possible:
 
       * ``approved → published`` — the normal path.
-      * ``draft → published`` — only when org setting
-        ``template_review_mandatory`` is ``False`` (the operator
-        explicitly opted out of mandatory review).
+      * ``draft → published`` — allowed when EITHER the org has opted
+        out of mandatory review (``template_review_mandatory=False``)
+        OR the caller is a senior role (holds ``templates.publish``,
+        i.e. Owner / Admin per the seeded role templates). Junior
+        roles that were granted publish by exception still traverse
+        the review chain unless the org flag is also flipped.
 
     Plus the external-status pre-check: ``external_status`` must be
     ``n_a`` (the channel doesn't require external review at all) or
@@ -285,11 +294,16 @@ async def publish(
         raise PublishBlockedByExternal(external_status=template.external_status.value)
 
     mandatory, _ = await _get_org_review_settings(session, org_id=org_id)
+    # Owner / Admin bypass — senior roles never need to wait for a
+    # second pair of eyes on their own draft. The router passes True
+    # when the caller holds ``templates.publish``, which the seeded
+    # Owner + Admin templates carry.
+    mandatory_effective = mandatory and not caller_can_publish
 
     if template.internal_status == TemplateInternalStatus.approved:
         pass  # always allowed
-    elif template.internal_status == TemplateInternalStatus.draft and not mandatory:
-        pass  # shortcut allowed when review is optional
+    elif template.internal_status == TemplateInternalStatus.draft and not mandatory_effective:
+        pass  # shortcut allowed when review is optional or caller is Owner / Admin
     else:
         raise InvalidWorkflowTransition(
             current=template.internal_status.value,
@@ -298,7 +312,7 @@ async def publish(
                 "publish requires approved status; enable "
                 "template_review_mandatory=false to allow direct "
                 "publish from draft"
-                if mandatory
+                if mandatory_effective
                 else "publish requires approved or draft"
             ),
         )
