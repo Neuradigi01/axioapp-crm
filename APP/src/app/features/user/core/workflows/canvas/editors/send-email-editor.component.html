@@ -1,17 +1,35 @@
 <div class="space-y-3">
   <div>
     <label class="block text-[11px] font-medium text-zinc-600 mb-1">
-      Template (email channel, published)
+      Template <span class="text-zinc-400">(email · published)</span>
     </label>
-    <input
-      type="text"
-      [ngModel]="state().templateId"
-      (ngModelChange)="onTemplateChange($event)"
-      placeholder="template UUID — pick via Step 16 gallery"
-      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500 font-mono"
-    />
+    @if (templates() === null) {
+      <div class="text-[11px] text-zinc-400 italic">Loading templates…</div>
+    } @else if (templates()!.length === 0) {
+      <div
+        class="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800"
+      >
+        No published Email templates yet.
+        <a routerLink="/user/templates/new" class="font-medium underline">Create one</a>
+        first.
+      </div>
+    } @else {
+      <select
+        [ngModel]="state().templateId"
+        (ngModelChange)="onTemplateChange($event)"
+        class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+      >
+        <option value="">— pick a template —</option>
+        @for (t of templates(); track t.id) {
+          <option [value]="t.id">{{ t.name }}{{ t.subject ? ' — ' + t.subject : '' }}</option>
+        }
+      </select>
+    }
     @if (!state().templateId) {
       <p class="text-[10px] text-rose-600 mt-1">Template is required.</p>
+    }
+    @if (loadError(); as err) {
+      <p class="text-[10px] text-rose-600 mt-1">{{ err }}</p>
     }
   </div>
 

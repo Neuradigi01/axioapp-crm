@@ -174,7 +174,42 @@ export class WorkflowNodeComponent {
     }
     return this.nodeType()?.label ?? this.node().type;
   });
-  readonly description = computed(() => this.nodeType()?.description ?? '');
+  /** Derive a human-readable summary from the node's live config so the
+   *  operator can see what each node does without clicking into it. For
+   *  the trigger, that's the picked event ("On lead.created"); for send
+   *  actions, whether a template is bound; for wait, the duration; else
+   *  we fall back to the static registry description. */
+  readonly description = computed(() => {
+    const type = this.nodeType();
+    if (!type) return '';
+    const cfg = (this.node().config ?? {}) as Record<string, unknown>;
+
+    if (type.type === 'trigger') {
+      const evt = cfg['event_type'];
+      if (typeof evt === 'string' && evt.trim()) {
+        return `On ${evt}`;
+      }
+      return 'Pick an event';
+    }
+
+    if (type.type.startsWith('send.')) {
+      const tpl = cfg['template_id'];
+      if (typeof tpl === 'string' && tpl.trim()) {
+        return 'Template selected';
+      }
+      return 'Pick a template';
+    }
+
+    if (type.type === 'wait') {
+      const dur = cfg['duration'] ?? cfg['delay'];
+      if (typeof dur === 'string' && dur.trim()) {
+        return `Wait ${dur}`;
+      }
+      return 'Set a duration';
+    }
+
+    return type.description;
+  });
   readonly bodyClass = computed(() => this.nodeType()?.colorClass ?? 'bg-zinc-50 border-zinc-300');
   readonly transform = computed(() => {
     const pos = this.node().position ?? { x: 0, y: 0 };
