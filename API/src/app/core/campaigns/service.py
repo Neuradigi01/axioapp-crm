@@ -28,6 +28,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -46,6 +47,7 @@ from src.app.core.campaigns.schemas import (
 from src.app.core.contacts import service as contacts_service
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations.adapters import ChannelMessageRef
+from src.app.core.tenants.models import Organization
 from src.app.core.campaigns.utils import (
     render_body,
     render_subject,
@@ -541,7 +543,7 @@ async def create_campaign(
         org_id=org_id,
         name=payload.name,
         channel=payload.channel,
-        audience_filter=payload.audience_filter.model_dump(exclude_none=True),
+        audience_filter=payload.audience_filter.model_dump(exclude_none=True, mode="json"),
         template=payload.template,
         template_id=payload.template_id,
         template_variables=(
@@ -613,7 +615,9 @@ async def update_campaign(
         campaign.name = payload.name
         changed = True
     if payload.audience_filter is not None:
-        campaign.audience_filter = payload.audience_filter.model_dump(exclude_none=True)
+        campaign.audience_filter = payload.audience_filter.model_dump(
+            exclude_none=True, mode="json"
+        )
         changed = True
     if payload.template is not None:
         campaign.template = payload.template
@@ -711,18 +715,23 @@ async def resolve_audience(
     session: AsyncSession, *, audience_filter: dict[str, Any]
 ) -> list[uuid.UUID]:
     """Translate the campaign's `audience_filter` JSONB into a list of
-    contact ids. Three modes per `AudienceFilter`:
+    contact ids. Four modes per `AudienceFilter`:
 
       - Empty filter → every contact in the org (RLS handles isolation).
       - `group_id` set → delegate to `contact_groups.resolve_group_contacts`
         which honours static-vs-dynamic group semantics.
       - `q/source/tag` set → run the predicate directly.
+      - `contact_ids` set → send to exactly those ids (scoped through
+        the tenant filter so cross-org ids drop out).
 
     A campaign that references a deleted group resolves to an empty
     list — the dispatch path then marks all queued messages failed
     with a clear "audience empty" error rather than silently sending
     zero messages."""
     af = AudienceFilter.model_validate(audience_filter or {})
+
+    if af.contact_ids:
+        return await campaigns_da.list_contact_ids_in_scope(session, ids=af.contact_ids)
 
     if af.group_id is not None:
         # Saved-group mode. Use a delayed import to avoid the
@@ -1084,6 +1093,17 @@ async def dispatch_chunk(
             _, _wa_config = bundle
             wa_rate_per_sec = max(1, int(_wa_config.rate_limit_per_sec or 50))
 
+    # Once-per-chunk org load. Powers the ``{{org.name}}`` resolution
+    # in :func:`_resolve_named_wa_variables` — every contact in the
+    # chunk shares the same org so we skip a re-fetch per row.
+    org: Organization | None = None
+    if campaign.channel == ConversationChannel.whatsapp and template_row is not None:
+        org = (
+            await session.execute(
+                select(Organization).where(Organization.id == campaign.org_id)
+            )
+        ).scalar_one_or_none()
+
     # Step 22 — DPDP opt-in pre-flight check. Marketing campaigns on
     # opted-out contacts must never ship; the dashboard's failure
     # classifier already maps "opted out" into its own bucket.
@@ -1391,7 +1411,17 @@ async def dispatch_chunk(
                 await acquire_wa_rate_token(campaign.org_id, rate_per_sec=wa_rate_per_sec)
             try:
                 if template_row is not None:
-                    variables = _resolve_template_variables(campaign, contact)
+                    # Start from the named-variable auto-resolution
+                    # (`{{contact.first_name}}` → positional {1} etc.
+                    # against the template's approved Meta body). Any
+                    # operator-supplied static/field binding on the
+                    # campaign row wins over the auto value for the
+                    # same positional slot.
+                    named_variables = _resolve_named_wa_variables(
+                        template_row, contact, org
+                    )
+                    operator_variables = _resolve_template_variables(campaign, contact)
+                    variables = {**named_variables, **operator_variables}
                     ref = await adapter.send_template(
                         org_id=campaign.org_id,
                         external_id=contact.phone,
@@ -1612,6 +1642,89 @@ def _get_contact_field(contact: Contact, field_name: str) -> str:
         value = custom.get(key)
         return str(value) if value not in (None, "") else ""
     return ""
+
+
+def _resolve_named_wa_variables(
+    template_row: WhatsAppTemplate,
+    contact: Contact,
+    org: Organization | None,
+) -> dict[int, str]:
+    """Derive Meta positional params (``{1: ..., 2: ...}``) from the
+    CRM template's named variables (``{{contact.first_name}}``,
+    ``{{org.name}}``, etc.) resolved against the target contact.
+
+    Meta only accepts positional placeholders in the actual template
+    body, so ``convert_all_components`` rewrites the CRM body at
+    Meta-submit time. At send-time we run the same conversion against
+    ``template_row.body`` to recover the ordered param names and
+    resolve each one — the positional index therefore always agrees
+    with what Meta approved.
+
+    Returns an empty dict when the body has no named vars (pure
+    positional or vars-free template).
+    """
+    from src.app.core.integrations.whatsapp.meta_variables import (
+        convert_to_positional,
+    )
+
+    _, param_names = convert_to_positional(template_row.body or "")
+    if not param_names:
+        return {}
+
+    context = _build_wa_variable_context(contact, org)
+    resolved: dict[int, str] = {}
+    for idx, name in enumerate(param_names, start=1):
+        value = _resolve_dotted_path(context, name)
+        text = "" if value is None else str(value)
+        # Meta rejects empty positional params — fall back so the send
+        # succeeds even when a contact's field is blank (e.g. no
+        # ``full_name``). Matches the modal's "field → fallback"
+        # convention for operator-supplied bindings.
+        resolved[idx] = text if text.strip() else _TEMPLATE_FIELD_FALLBACK
+    return resolved
+
+
+def _build_wa_variable_context(
+    contact: Contact, org: Organization | None
+) -> dict[str, Any]:
+    """Build the nested dict the WA variable resolver reads. Mirrors
+    :func:`core.templates.render.build_context` but derives
+    ``contact.first_name`` / ``last_name`` from ``full_name`` (the
+    Contact model stores a single ``full_name`` column), so templates
+    that reference ``{{contact.first_name}}`` render without an extra
+    schema lookup.
+    """
+    full_name = contact.full_name or ""
+    parts = full_name.split(None, 1) if full_name else []
+    first_name = parts[0] if parts else ""
+    last_name = parts[1] if len(parts) > 1 else ""
+    return {
+        "contact": {
+            "id": str(contact.id),
+            "first_name": first_name,
+            "last_name": last_name,
+            "full_name": full_name,
+            "email": contact.email or "",
+            "phone": contact.phone or "",
+            "source": getattr(contact, "source", None) or "",
+            "custom_data": dict(getattr(contact, "custom_data", None) or {}),
+        },
+        "org": {
+            "name": getattr(org, "name", "") if org else "",
+            "support_email": getattr(org, "support_email", "") if org else "",
+        },
+    }
+
+
+def _resolve_dotted_path(context: dict[str, Any], path: str) -> Any:
+    """Walk a dot-scoped path (``contact.first_name``) through a nested
+    dict, returning ``None`` for any missing segment."""
+    cur: Any = context
+    for segment in path.split("."):
+        if not isinstance(cur, dict) or segment not in cur:
+            return None
+        cur = cur[segment]
+    return cur
 
 
 def _resolve_template_variables(campaign: Campaign, contact: Contact) -> dict[int, str]:

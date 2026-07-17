@@ -24,6 +24,10 @@ export interface AudienceFilter {
   /** Saved contact group id. Mutually exclusive with q/source/tag —
    *  backend rejects mixed payloads with 422. */
   group_id?: string;
+  /** Explicit hand-picked contact ids. Mutually exclusive with all
+   *  other modes — set from the campaign modal's live preview when
+   *  the operator ticks specific rows. Frozen at save time. */
+  contact_ids?: string[];
 }
 
 /** One `{{n}}` binding in `template_variables`. `kind=static` is

@@ -14,7 +14,7 @@ from src.app.shared.schemas import ORMModel, PaginatedResponse
 
 
 class AudienceFilter(BaseModel):
-    """Campaign audience target — three mutually-exclusive modes:
+    """Campaign audience target — four mutually-exclusive modes:
 
       1. **Empty** (`{}`): "Everyone in the org". The default.
       2. **Filter**: any of `q` / `source` / `tag` — same shape as the
@@ -22,8 +22,10 @@ class AudienceFilter(BaseModel):
       3. **Group**: `group_id` references a saved `contact_groups` row
          (Step 3.5.7). Dynamic groups re-resolve at send time; static
          groups send to their frozen member list.
+      4. **Explicit**: `contact_ids` is a hand-picked list. Frozen at
+         save time — send at dispatch goes to exactly these ids.
 
-    Mixing modes 2 and 3 is rejected at the schema layer — the
+    Mixing modes 2/3/4 is rejected at the schema layer — the
     audience builder UI (Step 3.5.9) enforces "one mode at a time"
     via radio toggle, and the backend echoes the same constraint so
     a direct API call can't bypass it."""
@@ -32,13 +34,20 @@ class AudienceFilter(BaseModel):
     source: str | None = None
     tag: str | None = None
     group_id: uuid.UUID | None = None
+    contact_ids: list[uuid.UUID] | None = None
 
     @model_validator(mode="after")
     def _no_mixed_modes(self) -> AudienceFilter:
         has_filter = bool(self.q or self.source or self.tag)
         has_group = self.group_id is not None
-        if has_filter and has_group:
-            raise ValueError("Use either filter fields (q/source/tag) OR group_id, not both.")
+        has_ids = self.contact_ids is not None and len(self.contact_ids) > 0
+        active = int(has_filter) + int(has_group) + int(has_ids)
+        if active > 1:
+            raise ValueError(
+                "Use exactly one of: filter fields (q/source/tag), group_id, or contact_ids."
+            )
+        if self.contact_ids is not None and len(self.contact_ids) == 0:
+            raise ValueError("contact_ids must be a non-empty list when set.")
         return self
 
 

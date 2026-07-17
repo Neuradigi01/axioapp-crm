@@ -188,6 +188,59 @@ export class CreateCampaignModalComponent {
    *  check, not a full paginated table. */
   private readonly AUDIENCE_PREVIEW_LIMIT = 20;
 
+  /** Collapsed state for the Matching-contacts panel. Once the
+   *  operator has finished picking contacts they can click "Hide" to
+   *  free up vertical space — the selected chip strip stays visible
+   *  so the choice is still obvious. Manual-only toggle: typing a
+   *  new search doesn't force it back open, mirroring the shopping-
+   *  cart pattern (checkout continues to work with the drawer closed). */
+  protected readonly audiencePreviewCollapsed = signal(false);
+
+  protected toggleAudiencePreviewCollapsed(): void {
+    this.audiencePreviewCollapsed.update((v) => !v);
+  }
+
+  /** Contacts the operator has hand-picked from the preview list.
+   *  Stored as a Map (id → ContactListItem) so the chip strip can
+   *  render each picked contact's name even after the preview
+   *  refreshes with a different search. Non-empty = the campaign is
+   *  scoped to exactly these ids at save time (overrides q/source/tag).
+   *  Empty = "use the filter as-is", i.e. dynamic resolution at
+   *  dispatch. */
+  protected readonly selectedContactMap = signal<Map<string, ContactListItem>>(new Map());
+
+  /** Derived: array view of the selection for template iteration. */
+  protected readonly selectedContactList = computed<ContactListItem[]>(() =>
+    Array.from(this.selectedContactMap().values()),
+  );
+
+  protected isContactSelected(id: string): boolean {
+    return this.selectedContactMap().has(id);
+  }
+
+  protected toggleContactSelected(c: ContactListItem): void {
+    const next = new Map(this.selectedContactMap());
+    if (next.has(c.id)) next.delete(c.id);
+    else next.set(c.id, c);
+    this.selectedContactMap.set(next);
+  }
+
+  protected removeSelectedContact(id: string): void {
+    const next = new Map(this.selectedContactMap());
+    next.delete(id);
+    this.selectedContactMap.set(next);
+  }
+
+  protected selectAllShown(): void {
+    const next = new Map(this.selectedContactMap());
+    for (const c of this.audiencePreviewRows()) next.set(c.id, c);
+    this.selectedContactMap.set(next);
+  }
+
+  protected clearSelection(): void {
+    this.selectedContactMap.set(new Map());
+  }
+
   // --- WhatsApp send capacity state (Step 3.5.16) --------------------
 
   /** Signal mirror of `form.controls.channel.value` so the capacity-
@@ -602,6 +655,7 @@ export class CreateCampaignModalComponent {
         audience_source: null,
         audience_tag: null,
       });
+      this.clearSelection();
     }
   }
 
@@ -818,7 +872,8 @@ export class CreateCampaignModalComponent {
     const c = this.capacity();
     if (!c || c.is_unlimited) return null;
     if (this.channelSignal() !== 'whatsapp') return null;
-    const count = this.audienceCount();
+    const pickedSize = this.selectedContactMap().size;
+    const count = pickedSize > 0 ? pickedSize : this.audienceCount();
     if (count === null || count <= 0) return null;
     if (count > c.remaining) {
       const skipped = count - c.remaining;
@@ -869,9 +924,16 @@ export class CreateCampaignModalComponent {
       }
       audience.group_id = gid;
     } else if (mode === 'filter') {
-      if (v.audience_q?.trim()) audience.q = v.audience_q.trim();
-      if (v.audience_source?.trim()) audience.source = v.audience_source.trim();
-      if (v.audience_tag?.trim()) audience.tag = v.audience_tag.trim();
+      const picked = Array.from(this.selectedContactMap().keys());
+      if (picked.length > 0) {
+        // Explicit selection wins over q/source/tag — send goes to
+        // exactly the ticked contacts.
+        audience.contact_ids = picked;
+      } else {
+        if (v.audience_q?.trim()) audience.q = v.audience_q.trim();
+        if (v.audience_source?.trim()) audience.source = v.audience_source.trim();
+        if (v.audience_tag?.trim()) audience.tag = v.audience_tag.trim();
+      }
     }
     // 'everyone' mode leaves `audience` as {} — backend treats as
     // "all org contacts" (already the existing default behaviour).

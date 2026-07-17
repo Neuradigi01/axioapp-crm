@@ -101,6 +101,24 @@ async def delete_campaign_row(session: AsyncSession, campaign: Campaign) -> None
 # --- audience -----------------------------------------------------------
 
 
+async def list_contact_ids_in_scope(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+) -> list[uuid.UUID]:
+    """Return the subset of `ids` that exist in the caller's tenant.
+
+    The ORM filter drops any row from another org automatically, so
+    passing a stray id from an outside tenant silently produces an
+    empty match rather than leaking data. Deleted-since-save ids also
+    fall out here.
+    """
+    if not ids:
+        return []
+    stmt = select(Contact.id).where(Contact.id.in_(ids))
+    return [row for (row,) in (await session.execute(stmt)).all()]
+
+
 async def list_contact_ids_for_audience(
     session: AsyncSession,
     *,
