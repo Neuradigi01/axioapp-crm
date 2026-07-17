@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Any
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -199,6 +200,175 @@ def _resolve_body_text(
     return provided_text or ""
 
 
+async def _upsert_wa_extension(
+    session: AsyncSession,
+    *,
+    template: MessageTemplate,
+    payload: Any,
+) -> None:
+    """Persist WA-specific fields onto the ``tbl_whatsapp_templates``
+    extension row that shadows this central template.
+
+    Requires the org to have connected a WhatsApp integration — the
+    extension row is FK'd to ``tbl_integrations``. When no integration
+    exists we return silently so the operator can still author the WA
+    fields; they'll materialise on the next Meta-submit round once the
+    integration lands. Idempotent per ``message_template_id``: existing
+    rows are patched in place, missing rows are inserted.
+    """
+    from sqlalchemy import select as _select
+
+    from src.app.core.integrations.models import Integration, IntegrationProvider
+    from src.app.core.integrations.whatsapp.models import (
+        WhatsAppTemplate,
+        WhatsAppTemplateSubmissionStatus,
+    )
+
+    integration = (
+        await session.execute(
+            _select(Integration).where(Integration.provider == IntegrationProvider.whatsapp)
+        )
+    ).scalar_one_or_none()
+    if integration is None:
+        logger.info(
+            "wa extension skipped for template %s — org has no WhatsApp integration",
+            template.id,
+        )
+        return
+
+    # Build Meta component payload from the structured fields so
+    # ``external_submission`` can re-send verbatim.
+    components: list[dict[str, Any]] = [
+        {"type": "BODY", "text": template.body_text},
+    ]
+    if payload.header_type and payload.header_text:
+        components.insert(
+            0,
+            {
+                "type": "HEADER",
+                "format": payload.header_type.upper(),
+                "text": payload.header_text if payload.header_type == "text" else None,
+            },
+        )
+    if payload.footer_text:
+        components.append({"type": "FOOTER", "text": payload.footer_text})
+    if payload.buttons:
+        buttons_payload = []
+        for b in payload.buttons:
+            entry: dict[str, Any] = {"type": b.type.upper(), "text": b.text}
+            if b.type == "url" and b.url:
+                entry["url"] = b.url
+            elif b.type == "phone_number" and b.phone_number:
+                entry["phone_number"] = b.phone_number
+            buttons_payload.append(entry)
+        components.append({"type": "BUTTONS", "buttons": buttons_payload})
+
+    existing = (
+        await session.execute(
+            _select(WhatsAppTemplate).where(
+                WhatsAppTemplate.message_template_id == template.id
+            )
+        )
+    ).scalar_one_or_none()
+
+    # Meta's WA category (marketing / utility / authentication) lives on
+    # the payload; default to ``marketing`` when the operator hasn't
+    # picked one so the extension row satisfies its NOT NULL constraint.
+    wa_category = payload.category or "marketing"
+
+    if existing is None:
+        row = WhatsAppTemplate(
+            org_id=template.org_id,
+            integration_id=integration.id,
+            name=template.name,
+            language=template.language,
+            category=wa_category,
+            status="DRAFT",
+            body=template.body_text,
+            header_type=payload.header_type,
+            header_text=payload.header_text,
+            footer_text=payload.footer_text,
+            body_components=components,
+            submission_status=WhatsAppTemplateSubmissionStatus.draft,
+            message_template_id=template.id,
+        )
+        session.add(row)
+    else:
+        existing.category = wa_category
+        existing.header_type = payload.header_type
+        existing.header_text = payload.header_text
+        existing.footer_text = payload.footer_text
+        existing.body = template.body_text
+        existing.body_components = components
+    await session.flush()
+
+
+async def _load_wa_extension(
+    session: AsyncSession, *, template: MessageTemplate
+) -> None:
+    """Attach a ``whatsapp`` attribute to the template row containing
+    the extension's header / footer / buttons. Null on non-WA rows or
+    when no extension exists. The router's ``TemplateRead.model_validate``
+    picks it up via ORM mode without an explicit column.
+    """
+    from sqlalchemy import select as _select
+
+    from src.app.core.integrations.whatsapp.models import WhatsAppTemplate
+    from src.app.core.templates.schemas import (
+        WhatsAppExtensionRead,
+        WhatsAppTemplateButton,
+    )
+
+    if template.channel != ConversationChannel.whatsapp:
+        setattr(template, "whatsapp", None)
+        return
+
+    row = (
+        await session.execute(
+            _select(WhatsAppTemplate).where(
+                WhatsAppTemplate.message_template_id == template.id
+            )
+        )
+    ).scalar_one_or_none()
+
+    if row is None:
+        setattr(template, "whatsapp", None)
+        return
+
+    # Reverse the components payload into structured buttons so the
+    # frontend can render them without re-parsing Meta's shape.
+    buttons: list[WhatsAppTemplateButton] | None = None
+    if row.body_components:
+        for c in row.body_components:
+            if c.get("type") == "BUTTONS":
+                buttons = []
+                for b in c.get("buttons", []):
+                    btype = str(b.get("type", "")).lower()
+                    if btype not in {"url", "phone_number", "quick_reply"}:
+                        continue
+                    buttons.append(
+                        WhatsAppTemplateButton(
+                            type=btype,
+                            text=b.get("text", ""),
+                            url=b.get("url"),
+                            phone_number=b.get("phone_number"),
+                        )
+                    )
+                break
+
+    setattr(
+        template,
+        "whatsapp",
+        WhatsAppExtensionRead(
+            category=row.category,
+            header_type=row.header_type,
+            header_text=row.header_text,
+            footer_text=row.footer_text,
+            buttons=buttons,
+        ),
+    )
+
+
 async def create_template(
     session: AsyncSession,
     *,
@@ -275,8 +445,18 @@ async def create_template(
             change_note="Initial version",
         ),
     )
+    # Meta-specific extras — upsert the WA extension row so the
+    # ``Submit to Meta`` flow has the header / footer / buttons ready
+    # to send verbatim. Only touched on WA channel + when the payload
+    # actually carries values.
+    if (
+        payload.channel == ConversationChannel.whatsapp
+        and payload.whatsapp is not None
+    ):
+        await _upsert_wa_extension(session, template=template, payload=payload.whatsapp)
     await session.commit()
     await session.refresh(template)
+    await _load_wa_extension(session, template=template)
     logger.info(
         "templates.create org=%s id=%s channel=%s name=%s",
         org_id,
@@ -388,7 +568,19 @@ async def update_template(
                     merged.append(path)
         template.variables = merged
 
-    if not changed:
+    # Meta-specific extras — patch the WA extension row. Independent of
+    # ``changed`` above because the operator may only be editing WA
+    # fields (footer / buttons) without touching the body.
+    wa_touched = False
+    if (
+        template.channel == ConversationChannel.whatsapp
+        and payload.whatsapp is not None
+    ):
+        await _upsert_wa_extension(session, template=template, payload=payload.whatsapp)
+        wa_touched = True
+
+    if not changed and not wa_touched:
+        await _load_wa_extension(session, template=template)
         return template
 
     new_version = template.current_version + 1
@@ -422,6 +614,7 @@ async def update_template(
         raise DuplicateTemplateName(name=template.name, channel=template.channel.value) from exc
 
     await session.refresh(template)
+    await _load_wa_extension(session, template=template)
     logger.info(
         "templates.update org=%s id=%s new_version=%d",
         org_id,

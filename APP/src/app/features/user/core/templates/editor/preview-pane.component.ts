@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
-import type { TemplateChannel } from '../templates-api.service';
+import type { TemplateChannel, WhatsAppTemplateButton } from '../templates-api.service';
 
 /**
  * Generic preview pane — resolves dot-path `{{a.b.c}}` against a
@@ -90,18 +90,67 @@ const VAR_RE = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}/g;
           <p class="mb-2 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-600">
             Preview
           </p>
-          <div class="flex justify-start">
+          <div class="flex flex-col items-start gap-1">
             <div
-              class="max-w-[85%] rounded-2xl rounded-tl-sm bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm"
+              class="max-w-[85%] overflow-hidden rounded-2xl rounded-tl-sm bg-white text-sm text-zinc-900 shadow-sm"
             >
+              @if (waHeaderType() === 'text' && resolvedHeader()) {
+                <p class="px-3 pt-2 text-sm font-semibold text-zinc-900">
+                  {{ resolvedHeader() }}
+                </p>
+              } @else if (waHeaderType() === 'image') {
+                <div
+                  class="flex h-24 items-center justify-center bg-zinc-100 text-[10px] uppercase tracking-wide text-zinc-500"
+                >
+                  Image header
+                </div>
+              } @else if (waHeaderType() === 'video') {
+                <div
+                  class="flex h-24 items-center justify-center bg-zinc-100 text-[10px] uppercase tracking-wide text-zinc-500"
+                >
+                  Video header
+                </div>
+              } @else if (waHeaderType() === 'document') {
+                <div
+                  class="flex h-16 items-center justify-center bg-zinc-100 text-[10px] uppercase tracking-wide text-zinc-500"
+                >
+                  Document header
+                </div>
+              }
+
               @if (resolvedBody()) {
-                <p class="whitespace-pre-wrap break-words text-sm">
+                <p class="whitespace-pre-wrap break-words px-3 py-2 text-sm">
                   {{ resolvedBody() }}
                 </p>
               } @else {
-                <p class="text-xs italic text-zinc-400">Body text will appear here…</p>
+                <p class="px-3 py-2 text-xs italic text-zinc-400">Body text will appear here…</p>
+              }
+
+              @if (waFooter()) {
+                <p class="px-3 pb-2 text-[11px] text-zinc-500">{{ waFooter() }}</p>
               }
             </div>
+
+            @if (waButtons().length > 0) {
+              <div class="flex w-full max-w-[85%] flex-col gap-1">
+                @for (btn of waButtons(); track $index) {
+                  <button
+                    type="button"
+                    class="flex items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-medium text-[#0088cc] shadow-sm"
+                    tabindex="-1"
+                  >
+                    @if (btn.type === 'url') {
+                      <lucide-icon name="external-link" size="14" aria-hidden="true"></lucide-icon>
+                    } @else if (btn.type === 'phone_number') {
+                      <lucide-icon name="phone" size="14" aria-hidden="true"></lucide-icon>
+                    } @else {
+                      <lucide-icon name="corner-up-left" size="14" aria-hidden="true"></lucide-icon>
+                    }
+                    <span>{{ btn.text || '(button label)' }}</span>
+                  </button>
+                }
+              </div>
+            }
           </div>
         </div>
       }
@@ -142,6 +191,13 @@ export class PreviewPaneComponent {
   readonly channel = input.required<TemplateChannel>();
   readonly subject = input<string | null>(null);
   readonly body = input<string>('');
+  // WhatsApp-specific extras. All optional — the preview falls back
+  // to the plain body-only bubble when nothing is supplied so non-WA
+  // channels are unaffected.
+  readonly waHeaderType = input<'' | 'text' | 'image' | 'video' | 'document'>('');
+  readonly waHeaderText = input<string>('');
+  readonly waFooter = input<string>('');
+  readonly waButtons = input<WhatsAppTemplateButton[]>([]);
 
   protected readonly resolvedSubject = computed(() => {
     const s = this.subject();
@@ -149,6 +205,7 @@ export class PreviewPaneComponent {
   });
 
   protected readonly resolvedBody = computed(() => this.resolve(this.body()));
+  protected readonly resolvedHeader = computed(() => this.resolve(this.waHeaderText()));
 
   private resolve(text: string): string {
     if (!text) return '';

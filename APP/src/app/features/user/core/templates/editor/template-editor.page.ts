@@ -220,6 +220,21 @@ export class TemplateEditorPageComponent {
   protected readonly currentBody = signal<string>('');
   protected readonly currentSubject = signal<string | null>(null);
 
+  // WhatsApp preview extras — updated from the wa-form valueChanges
+  // subscription below so the preview bubble renders the operator's
+  // header / footer / buttons live as they type.
+  protected readonly currentWaHeaderType = signal<'' | 'text' | 'image' | 'video' | 'document'>('');
+  protected readonly currentWaHeaderText = signal<string>('');
+  protected readonly currentWaFooter = signal<string>('');
+  protected readonly currentWaButtons = signal<
+    Array<{
+      type: 'url' | 'phone_number' | 'quick_reply';
+      text: string;
+      url: string | null;
+      phone_number: string | null;
+    }>
+  >([]);
+
   // The textarea / input the variable-picker click should insert into.
   private focusedField: HTMLTextAreaElement | HTMLInputElement | null = null;
   protected readonly trackFocus = (el: HTMLTextAreaElement | HTMLInputElement): void => {
@@ -259,15 +274,39 @@ export class TemplateEditorPageComponent {
       if (channel === 'whatsapp') {
         const f = this.waForm();
         if (!f) return;
+        const syncWaExtras = (): void => {
+          this.currentWaHeaderType.set(f.controls.header_type.value);
+          this.currentWaHeaderText.set(f.controls.header_text.value ?? '');
+          this.currentWaFooter.set(f.controls.footer_text.value ?? '');
+          this.currentWaButtons.set(
+            f.controls.buttons.controls.map((b) => ({
+              type: b.controls.type.value,
+              text: b.controls.text.value ?? '',
+              url: (b.controls.url.value ?? '').trim() || null,
+              phone_number: (b.controls.phone_number.value ?? '').trim() || null,
+            })),
+          );
+        };
         const sub = f.controls.body_text.valueChanges
           .pipe(takeUntilDestroyed(this.destroyRef))
           .subscribe((v) => {
             this.currentBody.set(v ?? '');
             this.scheduleAutoSave();
           });
+        // Every WA-form value change (header type/text, footer,
+        // any button field) re-derives the preview extras + fires
+        // the auto-save timer.
+        const subWa = f.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+          syncWaExtras();
+          this.scheduleAutoSave();
+        });
         this.currentBody.set(f.controls.body_text.value);
         this.currentSubject.set(null);
-        onCleanup(() => sub.unsubscribe());
+        syncWaExtras();
+        onCleanup(() => {
+          sub.unsubscribe();
+          subWa.unsubscribe();
+        });
       } else if (channel === 'email') {
         const f = this.emailForm();
         if (!f) return;
@@ -384,7 +423,32 @@ export class TemplateEditorPageComponent {
             f.patchValue({
               body_text: row.body_text,
               language: row.language,
+              category: (row.whatsapp?.category ?? 'marketing') as
+                | 'marketing'
+                | 'utility'
+                | 'authentication',
+              header_type: (row.whatsapp?.header_type ?? '') as
+                | ''
+                | 'text'
+                | 'image'
+                | 'video'
+                | 'document',
+              header_text: row.whatsapp?.header_text ?? '',
+              footer_text: row.whatsapp?.footer_text ?? '',
             });
+            // Rebuild the buttons FormArray from the loaded row —
+            // patchValue can't add FormGroups to a FormArray.
+            f.controls.buttons.clear({ emitEvent: false });
+            for (const b of row.whatsapp?.buttons ?? []) {
+              f.controls.buttons.push(
+                WaFormComponent.buildButton({
+                  type: b.type,
+                  text: b.text,
+                  url: b.url ?? '',
+                  phone_number: b.phone_number ?? '',
+                }),
+              );
+            }
             this.waForm.set(f);
           } else if (row.channel === 'email') {
             const f = this.emailForm() ?? EmailFormComponent.build();
@@ -495,11 +559,46 @@ export class TemplateEditorPageComponent {
     const channel = this.channel();
     if (channel === 'whatsapp') {
       const f = this.waForm();
-      const base = {
+      // Serialise the WA extension fields — omit anything the operator
+      // didn't fill so the backend's ``whatsapp`` sub-payload only
+      // carries meaningful values. Empty strings map to nulls so
+      // Pydantic's `str_strip_whitespace + None` normalises cleanly.
+      const headerType = (f?.controls.header_type.value ?? '') as string;
+      const headerText = (f?.controls.header_text.value ?? '').trim();
+      const footerText = (f?.controls.footer_text.value ?? '').trim();
+      const buttons = (f?.controls.buttons.controls ?? [])
+        .map((b) => ({
+          type: b.controls.type.value,
+          text: (b.controls.text.value ?? '').trim(),
+          url: (b.controls.url.value ?? '').trim() || null,
+          phone_number: (b.controls.phone_number.value ?? '').trim() || null,
+        }))
+        .filter((b) => b.text.length > 0);
+      const waPayload: {
+        category?: 'marketing' | 'utility' | 'authentication' | null;
+        header_type?: 'text' | 'image' | 'video' | 'document' | null;
+        header_text?: string | null;
+        footer_text?: string | null;
+        buttons?: typeof buttons | null;
+      } = {};
+      // Always send the WA category — the extension row's category is
+      // NOT NULL and the backend defaults to marketing if absent.
+      waPayload.category = f?.controls.category.value ?? 'marketing';
+      if (headerType) waPayload.header_type = headerType as 'text' | 'image' | 'video' | 'document';
+      if (headerText) waPayload.header_text = headerText;
+      if (footerText) waPayload.footer_text = footerText;
+      if (buttons.length > 0) waPayload.buttons = buttons;
+      const base: TemplateCreatePayload = {
         name: this.headerForm.controls.name.value,
         channel: 'whatsapp' as const,
+        // Central `category` uses the send-guard taxonomy (marketing /
+        // transactional / service) which is different from Meta's WA
+        // taxonomy. Default to marketing here; the WA-specific value
+        // rides on the whatsapp sub-payload.
+        category: 'marketing',
         language: f?.controls.language.value ?? 'en',
         body_text: f?.controls.body_text.value ?? '',
+        whatsapp: waPayload,
       };
       return base;
     }

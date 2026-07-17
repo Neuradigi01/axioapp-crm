@@ -233,6 +233,9 @@ async def get_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="template not found",
         ) from exc
+    # Attach WA-specific fields for WhatsApp templates so the editor's
+    # header / footer / buttons UI re-populates on load.
+    await templates_service._load_wa_extension(db, template=template)
     return TemplateRead.model_validate(template)
 
 

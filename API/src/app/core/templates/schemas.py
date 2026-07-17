@@ -24,6 +24,69 @@ from src.app.core.templates.models import (
 )
 from src.app.shared.schemas.base import ORMModel
 
+# ---- WhatsApp extension sub-payload ----------------------------------
+
+
+class WhatsAppTemplateButton(BaseModel):
+    """One CTA button on a WA template. Meta caps at 3 per template
+    and each type has its own required companion field:
+
+      * ``url`` — ``text`` + ``url``
+      * ``phone_number`` — ``text`` + ``phone_number``
+      * ``quick_reply`` — ``text`` only
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    type: str = Field(pattern=r"^(url|phone_number|quick_reply)$")
+    text: str = Field(min_length=1, max_length=25)
+    url: str | None = Field(default=None, max_length=2000)
+    phone_number: str | None = Field(default=None, max_length=32)
+
+    @model_validator(mode="after")
+    def _type_companion_required(self) -> WhatsAppTemplateButton:
+        if self.type == "url" and not (self.url and self.url.strip()):
+            raise ValueError("url is required for a URL button")
+        if self.type == "phone_number" and not (
+            self.phone_number and self.phone_number.strip()
+        ):
+            raise ValueError("phone_number is required for a Phone button")
+        return self
+
+
+class WhatsAppExtensionPayload(BaseModel):
+    """Optional Meta-specific fields for WhatsApp templates.
+
+    Only meaningful on WA-channel templates; ignored (and rejected via
+    the model validator on TemplateCreate) for other channels. Every
+    field is optional — a WA template can ship body-only.
+
+    ``category`` uses Meta's taxonomy (Marketing / Utility /
+    Authentication) which is DIFFERENT from the central row's
+    ``TemplateCategory`` (marketing / transactional / service — the
+    send-guard classification). Both live independently; the send
+    guard reads the central column, the Submit-to-Meta payload reads
+    this one.
+
+    ``header_type`` supports the four Meta formats. When ``text`` is
+    picked, ``header_text`` carries the text; the ``image`` /
+    ``video`` / ``document`` variants require operators to upload a
+    sample via the existing WA templates upload flow.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    category: str | None = Field(
+        default=None, pattern=r"^(marketing|utility|authentication)$"
+    )
+    header_type: str | None = Field(
+        default=None, pattern=r"^(text|image|video|document)$"
+    )
+    header_text: str | None = Field(default=None, max_length=60)
+    footer_text: str | None = Field(default=None, max_length=60)
+    buttons: list[WhatsAppTemplateButton] | None = Field(default=None, max_length=3)
+
+
 # ---- Request shapes ---------------------------------------------------
 
 
@@ -50,6 +113,9 @@ class TemplateCreate(BaseModel):
     body_text_fallback_auto: bool = True
     subject: str | None = Field(default=None, max_length=998)
     preview_text: str | None = Field(default=None, max_length=190)
+    # Meta-specific extras — only accepted when channel=whatsapp. The
+    # service layer upserts a matching WhatsAppTemplate extension row.
+    whatsapp: WhatsAppExtensionPayload | None = None
 
     @model_validator(mode="after")
     def _email_channel_body_and_subject(self) -> TemplateCreate:
@@ -89,6 +155,10 @@ class TemplateCreate(BaseModel):
                 raise ValueError(
                     f"preview_text is only valid for email templates; got channel={self.channel.value}"
                 )
+        if self.whatsapp is not None and self.channel != ConversationChannel.whatsapp:
+            raise ValueError(
+                "whatsapp extension fields are only valid for whatsapp templates"
+            )
         return self
 
 
@@ -117,9 +187,27 @@ class TemplateUpdate(BaseModel):
     subject: str | None = Field(default=None, max_length=998)
     preview_text: str | None = Field(default=None, max_length=190)
     change_note: str | None = Field(default=None, max_length=2000)
+    # Meta-specific extras. Present only on WhatsApp templates; the
+    # service rejects it on other channels. Sending the key with
+    # ``None`` explicitly clears every WA field (idempotent no-op if
+    # already null); omitting the key leaves the current values alone.
+    whatsapp: WhatsAppExtensionPayload | None = None
 
 
 # ---- Read / response shapes ------------------------------------------
+
+
+class WhatsAppExtensionRead(BaseModel):
+    """Snapshot of the WA-specific fields — populated on ``TemplateRead``
+    for WhatsApp templates that have an extension row. Null on non-WA
+    channels + on WA templates that haven't set any Meta-specific
+    fields yet."""
+
+    category: str | None = None
+    header_type: str | None = None
+    header_text: str | None = None
+    footer_text: str | None = None
+    buttons: list[WhatsAppTemplateButton] | None = None
 
 
 class TemplateRead(ORMModel):
@@ -139,6 +227,10 @@ class TemplateRead(ORMModel):
     variables: list[Any]
     internal_status: TemplateInternalStatus
     external_status: TemplateExternalStatus
+    # Populated by the service layer for WA templates that carry an
+    # extension row; ``None`` for other channels and for legacy WA
+    # rows that pre-date extension writes.
+    whatsapp: WhatsAppExtensionRead | None = None
     # Campaigns v1 Step 02 — Meta rejection reason surfaced inline in
     # the CRM library + campaign picker. Populated by the list endpoint
     # via a LEFT OUTER JOIN onto the WhatsApp extension row; single-

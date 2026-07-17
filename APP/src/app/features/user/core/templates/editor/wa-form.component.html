@@ -1,16 +1,88 @@
-<form [formGroup]="form()" class="flex flex-col gap-3">
-  <label class="block">
-    <span class="text-xs font-medium text-zinc-700">Language</span>
-    <select
-      formControlName="language"
-      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
-    >
-      @for (lang of LANGUAGE_OPTIONS; track lang.value) {
-        <option [value]="lang.value">{{ lang.label }}</option>
-      }
-    </select>
-  </label>
+<form [formGroup]="form()" class="flex flex-col gap-4">
+  <!-- Row 1: Language + Category -->
+  <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+    <label class="block">
+      <span class="text-xs font-medium text-zinc-700">Language</span>
+      <select
+        formControlName="language"
+        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+      >
+        @for (lang of LANGUAGE_OPTIONS; track lang.value) {
+          <option [value]="lang.value">{{ lang.label }}</option>
+        }
+      </select>
+    </label>
+  </div>
 
+  <!-- Category — visual card selector -->
+  <div>
+    <span class="text-xs font-medium text-zinc-700">Category</span>
+    <p class="mt-0.5 text-[10px] text-zinc-400">
+      Meta uses this to pick the review track. Marketing is the strictest — Utility approves faster.
+    </p>
+    <div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+      @for (cat of CATEGORY_OPTIONS; track cat.value) {
+        <button
+          type="button"
+          (click)="pickCategory(cat.value)"
+          [disabled]="disabled()"
+          class="rounded-lg border p-3 text-left transition disabled:opacity-50"
+          [class.border-emerald-500]="form().controls.category.value === cat.value"
+          [class.bg-emerald-50]="form().controls.category.value === cat.value"
+          [class.ring-1]="form().controls.category.value === cat.value"
+          [class.ring-emerald-500]="form().controls.category.value === cat.value"
+          [class.border-zinc-200]="form().controls.category.value !== cat.value"
+          [class.hover:border-zinc-300]="form().controls.category.value !== cat.value"
+        >
+          <div class="text-sm font-semibold text-zinc-900">{{ cat.label }}</div>
+          <p class="mt-1 text-xs text-zinc-600">{{ cat.blurb }}</p>
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- Header — type dropdown + text (text-only inline for now) -->
+  <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+    <div class="grid grid-cols-[160px_1fr] gap-3">
+      <label class="block">
+        <span class="text-xs font-medium text-zinc-700">Header</span>
+        <select
+          formControlName="header_type"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+        >
+          <option value="">None</option>
+          <option value="text">Text</option>
+          <option value="image">Image</option>
+          <option value="video">Video</option>
+          <option value="document">Document</option>
+        </select>
+      </label>
+      @if (form().controls.header_type.value === 'text') {
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-700">Header text</span>
+          <input
+            type="text"
+            formControlName="header_text"
+            maxlength="60"
+            (focus)="onFocus($event)"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+            placeholder="e.g. Diwali Special"
+          />
+          <div class="mt-0.5 text-right text-[10px] text-zinc-400">
+            {{ form().controls.header_text.value.length }} / 60
+          </div>
+        </label>
+      } @else if (form().controls.header_type.value) {
+        <p
+          class="self-center rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800"
+        >
+          Upload the sample {{ form().controls.header_type.value }} on the Submit-to-Meta page.
+        </p>
+      }
+    </div>
+  </div>
+
+  <!-- Body -->
   <label class="block">
     <span class="text-xs font-medium text-zinc-700">
       Body
@@ -19,7 +91,7 @@
     <textarea
       formControlName="body_text"
       maxlength="1024"
-      rows="10"
+      rows="8"
       (focus)="onFocus($event)"
       class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
       placeholder="Hi {{ '{' + '{' + 'contact.first_name' + '}' + '}' }}, …"
@@ -36,10 +108,117 @@
     </div>
   </label>
 
-  <p class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-    <strong>Note:</strong> Meta-specific WhatsApp template fields (header / footer / buttons /
-    category) ship alongside the Meta- submission flow in a later step. This editor saves the body +
-    name to the central library; full WhatsApp Meta submission stays in the existing WhatsApp
-    Templates page for now.
-  </p>
+  <!-- Footer -->
+  <label class="block">
+    <span class="text-xs font-medium text-zinc-700">
+      Footer
+      <span class="text-zinc-400">(optional, max 60 chars)</span>
+    </span>
+    <input
+      type="text"
+      formControlName="footer_text"
+      maxlength="60"
+      (focus)="onFocus($event)"
+      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+      placeholder="e.g. Reply STOP to unsubscribe"
+    />
+    <div class="mt-0.5 text-right text-[10px] text-zinc-400">
+      {{ form().controls.footer_text.value.length }} / 60
+    </div>
+  </label>
+
+  <!-- Buttons -->
+  <div class="rounded-md border border-zinc-200 p-3">
+    <div class="flex items-center justify-between">
+      <div>
+        <span class="text-xs font-medium text-zinc-700">Call-to-action buttons</span>
+        <p class="text-[10px] text-zinc-400">Up to 3. Meta caps at three per template.</p>
+      </div>
+      <button
+        type="button"
+        (click)="addButton('url')"
+        [disabled]="disabled() || !canAddButton()"
+        class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+      >
+        + Add button
+      </button>
+    </div>
+
+    <div class="mt-3 flex flex-col gap-2" formArrayName="buttons">
+      @for (btn of form().controls.buttons.controls; track $index) {
+        <div
+          [formGroupName]="$index"
+          class="grid grid-cols-[110px_140px_1fr_28px] items-start gap-2 rounded-md border border-zinc-200 bg-white p-2"
+        >
+          <label class="block">
+            <span class="text-[10px] font-medium text-zinc-500">Type</span>
+            <select
+              [value]="btn.controls.type.value"
+              (change)="onButtonTypeChange($index, $any($event.target).value)"
+              class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs focus:border-zinc-500 focus:outline-none"
+            >
+              <option value="url">URL</option>
+              <option value="phone_number">Phone</option>
+              <option value="quick_reply">Quick reply</option>
+            </select>
+          </label>
+
+          <label class="block">
+            <span class="text-[10px] font-medium text-zinc-500">Label</span>
+            <input
+              type="text"
+              formControlName="text"
+              maxlength="25"
+              placeholder="Shop now"
+              class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs focus:border-zinc-500 focus:outline-none"
+            />
+          </label>
+
+          @if (btn.controls.type.value === 'url') {
+            <label class="block">
+              <span class="text-[10px] font-medium text-zinc-500">URL</span>
+              <input
+                type="url"
+                formControlName="url"
+                placeholder="https://your-site.com/landing"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 font-mono text-xs focus:border-zinc-500 focus:outline-none"
+              />
+            </label>
+          } @else if (btn.controls.type.value === 'phone_number') {
+            <label class="block">
+              <span class="text-[10px] font-medium text-zinc-500">Phone (with country code)</span>
+              <input
+                type="tel"
+                formControlName="phone_number"
+                placeholder="+91 98765 43210"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 font-mono text-xs focus:border-zinc-500 focus:outline-none"
+              />
+            </label>
+          } @else {
+            <p class="self-end pb-1 text-[10px] text-zinc-500">
+              Quick-reply buttons post the label back to the CRM as an inbound message.
+            </p>
+          }
+
+          <button
+            type="button"
+            (click)="removeButton($index)"
+            [disabled]="disabled()"
+            class="mt-4 flex h-6 w-6 items-center justify-center rounded text-rose-500 hover:bg-rose-50 disabled:opacity-50"
+            aria-label="Remove button"
+            title="Remove"
+          >
+            ×
+          </button>
+        </div>
+      }
+      @if (form().controls.buttons.length === 0) {
+        <p
+          class="rounded-md border border-dashed border-zinc-200 p-3 text-center text-[11px] text-zinc-400"
+        >
+          No buttons yet. Add a URL, Phone, or Quick-Reply CTA above.
+        </p>
+      }
+    </div>
+  </div>
 </form>

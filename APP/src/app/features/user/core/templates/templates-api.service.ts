@@ -25,6 +25,38 @@ export type TemplateExternalStatus = 'n_a' | 'pending' | 'approved' | 'rejected'
 
 export type TemplateCategory = 'marketing' | 'transactional' | 'service';
 
+export type WaButtonType = 'url' | 'phone_number' | 'quick_reply';
+export type WaHeaderType = 'text' | 'image' | 'video' | 'document';
+
+export interface WhatsAppTemplateButton {
+  type: WaButtonType;
+  text: string;
+  url?: string | null;
+  phone_number?: string | null;
+}
+
+export type WaCategory = 'marketing' | 'utility' | 'authentication';
+
+export interface WhatsAppExtensionPayload {
+  /** Meta's WA category (marketing / utility / authentication) — a
+   *  DIFFERENT taxonomy from TemplateCategory (marketing / transactional
+   *  / service). Store both: the central column drives the CRM's send
+   *  guard, this one drives Meta's review track. */
+  category?: WaCategory | null;
+  header_type?: WaHeaderType | null;
+  header_text?: string | null;
+  footer_text?: string | null;
+  buttons?: WhatsAppTemplateButton[] | null;
+}
+
+export interface WhatsAppExtensionRead {
+  category: WaCategory | null;
+  header_type: WaHeaderType | null;
+  header_text: string | null;
+  footer_text: string | null;
+  buttons: WhatsAppTemplateButton[] | null;
+}
+
 export interface TemplateRead {
   id: string;
   org_id: string;
@@ -56,6 +88,10 @@ export interface TemplateRead {
   updated_by_user_id: string | null;
   created_at: string;
   updated_at: string;
+  /** Populated by the backend for WhatsApp templates that have a
+   *  matching row in `tbl_whatsapp_templates`. Null on non-WA channels
+   *  and on legacy WA rows created before the extension write path. */
+  whatsapp?: WhatsAppExtensionRead | null;
 }
 
 export interface TemplateVersionRead {
@@ -113,6 +149,9 @@ export interface TemplateCreatePayload {
   body_text_fallback_auto?: boolean;
   subject?: string | null;
   preview_text?: string | null;
+  /** Meta-specific extras. Only accepted when `channel === 'whatsapp'`;
+   *  the backend upserts the tbl_whatsapp_templates extension row. */
+  whatsapp?: WhatsAppExtensionPayload | null;
 }
 
 export interface TemplateUpdatePayload {
@@ -127,6 +166,8 @@ export interface TemplateUpdatePayload {
   subject?: string | null;
   preview_text?: string | null;
   change_note?: string | null;
+  /** Meta-specific extras. See TemplateCreatePayload. */
+  whatsapp?: WhatsAppExtensionPayload | null;
 }
 
 export interface TemplateListQuery {

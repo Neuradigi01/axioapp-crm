@@ -310,7 +310,15 @@
           <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
             <app-channel-chip [channel]="c" />
           </p>
-          <app-preview-pane [channel]="c" [subject]="currentSubject()" [body]="currentBody()" />
+          <app-preview-pane
+            [channel]="c"
+            [subject]="currentSubject()"
+            [body]="currentBody()"
+            [waHeaderType]="currentWaHeaderType()"
+            [waHeaderText]="currentWaHeaderText()"
+            [waFooter]="currentWaFooter()"
+            [waButtons]="currentWaButtons()"
+          />
         </aside>
       }
     </div>

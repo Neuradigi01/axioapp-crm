@@ -1,19 +1,49 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
 /**
- * WhatsApp sub-form — channel-agnostic fields only (body + language).
+ * WhatsApp sub-form — full Meta-template shape.
  *
- * The Meta-specific extras (header type / button payloads / template
- * category) live in the WA-specific extension table from Step 9.
- * Until then this sub-form ships the minimal field set that the
- * central `tbl_message_templates` already supports — name, body,
- * language. The operator can still create + edit a WA template; Step 9
- * adds the header / buttons UI alongside the Meta-submission flow.
+ * Covers the fields Meta's ``/{waba_id}/message_templates`` endpoint
+ * accepts:
+ *
+ *  - ``category``      — Marketing / Utility / Authentication.
+ *                        Rendered as three visual cards; required.
+ *  - ``header_type``   — text (default) / image / video / document.
+ *                        Media headers are declared here but the
+ *                        actual sample media upload still happens on
+ *                        the separate Meta-submission page.
+ *  - ``header_text``   — text-only header string (max 60 chars).
+ *  - ``body_text``     — the message body, up to 1024 chars.
+ *  - ``footer_text``   — optional single-line footer (max 60 chars).
+ *  - ``buttons``       — up to 3 CTAs. Each button is either URL,
+ *                        Phone, or Quick Reply; the type dictates the
+ *                        required companion field.
+ *
+ * The parent template-editor page maps this form into a
+ * ``whatsapp`` sub-payload on ``TemplateCreate`` / ``TemplateUpdate``;
+ * the backend upserts the ``tbl_whatsapp_templates`` extension row so
+ * the Submit-to-Meta flow can send the payload verbatim.
  */
+export type WaButtonType = 'url' | 'phone_number' | 'quick_reply';
+export type WaCategory = 'marketing' | 'utility' | 'authentication';
+export type WaHeaderType = '' | 'text' | 'image' | 'video' | 'document';
+
+export type WaButtonFormGroup = FormGroup<{
+  type: FormControl<WaButtonType>;
+  text: FormControl<string>;
+  url: FormControl<string>;
+  phone_number: FormControl<string>;
+}>;
+
 export type WaFormGroup = FormGroup<{
   body_text: FormControl<string>;
   language: FormControl<string>;
+  category: FormControl<WaCategory>;
+  header_type: FormControl<WaHeaderType>;
+  header_text: FormControl<string>;
+  footer_text: FormControl<string>;
+  buttons: FormArray<WaButtonFormGroup>;
 }>;
 
 const LANGUAGE_OPTIONS: Array<{ value: string; label: string }> = [
@@ -27,6 +57,24 @@ const LANGUAGE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'ml', label: 'Malayalam (ml)' },
   { value: 'pa', label: 'Punjabi (pa)' },
   { value: 'bn', label: 'Bengali (bn)' },
+];
+
+const CATEGORY_OPTIONS: Array<{ value: WaCategory; label: string; blurb: string }> = [
+  {
+    value: 'marketing',
+    label: 'Marketing',
+    blurb: 'Promotions, offers, launches, newsletters.',
+  },
+  {
+    value: 'utility',
+    label: 'Utility',
+    blurb: 'Order updates, appointment reminders, account alerts.',
+  },
+  {
+    value: 'authentication',
+    label: 'Authentication',
+    blurb: 'One-time passwords + verification codes.',
+  },
 ];
 
 @Component({
@@ -44,10 +92,71 @@ export class WaFormComponent {
   );
 
   protected readonly LANGUAGE_OPTIONS = LANGUAGE_OPTIONS;
+  protected readonly CATEGORY_OPTIONS = CATEGORY_OPTIONS;
+
+  /** Meta caps at 3 buttons per template. Disables the Add button
+   *  when the array is full so the operator can't build an invalid
+   *  template on the client. */
+  protected readonly canAddButton = computed<boolean>(
+    () => this.form().controls.buttons.length < 3,
+  );
 
   protected onFocus(event: FocusEvent): void {
     const el = event.target as HTMLTextAreaElement | HTMLInputElement;
     this.trackFocus()(el);
+  }
+
+  protected pickCategory(cat: WaCategory): void {
+    if (this.disabled()) return;
+    this.form().controls.category.setValue(cat);
+  }
+
+  protected addButton(type: WaButtonType = 'url'): void {
+    if (this.disabled() || !this.canAddButton()) return;
+    this.form().controls.buttons.push(WaFormComponent.buildButton({ type }));
+  }
+
+  protected removeButton(index: number): void {
+    if (this.disabled()) return;
+    this.form().controls.buttons.removeAt(index);
+  }
+
+  protected onButtonTypeChange(index: number, type: WaButtonType): void {
+    const btn = this.form().controls.buttons.at(index);
+    btn.controls.type.setValue(type);
+    // Clear the sibling field so a URL button doesn't carry a stray
+    // phone_number into the payload (backend validator enforces).
+    if (type === 'url') {
+      btn.controls.phone_number.setValue('');
+    } else if (type === 'phone_number') {
+      btn.controls.url.setValue('');
+    } else {
+      btn.controls.url.setValue('');
+      btn.controls.phone_number.setValue('');
+    }
+  }
+
+  static buildButton(init?: {
+    type?: WaButtonType;
+    text?: string;
+    url?: string;
+    phone_number?: string;
+  }): WaButtonFormGroup {
+    return new FormGroup({
+      type: new FormControl<WaButtonType>(init?.type ?? 'url', { nonNullable: true }),
+      text: new FormControl<string>(init?.text ?? '', {
+        nonNullable: true,
+        validators: [Validators.required, Validators.maxLength(25)],
+      }),
+      url: new FormControl<string>(init?.url ?? '', {
+        nonNullable: true,
+        validators: [Validators.maxLength(2000)],
+      }),
+      phone_number: new FormControl<string>(init?.phone_number ?? '', {
+        nonNullable: true,
+        validators: [Validators.maxLength(32)],
+      }),
+    });
   }
 
   static build(): WaFormGroup {
@@ -60,6 +169,20 @@ export class WaFormComponent {
         nonNullable: true,
         validators: [Validators.required],
       }),
+      category: new FormControl<WaCategory>('marketing', {
+        nonNullable: true,
+        validators: [Validators.required],
+      }),
+      header_type: new FormControl<WaHeaderType>('', { nonNullable: true }),
+      header_text: new FormControl<string>('', {
+        nonNullable: true,
+        validators: [Validators.maxLength(60)],
+      }),
+      footer_text: new FormControl<string>('', {
+        nonNullable: true,
+        validators: [Validators.maxLength(60)],
+      }),
+      buttons: new FormArray<WaButtonFormGroup>([]),
     });
   }
 }
