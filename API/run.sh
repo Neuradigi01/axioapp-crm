@@ -85,6 +85,27 @@ ensure_hooks() {
 # Locate the running `api` container (no secrets needed for exec).
 api_cid() { docker compose $COMPOSE_FILES ps -q api 2>/dev/null | head -n1; }
 
+# Bind-mounted host dirs (compose `volumes:`) must exist and be owned by the
+# container user (appuser, uid/gid 1000 per the Dockerfile) BEFORE `up`.
+# Otherwise the docker daemon creates them root-owned and the api worker dies
+# on boot (PermissionError: './static/uploads'). Ownership only matters on
+# Linux; Docker Desktop on Mac maps host file permissions itself.
+APP_UID=1000
+APP_GID=1000
+ensure_dirs() {
+    mkdir -p static/uploads logs flower 2>/dev/null \
+        || sudo mkdir -p static/uploads logs flower
+    [ "$(uname -s)" = "Linux" ] || return 0
+    for d in static logs flower; do
+        owner="$(ls -ldn "$d" | awk '{print $3}')"
+        if [ "$owner" != "$APP_UID" ]; then
+            echo "Fixing ownership of ./$d (uid $owner -> $APP_UID, container appuser)..."
+            chown -R "$APP_UID:$APP_GID" "$d" 2>/dev/null \
+                || sudo chown -R "$APP_UID:$APP_GID" "$d"
+        fi
+    done
+}
+
 do_lint() {
     set +e; rc=0
     CID=$(api_cid)
@@ -121,8 +142,8 @@ do_lint_fix() {
     set -e
 }
 
-do_up()     { require_secrets; ensure_hooks; echo "Starting the full API stack..."; chmod -R 777 logs/ 2>/dev/null || true; chmod -R 777 flower/ 2>/dev/null || true; dc --profile celery up --build -d; echo "Started."; }
-do_up_api() { require_secrets; ensure_hooks; echo "Starting the API stack (api + redis only)..."; chmod -R 777 logs/ 2>/dev/null || true; dc up --build -d; echo "Started."; }
+do_up()     { require_secrets; ensure_hooks; ensure_dirs; echo "Starting the full API stack..."; dc --profile celery up --build -d; echo "Started."; }
+do_up_api() { require_secrets; ensure_hooks; ensure_dirs; echo "Starting the API stack (api + redis only)..."; dc up --build -d; echo "Started."; }
 do_down()   { require_secrets; echo "Stopping the full API stack..."; dc --profile celery down -v; echo "Stopped."; }
 
 case "$1" in
