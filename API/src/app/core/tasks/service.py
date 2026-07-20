@@ -30,7 +30,10 @@ from src.app.core.tasks import data_access as _da
 from src.app.core.tasks.models import Task, TaskPriority, TaskStatus
 from src.app.core.tasks.schemas import TaskCreate, TaskUpdate
 from src.app.shared.audit import log_entity_change, snapshot
+from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.queries import ensure_found
+
+_TASK_ENTITY = "task"
 
 DueFilter = Literal["today", "overdue", "upcoming"]
 SortBy = Literal["due_at", "priority", "title", "created_at", "last_activity_at"]
@@ -109,6 +112,7 @@ _SNAPSHOT_FIELDS = (
     "status",
     "priority",
     "followup_type",
+    "custom_data",
 )
 
 
@@ -128,6 +132,12 @@ async def create_task(
     current_user_id: uuid.UUID,
     payload: TaskCreate,
 ) -> Task:
+    cleaned_custom = await validate_custom_data(
+        session,
+        entity_type=_TASK_ENTITY,
+        payload=payload.custom_data,
+        require_all_required=True,
+    )
     task = Task(
         org_id=org_id,
         title=payload.title,
@@ -139,6 +149,7 @@ async def create_task(
         priority=payload.priority,
         followup_type=payload.followup_type,
         status=TaskStatus.open,
+        custom_data=cleaned_custom,
     )
     _da.insert_task(session, task)
     await session.commit()
@@ -163,6 +174,13 @@ async def update_task(
 
     before = _snapshot(task)
     changes = payload.model_dump(exclude_unset=True)
+    if "custom_data" in changes:
+        changes["custom_data"] = await validate_custom_data(
+            session,
+            entity_type=_TASK_ENTITY,
+            payload=changes["custom_data"] or {},
+            require_all_required=False,
+        )
     for key, value in changes.items():
         setattr(task, key, value)
     # Bump `last_activity_at` independently of the activity-insert

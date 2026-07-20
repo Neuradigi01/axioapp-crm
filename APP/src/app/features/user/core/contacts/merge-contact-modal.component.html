@@ -1,0 +1,125 @@
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="merge-contact-title"
+>
+  <div class="w-full max-w-lg rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
+    <div class="border-b border-zinc-200 px-5 py-3">
+      <h2 id="merge-contact-title" class="text-sm font-semibold text-zinc-900">
+        Merge another contact into &ldquo;{{ primary.full_name }}&rdquo;
+      </h2>
+      <p class="mt-1 text-xs text-zinc-500">
+        Every activity, task, lead, appointment, call, message, and consent event on the secondary
+        contact is moved to this one. The secondary contact is then deleted. This cannot be undone.
+      </p>
+    </div>
+
+    <div class="px-5 py-4">
+      @if (!selected()) {
+        <label class="block text-xs font-medium text-zinc-600" for="merge-search">
+          Find contact to merge in
+        </label>
+        <div class="relative mt-1">
+          <input
+            id="merge-search"
+            type="search"
+            class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            placeholder="Search by name, phone, or email…"
+            [value]="searchTerm()"
+            (input)="onSearchInput($event)"
+            autocomplete="off"
+          />
+          @if (searching()) {
+            <lucide-icon
+              name="loader-2"
+              class="absolute right-2 top-2.5 h-4 w-4 animate-spin text-zinc-400"
+            />
+          }
+        </div>
+
+        @if (searchTerm().length >= 2 && !searching() && visibleResults().length === 0) {
+          <p class="mt-3 text-xs text-zinc-500">
+            No contacts match &ldquo;{{ searchTerm() }}&rdquo;.
+          </p>
+        }
+
+        @if (visibleResults().length > 0) {
+          <ul
+            class="mt-3 max-h-64 divide-y divide-zinc-100 overflow-auto rounded-md border border-zinc-200"
+          >
+            @for (row of visibleResults(); track row.id) {
+              <li>
+                <button
+                  type="button"
+                  (click)="pickResult(row)"
+                  class="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-xs hover:bg-zinc-50"
+                >
+                  <span class="font-medium text-zinc-900">{{ row.full_name }}</span>
+                  <span class="text-zinc-500">
+                    {{ row.phone || '—' }}
+                    @if (row.email) {
+                      · {{ row.email }}
+                    }
+                  </span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      } @else {
+        <div
+          class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+        >
+          <p class="font-semibold">You are about to merge:</p>
+          <p class="mt-1">
+            <span class="font-medium">{{ selected()!.full_name }}</span>
+            @if (selected()!.phone) {
+              · {{ selected()!.phone }}
+            }
+            @if (selected()!.email) {
+              · {{ selected()!.email }}
+            }
+          </p>
+          <p class="mt-2">
+            → into <span class="font-medium">&ldquo;{{ primary.full_name }}&rdquo;</span>
+          </p>
+          <button
+            type="button"
+            (click)="clearSelection()"
+            class="mt-2 text-xs font-medium text-amber-900 underline hover:text-amber-950"
+          >
+            Choose a different contact
+          </button>
+        </div>
+      }
+
+      @if (error(); as err) {
+        <p class="mt-3 text-xs text-red-600">{{ err }}</p>
+      }
+    </div>
+
+    <div class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3">
+      <button
+        type="button"
+        (click)="onCancel()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        [disabled]="submitting()"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        (click)="onConfirm()"
+        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+        [disabled]="!selected() || submitting()"
+      >
+        @if (submitting()) {
+          Merging…
+        } @else {
+          Merge and delete secondary
+        }
+      </button>
+    </div>
+  </div>
+</div>

@@ -21,7 +21,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { CalendarComponent, CalendarEvent } from '../shared/calendar/calendar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
-import { ContactsApiService } from '../contacts/contacts-api.service';
+import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { MailLinkDirective } from '../shared/directives/mail-link.directive';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
 import {
@@ -288,13 +288,21 @@ export class AppointmentsPageComponent {
 
     // Honour `/user/appointments?new=1` (dashboard quick-action) so
     // landing on the page from elsewhere opens the book-appointment
-    // modal directly. Strip the param after consuming it.
+    // modal directly. Strip the params after consuming them.
+    //
+    // W5 — also honour `contact_id` (walk-ins page "Schedule" row
+    // action) so the picker lands pre-populated with the walk-in's
+    // contact instead of forcing the rep to search again.
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       if (params.get('new') !== null && !this.modalOpen()) {
+        const contactId = params.get('contact_id');
+        if (contactId) {
+          this.loadPrefillContact(contactId);
+        }
         this.openBook();
         this.router.navigate([], {
           relativeTo: this.route,
-          queryParams: { new: null },
+          queryParams: { new: null, contact_id: null, assigned_to_id: null },
           queryParamsHandling: 'merge',
           replaceUrl: true,
         });
@@ -341,6 +349,39 @@ export class AppointmentsPageComponent {
 
   protected closeBook(): void {
     this.modalOpen.set(false);
+    this.prefillContact.set(null);
+  }
+
+  /** W5 — pre-selected contact for the book-appointment modal when
+   *  the page was opened via `/user/appointments?new=1&contact_id=…`
+   *  (typically from the walk-ins "Schedule" row action). Null when
+   *  the operator opens the modal directly with no prefill. */
+  readonly prefillContact = signal<ContactListItem | null>(null);
+
+  private loadPrefillContact(contactId: string): void {
+    this.contactsApi
+      .get(contactId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (c) => {
+          // Adapt the full Contact into the trimmed ContactListItem
+          // shape the picker expects.
+          this.prefillContact.set({
+            id: c.id,
+            full_name: c.full_name,
+            phone: c.phone,
+            email: c.email,
+            source: c.source,
+            tags: c.tags ?? [],
+            assigned_to_id: c.assigned_to_id,
+            last_activity_at: c.last_activity_at,
+            created_at: c.created_at,
+          } as ContactListItem);
+        },
+        // Silently no-op — the modal still opens; the rep can search
+        // for the contact manually.
+        error: () => this.prefillContact.set(null),
+      });
   }
 
   protected onAppointmentCreated(appt: Appointment): void {

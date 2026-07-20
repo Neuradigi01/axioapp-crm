@@ -90,7 +90,11 @@ def _serialise_contact(contact: Any) -> dict[str, Any]:
         "email": contact.email,
         "source": contact.source,
         "tags": list(contact.tags or []),
-        "notes": contact.notes,
+        # `notes` was retired from the contact row in migration 0158.
+        # The DPDP export used to include this single-blob field; the
+        # per-contact activity feed (which includes every note the
+        # operator ever wrote about this contact) is exported through
+        # the transcripts channel and remains the authoritative record.
         "custom_data": dict(contact.custom_data or {}),
         "assigned_to_id": contact.assigned_to_id,
         "last_activity_at": contact.last_activity_at,

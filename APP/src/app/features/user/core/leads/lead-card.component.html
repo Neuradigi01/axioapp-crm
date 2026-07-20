@@ -7,8 +7,18 @@
       {{ initials() }}
     </span>
     <div class="min-w-0 flex-1">
-      <p class="truncate text-sm font-medium text-zinc-900">
-        {{ contactName() ?? 'Unknown contact' }}
+      <p class="flex items-center gap-1.5 truncate text-sm font-medium text-zinc-900">
+        <!-- F24 — stale/rotten dot when the lead hasn't seen activity
+             in 14+ / 30+ days. Amber = stale, rose = rotten. -->
+        @if (stalenessDotClass(); as dot) {
+          <span
+            class="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+            [class]="dot"
+            [title]="stalenessTooltip()"
+            aria-hidden="true"
+          ></span>
+        }
+        <span class="truncate">{{ contactName() ?? 'Unknown contact' }}</span>
       </p>
       <p class="truncate text-[11px] text-zinc-500">
         {{ dateLabel() }}

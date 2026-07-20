@@ -12,8 +12,15 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
+import { RouterLink } from '@angular/router';
+
 import { InrPipe } from '../shared/pipes/inr.pipe';
-import { CatalogApiService, CatalogItem } from './catalog-api.service';
+import {
+  CatalogApiService,
+  CatalogCategoriesApiService,
+  CatalogCategory,
+  CatalogItem,
+} from './catalog-api.service';
 import { AddItemModalComponent } from './add-item-modal.component';
 import { ViewItemModalComponent } from './view-item-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
@@ -33,6 +40,7 @@ import { deriveApiOrigin } from '@core/services/url.util';
     ReactiveFormsModule,
     LucideAngularModule,
     InrPipe,
+    RouterLink,
     AddItemModalComponent,
     ViewItemModalComponent,
   ],
@@ -40,7 +48,13 @@ import { deriveApiOrigin } from '@core/services/url.util';
 })
 export class CatalogPageComponent {
   private readonly api = inject(CatalogApiService);
+  private readonly categoriesApi = inject(CatalogCategoriesApiService);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** C2 — Server-managed categories. Replaces the previous client-
+   *  derived dropdown that could only see categories on the loaded
+   *  page. */
+  readonly categories = signal<CatalogCategory[]>([]);
 
   readonly items = signal<CatalogItem[]>([]);
   readonly total = signal<number>(0);
@@ -70,13 +84,29 @@ export class CatalogPageComponent {
   /** View modal: read-only details, opens on card click. */
   readonly viewingItem = signal<CatalogItem | null>(null);
 
-  /** Category options derived from the loaded list. */
-  readonly categoryOptions = computed(() => {
+  /** Category options for the dropdown. Prefers the server-managed
+   *  category list; falls back to derived-from-items if the categories
+   *  fetch hasn't landed yet or the org is still using free-text only. */
+  readonly categoryOptions = computed<CatalogCategory[]>(() => {
+    const server = this.categories();
+    if (server.length > 0) return server;
     const set = new Set<string>();
     for (const i of this.items()) {
       if (i.category) set.add(i.category);
     }
-    return [...set].sort();
+    return [...set].sort().map((name, idx) => ({
+      id: `derived:${name}`,
+      org_id: '',
+      name,
+      slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      description: null,
+      icon_emoji: null,
+      color_hex: null,
+      display_order: idx,
+      is_active: true,
+      created_at: '',
+      updated_at: '',
+    }));
   });
 
   // --- KPI cards ---
@@ -88,6 +118,7 @@ export class CatalogPageComponent {
 
   constructor() {
     this.reload();
+    this.reloadCategories();
 
     this.searchControl.valueChanges
       .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
@@ -95,6 +126,18 @@ export class CatalogPageComponent {
     this.categoryControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.reload());
+  }
+
+  protected reloadCategories(): void {
+    this.categoriesApi
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => this.categories.set(rows),
+        // Silently no-op — the derived fallback in `categoryOptions`
+        // keeps the dropdown usable if the categories endpoint fails.
+        error: () => this.categories.set([]),
+      });
   }
 
   protected reload(): void {

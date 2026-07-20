@@ -94,6 +94,17 @@ class Lead(Base, TenantScoped):
         ForeignKey("tbl_contacts.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    # W6 — reverse-link from Lead → originating walk-in (nullable;
+    # migration 0161). Populated by ``convert_walk_in_to_lead`` so a
+    # lead detail can render "originated from walk-in on X" and
+    # analytics can attribute won revenue back to walk-in cohorts.
+    # ON DELETE SET NULL — deleting a walk-in preserves the lead but
+    # loses the attribution linkage.
+    source_walk_in_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_walk_ins.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     pipeline_stage: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[LeadStatus] = mapped_column(
         lead_status_enum,
@@ -110,7 +121,26 @@ class Lead(Base, TenantScoped):
         nullable=True,
     )
     budget: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    # ISO-4217 3-letter currency code (added migration 0160). Nullable
+    # — renderers fall back to the org's ``currency`` when unset.
+    currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
     expected_close_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Won-capture fields (migration 0160). Populated by the move-stage
+    # service when the destination stage has ``is_won=true``. Symmetric
+    # to the lost_reason / lost_reason_other pair below.
+    won_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    close_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    won_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Lifecycle stamps (migration 0160). Auto-set by the move-stage
+    # service on first entry into an is_won / is_lost stage. Feed the
+    # funnel time-in-stage report (P.24 workflows analytics + future
+    # leads-level dashboards).
+    won_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    lost_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # Operator-defined rule engine output, clamped to [0, 100]. Recomputed
     # by `leads.scoring.recompute_lead` after every create/update that
     # touches a rule-relevant field, and by the hourly Celery sweep when

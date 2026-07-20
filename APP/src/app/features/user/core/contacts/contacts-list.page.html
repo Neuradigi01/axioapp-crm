@@ -240,7 +240,13 @@
                   <span class="flex items-center gap-2">
                     {{ item.full_name }}
                     @if ($any(item).whatsapp_opt_in_status === 'opted_out') {
-                      <app-opt-in-chip [status]="$any(item).whatsapp_opt_in_status" />
+                      <app-opt-in-chip
+                        [status]="$any(item).whatsapp_opt_in_status"
+                        channel="whatsapp"
+                      />
+                    }
+                    @if ($any(item).email_opt_in_status === 'opted_out') {
+                      <app-opt-in-chip [status]="$any(item).email_opt_in_status" channel="email" />
                     }
                   </span>
                 </div>

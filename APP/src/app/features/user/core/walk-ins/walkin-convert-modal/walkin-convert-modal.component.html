@@ -11,7 +11,121 @@
       <div class="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-700 ring-1 ring-zinc-200">
         The new lead's <strong>contact</strong>, <strong>owner</strong>, and
         <strong>budget</strong> carry over from this walk-in. It lands at the first stage of the
-        Leads pipeline.
+        Leads pipeline. A follow-up task is auto-created on the new lead, due tomorrow.
+      </div>
+
+      <!-- W3 — contact link mode. Default `auto` keeps the walk-in's
+           contact. `link` opens a picker so the rep can point the new
+           lead at a different existing contact. -->
+      <div>
+        <p class="text-xs font-medium text-zinc-700">Which contact should the lead use?</p>
+        <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            (click)="setLinkMode('auto')"
+            class="rounded-md border px-3 py-2 text-left text-xs transition"
+            [class.border-zinc-900]="linkMode() === 'auto'"
+            [class.bg-zinc-900]="linkMode() === 'auto'"
+            [class.text-white]="linkMode() === 'auto'"
+            [class.border-zinc-300]="linkMode() !== 'auto'"
+            [class.text-zinc-700]="linkMode() !== 'auto'"
+          >
+            <span class="block font-medium">This walk-in's contact</span>
+            <span
+              class="mt-0.5 block text-[11px]"
+              [class.text-zinc-300]="linkMode() === 'auto'"
+              [class.text-zinc-500]="linkMode() !== 'auto'"
+            >
+              Default. Use the contact quick-register created / matched.
+            </span>
+          </button>
+          <button
+            type="button"
+            (click)="setLinkMode('link')"
+            class="rounded-md border px-3 py-2 text-left text-xs transition"
+            [class.border-zinc-900]="linkMode() === 'link'"
+            [class.bg-zinc-900]="linkMode() === 'link'"
+            [class.text-white]="linkMode() === 'link'"
+            [class.border-zinc-300]="linkMode() !== 'link'"
+            [class.text-zinc-700]="linkMode() !== 'link'"
+          >
+            <span class="block font-medium">Pick an existing contact</span>
+            <span
+              class="mt-0.5 block text-[11px]"
+              [class.text-zinc-300]="linkMode() === 'link'"
+              [class.text-zinc-500]="linkMode() !== 'link'"
+            >
+              For repeat visitors or family members of an existing customer.
+            </span>
+          </button>
+        </div>
+
+        @if (linkMode() === 'link') {
+          @if (!selectedContact()) {
+            <label class="mt-3 block text-xs font-medium text-zinc-700" for="walkin_convert_search">
+              Search contacts
+            </label>
+            <input
+              id="walkin_convert_search"
+              type="search"
+              [formControl]="contactSearch"
+              placeholder="Search by name, phone, or email…"
+              autocomplete="off"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+            @if (contactResults().length > 0) {
+              <ul
+                class="mt-2 max-h-56 divide-y divide-zinc-100 overflow-auto rounded-md border border-zinc-200"
+              >
+                @for (row of contactResults(); track row.id) {
+                  <li>
+                    <button
+                      type="button"
+                      (click)="pickContact(row)"
+                      class="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-xs hover:bg-zinc-50"
+                    >
+                      <span class="font-medium text-zinc-900">{{ row.full_name }}</span>
+                      <span class="text-zinc-500">
+                        {{ row.phone || '—' }}
+                        @if (row.email) {
+                          · {{ row.email }}
+                        }
+                      </span>
+                    </button>
+                  </li>
+                }
+              </ul>
+            } @else if (contactSearch.value.length >= 2 && !contactSearching()) {
+              <p class="mt-2 text-xs text-zinc-500">
+                No contacts match &ldquo;{{ contactSearch.value }}&rdquo;.
+              </p>
+            }
+          } @else {
+            <div
+              class="mt-3 flex items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200"
+            >
+              <div>
+                <p class="font-medium">Lead will link to:</p>
+                <p class="mt-0.5">
+                  {{ selectedContact()!.full_name }}
+                  @if (selectedContact()!.phone) {
+                    · {{ selectedContact()!.phone }}
+                  }
+                  @if (selectedContact()!.email) {
+                    · {{ selectedContact()!.email }}
+                  }
+                </p>
+              </div>
+              <button
+                type="button"
+                (click)="clearContact()"
+                class="rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-medium text-amber-900 hover:bg-amber-100"
+              >
+                Change
+              </button>
+            </div>
+          }
+        }
       </div>
 
       <div>
@@ -25,7 +139,9 @@
           placeholder="e.g. seriously interested in teak sofa, budget confirmed"
           class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         ></textarea>
-        <p class="mt-1 text-xs text-zinc-500">Saved on the convert timeline entry.</p>
+        <p class="mt-1 text-xs text-zinc-500">
+          Saved on the convert timeline entry and copied into the auto-created follow-up task.
+        </p>
       </div>
 
       @if (_error(); as err) {
@@ -47,7 +163,7 @@
       </button>
       <button
         type="button"
-        [disabled]="_submitting()"
+        [disabled]="!canConfirm()"
         (click)="onConfirm()"
         class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
       >

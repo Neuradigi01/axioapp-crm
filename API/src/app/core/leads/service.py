@@ -99,11 +99,17 @@ _SNAPSHOT_FIELDS = (
     "source",
     "assigned_to_id",
     "budget",
+    "currency",
     "expected_close_date",
     "custom_data",
     "attribution",
     "lost_reason",
     "lost_reason_other",
+    "won_value",
+    "close_date",
+    "won_reason",
+    "won_at",
+    "lost_at",
 )
 
 
@@ -720,8 +726,19 @@ async def move_stage_for_lead(
     user_id: uuid.UUID,
     lost_reason: str | None = None,
     lost_reason_other: str | None = None,
+    won_value: Any = None,
+    close_date: Any = None,
+    won_reason: str | None = None,
 ) -> Lead:
     """Move a lead to a new stage and keep `status` in sync.
+
+    On move-to-Lost: ``lost_reason`` (picklist) is required. On
+    move-to-Won: ``won_value`` / ``close_date`` / ``won_reason`` are
+    all optional at the API layer — the frontend prompts and enforces.
+    First entry into an is_won / is_lost stage stamps ``won_at`` /
+    ``lost_at`` respectively (F22 lifecycle timestamps); re-entry
+    doesn't re-stamp so the timeline shows the *first* close, not the
+    latest kanban shuffle.
 
     Publishes ``lead.status_changed`` on every actual transition so
     automations / workflows can subscribe. No-op moves (target stage
@@ -785,6 +802,31 @@ async def move_stage_for_lead(
             needs_commit = True
         if lead.lost_reason_other != lost_reason_other:
             lead.lost_reason_other = lost_reason_other
+            needs_commit = True
+        # F22 lifecycle timestamp — stamp first-lost only.
+        if lead.lost_at is None:
+            from datetime import UTC, datetime as _dt
+
+            lead.lost_at = _dt.now(UTC)
+            needs_commit = True
+    if new_stage is not None and new_stage.is_won:
+        # F2 won-capture — only overwrite when the caller supplies a
+        # value; a re-drag to Won without new metadata keeps the
+        # earlier close info intact.
+        if won_value is not None and lead.won_value != won_value:
+            lead.won_value = won_value
+            needs_commit = True
+        if close_date is not None and lead.close_date != close_date:
+            lead.close_date = close_date
+            needs_commit = True
+        if won_reason is not None and lead.won_reason != won_reason:
+            lead.won_reason = won_reason
+            needs_commit = True
+        # F22 lifecycle timestamp — stamp first-won only.
+        if lead.won_at is None:
+            from datetime import UTC, datetime as _dt
+
+            lead.won_at = _dt.now(UTC)
             needs_commit = True
 
     if needs_commit:
@@ -1125,8 +1167,97 @@ async def delete_scoring_rule(session: AsyncSession, *, rule_id: uuid.UUID) -> N
     )
 
 
+# --- Pipeline value roll-up (F23) -----------------------------------------
+
+
+async def pipeline_value_rollup(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    assigned_to: uuid.UUID | None,
+) -> dict[str, Any]:
+    """Header-strip roll-up: open pipeline value + this-month won/lost.
+
+    Scope: when ``assigned_to`` is supplied, the roll-up sums only
+    that user's leads (personal roll-up). When None, org-wide. Caller
+    (router) decides which based on ``users.read`` — matches the same
+    visibility rule as the list endpoint.
+
+    Fires 4 folded aggregate queries in one round-trip via ``COUNT(*)
+    FILTER (WHERE ...)`` / ``SUM(...) FILTER (WHERE ...)`` — same
+    fold-per-table pattern the dashboard summary refactor established.
+    """
+    from calendar import monthrange
+    from datetime import UTC, datetime
+
+    from sqlalchemy import text
+
+    from src.app.core.tenants.service import get_organization_by_id
+
+    now = datetime.now(UTC)
+    month_start = datetime(now.year, now.month, 1, tzinfo=UTC)
+    # Exclusive upper bound = first day of the next month.
+    if now.month == 12:
+        month_end = datetime(now.year + 1, 1, 1, tzinfo=UTC)
+    else:
+        month_end = datetime(now.year, now.month + 1, 1, tzinfo=UTC)
+    _ = monthrange  # keep import; used implicitly by month math above
+
+    params: dict[str, Any] = {
+        "org_id": org_id,
+        "month_start": month_start,
+        "month_end": month_end,
+    }
+    scope_clause = ""
+    if assigned_to is not None:
+        scope_clause = " AND assigned_to_id = :assigned_to"
+        params["assigned_to"] = assigned_to
+
+    sql = text(
+        f"""
+        SELECT
+          COALESCE(SUM(budget) FILTER (WHERE status = 'active'), 0) AS open_value,
+          COUNT(*) FILTER (WHERE status = 'active') AS open_count,
+          COALESCE(
+            SUM(COALESCE(won_value, budget)) FILTER (
+              WHERE status = 'won'
+                AND won_at >= :month_start
+                AND won_at <  :month_end
+            ),
+            0
+          ) AS won_value_this_month,
+          COUNT(*) FILTER (
+            WHERE status = 'won'
+              AND won_at >= :month_start
+              AND won_at <  :month_end
+          ) AS won_count_this_month,
+          COUNT(*) FILTER (
+            WHERE status = 'lost'
+              AND lost_at >= :month_start
+              AND lost_at <  :month_end
+          ) AS lost_count_this_month
+        FROM tbl_leads
+        WHERE org_id = :org_id{scope_clause}
+        """
+    )
+    row = (await session.execute(sql, params)).one()
+
+    org = await get_organization_by_id(session, org_id)
+    currency = org.currency if org is not None else "INR"
+
+    return {
+        "open_value": row.open_value or 0,
+        "open_count": int(row.open_count or 0),
+        "won_value_this_month": row.won_value_this_month or 0,
+        "won_count_this_month": int(row.won_count_this_month or 0),
+        "lost_count_this_month": int(row.lost_count_this_month or 0),
+        "currency": currency,
+    }
+
+
 __all__ = [
     "bulk_delete_leads",
+    "bulk_move_stage",
     "bulk_reassign_leads",
     "create_lead",
     "create_scoring_rule",
@@ -1138,7 +1269,55 @@ __all__ = [
     "list_leads_where",
     "list_scoring_rules",
     "move_stage_for_lead",
+    "pipeline_value_rollup",
     "reassign_lead",
     "update_lead",
     "update_scoring_rule",
 ]
+
+
+# --- Bulk move-stage (F4) --------------------------------------------------
+
+
+async def bulk_move_stage(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    to_stage: str,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID,
+    lost_reason: str | None = None,
+    lost_reason_other: str | None = None,
+    won_value: Any = None,
+    close_date: Any = None,
+    won_reason: str | None = None,
+) -> int:
+    """Move N leads to ``to_stage`` in one transaction. Returns rows
+    actually touched (already-in-stage rows are silently skipped).
+
+    Reuses ``move_stage_for_lead`` per row so the same status-sync +
+    lifecycle-timestamp + audit-log semantics apply. Each per-row
+    failure is surfaced as-is (422 for missing lost_reason on a Lost
+    move, etc.) — bulk callers should validate the payload once at
+    the modal and know every id will succeed or fail identically.
+    """
+    moved = 0
+    for lid in ids:
+        lead = await get_lead(session, lid)
+        if lead is None or str(lead.org_id) != str(org_id):
+            continue
+        if lead.pipeline_stage == to_stage:
+            continue
+        await move_stage_for_lead(
+            session,
+            lead_id=lid,
+            to_stage=to_stage,
+            user_id=user_id,
+            lost_reason=lost_reason,
+            lost_reason_other=lost_reason_other,
+            won_value=won_value,
+            close_date=close_date,
+            won_reason=won_reason,
+        )
+        moved += 1
+    return moved

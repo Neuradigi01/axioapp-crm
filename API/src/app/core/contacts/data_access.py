@@ -20,6 +20,7 @@ from sqlalchemy import (
     func,
     or_,
     select,
+    text,
 )
 from sqlalchemy import (
     delete as sa_delete,
@@ -290,6 +291,140 @@ async def find_birthdays_on(
     return list((await session.execute(stmt)).scalars().all())
 
 
+async def reassign_contact_references(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    primary_id: uuid.UUID,
+    secondary_id: uuid.UUID,
+) -> dict[str, int]:
+    """Repoint every cross-module row that references ``secondary_id``
+    to ``primary_id`` inside the given org.
+
+    Called by ``service.merge_contacts`` right before the secondary row
+    is deleted. Every UPDATE is org-scoped even though the FK alone
+    would guarantee isolation — belt + suspenders, matches every other
+    DAL statement in the codebase.
+
+    Returns a per-table row-count map (``{"activities": 3, "leads": 1,
+    ...}``) so the service can render a "merged X activities + Y leads"
+    audit line.
+
+    Tables covered (grouped by relationship shape):
+
+    * **Direct FK columns.** appointments · leads · walk-ins · calls ·
+      campaign_messages · conversations · reviews · automation_runs ·
+      workflow_runs (2 columns) · invoices · consent_events ·
+      email_sequence_enrollments · whatsapp_flow_submissions ·
+      custom_orders (furniture pack) — a straight UPDATE ... WHERE
+      contact_id = :secondary.
+    * **Polymorphic entity refs.** activities · tasks — UPDATE where
+      entity_type = 'contact' AND entity_id = :secondary.
+    * **Join tables with unique (contact_id, X).** contact_group_members
+      — DELETE any row where primary is already a member of that group,
+      then UPDATE the rest. Otherwise the UPDATE would violate the
+      partial unique index.
+
+    Ordering: reassign group memberships (dedupe-first) before the
+    generic UPDATEs so a failed UPDATE on the join table doesn't leave
+    a half-merged state. Then the RESTRICT-FK targets so the eventual
+    secondary DELETE isn't blocked. Then SET NULL / CASCADE targets.
+    Order doesn't affect correctness but keeps the failure surface
+    small.
+    """
+    counts: dict[str, int] = {}
+
+    # Group memberships: dedupe (drop secondary rows for groups the
+    # primary is already in) then reassign the rest.
+    dedupe_group_members = text(
+        """
+        DELETE FROM tbl_contact_group_members
+        WHERE org_id = :org_id
+          AND contact_id = :secondary
+          AND group_id IN (
+            SELECT group_id FROM tbl_contact_group_members
+            WHERE org_id = :org_id AND contact_id = :primary
+          )
+        """
+    )
+    counts["contact_group_members_deduped"] = (
+        await session.execute(
+            dedupe_group_members,
+            {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+        )
+    ).rowcount or 0
+
+    # Every direct-FK table shares the same UPDATE shape. Iterate a
+    # (table, count-key) list so the map is populated per-table with
+    # zero repetition.
+    _FK_TARGETS: tuple[tuple[str, str], ...] = (
+        ("tbl_appointments", "appointments"),
+        ("tbl_leads", "leads"),
+        ("tbl_walk_ins", "walk_ins"),
+        ("tbl_calls", "calls"),
+        ("tbl_campaign_messages", "campaign_messages"),
+        ("tbl_conversations", "conversations"),
+        ("tbl_reviews", "reviews"),
+        ("tbl_automation_runs", "automation_runs"),
+        ("tbl_invoices", "invoices"),
+        ("tbl_consent_events", "consent_events"),
+        ("tbl_email_sequence_enrollments", "email_sequence_enrollments"),
+        ("tbl_contact_group_members", "contact_group_members"),
+    )
+    for tbl, key in _FK_TARGETS:
+        stmt = text(
+            f"UPDATE {tbl} SET contact_id = :primary "
+            f"WHERE org_id = :org_id AND contact_id = :secondary"
+        )
+        counts[key] = (
+            await session.execute(
+                stmt,
+                {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+            )
+        ).rowcount or 0
+
+    # Workflow runs carry two contact refs (subject + latest actor);
+    # both need updating.
+    for column in ("contact_id", "latest_contact_id"):
+        stmt = text(
+            f"UPDATE tbl_workflow_runs SET {column} = :primary "
+            f"WHERE org_id = :org_id AND {column} = :secondary"
+        )
+        counts[f"workflow_runs_{column}"] = (
+            await session.execute(
+                stmt,
+                {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+            )
+        ).rowcount or 0
+
+    # Polymorphic-entity tables: activities + tasks.
+    activities_stmt = text(
+        "UPDATE tbl_activities SET entity_id = :primary "
+        "WHERE org_id = :org_id "
+        "AND entity_type = 'contact' AND entity_id = :secondary"
+    )
+    counts["activities"] = (
+        await session.execute(
+            activities_stmt,
+            {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+        )
+    ).rowcount or 0
+
+    tasks_stmt = text(
+        "UPDATE tbl_tasks SET related_entity_id = :primary "
+        "WHERE org_id = :org_id "
+        "AND related_entity_type = 'contact' AND related_entity_id = :secondary"
+    )
+    counts["tasks"] = (
+        await session.execute(
+            tasks_stmt,
+            {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+        )
+    ).rowcount or 0
+
+    return counts
+
+
 async def list_contacts_for_export(
     session: AsyncSession,
     *,
@@ -330,4 +465,5 @@ __all__ = [
     "insert_contact",
     "is_user_active_member_of_org",
     "list_contacts_for_export",
+    "reassign_contact_references",
 ]

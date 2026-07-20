@@ -18,9 +18,10 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import DateTime, String, Text, text
-from sqlalchemy.dialects.postgresql import ENUM, UUID
+from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
@@ -115,6 +116,14 @@ class Task(Base, TenantScoped):
     last_activity_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+    # T4 — Rule 3: every entity that supports custom fields uses a
+    # ``custom_data`` JSONB column + renders the form via the shared
+    # dynamic-forms path. Added by migration 0162.
+    custom_data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

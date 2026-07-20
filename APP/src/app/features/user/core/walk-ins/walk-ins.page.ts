@@ -38,6 +38,7 @@ import {
   WalkInSortKey,
   WalkInStatus,
   WalkInsApiService,
+  WalkInsRollup,
   SortOrder,
 } from './walk-ins-api.service';
 import { RegisterWalkinModalComponent } from './register-walkin-modal.component';
@@ -235,37 +236,30 @@ export class WalkInsPageComponent {
     },
   };
 
-  // --- KPI cards (computed from `all`) ---
+  // --- KPI cards ---
+  //
+  // W7 — Server-side roll-up. Replaces the previous client-side
+  // computation that only summed the loaded page (broken at
+  // multi-location scale). Values pull from `GET /walk-ins/rollup`
+  // and are refreshed after any mutation (register / checkout /
+  // delete / convert / bulk actions).
 
-  readonly todayCount = computed(
-    () => this.state.items().filter((w) => this.isToday(w.time_in)).length,
-  );
-  readonly convertedTodayCount = computed(
-    () =>
-      this.state.items().filter((w) => w.status === 'converted' && this.isToday(w.updated_at))
-        .length,
-  );
-  /** Combined "warm leads" count â€” interested + follow_up across all loaded rows. */
-  readonly interestedOrFollowUpCount = computed(
-    () =>
-      this.state.items().filter((w) => w.status === 'interested' || w.status === 'follow_up')
-        .length,
-  );
+  readonly rollup = signal<WalkInsRollup | null>(null);
+  readonly todayCount = computed(() => this.rollup()?.today_count ?? 0);
+  readonly convertedTodayCount = computed(() => this.rollup()?.today_converted ?? 0);
+  readonly interestedOrFollowUpCount = computed(() => this.rollup()?.interested_or_follow_up ?? 0);
   readonly conversionRate = computed(() => {
-    const today = this.todayCount();
-    if (today === 0) return null;
-    const converted = this.convertedTodayCount();
-    return Math.round((converted / today) * 100);
+    const pct = this.rollup()?.conversion_rate_pct;
+    return pct == null ? null : Math.round(pct);
   });
-  /** Average visit duration in minutes, across all checked-out walk-ins. */
   readonly avgVisitDuration = computed<number | null>(() => {
-    const completed = this.state
-      .items()
-      .map((w) => (w.duration_min !== null ? Number(w.duration_min) : null))
-      .filter((n): n is number => n !== null && Number.isFinite(n));
-    if (completed.length === 0) return null;
-    const total = completed.reduce((a, b) => a + b, 0);
-    return Math.round(total / completed.length);
+    const m = this.rollup()?.avg_duration_min;
+    return m == null ? null : Math.round(m);
+  });
+  /** W9 — average wait time (queue → engagement) over last 30d. */
+  readonly avgWaitMin = computed<number | null>(() => {
+    const m = this.rollup()?.avg_wait_min;
+    return m == null ? null : Math.round(m);
   });
 
   constructor() {
@@ -286,6 +280,7 @@ export class WalkInsPageComponent {
       },
     ]);
     this.reload();
+    this.reloadRollup();
     effect(() => {
       // Fetch missing contact summaries whenever the visible list changes.
       const ids = new Set(this.state.items().map((w) => w.contact_id));
@@ -418,6 +413,7 @@ export class WalkInsPageComponent {
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
+          this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
           this.state.bulkSubmitting.set(false);
@@ -440,6 +436,7 @@ export class WalkInsPageComponent {
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
+          this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
           this.state.bulkSubmitting.set(false);
@@ -453,33 +450,41 @@ export class WalkInsPageComponent {
     if (ids.length === 0) return;
     this.state.bulkSubmitting.set(true);
     this.state.bulkError.set(null);
-    // walk_ins has no batched delete endpoint — call per row. v2: add one.
-    let done = 0;
-    let failed = 0;
-    const finish = () => {
-      this.state.bulkSubmitting.set(false);
-      this.clearSelection();
-      this.closeBulkModal();
-      if (failed > 0) {
-        this.state.loadError.set(`${failed} delete(s) failed; ${done} succeeded.`);
-      }
-      this.reload();
-    };
-    for (const id of ids) {
-      this.api
-        .delete(id)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: () => {
-            done++;
-            if (done + failed === ids.length) finish();
-          },
-          error: () => {
-            failed++;
-            if (done + failed === ids.length) finish();
-          },
-        });
-    }
+    // W1 — single-call bulk-delete (mirror of leads). Previously fired
+    // N sequential DELETEs; now one round-trip + one audit entry.
+    this.api
+      .bulkDelete(ids)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.state.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.reload();
+          this.reloadRollup();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.state.bulkSubmitting.set(false);
+          this.state.bulkError.set(extractApiError(err) ?? 'Could not delete walk-ins.');
+        },
+      });
+  }
+
+  /** W2 — single-row delete triggered from the row action button. */
+  protected onDeleteRow(w: WalkIn): void {
+    if (!confirm(`Delete this walk-in?`)) return;
+    this.api
+      .delete(w.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.state.items.update((rows) => rows.filter((r) => r.id !== w.id));
+          this.reloadRollup();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.state.loadError.set(extractApiError(err) ?? 'Could not delete walk-in.');
+        },
+      });
   }
 
   // --- Single reassign (pencil — wired but no row UI yet, reachable
@@ -549,6 +554,7 @@ export class WalkInsPageComponent {
               r.id === resp.walk_in_id ? { ...r, linked_lead_id: resp.lead_id } : r,
             ),
           );
+          this.reloadRollup();
           this.closeConvert();
           // Send the user straight to the new lead so they can fill in
           // the details. The pipeline_stage defaulted to the first
@@ -576,6 +582,7 @@ export class WalkInsPageComponent {
       .subscribe({
         next: (updated) => {
           this.state.items.update((rows) => rows.map((w) => (w.id === updated.id ? updated : w)));
+          this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
           this.state.items.set(before);
@@ -595,6 +602,7 @@ export class WalkInsPageComponent {
   protected onRegistered(_event: QuickRegisterResponse): void {
     this.modalOpen.set(false);
     this.reload();
+    this.reloadRollup();
   }
 
   protected onCheckout(walkIn: WalkIn): void {
@@ -611,6 +619,7 @@ export class WalkInsPageComponent {
       .subscribe({
         next: (updated) => {
           this.state.items.update((rows) => rows.map((w) => (w.id === updated.id ? updated : w)));
+          this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
           this.state.items.set(before);
@@ -700,6 +709,31 @@ export class WalkInsPageComponent {
           this.state.loadError.set(extractApiError(err) ?? 'Could not load walk-ins.');
         },
       });
+  }
+
+  private reloadRollup(): void {
+    this.api
+      .rollup()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (r) => this.rollup.set(r),
+        // Header KPIs are aesthetic — silently hide on failure so a
+        // roll-up error never blocks the main list view.
+        error: () => this.rollup.set(null),
+      });
+  }
+
+  /** W5 — schedule a follow-up appointment from a walk-in row.
+   *  Deep-links to the appointments page with the contact prefilled
+   *  so the operator lands directly on the book-appointment modal. */
+  protected onScheduleAppointment(w: WalkIn): void {
+    this.router.navigate(['/user/appointments'], {
+      queryParams: {
+        new: 1,
+        contact_id: w.contact_id,
+        assigned_to_id: w.assigned_to_id ?? undefined,
+      },
+    });
   }
 
   private fetchContacts(ids: string[]): void {

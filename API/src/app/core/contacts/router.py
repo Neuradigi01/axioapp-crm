@@ -35,8 +35,10 @@ from src.app.core.contacts.consent_service import (
     record_transition,
 )
 from src.app.core.contacts.data_export import build_contact_data_export
+from src.app.core.custom_fields import data_access as custom_fields_da
 from src.app.core.contacts.schemas import (
     ConsentEventOut,
+    ContactAnonymiseRequest,
     ContactBulkAddTag,
     ContactBulkAddTagResult,
     ContactBulkDelete,
@@ -48,6 +50,8 @@ from src.app.core.contacts.schemas import (
     ContactDuplicateMatch,
     ContactListItem,
     ContactListResponse,
+    ContactMergeRequest,
+    ContactMergeResponse,
     ContactOut,
     ContactReassign,
     ContactUpdate,
@@ -56,6 +60,7 @@ from src.app.core.contacts.schemas import (
     OptOutRecordRequest,
 )
 from src.app.core.contacts.service import (
+    anonymise_contact,
     bulk_add_tag_contacts,
     bulk_delete_contacts,
     bulk_reassign_contacts,
@@ -65,6 +70,7 @@ from src.app.core.contacts.service import (
     export_contacts_csv_rows,
     get_contact,
     list_contacts,
+    merge_contacts,
     reassign_contact,
     update_contact,
 )
@@ -181,10 +187,11 @@ async def export_csv_endpoint(
 ) -> StreamingResponse:
     """Stream the current filter as CSV. Capped at 50k rows server-side.
 
-    Columns: id, full_name, phone, email, source, tags, assigned_to_id,
-    last_activity_at, created_at, updated_at. Custom fields excluded
-    in v1 — adding them requires resolving the org's
-    `custom_field_definitions` and is a larger change.
+    Standard columns: id, full_name, phone, email, source, tags,
+    assigned_to_id, last_activity_at, created_at, updated_at. Then
+    one column per visible custom field, headed
+    ``custom.<field_key>`` — the stable key rather than the label so
+    downstream ETL doesn't break when an org renames a field.
     """
     rows = await export_contacts_csv_rows(
         db,
@@ -194,6 +201,10 @@ async def export_csv_endpoint(
         assigned_to_id=assigned_to_id,
         custom_filters=_extract_custom_filters(request),
     )
+    # Fetch every visible contact custom field for the org. Same order
+    # the render endpoint uses so the CSV columns match the form layout
+    # top-to-bottom.
+    custom_defs = await custom_fields_da.list_fields_query(db, entity_type="contact")
 
     # Resolve org slug for the filename. Two reasons: (1) the user is
     # often signed into multiple orgs and the file is more useful when
@@ -208,39 +219,42 @@ async def export_csv_endpoint(
     async def _stream() -> AsyncIterator[bytes]:
         buf = io.StringIO()
         writer = csv.writer(buf)
-        writer.writerow(
-            [
-                "id",
-                "full_name",
-                "phone",
-                "email",
-                "source",
-                "tags",
-                "assigned_to_id",
-                "last_activity_at",
-                "created_at",
-                "updated_at",
-            ]
-        )
+        header = [
+            "id",
+            "full_name",
+            "phone",
+            "email",
+            "source",
+            "tags",
+            "assigned_to_id",
+            "last_activity_at",
+            "created_at",
+            "updated_at",
+        ]
+        header.extend(f"custom.{d.field_key}" for d in custom_defs)
+        writer.writerow(header)
         yield buf.getvalue().encode("utf-8")
         buf.seek(0)
         buf.truncate()
 
         for c in rows:
-            writer.writerow(
-                [
-                    str(c.id),
-                    c.full_name,
-                    c.phone or "",
-                    c.email or "",
-                    c.source or "",
-                    "|".join(c.tags or []),
-                    str(c.assigned_to_id) if c.assigned_to_id else "",
-                    c.last_activity_at.isoformat() if c.last_activity_at else "",
-                    c.created_at.isoformat(),
-                    c.updated_at.isoformat(),
-                ]
+            standard = [
+                str(c.id),
+                c.full_name,
+                c.phone or "",
+                c.email or "",
+                c.source or "",
+                "|".join(c.tags or []),
+                str(c.assigned_to_id) if c.assigned_to_id else "",
+                c.last_activity_at.isoformat() if c.last_activity_at else "",
+                c.created_at.isoformat(),
+                c.updated_at.isoformat(),
+            ]
+            custom_data = c.custom_data or {}
+            standard.extend(
+                _format_custom_value(custom_data.get(d.field_key)) for d in custom_defs
             )
+            writer.writerow(standard)
             yield buf.getvalue().encode("utf-8")
             buf.seek(0)
             buf.truncate()
@@ -250,6 +264,21 @@ async def export_csv_endpoint(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+def _format_custom_value(value: object) -> str:
+    """Stringify a ``custom_data`` cell for CSV. Mirrors the frontend's
+    ``formatValue``: lists join with ``, ``, booleans render as
+    Yes/No, ``None`` becomes empty. Anything else falls back to
+    ``str(...)`` — ISO dates come out as their JSON string, numbers as
+    plain digits."""
+    if value is None or value == "":
+        return ""
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value)
+    return str(value)
 
 
 @router.get("/{contact_id}", response_model=ContactOut)
@@ -304,6 +333,54 @@ async def reassign_contact_endpoint(
         actor_user_id=user.legacy_uuid,
     )
     return ContactOut.model_validate(contact)
+
+
+@router.post("/{contact_id}/anonymise", response_model=ContactOut)
+async def anonymise_contact_endpoint(
+    contact_id: uuid.UUID,
+    payload: ContactAnonymiseRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.write")),
+) -> ContactOut:
+    """DPDP right-to-be-forgotten. Wipes PII on the contact row +
+    force-flips both consent channels to opted_out + stamps
+    ``anonymised_at``. Historical FKs (activities, leads,
+    appointments, invoices) are preserved so the audit trail stays
+    intact. ``reason`` is persisted to the audit log for auditor
+    trace; not stored on the anonymised row."""
+    contact = await anonymise_contact(
+        db,
+        contact_id=contact_id,
+        org_id=user.org_id,
+        reason=payload.reason,
+        actor_user_id=user.legacy_uuid,
+    )
+    return ContactOut.model_validate(contact)
+
+
+@router.post("/{primary_id}/merge", response_model=ContactMergeResponse)
+async def merge_contacts_endpoint(
+    primary_id: uuid.UUID,
+    payload: ContactMergeRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.write")),
+) -> ContactMergeResponse:
+    """Fold ``payload.secondary_id`` into ``primary_id``, delete the
+    secondary. Every cross-module row that referenced the secondary is
+    repointed at the primary so history is preserved. See
+    ``service.merge_contacts`` for the tag / custom_data merge rules
+    and the full list of tables touched."""
+    primary, rows_reassigned = await merge_contacts(
+        db,
+        primary_id=primary_id,
+        secondary_id=payload.secondary_id,
+        org_id=user.org_id,
+    )
+    return ContactMergeResponse(
+        primary=ContactOut.model_validate(primary),
+        secondary_id=payload.secondary_id,
+        rows_reassigned=rows_reassigned,
+    )
 
 
 @router.post("/bulk-reassign", response_model=ContactBulkReassignResult)

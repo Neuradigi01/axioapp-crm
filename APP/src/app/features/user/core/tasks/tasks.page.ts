@@ -31,6 +31,7 @@ import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { extractApiError } from '@core/services/api-error.util';
 
+import { SavedView, SavedViewConfig, SavedViewsApiService } from '../leads/saved-views-api.service';
 import {
   Task,
   TaskDueFilter,
@@ -116,6 +117,26 @@ export class TasksPageComponent {
 
   protected readonly modalOpen = signal(false);
   protected readonly editingTask = signal<Task | null>(null);
+
+  // T2 — single-row delete confirmation.
+  protected readonly deletingTask = signal<Task | null>(null);
+  protected readonly deleteSubmitting = signal(false);
+
+  // T15 — saved views for the tasks list.
+  private readonly savedViewsApi = inject(SavedViewsApiService);
+  protected readonly savedViews = signal<SavedView[]>([]);
+  protected readonly currentViewId = signal<string | null>(null);
+  protected readonly currentViewName = signal<string | null>(null);
+  protected readonly viewsMenuOpen = signal(false);
+  protected readonly saveViewOpen = signal(false);
+  protected readonly saveViewName = new FormControl('', { nonNullable: true });
+  protected readonly saveViewShared = signal(false);
+  protected readonly isCurrentViewOwner = computed(() => {
+    const id = this.currentViewId();
+    if (!id) return false;
+    const v = this.savedViews().find((x) => x.id === id);
+    return v?.owner_user_id === this.callerUuid();
+  });
 
   // --- Assignee dropdown (Step 2) ----------------------------------------
 
@@ -234,6 +255,7 @@ export class TasksPageComponent {
           this.scope.set(canView ? 'all' : 'mine');
           if (canView) this.loadAssignees();
           this.fetch();
+          this.reloadSavedViews();
         },
         error: () => {
           this.state.loadError.set('Could not load your profile.');
@@ -390,6 +412,208 @@ export class TasksPageComponent {
       return 'You';
     }
     return this.assigneeMap().get(task.assigned_to_id) ?? '—';
+  }
+
+  /** T7 — Assignee dropdown hidden when the "Mine" chip is active
+   *  (filtering "Mine" by owner=Other silently produces zero rows;
+   *  hide the trap). */
+  protected readonly showAssigneeDropdown = computed(
+    () => this.canViewAll() && this.scope() !== 'mine',
+  );
+
+  // --- T1: mark missed ----------------------------------------------------
+
+  protected onMarkMissed(task: Task): void {
+    if (this.togglingId()) return;
+    if (task.status !== 'open') return;
+    this.togglingId.set(task.id);
+    this.api
+      .markMissed(task.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.togglingId.set(null);
+          this.fetch();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.togglingId.set(null);
+          this.state.loadError.set(extractApiError(err) ?? 'Could not mark the task missed.');
+        },
+      });
+  }
+
+  // --- T2: single-row delete ----------------------------------------------
+
+  protected openDeleteRow(task: Task): void {
+    this.deletingTask.set(task);
+  }
+
+  protected closeDeleteRow(): void {
+    this.deletingTask.set(null);
+    this.deleteSubmitting.set(false);
+  }
+
+  protected confirmDeleteRow(): void {
+    const t = this.deletingTask();
+    if (!t) return;
+    this.deleteSubmitting.set(true);
+    this.api
+      .delete(t.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.deleteSubmitting.set(false);
+          this.closeDeleteRow();
+          this.state.items.update((rows) => rows.filter((r) => r.id !== t.id));
+        },
+        error: (err: HttpErrorResponse) => {
+          this.deleteSubmitting.set(false);
+          this.state.loadError.set(extractApiError(err) ?? 'Could not delete the task.');
+        },
+      });
+  }
+
+  // --- T9: snooze shortcuts ----------------------------------------------
+
+  /** Reschedule the task's due_at by the given delta (positive minutes
+   *  advance the due, negative rewind). Anchored on the existing due
+   *  if set, otherwise on "now" (typical for tasks with no due yet
+   *  where the operator hits "+1d" to give it one). Fires a PATCH
+   *  and re-fetches on success. */
+  protected snoozeTask(task: Task, deltaMinutes: number): void {
+    if (this.togglingId()) return;
+    const anchor = task.due_at ? new Date(task.due_at) : new Date();
+    const next = new Date(anchor.getTime() + deltaMinutes * 60 * 1000);
+    this.togglingId.set(task.id);
+    this.api
+      .update(task.id, { due_at: next.toISOString() })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.togglingId.set(null);
+          this.fetch();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.togglingId.set(null);
+          this.state.loadError.set(extractApiError(err) ?? 'Could not reschedule the task.');
+        },
+      });
+  }
+
+  /** Convenience: bump the due to tomorrow 9am (matches how most
+   *  Todoist-style CRMs interpret "Tomorrow"). */
+  protected snoozeToTomorrow(task: Task): void {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+    if (this.togglingId()) return;
+    this.togglingId.set(task.id);
+    this.api
+      .update(task.id, { due_at: tomorrow.toISOString() })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.togglingId.set(null);
+          this.fetch();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.togglingId.set(null);
+          this.state.loadError.set(extractApiError(err) ?? 'Could not reschedule the task.');
+        },
+      });
+  }
+
+  // --- T15: saved views --------------------------------------------------
+
+  protected reloadSavedViews(): void {
+    this.savedViewsApi
+      .list('tasks')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => this.savedViews.set(rows),
+        error: () => this.savedViews.set([]),
+      });
+  }
+
+  protected toggleViewsMenu(): void {
+    this.viewsMenuOpen.update((v) => !v);
+  }
+
+  protected applyView(v: SavedView): void {
+    const cfg = (v.config ?? {}) as SavedViewConfig & {
+      chip?: Chip;
+      status?: Task['status'];
+      due_filter?: TaskDueFilter;
+      priority?: TaskPriority;
+    };
+    if (cfg.chip) this.selectChip(cfg.chip);
+    if (cfg.status) this.status.set(cfg.status);
+    if (cfg.due_filter) this.dueFilter.set(cfg.due_filter);
+    if (cfg.priority) this.priorityFilter.set(cfg.priority);
+    if (cfg.sort) this.sortBy.set(cfg.sort as TaskSortBy);
+    if (cfg.order) this.sortDir.set(cfg.order);
+    this.currentViewId.set(v.id);
+    this.currentViewName.set(v.name);
+    this.viewsMenuOpen.set(false);
+  }
+
+  protected openSaveView(): void {
+    this.saveViewName.setValue('');
+    this.saveViewShared.set(false);
+    this.saveViewOpen.set(true);
+  }
+
+  protected closeSaveView(): void {
+    this.saveViewOpen.set(false);
+  }
+
+  protected submitSaveView(): void {
+    const name = this.saveViewName.value.trim();
+    if (!name) return;
+    const cfg: SavedViewConfig & Record<string, unknown> = {
+      sort: this.sortBy(),
+      order: this.sortDir(),
+    };
+    cfg['chip'] = this.activeChip();
+    cfg['status'] = this.status();
+    cfg['due_filter'] = this.dueFilter() ?? null;
+    cfg['priority'] = this.priorityFilter() ?? null;
+    this.savedViewsApi
+      .create({
+        entity: 'tasks',
+        name,
+        config: cfg,
+        shared: this.saveViewShared(),
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (v) => {
+          this.savedViews.update((prev) => [...prev, v]);
+          this.currentViewId.set(v.id);
+          this.currentViewName.set(v.name);
+          this.saveViewOpen.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.state.loadError.set(extractApiError(err) ?? 'Could not save view.');
+        },
+      });
+  }
+
+  protected deleteCurrentView(): void {
+    const id = this.currentViewId();
+    if (!id) return;
+    if (!confirm('Delete this saved view?')) return;
+    this.savedViewsApi
+      .delete(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.savedViews.update((rows) => rows.filter((r) => r.id !== id));
+          this.currentViewId.set(null);
+          this.currentViewName.set(null);
+        },
+        error: () => undefined,
+      });
   }
 
   protected priorityClass(p: TaskPriority): string {

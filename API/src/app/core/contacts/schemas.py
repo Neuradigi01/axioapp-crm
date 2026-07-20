@@ -38,7 +38,10 @@ class ContactCreate(BaseModel):
     email: EmailStr | None = None
     source: str | None = Field(default=None, max_length=64)
     tags: list[str] = Field(default_factory=list, max_length=_TAG_COUNT_MAX)
-    notes: str | None = None
+    # `notes` used to live here as a single TEXT column on the contact;
+    # retired in migration 0158 in favour of ``tbl_activities`` rows
+    # (``type='note'``) which are versioned + authored + queryable.
+    # Post a note via `POST /activities` after creating the contact.
     custom_data: dict[str, Any] = Field(default_factory=dict)
     assigned_to_id: uuid.UUID | None = None
 
@@ -66,7 +69,8 @@ class ContactUpdate(BaseModel):
     email: EmailStr | None = None
     source: str | None = Field(default=None, max_length=64)
     tags: list[str] | None = Field(default=None, max_length=_TAG_COUNT_MAX)
-    notes: str | None = None
+    # `notes` retired — see ContactCreate note above. Post to
+    # /activities instead.
     custom_data: dict[str, Any] | None = None
     assigned_to_id: uuid.UUID | None = None
 
@@ -80,7 +84,6 @@ class ContactOut(TimestampedOrgScopedOut):
     email: str | None
     source: str | None
     tags: list[str]
-    notes: str | None
     custom_data: dict[str, Any]
     assigned_to_id: uuid.UUID | None
     last_activity_at: datetime | None
@@ -91,6 +94,8 @@ class ContactOut(TimestampedOrgScopedOut):
     whatsapp_opt_in_recorded_by_user_id: uuid.UUID | None = None
     whatsapp_opt_out_recorded_at: datetime | None = None
     whatsapp_opt_out_reason: str | None = None
+    # U7 — DPDP right-to-be-forgotten. Non-null on anonymised rows.
+    anonymised_at: datetime | None = None
 
 
 class ContactListItem(ORMModel):
@@ -105,8 +110,64 @@ class ContactListItem(ORMModel):
     assigned_to_id: uuid.UUID | None
     last_activity_at: datetime | None
     created_at: datetime
-    # Step 22 — chip on the list page.
+    # Step 22 — chip on the list page. Campaigns v1 Step 06 added the
+    # email mirror so the list row can render an "opted out" pill for
+    # either channel without a second round-trip.
     whatsapp_opt_in_status: str = "never_contacted"
+    email_opt_in_status: str = "never_contacted"
+    # U7 — non-null → list row renders an "Anonymised" chip instead of
+    # PII.
+    anonymised_at: datetime | None = None
+
+
+# --- Merge (dedupe) request / response shapes ------------------------------
+
+
+class ContactMergeRequest(BaseModel):
+    """Body of ``POST /contacts/{primary_id}/merge``.
+
+    ``secondary_id`` is the contact to fold into ``primary_id`` and then
+    delete. Standard fields (name, phone, email, source, assigned_to_id)
+    on the primary are preserved; secondary's tags are union-merged and
+    secondary's ``custom_data`` fills any gap keys the primary doesn't
+    already have. Every FK reference from the secondary — activities,
+    tasks, leads, walk-ins, appointments, calls, conversations, campaign
+    messages, consent events, workflow runs, group memberships, and
+    every other cross-module row that points at ``tbl_contacts.id`` —
+    is re-pointed at the primary so no history is lost. The secondary
+    row is then deleted.
+    """
+
+    secondary_id: uuid.UUID
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ContactMergeResponse(BaseModel):
+    """Summary of a completed merge. ``rows_reassigned`` is the per-table
+    count of foreign-key rows re-pointed from the secondary to the
+    primary; callers use it to render a "merged X activities + Y leads"
+    confirmation."""
+
+    primary: ContactOut
+    secondary_id: uuid.UUID
+    rows_reassigned: dict[str, int]
+
+
+# --- Anonymise (DPDP right-to-be-forgotten) --------------------------------
+
+
+class ContactAnonymiseRequest(BaseModel):
+    """Body of ``POST /contacts/{id}/anonymise``.
+
+    ``reason`` is optional operator-supplied context (e.g. "SAR-12345")
+    that's persisted on the audit log + on the forced opt-out consent
+    events so an auditor can trace why the wipe happened. Keep it
+    short and free of PII."""
+
+    reason: str | None = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
 # --- Step 22 opt-in request / response shapes ------------------------------
