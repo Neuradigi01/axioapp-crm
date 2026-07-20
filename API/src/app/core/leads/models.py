@@ -94,6 +94,17 @@ class Lead(Base, TenantScoped):
         ForeignKey("tbl_contacts.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    # W6 — reverse-link from Lead → originating walk-in (nullable;
+    # migration 0161). Populated by ``convert_walk_in_to_lead`` so a
+    # lead detail can render "originated from walk-in on X" and
+    # analytics can attribute won revenue back to walk-in cohorts.
+    # ON DELETE SET NULL — deleting a walk-in preserves the lead but
+    # loses the attribution linkage.
+    source_walk_in_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_walk_ins.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     pipeline_stage: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[LeadStatus] = mapped_column(
         lead_status_enum,

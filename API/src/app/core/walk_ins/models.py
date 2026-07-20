@@ -25,11 +25,15 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from datetime import date
+
 from sqlalchemy import (
     Computed,
+    Date,
     DateTime,
     ForeignKey,
     Numeric,
+    SmallInteger,
     Text,
     text,
 )
@@ -118,6 +122,20 @@ class WalkIn(Base, TenantScoped):
         ForeignKey("tbl_leads.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # W8 — group visit tracking. Family of 4 shopping together is one
+    # walk-in row but rolls up as 4 visitors in footfall reports.
+    # Nullable: reception can skip if the org doesn't track group size.
+    party_size: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    # W9 — queue-arrival timestamp captured before rep engagement.
+    # ``time_in`` becomes "engaged at" for the (engagement − arrival)
+    # wait-time metric. Optional; orgs that don't measure queue time
+    # leave it NULL and the current UX is unchanged.
+    wait_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # W11 — "customer said they'd come back Saturday." Feeds retention
+    # / return-visit reports.
+    expected_return_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

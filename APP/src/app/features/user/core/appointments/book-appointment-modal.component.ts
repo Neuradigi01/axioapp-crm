@@ -107,6 +107,16 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     }
   }
 
+  /** W5 — pre-select a contact when the modal is opened via a deep-link
+   *  from another page (e.g. the walk-ins page "Schedule" row action).
+   *  The setter fills the `selectedContact` signal so the contact
+   *  picker renders in "chosen" mode from the first paint. */
+  @Input() set prefillContact(value: ContactListItem | null) {
+    if (value && !this.selectedContact()) {
+      this.selectedContact.set(value);
+    }
+  }
+
   /** Map a conflicting appointment id â†’ human-readable label (set by parent). */
   @Input() conflictTitleFor: (id: string) => string | null = () => null;
 

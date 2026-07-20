@@ -10,7 +10,7 @@ contact's existing tags / history alongside the new walk-in.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -28,6 +28,12 @@ class WalkInCreate(BaseModel):
     assigned_to_id: uuid.UUID | None = None
     notes: str | None = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
+    # W8/W9/W11 — extended reception-desk fields. All optional; orgs
+    # that don't track queue time / group size / return date leave
+    # them NULL and the current UX is unchanged.
+    party_size: int | None = Field(default=None, ge=1, le=99)
+    wait_started_at: datetime | None = None
+    expected_return_date: date | None = None
 
 
 class WalkInUpdate(BaseModel):
@@ -42,6 +48,10 @@ class WalkInUpdate(BaseModel):
     status: WalkInStatus | None = None
     notes: str | None = None
     custom_data: dict[str, Any] | None = None
+    # W8/W9/W11 — editable after registration (rep can add / correct).
+    party_size: int | None = Field(default=None, ge=1, le=99)
+    wait_started_at: datetime | None = None
+    expected_return_date: date | None = None
 
 
 class QuickRegisterPayload(BaseModel):
@@ -57,6 +67,10 @@ class QuickRegisterPayload(BaseModel):
     assigned_to_id: uuid.UUID | None = None
     notes: str | None = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
+    # W8/W9/W11 — reception can capture these at registration too.
+    party_size: int | None = Field(default=None, ge=1, le=99)
+    wait_started_at: datetime | None = None
+    expected_return_date: date | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -75,6 +89,10 @@ class WalkInOut(TimestampedOrgScopedOut):
     custom_data: dict[str, Any]
     last_activity_at: datetime | None
     linked_lead_id: uuid.UUID | None
+    # W8/W9/W11 — extended reception-desk fields (migration 0161).
+    party_size: int | None = None
+    wait_started_at: datetime | None = None
+    expected_return_date: date | None = None
 
 
 class QuickRegisterResponse(BaseModel):
@@ -153,3 +171,40 @@ class WalkInConvertResponse(BaseModel):
     walk_in_id: uuid.UUID
     contact_id: uuid.UUID
     lead_id: uuid.UUID
+
+
+# --- Bulk delete + KPI rollup (W1 / W7) -----------------------------------
+
+
+class WalkInBulkDelete(BaseModel):
+    """Bulk-delete N walk-ins in one call. Mirror of the leads bulk-
+    delete pattern: single SQL DELETE ... WHERE id IN (...) with
+    org-scope, single audit entry."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
+class WalkInBulkDeleteResult(BaseModel):
+    deleted: int
+
+
+class WalkInsRollup(BaseModel):
+    """Server-side KPI roll-up for the walk-ins page header (W7).
+
+    Scope follows caller row visibility (org vs. personal) — decided
+    server-side. Numbers are computed via one grouped SQL query
+    against the full org's data, not client-side over the loaded
+    page, so multi-location busy showrooms show accurate totals.
+
+    ``avg_duration_min`` is null when no completed visits exist in
+    the last 30 days (rather than showing 0, which would misrepresent
+    "quick visits"). ``conversion_rate_pct`` is null when no visits
+    have been checked out or converted yet in the last 30 days."""
+
+    today_count: int
+    today_converted: int
+    open_now: int
+    interested_or_follow_up: int
+    conversion_rate_pct: float | None
+    avg_duration_min: float | None
+    avg_wait_min: float | None

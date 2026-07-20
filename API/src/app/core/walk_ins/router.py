@@ -29,6 +29,8 @@ from src.app.core.walk_ins.schemas import (
     QuickRegisterResponse,
     WalkInBulkCheckout,
     WalkInBulkCheckoutResult,
+    WalkInBulkDelete,
+    WalkInBulkDeleteResult,
     WalkInBulkReassign,
     WalkInBulkReassignResult,
     WalkInConvertRequest,
@@ -36,10 +38,12 @@ from src.app.core.walk_ins.schemas import (
     WalkInCreate,
     WalkInOut,
     WalkInReassign,
+    WalkInsRollup,
     WalkInUpdate,
 )
 from src.app.core.walk_ins.service import (
     bulk_checkout_walk_ins,
+    bulk_delete_walk_ins,
     bulk_reassign_walk_ins,
     checkout,
     convert_walk_in_to_lead,
@@ -50,7 +54,9 @@ from src.app.core.walk_ins.service import (
     quick_register,
     reassign_walk_in,
     update_walk_in,
+    walk_ins_rollup,
 )
+from src.app.core.permissions.service import role_has_permission
 from src.app.shared.db import get_db
 
 router = APIRouter(prefix="/walk-ins", tags=["Walk-ins"])
@@ -112,6 +118,30 @@ async def create_walk_in_endpoint(
 ) -> WalkInOut:
     walk_in = await create_walk_in(db, org_id=user.org_id, payload=payload)
     return WalkInOut.model_validate(walk_in)
+
+
+# --- Static /rollup route: MUST come BEFORE /{walk_in_id} so the UUID
+# capture doesn't eat "rollup" and 422. Same trap the leads router hits
+# with /pipeline-value + /routing-config. ------------------------------
+
+
+@router.get("/rollup", response_model=WalkInsRollup)
+async def walk_ins_rollup_endpoint(
+    db: AsyncSession = Depends(get_db),
+    caller: User = Depends(require_permissions("walkins.read")),
+) -> WalkInsRollup:
+    """W7 — Server-side KPI roll-up for the walk-ins page header.
+
+    Scope follows the same row-visibility rule as the list endpoint:
+    callers with ``users.read`` see the whole org, everyone else sees
+    only their own contribution."""
+    is_org_scope = await role_has_permission(db, caller.role_id, "users.read")
+    rollup = await walk_ins_rollup(
+        db,
+        org_id=caller.org_id,
+        assigned_to=None if is_org_scope else caller.legacy_uuid,
+    )
+    return WalkInsRollup.model_validate(rollup)
 
 
 @router.get("/{walk_in_id}", response_model=WalkInOut)
@@ -214,6 +244,19 @@ async def bulk_checkout_walk_ins_endpoint(
 ) -> WalkInBulkCheckoutResult:
     checked_out, already = await bulk_checkout_walk_ins(db, ids=payload.ids, org_id=user.org_id)
     return WalkInBulkCheckoutResult(checked_out=checked_out, already_checked_out=already)
+
+
+@router.post("/bulk-delete", response_model=WalkInBulkDeleteResult)
+async def bulk_delete_walk_ins_endpoint(
+    payload: WalkInBulkDelete,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("walkins.write")),
+) -> WalkInBulkDeleteResult:
+    """W1 — Single-call bulk-delete replacing the frontend per-row
+    loop. Mirror of ``POST /leads/bulk-delete`` — one SQL statement,
+    one audit entry."""
+    n = await bulk_delete_walk_ins(db, ids=payload.ids, org_id=user.org_id)
+    return WalkInBulkDeleteResult(deleted=n)
 
 
 @router.post("/{walk_in_id}/convert", response_model=WalkInConvertResponse)

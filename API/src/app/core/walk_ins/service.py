@@ -51,6 +51,10 @@ _SNAPSHOT_FIELDS = (
     "status",
     "notes",
     "custom_data",
+    "party_size",
+    "wait_started_at",
+    "expected_return_date",
+    "linked_lead_id",
 )
 
 
@@ -107,6 +111,9 @@ async def create_walk_in(
         notes=payload.notes,
         status=WalkInStatus.browsing,
         custom_data=cleaned_custom,
+        party_size=payload.party_size,
+        wait_started_at=payload.wait_started_at,
+        expected_return_date=payload.expected_return_date,
     )
     _da.insert_walk_in(session, walk_in)
     await session.commit()
@@ -296,6 +303,9 @@ async def quick_register(
         notes=payload.notes,
         status=WalkInStatus.browsing,
         custom_data=cleaned_custom,
+        party_size=payload.party_size,
+        wait_started_at=payload.wait_started_at,
+        expected_return_date=payload.expected_return_date,
     )
     _da.insert_walk_in(session, walk_in)
     await session.commit()
@@ -511,6 +521,10 @@ async def convert_walk_in_to_lead(
     )
 
     walk_in.linked_lead_id = lead.id
+    # W6 — stamp the reverse-link on the fresh Lead so a lead-detail
+    # page can render "originated from walk-in on X" and win-attribution
+    # analytics can walk backwards from a closed deal.
+    lead.source_walk_in_id = walk_in.id
     await activities.record_in_session(
         session,
         org_id=org_id,
@@ -524,6 +538,41 @@ async def convert_walk_in_to_lead(
         },
         user_id=actor_user_id,
     )
+    # W4 — auto-create a follow-up task on the new lead so reps don't
+    # forget to circle back. Due tomorrow (24h out) so it lands on
+    # today's follow-ups widget for the rep's next-morning triage.
+    # Defensive try/except: task-create must not roll back the
+    # already-committed conversion — a Task insert failure logs and
+    # continues (rep can add the task manually).
+    from datetime import timedelta
+
+    from src.app.core.tasks.data_access import insert_task
+    from src.app.core.tasks.models import Task, TaskFollowupType, TaskPriority
+
+    try:
+        follow_up = Task(
+            org_id=org_id,
+            title=f"Follow up on new lead (from walk-in)",
+            description=(
+                (notes or "").strip() or "Auto-created when the walk-in was converted."
+            ),
+            due_at=datetime.now(UTC) + timedelta(days=1),
+            assigned_to_id=walk_in.assigned_to_id or actor_user_id,
+            related_entity_type="lead",
+            related_entity_id=lead.id,
+            priority=TaskPriority.med,
+            followup_type=TaskFollowupType.other,
+        )
+        insert_task(session, follow_up)
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "walk_ins.convert auto-task creation failed org=%s walk_in=%s lead=%s",
+            org_id,
+            walk_in.id,
+            lead.id,
+        )
     await session.commit()
     await session.refresh(walk_in)
 
@@ -541,9 +590,152 @@ async def convert_walk_in_to_lead(
     return walk_in, contact_id, lead.id
 
 
+async def bulk_delete_walk_ins(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> int:
+    """W1 — Bulk-delete N walk-ins in one SQL statement.
+
+    Mirror of ``leads.service.bulk_delete_leads``. Belt + suspenders:
+    the query filters by both the id list *and* ``org_id`` — RLS
+    would already scope us, but the explicit clause is defence in
+    depth against a mis-scoped session. Single audit row groups the
+    action ("bulk-delete of N walk-ins") rather than emitting one
+    audit per id.
+    """
+    from sqlalchemy import text as _text
+
+    if not ids:
+        return 0
+
+    # Snapshot count first so the audit + response are honest even
+    # when RLS filters some rows out.
+    rowcount = 0
+    stmt = _text(
+        "DELETE FROM tbl_walk_ins WHERE org_id = :org_id AND id = ANY(:ids)"
+    )
+    result = await session.execute(
+        stmt,
+        {"org_id": org_id, "ids": list(ids)},
+    )
+    rowcount = result.rowcount or 0
+    await session.commit()
+
+    await audit.log(
+        "walk_ins.bulk_deleted",
+        entity_type="walk_in",
+        # entity_id intentionally omitted — the action spans N rows.
+        after={"deleted_count": rowcount, "ids": [str(i) for i in ids]},
+    )
+    return rowcount
+
+
+async def walk_ins_rollup(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    assigned_to: uuid.UUID | None,
+) -> dict[str, Any]:
+    """W7 — Server-side KPI roll-up for the walk-ins page header.
+
+    One grouped SQL query against the full org's data — replaces the
+    client-side page-only computation that was wrong at multi-location
+    scale.
+
+    Scope: when ``assigned_to`` is supplied, sums only that user's
+    walk-ins (personal roll-up). When None, org-wide. Caller (router)
+    decides which based on ``users.read``.
+    """
+    from sqlalchemy import text as _text
+
+    params: dict[str, Any] = {"org_id": org_id}
+    scope_clause = ""
+    if assigned_to is not None:
+        scope_clause = " AND assigned_to_id = :assigned_to"
+        params["assigned_to"] = assigned_to
+
+    # Timezone caveat: ``time_in::date`` uses the DB server's local
+    # timezone which is UTC on this deployment. For orgs in IST /
+    # other timezones the "today" boundary is UTC-day-based; a
+    # tz-aware version would take ``org.timezone`` into account.
+    # Kept UTC for v1 to match every other "today" reference in the
+    # codebase.
+    sql = _text(
+        f"""
+        SELECT
+          COUNT(*) FILTER (WHERE time_in::date = CURRENT_DATE) AS today_count,
+          COUNT(*) FILTER (
+            WHERE time_in::date = CURRENT_DATE
+              AND status = 'converted'
+          ) AS today_converted,
+          COUNT(*) FILTER (WHERE time_out IS NULL) AS open_now,
+          COUNT(*) FILTER (
+            WHERE status IN ('interested', 'follow_up')
+          ) AS interested_or_follow_up,
+          -- Conversion % over the last 30 days: converted / (converted + left).
+          (
+            SELECT
+              CASE
+                WHEN COUNT(*) FILTER (
+                  WHERE status IN ('converted', 'left')
+                    AND updated_at >= NOW() - INTERVAL '30 days'
+                ) = 0 THEN NULL
+                ELSE
+                  100.0 * COUNT(*) FILTER (
+                    WHERE status = 'converted'
+                      AND updated_at >= NOW() - INTERVAL '30 days'
+                  ) / COUNT(*) FILTER (
+                    WHERE status IN ('converted', 'left')
+                      AND updated_at >= NOW() - INTERVAL '30 days'
+                  )
+              END
+            FROM tbl_walk_ins
+            WHERE org_id = :org_id{scope_clause}
+          ) AS conversion_rate_pct,
+          -- Avg duration over the last 30 days of checked-out visits.
+          (
+            SELECT AVG(duration_min)
+            FROM tbl_walk_ins
+            WHERE org_id = :org_id{scope_clause}
+              AND duration_min IS NOT NULL
+              AND time_out >= NOW() - INTERVAL '30 days'
+          ) AS avg_duration_min,
+          -- Avg wait time (time_in - wait_started_at) over 30 days.
+          (
+            SELECT AVG(EXTRACT(EPOCH FROM (time_in - wait_started_at)) / 60)
+            FROM tbl_walk_ins
+            WHERE org_id = :org_id{scope_clause}
+              AND wait_started_at IS NOT NULL
+              AND time_in >= NOW() - INTERVAL '30 days'
+          ) AS avg_wait_min
+        FROM tbl_walk_ins
+        WHERE org_id = :org_id{scope_clause}
+        """
+    )
+    row = (await session.execute(sql, params)).one()
+    return {
+        "today_count": int(row.today_count or 0),
+        "today_converted": int(row.today_converted or 0),
+        "open_now": int(row.open_now or 0),
+        "interested_or_follow_up": int(row.interested_or_follow_up or 0),
+        "conversion_rate_pct": (
+            float(row.conversion_rate_pct) if row.conversion_rate_pct is not None else None
+        ),
+        "avg_duration_min": (
+            float(row.avg_duration_min) if row.avg_duration_min is not None else None
+        ),
+        "avg_wait_min": (
+            float(row.avg_wait_min) if row.avg_wait_min is not None else None
+        ),
+    }
+
+
 __all__ = [
     "WalkInStatus",
     "bulk_checkout_walk_ins",
+    "bulk_delete_walk_ins",
     "bulk_reassign_walk_ins",
     "checkout",
     "convert_walk_in_to_lead",
@@ -554,4 +746,5 @@ __all__ = [
     "quick_register",
     "reassign_walk_in",
     "update_walk_in",
+    "walk_ins_rollup",
 ]
