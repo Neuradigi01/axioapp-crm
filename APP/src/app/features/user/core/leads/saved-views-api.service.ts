@@ -8,9 +8,9 @@ import { FilterDsl } from '../shared/filter-dsl.types';
 import { buildHttpParams } from '../shared/services/query-builder';
 
 /** Entities the saved-views API will accept. Widen as future list pages
- * (walk-ins, tasks, appointments) wire up their menus. Keep aligned
+ * (walk-ins, appointments) wire up their menus. Keep aligned
  * with the backend's `SavedViewCreate.entity` Literal. */
-export type SavedViewEntity = 'leads' | 'contacts';
+export type SavedViewEntity = 'leads' | 'contacts' | 'tasks';
 
 export type SavedViewScope = 'mine' | 'team' | 'all';
 export type SavedViewMode = 'list' | 'pipeline';

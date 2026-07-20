@@ -41,9 +41,9 @@ class SavedViewConfig(BaseModel):
 
 
 class SavedViewCreate(BaseModel):
-    # Widen further when walk-ins / tasks / appointments wire their
-    # saved-views toolbars.
-    entity: Literal["leads", "contacts"]
+    # Widen further when walk-ins / appointments wire their saved-views
+    # toolbars. Tasks live here as of the T15 tasks-review fix.
+    entity: Literal["leads", "contacts", "tasks"]
     name: str = Field(min_length=1, max_length=80)
     config: SavedViewConfig
     shared: bool = False

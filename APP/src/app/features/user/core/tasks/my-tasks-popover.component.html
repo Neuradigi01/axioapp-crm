@@ -59,5 +59,18 @@
         </div>
       }
     </div>
+
+    <!-- T8 — Deep-link to the full tasks page. Always visible so the
+         user can escape the summary popover into edit / filter / bulk
+         actions the popover doesn't expose. -->
+    <footer class="border-t border-zinc-100 bg-zinc-50 px-3 py-2 text-right">
+      <a
+        routerLink="/user/tasks"
+        class="inline-flex items-center gap-1 text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:underline"
+      >
+        Open full tasks page
+        <lucide-icon name="arrow-right" class="h-3 w-3" />
+      </a>
+    </footer>
   </div>
 }

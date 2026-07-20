@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -33,6 +34,9 @@ class TaskCreate(BaseModel):
     related_entity_id: uuid.UUID | None = None
     priority: TaskPriority = TaskPriority.med
     followup_type: TaskFollowupType | None = None
+    # T4 — custom_data JSONB payload; validated against entity=task's
+    # custom_field_definitions in the service layer.
+    custom_data: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -55,6 +59,9 @@ class TaskUpdate(BaseModel):
     status: TaskStatus | None = None
     priority: TaskPriority | None = None
     followup_type: TaskFollowupType | None = None
+    related_entity_type: str | None = Field(default=None, max_length=64)
+    related_entity_id: uuid.UUID | None = None
+    custom_data: dict[str, Any] | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -71,6 +78,7 @@ class TaskOut(TimestampedOrgScopedOut):
     priority: TaskPriority
     followup_type: TaskFollowupType | None
     last_activity_at: datetime | None
+    custom_data: dict[str, Any] = Field(default_factory=dict)
 
 
 TaskListResponse = PaginatedResponse[TaskOut]

@@ -90,7 +90,9 @@
   } @else {
     <ul class="space-y-2">
       @for (task of items(); track task.id) {
-        <li class="flex items-start gap-3 rounded-lg bg-white p-3 shadow-sm ring-1 ring-zinc-200">
+        <li
+          class="group flex items-start gap-3 rounded-lg bg-white p-3 shadow-sm ring-1 ring-zinc-200"
+        >
           <input
             type="checkbox"
             [checked]="task.status === 'done'"
@@ -124,8 +126,42 @@
             </div>
             <p class="mt-1 text-xs text-zinc-500">{{ formatDue(task.due_at) }}</p>
           </div>
+          <!-- T6 — Edit + delete row actions on the panel. -->
+          <div class="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+            <button
+              type="button"
+              (click)="openEdit(task)"
+              class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+              title="Edit task"
+              aria-label="Edit task"
+            >
+              <lucide-icon name="pencil" class="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              (click)="onDelete(task)"
+              class="rounded-md p-1 text-zinc-400 hover:bg-red-50 hover:text-red-700"
+              title="Delete task"
+              aria-label="Delete task"
+            >
+              <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
+            </button>
+          </div>
         </li>
       }
     </ul>
   }
 </div>
+
+<!-- T6 — Shared task-form-modal, opened when a row-edit button
+     fires. The modal reuses the same standard-fields + custom-
+     fields plumbing as the main tasks page. -->
+@if (editingTask()) {
+  <app-task-form-modal
+    [task]="editingTask()"
+    [assignees]="assignees()"
+    [callerUuid]="callerUuid()"
+    (saved)="onEditSaved($event)"
+    (cancelled)="closeEdit()"
+  />
+}
