@@ -4,6 +4,14 @@
 can't accidentally create two rows differing only by case
 (`SOF001` vs `sof001`). `currency` defaults to `INR` at the DB level;
 schemas keep it optional to match.
+
+Extended by the catalog review (migration 0163):
+  * ``description`` / ``cost_price`` / ``tags`` / ``image_urls`` /
+    ``category_id`` on the item shapes.
+  * ``CatalogCategoryCreate`` / ``Update`` / ``Out`` for the new
+    per-org category entity.
+  * ``CatalogItemBulkImportRow`` / ``CatalogItemBulkImportResult`` for
+    the bulk-import endpoint.
 """
 
 from __future__ import annotations
@@ -24,10 +32,14 @@ _CATEGORY_MAX = 64
 class CatalogItemCreate(BaseModel):
     sku: str = Field(min_length=1, max_length=_SKU_MAX)
     name: str = Field(min_length=1, max_length=_NAME_MAX)
+    description: str | None = None
     category: str | None = Field(default=None, max_length=_CATEGORY_MAX)
+    category_id: uuid.UUID | None = None
     price: Decimal = Field(ge=0)
+    cost_price: Decimal | None = Field(default=None, ge=0)
     currency: str = Field(default="INR", min_length=3, max_length=3)
     is_active: bool = True
+    tags: list[str] = Field(default_factory=list)
     custom_data: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -42,6 +54,18 @@ class CatalogItemCreate(BaseModel):
     def _normalize_currency(cls, value: str) -> str:
         return value.strip().upper()
 
+    @field_validator("tags")
+    @classmethod
+    def _normalize_tags(cls, value: list[str]) -> list[str]:
+        seen: set[str] = set()
+        out: list[str] = []
+        for t in value:
+            trimmed = t.strip()
+            if trimmed and trimmed not in seen:
+                seen.add(trimmed)
+                out.append(trimmed)
+        return out
+
 
 class CatalogItemUpdate(BaseModel):
     """Partial update. `sku` is intentionally not editable — SKU is a
@@ -49,10 +73,14 @@ class CatalogItemUpdate(BaseModel):
     to. Delete + recreate if you must change it."""
 
     name: str | None = Field(default=None, min_length=1, max_length=_NAME_MAX)
+    description: str | None = None
     category: str | None = Field(default=None, max_length=_CATEGORY_MAX)
+    category_id: uuid.UUID | None = None
     price: Decimal | None = Field(default=None, ge=0)
+    cost_price: Decimal | None = Field(default=None, ge=0)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     is_active: bool | None = None
+    tags: list[str] | None = None
     custom_data: dict[str, Any] | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -62,17 +90,125 @@ class CatalogItemUpdate(BaseModel):
     def _normalize_currency(cls, value: str | None) -> str | None:
         return value.strip().upper() if value is not None else None
 
+    @field_validator("tags")
+    @classmethod
+    def _normalize_tags(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        seen: set[str] = set()
+        out: list[str] = []
+        for t in value:
+            trimmed = t.strip()
+            if trimmed and trimmed not in seen:
+                seen.add(trimmed)
+                out.append(trimmed)
+        return out
+
 
 class CatalogItemOut(TimestampedOrgScopedOut):
     id: uuid.UUID
     sku: str
     name: str
+    description: str | None = None
     category: str | None
+    category_id: uuid.UUID | None = None
     price: Decimal
+    cost_price: Decimal | None = None
     currency: str
     is_active: bool
+    tags: list[str] = Field(default_factory=list)
     image_url: str | None = None
+    image_urls: list[str] = Field(default_factory=list)
     custom_data: dict[str, Any]
 
 
 CatalogListResponse = PaginatedResponse[CatalogItemOut]
+
+
+# --- Category schemas ------------------------------------------------------
+
+
+class CatalogCategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    description: str | None = None
+    icon_emoji: str | None = Field(default=None, max_length=8)
+    color_hex: str | None = Field(default=None, min_length=7, max_length=7, pattern=r"^#[0-9a-fA-F]{6}$")
+    display_order: int = 0
+    is_active: bool = True
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class CatalogCategoryUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    description: str | None = None
+    icon_emoji: str | None = Field(default=None, max_length=8)
+    color_hex: str | None = Field(default=None, min_length=7, max_length=7, pattern=r"^#[0-9a-fA-F]{6}$")
+    display_order: int | None = None
+    is_active: bool | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class CatalogCategoryOut(TimestampedOrgScopedOut):
+    id: uuid.UUID
+    name: str
+    slug: str
+    description: str | None
+    icon_emoji: str | None
+    color_hex: str | None
+    display_order: int
+    is_active: bool
+
+
+# --- Bulk import (C8) -----------------------------------------------------
+
+
+class CatalogItemBulkImportRow(BaseModel):
+    """One row in a bulk import request. Same field constraints as
+    `CatalogItemCreate` but grouped so the endpoint can report per-row
+    failures alongside successes."""
+
+    sku: str = Field(min_length=1, max_length=_SKU_MAX)
+    name: str = Field(min_length=1, max_length=_NAME_MAX)
+    description: str | None = None
+    category: str | None = Field(default=None, max_length=_CATEGORY_MAX)
+    price: Decimal = Field(ge=0)
+    cost_price: Decimal | None = Field(default=None, ge=0)
+    currency: str = Field(default="INR", min_length=3, max_length=3)
+    is_active: bool = True
+    tags: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("sku")
+    @classmethod
+    def _normalize_sku(cls, value: str) -> str:
+        return value.strip().upper()
+
+
+class CatalogItemBulkImportRequest(BaseModel):
+    """Bulk-import wrapper. `dry_run=True` validates + returns the
+    counts without inserting; the frontend wizard uses that for the
+    preview step."""
+
+    rows: list[CatalogItemBulkImportRow] = Field(min_length=1, max_length=1000)
+    dry_run: bool = False
+
+
+class CatalogItemBulkImportRowError(BaseModel):
+    row_index: int
+    sku: str
+    reason: str
+
+
+class CatalogItemBulkImportResult(BaseModel):
+    """`inserted` — rows successfully created. `skipped` — rows whose
+    SKU already exists in the org (bulk-import intentionally does NOT
+    overwrite; use the individual PATCH endpoint for that). `errors`
+    — malformed rows (missing name / invalid price / etc.)."""
+
+    inserted: int
+    skipped: int
+    errors: list[CatalogItemBulkImportRowError]
+    dry_run: bool

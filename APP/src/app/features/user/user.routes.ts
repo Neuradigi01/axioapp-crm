@@ -159,6 +159,17 @@ export const userRoutes: Routes = [
           import('./core/settings/lead-scoring-rules.page').then((m) => m.LeadScoringRulesPage),
       },
       {
+        // Catalog category taxonomy management. Gated on `catalog.write`
+        // — read-only Employees can pick categories in the catalog
+        // modal but can't manage the taxonomy.
+        path: 'settings/catalog-categories',
+        canActivate: [permissionGuard('catalog.write')],
+        loadComponent: () =>
+          import('./core/settings/catalog-categories.page').then(
+            (m) => m.CatalogCategoriesPageComponent,
+          ),
+      },
+      {
         // E.16 / F1 — Lead routing config. Backend endpoints are
         // gated on `settings.read` / `settings.write`; the guard here
         // uses `settings.write` so read-only Admins can still land on
@@ -270,6 +281,17 @@ export const userRoutes: Routes = [
         path: 'walk-ins',
         loadComponent: () =>
           import('./core/walk-ins/walk-ins.page').then((m) => m.WalkInsPageComponent),
+      },
+      {
+        // MUST precede `catalog/:id` if that route is ever added
+        // (same reason as `contacts/import`) — the wizard is a static
+        // segment.
+        path: 'catalog/import',
+        canActivate: [permissionGuard('catalog.write')],
+        loadComponent: () =>
+          import('./core/catalog/import/bulk-import.page').then(
+            (m) => m.CatalogBulkImportPageComponent,
+          ),
       },
       {
         path: 'catalog',

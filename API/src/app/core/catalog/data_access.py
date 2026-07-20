@@ -39,6 +39,7 @@ async def list_catalog_items_query(
     *,
     q: str | None = None,
     category: str | None = None,
+    category_id: uuid.UUID | None = None,
     active_only: bool = False,
     page: int = 1,
     size: int = 50,
@@ -49,7 +50,11 @@ async def list_catalog_items_query(
     if q:
         like = f"%{q}%"
         filters.append(or_(CatalogItem.name.ilike(like), CatalogItem.sku.ilike(like)))
-    if category:
+    if category_id is not None:
+        # New shape wins when both are supplied.
+        filters.append(CatalogItem.category_id == category_id)
+    elif category:
+        # Back-compat free-text match (category_id-less callers).
         filters.append(CatalogItem.category == category)
     if active_only:
         filters.append(CatalogItem.is_active.is_(True))
