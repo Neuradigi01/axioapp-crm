@@ -41,8 +41,9 @@ class SavedViewConfig(BaseModel):
 
 
 class SavedViewCreate(BaseModel):
-    # Widen the literal when contacts/walk-ins land their saved-views UI.
-    entity: Literal["leads"]
+    # Widen further when walk-ins / tasks / appointments wire their
+    # saved-views toolbars.
+    entity: Literal["leads", "contacts"]
     name: str = Field(min_length=1, max_length=80)
     config: SavedViewConfig
     shared: bool = False

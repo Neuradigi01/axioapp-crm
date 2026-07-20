@@ -31,7 +31,12 @@ export interface Contact {
   email: string | null;
   source: string | null;
   tags: string[];
-  notes: string | null;
+  /**
+   * Notes for a contact live in `tbl_activities` rows (type='note')
+   * — versioned, authored, queryable. The former single-blob
+   * `Contact.notes` column was retired in backend migration 0158.
+   * Post via `POST /activities`; render via the Activities tab.
+   */
   custom_data: Record<string, unknown>;
   assigned_to_id: string | null;
   last_activity_at: string | null;
@@ -51,6 +56,11 @@ export interface Contact {
   email_opt_in_status?: EmailOptInStatus;
   email_opt_in_source?: EmailOptInSource | null;
   email_opt_in_recorded_at?: string | null;
+  /** DPDP right-to-be-forgotten stamp. Non-null → PII wiped, both
+   *  channels forced to opted_out, row retained so cross-module FKs
+   *  don't break. UI must render an "Anonymised" chip instead of the
+   *  placeholder full_name. */
+  anonymised_at?: string | null;
 }
 
 /** Step 22 — DPDP opt-in state machine. Mirrored from the backend
@@ -107,7 +117,7 @@ export interface ContactCreate {
   email?: string | null;
   source?: string | null;
   tags?: string[];
-  notes?: string | null;
+  // `notes` was retired — post a note via /activities after create.
   custom_data?: Record<string, unknown>;
   assigned_to_id?: string | null;
 }
@@ -213,6 +223,38 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
       assigned_to_id: body.userId,
       note: body.note ?? null,
     });
+  }
+
+  /** DPDP right-to-be-forgotten. Wipes PII on the contact row +
+   *  force-flips both consent channels to opted_out. Historical FKs
+   *  (activities, leads, appointments, invoices) are preserved. The
+   *  operator-supplied `reason` is written to the audit log for
+   *  future auditor trace. */
+  anonymise(id: string, reason: string | null): Observable<Contact> {
+    return this.http.post<Contact>(`${this.base}/${id}/anonymise`, {
+      reason: reason ?? null,
+    });
+  }
+
+  /** Fold `secondaryId` into `primaryId` and delete the secondary.
+   *  Every FK / polymorphic ref that pointed at the secondary is
+   *  repointed at the primary (activities, tasks, leads, appointments,
+   *  calls, conversations, campaign messages, consent events, workflow
+   *  runs, group memberships, ...). Returns the refreshed primary +
+   *  a per-table count of rows reassigned. */
+  merge(
+    primaryId: string,
+    secondaryId: string,
+  ): Observable<{
+    primary: Contact;
+    secondary_id: string;
+    rows_reassigned: Record<string, number>;
+  }> {
+    return this.http.post<{
+      primary: Contact;
+      secondary_id: string;
+      rows_reassigned: Record<string, number>;
+    }>(`${this.base}/${primaryId}/merge`, { secondary_id: secondaryId });
   }
 
   bulkReassign(

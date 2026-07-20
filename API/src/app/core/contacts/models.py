@@ -128,7 +128,10 @@ class Contact(Base, TenantScoped):
         nullable=False,
         server_default=text("ARRAY[]::varchar[]"),
     )
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Notes for a contact live in ``tbl_activities`` as ``type='note'``
+    # rows — versioned, authored, queryable. The former
+    # ``tbl_contacts.notes`` TEXT column was retired in migration
+    # 0158; content was copied into activities.
     custom_data: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
@@ -209,6 +212,18 @@ class Contact(Base, TenantScoped):
     )
     whatsapp_opt_out_reason: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True,
+    )
+    # DPDP right-to-be-forgotten (added migration 0159). Non-NULL when
+    # the contact has been anonymised: PII columns (full_name, phone,
+    # email, tags, custom_data) have been wiped, both opt-in channels
+    # forced to opted_out, and the row is retained only to keep
+    # historical FKs intact (activities, leads, appointments,
+    # invoices...). Callers must NEVER show the wiped fields to
+    # operators — the ORM `.is_anonymised` helper + the frontend list
+    # chip both key off this column.
+    anonymised_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import HTTPException, status
@@ -28,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core import audit
 from src.app.core.activities import service as activities_service
 from src.app.core.activities.models import ActivityType
-from src.app.core.contacts import data_access
+from src.app.core.contacts import consent_service, data_access
 from src.app.core.contacts.models import Contact
 from src.app.core.contacts.schemas import ContactCreate, ContactUpdate
 from src.app.shared.audit import log_entity_change, snapshot
@@ -56,7 +57,6 @@ _SNAPSHOT_FIELDS = (
     "email",
     "source",
     "tags",
-    "notes",
     "custom_data",
     "assigned_to_id",
 )
@@ -122,7 +122,6 @@ async def create_contact(
         email=payload.email,
         source=payload.source,
         tags=payload.cleaned_tags(),
-        notes=payload.notes,
         custom_data=cleaned_custom,
         assigned_to_id=payload.assigned_to_id,
     )
@@ -194,6 +193,229 @@ async def delete_contact(session: AsyncSession, *, contact_id: uuid.UUID) -> Non
         entity_id=contact_uuid,
         before=before,
     )
+
+
+async def merge_contacts(
+    session: AsyncSession,
+    *,
+    primary_id: uuid.UUID,
+    secondary_id: uuid.UUID,
+    org_id: uuid.UUID,
+) -> tuple[Contact, dict[str, int]]:
+    """Fold ``secondary_id`` into ``primary_id``, delete the secondary.
+
+    Standard fields (name, phone, email, source, assigned_to_id) on
+    the primary are preserved as-is — merge is a hygiene action, not
+    a field-picker. Tags are union-merged (order preserved, duplicates
+    dropped). ``custom_data`` from the secondary fills any key the
+    primary doesn't already have; primary values always win on
+    conflict.
+
+    Every cross-module row that points at the secondary — activities,
+    tasks, leads, walk-ins, appointments, calls, conversations,
+    campaign messages, consent events, workflow runs, group members,
+    email-sequence enrollments — is re-pointed at the primary by
+    ``data_access.reassign_contact_references``. The secondary row is
+    then deleted.
+
+    Returns ``(primary_contact_refreshed, rows_reassigned)``. Raises
+    404 if either contact is missing; 400 if both ids are equal; 409
+    if either belongs to a different org (guards against a URL-hack
+    cross-tenant merge).
+    """
+    if primary_id == secondary_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="cannot merge a contact into itself",
+        )
+
+    primary = ensure_found(
+        await data_access.get_contact(session, primary_id), entity="contact"
+    )
+    secondary = ensure_found(
+        await data_access.get_contact(session, secondary_id), entity="contact"
+    )
+    if primary.org_id != org_id or secondary.org_id != org_id:
+        # Belt-and-suspenders — the ORM tenant filter should have
+        # already returned 404 for a cross-tenant id, but check
+        # explicitly so a leaked auth session can't ever merge across
+        # orgs.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="both contacts must belong to the caller's org",
+        )
+
+    before_primary = _snapshot(primary)
+    before_secondary = _snapshot(secondary)
+
+    # Union tags — primary order first, then any secondary tags not
+    # already present. Preserves the primary's intended tag ordering
+    # while picking up anything unique from the secondary.
+    merged_tags: dict[str, None] = {t: None for t in (primary.tags or [])}
+    for t in secondary.tags or []:
+        merged_tags.setdefault(t, None)
+    primary.tags = list(merged_tags)
+
+    # Custom data: primary wins on conflict; secondary fills gaps.
+    merged_custom: dict[str, Any] = dict(secondary.custom_data or {})
+    merged_custom.update(primary.custom_data or {})
+    primary.custom_data = merged_custom
+
+    # Repoint every FK / polymorphic ref before deleting the secondary.
+    # RESTRICT-FK tables (appointments, leads, walk-ins) would otherwise
+    # block the DELETE — the DAL handles them first.
+    rows_reassigned = await data_access.reassign_contact_references(
+        session,
+        org_id=org_id,
+        primary_id=primary.id,
+        secondary_id=secondary.id,
+    )
+    await data_access.delete_contact_row(session, secondary)
+    await session.commit()
+    await session.refresh(primary)
+
+    # Audit rows: one on each side so both timelines carry the merge.
+    # `contacts.merged` on the primary; `contacts.merged_into` on the
+    # secondary (though the row is gone, the audit log survives).
+    await log_entity_change(
+        action="contacts.merged",
+        entity_type="contact",
+        entity_id=primary.id,
+        before=before_primary,
+        after=_snapshot(primary),
+    )
+    await log_entity_change(
+        action="contacts.merged_into",
+        entity_type="contact",
+        entity_id=secondary.id,
+        before=before_secondary,
+        after={"merged_into_contact_id": str(primary.id)},
+    )
+
+    # Timeline breadcrumb on the primary so a rep browsing the
+    # activities tab sees "merged from <name>" alongside other events.
+    # Fire-and-forget so a failure here doesn't unwind the merge that
+    # already committed.
+    await activities_service.log(
+        entity_type="contact",
+        entity_id=primary.id,
+        type=ActivityType.note,
+        payload={
+            "text": (
+                f"Merged from {before_secondary.get('full_name') or 'contact'}. "
+                f"Repointed rows: "
+                + ", ".join(f"{k}={v}" for k, v in rows_reassigned.items() if v)
+            ),
+            "merged_from_contact_id": str(secondary.id),
+        },
+        org_id=org_id,
+    )
+
+    return primary, rows_reassigned
+
+
+async def anonymise_contact(
+    session: AsyncSession,
+    *,
+    contact_id: uuid.UUID,
+    org_id: uuid.UUID,
+    reason: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> Contact:
+    """DPDP right-to-be-forgotten. Wipe PII on the contact row without
+    breaking cross-module FKs.
+
+    Hard-delete isn't an option — appointments, leads, invoices,
+    workflow runs all point at ``tbl_contacts.id`` and either
+    (a) block the DELETE (RESTRICT FKs) or (b) drop the historical
+    linkage (SET NULL / CASCADE) — both undesirable when the
+    obligation is to remove the *personal data*, not the *audit trail*.
+    So instead we:
+
+    1. Reject the call if the contact is already anonymised (409).
+    2. Overwrite ``full_name`` with a stable placeholder (so timeline
+       renders on other entities still show *something*),
+       ``phone`` / ``email`` → NULL, ``tags`` → [], ``custom_data`` →
+       {}.
+    3. Force-flip both consent channels (WhatsApp via
+       ``consent_service.record_transition`` so the immutable log
+       captures the ``manual_override`` source; email opt-in via
+       direct row assignment because email has no equivalent service).
+    4. Stamp ``anonymised_at = now`` — the ``anonymised_at IS NOT
+       NULL`` predicate becomes the site-wide guard for excluding the
+       row from campaigns, automations, list defaults, etc.
+    5. Emit an audit row carrying the operator's ``reason`` so a
+       future auditor can trace *why* the wipe happened. Reason itself
+       is NOT stored on the row (it's operator-supplied text — could
+       contain a ticket reference or "as requested" — that goes in
+       the audit log, not on the anonymised contact).
+    """
+    contact = ensure_found(await data_access.get_contact(session, contact_id), entity="contact")
+    if contact.org_id != org_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="contact does not belong to the caller's org",
+        )
+    if contact.anonymised_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="contact is already anonymised",
+        )
+
+    before = _snapshot(contact)
+    now = datetime.now(UTC)
+
+    # 1. Wipe PII columns. `full_name` gets a stable placeholder so
+    # timelines on other entities (leads, appointments, invoices...)
+    # still render *something* rather than blowing up on empty
+    # strings.
+    placeholder = f"Anonymised contact {str(contact.id)[:8]}"
+    contact.full_name = placeholder
+    contact.phone = None
+    contact.email = None
+    contact.tags = []
+    contact.custom_data = {}
+    contact.anonymised_at = now
+
+    # 2. Force WhatsApp opt-out with a proper consent event so the
+    # immutable log carries the manual-override transition. Skips
+    # cleanly if already opted_out (idempotent).
+    if contact.whatsapp_opt_in_status != "opted_out":
+        await consent_service.record_transition(
+            session,
+            contact=contact,
+            new_status="opted_out",
+            source="manual_entry",
+            actor_user_id=actor_user_id,
+            reason=(reason or "dpdp right-to-be-forgotten"),
+            commit=False,
+        )
+
+    # 3. Force email opt-out (no service abstraction — direct assign).
+    contact.email_opt_in_status = "opted_out"
+    contact.email_opt_out = True
+    if contact.email_opt_out_at is None:
+        contact.email_opt_out_at = now
+
+    await session.commit()
+    await session.refresh(contact)
+
+    await log_entity_change(
+        action="contacts.anonymised",
+        entity_type="contact",
+        entity_id=contact.id,
+        before=before,
+        after={
+            "full_name": contact.full_name,
+            "phone": None,
+            "email": None,
+            "tags": [],
+            "custom_data": {},
+            "anonymised_at": now.isoformat(),
+            "reason": reason,
+        },
+    )
+    return contact
 
 
 async def list_contacts(

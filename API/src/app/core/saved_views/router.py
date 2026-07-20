@@ -39,7 +39,7 @@ router = APIRouter(prefix="/saved-views", tags=["Saved Views"])
 
 @router.get("", response_model=list[SavedViewOut])
 async def list_saved_views_endpoint(
-    entity: Literal["leads"] = Query(default="leads"),
+    entity: Literal["leads", "contacts"] = Query(default="leads"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("saved_views.use")),
 ) -> list[SavedViewOut]:

@@ -119,20 +119,46 @@
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button
-            type="button"
-            (click)="openEdit()"
-            class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            (click)="onDelete()"
-            class="rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
-          >
-            Delete
-          </button>
+          @if (isAnonymised()) {
+            <span
+              class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600"
+              title="This contact has been anonymised (DPDP right-to-be-forgotten). PII has been wiped and both consent channels are opted-out."
+            >
+              <lucide-icon name="shield" class="h-3.5 w-3.5" />
+              Anonymised
+            </span>
+          } @else {
+            <button
+              type="button"
+              (click)="openEdit()"
+              class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              (click)="openMerge()"
+              class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              title="Merge another duplicate contact into this one"
+            >
+              Merge
+            </button>
+            <button
+              type="button"
+              (click)="openAnonymise()"
+              class="rounded-md border border-amber-200 bg-white px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-50"
+              title="DPDP right-to-be-forgotten: wipe PII, force opt-out on all channels, retain audit trail"
+            >
+              Anonymise
+            </button>
+            <button
+              type="button"
+              (click)="onDelete()"
+              class="rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              Delete
+            </button>
+          }
         </div>
       </div>
     </section>
@@ -267,17 +293,6 @@
             </div>
           </div>
         }
-        @default {
-          <div
-            class="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-6 py-10 text-center text-sm text-zinc-500"
-          >
-            @if (placeholderForActiveTab() === 'later') {
-              Coming in a future step.
-            } @else {
-              Coming in Step {{ placeholderForActiveTab() }}.
-            }
-          </div>
-        }
       }
     </section>
   }
@@ -315,4 +330,71 @@
     (confirm)="confirmDelete()"
     (cancel)="closeDelete()"
   />
+}
+
+@if (mergeOpen() && contact(); as c) {
+  <app-merge-contact-modal [primary]="c" (cancel)="closeMerge()" (merged)="onMerged($event)" />
+}
+
+@if (anonymiseOpen() && contact(); as c) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
+      <div class="border-b border-zinc-200 px-5 py-3">
+        <h2 class="text-sm font-semibold text-zinc-900">
+          Anonymise &ldquo;{{ c.full_name }}&rdquo;?
+        </h2>
+      </div>
+      <div class="px-5 py-4 text-xs text-zinc-700">
+        <p>
+          This wipes name, phone, email, tags, and all custom fields; forces opt-out on both
+          WhatsApp and email. Historical activities, leads, appointments, and invoices are preserved
+          with a placeholder name so audit trails stay intact.
+        </p>
+        <p class="mt-2 font-medium text-red-700">This cannot be undone.</p>
+        <label class="mt-3 block text-xs font-medium text-zinc-600" for="anonymise-reason">
+          Reason (optional — logged for auditor trace)
+        </label>
+        <input
+          id="anonymise-reason"
+          type="text"
+          maxlength="500"
+          class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          placeholder="e.g. SAR-12345 or 'customer request'"
+          [value]="anonymiseReason()"
+          (input)="onAnonymiseReasonInput($event)"
+        />
+        @if (anonymiseError(); as err) {
+          <p class="mt-2 text-xs text-red-600">{{ err }}</p>
+        }
+      </div>
+      <div
+        class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3"
+      >
+        <button
+          type="button"
+          (click)="closeAnonymise()"
+          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          [disabled]="anonymiseSubmitting()"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          (click)="confirmAnonymise()"
+          class="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
+          [disabled]="anonymiseSubmitting()"
+        >
+          @if (anonymiseSubmitting()) {
+            Anonymising…
+          } @else {
+            Anonymise permanently
+          }
+        </button>
+      </div>
+    </div>
+  </div>
 }
