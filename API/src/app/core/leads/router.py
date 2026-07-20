@@ -51,9 +51,11 @@ from src.app.core.leads.schemas import (
     LeadScoringRuleUpdate,
     LeadUpdate,
     MoveStageRequest,
+    PipelineValueRollup,
 )
 from src.app.core.leads.service import (
     bulk_delete_leads,
+    bulk_move_stage,
     bulk_reassign_leads,
     create_scoring_rule,
     delete_lead,
@@ -64,10 +66,12 @@ from src.app.core.leads.service import (
     list_leads_where,
     list_scoring_rules,
     move_stage_for_lead,
+    pipeline_value_rollup,
     reassign_lead,
     update_lead,
     update_scoring_rule,
 )
+from src.app.core.permissions.service import role_has_permission
 from src.app.core.settings.schemas import (
     LeadRoutingConfigOut,
     LeadRoutingConfigUpdate,
@@ -359,6 +363,25 @@ async def put_routing_config_endpoint(
     return LeadRoutingConfigOut.model_validate(cfg)
 
 
+@router.get("/pipeline-value", response_model=PipelineValueRollup)
+async def pipeline_value_endpoint(
+    db: AsyncSession = Depends(get_db),
+    caller: User = Depends(require_permissions("leads.read")),
+) -> PipelineValueRollup:
+    """Header-strip roll-up for the kanban / list view.
+
+    Scope follows the same row-visibility rule as the list endpoint:
+    callers with ``users.read`` see the whole org, everyone else sees
+    only their own contribution."""
+    is_org_scope = await role_has_permission(db, caller.role_id, "users.read")
+    rollup = await pipeline_value_rollup(
+        db,
+        org_id=caller.org_id,
+        assigned_to=None if is_org_scope else caller.legacy_uuid,
+    )
+    return PipelineValueRollup.model_validate(rollup)
+
+
 @router.get("/{lead_id}", response_model=LeadOut)
 async def get_lead_endpoint(
     lead_id: uuid.UUID,
@@ -404,6 +427,9 @@ async def move_lead_stage_endpoint(
         user_id=user.legacy_uuid,
         lost_reason=payload.lost_reason,
         lost_reason_other=payload.lost_reason_other,
+        won_value=payload.won_value,
+        close_date=payload.close_date,
+        won_reason=payload.won_reason,
     )
     return LeadOut.model_validate(lead)
 
@@ -454,3 +480,48 @@ async def bulk_delete_leads_endpoint(
 ) -> LeadBulkDeleteResult:
     n = await bulk_delete_leads(db, ids=payload.ids, org_id=user.org_id)
     return LeadBulkDeleteResult(deleted=n)
+
+
+# --- Bulk move-stage (F4) ---------------------------------------------------
+
+
+class _BulkMoveStageRequest(MoveStageRequest):
+    """Bulk-move payload — the standard MoveStageRequest plus an ``ids``
+    list. Kept as a router-local shape because it's only used here."""
+
+    ids: list[uuid.UUID] = []
+
+
+class _BulkMoveStageResult(LeadBulkReassignResult):
+    """Same shape as bulk-reassign — just a count. Alias so client
+    generators don't emit two identical types."""
+
+    pass
+
+
+@router.post("/bulk-move-stage", response_model=_BulkMoveStageResult)
+async def bulk_move_stage_endpoint(
+    payload: _BulkMoveStageRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("leads.write")),
+) -> _BulkMoveStageResult:
+    """Move ``payload.ids`` all to ``payload.to_stage`` in one call.
+
+    Same validation rules as the single-row endpoint (Lost needs a
+    reason; Won can carry optional value/close_date/reason). All rows
+    in one bulk call get the same close metadata, which matches the
+    typical operator workflow — "close out these five deals with the
+    same reason". Rep can refine per-lead afterwards via PATCH."""
+    moved = await bulk_move_stage(
+        db,
+        ids=payload.ids,
+        to_stage=payload.to_stage,
+        org_id=user.org_id,
+        user_id=user.legacy_uuid,
+        lost_reason=payload.lost_reason,
+        lost_reason_other=payload.lost_reason_other,
+        won_value=payload.won_value,
+        close_date=payload.close_date,
+        won_reason=payload.won_reason,
+    )
+    return _BulkMoveStageResult(reassigned=moved)

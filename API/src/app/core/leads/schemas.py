@@ -53,6 +53,9 @@ class LeadCreate(BaseModel):
     pipeline_stage: str | None = Field(default=None, max_length=64)
     assigned_to_id: uuid.UUID | None = None
     budget: Decimal | None = Field(default=None, ge=0)
+    # ISO-4217 3-letter code. Omitted → renderers fall back to the
+    # org's default currency (from ``/users/me → org.currency``).
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
     expected_close_date: date | None = None
     custom_data: dict[str, Any] = Field(default_factory=dict)
     source: LeadSource = LeadSource.manual
@@ -76,10 +79,18 @@ class LeadUpdate(BaseModel):
     contact_id: uuid.UUID | None = None
     assigned_to_id: uuid.UUID | None = None
     budget: Decimal | None = Field(default=None, ge=0)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
     expected_close_date: date | None = None
     custom_data: dict[str, Any] | None = None
     lost_reason: str | None = Field(default=None, max_length=32)
     lost_reason_other: str | None = Field(default=None, max_length=255)
+    # Won-capture fields (F2). Populated by the move-stage endpoint on
+    # move-to-Won, but also editable via PATCH so a rep can refine
+    # ``won_value`` / ``close_date`` / ``won_reason`` after the initial
+    # transition. Symmetric to the lost_reason pair above.
+    won_value: Decimal | None = Field(default=None, ge=0)
+    close_date: date | None = None
+    won_reason: str | None = Field(default=None, max_length=64)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -90,14 +101,22 @@ class LeadUpdate(BaseModel):
 
 
 class MoveStageRequest(BaseModel):
-    """Move-stage request. When the destination stage has `is_lost=true`
-    the service requires `lost_reason` (picklist) — the FE collects it
-    in the move-to-Lost modal and submits it here in the same call.
+    """Move-stage request.
+
+    On move-to-Lost: ``lost_reason`` (picklist) is required. On
+    move-to-Won: ``won_value`` / ``close_date`` / ``won_reason`` are
+    all optional at the API layer — the FE prompts and enforces
+    per-org preference. Leaving them empty is intentional API-compat
+    (existing automations / tests calling move-stage on Won won't
+    422). Rep can also fill them later via PATCH /leads/{id}.
     """
 
     to_stage: str = Field(min_length=1, max_length=64)
     lost_reason: str | None = Field(default=None, max_length=32)
     lost_reason_other: str | None = Field(default=None, max_length=255)
+    won_value: Decimal | None = Field(default=None, ge=0)
+    close_date: date | None = None
+    won_reason: str | None = Field(default=None, max_length=64)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -115,6 +134,8 @@ class LeadOut(TimestampedOrgScopedOut):
     source: LeadSource
     assigned_to_id: uuid.UUID | None
     budget: Decimal | None
+    # ISO-4217 3-letter code (nullable — omit → org default at render).
+    currency: str | None = None
     expected_close_date: date | None
     # Rule-engine output, ``[0, 100]``. Computed by
     # ``src.app.core.leads.scoring`` after every create / update that
@@ -126,6 +147,15 @@ class LeadOut(TimestampedOrgScopedOut):
     last_activity_at: datetime | None
     lost_reason: str | None
     lost_reason_other: str | None
+    # Won-capture fields (F2). Set by the move-stage endpoint when the
+    # destination stage is is_won.
+    won_value: Decimal | None = None
+    close_date: date | None = None
+    won_reason: str | None = None
+    # Lifecycle timestamps (F22). Auto-set by the move-stage service on
+    # first entry into an is_won / is_lost stage.
+    won_at: datetime | None = None
+    lost_at: datetime | None = None
 
 
 class LeadListResponse(BaseModel):
@@ -212,3 +242,28 @@ class LeadScoringRecomputeResult(BaseModel):
     is the number of leads whose ``lead_score`` changed."""
 
     touched: int
+
+
+# --- Pipeline value roll-up (F23) ------------------------------------------
+
+
+class PipelineValueRollup(BaseModel):
+    """Summary numbers rendered in the header strip above the kanban /
+    list view.
+
+    Scope follows the caller's row-level visibility — reps without
+    ``users.read`` see only their own leads' contribution, managers
+    see the full org roll-up.
+
+    ``currency`` is the org's default ISO-4217 code; per-lead
+    ``currency`` overrides are ignored in this v1 roll-up (mixed-
+    currency orgs will need a future weighted conversion; not a
+    common case yet).
+    """
+
+    open_value: Decimal
+    won_value_this_month: Decimal
+    open_count: int
+    won_count_this_month: int
+    lost_count_this_month: int
+    currency: str

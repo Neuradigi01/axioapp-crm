@@ -27,6 +27,9 @@ export interface Lead {
   source: LeadSource;
   assigned_to_id: string | null;
   budget: string | null;
+  /** ISO-4217 code. Null → renderers fall back to the org's default
+   *  currency (from `/users/me → org.currency`). */
+  currency: string | null;
   expected_close_date: string | null;
   /** Operator-defined rule engine output, clamped `[0, 100]`. Surfaced
    * for the Step 6 "Score" column. */
@@ -35,6 +38,16 @@ export interface Lead {
   last_activity_at: string | null;
   lost_reason: string | null;
   lost_reason_other: string | null;
+  /** Won-capture fields (F2). Set by the move-stage endpoint when the
+   *  destination stage has `is_won=true`. */
+  won_value: string | null;
+  close_date: string | null;
+  won_reason: string | null;
+  /** Lifecycle timestamps (F22). Auto-stamped by move-stage on first
+   *  entry into an `is_won` / `is_lost` stage. Feed the funnel
+   *  time-in-stage story once the reports UI lands. */
+  won_at: string | null;
+  lost_at: string | null;
   /** Origin-channel attribution metadata. Populated by the ingest layer
    * for `widget`, `google_ads`, `meta_ads` sources; null for `manual`
    * and `bulk_import`. Keys vary by channel — Google Ads sends
@@ -71,6 +84,7 @@ export interface LeadCreate {
   pipeline_stage?: string | null;
   assigned_to_id?: string | null;
   budget?: string | null;
+  currency?: string | null;
   expected_close_date?: string | null;
   custom_data?: Record<string, unknown>;
   /** Defaults to 'manual' server-side when omitted. */
@@ -81,11 +95,28 @@ export type LeadUpdate = Partial<{
   contact_id: string;
   assigned_to_id: string | null;
   budget: string | null;
+  currency: string | null;
   expected_close_date: string | null;
   custom_data: Record<string, unknown>;
   lost_reason: string | null;
   lost_reason_other: string | null;
+  won_value: string | null;
+  close_date: string | null;
+  won_reason: string | null;
 }>;
+
+/** Header-strip roll-up rendered above the kanban / list view (F23).
+ *  Values are strings because Pydantic serialises Decimal as a string
+ *  by default; the frontend formats via `Intl.NumberFormat` using the
+ *  returned `currency`. */
+export interface PipelineValueRollup {
+  open_value: string;
+  open_count: number;
+  won_value_this_month: string;
+  won_count_this_month: number;
+  lost_count_this_month: number;
+  currency: string;
+}
 
 // --- Lead scoring rules (Step 7 admin UI) ---------------------------------
 
@@ -197,13 +228,55 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
   moveStage(
     id: string,
     toStage: string,
-    extras?: { lost_reason?: string | null; lost_reason_other?: string | null },
+    extras?: {
+      lost_reason?: string | null;
+      lost_reason_other?: string | null;
+      /** F2 — Won capture. Optional on the API; the frontend modal
+       *  prompts and enforces. */
+      won_value?: string | null;
+      close_date?: string | null;
+      won_reason?: string | null;
+    },
   ): Observable<Lead> {
     return this.http.post<Lead>(`${this.base}/${id}/move-stage`, {
       to_stage: toStage,
       lost_reason: extras?.lost_reason ?? null,
       lost_reason_other: extras?.lost_reason_other ?? null,
+      won_value: extras?.won_value ?? null,
+      close_date: extras?.close_date ?? null,
+      won_reason: extras?.won_reason ?? null,
     });
+  }
+
+  /** F4 — Bulk move-stage. Moves every id to the same `to_stage`;
+   *  same validation rules as single-row move-stage apply (Lost
+   *  needs a reason). */
+  bulkMoveStage(
+    ids: string[],
+    toStage: string,
+    extras?: {
+      lost_reason?: string | null;
+      lost_reason_other?: string | null;
+      won_value?: string | null;
+      close_date?: string | null;
+      won_reason?: string | null;
+    },
+  ): Observable<{ reassigned: number }> {
+    return this.http.post<{ reassigned: number }>(`${this.base}/bulk-move-stage`, {
+      ids,
+      to_stage: toStage,
+      lost_reason: extras?.lost_reason ?? null,
+      lost_reason_other: extras?.lost_reason_other ?? null,
+      won_value: extras?.won_value ?? null,
+      close_date: extras?.close_date ?? null,
+      won_reason: extras?.won_reason ?? null,
+    });
+  }
+
+  /** F23 — Pipeline value roll-up. Scope follows caller's row
+   *  visibility (org vs. personal) — decided server-side. */
+  pipelineValue(): Observable<PipelineValueRollup> {
+    return this.http.get<PipelineValueRollup>(`${this.base}/pipeline-value`);
   }
 
   /** Single-row reassign. `userId === null` clears the owner. */
