@@ -118,6 +118,15 @@ export interface PipelineValueRollup {
   currency: string;
 }
 
+/** Routing config (F1 / E.16). v1 accepts only `round_robin`; the
+ *  Literal widens here + on the backend when `sticky_by_source` or
+ *  future strategies actually land. */
+export type LeadRoutingStrategy = 'round_robin';
+
+export interface LeadRoutingConfig {
+  strategy: LeadRoutingStrategy;
+}
+
 // --- Lead scoring rules (Step 7 admin UI) ---------------------------------
 
 /** A single scoring rule. `condition` is the same shape as the leads
@@ -345,6 +354,16 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
 
   recomputeScores(): Observable<{ touched: number }> {
     return this.http.post<{ touched: number }>(`${this.base}/scoring-rules/recompute`, {});
+  }
+
+  // --- Routing config (F1 / E.16) -----------------------------------------
+
+  getRoutingConfig(): Observable<LeadRoutingConfig> {
+    return this.http.get<LeadRoutingConfig>(`${this.base}/routing-config`);
+  }
+
+  updateRoutingConfig(payload: LeadRoutingConfig): Observable<LeadRoutingConfig> {
+    return this.http.put<LeadRoutingConfig>(`${this.base}/routing-config`, payload);
   }
 
   private buildParams(query: LeadListQuery) {

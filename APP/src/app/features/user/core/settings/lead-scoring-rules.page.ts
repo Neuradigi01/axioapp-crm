@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
+import { RouterLink } from '@angular/router';
 
 import { AdvancedFilterModalComponent } from '../leads/advanced-filter-modal.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
@@ -24,7 +25,13 @@ type EditingState = LeadScoringRule | undefined | null;
   selector: 'app-lead-scoring-rules-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, LucideAngularModule, AdvancedFilterModalComponent, ConfirmDialogComponent],
+  imports: [
+    FormsModule,
+    LucideAngularModule,
+    AdvancedFilterModalComponent,
+    ConfirmDialogComponent,
+    RouterLink,
+  ],
   template: `
     <div class="mx-auto max-w-5xl p-6 space-y-5">
       <header class="flex flex-wrap items-start justify-between gap-3">
@@ -32,6 +39,15 @@ type EditingState = LeadScoringRule | undefined | null;
           <h1 class="text-lg font-semibold text-zinc-900">Lead scoring rules</h1>
           <p class="mt-0.5 text-xs text-zinc-500">
             Points add up across active rules; the final score is capped at 100 per lead.
+          </p>
+          <p class="mt-1 text-xs text-zinc-500">
+            Also see:
+            <a
+              routerLink="/user/settings/lead-routing"
+              class="text-zinc-900 underline hover:text-zinc-700"
+              >Lead routing</a
+            >
+            &mdash; how new leads are assigned to reps.
           </p>
         </div>
         <div class="flex items-center gap-2">

@@ -159,6 +159,16 @@ export const userRoutes: Routes = [
           import('./core/settings/lead-scoring-rules.page').then((m) => m.LeadScoringRulesPage),
       },
       {
+        // E.16 / F1 — Lead routing config. Backend endpoints are
+        // gated on `settings.read` / `settings.write`; the guard here
+        // uses `settings.write` so read-only Admins can still land on
+        // the page but the save action 403s.
+        path: 'settings/lead-routing',
+        canActivate: [permissionGuard('settings.write')],
+        loadComponent: () =>
+          import('./core/settings/lead-routing.page').then((m) => m.LeadRoutingPage),
+      },
+      {
         // Fold-in redirect: the standalone /user/profile page was
         // removed when its UI moved into Settings → Profile tab.
         // Existing bookmarks / deep links land on the same surface.
