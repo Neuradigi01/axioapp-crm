@@ -75,7 +75,7 @@ from src.app.core.activities.service import log as activities_log
 from src.app.core.contacts.schemas import ContactCreate
 from src.app.core.contacts.service import create_contact
 from src.app.core.custom_fields.models import CustomFieldDefinition
-from src.app.core.leads.imports.dedup import find_existing_contact
+from src.app.core.leads.imports.dedup import ExistingContactMatch, resolve_existing_contact
 from src.app.core.leads.imports.models import LeadImport, LeadImportStatus
 from src.app.core.leads.imports.parser import HeaderInfo, ParsedRow, parse_rows
 from src.app.core.leads.ingest import ingest as ingest_lead
@@ -156,7 +156,7 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
             raise
 
         try:
-            counts, error_rows = await _commit_rows(
+            counts, error_rows, skipped_rows = await _commit_rows(
                 org_id=org_id, mapping=mapping, rows_iter=rows_iter
             )
         except Exception as exc:
@@ -173,6 +173,15 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
                 error_rows=error_rows,
             )
 
+        skipped_report_path: str | None = None
+        if skipped_rows:
+            skipped_report_path = await _write_skipped_csv(
+                org_id=org_id,
+                import_id=import_id,
+                header=header,
+                skipped_rows=skipped_rows,
+            )
+
         async with async_session() as session:
             row = (
                 await session.execute(select(LeadImport).where(LeadImport.id == import_id))
@@ -182,6 +191,7 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
             row.status = LeadImportStatus.completed
             row.counts = counts
             row.error_report_path = error_report_path
+            row.skipped_report_path = skipped_report_path
             await session.commit()
 
         await audit.log(
@@ -192,6 +202,7 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
                 "import_id": str(import_id),
                 "counts": counts,
                 "error_report_path": error_report_path,
+                "skipped_report_path": skipped_report_path,
             },
         )
         return {"status": "completed", "counts": counts}
@@ -258,15 +269,30 @@ async def _commit_rows(
     org_id: uuid.UUID,
     mapping: dict[str, str | None],
     rows_iter,
-) -> tuple[dict[str, int], list[dict[str, Any]]]:
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     """Walk the parsed-row iterator and create one contact+lead per row.
 
     Each row's writes happen in their own session/transaction so a
-    single bad row doesn't roll back the batch. The error list buffers
-    failed rows for the per-import error CSV.
+    single bad row doesn't roll back the batch. Two per-row buffers
+    are kept:
+
+    - ``error_rows`` — rows that raised (validation, coercion, invalid
+      pipeline stage, etc.). Written to ``errors.csv``.
+    - ``skipped_rows`` — rows where the ingester chose to merge into
+      an existing open lead instead of creating a new one. Written
+      to ``skipped.csv`` so operators can see *which* rows collapsed
+      and *why* (contact matched by phone/email + open lead existed).
+
+    Returned counts additionally include ``error_reasons`` and
+    ``skipped_reasons`` buckets so the result page can render a
+    "50× invalid pipeline_stage / 10× invalid date / …"-style
+    breakdown without re-downloading the per-row CSV.
     """
     imported = duplicates = errors = 0
     error_rows: list[dict[str, Any]] = []
+    skipped_rows: list[dict[str, Any]] = []
+    error_reasons: dict[str, int] = {}
+    skipped_reasons: dict[str, int] = {}
 
     # Load custom-field routing once per import — every row reuses it.
     contact_cf_keys, lead_cf_keys = await _load_custom_field_routing(org_id)
@@ -279,7 +305,9 @@ async def _commit_rows(
 
         if not full_name:
             errors += 1
-            error_rows.append(_make_error_row(parsed, "missing required field 'contact.full_name'"))
+            reason = "missing required field 'contact.full_name'"
+            error_rows.append(_make_error_row(parsed, reason))
+            _bump(error_reasons, _bucket_error(reason))
             continue
 
         contact_custom, lead_custom = _split_custom_data(mapped, contact_cf_keys, lead_cf_keys)
@@ -290,12 +318,14 @@ async def _commit_rows(
                 # final lead-creation through `ingest()`, which handles
                 # the open-lead dedup + round-robin assignment uniformly
                 # across all five channels.
-                existing_contact_id = await find_existing_contact(
+                match = await resolve_existing_contact(
                     session, org_id=org_id, phone=phone, email=email
                 )
-                if existing_contact_id is not None:
-                    contact_id = existing_contact_id
+                if match is not None:
+                    contact_id = match.contact_id
+                    contact_match_reason = _contact_match_reason(match)
                 else:
+                    contact_match_reason = "new_contact_created"
                     contact_payload = ContactCreate(
                         full_name=full_name,
                         phone=phone,
@@ -349,20 +379,103 @@ async def _commit_rows(
                     # (which is the more precise UX intent — the
                     # existing lead got a touchpoint activity instead).
                     duplicates += 1
+                    skip_bucket = _skipped_bucket(contact_match_reason)
+                    _bump(skipped_reasons, skip_bucket)
+                    skipped_rows.append(
+                        _make_skipped_row(
+                            parsed,
+                            contact_match_reason=contact_match_reason,
+                            matched_contact_id=str(contact_id),
+                            merged_into_lead_id=str(result.lead_id),
+                        )
+                    )
                 else:
                     imported += 1
         except Exception as exc:
             errors += 1
-            error_rows.append(_make_error_row(parsed, _format_exc(exc)))
+            reason = _format_exc(exc)
+            error_rows.append(_make_error_row(parsed, reason))
+            _bump(error_reasons, _bucket_error(reason))
 
     return (
         {
             "imported": imported,
             "duplicates_skipped": duplicates,
             "errors": errors,
+            "error_reasons": error_reasons,
+            "skipped_reasons": skipped_reasons,
         },
         error_rows,
+        skipped_rows,
     )
+
+
+def _bump(bucket: dict[str, int], key: str) -> None:
+    bucket[key] = bucket.get(key, 0) + 1
+
+
+def _bucket_error(reason: str) -> str:
+    """Collapse a per-row error message into a short display bucket.
+
+    Pydantic + our own ``_coerce_*`` helpers all emit messages whose
+    leading fragment is the useful part; trailing lines add stack
+    context that isn't operator-actionable. Split on ' — ' (the joiner
+    ``_format_exc`` uses for multi-line errors) and keep the first
+    segment, capped at 80 chars, so the result page can show a
+    "50× invalid date 'next' (expected YYYY-MM-DD)"-style tally.
+    """
+    head = reason.split(" — ", 1)[0].strip()
+    return head[:80] if head else "unknown"
+
+
+def _contact_match_reason(match: ExistingContactMatch) -> str:
+    """Translate a dedup match record into a stable slug used in both
+    the per-row CSV (``__contact_match_reason``) and the skipped_reasons
+    bucket keys. Handles the "matched on both" case explicitly so
+    operators can tell composite matches apart from phone-only /
+    email-only dedup hits."""
+    if match.matched_by_phone and match.matched_by_email:
+        return "existing_contact_matched_by_phone_and_email"
+    if match.matched_by_phone:
+        return "existing_contact_matched_by_phone"
+    if match.matched_by_email:
+        return "existing_contact_matched_by_email"
+    # Defensive — find_existing_contact only returns a hit when at least
+    # one key matched, so we should never land here.
+    return "existing_contact_matched"
+
+
+def _skipped_bucket(contact_match_reason: str) -> str:
+    """Human-readable bucket key for the ``skipped_reasons`` counter.
+
+    A skipped row is always the same underlying reason ("an open lead
+    already existed for this contact") — what varies is *how* we found
+    the contact. Rolling both facts into one string keeps the result
+    page's per-reason list a single flat readout without a nested tree.
+    """
+    suffix = {
+        "existing_contact_matched_by_phone_and_email": " (contact matched by phone + email)",
+        "existing_contact_matched_by_phone": " (contact matched by phone)",
+        "existing_contact_matched_by_email": " (contact matched by email)",
+    }.get(contact_match_reason, "")
+    return f"open lead already exists for this contact{suffix}"
+
+
+def _make_skipped_row(
+    parsed: ParsedRow,
+    *,
+    contact_match_reason: str,
+    matched_contact_id: str,
+    merged_into_lead_id: str,
+) -> dict[str, Any]:
+    """Build the dict the skipped CSV writer will dump as one row."""
+    return {
+        "row_number": parsed.row_number,
+        "raw": parsed.raw,
+        "contact_match_reason": contact_match_reason,
+        "matched_contact_id": matched_contact_id,
+        "merged_into_lead_id": merged_into_lead_id,
+    }
 
 
 def _coerce_decimal(value: str | None):
@@ -435,6 +548,44 @@ async def _write_error_csv(
     blob = buf.getvalue().encode("utf-8")
 
     storage_path = f"{org_id}/imports/{import_id}/errors.csv"
+    get_storage().put(storage_path, blob, content_type="text/csv")
+    return storage_path
+
+
+async def _write_skipped_csv(
+    *,
+    org_id: uuid.UUID,
+    import_id: uuid.UUID,
+    header: HeaderInfo,
+    skipped_rows: list[dict[str, Any]],
+) -> str:
+    """Write the per-import "duplicates skipped" CSV via storage.
+
+    Mirrors ``_write_error_csv`` — original column order is preserved,
+    then four inspection columns are appended so an operator can trace
+    *which* input row collapsed onto *which* existing lead without
+    cross-referencing anything: ``__row_number``, ``__contact_match_reason``,
+    ``__matched_contact_id``, ``__merged_into_lead_id``.
+    """
+    buf = io.StringIO()
+    columns = header.columns + [
+        "__row_number",
+        "__contact_match_reason",
+        "__matched_contact_id",
+        "__merged_into_lead_id",
+    ]
+    writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
+    writer.writeheader()
+    for row in skipped_rows:
+        out = dict(row["raw"])
+        out["__row_number"] = row["row_number"]
+        out["__contact_match_reason"] = row["contact_match_reason"]
+        out["__matched_contact_id"] = row["matched_contact_id"]
+        out["__merged_into_lead_id"] = row["merged_into_lead_id"]
+        writer.writerow(out)
+    blob = buf.getvalue().encode("utf-8")
+
+    storage_path = f"{org_id}/imports/{import_id}/skipped.csv"
     get_storage().put(storage_path, blob, content_type="text/csv")
     return storage_path
 

@@ -58,7 +58,7 @@
             </div>
             <div>
               <label class="block text-xs font-medium text-zinc-700" for="lf_cf_phone">
-                Phone <span class="text-red-600">*</span>
+                Phone <span class="font-normal text-zinc-400">(optional)</span>
               </label>
               <input
                 id="lf_cf_phone"
@@ -69,12 +69,12 @@
                 class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
               @if (contactBasics.controls.phone.touched && contactBasics.controls.phone.invalid) {
-                <p class="mt-1 text-xs text-red-600">Phone is required.</p>
+                <p class="mt-1 text-xs text-red-600">Phone is too long.</p>
               }
             </div>
             <div>
               <label class="block text-xs font-medium text-zinc-700" for="lf_cf_email">
-                Email <span class="text-red-600">*</span>
+                Email <span class="font-normal text-zinc-400">(optional)</span>
               </label>
               <input
                 id="lf_cf_email"
@@ -85,13 +85,7 @@
                 class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
               @if (contactBasics.controls.email.touched && contactBasics.controls.email.invalid) {
-                <p class="mt-1 text-xs text-red-600">
-                  @if (contactBasics.controls.email.errors?.['required']) {
-                    Email is required.
-                  } @else {
-                    Enter a valid email.
-                  }
-                </p>
+                <p class="mt-1 text-xs text-red-600">Enter a valid email.</p>
               }
             </div>
           </div>

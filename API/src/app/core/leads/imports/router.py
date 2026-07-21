@@ -52,6 +52,7 @@ from src.app.core.leads.imports.service import (
     list_imports,
     read_error_csv,
     read_preview,
+    read_skipped_csv,
     read_source_file,
     upload,
 )
@@ -298,6 +299,35 @@ async def download_import_errors_endpoint(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
     data = read_error_csv(row)
     filename = f"import-{import_id}-errors.csv"
+    return Response(
+        content=data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/{import_id}/skipped.csv")
+async def download_import_skipped_endpoint(
+    import_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("leads.import")),
+) -> Response:
+    """Download the per-import "duplicates skipped" CSV.
+
+    Contains one row per input row where dedup collapsed the new lead
+    into an existing open lead. Each row carries the original columns
+    plus four inspection columns: ``__row_number``,
+    ``__contact_match_reason``, ``__matched_contact_id``,
+    ``__merged_into_lead_id``.
+
+    404 if the import didn't skip anything (no file written) or the
+    row is foreign-org / nonexistent.
+    """
+    row = await get_import(db, import_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
+    data = read_skipped_csv(row)
+    filename = f"import-{import_id}-skipped.csv"
     return Response(
         content=data,
         media_type="text/csv",

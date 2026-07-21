@@ -17,6 +17,7 @@ import { buildHttpParams } from '../../shared/services/query-builder';
  *   POST   /leads/import/{id}/commit         → commit mapping → run job
  *   POST   /leads/import/{id}/cancel         → cancel pre-terminal
  *   GET    /leads/import/{id}/errors.csv     → download per-import errors
+ *   GET    /leads/import/{id}/skipped.csv    → download per-import duplicates
  *   GET    /leads/import/targets             → mappable CRM fields
  *   GET    /leads/import/presets             → system + org presets
  *   POST   /leads/import/presets             → save an org preset
@@ -57,6 +58,7 @@ export interface LeadImport {
   mapping: Record<string, string | null> | null;
   counts: ImportCounts | null;
   error_report_path: string | null;
+  skipped_report_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -66,6 +68,14 @@ export interface ImportCounts {
   duplicates_skipped?: number;
   errors?: number;
   fatal_error?: string;
+  /** Bucketed error reasons — `{ "invalid date 'next' …": 10, … }`. Populated by
+   * the processor so the result page can show a per-reason tally without
+   * requiring an errors.csv download. Empty when the run had no errors. */
+  error_reasons?: Record<string, number>;
+  /** Bucketed skip reasons — currently one flavour per contact-match key
+   * (phone / email / both), all under the "open lead already exists" umbrella
+   * since that's the only condition that triggers a merge in v1. */
+  skipped_reasons?: Record<string, number>;
 }
 
 export interface LeadImportListResponse {
@@ -159,6 +169,13 @@ export class ImportsApiService {
   /** Returns a Blob so the caller can trigger a browser download. */
   downloadErrors(importId: string): Observable<Blob> {
     return this.http.get(`${this.base}/${importId}/errors.csv`, {
+      responseType: 'blob',
+    });
+  }
+
+  /** Returns the "duplicates skipped" CSV as a Blob for browser download. */
+  downloadSkipped(importId: string): Observable<Blob> {
+    return this.http.get(`${this.base}/${importId}/skipped.csv`, {
       responseType: 'blob',
     });
   }

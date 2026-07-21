@@ -47,6 +47,7 @@ class LeadImportRead(TimestampedOrgScopedOut):
     mapping: dict[str, Any] | None = None
     counts: dict[str, Any] | None = None
     error_report_path: str | None = None
+    skipped_report_path: str | None = None
 
 
 LeadImportListResponse = PaginatedResponse[LeadImportRead]

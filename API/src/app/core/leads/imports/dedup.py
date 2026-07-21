@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from dataclasses import dataclass
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,6 +49,22 @@ def lowercase_email(value: str | None) -> str:
     return value.strip().lower()
 
 
+@dataclass(frozen=True, slots=True)
+class ExistingContactMatch:
+    """Result of an importer contact-dedup lookup.
+
+    ``matched_by_phone`` / ``matched_by_email`` describe which key(s)
+    caused the hit — both may be True when the incoming row's phone
+    AND email both matched the existing contact. The result-page
+    reason breakdown uses these to tell operators *why* their row
+    collapsed onto an existing contact.
+    """
+
+    contact_id: uuid.UUID
+    matched_by_phone: bool
+    matched_by_email: bool
+
+
 async def find_existing_contact(
     session: AsyncSession,
     *,
@@ -57,6 +74,30 @@ async def find_existing_contact(
 ) -> uuid.UUID | None:
     """Return the id of an existing contact in `org_id` matching by
     phone OR email; None if no match (or if both inputs are blank).
+
+    Slim companion to :func:`resolve_existing_contact` — callers that
+    only need the id (Google/Meta webhooks, embed submissions) stay
+    on this shape so the return type doesn't force the rich match
+    dataclass on paths that would just discard it.
+    """
+    match = await resolve_existing_contact(
+        session, org_id=org_id, phone=phone, email=email
+    )
+    return match.contact_id if match is not None else None
+
+
+async def resolve_existing_contact(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    phone: str | None,
+    email: str | None,
+) -> ExistingContactMatch | None:
+    """Return the match record for an existing contact in `org_id`
+    matching by phone OR email; None if no match (or if both inputs
+    are blank). Callers that need to know *which* key matched (the
+    bulk-import result page) use this shape; callers that just need
+    the id use :func:`find_existing_contact`.
 
     `org_id` is passed explicitly even though RLS + the ORM tenant
     filter scope reads to the active org — this function runs raw
@@ -70,7 +111,11 @@ async def find_existing_contact(
 
     sql = text(
         """
-        SELECT id FROM tbl_contacts
+        SELECT
+            id,
+            (:phone_norm <> '' AND regexp_replace(coalesce(phone, ''), '\\D', '', 'g') = :phone_norm) AS matched_phone,
+            (:email_low  <> '' AND lower(coalesce(email, '')) = :email_low)                            AS matched_email
+        FROM tbl_contacts
         WHERE org_id = :org_id
           AND (
               (:phone_norm <> '' AND regexp_replace(coalesce(phone, ''), '\\D', '', 'g') = :phone_norm)
@@ -87,7 +132,20 @@ async def find_existing_contact(
             "email_low": email_low,
         },
     )
-    return result.scalar()
+    row = result.first()
+    if row is None:
+        return None
+    return ExistingContactMatch(
+        contact_id=row[0],
+        matched_by_phone=bool(row[1]),
+        matched_by_email=bool(row[2]),
+    )
 
 
-__all__ = ["find_existing_contact", "lowercase_email", "normalize_phone"]
+__all__ = [
+    "ExistingContactMatch",
+    "find_existing_contact",
+    "lowercase_email",
+    "normalize_phone",
+    "resolve_existing_contact",
+]
