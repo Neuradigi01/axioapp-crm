@@ -14,7 +14,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../auth/auth.service';
-import { forkJoin, of } from 'rxjs';
+import { of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { ContactsApiService } from '../contacts/contacts-api.service';
@@ -542,6 +542,7 @@ export class LeadsPageComponent {
       source: this.sourceFilter() || undefined,
       status: (this.statusControl.value as LeadStatus) || undefined,
       assigned_to: this.resolveAssignee(),
+      unassigned_only: this.assigneeControl.value === 'unassigned' ? true : undefined,
       last_activity_lt: this.resolveNoActivityCutoff() ?? undefined,
       sort: this.sortKey(),
       order: this.sortOrder(),
@@ -1397,13 +1398,24 @@ export class LeadsPageComponent {
   }
 
   private fetchContacts(ids: string[]): void {
-    forkJoin(ids.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((results) => {
-        this.contactsById.update((cache) => {
-          const next = { ...cache };
-          for (const c of results) {
-            if (c) {
+    // Batched hydrate collapses N per-id `GET /contacts/{id}` requests
+    // into one `POST /contacts/hydrate`. Backend caps id lists at
+    // 200; the list size matches the leads page cap so chunking is a
+    // no-op today, but we chunk defensively for future page-size
+    // bumps.
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      this.contactsApi
+        .hydrateByIds(slice)
+        .pipe(
+          catchError(() => of([])),
+          takeUntilDestroyed(this.destroyRef),
+        )
+        .subscribe((results) => {
+          this.contactsById.update((cache) => {
+            const next = { ...cache };
+            for (const c of results) {
               next[c.id] = {
                 id: c.id,
                 full_name: c.full_name,
@@ -1411,9 +1423,9 @@ export class LeadsPageComponent {
                 source: c.source,
               };
             }
-          }
-          return next;
+            return next;
+          });
         });
-      });
+    }
   }
 }

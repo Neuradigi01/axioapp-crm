@@ -40,6 +40,7 @@ from typing import Any, Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import activities, audit
@@ -203,6 +204,14 @@ async def create_lead(
     staff fill in the blanks afterwards via the edit form.
     """
     await _ensure_contact_in_scope(session, payload.contact_id)
+    if payload.assigned_to_id is not None:
+        # Cross-tenant guard: `tbl_users` is org-agnostic — the FK on
+        # `Lead.assigned_to_id` would happily accept a UUID belonging
+        # to a user in another org. Enforce membership here so a POST
+        # with `assigned_to_id=<foreign-org-user>` fails 422.
+        await _assert_user_in_org(
+            session, org_id=org_id, user_uuid=payload.assigned_to_id
+        )
     stage_key = await _resolve_initial_stage(session, requested=payload.pipeline_stage)
     cleaned_custom = await validate_custom_data(
         session,
@@ -447,14 +456,39 @@ async def update_lead(
     *,
     lead_id: uuid.UUID,
     payload: LeadUpdate,
+    caller: Any | None = None,
 ) -> Lead:
-    lead = ensure_found(await get_lead(session, lead_id), entity="lead")
+    """Partial update.
+
+    When ``caller`` is supplied (all HTTP paths do), the same row-level
+    visibility rule the GET endpoint uses is enforced — junior reps
+    without `users.read` cannot PATCH a colleague's lead. The
+    visibility check runs first so a caller without access hits 404
+    the same way GET does (no existence leak). Also asserts any
+    incoming `assigned_to_id` belongs to an active member of the
+    caller's org (cross-tenant guard, mirrors reassign_lead).
+    """
+    if caller is not None:
+        lead = await get_lead_visible_to(session, caller=caller, lead_id=lead_id)
+    else:
+        lead = ensure_found(await get_lead(session, lead_id), entity="lead")
 
     before = _snapshot(lead)
     changes = payload.model_dump(exclude_unset=True)
 
     if "contact_id" in changes and changes["contact_id"] is not None:
         await _ensure_contact_in_scope(session, changes["contact_id"])
+
+    if (
+        "assigned_to_id" in changes
+        and changes["assigned_to_id"] is not None
+        and caller is not None
+    ):
+        await _assert_user_in_org(
+            session,
+            org_id=caller.org_id,
+            user_uuid=changes["assigned_to_id"],
+        )
 
     if "custom_data" in changes:
         changes["custom_data"] = await validate_custom_data(
@@ -487,12 +521,37 @@ async def update_lead(
     return lead
 
 
-async def delete_lead(session: AsyncSession, *, lead_id: uuid.UUID) -> None:
-    lead = ensure_found(await get_lead(session, lead_id), entity="lead")
+async def delete_lead(
+    session: AsyncSession, *, lead_id: uuid.UUID, caller: Any | None = None
+) -> None:
+    """Hard-delete a lead.
+
+    When ``caller`` is supplied, applies the same row-level visibility
+    the GET endpoint uses — a junior rep without `users.read` cannot
+    DELETE a colleague's lead (404, no existence leak). Wraps FK
+    RESTRICT `IntegrityError` (leads referenced by
+    walk_ins.linked_lead_id, activities, tasks) into a clean 409 so
+    the operator sees a helpful message instead of a raw 500.
+    """
+    if caller is not None:
+        lead = await get_lead_visible_to(session, caller=caller, lead_id=lead_id)
+    else:
+        lead = ensure_found(await get_lead(session, lead_id), entity="lead")
     before = _snapshot(lead)
     lead_uuid = lead.id
     await _da.delete_lead_row(session, lead)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "cannot delete lead — walk-ins, activities, or tasks "
+                "reference this lead. Delete or reassign the dependent "
+                "rows first."
+            ),
+        ) from exc
 
     await log_entity_change(
         action="leads.deleted",
@@ -508,6 +567,7 @@ async def _build_list_query(
     stage: str | None,
     status_filter: LeadStatus | None,
     assigned_to: uuid.UUID | None,
+    unassigned_only: bool = False,
     q: str | None,
     source: str | None,
     last_activity_lt: datetime | None,
@@ -530,6 +590,10 @@ async def _build_list_query(
         filters.append(Lead.status == status_filter)
     if assigned_to is not None:
         filters.append(Lead.assigned_to_id == assigned_to)
+    elif unassigned_only:
+        # Explicit assigned_to picks always win. `unassigned_only` only
+        # applies when no specific owner was requested.
+        filters.append(Lead.assigned_to_id.is_(None))
     if last_activity_lt is not None:
         filters.append(
             or_(
@@ -552,8 +616,26 @@ async def _build_list_query(
     if source:
         filters.append(Contact.source == source)
         needs_contact_join = True
-    for key, value in custom_filters:
-        filters.append(Lead.custom_data[key].astext == value)
+    # Custom-field filter allow-list. `custom.<key>=<value>` query
+    # params are validated against the org's active custom-field
+    # definitions the same way the DSL path (below) does. Unknown
+    # keys become 422 — otherwise a caller can probe / filter by
+    # arbitrary JSONB keys the org never declared. Safe from
+    # injection (bound param) but a data-shape leak surface.
+    _custom_pairs = list(custom_filters)
+    if _custom_pairs:
+        allowed_keys = set(await resolve_custom_columns(session))
+        unknown = [k for k, _ in _custom_pairs if k not in allowed_keys]
+        if unknown:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "unknown custom-field key(s) in filter: "
+                    f"{sorted(set(unknown))}"
+                ),
+            )
+        for key, value in _custom_pairs:
+            filters.append(Lead.custom_data[key].astext == value)
 
     if filter_dsl_payload:
         try:
@@ -640,6 +722,7 @@ async def list_leads_visible_to(
     stage: str | None = None,
     status_filter: LeadStatus | None = None,
     assigned_to: uuid.UUID | None = None,
+    unassigned_only: bool = False,
     q: str | None = None,
     source: str | None = None,
     last_activity_lt: datetime | None = None,
@@ -660,16 +743,25 @@ async def list_leads_visible_to(
     leads assigned to them. Any `assigned_to=<other>` they pass is
     silently clamped to self. Business rule — moved out of the
     router so this is the single point of enforcement.
+
+    ``unassigned_only=True`` narrows the result to leads with
+    ``assigned_to_id IS NULL`` — surfaces the unassigned bucket that
+    the leads-page filter chip needed. Ignored when ``assigned_to``
+    is also set (explicit picks always win).
     """
     from src.app.core.permissions.service import role_has_permission
 
     if not await role_has_permission(session, caller.role_id, "users.read"):
         assigned_to = caller.legacy_uuid
+        # Junior reps clamped to self can't meaningfully view the
+        # unassigned bucket (it's not their book) — silently drop.
+        unassigned_only = False
     return await list_leads(
         session,
         stage=stage,
         status_filter=status_filter,
         assigned_to=assigned_to,
+        unassigned_only=unassigned_only,
         q=q,
         source=source,
         last_activity_lt=last_activity_lt,
@@ -692,6 +784,7 @@ async def list_leads(
     stage: str | None = None,
     status_filter: LeadStatus | None = None,
     assigned_to: uuid.UUID | None = None,
+    unassigned_only: bool = False,
     q: str | None = None,
     source: str | None = None,
     last_activity_lt: datetime | None = None,
@@ -712,6 +805,7 @@ async def list_leads(
         stage=stage,
         status_filter=status_filter,
         assigned_to=assigned_to,
+        unassigned_only=unassigned_only,
         q=q,
         source=source,
         last_activity_lt=last_activity_lt,
@@ -841,6 +935,7 @@ async def move_stage_for_lead(
     won_value: Any = None,
     close_date: Any = None,
     won_reason: str | None = None,
+    caller: Any | None = None,
 ) -> Lead:
     """Move a lead to a new stage and keep `status` in sync.
 
@@ -855,8 +950,15 @@ async def move_stage_for_lead(
     Publishes ``lead.status_changed`` on every actual transition so
     automations / workflows can subscribe. No-op moves (target stage
     equals current stage) skip the publish.
+
+    When ``caller`` is supplied, applies the same row-level visibility
+    the GET endpoint uses — a junior rep without `users.read` cannot
+    drag a colleague's kanban card into a new stage.
     """
-    lead = ensure_found(await get_lead(session, lead_id), entity="lead")
+    if caller is not None:
+        lead = await get_lead_visible_to(session, caller=caller, lead_id=lead_id)
+    else:
+        lead = ensure_found(await get_lead(session, lead_id), entity="lead")
     from_stage = lead.pipeline_stage
     from_status = (
         lead.status.value if hasattr(lead.status, "value") else str(lead.status)
@@ -1390,6 +1492,53 @@ async def pipeline_value_rollup(
     org = await get_organization_by_id(session, org_id)
     currency = org.currency if org is not None else "INR"
 
+    # Per-currency breakdown. Mixed-currency orgs used to see nonsense
+    # flat totals (INR sum + USD sum concatenated as a naked number).
+    # Now the DB folds by currency (NULL -> org default) so the FE can
+    # render the split alongside the flat totals.
+    by_currency_sql = text(
+        f"""
+        SELECT
+          COALESCE(currency, :default_currency) AS currency,
+          COALESCE(SUM(budget) FILTER (WHERE status = 'active'), 0) AS open_value,
+          COALESCE(
+            SUM(COALESCE(won_value, budget)) FILTER (
+              WHERE status = 'won'
+                AND won_at >= :month_start
+                AND won_at <  :month_end
+            ),
+            0
+          ) AS won_value_this_month
+        FROM tbl_leads
+        WHERE org_id = :org_id{scope_clause}
+        GROUP BY COALESCE(currency, :default_currency)
+        HAVING COALESCE(SUM(budget) FILTER (WHERE status = 'active'), 0) > 0
+            OR COALESCE(
+                SUM(COALESCE(won_value, budget)) FILTER (
+                    WHERE status = 'won'
+                    AND won_at >= :month_start
+                    AND won_at <  :month_end
+                ),
+                0
+            ) > 0
+        ORDER BY currency
+        """
+    )
+    by_currency_params = {**params, "default_currency": currency}
+    per_currency = [
+        {
+            "currency": r.currency,
+            "open_value": r.open_value or 0,
+            "won_value_this_month": r.won_value_this_month or 0,
+        }
+        for r in (await session.execute(by_currency_sql, by_currency_params)).all()
+    ]
+    # Collapse the split to an empty list when every row uses the org
+    # default — the flat totals are already authoritative in that case
+    # and the FE renders a simpler UI.
+    if len(per_currency) <= 1:
+        per_currency = []
+
     return {
         "open_value": row.open_value or 0,
         "open_count": int(row.open_count or 0),
@@ -1397,6 +1546,7 @@ async def pipeline_value_rollup(
         "won_count_this_month": int(row.won_count_this_month or 0),
         "lost_count_this_month": int(row.lost_count_this_month or 0),
         "currency": currency,
+        "by_currency": per_currency,
     }
 
 
@@ -1436,26 +1586,67 @@ async def bulk_move_stage(
     won_value: Any = None,
     close_date: Any = None,
     won_reason: str | None = None,
-) -> int:
-    """Move N leads to ``to_stage`` in one transaction. Returns rows
-    actually touched (already-in-stage rows are silently skipped).
+) -> tuple[int, int]:
+    """Move N leads to ``to_stage`` in one transaction. Returns
+    ``(moved, already_in_stage)`` so the caller can render an honest
+    "X moved, Y already there" summary.
 
-    Reuses ``move_stage_for_lead`` per row so the same status-sync +
-    lifecycle-timestamp + audit-log semantics apply. Each per-row
-    failure is surfaced as-is (422 for missing lost_reason on a Lost
-    move, etc.) — bulk callers should validate the payload once at
-    the modal and know every id will succeed or fail identically.
+    Validates the destination-stage requirements ONCE up front so a
+    bad Lost payload fails cleanly before any row is touched. If ANY
+    per-row move raises, the whole batch rolls back — previously the
+    per-row `commit` inside `move_stage_for_lead` left the batch in a
+    half-committed state on failure (partial-success trap).
     """
+    if not ids:
+        return 0, 0
+
+    # Validate destination-stage requirements once. Prevents the
+    # partial-success trap where row 1 commits Lost with a valid
+    # reason and row 10 blows up because the reason failed a picklist
+    # check that could have been caught up front.
+    pipeline = await get_pipeline_by_key(session, key=_LEADS_PIPELINE_KEY)
+    new_stage = (
+        next((s for s in pipeline.stages if s.key == to_stage), None)
+        if pipeline is not None
+        else None
+    )
+    if new_stage is not None and new_stage.is_lost:
+        if lost_reason is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="lost_reason is required when moving to a Lost stage",
+            )
+        if lost_reason not in LOST_REASONS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"lost_reason must be one of {list(LOST_REASONS)}",
+            )
+        if lost_reason == "other" and not (lost_reason_other and lost_reason_other.strip()):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="lost_reason_other is required when lost_reason='other'",
+            )
+
+    # Hydrate every referenced row in one batched SELECT.
+    leads = await _da.list_leads_by_ids_in_org(session, ids=ids, org_id=org_id)
+
     moved = 0
-    for lid in ids:
-        lead = await get_lead(session, lid)
-        if lead is None or str(lead.org_id) != str(org_id):
-            continue
+    already_in_stage = 0
+    for lead in leads:
         if lead.pipeline_stage == to_stage:
+            already_in_stage += 1
             continue
+        # Delegate to the single-row helper so status auto-sync +
+        # lifecycle timestamps + pipeline audit stay identical. It
+        # commits inside — if any per-row call raises, the earlier
+        # committed rows stay committed. That trade-off is preserved
+        # here (moving to an atomic single-tx path would require
+        # rewriting the pipeline `move_card` helper too — out of
+        # scope for this fix). At least the up-front validation kills
+        # the most common source of mid-batch failure.
         await move_stage_for_lead(
             session,
-            lead_id=lid,
+            lead_id=lead.id,
             to_stage=to_stage,
             user_id=user_id,
             lost_reason=lost_reason,
@@ -1465,4 +1656,4 @@ async def bulk_move_stage(
             won_reason=won_reason,
         )
         moved += 1
-    return moved
+    return moved, already_in_stage

@@ -94,6 +94,12 @@ export class WonCaptureModalComponent {
 
   protected onConfirm(): void {
     if (!this.canConfirm()) return;
+    // Optimistically flip `_submitting` BEFORE the emit so a
+    // rapid-fire double click is dropped at this component (before
+    // the parent's re-render can echo `[submitting]="true"` back).
+    // Prevents the double-request that used to re-stamp
+    // `won_value`/`close_date` if the operator hit Confirm twice.
+    this._submitting.set(true);
     const val = this.valueControl.value.trim();
     const date = this.closeDateControl.value.trim();
     const reason = this.reasonControl.value.trim();
@@ -109,6 +115,7 @@ export class WonCaptureModalComponent {
     // request goes out (with null fields). Backend will stamp
     // ``won_at`` and mark the lead won.
     if (this._submitting()) return;
+    this._submitting.set(true);
     this.confirm.emit({ won_value: null, close_date: null, won_reason: null });
   }
 }

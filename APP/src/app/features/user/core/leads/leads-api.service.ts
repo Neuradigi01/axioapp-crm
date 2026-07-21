@@ -16,7 +16,14 @@ export type LeadStatus = 'active' | 'won' | 'lost';
 
 /** Provenance of a lead row. Matches the backend `lead_source` PG enum
  * exactly — keep in sync. */
-export type LeadSource = 'manual' | 'bulk_import' | 'widget' | 'google_ads' | 'meta_ads';
+export type LeadSource =
+  | 'manual'
+  | 'bulk_import'
+  | 'widget'
+  | 'google_ads'
+  | 'meta_ads'
+  | 'whatsapp_flow'
+  | 'walk_in';
 
 export interface Lead {
   id: string;
@@ -55,6 +62,10 @@ export interface Lead {
    * Meta sends `external_form_id`, `external_lead_id`, `page_id`;
    * widget sends `utm_source`, `utm_medium`, `utm_campaign`, `referrer`. */
   attribution: Record<string, unknown> | null;
+  /** W6 attribution — set when the lead was created from a walk-in
+   *  conversion. Detail-page renders an "Originated from walk-in"
+   *  panel that deep-links back to the walk-in row when set. */
+  source_walk_in_id?: string | null;
   created_at: string;
   updated_at: string;
   /** Index signature so `Lead` is structurally compatible with `PipelineItem`. */
@@ -109,6 +120,12 @@ export type LeadUpdate = Partial<{
  *  Values are strings because Pydantic serialises Decimal as a string
  *  by default; the frontend formats via `Intl.NumberFormat` using the
  *  returned `currency`. */
+export interface PipelineValueByCurrency {
+  currency: string;
+  open_value: string;
+  won_value_this_month: string;
+}
+
 export interface PipelineValueRollup {
   open_value: string;
   open_count: number;
@@ -116,6 +133,9 @@ export interface PipelineValueRollup {
   won_count_this_month: number;
   lost_count_this_month: number;
   currency: string;
+  /** Per-currency split for mixed-currency orgs. Empty when every
+   *  lead uses the org default (flat totals are authoritative). */
+  by_currency?: PipelineValueByCurrency[];
 }
 
 /** Routing config (F1 / E.16). v1 accepts only `round_robin`; the
@@ -163,6 +183,10 @@ export interface LeadListQuery {
   stage?: string;
   status?: LeadStatus;
   assigned_to?: string | null;
+  /** When true, only leads with `assigned_to_id IS NULL` are returned.
+   *  Ignored if `assigned_to` is also set. Powers the "Unassigned"
+   *  chip on the assignee filter. */
+  unassigned_only?: boolean;
   q?: string;
   source?: string;
   /** ISO timestamps for the no-activity chip. `lt` returns rows older
@@ -259,7 +283,9 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
 
   /** F4 — Bulk move-stage. Moves every id to the same `to_stage`;
    *  same validation rules as single-row move-stage apply (Lost
-   *  needs a reason). */
+   *  needs a reason). Returns `{moved, already_in_stage}` so the FE
+   *  can render an honest "X moved, Y already there" summary
+   *  (previous shape underreported by rolling both into `reassigned`). */
   bulkMoveStage(
     ids: string[],
     toStage: string,
@@ -270,16 +296,19 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
       close_date?: string | null;
       won_reason?: string | null;
     },
-  ): Observable<{ reassigned: number }> {
-    return this.http.post<{ reassigned: number }>(`${this.base}/bulk-move-stage`, {
-      ids,
-      to_stage: toStage,
-      lost_reason: extras?.lost_reason ?? null,
-      lost_reason_other: extras?.lost_reason_other ?? null,
-      won_value: extras?.won_value ?? null,
-      close_date: extras?.close_date ?? null,
-      won_reason: extras?.won_reason ?? null,
-    });
+  ): Observable<{ moved: number; already_in_stage: number }> {
+    return this.http.post<{ moved: number; already_in_stage: number }>(
+      `${this.base}/bulk-move-stage`,
+      {
+        ids,
+        to_stage: toStage,
+        lost_reason: extras?.lost_reason ?? null,
+        lost_reason_other: extras?.lost_reason_other ?? null,
+        won_value: extras?.won_value ?? null,
+        close_date: extras?.close_date ?? null,
+        won_reason: extras?.won_reason ?? null,
+      },
+    );
   }
 
   /** F23 — Pipeline value roll-up. Scope follows caller's row
@@ -371,6 +400,7 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
       stage: query.stage,
       status: query.status,
       assigned_to: query.assigned_to,
+      unassigned_only: query.unassigned_only ? true : undefined,
       q: query.q,
       source: query.source,
       last_activity_lt: query.last_activity_lt,

@@ -338,6 +338,27 @@ async def commit_mapping(
             ),
         )
 
+    # Reject duplicate non-tag targets. Silent last-write-wins on
+    # `contact.full_name` / `contact.phone` / `contact.email` /
+    # `contact.source` corrupts data — surface the conflict as 422 so
+    # the operator picks one column and marks the other `skip`.
+    # Duplicate `contact.tag` targets are allowed (they aggregate).
+    seen_targets: dict[str, str] = {}
+    conflicts: list[str] = []
+    for column, target in mapping.items():
+        if not target or target == "skip" or target == "contact.tag":
+            continue
+        prior = seen_targets.get(target)
+        if prior is not None:
+            conflicts.append(f"{prior!r} and {column!r} both map to {target!r}")
+        else:
+            seen_targets[target] = column
+    if conflicts:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Duplicate mapping targets: " + "; ".join(conflicts),
+        )
+
     row.mapping = mapping
     row.status = LeadImportStatus.mapping_committed
     await session.commit()
@@ -410,10 +431,17 @@ def read_preview(import_row: LeadImport, limit: int) -> PreviewPayload:
     header, rows_iter = parse_rows(import_row.storage_path, mapping={})
 
     rows: list[list[str | None]] = []
-    for parsed in rows_iter:
-        if len(rows) >= capped_limit:
-            break
-        rows.append([parsed.raw.get(col) for col in header.columns])
+    try:
+        for parsed in rows_iter:
+            if len(rows) >= capped_limit:
+                break
+            rows.append([parsed.raw.get(col) for col in header.columns])
+    finally:
+        # Force the parser generator's `finally: wb.close()` to run
+        # even when we break out early after `capped_limit`. Without
+        # this, the openpyxl workbook stays open until GC (or never)
+        # and its underlying file handle leaks per preview call.
+        rows_iter.close()
 
     return PreviewPayload(columns=header.columns, rows=rows)
 

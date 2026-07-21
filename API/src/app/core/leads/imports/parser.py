@@ -145,6 +145,12 @@ def parse_xlsx_rows(
                     else:
                         text = str(value).strip()
                         raw[col] = text or None
+                # Skip all-empty rows past the last real data row.
+                # openpyxl's used-range often over-counts on workbooks
+                # with stray formatting past the data, inflating
+                # `will_skip` counts and per-row errors otherwise.
+                if not any(v for v in raw.values()):
+                    continue
                 yield ParsedRow(
                     row_number=idx,
                     raw=raw,

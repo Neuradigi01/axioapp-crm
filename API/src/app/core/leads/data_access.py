@@ -114,6 +114,22 @@ async def bulk_delete_leads_by_ids(
     return int(result.rowcount or 0)
 
 
+async def list_leads_by_ids_in_org(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> list[Lead]:
+    """Batched hydrate for bulk-move-stage. Empty input returns [] without
+    a round-trip. Belt + suspenders on org_id."""
+    if not ids:
+        return []
+    result = await session.execute(
+        select(Lead).where(Lead.id.in_(ids), Lead.org_id == org_id)
+    )
+    return list(result.scalars().all())
+
+
 def insert_lead(session: AsyncSession, lead: Lead) -> None:
     """Register an already-constructed Lead for INSERT."""
     session.add(lead)

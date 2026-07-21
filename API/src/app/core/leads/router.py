@@ -39,6 +39,8 @@ from src.app.core.leads.models import LeadStatus
 from src.app.core.leads.schemas import (
     LeadBulkDelete,
     LeadBulkDeleteResult,
+    LeadBulkMoveStageRequest,
+    LeadBulkMoveStageResult,
     LeadBulkReassign,
     LeadBulkReassignResult,
     LeadCreate,
@@ -126,6 +128,13 @@ async def list_leads_endpoint(
     stage: str | None = Query(default=None, max_length=64),
     status_filter: LeadStatus | None = Query(default=None, alias="status"),
     assigned_to: uuid.UUID | None = Query(default=None),
+    unassigned_only: bool = Query(
+        default=False,
+        description=(
+            "When true, only leads with `assigned_to_id IS NULL` are "
+            "returned. Ignored when `assigned_to` is also set."
+        ),
+    ),
     q: str | None = Query(default=None, max_length=255),
     source: str | None = Query(default=None, max_length=64),
     last_activity_lt: datetime | None = Query(default=None),
@@ -155,6 +164,7 @@ async def list_leads_endpoint(
         stage=stage,
         status_filter=status_filter,
         assigned_to=assigned_to,
+        unassigned_only=unassigned_only,
         q=q,
         source=source,
         last_activity_lt=last_activity_lt,
@@ -229,6 +239,7 @@ async def export_leads_csv_endpoint(
     sort: Literal["created_at", "last_activity_at", "lead_score", "contact_name"] = Query(
         default="created_at"
     ),
+    order: Literal["asc", "desc"] = Query(default="desc"),
     filter_param: str | None = Query(default=None, alias="filter", max_length=4096),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("leads.export")),
@@ -260,7 +271,13 @@ async def export_leads_csv_endpoint(
     filename = export_filename(org.slug)
 
     return StreamingResponse(
-        export_rows(db, where_clause=where_clause, needs_contact_join=needs_join),
+        export_rows(
+            db,
+            where_clause=where_clause,
+            needs_contact_join=needs_join,
+            sort=sort,
+            order=order,
+        ),
         media_type="text/csv",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
@@ -397,9 +414,25 @@ async def update_lead_endpoint(
     lead_id: uuid.UUID,
     payload: LeadUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("leads.write")),
+    caller: User = Depends(require_permissions("leads.write")),
 ) -> LeadOut:
-    lead = await update_lead(db, lead_id=lead_id, payload=payload)
+    # Reassign gate: mirror the contacts / walk-ins fix — a PATCH that
+    # includes `assigned_to_id` must also carry `leads.reassign`,
+    # otherwise the edit modal is a side-door around the dedicated
+    # reassign gate.
+    changes = payload.model_dump(exclude_unset=True)
+    if "assigned_to_id" in changes:
+        if not await role_has_permission(db, caller.role_id, "leads.reassign"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Missing permission(s): leads.reassign",
+            )
+    lead = await update_lead(
+        db,
+        lead_id=lead_id,
+        payload=payload,
+        caller=caller,
+    )
     return LeadOut.model_validate(lead)
 
 
@@ -407,9 +440,9 @@ async def update_lead_endpoint(
 async def delete_lead_endpoint(
     lead_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("leads.write")),
+    caller: User = Depends(require_permissions("leads.write")),
 ) -> Response:
-    await delete_lead(db, lead_id=lead_id)
+    await delete_lead(db, lead_id=lead_id, caller=caller)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -430,6 +463,7 @@ async def move_lead_stage_endpoint(
         won_value=payload.won_value,
         close_date=payload.close_date,
         won_reason=payload.won_reason,
+        caller=user,
     )
     return LeadOut.model_validate(lead)
 
@@ -485,34 +519,19 @@ async def bulk_delete_leads_endpoint(
 # --- Bulk move-stage (F4) ---------------------------------------------------
 
 
-class _BulkMoveStageRequest(MoveStageRequest):
-    """Bulk-move payload — the standard MoveStageRequest plus an ``ids``
-    list. Kept as a router-local shape because it's only used here."""
-
-    ids: list[uuid.UUID] = []
-
-
-class _BulkMoveStageResult(LeadBulkReassignResult):
-    """Same shape as bulk-reassign — just a count. Alias so client
-    generators don't emit two identical types."""
-
-    pass
-
-
-@router.post("/bulk-move-stage", response_model=_BulkMoveStageResult)
+@router.post("/bulk-move-stage", response_model=LeadBulkMoveStageResult)
 async def bulk_move_stage_endpoint(
-    payload: _BulkMoveStageRequest,
+    payload: LeadBulkMoveStageRequest,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("leads.write")),
-) -> _BulkMoveStageResult:
+) -> LeadBulkMoveStageResult:
     """Move ``payload.ids`` all to ``payload.to_stage`` in one call.
 
-    Same validation rules as the single-row endpoint (Lost needs a
-    reason; Won can carry optional value/close_date/reason). All rows
-    in one bulk call get the same close metadata, which matches the
-    typical operator workflow — "close out these five deals with the
-    same reason". Rep can refine per-lead afterwards via PATCH."""
-    moved = await bulk_move_stage(
+    Ids are capped at 200 by the schema (via `BulkIds`). Same
+    validation rules as the single-row endpoint (Lost needs a reason;
+    Won can carry optional value/close_date/reason). All rows in one
+    bulk call get the same close metadata."""
+    moved, already = await bulk_move_stage(
         db,
         ids=payload.ids,
         to_stage=payload.to_stage,
@@ -524,4 +543,4 @@ async def bulk_move_stage_endpoint(
         close_date=payload.close_date,
         won_reason=payload.won_reason,
     )
-    return _BulkMoveStageResult(reassigned=moved)
+    return LeadBulkMoveStageResult(moved=moved, already_in_stage=already)

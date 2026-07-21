@@ -110,22 +110,29 @@ async def recompute_lead(
 async def recompute_org_scores(session: AsyncSession, *, org_id: uuid.UUID) -> int:
     """Bulk-recompute every lead in the org. Returns rows touched.
 
-    Streams leads in batches of 500 to keep the working set bounded.
+    Streams leads in keyset batches of 500 ordered by id. Keyset
+    walking avoids the deep-offset O(N²) scan the previous
+    ``.offset(offset)`` approach did on 10k+-lead orgs — Postgres
+    used to re-scan the first ``offset`` rows before returning the
+    batch. Now every batch is a bounded index-range read.
+
     Commits once at the end — the caller is responsible for any
     larger transaction it wants to wrap this in.
     """
     rules = await fetch_active_rules(session, org_id=org_id)
     touched = 0
-    offset = 0
     batch_size = 500
+    last_id: uuid.UUID | None = None
     while True:
-        result = await session.execute(
+        stmt = (
             select(Lead)
             .where(Lead.org_id == org_id)
             .order_by(Lead.id)
-            .offset(offset)
             .limit(batch_size)
         )
+        if last_id is not None:
+            stmt = stmt.where(Lead.id > last_id)
+        result = await session.execute(stmt)
         batch = list(result.scalars())
         if not batch:
             break
@@ -134,8 +141,10 @@ async def recompute_org_scores(session: AsyncSession, *, org_id: uuid.UUID) -> i
             if lead.lead_score != new_score:
                 lead.lead_score = new_score
                 touched += 1
+            last_id = lead.id
         await session.flush()
-        offset += batch_size
+        if len(batch) < batch_size:
+            break
     await session.commit()
     # The rule-relevant-fields cache is keyed by org; invalidate
     # because some rules may have changed before the caller invoked us.

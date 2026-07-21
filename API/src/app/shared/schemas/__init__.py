@@ -10,6 +10,7 @@ from src.app.shared.schemas.bulk_actions import (
     BulkAddTagResult,
     BulkDelete,
     BulkDeleteResult,
+    BulkIds,
     BulkReassign,
     BulkReassignResult,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "BulkAddTagResult",
     "BulkDelete",
     "BulkDeleteResult",
+    "BulkIds",
     "BulkReassign",
     "BulkReassignResult",
     "ORMModel",

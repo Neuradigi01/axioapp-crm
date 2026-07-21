@@ -91,7 +91,22 @@ async def ingest(
     existing_lead_id = await find_open_lead_for_contact(
         session, org_id=org_id, contact_id=contact_id
     )
+    existing_assignee_id: uuid.UUID | None = None
     if existing_lead_id is not None:
+        # Surface the existing lead's current owner in `IngestResult`
+        # so `assigned` publishers / notifiers on the merged branch
+        # don't get `None` when the row is actually owned. The
+        # additional round-trip is cheap (single-PK read) and only
+        # fires on the dedup-hit path.
+        from src.app.core.leads.models import Lead as _Lead
+        from sqlalchemy import select as _select
+
+        _existing = (
+            await session.execute(
+                _select(_Lead.assigned_to_id).where(_Lead.id == existing_lead_id)
+            )
+        ).scalar_one_or_none()
+        existing_assignee_id = _existing
         # Append a "touchpoint" activity so the open lead's timeline
         # shows the new inbound signal. We use `ActivityType.note`
         # (the existing enum has no dedicated `touchpoint` value) with
@@ -117,15 +132,11 @@ async def ingest(
                 "contact_id": str(contact_id),
             },
         )
-        # We don't re-query the lead row just to surface its current
-        # assignee_id — that detail isn't load-bearing for any
-        # caller. The returned result's assignee_id stays None for
-        # the merged branch to keep the response shape simple.
         return IngestResult(
             action="merged",
             lead_id=existing_lead_id,
             contact_id=contact_id,
-            assignee_id=None,
+            assignee_id=existing_assignee_id,
         )
 
     # 2. Fresh lead — pick an assignee, then create.

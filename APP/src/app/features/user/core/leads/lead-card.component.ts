@@ -182,6 +182,10 @@ export class LeadCardComponent {
         return 'bg-amber-100 text-amber-700 ring-amber-200';
       case 'meta_ads':
         return 'bg-blue-100 text-blue-700 ring-blue-200';
+      case 'whatsapp_flow':
+        return 'bg-green-100 text-green-700 ring-green-200';
+      case 'walk_in':
+        return 'bg-teal-100 text-teal-700 ring-teal-200';
       default:
         return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
     }
@@ -197,6 +201,10 @@ export class LeadCardComponent {
         return 'Google Ads';
       case 'meta_ads':
         return 'Meta Ads';
+      case 'whatsapp_flow':
+        return 'WhatsApp Flow';
+      case 'walk_in':
+        return 'Walk-in';
       default:
         return 'Manual';
     }

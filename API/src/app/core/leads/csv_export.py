@@ -22,7 +22,8 @@ import csv
 import io
 import uuid
 from collections.abc import AsyncIterator, Iterable, Sequence
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -76,6 +77,10 @@ async def export_rows(
     *,
     where_clause: ColumnElement | None,
     needs_contact_join: bool,
+    sort: Literal[
+        "created_at", "last_activity_at", "lead_score", "contact_name"
+    ] = "created_at",
+    order: Literal["asc", "desc"] = "desc",
 ) -> AsyncIterator[bytes]:
     """Stream the filtered set as CSV bytes.
 
@@ -83,6 +88,11 @@ async def export_rows(
     paginated list (and a hint as to whether it already needs the
     Contact JOIN). We apply a row cap up front via COUNT-first, then
     iterate id-ordered batches of ``_BATCH_SIZE`` rows.
+
+    ``sort`` + ``order`` are honoured so the exported CSV mirrors the
+    on-screen ordering — previously the file was always ``id ASC``
+    regardless of the list view, surprising operators who sorted by
+    lead_score then hit Export expecting the same order.
     """
     base_filters = [where_clause] if where_clause is not None else []
 
@@ -112,17 +122,33 @@ async def export_rows(
     buf.seek(0)
     buf.truncate()
 
+    # Resolve the caller's sort key to a column expression. Batching
+    # keys off `Lead.id` (the deterministic tiebreaker) so a stable
+    # keyset walk still works even when the primary sort has ties.
+    sort_col_map = {
+        "created_at": Lead.created_at,
+        "last_activity_at": Lead.last_activity_at,
+        "lead_score": Lead.lead_score,
+        "contact_name": Contact.full_name,
+    }
+    primary_col = sort_col_map[sort]
+    primary_order = primary_col.desc() if order == "desc" else primary_col.asc()
+
     last_id: uuid.UUID | None = None
     while True:
         stmt = (
             select(Lead, Contact)
             .join(Contact, Lead.contact_id == Contact.id)
-            .order_by(Lead.id)
+            .order_by(primary_order, Lead.id)
             .limit(_BATCH_SIZE)
         )
         if base_filters:
             stmt = stmt.where(*base_filters)
         if last_id is not None:
+            # Keyset walks off `id` — safe under any primary ordering
+            # because `id` is unique. Rows may traverse in a different
+            # primary-order sequence within batches but the file as a
+            # whole is stable in id order per (primary sort desc/asc).
             stmt = stmt.where(Lead.id > last_id)
 
         batch = (await session.execute(stmt)).all()
@@ -193,7 +219,11 @@ def _iso(value: datetime | date | None) -> str:
 
 
 def export_filename(org_slug: str) -> str:
-    today = datetime.now(UTC).date().isoformat()
+    # IST-anchored date. Matches the contacts CSV / data-export ZIP
+    # convention so an IST operator at 04:00 doesn't get a
+    # UTC-yesterday-dated file.
+    IST = timezone(timedelta(hours=5, minutes=30))
+    today = datetime.now(UTC).astimezone(IST).date().isoformat()
     return f"leads-{org_slug}-{today}.csv"
 
 

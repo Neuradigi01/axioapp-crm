@@ -20,6 +20,7 @@ from src.app.core.leads.models import LeadSource, LeadStatus
 from src.app.shared.schemas import (
     BulkDelete,
     BulkDeleteResult,
+    BulkIds,
     BulkReassign,
     BulkReassignResult,
     TimestampedOrgScopedOut,
@@ -197,6 +198,21 @@ LeadBulkReassignResult = BulkReassignResult
 LeadBulkDeleteResult = BulkDeleteResult
 
 
+class LeadBulkMoveStageRequest(BulkIds, MoveStageRequest):
+    """Bulk-move payload — the standard MoveStageRequest plus a capped
+    ``ids`` list. Inheriting from `BulkIds` gets the min=1/max=200 cap
+    the router-local class previously lacked (raw API caller could
+    otherwise POST 10K ids)."""
+
+
+class LeadBulkMoveStageResult(BaseModel):
+    """Split result so the FE can show `"X moved, Y already there"`
+    instead of undercounting silently."""
+
+    moved: int
+    already_in_stage: int = 0
+
+
 # --- Scoring rule schemas ---------------------------------------------------
 
 
@@ -247,6 +263,18 @@ class LeadScoringRecomputeResult(BaseModel):
 # --- Pipeline value roll-up (F23) ------------------------------------------
 
 
+class PipelineValueByCurrency(BaseModel):
+    """Per-currency open / won bucket. Rendered alongside the flat
+    header totals so mixed-currency orgs can see the split instead of
+    a nonsense sum. Empty list means every lead uses the org default
+    (the flat `open_value`/`won_value_this_month` are already correct
+    in that case)."""
+
+    currency: str
+    open_value: Decimal
+    won_value_this_month: Decimal
+
+
 class PipelineValueRollup(BaseModel):
     """Summary numbers rendered in the header strip above the kanban /
     list view.
@@ -255,10 +283,13 @@ class PipelineValueRollup(BaseModel):
     ``users.read`` see only their own leads' contribution, managers
     see the full org roll-up.
 
-    ``currency`` is the org's default ISO-4217 code; per-lead
-    ``currency`` overrides are ignored in this v1 roll-up (mixed-
-    currency orgs will need a future weighted conversion; not a
-    common case yet).
+    ``currency`` is the org's default ISO-4217 code. The flat
+    ``open_value`` + ``won_value_this_month`` sums treat leads with a
+    NULL per-row `currency` as org-default; leads with a non-null
+    override are NOT folded into the flat total (would produce a
+    misleading mixed-currency sum). Instead they show up in
+    ``by_currency`` alongside the default-bucket totals so the FE can
+    render an accurate breakdown.
     """
 
     open_value: Decimal
@@ -267,3 +298,8 @@ class PipelineValueRollup(BaseModel):
     won_count_this_month: int
     lost_count_this_month: int
     currency: str
+    # Per-currency split. Includes the org default bucket AND every
+    # non-default per-row currency the current filter matched. Empty
+    # when every lead uses the org default currency (flat totals are
+    # authoritative in that case).
+    by_currency: list[PipelineValueByCurrency] = Field(default_factory=list)
