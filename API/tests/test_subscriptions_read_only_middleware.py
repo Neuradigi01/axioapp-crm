@@ -241,6 +241,77 @@ async def test_allowlist_logout_reaches_handler_on_read_only(
     assert resp.status_code != 402, resp.text
 
 
+@pytest.mark.asyncio
+async def test_signup_not_blocked_by_stale_read_only_token(
+    layered_client,
+    seeded_admin,
+):
+    """Registering a brand-new account must work even when the browser
+    still carries a token for a `read_only` org.
+
+    The SPA's auth interceptor attaches the stored JWT to every request,
+    signup included, so `TenantContextMiddleware` resolves `org_id` to
+    the OLD org and the middleware used to answer 402 "Your trial has
+    ended" on a flow that has nothing to do with that org. The new
+    account is a different tenant entirely.
+    """
+    org = seeded_admin["org"]
+    now = datetime.now(tz=UTC)
+    await _insert_subscription(
+        org.id,
+        plan_code="trial",
+        status="read_only",
+        trial_started_at=now - timedelta(days=15),
+        trial_ends_at=now - timedelta(days=1),
+        read_only_at=now - timedelta(hours=1),
+    )
+
+    token = await _login_seeded(layered_client, seeded_admin)
+    resp = await layered_client.post(
+        "/api/v1/auth/register",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "first_name": "Stale",
+            "last_name": "Token",
+            "email": "stale.token.signup@example.com",
+            "mobile": "+915554545299",
+            "password": "dJMRR!ffV9aka2B",
+            "confirm_password": "dJMRR!ffV9aka2B",
+            "country": "India",
+            "state": "Maharashtra",
+        },
+    )
+    assert resp.status_code != 402, resp.text
+
+
+@pytest.mark.asyncio
+async def test_password_reset_not_blocked_on_read_only(
+    layered_client,
+    seeded_admin,
+):
+    """Password recovery must stay reachable on a write-locked org —
+    it is identity-level, and locking it would strand the user outside
+    the account they need in order to pay."""
+    org = seeded_admin["org"]
+    now = datetime.now(tz=UTC)
+    await _insert_subscription(
+        org.id,
+        plan_code="trial",
+        status="read_only",
+        trial_started_at=now - timedelta(days=15),
+        trial_ends_at=now - timedelta(days=1),
+        read_only_at=now - timedelta(hours=1),
+    )
+
+    token = await _login_seeded(layered_client, seeded_admin)
+    resp = await layered_client.post(
+        "/api/v1/auth/forgot-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"identifier": seeded_admin["user"].email},
+    )
+    assert resp.status_code != 402, resp.text
+
+
 # ---------------------------------------------------------------------------
 # Active / trialing subs pass write routes
 # ---------------------------------------------------------------------------

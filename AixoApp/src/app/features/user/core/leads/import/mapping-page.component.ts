@@ -110,19 +110,24 @@ export class MappingPageComponent {
     return required.filter((t) => !mapped.has(t.key));
   });
 
-  /** Detect duplicate target mappings (same CRM field mapped by 2+ columns). */
-  protected readonly duplicateTargets = computed(() => {
-    const counts: Record<string, number> = {};
-    for (const v of Object.values(this.mapping())) {
+  /** Duplicate target mappings (same CRM field picked by 2+ columns),
+   * with the offending CSV columns so the banner can name them. */
+  protected readonly duplicateDetails = computed(() => {
+    const byTarget = new Map<string, string[]>();
+    for (const [col, v] of Object.entries(this.mapping())) {
       if (!v) continue;
-      counts[v] = (counts[v] ?? 0) + 1;
+      byTarget.set(v, [...(byTarget.get(v) ?? []), col]);
     }
-    return new Set(
-      Object.entries(counts)
-        .filter(([, n]) => n > 1)
-        .map(([k]) => k),
-    );
+    const labels = new Map(this.targets().map((t) => [t.key, t.label]));
+    return [...byTarget.entries()]
+      .filter(([, cols]) => cols.length > 1)
+      .map(([key, cols]) => ({ key, label: labels.get(key) ?? key, columns: cols }));
   });
+
+  /** Just the duplicated target keys — per-row status marker + commit gate. */
+  protected readonly duplicateTargets = computed(
+    () => new Set(this.duplicateDetails().map((d) => d.key)),
+  );
 
   /** Commit is allowed iff every required target is mapped and no duplicates. */
   protected readonly canCommit = computed(
@@ -208,7 +213,10 @@ export class MappingPageComponent {
       });
   }
 
-  /** Pre-fill priority: org-owned preset > system preset > heuristic. */
+  /** Pre-fill priority: org-owned preset > system preset > heuristic.
+   * Each target is assigned to at most ONE column (first in file order
+   * wins) — pre-fill must never produce a duplicate-mapping state, or
+   * the user's own selection gets flagged as the conflict. */
   private buildInitialMapping(
     columns: string[],
     targets: MappingTarget[],
@@ -216,6 +224,7 @@ export class MappingPageComponent {
   ): Record<string, string | null> {
     const out: Record<string, string | null> = {};
     const targetKeys = new Set(targets.map((t) => t.key));
+    const used = new Set<string>();
 
     // Pick the most recent org-owned preset; fall back to system.
     const orgPreset = presets.find((p) => !p.is_system);
@@ -224,22 +233,31 @@ export class MappingPageComponent {
     const presetMap = active?.mapping ?? {};
 
     for (const col of columns) {
-      // Preset wins if the preset target is still a valid target.
+      // Preset wins if its target is still valid and not already taken
+      // by an earlier column (presets may list header variants — e.g.
+      // "Phone" and "Mobile" both → contact.phone — for CSVs that only
+      // contain one of them).
       const fromPreset = presetMap[col];
-      if (fromPreset && targetKeys.has(fromPreset)) {
-        out[col] = fromPreset;
-        continue;
-      }
-      out[col] = this.heuristicMatch(col, targets);
+      const target =
+        fromPreset && targetKeys.has(fromPreset) && !used.has(fromPreset)
+          ? fromPreset
+          : this.heuristicMatch(col, targets, used);
+      if (target) used.add(target);
+      out[col] = target;
     }
     return out;
   }
 
-  private heuristicMatch(csvColumn: string, targets: MappingTarget[]): string | null {
+  private heuristicMatch(
+    csvColumn: string,
+    targets: MappingTarget[],
+    used: ReadonlySet<string>,
+  ): string | null {
     const c = csvColumn.toLowerCase().trim();
     if (!c) return null;
     // 1. Exact match on label or key (case-insensitive).
     for (const t of targets) {
+      if (used.has(t.key)) continue;
       if (c === t.label.toLowerCase() || c === t.key.toLowerCase()) {
         return t.key;
       }
@@ -249,6 +267,7 @@ export class MappingPageComponent {
     // then custom, so contact-side matches win when ambiguous (a
     // column called "name" maps to contact.full_name, not lead.budget).
     for (const t of targets) {
+      if (used.has(t.key)) continue;
       const tl = t.label.toLowerCase();
       const tk = t.key.toLowerCase();
       if (c.includes(tl) || tl.includes(c) || c.includes(tk)) {

@@ -14,6 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.core.logger import logger
 # Bind the configured Celery app at API startup so @shared_task tasks
@@ -178,6 +179,51 @@ app = FastAPI(
     redirect_slashes=False,
 )
 
+
+async def catch_exceptions_middleware(request: FastAPIRequest, call_next):
+    """Last-resort handler: turn an unhandled exception into a 500 JSON
+    body (and a row in the error log) instead of a dropped connection."""
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        error_message = await log_error_to_db(exc, request=request)
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": error_message},
+        )
+
+
+# Order matters: Starlette's `add_middleware` puts the most recently
+# added middleware OUTERMOST (it runs first on the request path), so the
+# registrations below read inside-out. The resulting request path is:
+#
+#     CORSMiddleware  (outermost — sees EVERY response on the way out)
+#       → catch_exceptions_middleware  (unhandled exception → 500 JSON)
+#         → TenantContextMiddleware  (sets RequestContext.org_id from JWT)
+#           → SubscriptionStateMiddleware  (reads org_id, blocks writes on
+#                                           read_only / past_due / archived /
+#                                           cancelled subs)
+#             → route handler
+#
+# CORS MUST be outermost. Middleware that short-circuits — the 402 from
+# `SubscriptionStateMiddleware`, the 500 from `catch_exceptions_middleware`
+# — builds its own response and never reaches the route, so nothing
+# nested inside it can add headers afterwards. With CORS on the inside
+# those responses shipped without `Access-Control-Allow-Origin`; the
+# browser then blocked them and the SPA saw an opaque status-0 failure
+# with no body, forcing every page to render its generic fallback copy
+# ("Upload failed — check the file format") instead of the real reason
+# ("Your trial has ended"). Only responses produced by the router or by
+# an `@app.exception_handler` were ever visible to the browser.
+#
+# `SubscriptionStateMiddleware` is registered FIRST (innermost) so that
+# `TenantContextMiddleware`, sitting outside it, has already populated
+# `RequestContext.org_id` by the time it runs.
+from src.app.core.subscriptions.middleware import SubscriptionStateMiddleware  # noqa: E402
+
+app.add_middleware(SubscriptionStateMiddleware)
+app.add_middleware(TenantContextMiddleware)
+app.add_middleware(BaseHTTPMiddleware, dispatch=catch_exceptions_middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -185,24 +231,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# Order matters: Starlette's `add_middleware` puts the most recently
-# added middleware OUTERMOST (it runs first on the request path). We
-# want the request path to be:
-#
-#     TenantContextMiddleware  (sets RequestContext.org_id from JWT)
-#       → SubscriptionStateMiddleware  (reads org_id, blocks writes on
-#                                       read_only / past_due / archived /
-#                                       cancelled subs)
-#         → CORSMiddleware  (response-side header injection)
-#           → route handler
-#
-# So `SubscriptionStateMiddleware` must be added BEFORE
-# `TenantContextMiddleware` in code (which makes it INNER relative to
-# the context-setter, so context is populated by the time it runs).
-from src.app.core.subscriptions.middleware import SubscriptionStateMiddleware  # noqa: E402
-
-app.add_middleware(SubscriptionStateMiddleware)
-app.add_middleware(TenantContextMiddleware)
 
 os.makedirs(STATIC_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -235,8 +263,10 @@ app.include_router(contact_imports_router, prefix="/api/v1")
 app.include_router(activities_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(pipelines_router, prefix="/api/v1")
-app.include_router(leads_router, prefix="/api/v1")
+# Same ordering rule as contacts above: `/leads/import` must be matched
+# before `leads_router`'s `/leads/{lead_id}`.
 app.include_router(lead_imports_router, prefix="/api/v1")
+app.include_router(leads_router, prefix="/api/v1")
 app.include_router(embed_keys_router, prefix="/api/v1")
 app.include_router(embed_public_router, prefix="/api/v1")
 app.include_router(email_router, prefix="/api/v1")
@@ -310,19 +340,6 @@ if os.getenv("IS_DEVELOPMENT", "").lower() == "true":
     app.include_router(dev_router, prefix="/api/v1")
     logger.info("dev routes mounted at /api/v1/_dev/* (IS_DEVELOPMENT=true)")
 app.include_router(modules_router, prefix="/api/v1")
-
-
-@app.middleware("http")
-async def catch_exceptions_middleware(request: FastAPIRequest, call_next):
-    try:
-        response = await call_next(request)
-        return response
-    except Exception as exc:
-        error_message = await log_error_to_db(exc, request=request)
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "message": error_message},
-        )
 
 
 @app.exception_handler(HTTPException)

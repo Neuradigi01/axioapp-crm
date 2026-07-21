@@ -70,6 +70,8 @@ except ImportError:  # pragma: no cover - celery not always installed in dev
 from sqlalchemy import select
 
 from src.app.core import audit
+from src.app.core.activities.models import ActivityType
+from src.app.core.activities.service import log as activities_log
 from src.app.core.contacts.schemas import ContactCreate
 from src.app.core.contacts.service import create_contact
 from src.app.core.custom_fields.models import CustomFieldDefinition
@@ -299,7 +301,6 @@ async def _commit_rows(
                         phone=phone,
                         email=email,
                         source=mapped.get("contact.source"),
-                        notes=mapped.get("contact.notes"),
                         custom_data=contact_custom,
                     )
                     contact = await create_contact(
@@ -309,6 +310,20 @@ async def _commit_rows(
                         require_all_required=False,
                     )
                     contact_id = contact.id
+                    # `tbl_contacts.notes` was retired (migration 0158)
+                    # in favour of timeline notes — a mapped Notes
+                    # column lands as an activity row on the new
+                    # contact. Existing contacts are skipped so a
+                    # re-import doesn't duplicate the same note.
+                    notes_text = (mapped.get("contact.notes") or "").strip()
+                    if notes_text:
+                        await activities_log(
+                            entity_type="contact",
+                            entity_id=contact_id,
+                            type=ActivityType.note,
+                            payload={"text": notes_text, "source": "bulk_import"},
+                            org_id=org_id,
+                        )
 
                 lead_payload = LeadCreate(
                     contact_id=contact_id,
@@ -375,8 +390,14 @@ def _coerce_date(value: str | None):
 
 
 def _format_exc(exc: Exception) -> str:
-    """Squeeze a Pydantic/Validation/SQL error into one error-CSV cell."""
-    text = str(exc).splitlines()[0]
+    """Squeeze a Pydantic/Validation/SQL error into one error-CSV cell.
+
+    Pydantic's multi-line format puts the failing field + reason on the
+    lines AFTER the "N validation errors for X" header, so keep the
+    first few lines (joined with " — ") instead of only the header.
+    """
+    lines = [ln.strip() for ln in str(exc).splitlines() if ln.strip()]
+    text = " — ".join(lines[:3]) if lines else repr(exc)
     return text[:500]
 
 

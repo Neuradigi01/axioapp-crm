@@ -43,10 +43,20 @@
         </ul>
       </div>
     }
-    @if (duplicateTargets().size > 0) {
+    @if (duplicateDetails().length > 0) {
       <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        Two or more columns are mapped to the same CRM field. Each field can only receive one
-        column.
+        <p class="font-medium">
+          Two or more columns are mapped to the same CRM field. Each field can only receive one
+          column — set the extra column(s) to "— Ignore —" or a different field.
+        </p>
+        <ul class="mt-1 list-disc list-inside">
+          @for (d of duplicateDetails(); track d.key) {
+            <li>
+              <span class="font-medium">{{ d.label }}</span> is mapped by:
+              {{ d.columns.join(', ') }}
+            </li>
+          }
+        </ul>
       </div>
     }
 

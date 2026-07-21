@@ -4,7 +4,14 @@ Blocks every mutating HTTP verb (POST / PUT / PATCH / DELETE) for orgs
 whose subscription status is one of `read_only`, `past_due`,
 `archived`, or `cancelled`. Read verbs (GET / HEAD / OPTIONS) always
 pass; so do a tight, explicit allow-list of write paths that are the
-recovery flow or identity-level (logout, profile, exports, …).
+recovery flow or identity-level (the whole `/auth/*` surface, profile,
+exports, …).
+
+The gate keys off `RequestContext.org_id`, which is decoded from the
+request's JWT — NOT from the resource being written. Any endpoint that
+is not a write against the caller's own tenant data therefore needs an
+allow-list entry, or a stale/irrelevant token will gate it against an
+unrelated org's billing state.
 
 Order is set in `main.py`:
 
@@ -63,8 +70,22 @@ BLOCKED_STATUSES: frozenset[str] = frozenset({"read_only", "past_due", "archived
 # adding a new entry should be accompanied by a code-review note
 # explaining why the path must remain writable on a blocked sub.
 _ALLOWLIST_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"^/api/v1/auth/logout$"),
-    re.compile(r"^/api/v1/auth/refresh$"),
+    # The entire auth surface is identity-level, not org-scoped: login,
+    # register, onboarding/complete, refresh, logout, session revoke,
+    # forgot/reset-password, 2FA challenge, contact verification and
+    # admin-login. None of them writes tenant data, so a subscription
+    # write-lock must never gate them.
+    #
+    # This has to be a prefix rather than the previous two entries
+    # (logout + refresh) because `TenantContextMiddleware` populates
+    # `org_id` from whatever JWT the request carries. A browser holding
+    # a stale token for a `read_only` org sends it on EVERY call — the
+    # SPA's auth interceptor attaches it unconditionally — so signing up
+    # for a brand-new account, or resetting a forgotten password, was
+    # rejected with the previous org's 402 ("Your trial has ended").
+    # That locks a user out of the exact flows they need to recover or
+    # to pay, which inverts the point of the write-lock.
+    re.compile(r"^/api/v1/auth/.*$"),
     re.compile(r"^/api/v1/subscriptions/change$"),
     re.compile(r"^/api/v1/subscriptions/seats$"),
     re.compile(r"^/api/v1/subscriptions/cancel$"),
