@@ -251,31 +251,48 @@ async def _load_custom_field_routing(
     return contact_keys, lead_keys
 
 
-async def _load_leads_stage_registry() -> tuple[set[str], str | None]:
-    """Return ``(valid_stage_keys, default_stage_key)`` for the org's
+async def _load_leads_stage_registry() -> tuple[dict[str, str], str | None]:
+    """Return ``(stage_lookup, default_stage_key)`` for the org's
     leads pipeline.
 
-    Loaded once per import so per-row stage validation is a
-    dict/set lookup rather than a DB round-trip. ``default_stage_key``
-    is the first stage by ``display_order`` — the value the importer
-    substitutes when a CSV row's ``lead.pipeline_stage`` cell doesn't
-    match any real stage key (the "fallback-to-default" behaviour
-    HubSpot / Zoho ship as the operator-friendly default).
+    ``stage_lookup`` is a **case-insensitive** map from a normalised
+    incoming CSV value to the pipeline's canonical stage ``key``.
+    Every stage contributes two entries: its ``key.lower()`` and its
+    ``name.lower()``. That covers three common CSV export flavours:
 
-    Returns ``(set(), None)`` if the org has no leads pipeline; in
-    that case each per-row lead create will surface the underlying
-    error the way it did pre-fallback, and no substitution is
-    attempted. That's deliberate — silently mapping to "no stage"
-    would hide the missing-pipeline configuration bug from the
-    operator.
+      - Lowercase key exports ("won", "contacted") — Salesforce-style.
+      - Display-name exports ("Won", "Contacted") — HubSpot-style,
+        which is what you see in almost every hand-produced CSV.
+      - Mixed case ("WON", "cOnTaCtEd") — accidental exports.
+
+    Loaded once per import so per-row stage resolution is a dict
+    lookup rather than a DB round-trip. ``default_stage_key`` is the
+    first stage by ``display_order`` — the value the importer
+    substitutes when a CSV row's ``lead.pipeline_stage`` cell doesn't
+    fuzzy-match anything (the "fallback-to-default" behaviour HubSpot
+    / Zoho ship as the operator-friendly default).
+
+    Returns ``({}, None)`` if the org has no leads pipeline; in that
+    case each per-row lead create will surface the underlying error
+    the way it did pre-fallback, and no substitution is attempted.
+    That's deliberate — silently mapping to "no stage" would hide a
+    missing-pipeline configuration bug from the operator.
     """
     async with async_session() as session:
         pipeline = await get_pipeline_by_key(session, key="leads")
     if pipeline is None or not pipeline.stages:
-        return set(), None
-    stage_keys = {s.key for s in pipeline.stages}
+        return {}, None
+    stage_lookup: dict[str, str] = {}
+    for stage in pipeline.stages:
+        # Both the internal key AND the display name map back to the
+        # canonical key. On the (unlikely) collision where one stage's
+        # name matches another's key, the later insert wins — which is
+        # fine, both point to a real stage so the lead lands somewhere
+        # sensible either way.
+        stage_lookup[stage.key.strip().lower()] = stage.key
+        stage_lookup[stage.name.strip().lower()] = stage.key
     default_key = min(pipeline.stages, key=lambda s: s.display_order).key
-    return stage_keys, default_key
+    return stage_lookup, default_key
 
 
 def _split_custom_data(
@@ -349,12 +366,14 @@ async def _commit_rows(
 
     # Load org-scoped registries once per import — every row reuses
     # them. Custom-field routing splits `custom_data.*` mapped cells
-    # into the right entity's dict; the stage registry lets us catch
-    # out-of-vocabulary `pipeline_stage` values BEFORE the leads
-    # service raises 422, so we can fall back to the default stage
-    # + record a warning instead of hard-failing the row.
+    # into the right entity's dict; the stage lookup is a
+    # case-insensitive map from the incoming CSV value (whether it's
+    # a `key` like "won" or a `name` like "Won") to the pipeline's
+    # canonical stage key, so we can catch out-of-vocabulary values
+    # BEFORE the leads service raises 422 — and reserve the fallback
+    # + warning surface for real typos, not just casing differences.
     contact_cf_keys, lead_cf_keys = await _load_custom_field_routing(org_id)
-    valid_stage_keys, default_stage_key = await _load_leads_stage_registry()
+    stage_lookup, default_stage_key = await _load_leads_stage_registry()
 
     for parsed in rows_iter:
         mapped = parsed.mapped
@@ -371,24 +390,28 @@ async def _commit_rows(
 
         contact_custom, lead_custom = _split_custom_data(mapped, contact_cf_keys, lead_cf_keys)
 
-        # Fallback substitution for `pipeline_stage`. When the CSV
-        # value doesn't match any real stage key AND we have a default
-        # stage to swap in, use the default and remember the original
-        # so we can (a) emit a timeline note on the created lead, and
-        # (b) surface the substitution in the warnings breakdown.
-        # No stage registry (missing pipeline) → skip fallback and let
-        # the underlying error path fire; that's a config bug we don't
-        # want to paper over.
+        # Resolve `pipeline_stage` against the case-insensitive
+        # key+name lookup. Three outcomes:
+        #   1. Fuzzy match hit ("Won"/"WON" → canonical "won"): use
+        #      the canonical key, no warning. Casing differences are
+        #      the norm in real CSV exports and shouldn't tag every
+        #      row as a fallback.
+        #   2. Real mismatch ("intrested"): substitute with the
+        #      default stage AND record the substitution for the
+        #      warnings panel + timeline note.
+        #   3. No stage registry loaded (missing pipeline): don't
+        #      substitute — let the leads service surface the config
+        #      bug rather than silently mapping to "no stage".
         requested_stage = mapped.get("lead.pipeline_stage")
         stage_fallback: tuple[str, str] | None = None
         effective_stage = requested_stage
-        if (
-            requested_stage
-            and default_stage_key is not None
-            and requested_stage not in valid_stage_keys
-        ):
-            stage_fallback = (requested_stage, default_stage_key)
-            effective_stage = default_stage_key
+        if requested_stage:
+            resolved_key = stage_lookup.get(requested_stage.strip().lower())
+            if resolved_key is not None:
+                effective_stage = resolved_key
+            elif default_stage_key is not None:
+                stage_fallback = (requested_stage, default_stage_key)
+                effective_stage = default_stage_key
 
         try:
             async with async_session() as session:
