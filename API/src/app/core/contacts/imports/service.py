@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -39,10 +40,22 @@ MAX_ROW_COUNT = 10_000
 
 
 def _normalise_phone(raw: str) -> str:
-    """Strip non-digits + leading zeros. Empty → empty. The dedupe
-    check uses this to compare existing contacts."""
+    """Strip non-digits and return the last 10 digits.
+
+    Mirrors ``contacts.service._normalise_phone_suffix`` so a phone
+    number entered via the CRM's create modal (``+91 9000000001``,
+    stored raw) and the same number arriving in a CSV row
+    (``9000000001``) collapse onto the same dedupe key. Previously
+    this stripped leading zeros only, so the CRM's raw ``+91`` prefix
+    made every CRM-created contact look distinct from its bulk-import
+    twin. Short (<6-digit) inputs return "" — same guard as the CRM
+    side so a rogue single-digit doesn't drop us to a mega-collision
+    key.
+    """
     digits = "".join(c for c in (raw or "") if c.isdigit())
-    return digits.lstrip("0") if digits else ""
+    if len(digits) < 6:
+        return ""
+    return digits[-10:] if len(digits) >= 10 else digits
 
 
 async def _get_import(session: AsyncSession, import_id: uuid.UUID) -> ContactImport:
@@ -154,6 +167,7 @@ async def dry_run_import(
     *,
     import_id: uuid.UUID,
     mapping: dict[str, str],
+    opt_in_source: str | None = None,
 ) -> ImportDryRunOut:
     """Walk the file without writing. Reports per-row errors + dupe
     counts so the operator can decide whether to commit.
@@ -163,7 +177,17 @@ async def dry_run_import(
     storage = get_storage()
     file_bytes = _read_file_bytes(storage, row.storage_path)
 
-    existing_phones = await _load_existing_phone_set(session)
+    # Pass 1 — gather candidate phone keys from the incoming file so the
+    # existence check can target just those keys instead of streaming
+    # every phone in the tenant.
+    parsed_rows = list(parse_all_rows(file_bytes, row.filename))
+    candidate_phones: set[str] = set()
+    for _row_no, raw in parsed_rows:
+        mapped = _apply_mapping(raw, mapping)
+        phone_norm = _normalise_phone(mapped.get("phone") or "")
+        if phone_norm:
+            candidate_phones.add(phone_norm)
+    existing_phones = await _dedupe_key_hits(session, candidates=candidate_phones)
 
     will_insert = 0
     will_skip = 0
@@ -171,7 +195,7 @@ async def dry_run_import(
     errors: list[RowError] = []
     seen_phones_in_file: set[str] = set()
 
-    for row_no, raw in parse_all_rows(file_bytes, row.filename):
+    for row_no, raw in parsed_rows:
         mapped = _apply_mapping(raw, mapping)
 
         if not mapped.get("full_name"):
@@ -192,11 +216,14 @@ async def dry_run_import(
 
     # Persist the dry-run snapshot — operator's commit click should
     # match exactly what we just previewed (or rerun if the file
-    # changed).
+    # changed). Stash `opt_in_source` here too so the commit step
+    # doesn't need the wizard to send it again.
     row.applied_mapping = dict(mapping)
     row.status = ContactImportStatus.dry_run
     row.error_count = len(errors)
     row.error_log = [e.model_dump() for e in errors]
+    if opt_in_source is not None:
+        row.opt_in_source = opt_in_source
     await session.commit()
 
     return ImportDryRunOut(
@@ -219,20 +246,49 @@ async def commit_import(
     mapping: dict[str, str],
     create_group: bool = False,
     group_name: str | None = None,
+    opt_in_source: str | None = None,
 ) -> ContactImport:
     """Insert rows. Same parse + dedupe logic as dry-run; same errors
     surface in the persisted `error_log`. Optionally bundles the
-    successfully-inserted contacts into a new static contact group."""
+    successfully-inserted contacts into a new static contact group.
+
+    Idempotent: once ``row.status`` is ``committed`` a re-invocation
+    returns the existing row without touching contacts. Guards a
+    network-stall rage-click from inserting the whole file a second
+    time.
+    """
     row = await _get_import(session, import_id)
+
+    # Idempotency: refuse to re-commit an already-committed import row.
+    # Prior behaviour was a silent re-insert of every contact — the
+    # frontend comment claimed idempotency the backend didn't have.
+    if row.status == ContactImportStatus.committed:
+        return row
+
+    # Fold the effective opt-in source: prefer the fresh caller value,
+    # otherwise use what dry-run stashed on the row.
+    effective_opt_in_source = opt_in_source or row.opt_in_source
+
     storage = get_storage()
     file_bytes = _read_file_bytes(storage, row.storage_path)
 
-    existing_phones = await _load_existing_phone_set(session)
+    # Pass 1 — collect candidate phone keys so the existence check
+    # touches only the working set.
+    parsed_rows = list(parse_all_rows(file_bytes, row.filename))
+    candidate_phones: set[str] = set()
+    for _row_no, raw in parsed_rows:
+        mapped = _apply_mapping(raw, mapping)
+        phone_norm = _normalise_phone(mapped.get("phone") or "")
+        if phone_norm:
+            candidate_phones.add(phone_norm)
+    existing_phones = await _dedupe_key_hits(session, candidates=candidate_phones)
+
     seen_phones_in_file: set[str] = set()
     inserted_ids: list[uuid.UUID] = []
     errors: list[dict[str, Any]] = []
+    opt_in_recorded_at = datetime.now(UTC) if effective_opt_in_source else None
 
-    for row_no, raw in parse_all_rows(file_bytes, row.filename):
+    for row_no, raw in parsed_rows:
         mapped = _apply_mapping(raw, mapping)
         full_name = mapped.get("full_name")
         if not full_name:
@@ -245,19 +301,30 @@ async def commit_import(
             continue
 
         contact_id = uuid.uuid4()
-        tags = [mapped["tag"].strip()] if mapped.get("tag") and mapped["tag"].strip() else []
-        data_access.add_contact(
-            session,
-            Contact(
-                id=contact_id,
-                org_id=org_id,
-                full_name=full_name,
-                phone=mapped.get("phone") or None,
-                email=mapped.get("email") or None,
-                source=mapped.get("source") or None,
-                tags=tags,
-            ),
+        tag_value = mapped.get("tag")
+        tags: list[str] = tag_value if isinstance(tag_value, list) else (
+            [tag_value.strip()] if isinstance(tag_value, str) and tag_value.strip() else []
         )
+        contact = Contact(
+            id=contact_id,
+            org_id=org_id,
+            full_name=full_name,
+            phone=mapped.get("phone") or None,
+            email=mapped.get("email") or None,
+            source=mapped.get("source") or None,
+            tags=tags,
+        )
+        if effective_opt_in_source:
+            # DPDP: stamp the operator-chosen provenance on each row.
+            # Bulk imports never carry an explicit "yes" — the operator
+            # asserts they have consent from an offline capture; that's
+            # `opted_in` state. A future "unknown" branch could set
+            # `implicit` for prospecting lists.
+            contact.whatsapp_opt_in_status = "opted_in"
+            contact.whatsapp_opt_in_source = effective_opt_in_source
+            contact.whatsapp_opt_in_recorded_at = opt_in_recorded_at
+            contact.whatsapp_opt_in_recorded_by_user_id = user_id
+        data_access.add_contact(session, contact)
         inserted_ids.append(contact_id)
         if phone_norm:
             seen_phones_in_file.add(phone_norm)
@@ -299,6 +366,8 @@ async def commit_import(
     row.error_count = len(errors)
     row.error_log = errors
     row.created_group_id = created_group_id
+    if effective_opt_in_source:
+        row.opt_in_source = effective_opt_in_source
     row.status = ContactImportStatus.committed
     await session.commit()
     await session.refresh(row)
@@ -328,25 +397,71 @@ def _read_file_bytes(storage, storage_path: str) -> bytes:
     return full.read_bytes()
 
 
-def _apply_mapping(raw: dict[str, str], mapping: dict[str, str]) -> dict[str, str]:
-    """Translate `{column: cell}` into `{contact_field: cell}` using
-    the operator's mapping. Columns mapped to `'skip'` (or absent
-    from the mapping) are dropped."""
-    out: dict[str, str] = {}
+def _apply_mapping(raw: dict[str, str], mapping: dict[str, str]) -> dict[str, Any]:
+    """Translate `{column: cell}` into `{contact_field: cell(s)}` using
+    the operator's mapping. Columns mapped to `'skip'` (or absent from
+    the mapping) are dropped.
+
+    Special-cases ``target='tag'``: the value is returned as a list so
+    two CSV columns both mapped to ``tag`` (or a single column carrying
+    comma-separated tags like ``"vip, priority, hot"``) aggregate
+    into the contact's ``tags`` array instead of last-write-wins."""
+    out: dict[str, Any] = {}
+    tags_bucket: list[str] = []
     for column, value in raw.items():
         target = mapping.get(column, "skip")
         if target == "skip" or not target:
             continue
+        if target == "tag":
+            for chunk in _split_tag_cell(value):
+                if chunk and chunk not in tags_bucket:
+                    tags_bucket.append(chunk)
+            continue
         out[target] = value
+    if tags_bucket:
+        out["tag"] = tags_bucket
     return out
 
 
-async def _load_existing_phone_set(session: AsyncSession) -> set[str]:
-    """All existing phone numbers for the active tenant, normalised
-    the same way `_normalise_phone` does. Used by dry-run + commit
-    for dedupe detection without N+1 queries."""
-    rows = await data_access.list_all_non_null_phones(session)
-    return {_normalise_phone(p) for p in rows if p}
+def _split_tag_cell(cell: str) -> list[str]:
+    """Break a tag CSV cell on ``,`` / ``;`` / ``|`` and trim each piece.
+    Empty pieces are dropped. A cell without a separator returns one
+    element."""
+    if not cell:
+        return []
+    pieces: list[str] = []
+    for chunk in cell.replace(";", ",").replace("|", ",").split(","):
+        stripped = chunk.strip()
+        if stripped:
+            pieces.append(stripped)
+    return pieces
+
+
+async def _dedupe_key_hits(
+    session: AsyncSession, *, candidates: set[str]
+) -> set[str]:
+    """Return the subset of normalised phone keys already present in
+    the tenant's contacts table.
+
+    Replaces the old ``_load_existing_phone_set`` which streamed EVERY
+    phone for the tenant into memory on every dry-run and every commit
+    (500K contacts ≈ 50MB per request). Now we only ask the DB about
+    the keys that appear in *this* file — the working set is at most
+    ``MAX_ROW_COUNT``.
+    """
+    if not candidates:
+        return set()
+    rows = await data_access.list_matching_phones_by_suffix(
+        session, suffixes=list(candidates)
+    )
+    hits: set[str] = set()
+    for raw in rows:
+        if not raw:
+            continue
+        key = _normalise_phone(raw)
+        if key in candidates:
+            hits.add(key)
+    return hits
 
 
 __all__ = [

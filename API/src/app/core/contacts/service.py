@@ -143,7 +143,17 @@ async def update_contact(
     *,
     contact_id: uuid.UUID,
     payload: ContactUpdate,
+    org_id: uuid.UUID | None = None,
 ) -> Contact:
+    """Partial update.
+
+    ``org_id`` is optional for back-compat with callers that already
+    filter by tenant at the DAL layer, but when supplied the service
+    enforces cross-tenant safety on ``assigned_to_id``: a caller with
+    ``contacts.write`` cannot reassign a contact to a user that isn't
+    an active member of their own org (would otherwise leak referential
+    integrity across tenants because ``tbl_users`` is org-agnostic).
+    """
     contact = ensure_found(await data_access.get_contact(session, contact_id), entity="contact")
 
     before = _snapshot(contact)
@@ -164,6 +174,13 @@ async def update_contact(
             if value and value not in seen:
                 seen[value] = None
         changes["tags"] = list(seen)
+
+    if "assigned_to_id" in changes and changes["assigned_to_id"] is not None and org_id is not None:
+        await _assert_user_in_org(
+            session,
+            org_id=org_id,
+            user_uuid=changes["assigned_to_id"],
+        )
 
     for key, value in changes.items():
         setattr(contact, key, value)
@@ -294,22 +311,27 @@ async def merge_contacts(
 
     # Timeline breadcrumb on the primary so a rep browsing the
     # activities tab sees "merged from <name>" alongside other events.
-    # Fire-and-forget so a failure here doesn't unwind the merge that
-    # already committed.
-    await activities_service.log(
-        entity_type="contact",
-        entity_id=primary.id,
-        type=ActivityType.note,
-        payload={
-            "text": (
-                f"Merged from {before_secondary.get('full_name') or 'contact'}. "
-                f"Repointed rows: "
-                + ", ".join(f"{k}={v}" for k, v in rows_reassigned.items() if v)
-            ),
-            "merged_from_contact_id": str(secondary.id),
-        },
-        org_id=org_id,
-    )
+    # Fire-and-forget: the merge/commit is already durable at this
+    # point, so a failing timeline write must NOT surface as a 500 —
+    # operator would rage-retry a merge that already ran and hit "both
+    # contacts must belong to the caller's org" (secondary is gone).
+    try:
+        await activities_service.log(
+            entity_type="contact",
+            entity_id=primary.id,
+            type=ActivityType.note,
+            payload={
+                "text": (
+                    f"Merged from {before_secondary.get('full_name') or 'contact'}. "
+                    f"Repointed rows: "
+                    + ", ".join(f"{k}={v}" for k, v in rows_reassigned.items() if v)
+                ),
+                "merged_from_contact_id": str(secondary.id),
+            },
+            org_id=org_id,
+        )
+    except Exception:  # noqa: BLE001 — best-effort audit breadcrumb.
+        pass
 
     return primary, rows_reassigned
 
@@ -565,11 +587,16 @@ async def bulk_reassign_contacts(
     if assigned_to_id is not None:
         await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
+    # Batched hydrate — collapses the old per-id round-trips into a
+    # single `WHERE id IN (:ids)` read. Activity inserts stay per-row
+    # (each contact needs its own timeline entry) but there's no reason
+    # the SELECTs should be N.
+    contacts = await data_access.list_contacts_by_ids_in_org(
+        session, ids=ids, org_id=org_id
+    )
+
     reassigned = 0
-    for cid in ids:
-        contact = await data_access.get_contact(session, cid)
-        if contact is None:
-            continue
+    for contact in contacts:
         if contact.assigned_to_id == assigned_to_id:
             continue
         before_id = contact.assigned_to_id
@@ -620,7 +647,12 @@ async def bulk_add_tag_contacts(
     """
     clean = tag.strip()
     if not clean:
-        return 0
+        # Schema already enforces min_length=1; raise here so a direct
+        # caller sees a clean 422 instead of silent "updated 0 rows".
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="tag must not be blank",
+        )
     # `tags = CASE WHEN clean = ANY(tags) THEN tags ELSE array_append(tags, clean) END`
     # via SQLAlchemy text expression — keeps the per-row decision in PG.
     rowcount = await data_access.bulk_append_tag(session, ids=ids, tag=clean, org_id=org_id)

@@ -36,19 +36,32 @@ class ImportUploadOut(ORMModel):
     sample_rows: list[dict[str, Any]] = Field(default_factory=list)
 
 
+OptInSource = Literal[
+    "form_widget",
+    "bulk_import",
+    "manual_entry",
+    "inbound_first_message",
+    "explicit_opt_in_link",
+    "stop_keyword",
+]
+
+
 class ImportDryRunIn(BaseModel):
     """Body for `POST /{id}/dry-run`.
 
     `mapping` is the operator's final column → contact-field assignment.
     `create_group` + `group_name` are the optional bundling — if set,
     the commit step (separate endpoint) will create a static group from
-    the successfully-inserted contacts."""
+    the successfully-inserted contacts.
+    `opt_in_source` is the DPDP provenance the operator picks on the
+    mapping step — persisted onto every contact this import inserts."""
 
     model_config = ConfigDict(extra="forbid")
 
     mapping: dict[str, str]
     create_group: bool = False
     group_name: str | None = Field(default=None, max_length=255)
+    opt_in_source: OptInSource | None = None
 
 
 class RowError(BaseModel):
@@ -88,5 +101,6 @@ __all__ = [
     "ImportDryRunIn",
     "ImportDryRunOut",
     "ImportUploadOut",
+    "OptInSource",
     "RowError",
 ]

@@ -323,7 +323,7 @@
 @if (deleteOpen() && contact(); as c) {
   <app-confirm-dialog
     [title]="'Delete contact “' + c.full_name + '”?'"
-    [body]="'This cannot be undone. Activities, tasks, and appointments linked to this contact remain in their respective timelines.'"
+    [body]="'This cannot be undone. Activities, tasks, and appointments linked to this contact remain in their respective timelines. If this is a DPDP right-to-be-forgotten request, use Anonymise instead — it wipes personal data while preserving the audit trail required for compliance.'"
     [confirmLabel]="'Delete'"
     [danger]="true"
     [submitting]="deleteSubmitting()"

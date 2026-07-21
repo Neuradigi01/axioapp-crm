@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,11 +67,30 @@ async def bulk_upsert_group_members(
     )
 
 
-async def list_all_non_null_phones(session: AsyncSession) -> list[str]:
-    """Every non-NULL phone for the active tenant. Used by the import
-    dedupe pre-pass — caller normalises and dedupes."""
+async def list_matching_phones_by_suffix(
+    session: AsyncSession, *, suffixes: list[str]
+) -> list[str]:
+    """Return only those contact phones whose digit-only tail matches
+    one of the last-10-digit ``suffixes`` from an incoming import.
+
+    Replaces the old ``list_all_non_null_phones`` which streamed every
+    phone in the tenant. ``regexp_replace(phone, '\\D', '', 'g')``
+    strips non-digits, ``LIKE '%<suf>'`` matches the tail. Empty
+    ``suffixes`` returns ``[]`` without a round-trip."""
+    if not suffixes:
+        return []
+    digits_only = func.regexp_replace(Contact.phone, r"\D", "", "g")
+    predicates = [digits_only.like(f"%{s}") for s in suffixes if s]
+    if not predicates:
+        return []
     rows = (
-        (await session.execute(select(Contact.phone).where(Contact.phone.is_not(None))))
+        (
+            await session.execute(
+                select(Contact.phone)
+                .where(Contact.phone.is_not(None))
+                .where(or_(*predicates))
+            )
+        )
         .scalars()
         .all()
     )
@@ -84,5 +103,5 @@ __all__ = [
     "add_import",
     "bulk_upsert_group_members",
     "get_import_by_id",
-    "list_all_non_null_phones",
+    "list_matching_phones_by_suffix",
 ]

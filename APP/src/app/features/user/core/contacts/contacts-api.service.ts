@@ -172,6 +172,10 @@ export interface ContactImportRunIn {
   mapping: Record<string, ContactFieldTarget>;
   create_group: boolean;
   group_name?: string | null;
+  /** DPDP opt-in provenance picked on the wizard's mapping step.
+   *  Backend Step 0164 persists it onto every contact this import
+   *  inserts (whatsapp_opt_in_status='opted_in' + source=…). */
+  opt_in_source?: WhatsAppOptInSource | null;
 }
 
 export interface ContactImportRowError {

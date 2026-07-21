@@ -21,7 +21,7 @@ import csv
 import io
 import uuid
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -29,6 +29,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.permissions.service import list_permissions_for_role
 from src.app.core.contacts.consent_service import (
     ConsentError,
     list_consent_events,
@@ -213,7 +214,11 @@ async def export_csv_endpoint(
     org = await tenants_service.get_organization_by_id(db, user.org_id)
     assert org is not None  # authed user implies their org exists
 
-    today = datetime.now(UTC).date().isoformat()
+    # IST-anchored filename date. Mumbai / Bangalore operators pulling
+    # an export at 04:00 IST would previously get yesterday's UTC date
+    # in the filename — surprising and hard to search for later.
+    IST = timezone(timedelta(hours=5, minutes=30))
+    today = datetime.now(UTC).astimezone(IST).date().isoformat()
     filename = f"contacts-{org.slug}-{today}.csv"
 
     async def _stream() -> AsyncIterator[bytes]:
@@ -298,9 +303,27 @@ async def update_contact_endpoint(
     contact_id: uuid.UUID,
     payload: ContactUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("contacts.write")),
+    user: User = Depends(require_permissions("contacts.write")),
 ) -> ContactOut:
-    contact = await update_contact(db, contact_id=contact_id, payload=payload)
+    # Reassigning via the edit modal must not sidestep the dedicated
+    # `contacts.reassign` gate. When the payload includes
+    # `assigned_to_id`, additionally require `contacts.reassign`.
+    # `exclude_unset=True` distinguishes "not sent" from "sent as null"
+    # (the null case is an explicit unassign — still a reassign action).
+    changes = payload.model_dump(exclude_unset=True)
+    if "assigned_to_id" in changes:
+        granted = {p.key for p in await list_permissions_for_role(db, user.role_id)}
+        if "contacts.reassign" not in granted:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Missing permission(s): contacts.reassign",
+            )
+    contact = await update_contact(
+        db,
+        contact_id=contact_id,
+        payload=payload,
+        org_id=user.org_id,
+    )
     return ContactOut.model_validate(contact)
 
 

@@ -175,6 +175,26 @@ async def count_static_members(session: AsyncSession, group_id: uuid.UUID) -> in
     return int(result.scalar_one())
 
 
+async def count_static_members_by_group_ids(
+    session: AsyncSession, group_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """Batched `GROUP BY group_id` count for the groups list page.
+
+    Replaces the per-group `count_static_members` loop that was N+1 in
+    `list_groups_endpoint`. Empty input → empty dict without a
+    round-trip. Groups with zero members are absent from the result;
+    the caller defaults to 0.
+    """
+    if not group_ids:
+        return {}
+    result = await session.execute(
+        select(ContactGroupMember.group_id, func.count())
+        .where(ContactGroupMember.group_id.in_(group_ids))
+        .group_by(ContactGroupMember.group_id)
+    )
+    return {row[0]: int(row[1]) for row in result.all()}
+
+
 async def list_contact_ids_matching_filter_limited(
     session: AsyncSession,
     *,
@@ -214,6 +234,7 @@ __all__ = [
     "count_contacts_matching_filter",
     "count_groups",
     "count_static_members",
+    "count_static_members_by_group_ids",
     "delete_group_row",
     "delete_members_for_group",
     "get_group_by_id",

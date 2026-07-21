@@ -66,6 +66,10 @@ class ContactImport(Base, TenantScoped):
         ForeignKey("tbl_contact_groups.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # DPDP opt-in provenance picked on the wizard's mapping step. NULL
+    # means "operator didn't pick" — commit falls back to the default
+    # `never_contacted` status on each contact created.
+    opt_in_source: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[ContactImportStatus] = mapped_column(
         Enum(
             ContactImportStatus,

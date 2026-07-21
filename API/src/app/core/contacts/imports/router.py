@@ -31,6 +31,7 @@ from src.app.core.contacts.imports.schemas import (
     ImportUploadOut,
 )
 from src.app.core.contacts.imports.service import (
+    MAX_FILE_SIZE_BYTES,
     commit_import,
     dry_run_import,
     upload_file,
@@ -56,13 +57,24 @@ async def upload_endpoint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="filename missing",
         )
-    file_bytes = await file.read()
+    # Streamed size check: read in chunks and 413 as soon as we cross
+    # the cap. Prior behaviour was `await file.read()` which buffered
+    # every byte in memory before the size check — a 500MB upload
+    # spikes container RAM before the 413 fires.
+    file_bytes = bytearray()
+    while chunk := await file.read(1 << 20):  # 1 MiB chunks
+        file_bytes.extend(chunk)
+        if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds the {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB cap.",
+            )
     return await upload_file(
         db,
         org_id=user.org_id,
         user_id=user.legacy_uuid,
         filename=file.filename,
-        file_bytes=file_bytes,
+        file_bytes=bytes(file_bytes),
     )
 
 
@@ -80,6 +92,7 @@ async def dry_run_endpoint(
         db,
         import_id=import_id,
         mapping=payload.mapping,
+        opt_in_source=payload.opt_in_source,
     )
 
 
@@ -101,6 +114,7 @@ async def commit_endpoint(
         mapping=payload.mapping,
         create_group=payload.create_group,
         group_name=payload.group_name,
+        opt_in_source=payload.opt_in_source,
     )
     return ImportCommitOut(
         id=row.id,

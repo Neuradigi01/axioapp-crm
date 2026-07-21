@@ -144,6 +144,50 @@
         </tbody>
       </table>
     </div>
+    @if (total() > 0) {
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-600">
+        <span>
+          Page {{ page() }} of {{ totalPages() }} · {{ total() }} group{{
+            total() === 1 ? '' : 's'
+          }}
+        </span>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5">
+            <label for="groups_pagesize" class="text-zinc-500">Rows</label>
+            <select
+              id="groups_pagesize"
+              [value]="pageSize()"
+              (change)="onPageSizeChange(+$any($event.target).value)"
+              class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            >
+              <option [value]="25">25</option>
+              <option [value]="50">50</option>
+              <option [value]="100">100</option>
+            </select>
+          </div>
+          @if (total() > pageSize()) {
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                [disabled]="page() <= 1"
+                (click)="goToPage(page() - 1)"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                [disabled]="page() >= totalPages()"
+                (click)="goToPage(page() + 1)"
+              >
+                Next
+              </button>
+            </div>
+          }
+        </div>
+      </div>
+    }
   }
 </div>
 

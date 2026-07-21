@@ -82,6 +82,11 @@ def _to_json_bytes(payload: Any) -> bytes:
 
 
 def _serialise_contact(contact: Any) -> dict[str, Any]:
+    # DPDP right-to-access exports on an anonymised row surface the
+    # placeholder full_name + null phone/email — flag the state
+    # explicitly so an auditor / the data subject reading the archive
+    # isn't misled into thinking the placeholder is real PII.
+    anonymised_at = getattr(contact, "anonymised_at", None)
     return {
         "id": contact.id,
         "org_id": contact.org_id,
@@ -106,6 +111,8 @@ def _serialise_contact(contact: Any) -> dict[str, Any]:
         "whatsapp_opt_out_reason": getattr(contact, "whatsapp_opt_out_reason", None),
         "created_at": contact.created_at,
         "updated_at": contact.updated_at,
+        "anonymised": anonymised_at is not None,
+        "anonymised_at": anonymised_at,
     }
 
 

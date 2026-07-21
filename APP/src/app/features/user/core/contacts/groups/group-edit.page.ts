@@ -29,7 +29,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { Subject, of } from 'rxjs';
+import { Subject, forkJoin, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
@@ -74,6 +74,13 @@ export class ContactGroupEditPageComponent {
   protected readonly searchResults = signal<ContactListItem[]>([]);
   protected readonly searchLoading = signal(false);
   protected readonly selectedContacts = signal<ContactListItem[]>([]);
+
+  /** IDs of existing members that were loaded from the server but not
+   *  hydrated into `selectedContacts` chips (i.e. members past the
+   *  first 10 shown by name). These are preserved through save so the
+   *  edit does not silently drop the tail. Mutated when the operator
+   *  toggles a chip-visible existing member or explicitly clears all. */
+  protected readonly hiddenExistingIds = signal<Set<string>>(new Set());
 
   protected readonly form = this.fb.group({
     name: this.fb.control('', {
@@ -206,7 +213,13 @@ export class ContactGroupEditPageComponent {
       if (isDynamic) {
         payload.filter_json = this._currentFilter();
       } else {
-        payload.contact_ids = this.selectedContacts().map((c) => c.id);
+        // Combine chip-visible ids with the hidden-but-preserved tail
+        // of the original member set. Prevents the silent data-loss
+        // bug where saving name-only changes on a >10-member static
+        // group used to wipe the tail.
+        const visible = this.selectedContacts().map((c) => c.id);
+        const hidden = [...this.hiddenExistingIds()].filter((id) => !visible.includes(id));
+        payload.contact_ids = [...visible, ...hidden];
       }
       this.api
         .update(this.groupId()!, payload)
@@ -265,7 +278,6 @@ export class ContactGroupEditPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (detail) => {
-          this.loading.set(false);
           this.mode.set(detail.is_dynamic ? 'dynamic' : 'static');
           this.form.patchValue({
             name: detail.name,
@@ -274,29 +286,85 @@ export class ContactGroupEditPageComponent {
             filter_source: detail.filter_json?.source ?? '',
             filter_tag: detail.filter_json?.tag ?? '',
           });
-          // For static groups we only get a sample of 10 ids; load
-          // the full list isn't necessary for editing the metadata.
-          // If the operator wants to fully replace the member set,
-          // they re-pick from scratch (rare flow).
-          if (!detail.is_dynamic && detail.sample_contact_ids.length > 0) {
-            // Render placeholder chips so the operator sees that
-            // members exist; full picker hydration is P2.
-            const placeholders: ContactListItem[] = detail.sample_contact_ids.map(
-              (cid) =>
-                ({
-                  id: cid,
-                  full_name: '(existing member)',
-                  phone: null,
-                  email: null,
-                }) as ContactListItem,
-            );
-            this.selectedContacts.set(placeholders);
-          }
           this.previewCount.set(detail.member_count);
+
+          if (detail.is_dynamic) {
+            this.loading.set(false);
+            return;
+          }
+
+          // Static group. Fetch the FULL member id list so a save
+          // does not silently drop members past the first 10, then
+          // hydrate real names for the sample (first 10) so the
+          // chips are meaningful instead of "(existing member)".
+          this._hydrateStaticMembers(id, detail.sample_contact_ids);
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.submitError.set(extractApiError(err));
+        },
+      });
+  }
+
+  private _hydrateStaticMembers(groupId: string, sampleIds: string[]): void {
+    this.api
+      .listMemberIds(groupId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (allIds) => {
+          const sampleSet = new Set(sampleIds);
+          const hidden = new Set<string>(allIds.filter((id) => !sampleSet.has(id)));
+          this.hiddenExistingIds.set(hidden);
+
+          if (sampleIds.length === 0) {
+            this.loading.set(false);
+            return;
+          }
+          // Parallel `GET /contacts/{id}` per sample so chip labels
+          // carry real names. Bounded at 10 (server-side sample cap)
+          // so we can afford the fan-out. Falls back to placeholder
+          // text for any id that fails to hydrate (e.g. deleted).
+          forkJoin(
+            sampleIds.map((cid) => this.contactsApi.get(cid).pipe(catchError(() => of(null)))),
+          )
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe((rows) => {
+              const chips: ContactListItem[] = sampleIds.map((cid, idx) => {
+                const c = rows[idx];
+                if (!c) {
+                  return {
+                    id: cid,
+                    full_name: 'Contact ' + cid.slice(0, 8),
+                    phone: null,
+                    email: null,
+                  } as ContactListItem;
+                }
+                return {
+                  id: c.id,
+                  full_name: c.full_name,
+                  phone: c.phone,
+                  email: c.email,
+                } as ContactListItem;
+              });
+              this.selectedContacts.set(chips);
+              this.loading.set(false);
+            });
+        },
+        error: () => {
+          // If the members fetch fails, fall back to placeholder chips
+          // so the operator can at least edit metadata safely (they
+          // still see the count from the detail response).
+          const placeholders: ContactListItem[] = sampleIds.map(
+            (cid) =>
+              ({
+                id: cid,
+                full_name: 'Contact ' + cid.slice(0, 8),
+                phone: null,
+                email: null,
+              }) as ContactListItem,
+          );
+          this.selectedContacts.set(placeholders);
+          this.loading.set(false);
         },
       });
   }

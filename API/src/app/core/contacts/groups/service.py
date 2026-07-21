@@ -280,13 +280,50 @@ async def get_sample_member_ids(
     return await data_access.list_static_member_contact_ids_limited(session, group.id, limit=limit)
 
 
+async def count_members_for_groups(
+    session: AsyncSession,
+    *,
+    groups: list[ContactGroup],
+) -> dict[uuid.UUID, int]:
+    """Batched member-count for the groups list page.
+
+    Static groups collapse into one `GROUP BY group_id` query; dynamic
+    groups still evaluate their saved filter individually. Empty input
+    returns an empty dict.
+    """
+    if not groups:
+        return {}
+    static_ids = [g.id for g in groups if not g.is_dynamic]
+    counts = await data_access.count_static_members_by_group_ids(session, static_ids)
+    for group in groups:
+        if group.is_dynamic:
+            counts[group.id] = await data_access.count_contacts_matching_filter(
+                session, filter_json=group.filter_json
+            )
+    return counts
+
+
+async def list_static_member_contact_ids(
+    session: AsyncSession, group_id: uuid.UUID
+) -> list[uuid.UUID]:
+    """Full ordered list of contact ids for a static group.
+
+    Used by the group-edit page to hydrate every existing member — the
+    old sample-only approach dropped members past the first 10 when
+    the operator saved the form.
+    """
+    return await data_access.list_static_member_contact_ids(session, group_id)
+
+
 __all__ = [
+    "count_members_for_groups",
     "create_group",
     "delete_group",
     "get_group",
     "get_member_count",
     "get_sample_member_ids",
     "list_groups",
+    "list_static_member_contact_ids",
     "preview_audience_size",
     "resolve_group_contacts",
     "update_group",

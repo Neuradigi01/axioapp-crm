@@ -167,6 +167,23 @@ async def is_user_active_member_of_org(
     return result.scalar_one_or_none() is not None
 
 
+async def list_contacts_by_ids_in_org(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> list[Contact]:
+    """Batched hydrate for the bulk-reassign path. Empty input → empty
+    list without a round-trip. `org_id` is asserted in the WHERE clause
+    as a belt to the ORM tenant filter."""
+    if not ids:
+        return []
+    result = await session.execute(
+        select(Contact).where(Contact.id.in_(ids), Contact.org_id == org_id)
+    )
+    return list(result.scalars().all())
+
+
 async def delete_contacts_in_org(
     session: AsyncSession,
     *,
@@ -228,6 +245,11 @@ async def find_duplicate_candidates(
     stmt = (
         select(Contact)
         .where(Contact.org_id == org_id)
+        # Anonymised rows carry a placeholder full_name and null
+        # phone/email — surfacing them as "possible duplicates" in the
+        # create/edit modal is misleading (operator could click
+        # through to a wiped record).
+        .where(Contact.anonymised_at.is_(None))
         .where(or_(*or_filters))
         .order_by(Contact.created_at.desc())
         .limit(limit)
@@ -464,6 +486,7 @@ __all__ = [
     "get_contact_by_phone",
     "insert_contact",
     "is_user_active_member_of_org",
+    "list_contacts_by_ids_in_org",
     "list_contacts_for_export",
     "reassign_contact_references",
 ]

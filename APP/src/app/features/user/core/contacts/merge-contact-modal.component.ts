@@ -53,6 +53,18 @@ export class MergeContactModalComponent {
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
 
+  /** "Type at least 2 characters" hint state — flips true once the
+   *  operator has focused the box and typed a short query. Keeps the
+   *  fresh empty state uncluttered but tells the user why a 1-char
+   *  query returned nothing. */
+  protected readonly searchHint = signal(false);
+
+  /** Double-confirm gate on the merge action. Merging is irreversible
+   *  (secondary contact deleted, every FK repointed). Operator has to
+   *  click "Merge" twice: first click flips this on and reveals the
+   *  final confirm button; second click actually calls the API. */
+  protected readonly confirmPending = signal(false);
+
   /** Filter the self-row out of the results — you can't merge a
    *  contact into itself and the backend returns 400 if you try. */
   protected readonly visibleResults = computed(() =>
@@ -67,12 +79,15 @@ export class MergeContactModalComponent {
         debounceTime(200),
         distinctUntilChanged(),
         switchMap((q) => {
-          if (!q || q.trim().length < 2) {
+          const trimmed = (q || '').trim();
+          if (trimmed.length < 2) {
             this.searching.set(false);
+            this.searchHint.set(trimmed.length > 0);
             return [{ items: [] as ContactListItem[] }];
           }
+          this.searchHint.set(false);
           this.searching.set(true);
-          return this.api.list({ q: q.trim(), size: 10 });
+          return this.api.list({ q: trimmed, size: 10 });
         }),
         takeUntilDestroyed(this.destroyRef),
       )
@@ -97,15 +112,23 @@ export class MergeContactModalComponent {
 
   protected pickResult(row: ContactListItem): void {
     this.selected.set(row);
+    this.confirmPending.set(false);
   }
 
   protected clearSelection(): void {
     this.selected.set(null);
+    this.confirmPending.set(false);
   }
 
   protected onConfirm(): void {
     const secondary = this.selected();
     if (!secondary) return;
+    if (!this.confirmPending()) {
+      // First click — arm the confirm. The template re-labels the
+      // button to make it clear the next click actually merges.
+      this.confirmPending.set(true);
+      return;
+    }
     this.submitting.set(true);
     this.error.set(null);
     this.api
@@ -118,6 +141,7 @@ export class MergeContactModalComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
+          this.confirmPending.set(false);
           this.error.set(extractApiError(err) ?? 'Could not merge contacts.');
         },
       });

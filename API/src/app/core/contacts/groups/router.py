@@ -33,12 +33,14 @@ from src.app.core.contacts.groups.schemas import (
     PreviewSizeOut,
 )
 from src.app.core.contacts.groups.service import (
+    count_members_for_groups,
     create_group,
     delete_group,
     get_group,
     get_member_count,
     get_sample_member_ids,
     list_groups,
+    list_static_member_contact_ids,
     preview_audience_size,
     update_group,
 )
@@ -56,13 +58,17 @@ async def list_groups_endpoint(
     _user: User = Depends(require_permissions("contacts.read")),
 ) -> GroupListResponse:
     """Paginated list with per-row `member_count` attached. The UI
-    uses this to render the Groups table (Step 3.5.8)."""
+    uses this to render the Groups table (Step 3.5.8).
+
+    Static-group counts are batched into a single `GROUP BY` query.
+    Dynamic-group counts still evaluate their saved filter one row at
+    a time — cheap for typical directory sizes."""
     rows, total = await list_groups(db, page=page, size=size)
+    counts = await count_members_for_groups(db, groups=rows)
     items: list[GroupRead] = []
     for row in rows:
-        count = await get_member_count(db, group=row)
         item = GroupRead.model_validate(row)
-        item.member_count = count
+        item.member_count = counts.get(row.id, 0)
         items.append(item)
     return GroupListResponse(items=items, total=total, page=page, size=size)
 
@@ -105,6 +111,25 @@ async def get_group_endpoint(
     out.member_count = count
     out.sample_contact_ids = sample
     return out
+
+
+@router.get("/{group_id}/members", response_model=list[uuid.UUID])
+async def list_group_members_endpoint(
+    group_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("contacts.read")),
+) -> list[uuid.UUID]:
+    """Full contact-id list for one static group.
+
+    The edit page uses this to hydrate the picker with every existing
+    member — the ``sample_contact_ids`` on the detail response only
+    holds the first 10, which caused static-group edits with >10
+    members to silently drop the tail on save. Dynamic groups are
+    materialised on demand — their filter drives resolution."""
+    row = await get_group(db, group_id)
+    if row.is_dynamic:
+        return await get_sample_member_ids(db, group=row, limit=10_000)
+    return await list_static_member_contact_ids(db, group_id)
 
 
 @router.patch("/{group_id}", response_model=GroupRead)
