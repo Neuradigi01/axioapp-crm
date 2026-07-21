@@ -263,16 +263,36 @@ async def list_consent_events(
     *,
     contact_id: uuid.UUID,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[ConsentEvent]:
     """Most-recent-first history for one contact. RLS-scoped via
-    the standard ``app.org_id`` setting — no manual filter needed."""
+    the standard ``app.org_id`` setting — no manual filter needed.
+
+    ``offset`` supports paging past the 200-row window so a contact
+    with a long consent history stays fully auditable."""
     stmt = (
         select(ConsentEvent)
         .where(ConsentEvent.contact_id == contact_id)
         .order_by(ConsentEvent.recorded_at.desc())
+        .offset(max(0, offset))
         .limit(max(1, min(limit, 200)))
     )
     return list((await session.execute(stmt)).scalars().all())
+
+
+async def count_consent_events(
+    session: AsyncSession,
+    *,
+    contact_id: uuid.UUID,
+) -> int:
+    """Total consent-event count for one contact — drives the "N more"
+    affordance in the opt-in history panel."""
+    from sqlalchemy import func as _func
+
+    result = await session.execute(
+        select(_func.count(ConsentEvent.id)).where(ConsentEvent.contact_id == contact_id)
+    )
+    return int(result.scalar_one() or 0)
 
 
 async def auto_flip_on_inbound(

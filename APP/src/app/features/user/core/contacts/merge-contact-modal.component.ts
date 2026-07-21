@@ -87,7 +87,13 @@ export class MergeContactModalComponent {
           }
           this.searchHint.set(false);
           this.searching.set(true);
-          return this.api.list({ q: trimmed, size: 10 });
+          // Merge target must not be an anonymised record — DPDP
+          // integrity guard mirrored on the backend service.
+          return this.api.list({
+            q: trimmed,
+            size: 10,
+            exclude_anonymised: true,
+          });
         }),
         takeUntilDestroyed(this.destroyRef),
       )

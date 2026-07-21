@@ -174,6 +174,7 @@ async def dry_run_import(
 
     Same parse pass the commit step uses — keeps the contract honest."""
     row = await _get_import(session, import_id)
+    _validate_mapping(mapping)
     storage = get_storage()
     file_bytes = _read_file_bytes(storage, row.storage_path)
 
@@ -265,6 +266,8 @@ async def commit_import(
     if row.status == ContactImportStatus.committed:
         return row
 
+    _validate_mapping(mapping)
+
     # Fold the effective opt-in source: prefer the fresh caller value,
     # otherwise use what dry-run stashed on the row.
     effective_opt_in_source = opt_in_source or row.opt_in_source
@@ -302,9 +305,18 @@ async def commit_import(
 
         contact_id = uuid.uuid4()
         tag_value = mapped.get("tag")
-        tags: list[str] = tag_value if isinstance(tag_value, list) else (
-            [tag_value.strip()] if isinstance(tag_value, str) and tag_value.strip() else []
+        # Normalise, dedupe, trim, and cap. `Contact.tags` is
+        # `ARRAY(String(64))` — an unbounded tag from a CSV cell
+        # otherwise raises `DataError` mid-batch and rolls back every
+        # already-inserted row up to that point.
+        raw_tags: list[str] = tag_value if isinstance(tag_value, list) else (
+            [tag_value] if isinstance(tag_value, str) else []
         )
+        tags: list[str] = []
+        for t in raw_tags:
+            cleaned = str(t).strip()[:64]
+            if cleaned and cleaned not in tags:
+                tags.append(cleaned)
         contact = Contact(
             id=contact_id,
             org_id=org_id,
@@ -395,6 +407,32 @@ def _read_file_bytes(storage, storage_path: str) -> bytes:
 
     full = Path("./storage").resolve() / storage_path.lstrip("/")
     return full.read_bytes()
+
+
+def _validate_mapping(mapping: dict[str, str]) -> None:
+    """Reject a mapping where two columns land on the same non-tag
+    target. Silent last-write-wins on `full_name` / `phone` / `email`
+    / `source` corrupts data — surface the conflict as a 422 so the
+    operator picks one column and marks the other `skip`.
+
+    Duplicate `tag` targets are allowed (they aggregate via
+    `_apply_mapping`).
+    """
+    non_tag_seen: dict[str, str] = {}
+    conflicts: list[str] = []
+    for column, target in mapping.items():
+        if not target or target == "skip" or target == "tag":
+            continue
+        prior = non_tag_seen.get(target)
+        if prior is not None:
+            conflicts.append(f"{prior!r} and {column!r} both map to {target!r}")
+        else:
+            non_tag_seen[target] = column
+    if conflicts:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Duplicate mapping targets: " + "; ".join(conflicts),
+        )
 
 
 def _apply_mapping(raw: dict[str, str], mapping: dict[str, str]) -> dict[str, Any]:

@@ -69,10 +69,17 @@ def _xlsx_rows(data: bytes) -> Iterator[list[str]]:
         ) from exc
     wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     ws = wb.active
+    first_row_seen = False
     for raw_row in ws.iter_rows(values_only=True):
-        # Coerce cells to strings; None → "". openpyxl returns
-        # int/float/datetime for typed cells.
-        yield ["" if c is None else str(c) for c in raw_row]
+        cells = ["" if c is None else str(c) for c in raw_row]
+        # Drop all-empty rows AFTER the header. openpyxl's used-range
+        # includes rows that carry stray formatting past the last data
+        # row — those otherwise inflate `row_count` / `will_skip` and
+        # pollute the errors list.
+        if first_row_seen and not any(cell.strip() for cell in cells):
+            continue
+        first_row_seen = True
+        yield cells
 
 
 # --- public API ----------------------------------------------------------

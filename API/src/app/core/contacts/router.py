@@ -29,14 +29,14 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
-from src.app.core.permissions.service import list_permissions_for_role
+from src.app.core.permissions.service import role_has_permission
 from src.app.core.contacts.consent_service import (
     ConsentError,
+    count_consent_events,
     list_consent_events,
     record_transition,
 )
 from src.app.core.contacts.data_export import build_contact_data_export
-from src.app.core.custom_fields import data_access as custom_fields_da
 from src.app.core.contacts.schemas import (
     ConsentEventOut,
     ContactAnonymiseRequest,
@@ -61,7 +61,6 @@ from src.app.core.contacts.schemas import (
     OptInRecordRequest,
     OptOutRecordRequest,
 )
-from src.app.core.contacts import data_access as contacts_da
 from src.app.core.contacts.service import (
     anonymise_contact,
     bulk_add_tag_contacts,
@@ -72,6 +71,8 @@ from src.app.core.contacts.service import (
     delete_contact,
     export_contacts_csv_rows,
     get_contact,
+    hydrate_contacts_by_ids,
+    list_contact_custom_field_defs,
     list_contacts,
     merge_contacts,
     reassign_contact,
@@ -102,6 +103,14 @@ async def list_contacts_endpoint(
     source: str | None = Query(default=None, max_length=64),
     tag: str | None = Query(default=None, max_length=64),
     assigned_to_id: uuid.UUID | None = Query(default=None),
+    exclude_anonymised: bool = Query(
+        default=False,
+        description=(
+            "When true, anonymised (DPDP right-to-be-forgotten) contacts "
+            "are excluded from the result. Used by pickers that must not "
+            "offer wiped records as merge / link targets."
+        ),
+    ),
     sort: Literal["full_name", "created_at", "last_activity_at"] = Query(default="created_at"),
     order: Literal["asc", "desc"] = Query(default="desc"),
     page: int = Query(default=1, ge=1),
@@ -120,6 +129,7 @@ async def list_contacts_endpoint(
         order=order,
         page=page,
         size=size,
+        exclude_anonymised=exclude_anonymised,
     )
     return ContactListResponse(
         items=[ContactListItem.model_validate(r) for r in rows],
@@ -207,7 +217,7 @@ async def export_csv_endpoint(
     # Fetch every visible contact custom field for the org. Same order
     # the render endpoint uses so the CSV columns match the form layout
     # top-to-bottom.
-    custom_defs = await custom_fields_da.list_fields_query(db, entity_type="contact")
+    custom_defs = await list_contact_custom_field_defs(db)
 
     # Resolve org slug for the filename. Two reasons: (1) the user is
     # often signed into multiple orgs and the file is more useful when
@@ -314,8 +324,7 @@ async def update_contact_endpoint(
     # (the null case is an explicit unassign — still a reassign action).
     changes = payload.model_dump(exclude_unset=True)
     if "assigned_to_id" in changes:
-        granted = {p.key for p in await list_permissions_for_role(db, user.role_id)}
-        if "contacts.reassign" not in granted:
+        if not await role_has_permission(db, user.role_id, "contacts.reassign"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Missing permission(s): contacts.reassign",
@@ -444,9 +453,7 @@ async def hydrate_contacts_endpoint(
     """Bulk-fetch `ContactListItem` shape for many ids in a single
     call. Collapses N per-row `GET /contacts/{id}` fan-outs from
     list pages (walk-ins, appointments, etc.) into one round-trip."""
-    rows = await contacts_da.list_contacts_by_ids_in_org(
-        db, ids=payload.ids, org_id=user.org_id
-    )
+    rows = await hydrate_contacts_by_ids(db, ids=payload.ids, org_id=user.org_id)
     return [ContactListItem.model_validate(r) for r in rows]
 
 
@@ -527,17 +534,27 @@ async def export_contact_data_endpoint(
 )
 async def get_opt_in_endpoint(
     contact_id: uuid.UUID,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("contacts.read")),
 ) -> OptInHistoryOut:
     """Read-only view of the opt-in surface for one contact. Read
     gate is the standard `contacts.read` — every staffer with
     access to the contact can see the consent state. Manual
-    overrides are gated separately on `whatsapp.opt_in.manage`."""
+    overrides are gated separately on `whatsapp.opt_in.manage`.
+
+    `limit` / `offset` page through the consent events (200 max per
+    call). `total_events` in the response tells the FE how many more
+    exist so it can render an accurate "N more" pager.
+    """
     contact = await get_contact(db, contact_id)
     if contact is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact not found")
-    events = await list_consent_events(db, contact_id=contact_id)
+    events = await list_consent_events(
+        db, contact_id=contact_id, limit=limit, offset=offset
+    )
+    total = await count_consent_events(db, contact_id=contact_id)
     return OptInHistoryOut(
         contact_id=contact.id,
         status=contact.whatsapp_opt_in_status,
@@ -547,6 +564,7 @@ async def get_opt_in_endpoint(
         opt_out_recorded_at=contact.whatsapp_opt_out_recorded_at,
         opt_out_reason=contact.whatsapp_opt_out_reason,
         events=[ConsentEventOut.model_validate(e) for e in events],
+        total_events=total,
     )
 
 

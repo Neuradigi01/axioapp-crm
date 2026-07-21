@@ -24,6 +24,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -80,6 +81,33 @@ async def get_contact_by_phone(session: AsyncSession, phone: str) -> Contact | N
     conversation routing and walk-in reception to resolve an
     incoming number to a contact."""
     return await data_access.get_contact_by_phone(session, phone)
+
+
+async def hydrate_contacts_by_ids(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> list[Contact]:
+    """Batched hydrate for the `POST /contacts/hydrate` endpoint.
+
+    Wraps `data_access.list_contacts_by_ids_in_org` so the router
+    stays a thin HTTP shim per the Router → Service → DAL rule. The
+    DAL query filters by `org_id` in the WHERE clause; ids from
+    another tenant simply don't come back.
+    """
+    return await data_access.list_contacts_by_ids_in_org(
+        session, ids=ids, org_id=org_id
+    )
+
+
+async def list_contact_custom_field_defs(session: AsyncSession):
+    """Ordered list of `custom_field_definitions` for the CSV export
+    header. Router doesn't reach into `custom_fields.data_access`
+    directly — this shim keeps the layering clean."""
+    from src.app.core.custom_fields import data_access as custom_fields_da
+
+    return await custom_fields_da.list_fields_query(session, entity_type="contact")
 
 
 def insert_contact(session: AsyncSession, contact: Contact) -> None:
@@ -198,11 +226,31 @@ async def update_contact(
 
 
 async def delete_contact(session: AsyncSession, *, contact_id: uuid.UUID) -> None:
+    """Hard-delete one contact.
+
+    Wraps the FK RESTRICT `IntegrityError` (leads / walk-ins /
+    appointments / invoices point at ``tbl_contacts.id`` with
+    ``ON DELETE RESTRICT``) into a clean 409 with a hint to use
+    Anonymise or delete the dependent rows first. Previous behaviour
+    let the raw ``IntegrityError`` bubble up as a 500.
+    """
     contact = ensure_found(await data_access.get_contact(session, contact_id), entity="contact")
     before = _snapshot(contact)
     contact_uuid = contact.id
     await data_access.delete_contact_row(session, contact)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "cannot delete contact — leads, walk-ins, appointments, "
+                "or invoices reference this contact. Delete or reassign "
+                "the dependent rows first, or use Anonymise to wipe PII "
+                "while preserving history."
+            ),
+        ) from exc
 
     await log_entity_change(
         action="contacts.deleted",
@@ -260,6 +308,21 @@ async def merge_contacts(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="both contacts must belong to the caller's org",
+        )
+    if primary.anonymised_at is not None or secondary.anonymised_at is not None:
+        # DPDP guard: neither side of a merge may be anonymised.
+        # Folding an anonymised row's placeholder name / empty tags
+        # into an active contact silently corrupts real PII; folding
+        # an active contact into a wiped primary re-populates the
+        # placeholder with the secondary's data (un-anonymises via
+        # merge). Both must be blocked.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "cannot merge — one of the contacts is anonymised "
+                "(DPDP right-to-be-forgotten). Anonymised rows are "
+                "immutable to merge to preserve the wipe."
+            ),
         )
 
     before_primary = _snapshot(primary)
@@ -452,6 +515,7 @@ async def list_contacts(
     order: Literal["asc", "desc"] = "desc",
     page: int = 1,
     size: int = 50,
+    exclude_anonymised: bool = False,
 ) -> tuple[list[Contact], int]:
     """Paginated list with optional filters. Returns (rows, total).
 
@@ -479,6 +543,7 @@ async def list_contacts(
         sort_column=_SORT_COLUMNS[sort],
         sort=sort,
         order=order,
+        exclude_anonymised=exclude_anonymised,
     )
     return await paginate(session, base, page=page, size=size)
 
@@ -626,9 +691,24 @@ async def bulk_delete_contacts(
 
     `org_id` is enforced in the WHERE clause as a belt to the tenant RLS
     policy — the auto ORM tenant filter only injects on SELECTs.
+
+    Wraps FK RESTRICT `IntegrityError` (see `delete_contact` for the
+    list of dependent tables) into a clean 409 — otherwise a
+    single-row conflict would raw-500 the whole batch.
     """
     deleted = await data_access.delete_contacts_in_org(session, ids=ids, org_id=org_id)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "cannot delete one or more contacts — leads, walk-ins, "
+                "appointments, or invoices reference them. Delete or "
+                "reassign the dependent rows first, or use Anonymise."
+            ),
+        ) from exc
     return deleted
 
 

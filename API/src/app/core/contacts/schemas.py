@@ -226,6 +226,10 @@ class OptInHistoryOut(BaseModel):
     opt_out_recorded_at: datetime | None
     opt_out_reason: str | None
     events: list[ConsentEventOut]
+    # Total events across all time — drives the "N more" pager on the
+    # opt-in history panel. Router-level defaults return the first 50
+    # so a chatty inbox contact stays fully auditable.
+    total_events: int = 0
 
 
 ContactListResponse = PaginatedResponse[ContactListItem]

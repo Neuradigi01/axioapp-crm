@@ -149,6 +149,10 @@ export interface ContactListQuery {
   size?: number;
   /** `custom.<field_key> = value` filters. */
   customFilters?: Record<string, string>;
+  /** When true, anonymised (DPDP right-to-be-forgotten) contacts are
+   *  excluded server-side. Merge modal + link pickers pass true so a
+   *  wiped record can never appear as a merge / link target. */
+  exclude_anonymised?: boolean;
 }
 
 /** Targets the operator can map a CSV column to. Mirrors the
@@ -216,6 +220,7 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
       order: query.order,
       page: query.page,
       size: query.size,
+      exclude_anonymised: query.exclude_anonymised ? true : undefined,
       ...prefixCustomFilters(query.customFilters),
     });
     return this.http.get<ContactListResponse>(this.base, { params });

@@ -29,7 +29,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { Subject, forkJoin, of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
@@ -320,30 +320,26 @@ export class ContactGroupEditPageComponent {
             this.loading.set(false);
             return;
           }
-          // Parallel `GET /contacts/{id}` per sample so chip labels
-          // carry real names. Bounded at 10 (server-side sample cap)
-          // so we can afford the fan-out. Falls back to placeholder
-          // text for any id that fails to hydrate (e.g. deleted).
-          forkJoin(
-            sampleIds.map((cid) => this.contactsApi.get(cid).pipe(catchError(() => of(null)))),
-          )
-            .pipe(takeUntilDestroyed(this.destroyRef))
+          // Batched `POST /contacts/hydrate` — one round-trip for the
+          // whole sample instead of N per-id GETs. Falls back to a
+          // placeholder chip for any id that didn't come back (e.g.
+          // deleted / anonymised).
+          this.contactsApi
+            .hydrateByIds(sampleIds)
+            .pipe(
+              catchError(() => of([] as ContactListItem[])),
+              takeUntilDestroyed(this.destroyRef),
+            )
             .subscribe((rows) => {
-              const chips: ContactListItem[] = sampleIds.map((cid, idx) => {
-                const c = rows[idx];
-                if (!c) {
-                  return {
-                    id: cid,
-                    full_name: 'Contact ' + cid.slice(0, 8),
-                    phone: null,
-                    email: null,
-                  } as ContactListItem;
-                }
+              const byId = new Map(rows.map((r) => [r.id, r]));
+              const chips: ContactListItem[] = sampleIds.map((cid) => {
+                const hydrated = byId.get(cid);
+                if (hydrated) return hydrated;
                 return {
-                  id: c.id,
-                  full_name: c.full_name,
-                  phone: c.phone,
-                  email: c.email,
+                  id: cid,
+                  full_name: 'Contact ' + cid.slice(0, 8),
+                  phone: null,
+                  email: null,
                 } as ContactListItem;
               });
               this.selectedContacts.set(chips);

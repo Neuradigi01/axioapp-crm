@@ -56,7 +56,7 @@ from src.app.core.walk_ins.service import (
     update_walk_in,
     walk_ins_rollup,
 )
-from src.app.core.permissions.service import list_permissions_for_role, role_has_permission
+from src.app.core.permissions.service import role_has_permission
 from src.app.shared.db import get_db
 
 router = APIRouter(prefix="/walk-ins", tags=["Walk-ins"])
@@ -181,8 +181,7 @@ async def update_walk_in_endpoint(
     # from "sent as null".
     changes = payload.model_dump(exclude_unset=True)
     if "assigned_to_id" in changes:
-        granted = {p.key for p in await list_permissions_for_role(db, user.role_id)}
-        if "walkins.reassign" not in granted:
+        if not await role_has_permission(db, user.role_id, "walkins.reassign"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Missing permission(s): walkins.reassign",

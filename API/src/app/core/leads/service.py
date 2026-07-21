@@ -261,7 +261,119 @@ async def create_lead(
     # committed; a misbehaving handler can't roll it back.
     await _publish_lead_created(session, org_id=org_id, lead=lead)
 
+    # `lead.assigned` fires when a lead lands with an owner already
+    # set (manual create with assignee, or a channel that pre-picks
+    # a rep). ``from_user_id`` is null because there was no prior
+    # owner. The reassign paths below fire the same event with a
+    # non-null ``from_user_id`` so a single automation subscribes
+    # once and covers both branches.
+    if lead.assigned_to_id is not None:
+        await _publish_lead_assigned(
+            session,
+            org_id=org_id,
+            lead=lead,
+            from_user_id=None,
+            to_user_id=lead.assigned_to_id,
+        )
+
     return lead
+
+
+async def _publish_lead_assigned(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    lead: Lead,
+    from_user_id: uuid.UUID | None,
+    to_user_id: uuid.UUID,
+) -> None:
+    """Build the ``lead.assigned`` envelope + publish via the bus.
+
+    Snapshots the assignee ``user`` (full_name / email), the ``lead``,
+    the linked ``contact``, and the ``org`` so a downstream automation's
+    Send Email action can render ``{{user.*}}`` / ``{{lead.*}}`` /
+    ``{{contact.*}}`` / ``{{org.*}}`` without extra DB hits, and the
+    ``user.email`` recipient resolver has an id to look up.
+
+    ``event_id`` includes the ``to_user_id`` so an identity-reassign
+    replay (rare — the caller normally short-circuits before we get
+    here) doesn't produce two automation runs for the same assignment.
+    Wraps every DB call in a try/except that swallows subscriber
+    failures — the lead + reassign audit are already committed by the
+    caller; a misbehaving handler can't roll them back.
+    """
+    try:
+        from datetime import UTC, datetime
+
+        from sqlalchemy import select
+
+        from src.app.core.contacts.models import Contact
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+        from src.app.core.users.models import User
+
+        contact = (
+            await session.execute(select(Contact).where(Contact.id == lead.contact_id))
+        ).scalar_one_or_none()
+        org = (
+            await session.execute(select(Organization).where(Organization.id == org_id))
+        ).scalar_one_or_none()
+        user = (
+            await session.execute(select(User).where(User.legacy_uuid == to_user_id))
+        ).scalar_one_or_none()
+
+        payload: dict = {
+            "lead_id": str(lead.id),
+            "contact_id": str(lead.contact_id),
+            "from_user_id": str(from_user_id) if from_user_id else None,
+            "to_user_id": str(to_user_id),
+            "assigned_at": datetime.now(UTC).isoformat(),
+            "lead": {
+                "id": str(lead.id),
+                "source": str(lead.source) if lead.source else None,
+                "status": (
+                    lead.status.value if hasattr(lead.status, "value") else str(lead.status)
+                ),
+                "pipeline_stage": lead.pipeline_stage,
+                "assigned_to_id": str(to_user_id),
+                "budget": float(lead.budget) if lead.budget is not None else None,
+            },
+        }
+        if user is not None:
+            payload["user"] = {
+                "id": str(to_user_id),
+                "full_name": user.full_name,
+                "email": user.email,
+            }
+        if contact is not None:
+            payload["contact"] = {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+            }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+            }
+
+        await events_publish(
+            "lead.assigned",
+            payload,
+            org_id=org_id,
+            event_id=f"lead_assigned:{lead.id}:{to_user_id}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "leads publish_lead_assigned_failed org=%s lead=%s to=%s",
+            org_id,
+            lead.id,
+            to_user_id,
+        )
 
 
 async def _publish_lead_created(session: AsyncSession, *, org_id: uuid.UUID, lead: Lead) -> None:
@@ -1007,6 +1119,20 @@ async def reassign_lead(
         before=before,
         after=_snapshot(lead),
     )
+    # Fire `lead.assigned` only when the new owner is a real user
+    # (unassign → null skips — no one to notify). Same event the
+    # create-with-assignee path publishes, so per-org automations
+    # subscribe once and cover both branches; the `from_user_id`
+    # field distinguishes them for operators who want to condition
+    # on it (`from_user_id IS NULL` = first assignment).
+    if assigned_to_id is not None:
+        await _publish_lead_assigned(
+            session,
+            org_id=org_id,
+            lead=lead,
+            from_user_id=before_id,
+            to_user_id=assigned_to_id,
+        )
     return lead
 
 
@@ -1024,7 +1150,12 @@ async def bulk_reassign_leads(
     if assigned_to_id is not None:
         await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
+    # Collect per-row (lead, prior_owner_id) pairs during the loop so
+    # we can fan out `lead.assigned` events AFTER the commit — the
+    # subscriber-facing snapshot needs the committed row + we don't
+    # want a misbehaving handler rolling back the whole batch.
     reassigned = 0
+    assigned_rows: list[tuple[Lead, uuid.UUID | None]] = []
     for lid in ids:
         lead = await get_lead(session, lid)
         if lead is None:
@@ -1043,8 +1174,22 @@ async def bulk_reassign_leads(
             user_id=actor_user_id,
         )
         reassigned += 1
+        assigned_rows.append((lead, before_id))
 
     await session.commit()
+
+    # Fan out `lead.assigned` events per touched row when the new
+    # owner is a real user (unassign → null skips — no one to notify).
+    # Same event the single-row reassign path publishes.
+    if assigned_to_id is not None:
+        for lead, before_id in assigned_rows:
+            await _publish_lead_assigned(
+                session,
+                org_id=org_id,
+                lead=lead,
+                from_user_id=before_id,
+                to_user_id=assigned_to_id,
+            )
     return reassigned
 
 

@@ -161,6 +161,62 @@ _register(
 )
 _register(
     CatalogEntry(
+        event_type="lead.assigned",
+        label="Lead assigned",
+        description=(
+            "A lead's owner is set or changed — fires when a lead is "
+            "created with an assignee, single-row reassigned, or "
+            "bulk-reassigned. ``from_user_id`` is null on the "
+            "first-time assignment (fresh lead) and non-null when a "
+            "reassignment moves ownership between reps, so operators "
+            "can add ``from_user_id IS NULL`` conditions to target only "
+            "one branch. Round-robin auto-assign inside a workflow is "
+            "**not** covered here — the seeded auto-triage workflow "
+            "already notifies the assignee inline. "
+            "``event_id=lead_assigned:{lead_id}:{to_user_id}`` "
+            "deduplicates identity-reassign replays."
+        ),
+        sample_payload={
+            # Flat top-level keys so condition AST paths like
+            # `field='to_user_id'` work without nesting; nested
+            # `user` / `lead` / `contact` / `org` dicts carry the
+            # variable renderer's lookups. `from_user_id` is null
+            # when the row previously had no assignee.
+            "lead_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "from_user_id": None,
+            "to_user_id": "00000000-0000-0000-0000-000000000000",
+            "assigned_at": "2026-07-21T13:00:00+00:00",
+            "user": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Priya Kapoor",
+                "email": "priya@example.com",
+                "role": "Sales",
+            },
+            "lead": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "source": "widget",
+                "status": "active",
+                "pipeline_stage": "new",
+                "assigned_to_id": "00000000-0000-0000-0000-000000000000",
+                "budget": None,
+            },
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
+        },
+    )
+)
+_register(
+    CatalogEntry(
         event_type="lead.status_changed",
         label="Lead status changed",
         description="The lead transitions between pipeline stages.",

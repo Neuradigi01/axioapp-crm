@@ -35,7 +35,7 @@ import logging
 import uuid
 import zipfile
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -262,8 +262,15 @@ async def build_contact_data_export(
         }
         zf.writestr(f"{prefix}/manifest.json", _to_json_bytes(manifest))
 
-    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    filename = f"contact-{contact_id}-data-export-{timestamp}.zip"
+    # IST-anchored filename timestamp — matches the contacts CSV
+    # export (`contacts/router.py::export_csv_endpoint`) so both
+    # operator-facing artifacts follow the same convention. Mumbai
+    # operator at 04:00 IST used to get a UTC-yesterday-dated ZIP
+    # (`20260721T223000Z`) — misleading and search-unfriendly.
+    IST = timezone(timedelta(hours=5, minutes=30))
+    ist_now = datetime.now(UTC).astimezone(IST)
+    timestamp = ist_now.strftime("%Y%m%dT%H%M%S")
+    filename = f"contact-{contact_id}-data-export-{timestamp}-IST.zip"
     summary = {
         "contact_id": str(contact_id),
         "filename": filename,

@@ -93,6 +93,7 @@ def _build_filters(
     tag: str | None,
     assigned_to_id: uuid.UUID | None,
     custom_filters: Iterable[tuple[str, str]],
+    exclude_anonymised: bool = False,
 ) -> list[ColumnElement[bool]]:
     """Shared filter assembler used by list / export / count helpers."""
     filters: list[ColumnElement[bool]] = []
@@ -111,6 +112,8 @@ def _build_filters(
         filters.append(Contact.tags.contains([tag]))
     if assigned_to_id is not None:
         filters.append(Contact.assigned_to_id == assigned_to_id)
+    if exclude_anonymised:
+        filters.append(Contact.anonymised_at.is_(None))
     for key, value in custom_filters:
         filters.append(Contact.custom_data[key].astext == value)
     return filters
@@ -126,6 +129,7 @@ def build_contact_list_query(
     sort_column: Any,
     sort: str,
     order: str,
+    exclude_anonymised: bool = False,
 ) -> Select[tuple[Contact]]:
     """Assemble the paginated list query with filter + sort applied.
 
@@ -140,6 +144,7 @@ def build_contact_list_query(
         tag=tag,
         assigned_to_id=assigned_to_id,
         custom_filters=custom_filters,
+        exclude_anonymised=exclude_anonymised,
     )
     base = select(Contact)
     if filters:
@@ -214,10 +219,14 @@ async def bulk_append_tag(
     ids: list[uuid.UUID],
     tag: str,
     org_id: uuid.UUID,
+    max_tags: int = 32,
 ) -> int:
     """Append `tag` to each contact's `tags` array (if missing).
 
     Postgres `array_append` keeps the operation atomic per row.
+    Rows whose current `tags` length is already at `max_tags` are
+    skipped — mirrors the create/update schema cap so this endpoint
+    can't quietly grow rows past the intended bound.
     Returns rowcount.
     """
     if not ids:
@@ -226,6 +235,9 @@ async def bulk_append_tag(
         sa_update(Contact)
         .where(Contact.id.in_(ids), Contact.org_id == org_id)
         .where(~Contact.tags.contains([tag]))
+        .where(func.array_length(Contact.tags, 1).is_(None) | (
+            func.array_length(Contact.tags, 1) < max_tags
+        ))
         .values(tags=func.array_append(Contact.tags, tag))
     )
     return int(result.rowcount or 0)
@@ -401,6 +413,11 @@ async def reassign_contact_references(
         ("tbl_consent_events", "consent_events"),
         ("tbl_email_sequence_enrollments", "email_sequence_enrollments"),
         ("tbl_contact_group_members", "contact_group_members"),
+        # WhatsApp Flows submissions. FK is `SET NULL` on delete so the
+        # secondary DELETE succeeds without repointing — but that
+        # silently loses the customer's flow-submission history. Move
+        # it to the primary instead.
+        ("tbl_whatsapp_flow_submissions", "whatsapp_flow_submissions"),
     )
     for tbl, key in _FK_TARGETS:
         stmt = text(
