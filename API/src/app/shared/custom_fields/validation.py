@@ -72,10 +72,18 @@ async def validate_custom_data(
         cleaned[key] = coerce_value(defs[key].field_type, key, value)
 
     if require_all_required:
+        # Hidden fields are treated as "removed from the form" — the
+        # operator can't fill them in the create UI, so it would be
+        # nonsense for the API to reject the same create for missing
+        # them. The definitions stay in the DB (existing `custom_data`
+        # payloads still coerce cleanly above); they just don't force
+        # anything.
         missing = [
             key
             for key, defn in defs.items()
-            if defn.is_required and (key not in cleaned or cleaned[key] is None)
+            if defn.is_required
+            and not defn.is_hidden
+            and (key not in cleaned or cleaned[key] is None)
         ]
         if missing:
             raise HTTPException(

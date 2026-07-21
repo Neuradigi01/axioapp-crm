@@ -78,7 +78,13 @@ async def list_targets(session: AsyncSession) -> list[MappingTarget]:
         (
             await session.execute(
                 select(CustomFieldDefinition).where(
-                    CustomFieldDefinition.entity_type.in_(("contact", "lead"))
+                    CustomFieldDefinition.entity_type.in_(("contact", "lead")),
+                    # Hidden custom fields must NOT surface as import
+                    # targets — the operator removed them from the form,
+                    # so the mapping page trying to enforce them as
+                    # required is stale behaviour (see leads-import
+                    # regression 2026-07-21).
+                    CustomFieldDefinition.is_hidden.is_(False),
                 )
             )
         )
