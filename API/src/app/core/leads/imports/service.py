@@ -476,6 +476,29 @@ def read_skipped_csv(import_row: LeadImport) -> bytes:
     return full.read_bytes()
 
 
+def read_warnings_csv(import_row: LeadImport) -> bytes:
+    """Read the warnings CSV bytes for a completed import.
+
+    Same shape as the error / skipped readers — 404 when the import
+    didn't emit any warnings or when the row is missing on disk.
+    Powers the "Download warnings report" button on the result page.
+    """
+    if not import_row.warnings_report_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="this import has no warnings report",
+        )
+    from pathlib import Path
+
+    full = Path("./storage").resolve() / import_row.warnings_report_path.lstrip("/")
+    if not full.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="warnings report file missing on disk",
+        )
+    return full.read_bytes()
+
+
 __all__ = [
     "PreviewPayload",
     "cancel_import",
@@ -486,5 +509,6 @@ __all__ = [
     "read_preview",
     "read_skipped_csv",
     "read_source_file",
+    "read_warnings_csv",
     "upload",
 ]

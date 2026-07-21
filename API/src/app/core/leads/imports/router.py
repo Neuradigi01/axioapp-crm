@@ -54,6 +54,7 @@ from src.app.core.leads.imports.service import (
     read_preview,
     read_skipped_csv,
     read_source_file,
+    read_warnings_csv,
     upload,
 )
 from src.app.core.leads.imports.targets import list_targets
@@ -328,6 +329,36 @@ async def download_import_skipped_endpoint(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
     data = read_skipped_csv(row)
     filename = f"import-{import_id}-skipped.csv"
+    return Response(
+        content=data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/{import_id}/warnings.csv")
+async def download_import_warnings_endpoint(
+    import_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("leads.import")),
+) -> Response:
+    """Download the per-import warnings CSV.
+
+    Contains one row per input row that was imported successfully
+    but only after substituting an out-of-vocabulary value (currently:
+    an unknown ``pipeline_stage`` falling back to the pipeline's
+    default first stage). Each row carries the original columns plus
+    the ``__original_value`` / ``__substituted_value`` /
+    ``__created_lead_id`` / ``__created_contact_id`` inspection
+    columns so operators can bulk-edit the substituted stages later.
+
+    404 if the import emitted no warnings.
+    """
+    row = await get_import(db, import_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
+    data = read_warnings_csv(row)
+    filename = f"import-{import_id}-warnings.csv"
     return Response(
         content=data,
         media_type="text/csv",

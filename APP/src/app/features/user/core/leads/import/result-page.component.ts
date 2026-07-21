@@ -24,9 +24,11 @@ import { ImportsApiService, LeadImport, LeadImportStatus } from './imports-api.s
  *   - counts card (imported / duplicates skipped / errors);
  *   - per-category reason breakdown (e.g. "50× invalid date …")
  *     under the counters that had non-empty `error_reasons` /
- *     `skipped_reasons` maps in the response;
+ *     `skipped_reasons` / `warning_reasons` maps in the response;
  *   - "Download error report" button when the job produced errors;
  *   - "Download duplicates report" button when the job skipped rows;
+ *   - "Download warnings report" button when the job substituted
+ *     out-of-vocabulary values (e.g. unknown pipeline_stage → default);
  *   - "Back to leads" CTA.
  *
  * In dev (CELERY_ENABLED=false), the commit endpoint awaits the
@@ -57,6 +59,7 @@ export class ResultPageComponent {
   protected readonly loadError = signal<string | null>(null);
   protected readonly downloading = signal(false);
   protected readonly downloadingSkipped = signal(false);
+  protected readonly downloadingWarnings = signal(false);
 
   protected readonly isTerminal = computed(() => {
     const row = this.importRow();
@@ -93,6 +96,11 @@ export class ResultPageComponent {
     return c !== null && (c.duplicates_skipped ?? 0) > 0 && !!this.importRow()?.skipped_report_path;
   });
 
+  protected readonly hasWarnings = computed(() => {
+    const c = this.counts();
+    return c !== null && (c.warnings ?? 0) > 0 && !!this.importRow()?.warnings_report_path;
+  });
+
   /** Error reasons sorted count-descending for a stable readout order.
    * Empty when the processor didn't emit any bucketed reasons (legacy
    * completed imports from before the reason-tracking work). */
@@ -103,6 +111,11 @@ export class ResultPageComponent {
   /** Same shape as `errorReasonList`, for the "duplicates skipped" tally. */
   protected readonly skippedReasonList = computed(() =>
     this.reasonList(this.counts()?.skipped_reasons),
+  );
+
+  /** Same shape, for the "imported with a value fallback" tally. */
+  protected readonly warningReasonList = computed(() =>
+    this.reasonList(this.counts()?.warning_reasons),
   );
 
   private reasonList(
@@ -180,6 +193,21 @@ export class ResultPageComponent {
           this.triggerDownload(blob, `import-${this.importId}-skipped.csv`);
         },
         error: () => this.downloadingSkipped.set(false),
+      });
+  }
+
+  protected downloadWarnings(): void {
+    if (!this.hasWarnings() || this.downloadingWarnings()) return;
+    this.downloadingWarnings.set(true);
+    this.api
+      .downloadWarnings(this.importId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.downloadingWarnings.set(false);
+          this.triggerDownload(blob, `import-${this.importId}-warnings.csv`);
+        },
+        error: () => this.downloadingWarnings.set(false),
       });
   }
 

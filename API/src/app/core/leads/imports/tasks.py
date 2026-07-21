@@ -81,6 +81,7 @@ from src.app.core.leads.imports.parser import HeaderInfo, ParsedRow, parse_rows
 from src.app.core.leads.ingest import ingest as ingest_lead
 from src.app.core.leads.models import LeadSource
 from src.app.core.leads.schemas import LeadCreate
+from src.app.core.pipelines.service import get_pipeline_by_key
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 from src.app.shared.storage import get_storage
@@ -156,7 +157,7 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
             raise
 
         try:
-            counts, error_rows, skipped_rows = await _commit_rows(
+            counts, error_rows, skipped_rows, warning_rows = await _commit_rows(
                 org_id=org_id, mapping=mapping, rows_iter=rows_iter
             )
         except Exception as exc:
@@ -182,6 +183,15 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
                 skipped_rows=skipped_rows,
             )
 
+        warnings_report_path: str | None = None
+        if warning_rows:
+            warnings_report_path = await _write_warnings_csv(
+                org_id=org_id,
+                import_id=import_id,
+                header=header,
+                warning_rows=warning_rows,
+            )
+
         async with async_session() as session:
             row = (
                 await session.execute(select(LeadImport).where(LeadImport.id == import_id))
@@ -192,6 +202,7 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
             row.counts = counts
             row.error_report_path = error_report_path
             row.skipped_report_path = skipped_report_path
+            row.warnings_report_path = warnings_report_path
             await session.commit()
 
         await audit.log(
@@ -203,6 +214,7 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
                 "counts": counts,
                 "error_report_path": error_report_path,
                 "skipped_report_path": skipped_report_path,
+                "warnings_report_path": warnings_report_path,
             },
         )
         return {"status": "completed", "counts": counts}
@@ -239,6 +251,33 @@ async def _load_custom_field_routing(
     return contact_keys, lead_keys
 
 
+async def _load_leads_stage_registry() -> tuple[set[str], str | None]:
+    """Return ``(valid_stage_keys, default_stage_key)`` for the org's
+    leads pipeline.
+
+    Loaded once per import so per-row stage validation is a
+    dict/set lookup rather than a DB round-trip. ``default_stage_key``
+    is the first stage by ``display_order`` — the value the importer
+    substitutes when a CSV row's ``lead.pipeline_stage`` cell doesn't
+    match any real stage key (the "fallback-to-default" behaviour
+    HubSpot / Zoho ship as the operator-friendly default).
+
+    Returns ``(set(), None)`` if the org has no leads pipeline; in
+    that case each per-row lead create will surface the underlying
+    error the way it did pre-fallback, and no substitution is
+    attempted. That's deliberate — silently mapping to "no stage"
+    would hide the missing-pipeline configuration bug from the
+    operator.
+    """
+    async with async_session() as session:
+        pipeline = await get_pipeline_by_key(session, key="leads")
+    if pipeline is None or not pipeline.stages:
+        return set(), None
+    stage_keys = {s.key for s in pipeline.stages}
+    default_key = min(pipeline.stages, key=lambda s: s.display_order).key
+    return stage_keys, default_key
+
+
 def _split_custom_data(
     mapped: dict[str, str | None],
     contact_keys: set[str],
@@ -269,33 +308,53 @@ async def _commit_rows(
     org_id: uuid.UUID,
     mapping: dict[str, str | None],
     rows_iter,
-) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[
+    dict[str, Any],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
     """Walk the parsed-row iterator and create one contact+lead per row.
 
     Each row's writes happen in their own session/transaction so a
-    single bad row doesn't roll back the batch. Two per-row buffers
+    single bad row doesn't roll back the batch. Three per-row buffers
     are kept:
 
-    - ``error_rows`` — rows that raised (validation, coercion, invalid
-      pipeline stage, etc.). Written to ``errors.csv``.
+    - ``error_rows`` — rows that raised (validation, coercion,
+      missing-name, etc.). Written to ``errors.csv``.
     - ``skipped_rows`` — rows where the ingester chose to merge into
       an existing open lead instead of creating a new one. Written
       to ``skipped.csv`` so operators can see *which* rows collapsed
       and *why* (contact matched by phone/email + open lead existed).
+    - ``warning_rows`` — rows the importer *did* land as leads but
+      only after substituting an out-of-vocabulary value (currently:
+      an unknown ``pipeline_stage`` value like "intrested" falling
+      back to the pipeline's default first stage). The lead is real,
+      just tagged with a "value fallback" timeline note so the
+      operator can bulk-edit later. Written to ``warnings.csv``.
 
-    Returned counts additionally include ``error_reasons`` and
-    ``skipped_reasons`` buckets so the result page can render a
-    "50× invalid pipeline_stage / 10× invalid date / …"-style
-    breakdown without re-downloading the per-row CSV.
+    Returned counts additionally include ``error_reasons`` /
+    ``skipped_reasons`` / ``warning_reasons`` buckets so the result
+    page can render "50× invalid date / 57× unknown pipeline_stage
+    'intrested' — defaulted to 'new'"-style breakdowns without
+    re-downloading the per-row CSVs.
     """
-    imported = duplicates = errors = 0
+    imported = duplicates = errors = warnings = 0
     error_rows: list[dict[str, Any]] = []
     skipped_rows: list[dict[str, Any]] = []
+    warning_rows: list[dict[str, Any]] = []
     error_reasons: dict[str, int] = {}
     skipped_reasons: dict[str, int] = {}
+    warning_reasons: dict[str, int] = {}
 
-    # Load custom-field routing once per import — every row reuses it.
+    # Load org-scoped registries once per import — every row reuses
+    # them. Custom-field routing splits `custom_data.*` mapped cells
+    # into the right entity's dict; the stage registry lets us catch
+    # out-of-vocabulary `pipeline_stage` values BEFORE the leads
+    # service raises 422, so we can fall back to the default stage
+    # + record a warning instead of hard-failing the row.
     contact_cf_keys, lead_cf_keys = await _load_custom_field_routing(org_id)
+    valid_stage_keys, default_stage_key = await _load_leads_stage_registry()
 
     for parsed in rows_iter:
         mapped = parsed.mapped
@@ -311,6 +370,25 @@ async def _commit_rows(
             continue
 
         contact_custom, lead_custom = _split_custom_data(mapped, contact_cf_keys, lead_cf_keys)
+
+        # Fallback substitution for `pipeline_stage`. When the CSV
+        # value doesn't match any real stage key AND we have a default
+        # stage to swap in, use the default and remember the original
+        # so we can (a) emit a timeline note on the created lead, and
+        # (b) surface the substitution in the warnings breakdown.
+        # No stage registry (missing pipeline) → skip fallback and let
+        # the underlying error path fire; that's a config bug we don't
+        # want to paper over.
+        requested_stage = mapped.get("lead.pipeline_stage")
+        stage_fallback: tuple[str, str] | None = None
+        effective_stage = requested_stage
+        if (
+            requested_stage
+            and default_stage_key is not None
+            and requested_stage not in valid_stage_keys
+        ):
+            stage_fallback = (requested_stage, default_stage_key)
+            effective_stage = default_stage_key
 
         try:
             async with async_session() as session:
@@ -357,7 +435,7 @@ async def _commit_rows(
 
                 lead_payload = LeadCreate(
                     contact_id=contact_id,
-                    pipeline_stage=mapped.get("lead.pipeline_stage"),
+                    pipeline_stage=effective_stage,
                     budget=_coerce_decimal(mapped.get("lead.budget")),
                     expected_close_date=_coerce_date(mapped.get("lead.expected_close_date")),
                     custom_data=lead_custom,
@@ -389,8 +467,53 @@ async def _commit_rows(
                             merged_into_lead_id=str(result.lead_id),
                         )
                     )
+                    # No warning fires on merged rows — the fallback
+                    # substitution was moot (no new lead was created).
                 else:
                     imported += 1
+                    if stage_fallback is not None:
+                        # Stamp the substitution onto the new lead's
+                        # timeline + increment the warnings surface.
+                        # The activity note is a permanent artefact so
+                        # a rep can spot the original CSV value weeks
+                        # later without re-downloading the report.
+                        original_value, substituted_value = stage_fallback
+                        await activities_log(
+                            entity_type="lead",
+                            entity_id=result.lead_id,
+                            type=ActivityType.note,
+                            payload={
+                                "kind": "bulk_import_value_fallback",
+                                "field": "pipeline_stage",
+                                "original_value": original_value,
+                                "substituted_value": substituted_value,
+                                "text": (
+                                    f"Imported with unknown pipeline_stage "
+                                    f"{original_value!r} — defaulted to "
+                                    f"{substituted_value!r}."
+                                ),
+                            },
+                            org_id=org_id,
+                        )
+                        warnings += 1
+                        _bump(
+                            warning_reasons,
+                            _warning_bucket_stage_fallback(
+                                original=original_value,
+                                substituted=substituted_value,
+                            ),
+                        )
+                        warning_rows.append(
+                            _make_warning_row(
+                                parsed,
+                                warning_type="pipeline_stage_fallback",
+                                field="lead.pipeline_stage",
+                                original_value=original_value,
+                                substituted_value=substituted_value,
+                                created_lead_id=str(result.lead_id),
+                                created_contact_id=str(contact_id),
+                            )
+                        )
         except Exception as exc:
             errors += 1
             reason = _format_exc(exc)
@@ -402,12 +525,50 @@ async def _commit_rows(
             "imported": imported,
             "duplicates_skipped": duplicates,
             "errors": errors,
+            "warnings": warnings,
             "error_reasons": error_reasons,
             "skipped_reasons": skipped_reasons,
+            "warning_reasons": warning_reasons,
         },
         error_rows,
         skipped_rows,
+        warning_rows,
     )
+
+
+def _warning_bucket_stage_fallback(*, original: str, substituted: str) -> str:
+    """Bucket key for the ``warning_reasons`` counter.
+
+    Groups all substitutions of the same original CSV value under one
+    label so a mistyped-once "intrested" that appears 57 times shows
+    as a single "57×" line instead of 57 identical entries.
+    """
+    return (
+        f"unknown pipeline_stage {original!r} — defaulted to {substituted!r}"
+    )
+
+
+def _make_warning_row(
+    parsed: ParsedRow,
+    *,
+    warning_type: str,
+    field: str,
+    original_value: str,
+    substituted_value: str,
+    created_lead_id: str,
+    created_contact_id: str,
+) -> dict[str, Any]:
+    """Build the dict the warnings CSV writer will dump as one row."""
+    return {
+        "row_number": parsed.row_number,
+        "raw": parsed.raw,
+        "warning_type": warning_type,
+        "field": field,
+        "original_value": original_value,
+        "substituted_value": substituted_value,
+        "created_lead_id": created_lead_id,
+        "created_contact_id": created_contact_id,
+    }
 
 
 def _bump(bucket: dict[str, int], key: str) -> None:
@@ -586,6 +747,51 @@ async def _write_skipped_csv(
     blob = buf.getvalue().encode("utf-8")
 
     storage_path = f"{org_id}/imports/{import_id}/skipped.csv"
+    get_storage().put(storage_path, blob, content_type="text/csv")
+    return storage_path
+
+
+async def _write_warnings_csv(
+    *,
+    org_id: uuid.UUID,
+    import_id: uuid.UUID,
+    header: HeaderInfo,
+    warning_rows: list[dict[str, Any]],
+) -> str:
+    """Write the per-import warnings CSV — one row per successful
+    lead where a value fallback fired.
+
+    Column order mirrors the source CSV, then appends six inspection
+    columns so an operator can grep the substitutions without any
+    cross-referencing: ``__row_number``, ``__warning_type``,
+    ``__field``, ``__original_value``, ``__substituted_value``,
+    ``__created_lead_id``, ``__created_contact_id``.
+    """
+    buf = io.StringIO()
+    columns = header.columns + [
+        "__row_number",
+        "__warning_type",
+        "__field",
+        "__original_value",
+        "__substituted_value",
+        "__created_lead_id",
+        "__created_contact_id",
+    ]
+    writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
+    writer.writeheader()
+    for row in warning_rows:
+        out = dict(row["raw"])
+        out["__row_number"] = row["row_number"]
+        out["__warning_type"] = row["warning_type"]
+        out["__field"] = row["field"]
+        out["__original_value"] = row["original_value"]
+        out["__substituted_value"] = row["substituted_value"]
+        out["__created_lead_id"] = row["created_lead_id"]
+        out["__created_contact_id"] = row["created_contact_id"]
+        writer.writerow(out)
+    blob = buf.getvalue().encode("utf-8")
+
+    storage_path = f"{org_id}/imports/{import_id}/warnings.csv"
     get_storage().put(storage_path, blob, content_type="text/csv")
     return storage_path
 

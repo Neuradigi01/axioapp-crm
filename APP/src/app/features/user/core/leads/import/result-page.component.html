@@ -85,6 +85,29 @@
         </div>
       }
 
+      @if (warningReasonList().length > 0) {
+        <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">
+            Imported with value fallbacks
+          </p>
+          <ul class="mt-2 space-y-1 text-sm text-amber-900">
+            @for (r of warningReasonList(); track r.label) {
+              <li class="flex items-start gap-2">
+                <span class="min-w-[2.5rem] shrink-0 font-medium tabular-nums">
+                  {{ r.count }}×
+                </span>
+                <span class="break-words">{{ r.label }}</span>
+              </li>
+            }
+          </ul>
+          <p class="mt-2 text-xs text-amber-700">
+            Each affected lead was created and stamped with a timeline note recording the original
+            CSV value. Download the report below to bulk-triage the substitutions, or open the leads
+            individually to reclassify.
+          </p>
+        </div>
+      }
+
       @if (errorReasonList().length > 0) {
         <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3">
           <p class="text-xs font-semibold uppercase tracking-wide text-red-700">Top errors</p>
@@ -128,6 +151,17 @@
         >
           <lucide-icon name="download" class="h-4 w-4" />
           {{ downloadingSkipped() ? 'Downloading…' : 'Download duplicates report' }}
+        </button>
+      }
+      @if (hasWarnings()) {
+        <button
+          type="button"
+          (click)="downloadWarnings()"
+          [disabled]="downloadingWarnings()"
+          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+        >
+          <lucide-icon name="download" class="h-4 w-4" />
+          {{ downloadingWarnings() ? 'Downloading…' : 'Download warnings report' }}
         </button>
       }
       @if (hasErrors()) {
