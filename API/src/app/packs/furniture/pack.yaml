@@ -80,7 +80,6 @@ custom_fields:
     field_label: Budget Range
     field_type: select
     options: ['Below ₹25k', '₹25k–₹50k', '₹50k–₹1L', '₹1L–₹3L', '₹3L–₹5L', '₹5L+']
-    is_required: true
     display_order: 10
 
   - entity_type: lead

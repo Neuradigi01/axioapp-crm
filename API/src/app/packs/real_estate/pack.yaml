@@ -75,7 +75,6 @@ custom_fields:
     field_label: Budget Range
     field_type: select
     options: ['Below ₹25L', '₹25L–₹50L', '₹50L–₹1Cr', '₹1Cr–₹3Cr', '₹3Cr–₹5Cr', '₹5Cr+']
-    is_required: true
     display_order: 10
 
   - entity_type: lead
