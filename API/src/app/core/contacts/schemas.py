@@ -253,6 +253,18 @@ ContactBulkDeleteResult = BulkDeleteResult
 ContactBulkAddTagResult = BulkAddTagResult
 
 
+class ContactHydrateRequest(BaseModel):
+    """Bulk-hydrate contact-list-items by id. Used by list pages that
+    render owner/customer summaries per row (walk-ins, appointments,
+    etc.) to collapse N per-row `GET /contacts/{id}` calls into one
+    round-trip. `size` matches the hard cap that other bulk endpoints
+    use (200) so the surface stays consistent."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
 # --- Duplicate-check response shape -----------------------------------------
 
 

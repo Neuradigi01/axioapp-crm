@@ -285,6 +285,13 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
     });
   }
 
+  /** Bulk-hydrate `ContactListItem`s by id. Used by list pages that
+   *  render contact summaries per row (walk-ins, appointments) to
+   *  collapse per-row `GET /contacts/{id}` fan-outs into one call. */
+  hydrateByIds(ids: string[]): Observable<ContactListItem[]> {
+    return this.http.post<ContactListItem[]>(`${this.base}/hydrate`, { ids });
+  }
+
   /** Live duplicate check called from the create / edit modal as the
    * user types. Backend matches phone on last-10-digit suffix and
    * email case-insensitively. */

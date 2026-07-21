@@ -133,7 +133,13 @@ class WalkInBulkCheckout(BaseModel):
 
 
 class WalkInBulkReassignResult(BaseModel):
+    """`reassigned` counts rows whose owner actually changed this call.
+    `already_assigned` counts rows skipped because they already owned
+    the target — surfaced so the FE can show an honest "X reassigned,
+    Y already had this owner" summary instead of undercounting."""
+
     reassigned: int
+    already_assigned: int = 0
 
 
 class WalkInBulkCheckoutResult(BaseModel):

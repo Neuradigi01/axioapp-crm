@@ -133,11 +133,29 @@ async def update_walk_in(
     *,
     walk_in_id: uuid.UUID,
     payload: WalkInUpdate,
+    org_id: uuid.UUID | None = None,
 ) -> WalkIn:
+    """Partial update.
+
+    `org_id` is optional for back-compat, but when supplied the service
+    enforces cross-tenant safety on `assigned_to_id` — a caller with
+    `walkins.write` cannot reassign a walk-in to a user that isn't an
+    active member of their own org. Complements the router-side
+    `walkins.reassign` permission check.
+    """
     walk_in = ensure_found(await get_walk_in(session, walk_in_id), entity="walk-in")
 
     before = _snapshot(walk_in)
     changes = payload.model_dump(exclude_unset=True)
+
+    if (
+        "assigned_to_id" in changes
+        and changes["assigned_to_id"] is not None
+        and org_id is not None
+    ):
+        await _assert_user_in_org(
+            session, org_id=org_id, user_uuid=changes["assigned_to_id"]
+        )
 
     # State-machine enforcement: only allow status transitions declared
     # in `ALLOWED_TRANSITIONS`. Identity transitions (X → X) are no-ops
@@ -414,16 +432,27 @@ async def bulk_reassign_walk_ins(
     assigned_to_id: uuid.UUID | None,
     note: str | None,
     actor_user_id: uuid.UUID | None,
-) -> int:
+) -> tuple[int, int]:
+    """Reassign N walk-ins in one transaction.
+
+    Returns `(reassigned, already_assigned)` so the caller can render
+    an honest "X reassigned, Y already owned this seat" summary
+    instead of silently dropping the second bucket.
+
+    Batched SELECT via `list_walk_ins_by_ids_in_org` collapses the old
+    per-id N+1 fetch. Activity inserts stay per-row (each timeline
+    needs its own entry).
+    """
     if assigned_to_id is not None:
         await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
+    walk_ins = await _da.list_walk_ins_by_ids_in_org(session, ids=ids, org_id=org_id)
+
     reassigned = 0
-    for wid in ids:
-        walk_in = await get_walk_in(session, wid)
-        if walk_in is None:
-            continue
+    already_assigned = 0
+    for walk_in in walk_ins:
         if walk_in.assigned_to_id == assigned_to_id:
+            already_assigned += 1
             continue
         before_id = walk_in.assigned_to_id
         walk_in.assigned_to_id = assigned_to_id
@@ -439,7 +468,7 @@ async def bulk_reassign_walk_ins(
         reassigned += 1
 
     await session.commit()
-    return reassigned
+    return reassigned, already_assigned
 
 
 async def bulk_checkout_walk_ins(
@@ -448,16 +477,19 @@ async def bulk_checkout_walk_ins(
     ids: list[uuid.UUID],
     org_id: uuid.UUID,
 ) -> tuple[int, int]:
-    """Bulk equivalent of single-row `checkout`."""
+    """Bulk equivalent of single-row `checkout`.
+
+    Batched: fetch every referenced row in one SELECT, split into
+    "already checked out" vs "needs stamp", then apply the stamps
+    to the ORM instances so `updated_at` + audit-log columns fire
+    normally. Previous per-id loop was O(N) round-trips.
+    """
+    now_ts = datetime.now(UTC)
+    walk_ins = await _da.list_walk_ins_by_ids_in_org(session, ids=ids, org_id=org_id)
+
     checked_out = 0
     already_out = 0
-    now_ts = datetime.now(UTC)
-    for wid in ids:
-        walk_in = await get_walk_in(session, wid)
-        if walk_in is None:
-            continue
-        if walk_in.org_id != org_id:
-            continue
+    for walk_in in walk_ins:
         if walk_in.time_out is not None:
             already_out += 1
             continue
@@ -511,7 +543,11 @@ async def convert_walk_in_to_lead(
         assigned_to_id=walk_in.assigned_to_id,
         budget=walk_in.budget,
         custom_data={},  # walk-in.custom_data is walk-in-shaped, not lead-shaped
-        source=LeadSource.manual,
+        # Stamp `walk_in` provenance so downstream attribution reports
+        # keyed on `Lead.source` can tell hand-typed manual leads from
+        # walk-in conversions. `Lead.source_walk_in_id` remains the
+        # FK-backed backlink for detail-page rendering.
+        source=LeadSource.walk_in,
     )
     lead = await create_lead_service(
         session,
@@ -599,28 +635,15 @@ async def bulk_delete_walk_ins(
     """W1 — Bulk-delete N walk-ins in one SQL statement.
 
     Mirror of ``leads.service.bulk_delete_leads``. Belt + suspenders:
-    the query filters by both the id list *and* ``org_id`` — RLS
+    the DAL query filters by both the id list *and* ``org_id`` — RLS
     would already scope us, but the explicit clause is defence in
     depth against a mis-scoped session. Single audit row groups the
     action ("bulk-delete of N walk-ins") rather than emitting one
     audit per id.
     """
-    from sqlalchemy import text as _text
-
-    if not ids:
+    rowcount = await _da.delete_walk_ins_in_org(session, ids=ids, org_id=org_id)
+    if rowcount == 0:
         return 0
-
-    # Snapshot count first so the audit + response are honest even
-    # when RLS filters some rows out.
-    rowcount = 0
-    stmt = _text(
-        "DELETE FROM tbl_walk_ins WHERE org_id = :org_id AND id = ANY(:ids)"
-    )
-    result = await session.execute(
-        stmt,
-        {"org_id": org_id, "ids": list(ids)},
-    )
-    rowcount = result.rowcount or 0
     await session.commit()
 
     await audit.log(
@@ -640,81 +663,21 @@ async def walk_ins_rollup(
 ) -> dict[str, Any]:
     """W7 — Server-side KPI roll-up for the walk-ins page header.
 
-    One grouped SQL query against the full org's data — replaces the
-    client-side page-only computation that was wrong at multi-location
-    scale.
-
     Scope: when ``assigned_to`` is supplied, sums only that user's
     walk-ins (personal roll-up). When None, org-wide. Caller (router)
     decides which based on ``users.read``.
+
+    "Today" is IST-anchored (+330 min from UTC) so IST orgs don't
+    roll over at 5:30 AM local. Multi-tz support is a future step —
+    when we add `org.timezone`, the service resolves that to an offset
+    and passes it to the DAL.
     """
-    from sqlalchemy import text as _text
-
-    params: dict[str, Any] = {"org_id": org_id}
-    scope_clause = ""
-    if assigned_to is not None:
-        scope_clause = " AND assigned_to_id = :assigned_to"
-        params["assigned_to"] = assigned_to
-
-    # Timezone caveat: ``time_in::date`` uses the DB server's local
-    # timezone which is UTC on this deployment. For orgs in IST /
-    # other timezones the "today" boundary is UTC-day-based; a
-    # tz-aware version would take ``org.timezone`` into account.
-    # Kept UTC for v1 to match every other "today" reference in the
-    # codebase.
-    sql = _text(
-        f"""
-        SELECT
-          COUNT(*) FILTER (WHERE time_in::date = CURRENT_DATE) AS today_count,
-          COUNT(*) FILTER (
-            WHERE time_in::date = CURRENT_DATE
-              AND status = 'converted'
-          ) AS today_converted,
-          COUNT(*) FILTER (WHERE time_out IS NULL) AS open_now,
-          COUNT(*) FILTER (
-            WHERE status IN ('interested', 'follow_up')
-          ) AS interested_or_follow_up,
-          -- Conversion % over the last 30 days: converted / (converted + left).
-          (
-            SELECT
-              CASE
-                WHEN COUNT(*) FILTER (
-                  WHERE status IN ('converted', 'left')
-                    AND updated_at >= NOW() - INTERVAL '30 days'
-                ) = 0 THEN NULL
-                ELSE
-                  100.0 * COUNT(*) FILTER (
-                    WHERE status = 'converted'
-                      AND updated_at >= NOW() - INTERVAL '30 days'
-                  ) / COUNT(*) FILTER (
-                    WHERE status IN ('converted', 'left')
-                      AND updated_at >= NOW() - INTERVAL '30 days'
-                  )
-              END
-            FROM tbl_walk_ins
-            WHERE org_id = :org_id{scope_clause}
-          ) AS conversion_rate_pct,
-          -- Avg duration over the last 30 days of checked-out visits.
-          (
-            SELECT AVG(duration_min)
-            FROM tbl_walk_ins
-            WHERE org_id = :org_id{scope_clause}
-              AND duration_min IS NOT NULL
-              AND time_out >= NOW() - INTERVAL '30 days'
-          ) AS avg_duration_min,
-          -- Avg wait time (time_in - wait_started_at) over 30 days.
-          (
-            SELECT AVG(EXTRACT(EPOCH FROM (time_in - wait_started_at)) / 60)
-            FROM tbl_walk_ins
-            WHERE org_id = :org_id{scope_clause}
-              AND wait_started_at IS NOT NULL
-              AND time_in >= NOW() - INTERVAL '30 days'
-          ) AS avg_wait_min
-        FROM tbl_walk_ins
-        WHERE org_id = :org_id{scope_clause}
-        """
+    row = await _da.rollup_query(
+        session,
+        org_id=org_id,
+        assigned_to=assigned_to,
+        day_boundary_offset_minutes=330,  # IST
     )
-    row = (await session.execute(sql, params)).one()
     return {
         "today_count": int(row.today_count or 0),
         "today_converted": int(row.today_converted or 0),

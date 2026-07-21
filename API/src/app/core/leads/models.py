@@ -72,6 +72,10 @@ class LeadSource(str, enum.Enum):
     # `lead_capture` category. Migration 0113 added the matching
     # PG enum value via `ALTER TYPE lead_source ADD VALUE`.
     whatsapp_flow = "whatsapp_flow"
+    # W6 — walk-in → lead conversion. Migration 0165 adds the PG
+    # enum value. Distinguishes hand-typed leads from converted-in-
+    # store walk-ins so attribution reports read cleanly.
+    walk_in = "walk_in"
 
 
 lead_source_enum = ENUM(

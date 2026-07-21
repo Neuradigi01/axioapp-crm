@@ -56,7 +56,7 @@ from src.app.core.walk_ins.service import (
     update_walk_in,
     walk_ins_rollup,
 )
-from src.app.core.permissions.service import role_has_permission
+from src.app.core.permissions.service import list_permissions_for_role, role_has_permission
 from src.app.shared.db import get_db
 
 router = APIRouter(prefix="/walk-ins", tags=["Walk-ins"])
@@ -172,9 +172,27 @@ async def update_walk_in_endpoint(
     walk_in_id: uuid.UUID,
     payload: WalkInUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("walkins.write")),
+    user: User = Depends(require_permissions("walkins.write")),
 ) -> WalkInOut:
-    walk_in = await update_walk_in(db, walk_in_id=walk_in_id, payload=payload)
+    # Reassigning through the edit modal must not sidestep the dedicated
+    # `walkins.reassign` gate. When the PATCH includes assigned_to_id
+    # (including null → explicit unassign), additionally require
+    # `walkins.reassign`. `exclude_unset=True` distinguishes "not sent"
+    # from "sent as null".
+    changes = payload.model_dump(exclude_unset=True)
+    if "assigned_to_id" in changes:
+        granted = {p.key for p in await list_permissions_for_role(db, user.role_id)}
+        if "walkins.reassign" not in granted:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Missing permission(s): walkins.reassign",
+            )
+    walk_in = await update_walk_in(
+        db,
+        walk_in_id=walk_in_id,
+        payload=payload,
+        org_id=user.org_id,
+    )
     return WalkInOut.model_validate(walk_in)
 
 
@@ -225,7 +243,7 @@ async def bulk_reassign_walk_ins_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("walkins.reassign")),
 ) -> WalkInBulkReassignResult:
-    n = await bulk_reassign_walk_ins(
+    reassigned, already_assigned = await bulk_reassign_walk_ins(
         db,
         ids=payload.ids,
         org_id=user.org_id,
@@ -233,7 +251,9 @@ async def bulk_reassign_walk_ins_endpoint(
         note=payload.note,
         actor_user_id=user.legacy_uuid,
     )
-    return WalkInBulkReassignResult(reassigned=n)
+    return WalkInBulkReassignResult(
+        reassigned=reassigned, already_assigned=already_assigned
+    )
 
 
 @router.post("/bulk-checkout", response_model=WalkInBulkCheckoutResult)
@@ -264,13 +284,12 @@ async def convert_walk_in_endpoint(
     walk_in_id: uuid.UUID,
     payload: WalkInConvertRequest,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_permissions("leads.write")),
+    user: User = Depends(require_permissions("leads.write", "walkins.write")),
 ) -> WalkInConvertResponse:
-    """Convert a walk-in to a lead. Requires `leads.write` (the
-    feature's primary side-effect is creating a lead) plus the
-    `walkins.write` the caller already needs to mutate the walk-in
-    row — that's covered by the leads.write requirement here since
-    any role with leads.write also has walkins.write by template."""
+    """Convert a walk-in to a lead. Requires BOTH `leads.write` (a
+    lead is created) AND `walkins.write` (the walk-in row is mutated:
+    `linked_lead_id` set). Custom roles that hold `leads.write` alone
+    must not be able to mutate walk-in rows through this side door."""
     walk_in, contact_id, lead_id = await convert_walk_in_to_lead(
         db,
         walk_in_id=walk_in_id,

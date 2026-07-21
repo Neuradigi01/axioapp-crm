@@ -49,15 +49,24 @@ async def get_contact(session: AsyncSession, contact_id: uuid.UUID) -> Contact |
 
 
 async def get_contact_by_phone(session: AsyncSession, phone: str) -> Contact | None:
-    """Resolve a contact by phone number.
+    """Resolve a contact by phone number within the active tenant.
 
-    Used by walk-in reception (existing-customer detection) and by
-    the conversation router (inbound WhatsApp / SMS → contact mapping).
-    The phone column is indexed but not unique — multiple contacts
-    can share a number across orgs (different tenants). The tenant
-    auto-filter narrows the result to the active org.
+    Returns the most-recently-created match. `phone` is NOT unique in
+    the tenant (data-entry drift, imports, etc.) — old behaviour used
+    `scalar_one_or_none()` which raised `MultipleResultsFound` on
+    duplicates, 500ing the reception desk. Now we order + limit(1).
+
+    Anonymised contacts (DPDP right-to-be-forgotten) are excluded so
+    walk-in / inbound-message reception cannot re-attach fresh
+    activity to a wiped record.
     """
-    result = await session.execute(select(Contact).where(Contact.phone == phone))
+    result = await session.execute(
+        select(Contact)
+        .where(Contact.phone == phone)
+        .where(Contact.anonymised_at.is_(None))
+        .order_by(Contact.created_at.desc())
+        .limit(1)
+    )
     return result.scalar_one_or_none()
 
 

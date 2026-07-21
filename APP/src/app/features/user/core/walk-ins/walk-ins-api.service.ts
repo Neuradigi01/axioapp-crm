@@ -146,8 +146,11 @@ export class WalkInsApiService {
   bulkReassign(
     ids: string[],
     body: { userId: string | null; note?: string | null },
-  ): Observable<{ reassigned: number }> {
-    return this.http.post<{ reassigned: number }>(`${this.base}/bulk-reassign`, {
+  ): Observable<{ reassigned: number; already_assigned: number }> {
+    return this.http.post<{
+      reassigned: number;
+      already_assigned: number;
+    }>(`${this.base}/bulk-reassign`, {
       ids,
       assigned_to_id: body.userId,
       note: body.note ?? null,

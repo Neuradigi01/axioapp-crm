@@ -49,6 +49,7 @@ from src.app.core.contacts.schemas import (
     ContactCreate,
     ContactDuplicateCheckResponse,
     ContactDuplicateMatch,
+    ContactHydrateRequest,
     ContactListItem,
     ContactListResponse,
     ContactMergeRequest,
@@ -60,6 +61,7 @@ from src.app.core.contacts.schemas import (
     OptInRecordRequest,
     OptOutRecordRequest,
 )
+from src.app.core.contacts import data_access as contacts_da
 from src.app.core.contacts.service import (
     anonymise_contact,
     bulk_add_tag_contacts,
@@ -431,6 +433,21 @@ async def bulk_delete_endpoint(
 ) -> ContactBulkDeleteResult:
     n = await bulk_delete_contacts(db, ids=payload.ids, org_id=user.org_id)
     return ContactBulkDeleteResult(deleted=n)
+
+
+@router.post("/hydrate", response_model=list[ContactListItem])
+async def hydrate_contacts_endpoint(
+    payload: ContactHydrateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.read")),
+) -> list[ContactListItem]:
+    """Bulk-fetch `ContactListItem` shape for many ids in a single
+    call. Collapses N per-row `GET /contacts/{id}` fan-outs from
+    list pages (walk-ins, appointments, etc.) into one round-trip."""
+    rows = await contacts_da.list_contacts_by_ids_in_org(
+        db, ids=payload.ids, org_id=user.org_id
+    )
+    return [ContactListItem.model_validate(r) for r in rows]
 
 
 @router.post("/bulk-add-tag", response_model=ContactBulkAddTagResult)

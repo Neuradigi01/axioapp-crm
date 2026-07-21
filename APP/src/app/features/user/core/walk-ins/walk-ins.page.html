@@ -142,6 +142,26 @@
       </div>
     }
 
+    <!-- W? — Open-only toggle. Reception's most common query
+         ("who's currently in-store"). Backend already supports
+         open_only=1; the toggle here surfaces it in the UI. -->
+    <button
+      type="button"
+      (click)="toggleOpenOnly()"
+      class="rounded-full px-3 py-1 font-medium ring-1 transition"
+      [class.bg-emerald-600]="openOnly()"
+      [class.text-white]="openOnly()"
+      [class.ring-emerald-600]="openOnly()"
+      [class.bg-white]="!openOnly()"
+      [class.text-zinc-700]="!openOnly()"
+      [class.ring-zinc-300]="!openOnly()"
+      [class.hover:bg-zinc-50]="!openOnly()"
+      title="Show only currently-in-store visitors"
+    >
+      <lucide-icon name="user-check" class="mr-1 inline h-3 w-3 -translate-y-[1px]" />
+      In-store now
+    </button>
+
     <!-- Sort dropdown -->
     <select
       [value]="sortKey() + ':' + sortOrder()"
@@ -529,5 +549,21 @@
     [error]="convertError()"
     (confirm)="onConvertConfirm($event)"
     (cancel)="closeConvert()"
+  />
+}
+
+<!-- Single-row delete confirm (replaces `window.confirm`). -->
+@if (pendingDelete()) {
+  <app-confirm-dialog
+    [title]="'Delete this walk-in?'"
+    [body]="
+      deleteError() ??
+      'This cannot be undone. Contacts and activities linked to this visit remain in their timelines.'
+    "
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    [submitting]="deleteSubmitting()"
+    (confirm)="confirmDelete()"
+    (cancel)="cancelDelete()"
   />
 }

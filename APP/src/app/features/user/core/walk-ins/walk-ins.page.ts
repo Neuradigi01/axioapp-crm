@@ -11,8 +11,11 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
-import { forkJoin, of } from 'rxjs';
-import { catchError, distinctUntilChanged } from 'rxjs/operators';
+import { distinctUntilChanged } from 'rxjs/operators';
+
+/** Backend cap on `POST /walk-ins/bulk-*` id lists. FE guards against
+ *  submitting more so operators get a clean toast instead of a 422. */
+const BULK_ACTION_MAX = 200;
 
 import { FurnitureAuthService } from '../auth/auth.service';
 import { ContactsApiService } from '../contacts/contacts-api.service';
@@ -118,6 +121,22 @@ export class WalkInsPageComponent {
 
   readonly contactsById = signal<Record<string, ContactSummary>>({});
   readonly modalOpen = signal(false);
+
+  /** "Open only" filter — currently-in-store visitors (time_out IS
+   *  NULL). Backend already supports the `open_only=1` query param;
+   *  the UI toggle here surfaces it. */
+  readonly openOnly = signal(false);
+
+  /** Pending single-row delete target (opens the shared confirm
+   *  dialog). null = closed. */
+  readonly pendingDelete = signal<WalkIn | null>(null);
+  readonly deleteSubmitting = signal(false);
+  readonly deleteError = signal<string | null>(null);
+
+  /** Client-side cap on bulk selection so the operator sees a clean
+   *  message instead of a 422 from the backend. */
+  readonly bulkActionMax = BULK_ACTION_MAX;
+  readonly overBulkCap = computed(() => this.state.selectedCount() > BULK_ACTION_MAX);
 
   // --- Step 2: filter + sort + scope --------------------------------------
 
@@ -234,6 +253,11 @@ export class WalkInsPageComponent {
       queryKey: 'order',
       defaultValue: 'desc',
     },
+    open_only: {
+      read: () => (this.openOnly() ? '1' : ''),
+      write: (v) => this.openOnly.set(v === '1' || v === 'true'),
+      queryKey: 'open_only',
+    },
   };
 
   // --- KPI cards ---
@@ -311,6 +335,14 @@ export class WalkInsPageComponent {
   protected setScope(value: string): void {
     if (value !== 'mine' && value !== 'team' && value !== 'all') return;
     this.scope.set(value);
+    // Scope is applied via `resolveAssignee()` on reload — 'mine'
+    // collapses to the caller uuid; 'team' / 'all' clear the
+    // assignee override (server-side row-visibility handles the rest).
+    this.reload();
+  }
+
+  protected toggleOpenOnly(): void {
+    this.openOnly.update((v) => !v);
     this.reload();
   }
 
@@ -336,12 +368,24 @@ export class WalkInsPageComponent {
   }
 
   /** Resolve the assignee filter to a UUID for the API call.
-   * `''` → undefined; `'me'` → current user; UUID → that UUID. */
+   *
+   * Priority order:
+   *   1. Owner dropdown pick (specific user or 'me') always wins.
+   *   2. Scope toggle: 'mine' collapses to the caller uuid.
+   *   3. 'team' / 'all' clear the filter — backend row-visibility
+   *      (list_walk_ins_visible_to) still gates non-privileged
+   *      callers to their own book.
+   */
   private resolveAssignee(): string | undefined {
     const raw = this.assigneeControl.value;
-    if (!raw) return undefined;
-    if (raw === 'me') return this.auth.currentUserId() ?? undefined;
-    return raw;
+    if (raw) {
+      if (raw === 'me') return this.auth.currentUserId() ?? undefined;
+      return raw;
+    }
+    if (this.scope() === 'mine') {
+      return this.auth.currentUserId() ?? undefined;
+    }
+    return undefined;
   }
 
   /** Date chip → ISO `date_from` cutoff. Returns null when no chip set. */
@@ -388,6 +432,14 @@ export class WalkInsPageComponent {
 
   protected onBulkAction(key: string): void {
     this.state.bulkError.set(null);
+    if (this.state.selectedCount() > BULK_ACTION_MAX) {
+      this.state.bulkError.set(
+        `Too many rows selected (${this.state.selectedCount()}). ` +
+          `The server caps bulk actions at ${BULK_ACTION_MAX}. ` +
+          `Narrow your selection and try again.`,
+      );
+      return;
+    }
     if (key === 'reassign') this.state.bulkModal.set('reassign');
     else if (key === 'checkout') this.state.bulkModal.set('checkout');
     else if (key === 'delete') this.state.bulkModal.set('delete');
@@ -408,8 +460,18 @@ export class WalkInsPageComponent {
       .bulkReassign(ids, { userId: payload.userId, note: payload.note })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: (result) => {
           this.state.bulkSubmitting.set(false);
+          // Surface the split so an operator selecting 20 rows and
+          // reassigning to a user who already owns 5 of them sees the
+          // honest "15 reassigned, 5 already owned this seat" summary
+          // instead of a misleading "20 reassigned".
+          if (result.already_assigned > 0) {
+            this.state.loadError.set(
+              `Reassigned ${result.reassigned}. ` +
+                `${result.already_assigned} already owned this seat.`,
+            );
+          }
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
@@ -470,19 +532,39 @@ export class WalkInsPageComponent {
       });
   }
 
-  /** W2 — single-row delete triggered from the row action button. */
+  /** W2 — single-row delete triggered from the row action button.
+   *  Opens the shared `<app-confirm-dialog>` (same UX as bulk-delete)
+   *  instead of `window.confirm` so the danger action reads consistently
+   *  and errors surface inline rather than in the page-level banner. */
   protected onDeleteRow(w: WalkIn): void {
-    if (!confirm(`Delete this walk-in?`)) return;
+    this.deleteError.set(null);
+    this.pendingDelete.set(w);
+  }
+
+  protected cancelDelete(): void {
+    this.pendingDelete.set(null);
+    this.deleteSubmitting.set(false);
+    this.deleteError.set(null);
+  }
+
+  protected confirmDelete(): void {
+    const target = this.pendingDelete();
+    if (!target) return;
+    this.deleteSubmitting.set(true);
+    this.deleteError.set(null);
     this.api
-      .delete(w.id)
+      .delete(target.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.state.items.update((rows) => rows.filter((r) => r.id !== w.id));
+          this.deleteSubmitting.set(false);
+          this.state.items.update((rows) => rows.filter((r) => r.id !== target.id));
+          this.pendingDelete.set(null);
           this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
-          this.state.loadError.set(extractApiError(err) ?? 'Could not delete walk-in.');
+          this.deleteSubmitting.set(false);
+          this.deleteError.set(extractApiError(err) ?? 'Could not delete walk-in.');
         },
       });
   }
@@ -556,10 +638,11 @@ export class WalkInsPageComponent {
           );
           this.reloadRollup();
           this.closeConvert();
-          // Send the user straight to the new lead so they can fill in
-          // the details. The pipeline_stage defaulted to the first
-          // stage; they typically want to move it through right away.
-          this.router.navigate(['/user/leads'], { queryParams: { q: resp.lead_id } });
+          // Send the user straight to the new lead detail page so
+          // they can fill in the details. Previously navigated to the
+          // list page with `?q=<uuid>` which relied on the search box
+          // matching a UUID substring — fragile and inconsistent.
+          this.router.navigate(['/user/leads', resp.lead_id]);
         },
         error: (err: HttpErrorResponse) => {
           this.convertSubmitting.set(false);
@@ -568,11 +651,12 @@ export class WalkInsPageComponent {
       });
   }
 
-  /** Advance a walk-in to a new state. Optimistic — replaces the row
-   * on success, reverts on error. */
+  /** Advance a walk-in to a new state. Optimistic — patches the
+   *  single row on success, and on error reverts ONLY that row
+   *  (surgical) so concurrent mutations to sibling rows during the
+   *  in-flight request aren't blown away by a wholesale rollback. */
   protected advanceStatus(walkIn: WalkIn, target: WalkInStatus): void {
-    const before = this.state.items();
-    // Optimistic update.
+    const beforeRow = { ...walkIn };
     this.state.items.update((rows) =>
       rows.map((w) => (w.id === walkIn.id ? { ...w, status: target } : w)),
     );
@@ -585,7 +669,9 @@ export class WalkInsPageComponent {
           this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
-          this.state.items.set(before);
+          this.state.items.update((rows) =>
+            rows.map((w) => (w.id === beforeRow.id ? beforeRow : w)),
+          );
           this.state.loadError.set(extractApiError(err) ?? 'Could not update walk-in status.');
         },
       });
@@ -608,8 +694,9 @@ export class WalkInsPageComponent {
   protected onCheckout(walkIn: WalkIn): void {
     // Optimistic: stamp time_out locally to a near-now ISO so the
     // duration column populates immediately. Replaced by server value.
+    // Surgical per-row revert on error (see `advanceStatus`).
     const optimisticNow = new Date().toISOString();
-    const before = this.state.items();
+    const beforeRow = { ...walkIn };
     this.state.items.update((rows) =>
       rows.map((w) => (w.id === walkIn.id ? { ...w, time_out: optimisticNow } : w)),
     );
@@ -622,7 +709,9 @@ export class WalkInsPageComponent {
           this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
-          this.state.items.set(before);
+          this.state.items.update((rows) =>
+            rows.map((w) => (w.id === beforeRow.id ? beforeRow : w)),
+          );
           this.state.loadError.set(extractApiError(err) ?? 'Could not check out walk-in.');
         },
       });
@@ -648,9 +737,9 @@ export class WalkInsPageComponent {
   }
 
   protected formatTime(iso: string | null): string {
-    if (iso === null) return 'â€”';
+    if (iso === null) return '—';
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return 'â€”';
+    if (Number.isNaN(d.getTime())) return '—';
     return d.toLocaleTimeString(undefined, {
       hour: '2-digit',
       minute: '2-digit',
@@ -658,25 +747,18 @@ export class WalkInsPageComponent {
   }
 
   protected formatDate(iso: string | null): string {
-    if (iso === null) return 'â€”';
+    if (iso === null) return '—';
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return 'â€”';
+    if (Number.isNaN(d.getTime())) return '—';
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
   }
-
-  /** No users-list API yet â€” show a short id snippet, or "â€”" if unassigned. */
-  protected assignedToLabel(id: string | null): string {
-    if (id === null) return 'â€”';
-    return id.slice(0, 8);
-  }
-
   protected formatDuration(min: string | null): string {
-    if (min === null) return 'â€”';
+    if (min === null) return '—';
     const n = Number(min);
-    if (!Number.isFinite(n)) return 'â€”';
+    if (!Number.isFinite(n)) return '—';
     if (n < 1) return `${Math.round(n * 60)}s`;
     if (n < 60) return `${Math.round(n)} min`;
     const hours = Math.floor(n / 60);
@@ -692,6 +774,7 @@ export class WalkInsPageComponent {
       .list({
         status: filter === 'all' ? undefined : filter,
         assigned_to: this.resolveAssignee(),
+        open_only: this.openOnly() || undefined,
         date_from: this.resolveDateFrom() ?? undefined,
         sort: this.sortKey(),
         order: this.sortOrder(),
@@ -737,17 +820,31 @@ export class WalkInsPageComponent {
   }
 
   private fetchContacts(ids: string[]): void {
-    forkJoin(ids.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((results) => {
-        this.contactsById.update((cache) => {
-          const next = { ...cache };
-          for (const c of results) {
-            if (c) next[c.id] = { id: c.id, full_name: c.full_name, phone: c.phone };
-          }
-          return next;
+    // Single batched POST replaces the previous per-id fan-out (up to
+    // 100 round-trips for a fully-loaded page). Backend caps id lists
+    // at 200 which matches the list page-size; chunk here in case a
+    // future page-size ever exceeds it.
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      this.contactsApi
+        .hydrateByIds(slice)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (rows) => {
+            this.contactsById.update((cache) => {
+              const next = { ...cache };
+              for (const c of rows) {
+                next[c.id] = { id: c.id, full_name: c.full_name, phone: c.phone };
+              }
+              return next;
+            });
+          },
+          // Silent: contact summaries are decorative; the list still
+          // renders id-only if the hydrate hiccups.
+          error: () => undefined,
         });
-      });
+    }
   }
 
   private isToday(iso: string): boolean {

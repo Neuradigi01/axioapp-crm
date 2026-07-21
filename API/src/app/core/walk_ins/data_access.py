@@ -26,7 +26,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.contacts.models import Contact
@@ -125,6 +125,111 @@ async def contact_exists_in_org(session: AsyncSession, contact_id: uuid.UUID) ->
     return row is not None
 
 
+async def list_walk_ins_by_ids_in_org(
+    session: AsyncSession, *, ids: list[uuid.UUID], org_id: uuid.UUID
+) -> list[WalkIn]:
+    """Batched hydrate for bulk-checkout / bulk-reassign. Empty input
+    returns [] without a round-trip. Belt + suspenders on org_id."""
+    if not ids:
+        return []
+    result = await session.execute(
+        select(WalkIn).where(WalkIn.id.in_(ids), WalkIn.org_id == org_id)
+    )
+    return list(result.scalars().all())
+
+
+async def delete_walk_ins_in_org(
+    session: AsyncSession, *, ids: list[uuid.UUID], org_id: uuid.UUID
+) -> int:
+    """Bulk-delete N walk-ins in one SQL statement. Returns rowcount."""
+    if not ids:
+        return 0
+    stmt = sa_text("DELETE FROM tbl_walk_ins WHERE org_id = :org_id AND id = ANY(:ids)")
+    result = await session.execute(stmt, {"org_id": org_id, "ids": list(ids)})
+    return int(result.rowcount or 0)
+
+
+async def rollup_query(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    assigned_to: uuid.UUID | None,
+    day_boundary_offset_minutes: int = 0,
+) -> Any:
+    """One grouped SQL query for the walk-ins KPI card strip.
+
+    `day_boundary_offset_minutes` shifts the "today" cutoff off UTC so
+    IST-anchored orgs don't roll over at 5:30 AM local. Service layer
+    resolves the org's timezone → offset (defaults to IST 330).
+    """
+    params: dict[str, Any] = {
+        "org_id": org_id,
+        "offset_min": day_boundary_offset_minutes,
+    }
+    scope_clause = ""
+    if assigned_to is not None:
+        scope_clause = " AND assigned_to_id = :assigned_to"
+        params["assigned_to"] = assigned_to
+
+    sql = sa_text(
+        f"""
+        SELECT
+          COUNT(*) FILTER (
+            WHERE (time_in + (:offset_min || ' minutes')::interval)::date
+                = (NOW() + (:offset_min || ' minutes')::interval)::date
+          ) AS today_count,
+          COUNT(*) FILTER (
+            WHERE (time_in + (:offset_min || ' minutes')::interval)::date
+                = (NOW() + (:offset_min || ' minutes')::interval)::date
+              AND status = 'converted'
+          ) AS today_converted,
+          COUNT(*) FILTER (WHERE time_out IS NULL) AS open_now,
+          COUNT(*) FILTER (
+            WHERE status IN ('interested', 'follow_up')
+          ) AS interested_or_follow_up,
+          (
+            SELECT
+              CASE
+                WHEN COUNT(*) FILTER (
+                  WHERE status IN ('converted', 'left')
+                    AND updated_at >= NOW() - INTERVAL '30 days'
+                ) = 0 THEN NULL
+                ELSE
+                  100.0 * COUNT(*) FILTER (
+                    WHERE status = 'converted'
+                      AND updated_at >= NOW() - INTERVAL '30 days'
+                  ) / COUNT(*) FILTER (
+                    WHERE status IN ('converted', 'left')
+                      AND updated_at >= NOW() - INTERVAL '30 days'
+                  )
+              END
+            FROM tbl_walk_ins
+            WHERE org_id = :org_id{scope_clause}
+          ) AS conversion_rate_pct,
+          (
+            SELECT AVG(duration_min)
+            FROM tbl_walk_ins
+            WHERE org_id = :org_id{scope_clause}
+              AND duration_min IS NOT NULL
+              AND time_out >= NOW() - INTERVAL '30 days'
+          ) AS avg_duration_min,
+          -- Only count positive waits (a bad wait_started_at > time_in
+          -- would skew the metric silently otherwise).
+          (
+            SELECT AVG(EXTRACT(EPOCH FROM (time_in - wait_started_at)) / 60)
+            FROM tbl_walk_ins
+            WHERE org_id = :org_id{scope_clause}
+              AND wait_started_at IS NOT NULL
+              AND time_in >= wait_started_at
+              AND time_in >= NOW() - INTERVAL '30 days'
+          ) AS avg_wait_min
+        FROM tbl_walk_ins
+        WHERE org_id = :org_id{scope_clause}
+        """
+    )
+    return (await session.execute(sql, params)).one()
+
+
 async def user_has_active_membership(
     session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
 ) -> bool:
@@ -147,8 +252,11 @@ async def user_has_active_membership(
 __all__ = [
     "contact_exists_in_org",
     "delete_walk_in_row",
+    "delete_walk_ins_in_org",
     "get_walk_in_by_id",
     "insert_walk_in",
+    "list_walk_ins_by_ids_in_org",
     "list_walk_ins_paginated",
+    "rollup_query",
     "user_has_active_membership",
 ]
