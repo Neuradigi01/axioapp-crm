@@ -41,6 +41,11 @@ class OrgSummary(ORMModel):
     name: str
     slug: str
     template_id: str
+    # Org-level default currency (3-letter ISO). Falls back to the DB
+    # column's `'INR'` server_default. Consumed by money-formatting UIs
+    # (lead detail, invoices) so USD/EUR orgs don't render INR symbols
+    # on every value.
+    currency: str = "INR"
 
 
 class UserMe(UserOut):
